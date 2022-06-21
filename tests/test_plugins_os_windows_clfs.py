@@ -46,7 +46,7 @@ def test_clfs_plugin(target_win, fs_win):
     assert last_record_offset == expected_last_record_offset
 
     expected_first_record_data = bytes.fromhex("000000000000000004010000762f16000519ea11a810000d3aa41ef300000000")
-    first_record = bytes.fromhex(records[0].record_data)
+    first_record = records[0].record_data
     assert first_record == expected_first_record_data
 
     expected_first_block_data = bytes.fromhex(
@@ -62,11 +62,11 @@ def test_clfs_plugin(target_win, fs_win):
         00 00 00 00 00 00 00 00
         """
     )
-    first_block_data = bytes.fromhex(records[0].block_data)
+    first_block_data = records[0].block_data
     assert first_block_data == expected_first_block_data
 
     expected_last_record_data = bytes.fromhex("000000000000000004010000762f16000519ea11a810000d3aa41ef300000000")
-    last_record = bytes.fromhex(records[-1].record_data)
+    last_record = records[-1].record_data
     assert last_record == expected_last_record_data
 
     expected_last_block_data = bytes.fromhex(
@@ -82,5 +82,5 @@ def test_clfs_plugin(target_win, fs_win):
         00 00 00 00 00 00 00 00
         """
     )
-    last_block_data = bytes.fromhex(records[-1].block_data)
+    last_block_data = records[-1].block_data
     assert last_block_data == expected_last_block_data
