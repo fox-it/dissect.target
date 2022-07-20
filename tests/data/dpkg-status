@@ -1,0 +1,215 @@
+Package: accountsservice
+Status: install ok installed
+Priority: optional
+Section: admin
+Installed-Size: 452
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 0.6.55-0ubuntu12~20.04.5
+Depends: dbus, libaccountsservice0 (= 0.6.55-0ubuntu12~20.04.5), libc6 (>= 2.4), libglib2.0-0 (>= 2.44), libpolkit-gobject-1-0 (>= 0.99)
+Suggests: gnome-control-center
+Conffiles:
+ /etc/dbus-1/system.d/org.freedesktop.Accounts.conf 06247d62052029ead7d9ec1ef9457f42
+Description: query and manipulate user account information
+ The AccountService project provides a set of D-Bus
+ interfaces for querying and manipulating user account
+ information and an implementation of these interfaces,
+ based on the useradd, usermod and userdel commands.
+Homepage: https://www.freedesktop.org/wiki/Software/AccountsService/
+Original-Maintainer: Debian freedesktop.org maintainers <pkg-freedesktop-maintainers@lists.alioth.debian.org>
+
+Package: acl
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 192
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Multi-Arch: foreign
+Version: 2.2.53-6
+Depends: libacl1 (= 2.2.53-6), libc6 (>= 2.14)
+Description: access control list - utilities
+ This package contains the getfacl and setfacl utilities needed for
+ manipulating access control lists. It also contains the chacl IRIX
+ compatible utility.
+Original-Maintainer: Guillem Jover <guillem@debian.org>
+Homepage: https://savannah.nongnu.org/projects/acl/
+
+Package: acpi-support
+Status: install ok installed
+Priority: optional
+Section: admin
+Installed-Size: 61
+Maintainer: Ubuntu Core developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 0.143
+Depends: acpid (>= 1.0.4-1ubuntu4)
+Recommends: toshset, wireless-tools
+Conflicts: uswsusp (<= 0.2)
+Conffiles:
+ /etc/acpi/asus-keyboard-backlight.sh e39fd5c9c93d49d66463e4c482d0c7fa
+ /etc/acpi/asus-wireless.sh 317925e1305250929f01e52db6c6dc53
+ /etc/acpi/events/asus-keyboard-backlight-down 69fda23d9000b89b1c63d7519fc01052
+ /etc/acpi/events/asus-keyboard-backlight-up a2f58b5ef417e6899a85d6a7046b6dd5
+ /etc/acpi/events/asus-wireless-off 6598947a552de0811797c2a8dda1811f
+ /etc/acpi/events/asus-wireless-on 3b56684384dfe99a2a8facdbb91cda38
+ /etc/acpi/events/ibm-wireless 02e8c71a351441b5eee01295d7b6f226
+ /etc/acpi/events/lenovo-undock 4745d281ecd8026ea03e2b8aabf9d247
+ /etc/acpi/events/thinkpad-cmos 6ada4fc0d4c67b6363a6d564e0e5f13b
+ /etc/acpi/events/tosh-wireless fdd34ccab360946bfcb591721c1ff748
+ /etc/acpi/ibm-wireless.sh beefa7ca7799c4a5fa63d5c3138ac6c9
+ /etc/acpi/tosh-wireless.sh b61716d95c6873f3deb6584344e7f58b
+ /etc/acpi/undock.sh 5c97c8f313160055a3e61e6c72dd521a
+ /etc/default/acpi-support 68b9ed124fb8a7b6a7296dd38ead7806
+Description: scripts for handling many ACPI events
+ This package contains scripts to react to various ACPI events. It only
+ includes scripts for events that can be supported with some level of
+ safety cross platform.
+ .
+ It is able to:
+  * Detect loss and gain of AC power, lid closure, and the press of a
+    number of specific buttons (on Asus, IBM, Lenovo, Panasonic, Sony
+    and Toshiba laptops).
+  * Suspend, hibernate and resume the computer, with workarounds for
+    hardware that needs it.
+  * On some laptops, set screen brightness.
+Original-Maintainer: Bart Samwel <bart@samwel.tk>
+
+Package: acpid
+Status: install ok installed
+Priority: optional
+Section: admin
+Installed-Size: 155
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 1:2.0.32-1ubuntu1
+Depends: libc6 (>= 2.27), lsb-base (>= 3.2-14), kmod
+Pre-Depends: init-system-helpers (>= 1.54~)
+Conffiles:
+ /etc/default/acpid 5b934527919a9bba89c7978d15e918b3
+ /etc/init.d/acpid 2ba41d3445b3052d9d2d170b7a9c30dc
+Description: Advanced Configuration and Power Interface event daemon
+ Modern computers support the Advanced Configuration and Power Interface (ACPI)
+ to allow intelligent power management on your system and to query battery and
+ configuration status.
+ .
+ ACPID is a completely flexible, totally extensible daemon for delivering
+ ACPI events. It listens on netlink interface (or on the deprecated file
+ /proc/acpi/event), and when an event occurs, executes programs to handle the
+ event. The programs it executes are configured through a set of configuration
+ files, which can be dropped into place by packages or by the admin.
+Homepage: http://sourceforge.net/projects/acpid2/
+Original-Maintainer: Josue Ortega <josue@debian.org>
+
+Package: adduser
+Status: install ok installed
+Priority: important
+Section: admin
+Installed-Size: 624
+Maintainer: Ubuntu Core Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: all
+Multi-Arch: foreign
+Version: 3.118ubuntu2
+Depends: passwd, debconf (>= 0.5) | debconf-2.0
+Suggests: liblocale-gettext-perl, perl, ecryptfs-utils (>= 67-1)
+Conffiles:
+ /etc/deluser.conf 773fb95e98a27947de4a95abb3d3f2a2
+Description: add and remove users and groups
+ This package includes the 'adduser' and 'deluser' commands for creating
+ and removing users.
+ .
+  - 'adduser' creates new users and groups and adds existing users to
+    existing groups;
+  - 'deluser' removes users and groups and removes users from a given
+    group.
+ .
+ Adding users with 'adduser' is much easier than adding them manually.
+ Adduser will choose appropriate UID and GID values, create a home
+ directory, copy skeletal user configuration, and automate setting
+ initial values for the user's password, real name and so on.
+ .
+ Deluser can back up and remove users' home directories
+ and mail spool or all the files they own on the system.
+ .
+ A custom script can be executed after each of the commands.
+Original-Maintainer: Debian Adduser Developers <adduser@packages.debian.org>
+
+Package: zip
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 623
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Multi-Arch: foreign
+Version: 3.0-11build1
+Depends: libbz2-1.0, libc6 (>= 2.14)
+Recommends: unzip
+Description: Archiver for .zip files
+ This is InfoZIP's zip program. It produces files that are fully
+ compatible with the popular PKZIP program; however, the command line
+ options are not identical. In other words, the end result is the same,
+ but the methods differ. :-)
+ .
+ This version supports encryption.
+Original-Maintainer: Santiago Vila <sanvila@debian.org>
+Homepage: http://www.info-zip.org/Zip.html
+
+Package: zlib1g
+Status: install ok installed
+Priority: required
+Section: libs
+Installed-Size: 163
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Multi-Arch: same
+Source: zlib
+Version: 1:1.2.11.dfsg-2ubuntu1.2
+Provides: libz1
+Depends: libc6 (>= 2.14)
+Breaks: libxml2 (<< 2.7.6.dfsg-2), texlive-binaries (<< 2009-12)
+Conflicts: zlib1 (<= 1:1.0.4-7)
+Description: compression library - runtime
+ zlib is a library implementing the deflate compression method found
+ in gzip and PKZIP.  This package includes the shared library.
+Homepage: http://zlib.net/
+Original-Maintainer: Mark Brown <broonie@debian.org>
+
+Package: zlib1g-dev
+Status: install ok installed
+Priority: optional
+Section: libdevel
+Installed-Size: 591
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Multi-Arch: same
+Source: zlib
+Version: 1:1.2.11.dfsg-2ubuntu1.2
+Provides: libz-dev
+Depends: zlib1g (= 1:1.2.11.dfsg-2ubuntu1.2), libc6-dev | libc-dev
+Conflicts: zlib1-dev
+Description: compression library - development
+ zlib is a library implementing the deflate compression method found
+ in gzip and PKZIP.  This package includes the development support
+ files.
+Homepage: http://zlib.net/
+Original-Maintainer: Mark Brown <broonie@debian.org>
+
+Package: zstd
+Status: install ok installed
+Priority: optional
+Section: utils
+Installed-Size: 1555
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Source: libzstd
+Version: 1.4.4+dfsg-3ubuntu0.1
+Depends: libc6 (>= 2.16), libgcc-s1 (>= 3.0), liblz4-1 (>= 0.0~r127), liblzma5 (>= 5.1.1alpha+20120614), libstdc++6 (>= 6), zlib1g (>= 1:1.1.4)
+Description: fast lossless compression algorithm -- CLI tool
+ Zstd, short for Zstandard, is a fast lossless compression algorithm, targeting
+ real-time compression scenarios at zlib-level compression ratio.
+ .
+ This package contains the CLI program implementing zstd.
+Homepage: https://github.com/facebook/zstd
+Original-Maintainer: Debian Med Packaging Team <debian-med-packaging@lists.alioth.debian.org>
+

@@ -1,0 +1,4 @@
+bitlocker,passphrase,,Password1234
+,passphrase,,AnotherTestPassword
+Bitlocker,recovery_key,,312268-409816-583517-486695-627121-599511-664389-145640
+bitlocker,recovery_key,,312268-409816-583517-486695-627121-599511-664389-145640,what,

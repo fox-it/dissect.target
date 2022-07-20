@@ -1,0 +1,4 @@
+exclude .gitignore
+exclude .github
+
+graft autocompletion/
