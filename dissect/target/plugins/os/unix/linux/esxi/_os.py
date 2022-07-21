@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gzip
 import json
 import lzma
@@ -5,6 +7,7 @@ import struct
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
+from typing import Any, BinaryIO, Dict, Iterator, List, Optional, TextIO
 
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
@@ -17,10 +20,12 @@ try:
 except ImportError:
     HAS_ENVELOPE = False
 
+from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems import tar
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import arg, export, internal
-from dissect.target.plugins.os.unix._os import LinuxPlugin
+from dissect.target.plugin import OperatingSystem, arg, export, internal
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.target import Target
 
 VirtualMachineRecord = TargetRecordDescriptor(
     "esxi/vm",
@@ -44,7 +49,7 @@ class ESXiPlugin(LinuxPlugin):
         9: vmkcore (ESXi 6)
     """
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._config = None
         self._configstore = None
@@ -60,7 +65,7 @@ class ESXiPlugin(LinuxPlugin):
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
 
-    def _cfg(self, path):
+    def _cfg(self, path: str) -> Optional[str]:
         if not self._config:
             raise ValueError("No ESXi config!")
 
@@ -73,7 +78,7 @@ class ESXiPlugin(LinuxPlugin):
         return obj.get(value_name) if obj else None
 
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         bootbanks = [
             fs for fs in target.filesystems if fs.path("boot.cfg").exists() and list(fs.path("/").glob("*.v00"))
         ]
@@ -84,7 +89,7 @@ class ESXiPlugin(LinuxPlugin):
         return cfgs[0][0] if cfgs else None
 
     @classmethod
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> ESXiPlugin:
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
         # Create a root layer for the "local state" filesystem
@@ -108,15 +113,15 @@ class ESXiPlugin(LinuxPlugin):
         return obj
 
     @export(property=True)
-    def hostname(self):
+    def hostname(self) -> str:
         return self._cfg("/adv/Misc/HostName").split(".", 1)[0]
 
     @export(property=True)
-    def domain(self):
+    def domain(self) -> Optional[str]:
         return self._cfg("/adv/Misc/HostName").partition(".")[2] or None
 
     @export(property=True)
-    def ips(self):
+    def ips(self) -> List[str]:
         result = set()
         host_ip = self._cfg("/adv/Misc/HostIPAddr")
         mgmt_ip = self._cfg("/adv/Net/ManagementAddr")
@@ -129,7 +134,7 @@ class ESXiPlugin(LinuxPlugin):
         return list(result)
 
     @export(property=True)
-    def version(self):
+    def version(self) -> Optional[str]:
         boot_cfg = self.target.fs.path("/bootbank/boot.cfg")
         if not boot_cfg.exists():
             return None
@@ -142,7 +147,7 @@ class ESXiPlugin(LinuxPlugin):
             return f"VMware ESXi {version.strip()}"
 
     @export(record=VirtualMachineRecord)
-    def vm_inventory(self):
+    def vm_inventory(self) -> Iterator[VirtualMachineRecord]:
         inv_file = self.target.fs.path("/etc/vmware/hostd/vmInventory.xml")
         if not inv_file.exists():
             return []
@@ -157,7 +162,7 @@ class ESXiPlugin(LinuxPlugin):
     @export(output="none")
     @arg("path", help="config path")
     @arg("--as-json", action="store_true", help="format as json")
-    def esxconf(self, path, as_json):
+    def esxconf(self, path: str, as_json: bool) -> None:
         obj = self._cfg(path)
 
         if as_json:
@@ -166,15 +171,15 @@ class ESXiPlugin(LinuxPlugin):
             print(obj)
 
     @internal
-    def configstore(self):
+    def configstore(self) -> Dict[str, Any]:
         return self._configstore
 
     @export(property=True)
     def os(self):
-        return "esxi"
+        return OperatingSystem.ESXI.value
 
 
-def _mount_modules(target, sysvol, cfg):
+def _mount_modules(target: Target, sysvol: Filesystem, cfg: Dict[str, str]):
     modules = [m.strip() for m in cfg["modules"].split("---")]
 
     for module in modules:
@@ -201,7 +206,7 @@ def _mount_modules(target, sysvol, cfg):
             target.fs.add_layer().mount("/", tfs)
 
 
-def _mount_local(target, local_layer):
+def _mount_local(target: Target, local_layer: VirtualFilesystem):
     local_tgz = target.fs.path("local.tgz")
     local_fs = None
 
@@ -226,7 +231,7 @@ def _mount_local(target, local_layer):
         local_layer.mount("/", local_fs)
 
 
-def _mount_filesystems(target, sysvol, cfg):
+def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: Dict[str, str]):
     version = cfg["build"]
 
     osdata_fs = None
@@ -305,7 +310,7 @@ def _mount_filesystems(target, sysvol, cfg):
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
 
 
-def _link_log_dir(target, cfg, plugin_obj):
+def _link_log_dir(target: Target, cfg: Dict[str, str], plugin_obj: ESXiPlugin):
     version = cfg["build"]
 
     # Don't really know how ESXi does this, but let's just take a shortcut for now
@@ -336,7 +341,7 @@ def _link_log_dir(target, cfg, plugin_obj):
         target.fs.symlink(log_dir, "/var/log")
 
 
-def parse_boot_cfg(fh):
+def parse_boot_cfg(fh: TextIO) -> Dict[str, str]:
     cfg = {}
     for line in fh:
         line = line.strip()
@@ -350,7 +355,7 @@ def parse_boot_cfg(fh):
     return cfg
 
 
-def parse_esx_conf(fh):
+def parse_esx_conf(fh: TextIO) -> Dict[str, Any]:
     config = {}
     for line in fh:
         line = line.strip()
@@ -375,7 +380,7 @@ def parse_esx_conf(fh):
     return config
 
 
-def _traverse(path, obj, create=False):
+def _traverse(path: str, obj: Dict[str, Any], create: bool = False):
     parts = path.strip("/").split("/")
     path_parts = parts[:-1]
     for part in path_parts:
@@ -402,7 +407,7 @@ def _traverse(path, obj, create=False):
     return obj
 
 
-def parse_config_store(fh):
+def parse_config_store(fh: BinaryIO) -> Dict[str, Any]:
     db = sqlite3.SQLite3(fh)
 
     store = {}

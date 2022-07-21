@@ -2,6 +2,7 @@
 
 See dissect/target/plugins/general/example.py for an example plugin.
 """
+import enum
 import functools
 import importlib
 import logging
@@ -56,6 +57,19 @@ class Category:
     PERSISTENCE = "persistence"
 
 
+class OperatingSystem(enum.Enum):
+    LINUX = "linux"
+    WINDOWS = "windows"
+    ESXI = "exsi"
+    BSD = "bsd"
+    OSX = "osx"
+    UNIX = "unix"
+    ANDROID = "android"
+    VYOS = "vyos"
+    IOS = "ios"
+    FORTIGATE = "fortigate"
+
+
 def export(*args, **kwargs):
     """Decorator to be used on Plugin functions that should be exported.
 
@@ -87,6 +101,21 @@ def export(*args, **kwargs):
         if kwargs.get("property", False):
             obj = property(obj)
 
+        return obj
+
+    if len(args) == 1:
+        return decorator(args[0])
+    else:
+        return decorator
+
+
+def internal(*args, **kwargs):
+    """Decorator to be used on Plugin functions that should be internal only."""
+
+    def decorator(obj):
+        obj.__internal__ = True
+        if kwargs.get("property", False):
+            obj = property(obj)
         return obj
 
     if len(args) == 1:
@@ -186,16 +215,30 @@ class OSPlugin(Plugin):
         """OSPlugin's use a different compatibility check, override the default one."""
         return True
 
-    def detect(cls, fs):
-        """Provide detection of this OSPlugin on a given filesystem.
+    @internal(property=True)
+    def os_all(self):
+        """Walk the OSPlugin MRO and return a list of all detected operating systems.
+
+        Returns:
+            A list of static os strings detected, like 'windows', 'linux', 'bsd'
+        """
+        os_objects = []
+
+        for os_plugin in self.__class__.__mro__:
+            if issubclass(os_plugin, OSPlugin) and os_plugin is not OSPlugin:
+                os_objects.append(os_plugin.os.__get__(self))
+        return os_objects
+
+    def detect(cls, target):
+        """Provide detection of this OSPlugin on a given target.
 
         Note: must be implemented as a classmethod.
 
         Args:
-            fs: Filesystem to detect the OS on.
+            target: Target to detect the OS on.
 
         Returns:
-            True if the OS was detected on the filesystem, else False.
+            The filesystem of the OS that was detected, else None
         """
         raise NotImplementedError
 
@@ -207,6 +250,9 @@ class OSPlugin(Plugin):
         Args:
             target: The Target object.
             sysvol: The filesystem that was detected in the detect() function.
+
+        Returns:
+            An instance of this OSPlugin class.
         """
         raise NotImplementedError
 
@@ -241,7 +287,24 @@ class OSPlugin(Plugin):
     def os(self):
         """Required OS function. Returns a slug of the OS name, e.g. 'windows' or 'linux'.
 
-        Implementations must be decorated with export(property=True)
+        Implementations must be decorated with @export(property=True)
+        """
+        raise NotImplementedError
+
+    def architecture(self):
+        """Required OS function. Return the target triples of a system as a string. Of which the vendor can be optional.
+
+        Implementations must be decorated with @export(property=True)
+
+        Returns:
+            String: machine-vendor-os
+        """
+        raise NotImplementedError
+
+    def distribution(self):
+        """Required OS function. Return a slug of the distribution name of the system, e.g. 'Debian' or 'Gentoo'
+
+        Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
@@ -313,21 +376,6 @@ def register(plugincls):
     root["namespace"] = plugincls.__namespace__
     root["categories"] = plugincls.__categories__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
-
-
-def internal(*args, **kwargs):
-    """Decorator to be used on Plugin functions that should be internal only."""
-
-    def decorator(obj):
-        obj.__internal__ = True
-        if kwargs.get("property", False):
-            obj = property(obj)
-        return obj
-
-    if len(args) == 1:
-        return decorator(args[0])
-    else:
-        return decorator
 
 
 def _cache_function(func):

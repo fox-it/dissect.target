@@ -1,8 +1,15 @@
+from __future__ import annotations
+
 import gzip
 import os
 import socket
+from typing import BinaryIO, List, Iterator, Optional
 
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.filesystem import Filesystem
+from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.plugin import export, OperatingSystem
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.target import Target
 
 
 def netmask_to_bits(netmask):
@@ -100,14 +107,11 @@ class FortigateConfig:
                     path += part
 
                 path.append(p[1])
-
-                # print path
-
                 self.config.set(path, p[2:])
 
 
-class FortigatePlugin(OSPlugin):
-    def __init__(self, target):
+class FortigatePlugin(LinuxPlugin):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
 
@@ -115,10 +119,15 @@ class FortigatePlugin(OSPlugin):
         self.config = FortigateConfig(fp)
         fp.close()
 
-    def users(self):
+    @export(record=UnixUserRecord)
+    def users(self) -> Iterator[UnixUserRecord]:
         raise NotImplementedError()
 
-    def open_config(self):
+    @export(property=True)
+    def os(self) -> str:
+        return OperatingSystem.FORTIGATE.value
+
+    def open_config(self) -> BinaryIO:
         fs = self.target.filesystems[0]
         if fs.exists("system.conf"):
             fp = fs.open("system.conf")
@@ -133,7 +142,7 @@ class FortigatePlugin(OSPlugin):
         return fp
 
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
             if fs.exists("/config") and fs.exists("/rootfs.gz"):
                 return fs
@@ -141,16 +150,16 @@ class FortigatePlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> FortigatePlugin:
         target.fs.mount("/", sysvol)
         return cls(target)
 
     @export(property=True)
-    def hostname(self):
+    def hostname(self) -> str:
         return self.config.config.system["global"].hostname[0]
 
     @export(property=True)
-    def ips(self):
+    def ips(self) -> List[str]:
         r = []
         for _, conf in self.config.config.system.interface.children.items():
             if "ip" in conf:
@@ -158,13 +167,9 @@ class FortigatePlugin(OSPlugin):
         return r
 
     @export(property=True)
-    def version(self):
+    def version(self) -> str:
         fp = self.open_config()
         r = fp.readline().split("=")[1].rsplit("-", 1)[0]
         fp.close()
 
         return "Fortigate " + r
-
-    @export(property=True)
-    def os(self):
-        return "fortigate"

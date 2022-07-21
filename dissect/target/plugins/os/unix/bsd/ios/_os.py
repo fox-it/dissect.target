@@ -1,6 +1,6 @@
 import plistlib
 
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OSPlugin, export, OperatingSystem
 
 
 class IOSPlugin(OSPlugin):
@@ -41,4 +41,4 @@ class IOSPlugin(OSPlugin):
 
     @export(property=True)
     def os(self):
-        return "ios"
+        return OperatingSystem.IOS.value
