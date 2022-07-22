@@ -54,6 +54,7 @@ setup(
     install_requires=[
         "dissect.cstruct>=3.0.dev,<4.0.dev",
         "dissect.eventlog>=3.0.dev,<4.0.dev",
+        "dissect.shellitem>=3.0.dev,<4.0.dev",
         "dissect.evidence>=3.0.dev,<4.0.dev",
         "dissect.ntfs>=3.0.dev,<4.0.dev",
         "dissect.regf>=3.0.dev,<4.0.dev",
