@@ -102,7 +102,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        for entry in self.dereference().iterdir(ignore_dos):
+        for entry in self.dereference().iterdir(ignore_dos=ignore_dos):
             if entry.attribute.file_name == ".":
                 continue
 
