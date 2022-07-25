@@ -60,7 +60,7 @@ __target_help() {
 
     COMPREPLY=()
     cur=${COMP_WORDS[COMP_CWORD]}
-    options=$(${COMP_WORDS[0]} --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
+    options=$(${COMP_WORDS[0]} --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
 
     case "${cur}" in
     -*)
@@ -70,7 +70,7 @@ __target_help() {
 }
 
 #######################################
-# Autocomplete target-query entries
+# Autocomplete target-* entries with a --function
 # sets COMPREPLY for completion argument
 # Globals:
 #   COMPREPLY
@@ -78,7 +78,7 @@ __target_help() {
 # Arguments:
 #   None
 #######################################
-__target_query ()
+__target_function ()
 {
     local cur prev
     # Set compreply to command line arguments if -* is detected
@@ -89,7 +89,7 @@ __target_query ()
 
     # Store plugin in global variable, so it only gets executed once
     if [[ -z ${DISSECT_PLUGINS+x} ]]; then
-        DISSECT_PLUGINS=$(target-query --list | grep ' -' | awk '{print $1}')
+        DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
     fi
 
     case "${prev}" in
@@ -101,10 +101,11 @@ __target_query ()
 }
 
 
-complete -F __target_query -o filenames -o default target-query
+complete -F __target_function -o filenames -o default target-query
 
 complete -F __target_help -o filenames -o default target-dd
 complete -F __target_help -o filenames -o default target-fs
+complete -F __target_function -o filenames -o default target-dump
 complete -F __target_help -o filenames -o default target-mount
 complete -F __target_help -o filenames -o default target-reg
 complete -F __target_help -o filenames -o default target-shell
