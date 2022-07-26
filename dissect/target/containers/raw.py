@@ -1,11 +1,13 @@
 import io
+from pathlib import Path
+from typing import BinaryIO, Union
 
 from dissect.target.container import Container
 from dissect.util.stream import AlignedStream, BufferedStream
 
 
 class RawContainer(Container):
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         if not hasattr(fh, "read"):
             fh = fh.open("rb")
 
@@ -29,9 +31,9 @@ class RawContainer(Container):
         super().__init__(fh, size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh, original):
+    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return True
 
     @staticmethod
-    def detect_path(path, original):
+    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
         return True
