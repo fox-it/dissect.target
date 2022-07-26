@@ -7,6 +7,7 @@ from dissect.target.container import Container
 
 
 def find_files(path: Path) -> List[Path]:
+    path = path.resolve()
     return sorted([f for f in path.parent.glob(path.stem + ".*") if f.suffix[1:].isdigit()])
 
 
