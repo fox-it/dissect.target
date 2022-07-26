@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import os
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
 
 from dissect.target import filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
@@ -17,6 +19,8 @@ from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
 from dissect.target.plugins.general import default
 
 log = logging.getLogger(__name__)
+
+FunctionTuple = tuple[plugin.Plugin, Optional[Union[plugin.Plugin, property]]]
 
 
 class Event(StrEnum):
@@ -38,6 +42,12 @@ class TargetLogAdapter(logging.LoggerAdapter):
 
 
 class Target:
+    """The class where all the magic happens.
+
+    Args:
+        path: The location of an file-like object.
+    """
+
     def __init__(self, path: Union[str, Path] = None):
         # WIP, part of the introduction of URI-style paths.
         # Since pathlib.Path does not support URIs, bigger refactoring
@@ -47,15 +57,15 @@ class Target:
         if self.path is not None:
             self.path = Path(self.path)
 
-        self.props = dict()
+        self.props: dict[Any, Any] = dict()
         self.log = getlogger(self)
 
         self._name = None
-        self._plugins = []
-        self._functions = {}
+        self._plugins: list[plugin.Plugin] = []
+        self._functions: dict[str, FunctionTuple] = {}
         self._loader = None
-        self._os_plugin = None
-        self._child_plugins = {}
+        self._os_plugin: plugin.OSPlugin = None
+        self._child_plugins: dict[str, plugin.Plugin] = {}
         self._cache = dict()
         self._errors = []
         self._applied = False
@@ -86,14 +96,14 @@ class Target:
         self.fs = filesystem.RootFilesystem(self)
 
     @classmethod
-    def set_event_callback(cls, *, event_type: Optional[Event] = None, event_callback: Callable):
+    def set_event_callback(cls, *, event_type: Optional[Event] = None, event_callback: Callable) -> None:
         if not hasattr(cls, "event_callbacks"):
             cls.event_callbacks = defaultdict(set)
 
         # When `event_type` is not set or is None, the callback is a catch-all callback
         cls.event_callbacks[event_type].add(event_callback)
 
-    def send_event(self, event_type: Event, **kwargs):
+    def send_event(self, event_type: Event, **kwargs) -> None:
         cls = type(self)
         if not hasattr(cls, "event_callbacks"):
             return
@@ -107,7 +117,7 @@ class Target:
             except Exception:
                 self.log.warning(f"Can't send event {event_type} to {callback}", exc_info=True)
 
-    def apply(self):
+    def apply(self) -> None:
         self.disks.apply()
         self.volumes.apply()
         self._init_os()
@@ -161,7 +171,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path):
+    def open(cls, path: Union[str, Path]) -> Target:
         """Try to find a suitable loader for the given path and load a Target from it.
 
         Args:
@@ -177,7 +187,7 @@ class Target:
         return cls.open_raw(path)
 
     @classmethod
-    def open_raw(cls, path):
+    def open_raw(cls, path: Union[str, Path]) -> Target:
         """Open a Target with the given path using the RawLoader.
 
         Args:
@@ -189,7 +199,7 @@ class Target:
         return cls._load(path, loader.RawLoader(path))
 
     @classmethod
-    def open_all(cls, paths, include_children=False):
+    def open_all(cls, paths: list[Union[str, Path]], include_children: bool = False) -> Iterator[Target]:
         """Yield targets from a list of paths.
 
         If the path is a directory, iterate files one directory deep.
@@ -201,7 +211,7 @@ class Target:
             TargetError: Raised when not a single target can be loaded.
         """
 
-        def _find(find_path):
+        def _find(find_path: Path):
             yield find_path
 
             if find_path.is_dir():
@@ -274,7 +284,7 @@ class Target:
         if not loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
-    def _load_child_plugins(self):
+    def _load_child_plugins(self) -> None:
         if self._child_plugins:
             return
 
@@ -292,7 +302,7 @@ class Target:
                 self.log.exception("Broken child plugin: %s", plugin_desc["class"])
                 continue
 
-    def open_child(self, child):
+    def open_child(self, child: Union[str, Path]) -> Target:
         if isinstance(child, str) and child.isdecimal():
             child_num = int(child)
             for child_record in self.list_children():
@@ -302,7 +312,7 @@ class Target:
         else:
             return Target.open(self.fs.path(child))
 
-    def open_children(self, recursive=False):
+    def open_children(self, recursive: bool = False) -> Iterator[Target]:
         for child in self.list_children():
             try:
                 target = self.open_child(child.path)
@@ -321,7 +331,7 @@ class Target:
             yield from child_plugin.list_children()
 
     @classmethod
-    def _load(cls, path, ldr):
+    def _load(cls, path: Union[str, Path], ldr: loader.Loader) -> Target:
         """Internal function that attemps to load a path using a given loader."""
         target = cls(path)
 
@@ -333,7 +343,7 @@ class Target:
         except Exception as e:
             raise TargetError(f"Failed to load target: {path}", cause=e)
 
-    def _init_os(self):
+    def _init_os(self) -> None:
         """Internal function that attemps to load an OSPlugin for this target."""
         if self._os_plugin:
             self.add_plugin(self._os_plugin)
@@ -388,7 +398,7 @@ class Target:
             self.log.warning("Failed to find OS plugin, falling back to default")
             self.add_plugin(default.DefaultPlugin)
 
-    def add_plugin(self, plugin_cls, check_compatible=True):
+    def add_plugin(self, plugin_cls: type[plugin.Plugin], check_compatible: bool = True) -> None:
         """Add and register a plugin by class.
 
         Args:
@@ -428,7 +438,7 @@ class Target:
 
         self._register_plugin_functions(p)
 
-    def _register_plugin_functions(self, plugin_inst):
+    def _register_plugin_functions(self, plugin_inst: plugin.Plugin) -> None:
         """Internal function that registers all the exported functions from a given plugin.
 
         Args:
@@ -445,7 +455,7 @@ class Target:
                 # If we getattr here, property members will be executed, so we do that in __getattr__
                 self._functions[func] = (plugin_inst, None)
 
-    def get_function(self, function):
+    def get_function(self, function: str) -> FunctionTuple:
         """Attempt to get a given function.
 
         If the function is not already registered, look for plugins that export the function and register them.
@@ -497,7 +507,7 @@ class Target:
 
         return p, func
 
-    def has_function(self, function):
+    def has_function(self, function: str) -> bool:
         """Return whether this Target supports a given function.
 
         Args:
@@ -509,7 +519,7 @@ class Target:
         except PluginError:
             return False
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str) -> Union[plugin.Plugin, Any]:
         p, func = self.get_function(attr)
 
         if isinstance(func, property):
