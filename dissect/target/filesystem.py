@@ -842,7 +842,10 @@ class VirtualFileHandle(io.RawIOBase):
         self.seek(0)
 
     def readinto(self, b):
-        return self.fh.readinto(b)
+        data = self.fh.read(len(b))
+        size = len(data)
+        b[:size] = data
+        return size
 
     def seek(self, offset, whence=io.SEEK_SET):
         return self.fh.seek(offset, whence)
