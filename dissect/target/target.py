@@ -15,6 +15,7 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import config
+from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
 from dissect.target.plugins.general import default
 
@@ -42,10 +43,17 @@ class TargetLogAdapter(logging.LoggerAdapter):
 
 
 class Target:
-    """The class where all the magic happens.
+    """The class that represents the image that you are talking to.
+
+    Targets are the glue that connects the different ``Containers``, ``Loaders``, ``Volumes``
+    and ``Filesystems`` together.
+    ``Containers`` use ``Loaders`` to map the ``Volumes`` and ``Filesystems`` of the target onto the target.
+
+    Additionally, the plugins of dissect get mapped onto the ``Target`` too.
+    By executing the plugin function with a target, it will perform the function on itself.
 
     Args:
-        path: The location of an file-like object.
+        path: The location of a file-like object that contains an image.
     """
 
     def __init__(self, path: Union[str, Path] = None):
@@ -65,7 +73,7 @@ class Target:
         self._functions: dict[str, FunctionTuple] = {}
         self._loader = None
         self._os_plugin: plugin.OSPlugin = None
-        self._child_plugins: dict[str, plugin.Plugin] = {}
+        self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}
         self._cache = dict()
         self._errors = []
         self._applied = False
@@ -97,6 +105,18 @@ class Target:
 
     @classmethod
     def set_event_callback(cls, *, event_type: Optional[Event] = None, event_callback: Callable) -> None:
+        """Sets ``event_callbacks`` on a Target class.
+
+        ``event_callbacks`` get used to handle specific events denoted by :class:`Event`.
+        This records events releated to the plugins.
+        It detecs whether:
+
+        - a plugin gets registered to the target
+        - a plugin is incompatible with the target
+        - a function succeededs in its execution
+        - a function fails in execution
+
+        """
         if not hasattr(cls, "event_callbacks"):
             cls.event_callbacks = defaultdict(set)
 
@@ -104,6 +124,14 @@ class Target:
         cls.event_callbacks[event_type].add(event_callback)
 
     def send_event(self, event_type: Event, **kwargs) -> None:
+        """Call the event callbacks if a specific ``event_type`` occured.
+
+        Each event can have multiple callback methods, it calls all the callbacks that fit the corresponding event type.
+        ``None`` is a catch-all method for event callbacks that always get called.
+
+        Args:
+            event_type: The type of event
+        """
         cls = type(self)
         if not hasattr(cls, "event_callbacks"):
             return
@@ -118,6 +146,7 @@ class Target:
                 self.log.warning(f"Can't send event {event_type} to {callback}", exc_info=True)
 
     def apply(self) -> None:
+        """Link all the disks and volumes to the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
         self._init_os()
@@ -146,6 +175,9 @@ class Target:
         The function is guaranteed to give back some name.
         The name will be guaranteed to not have slashes, backslashes and spaces.
         The name won't be guaranteed to be unique.
+
+        Returns:
+            The name of a target.
         """
         if self._name:
             return self._name
@@ -172,10 +204,13 @@ class Target:
 
     @classmethod
     def open(cls, path: Union[str, Path]) -> Target:
-        """Try to find a suitable loader for the given path and load a Target from it.
+        """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
-            path: Path to load the Target from.
+            path: the location of the file we want to load.
+
+        Returns:
+            A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
         if not isinstance(path, Path):
             path = Path(path)
@@ -188,7 +223,7 @@ class Target:
 
     @classmethod
     def open_raw(cls, path: Union[str, Path]) -> Target:
-        """Open a Target with the given path using the RawLoader.
+        """Open a Target with the given path using the :class:`~dissect.target.loaders.raw.RawLoader`.
 
         Args:
             path: Path to load the Target from.
@@ -205,10 +240,10 @@ class Target:
         If the path is a directory, iterate files one directory deep.
 
         Args:
-            paths: List of paths to load targets from.
+            paths: a list of paths to load ``Targets`` from.
 
         Raises:
-            TargetError: Raised when not a single target can be loaded.
+            TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
         def _find(find_path: Path):
@@ -285,6 +320,14 @@ class Target:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
     def _load_child_plugins(self) -> None:
+        """Load special :class:`~dissect.target.plugin.ChildTargetPlugin` plugins.
+
+        These plugins inform the Target how to deal with the children of a Hypervisor.
+        Examples of these plugins are:
+
+        - :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin`
+        - :class:`~dissect.target.plugins.child.hyper-v.HyperVChildTargetPlugin`
+        """
         if self._child_plugins:
             return
 
@@ -303,6 +346,14 @@ class Target:
                 continue
 
     def open_child(self, child: Union[str, Path]) -> Target:
+        """Open a child target.
+
+        Args:
+            child: The location of a ``Target`` on the current ``Target``.
+
+        Returns:
+            A Target object the data from the child target.
+        """
         if isinstance(child, str) and child.isdecimal():
             child_num = int(child)
             for child_record in self.list_children():
@@ -313,6 +364,17 @@ class Target:
             return Target.open(self.fs.path(child))
 
     def open_children(self, recursive: bool = False) -> Iterator[Target]:
+        """Open all the child Targets on a Target.
+
+        Here we assume that the current ``Target`` is on a Hypervisor.
+        It opens all the ``Targets`` relative to itself.
+
+        Args:
+            recursive: Whether to check the child ``Target`` for more ``Targets``.
+
+        Returns:
+            An interator of ``Targets``.
+        """
         for child in self.list_children():
             try:
                 target = self.open_child(child.path)
@@ -325,14 +387,26 @@ class Target:
             if recursive:
                 yield from target.open_children(recursive=recursive)
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
+        """Lists all Targets, that our :class:`~dissect.target.plugin.ChildTargetPlugin` classes can interpret."""
         self._load_child_plugins()
         for child_plugin in self._child_plugins.values():
             yield from child_plugin.list_children()
 
     @classmethod
     def _load(cls, path: Union[str, Path], ldr: loader.Loader) -> Target:
-        """Internal function that attemps to load a path using a given loader."""
+        """Internal function that attemps to load a path using a given loader.
+
+        Args:
+            path: The path to the target image.
+            ldr: The loader used to load this target.
+
+        Raises:
+            TargetError: If it failed to load a target.
+
+        Returns:
+            A Target object containing Disks, Volumes, and the Filesystem contained by the image pointed to by ``path``.
+        """
         target = cls(path)
 
         try:
@@ -403,7 +477,7 @@ class Target:
 
         Args:
             plugin_cls: Class of the plugin to add and register.
-            check_compatible:
+            check_compatible: A flag that determines if we check whether the plugin is compatible with the ``Target``.
 
         Raises:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
@@ -463,6 +537,9 @@ class Target:
         Args:
             function: Function name to look for.
 
+        Returns:
+            A tuple of the plugin and the corresponding function.
+
         Raises:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
             PluginError: Raised when any other exception occurs while trying to load the plugin.
@@ -511,7 +588,10 @@ class Target:
         """Return whether this Target supports a given function.
 
         Args:
-            function: Function name to look for
+            function: The function name to look for.
+
+        Returns:
+            ``True`` if the function can be found, ``False`` otherwise.
         """
         try:
             self.get_function(function)
@@ -520,6 +600,7 @@ class Target:
             return False
 
     def __getattr__(self, attr: str) -> Union[plugin.Plugin, Any]:
+        """Override of the default __getattr__ so plugins and functions can be callef from a ``Target`` object."""
         p, func = self.get_function(attr)
 
         if isinstance(func, property):
