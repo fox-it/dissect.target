@@ -39,12 +39,12 @@ class Container(io.IOBase):
     Override ``__init__`` for any opening that you may need to do, but don't forget to initialize the super class.
 
     Args:
-        fh: The source file-like object of the container.
+        fh: The source file-like object of the container or a ``Path`` object to the file.
         size: The size of the container.
         vs: An optional shorthand to set the underlying volume system, usually set later.
     """
 
-    def __init__(self, fh: BinaryIO, size: int, vs: VolumeSystem = None):
+    def __init__(self, fh: Union[BinaryIO, Path], size: int, vs: VolumeSystem = None):
         self.fh = fh
         self.size = size
 
@@ -79,7 +79,7 @@ class Container(io.IOBase):
 
         Args:
             fh: A file-like object that we want to open a ``Container`` on.
-            original: The location where the file-like object comes from.
+            original: The original argument passed to ``detect()``.
 
         Returns:
             ``True`` if this ``Container`` can be used for this file-like object, ``False`` otherwise.
@@ -96,7 +96,7 @@ class Container(io.IOBase):
 
         Args:
             path: A location to a file.
-            original: The location where the file-like object comes from.
+            original: The original argument passed to ``detect()``.
 
         Returns:
             ``True`` if this ``Container`` can be used for this path, ``False`` otherwise.
@@ -165,8 +165,8 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         raw.RawContainer,
     ]
     if isinstance(item, list):
-        item = [Path(entry) if not isinstance(entry, Path) else entry for entry in item]
-    elif not isinstance(item, Path):
+        item = [Path(entry) if isinstance(entry, str) else entry for entry in item]
+    elif isinstance(item, str):
         item = Path(item)
 
     for container in containers:
