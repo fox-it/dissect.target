@@ -1,10 +1,11 @@
 import io
 import logging
-from typing import List
+from typing import ByteString, List
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 
 disk = import_lazy("dissect.target.volumes.disk")
 lvm = import_lazy("dissect.target.volumes.lvm")
@@ -40,6 +41,9 @@ class VolumeSystem:
         Volume system implementations must implement this and yield all valid found partitions
         """
         raise NotImplementedError()
+
+    def readinto(self, b: ByteString) -> int:
+        return readinto(buffer=b, fh=self.fh)
 
     @property
     def volumes(self):

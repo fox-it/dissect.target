@@ -16,6 +16,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 from dissect.target.volume import Volume
 
 ntfs = import_lazy("dissect.target.filesystems.ntfs")
@@ -842,10 +843,7 @@ class VirtualFileHandle(io.RawIOBase):
         self.seek(0)
 
     def readinto(self, b):
-        data = self.fh.read(len(b))
-        size = len(data)
-        b[:size] = data
-        return size
+        return readinto(b, self.fh)
 
     def seek(self, offset, whence=io.SEEK_SET):
         return self.fh.seek(offset, whence)

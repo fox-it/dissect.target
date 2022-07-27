@@ -1,9 +1,9 @@
 import stat
-from unittest.mock import Mock, mock_open
+from unittest.mock import Mock
 
 import pytest
 from dissect.target.exceptions import SymlinkRecursionError
-from dissect.target.filesystem import VirtualFile, VirtualFileHandle, VirtualFilesystem
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
 from dissect.target.filesystems.ffs import FfsFilesystemEntry
 from dissect.target.filesystems.tar import TarFilesystemEntry
@@ -245,16 +245,3 @@ def test_filesystem_link_resolve(entry, link_dict):
     vfs.map_file_entry(vfspath="path/to/target", entry=actual_file)
 
     assert link.readlink_ext() == actual_file
-
-
-def test_filesystem_readinto():
-    vfs = VirtualFilesystem()
-    data = b"hello_world"
-    mocked_file = mock_open(read_data=b"hello_world")
-    vfs.map_file_fh(vfspath="path/to/target", fh=mocked_file.return_value)
-
-    virtual_file: VirtualFileHandle = vfs.open("path/to/target")
-    buffer = bytearray([0] * 512)
-    assert virtual_file.readinto(buffer) == len(data)
-    assert buffer[: len(data)] == data
-    assert len(buffer) == 512

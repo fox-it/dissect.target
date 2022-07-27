@@ -3,10 +3,11 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO, ByteString, Union
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
     from dissect.target.volume import VolumeSystem
@@ -138,6 +139,9 @@ class Container(io.IOBase):
         Override this if you need to clean-up anything.
         """
         raise NotImplementedError()
+
+    def readinto(self, b: ByteString) -> int:
+        return readinto(buffer=b, fh=self.fh)
 
 
 def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
