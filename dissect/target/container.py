@@ -141,6 +141,7 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
     def readinto(self, b: ByteString) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
         return readinto(buffer=b, fh=self.fh)
 
 

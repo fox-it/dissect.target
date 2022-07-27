@@ -843,6 +843,7 @@ class VirtualFileHandle(io.RawIOBase):
         self.seek(0)
 
     def readinto(self, b):
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
         return readinto(b, self.fh)
 
     def seek(self, offset, whence=io.SEEK_SET):
