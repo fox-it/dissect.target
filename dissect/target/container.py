@@ -108,6 +108,10 @@ class Container(io.IOBase):
         """Read a ``length`` of bytes from ``fh``"""
         raise NotImplementedError()
 
+    def readinto(self, b: bytearray) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
+        return readinto(buffer=b, fh=self)
+
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         """Change the stream positition.
 
@@ -139,10 +143,6 @@ class Container(io.IOBase):
         Override this if you need to clean-up anything.
         """
         raise NotImplementedError()
-
-    def readinto(self, b: bytearray) -> int:
-        """Uses :func:`dissect.target.helpers.utils.readinto`."""
-        return readinto(buffer=b, fh=self)
 
 
 def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):

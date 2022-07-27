@@ -36,7 +36,7 @@ def slugify(name: str) -> str:
 
 
 def readinto(buffer: bytearray, fh: BinaryIO) -> int:
-    """A readinto implementation as used in cpython.
+    """A readinto implementation that uses ``read()``.
 
     Reads the length of the buffer from ``fh``, and fills the buffer with said data.
 
