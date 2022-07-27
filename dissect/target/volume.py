@@ -122,7 +122,7 @@ class Volume(io.IOBase):
     def read(self, length):
         return self.fh.read(length)
 
-    def readinto(self, b: bytes) -> int:
+    def readinto(self, b: bytearray) -> int:
         """Uses :func:`dissect.target.helpers.utils.readinto`."""
         return readinto(buffer=b, fh=self)
 

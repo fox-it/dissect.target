@@ -1,7 +1,7 @@
 import re
 import urllib.parse
 from enum import Enum
-from typing import BinaryIO, ByteString
+from typing import BinaryIO
 
 
 class StrEnum(str, Enum):
@@ -35,7 +35,7 @@ def slugify(name: str) -> str:
     return SLUG_RE.sub("_", name)
 
 
-def readinto(buffer: ByteString, fh: BinaryIO) -> int:
+def readinto(buffer: bytearray, fh: BinaryIO) -> int:
     """A readinto implementation as used in cpython.
 
     Reads the length of the buffer from ``fh``, and fills the buffer with said data.

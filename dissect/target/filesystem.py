@@ -841,7 +841,7 @@ class VirtualFileHandle(io.RawIOBase):
         self.fh = fh
         self.seek(0)
 
-    def readinto(self, b: bytes) -> int:
+    def readinto(self, b: bytearray) -> int:
         return self.fh.readinto(b)
 
     def seek(self, offset, whence=io.SEEK_SET):
