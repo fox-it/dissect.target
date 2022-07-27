@@ -5,7 +5,7 @@ import logging
 import os
 import stat
 from collections import defaultdict
-from typing import Any, BinaryIO, ByteString, Callable, Iterator, List, Optional, Union
+from typing import Any, BinaryIO, Callable, Iterator, List, Optional, Union
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -842,7 +842,7 @@ class VirtualFileHandle(io.RawIOBase):
         self.fh = fh
         self.seek(0)
 
-    def readinto(self, b: ByteString) -> int:
+    def readinto(self, b: bytes) -> int:
         """Uses :func:`dissect.target.helpers.utils.readinto`."""
         return readinto(buffer=b, fh=self.fh)
 

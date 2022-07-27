@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, ByteString, Union
+from typing import TYPE_CHECKING, BinaryIO, Union
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
@@ -140,9 +140,9 @@ class Container(io.IOBase):
         """
         raise NotImplementedError()
 
-    def readinto(self, b: ByteString) -> int:
+    def readinto(self, b: bytes) -> int:
         """Uses :func:`dissect.target.helpers.utils.readinto`."""
-        return readinto(buffer=b, fh=self.fh)
+        return readinto(buffer=b, fh=self)
 
 
 def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):

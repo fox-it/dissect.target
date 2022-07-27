@@ -1,6 +1,6 @@
 import io
 import logging
-from typing import ByteString, List
+from typing import List
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
@@ -41,10 +41,6 @@ class VolumeSystem:
         Volume system implementations must implement this and yield all valid found partitions
         """
         raise NotImplementedError()
-
-    def readinto(self, b: ByteString) -> int:
-        """Uses :func:`dissect.target.helpers.utils.readinto`."""
-        return readinto(buffer=b, fh=self.fh)
 
     @property
     def volumes(self):
@@ -125,6 +121,10 @@ class Volume(io.IOBase):
 
     def read(self, length):
         return self.fh.read(length)
+
+    def readinto(self, b: bytes) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
+        return readinto(buffer=b, fh=self)
 
     def seek(self, offset, whence=io.SEEK_SET):
         return self.fh.seek(offset, whence)

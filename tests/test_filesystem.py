@@ -2,6 +2,7 @@ import stat
 from unittest.mock import Mock
 
 import pytest
+
 from dissect.target.exceptions import SymlinkRecursionError
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
