@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO, Union
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
     from dissect.target.volume import VolumeSystem
@@ -106,6 +107,10 @@ class Container(io.IOBase):
     def read(self, length: int) -> bytes:
         """Read a ``length`` of bytes from ``fh``"""
         raise NotImplementedError()
+
+    def readinto(self, b: bytearray) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
+        return readinto(buffer=b, fh=self)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         """Change the stream positition.

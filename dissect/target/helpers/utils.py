@@ -1,6 +1,7 @@
 import re
 import urllib.parse
 from enum import Enum
+from typing import BinaryIO
 
 
 class StrEnum(str, Enum):
@@ -32,3 +33,21 @@ def slugify(name: str) -> str:
     This is useful to turn a name into something that can be used as filename.
     """
     return SLUG_RE.sub("_", name)
+
+
+def readinto(buffer: bytearray, fh: BinaryIO) -> int:
+    """A readinto implementation that uses ``read()``.
+
+    Reads the length of the buffer from ``fh``, and fills the buffer with said data.
+
+    Args:
+        buffer: The buffer we read the data into.
+        fh: The file-like object we use for reading.
+
+    Returns:
+        the size in bytes that was read.
+    """
+    data = fh.read(len(buffer))
+    size = len(data)
+    buffer[:size] = data
+    return size
