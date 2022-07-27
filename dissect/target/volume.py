@@ -5,6 +5,7 @@ from typing import List
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 
 disk = import_lazy("dissect.target.volumes.disk")
 lvm = import_lazy("dissect.target.volumes.lvm")
@@ -120,6 +121,10 @@ class Volume(io.IOBase):
 
     def read(self, length):
         return self.fh.read(length)
+
+    def readinto(self, b: bytearray) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
+        return readinto(buffer=b, fh=self)
 
     def seek(self, offset, whence=io.SEEK_SET):
         return self.fh.seek(offset, whence)
