@@ -207,7 +207,7 @@ class Target:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
-            path: Path to load the Target from.
+            path: Path to load the ``Target`` from.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
@@ -322,7 +322,7 @@ class Target:
     def _load_child_plugins(self) -> None:
         """Load special :class:`~dissect.target.plugin.ChildTargetPlugin` plugins.
 
-        These plugins inform the Target how to deal with child targets, such as VMs from a hypervisor.
+        These plugins inform the ``Target`` how to deal with child targets, such as VMs from a hypervisor.
         Examples of these plugins are:
 
         - :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin`
@@ -366,7 +366,7 @@ class Target:
     def open_children(self, recursive: bool = False) -> Iterator[Target]:
         """Open all the child targets on a ``Target``.
 
-        Will open all discovered child targets if the current ``Target`` has them, such as, VMs on a hypervisor.
+        Will open all discovered child targets if the current ``Target`` has them, such as VMs on a hypervisor.
 
         Args:
             recursive: Whether to check the child ``Target`` for more ``Targets``.
@@ -388,7 +388,8 @@ class Target:
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes
-        can discover."""
+        can discover.
+        """
         self._load_child_plugins()
         for child_plugin in self._child_plugins.values():
             yield from child_plugin.list_children()
