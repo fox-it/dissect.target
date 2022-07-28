@@ -206,7 +206,7 @@ class Target:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
-            path: the location of the file we want to load.
+            path: Path to load the Target from.
 
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
