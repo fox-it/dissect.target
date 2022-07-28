@@ -400,7 +400,7 @@ class Target:
 
         Args:
             path: The path to the target.
-            ldr: The loader used to load this target.
+            ldr: The loader to use for loading this target.
 
         Raises:
             TargetError: If it failed to load a target.
