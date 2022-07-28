@@ -50,7 +50,7 @@ class Target:
     ``Loaders`` are used to map the ``Containers``, ``Volumes`` and ``Filesystems`` of the target
     onto the ``Target`` object.
 
-    Additionally, the plugins of dissect.target get mapped onto the ``Target`` too.
+    The plugins of dissect.target get mapped onto the ``Target`` too.
     They become available as attributes on a ``Target`` object. For example, ``t.hostname``, ``t.evtx()``.
     By executing the plugin function with a target, it will perform the function on itself.
 
