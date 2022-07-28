@@ -47,7 +47,8 @@ class Target:
 
     Targets are the glue that connects the different ``Containers``, ``Loaders``, ``Volumes``
     and ``Filesystems`` together.
-    ``Loaders`` are used to map the ``Containers``, ``Volumes`` and ``Filesystems`` of the target onto the ``Target`` object.
+    ``Loaders`` are used to map the ``Containers``, ``Volumes`` and ``Filesystems`` of the target
+    onto the ``Target`` object.
 
     Additionally, the plugins of dissect get mapped onto the ``Target`` too.
     By executing the plugin function with a target, it will perform the function on itself.
@@ -386,7 +387,8 @@ class Target:
                 yield from target.open_children(recursive=recursive)
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes can discover."""
+        """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes
+        can discover."""
         self._load_child_plugins()
         for child_plugin in self._child_plugins.values():
             yield from child_plugin.list_children()
