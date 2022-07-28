@@ -43,17 +43,17 @@ class TargetLogAdapter(logging.LoggerAdapter):
 
 
 class Target:
-    """The class that represents the image that you are talking to.
+    """The class that represents the target that you are talking to.
 
     Targets are the glue that connects the different ``Containers``, ``Loaders``, ``Volumes``
     and ``Filesystems`` together.
-    ``Containers`` use ``Loaders`` to map the ``Volumes`` and ``Filesystems`` of the target onto the target.
+    ``Loaders`` are used to map the ``Containers``, ``Volumes`` and ``Filesystems`` of the target onto the ``Target`` object.
 
     Additionally, the plugins of dissect get mapped onto the ``Target`` too.
     By executing the plugin function with a target, it will perform the function on itself.
 
     Args:
-        path: The location of a file-like object that contains an image.
+        path: The path of a target.
     """
 
     def __init__(self, path: Union[str, Path] = None):
@@ -108,8 +108,7 @@ class Target:
         """Sets ``event_callbacks`` on a Target class.
 
         ``event_callbacks`` get used to handle specific events denoted by :class:`Event`.
-        This records events releated to the plugins.
-        It detecs whether:
+        This records events related to the target, such as:
 
         - a plugin gets registered to the target
         - a plugin is incompatible with the target
@@ -124,7 +123,7 @@ class Target:
         cls.event_callbacks[event_type].add(event_callback)
 
     def send_event(self, event_type: Event, **kwargs) -> None:
-        """Call the event callbacks if a specific ``event_type`` occured.
+        """Notify event callbacks for the given ``event_type``.
 
         Each event can have multiple callback methods, it calls all the callbacks that fit the corresponding event type.
         ``None`` is a catch-all method for event callbacks that always get called.
@@ -146,7 +145,7 @@ class Target:
                 self.log.warning(f"Can't send event {event_type} to {callback}", exc_info=True)
 
     def apply(self) -> None:
-        """Link all the disks and volumes to the current ``Target``."""
+        """Resolve all disks, volumes and filesystems and load an operating system on the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
         self._init_os()
@@ -240,7 +239,7 @@ class Target:
         If the path is a directory, iterate files one directory deep.
 
         Args:
-            paths: a list of paths to load ``Targets`` from.
+            paths: A list of paths to load ``Targets`` from.
 
         Raises:
             TargetError: Raised when not a single ``Target`` can be loaded.
@@ -322,7 +321,7 @@ class Target:
     def _load_child_plugins(self) -> None:
         """Load special :class:`~dissect.target.plugin.ChildTargetPlugin` plugins.
 
-        These plugins inform the Target how to deal with the children of a Hypervisor.
+        These plugins inform the Target how to deal with child targets, such as VMs from a hypervisor.
         Examples of these plugins are:
 
         - :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin`
@@ -349,10 +348,10 @@ class Target:
         """Open a child target.
 
         Args:
-            child: The location of a ``Target`` on the current ``Target``.
+            child: The location of a target within the current ``Target``.
 
         Returns:
-            A Target object the data from the child target.
+            An opened ``Target`` object of the child target.
         """
         if isinstance(child, str) and child.isdecimal():
             child_num = int(child)
@@ -364,10 +363,9 @@ class Target:
             return Target.open(self.fs.path(child))
 
     def open_children(self, recursive: bool = False) -> Iterator[Target]:
-        """Open all the child Targets on a Target.
+        """Open all the child targets on a ``Target``.
 
-        Here we assume that the current ``Target`` is on a Hypervisor.
-        It opens all the ``Targets`` relative to itself.
+        Will open all discovered child targets if the current ``Target`` has them, such as, VMs on a hypervisor.
 
         Args:
             recursive: Whether to check the child ``Target`` for more ``Targets``.
@@ -388,7 +386,7 @@ class Target:
                 yield from target.open_children(recursive=recursive)
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        """Lists all Targets, that our :class:`~dissect.target.plugin.ChildTargetPlugin` classes can interpret."""
+        """Lists all child targets that compatible :class:`~dissect.target.plugin.ChildTargetPlugin` classes can discover."""
         self._load_child_plugins()
         for child_plugin in self._child_plugins.values():
             yield from child_plugin.list_children()
@@ -398,14 +396,14 @@ class Target:
         """Internal function that attemps to load a path using a given loader.
 
         Args:
-            path: The path to the target image.
+            path: The path to the target.
             ldr: The loader used to load this target.
 
         Raises:
             TargetError: If it failed to load a target.
 
         Returns:
-            A Target object containing Disks, Volumes, and the Filesystem contained by the image pointed to by ``path``.
+            A ``Target`` object with disks, volumes and/or filesystems mapped by the ``ldr`` from the given ``path``.
         """
         target = cls(path)
 
@@ -600,7 +598,7 @@ class Target:
             return False
 
     def __getattr__(self, attr: str) -> Union[plugin.Plugin, Any]:
-        """Override of the default __getattr__ so plugins and functions can be callef from a ``Target`` object."""
+        """Override of the default __getattr__ so plugins and functions can be called from a ``Target`` object."""
         p, func = self.get_function(attr)
 
         if isinstance(func, property):
