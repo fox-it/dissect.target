@@ -32,12 +32,12 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
         except Exception:
             return False
 
-    def _volumes(self) -> Generator[Volume, None, None]:
+    def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
             volume_details = dict(
                 number=self.fh.number,
                 offset=self.fh.offset,
-                vtype=self.fh.type,
+                vtype=self.fh.vtype,
                 name=self.fh.name,
             )
         else:
