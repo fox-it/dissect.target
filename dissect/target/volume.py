@@ -25,6 +25,14 @@ ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVol
 
 
 class VolumeSystem:
+    """A base class that keeps account of all the :class:`Volume` instances.
+
+    Args:
+        fh: The file-like object representing the disk.
+        dsk: A disk that contains the volumes.
+        serial: Serial number of a volumes.
+    """
+
     def __init__(self, fh: BinaryIO, dsk: BinaryIO = None, serial: str = None):
         self.fh = fh
         self.disk = dsk or fh  # Provide shorthand access to source disk
@@ -36,15 +44,28 @@ class VolumeSystem:
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
+        """Detects wether this ``VolumeSystem`` class can load this specific disk.
+
+        Returns:
+            True or False if they can read the ``VolumeSystem``
         """
         raise NotImplementedError()
 
     def _volumes(self) -> Iterator[Volume]:
+        """List all valid found partitions found on the disk.
+
+        Returns:
+            An iterator that goes through the ``Volumes`` or partitions of a disk image.
         """
         raise NotImplementedError()
 
     @property
     def volumes(self) -> list[Volume]:
+        """A property that puts all the found volumes inside a list.
+
+        Returns:
+            A list of ``Volumes``.
+        """
         if self._volumes_list is None:
             self._volumes_list = list(self._volumes())
 
@@ -52,6 +73,9 @@ class VolumeSystem:
 
 
 class EncryptedVolumeSystem(VolumeSystem):
+    """An extention of the ``VolumeSystem`` class that provides additional function for encryption.
+
+    It adds more helper function to go through specific keys, to see which key matches."""
 
     PROVIDER = None
 
@@ -85,6 +109,11 @@ class LogicalVolumeSystem(VolumeSystem):
 
 
 class Volume(io.IOBase):
+    """A representation of a volume on disk.
+
+    It allows to directly interact with the volume.
+    """
+
     def __init__(
         self,
         fh: BinaryIO,
@@ -121,6 +150,11 @@ class Volume(io.IOBase):
         return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
 
     def read(self, length: int) -> bytes:
+        """Read the ``length`` in bytes from ``fh``.
+
+        Returns:
+            The number of bytes that were read.
+        """
         return self.fh.read(length)
 
     def readinto(self, b: bytearray) -> int:
@@ -128,12 +162,28 @@ class Volume(io.IOBase):
         return readinto(buffer=b, fh=self)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        """Change the stream positition.
+
+        Change the stream position to ``offset``.
+
+        ``whence`` determines where to seek from:
+
+        * ``io.SEEK_SET`` (``0``):: absolute offset in the stream.
+        * ``io.SEEK_CUR`` (``1``):: current position in the stream.
+        * ``io.SEEK_END`` (``2``):: end of stream.
+
+        Args:
+            offset: The offset relative to the position indicated by ``whence``.
+            whence: Where to start the seek from.
+        """
         return self.fh.seek(offset, whence)
 
     def tell(self) -> int:
+        """Returns the current position of the ``fh`` stream."""
         return self.fh.tell()
 
     def seekable(self) -> bool:
+        """Returns whether ``seek`` can be used by this container. Always ``True``."""
         return True
 
 
