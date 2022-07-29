@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import io
 import logging
-from typing import List
+from typing import TYPE_CHECKING, BinaryIO, Iterator, List
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.utils import readinto
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
 
 disk = import_lazy("dissect.target.volumes.disk")
 lvm = import_lazy("dissect.target.volumes.lvm")
@@ -14,36 +19,32 @@ bde = import_lazy("dissect.target.volumes.bde")
 
 log = logging.getLogger(__name__)
 
-LOGICAL_VOLUME_MANAGERS = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
+LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
 
-ENCRYPTED_VOLUME_MANAGERS = [bde.BitlockerVolumeSystem]
+ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
 
 
 class VolumeSystem:
-    def __init__(self, fh, dsk=None, serial=None):
+    def __init__(self, fh: BinaryIO, dsk: BinaryIO = None, serial: str = None):
         self.fh = fh
         self.disk = dsk or fh  # Provide shorthand access to source disk
         self.serial = serial
-        self._volumes_list = None
+        self._volumes_list: list[Volume] = None
 
     def __repr__(self):
         return f"<{self.__class__.__name__} serial={self.serial}>"
 
     @staticmethod
-    def detect(fh):
-        """
-        Volume system implementations must implement this and return True or False if they can read the volume system
+    def detect(fh: BinaryIO) -> bool:
         """
         raise NotImplementedError()
 
-    def _volumes(self):
-        """
-        Volume system implementations must implement this and yield all valid found partitions
+    def _volumes(self) -> Iterator[Volume]:
         """
         raise NotImplementedError()
 
     @property
-    def volumes(self):
+    def volumes(self) -> list[Volume]:
         if self._volumes_list is None:
             self._volumes_list = list(self._volumes())
 
@@ -75,29 +76,29 @@ class EncryptedVolumeSystem(VolumeSystem):
 
 class LogicalVolumeSystem(VolumeSystem):
     @staticmethod
-    def detect_volume(fh):
+    def detect_volume(fh: BinaryIO):
         raise NotImplementedError()
 
     @classmethod
-    def open_all(cls, volumes):
+    def open_all(cls, volumes) -> Iterator[LogicalVolumeSystem]:
         raise NotImplementedError()
 
 
 class Volume(io.IOBase):
     def __init__(
         self,
-        fh,
-        number,
-        offset,
-        size,
-        vtype,
-        name,
-        guid=None,
-        raw=None,
-        disk=None,
-        vs=None,
-        fs=None,
-        drive_letter=None,
+        fh: BinaryIO,
+        number: int,
+        offset: int,
+        size: int,
+        vtype: int,
+        name: str,
+        guid: str = None,
+        raw: BinaryIO = None,
+        disk: BinaryIO = None,
+        vs: VolumeSystem = None,
+        fs: Filesystem = None,
+        drive_letter: str = None,
     ):
         self.fh = fh
         self.number = number
@@ -119,39 +120,39 @@ class Volume(io.IOBase):
     def __repr__(self):
         return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
 
-    def read(self, length):
+    def read(self, length: int) -> bytes:
         return self.fh.read(length)
 
     def readinto(self, b: bytearray) -> int:
         """Uses :func:`dissect.target.helpers.utils.readinto`."""
         return readinto(buffer=b, fh=self)
 
-    def seek(self, offset, whence=io.SEEK_SET):
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         return self.fh.seek(offset, whence)
 
-    def tell(self):
+    def tell(self) -> int:
         return self.fh.tell()
 
-    def seekable(self):
+    def seekable(self) -> bool:
         return True
 
 
-def open(fh, *args, **kwargs):
+def open(fh: BinaryIO, *args, **kwargs) -> VolumeSystem:
     try:
         return disk.DissectVolumeSystem(fh)
     except Exception as e:
         raise VolumeSystemError(f"Failed to load volume system for {fh}", cause=e)
 
 
-def is_lvm_volume(vol):
+def is_lvm_volume(volume: BinaryIO) -> bool:
     for logical_vs in LOGICAL_VOLUME_MANAGERS:
         try:
-            if logical_vs.detect_volume(vol):
+            if logical_vs.detect_volume(volume):
                 return True
         except ImportError as e:
             log.warning("Failed to import %s", logical_vs, exc_info=e)
         except Exception as e:
-            raise VolumeSystemError(f"Failed to detect logical volume for {vol}", cause=e)
+            raise VolumeSystemError(f"Failed to detect logical volume for {volume}", cause=e)
 
     return False
 
@@ -179,7 +180,7 @@ def open_encrypted(volume: Volume) -> Volume:
     return None
 
 
-def open_lvm(volumes, *args, **kwargs):
+def open_lvm(volumes, *args, **kwargs) -> Iterator[VolumeSystem]:
     for logical_vs in LOGICAL_VOLUME_MANAGERS:
         try:
             for lv in logical_vs.open_all(volumes):
