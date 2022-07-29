@@ -99,12 +99,30 @@ class EncryptedVolumeSystem(VolumeSystem):
 
 
 class LogicalVolumeSystem(VolumeSystem):
+    """A representation for logical ``VolumeSystems``."""
+
     @staticmethod
-    def detect_volume(fh: BinaryIO):
+    def detect_volume(fh: Volume) -> bool:
+        """Determine wether any logical ``Volume`` could be detected.
+
+        Args:
+            fh: A ``Volume`` object that might contain more ``Volumes``.
+
+        Returns:
+            ``True`` if a volume could be detected, ``False`` otherwise.
+        """
         raise NotImplementedError()
 
     @classmethod
-    def open_all(cls, volumes) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[Volume]) -> Iterator[LogicalVolumeSystem]:
+        """Open all the volumes/file like objects that correspond to this disk image.
+
+        Args:
+            volumes: A list of file-like ``Volume`` objects.
+
+        Returns:
+            An iterator of LogicalVolumeSystems.
+        """
         raise NotImplementedError()
 
 
@@ -233,8 +251,7 @@ def open_encrypted(volume: Volume) -> Volume:
 def open_lvm(volumes, *args, **kwargs) -> Iterator[VolumeSystem]:
     for logical_vs in LOGICAL_VOLUME_MANAGERS:
         try:
-            for lv in logical_vs.open_all(volumes):
-                yield lv
+            yield from logical_vs.open_all(volumes)
         except ImportError as e:
             log.warning("Failed to import %s", logical_vs, exc_info=e)
         except Exception as e:
