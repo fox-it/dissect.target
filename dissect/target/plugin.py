@@ -2,16 +2,17 @@
 
 See dissect/target/plugins/general/example.py for an example plugin.
 """
+from __future__ import annotations
+
 import functools
 import importlib
 import logging
 import os
 import sys
 import traceback
-
 from itertools import tee
-from types import GeneratorType
-from typing import Type, List, Callable, Any, Generator
+from types import FunctionType, GeneratorType
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import cache
@@ -24,7 +25,13 @@ except Exception:
     PLUGINS = {}
     GENERATED = False
 
+if TYPE_CHECKING:
+    from dissect.target import Target
+    from dissect.target.filesystem import Filesystem
+    from flow.record import Record
+
 Tee = tee([], 1)[0].__class__
+PluginDescriptor = dict[str, Any]
 
 MODULE_PATH = "dissect.target.plugins"
 OUTPUTS = (
@@ -56,7 +63,7 @@ class Category:
     PERSISTENCE = "persistence"
 
 
-def export(*args, **kwargs):
+def export(*args, **kwargs) -> Callable:
     """Decorator to be used on Plugin functions that should be exported.
 
     Supported keyword arguments:
@@ -95,20 +102,20 @@ def export(*args, **kwargs):
         return decorator
 
 
-def get_nonprivate_attribute_names(cls: Type["Plugin"]) -> List[str]:
+def get_nonprivate_attribute_names(cls: Type[Plugin]) -> list[str]:
     return [attr for attr in dir(cls) if not attr.startswith("_")]
 
 
-def get_nonprivate_attributes(cls: Type["Plugin"]) -> List[Any]:
+def get_nonprivate_attributes(cls: Type[Plugin]) -> list[Any]:
     # Note: `dir()` might return attributes from parent class
     return [getattr(cls, attr) for attr in get_nonprivate_attribute_names(cls)]
 
 
-def get_nonprivate_methods(cls: Type["Plugin"]) -> List[Callable]:
+def get_nonprivate_methods(cls: Type[Plugin]) -> list[Callable]:
     return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property)]
 
 
-def get_descriptors_on_nonprivate_methods(cls: Type["Plugin"]):
+def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]):
     """Return record descriptors set on nonprivate methods in `cls` class"""
     descriptors = set()
     methods = get_nonprivate_methods(cls)
@@ -148,17 +155,17 @@ class Plugin:
         cls.__record_descriptors__ = record_descriptors
         cls.get_all_records = export(output="record", record=record_descriptors)(cls.get_all_records)
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         self.target = target
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         """Check for plugin compatibility.
 
         Should either return None or raise an exception.
         """
         raise NotImplementedError
 
-    def get_all_records(self):
+    def get_all_records(self) -> Iterator[Record]:
         """Return the records from all exported methods"""
         if not self.__namespace__:
             raise PluginError(f"Plugin {self.__class__.__name__} is not a namespace plugin")
@@ -182,24 +189,24 @@ class Plugin:
 class OSPlugin(Plugin):
     """Base class for OS plugins."""
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
         """OSPlugin's use a different compatibility check, override the default one."""
         return True
 
-    def detect(cls, fs):
+    def detect(cls, fs: Filesystem) -> bool:
         """Provide detection of this OSPlugin on a given filesystem.
 
         Note: must be implemented as a classmethod.
 
         Args:
-            fs: Filesystem to detect the OS on.
+            fs: :class:`~dissect.target.filesystem.Filesystem` to detect the OS on.
 
         Returns:
-            True if the OS was detected on the filesystem, else False.
+            ``True`` if the OS was detected on the filesystem, else ``False``.
         """
         raise NotImplementedError
 
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> None:
         """Initiate this OSPlugin with the given target and detected filesystem.
 
         Note: must be implemented as a classmethod.
@@ -210,35 +217,35 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
-    def hostname(self):
+    def hostname(self) -> str:
         """Required OS function. Returns the hostname as string.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def ips(self):
+    def ips(self) -> list[str]:
         """Required OS function. Returns the IPs as list.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def version(self):
+    def version(self) -> str:
         """Required OS function. Returns the OS version as string.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def users(self):
+    def users(self) -> list[Record]:
         """Required OS function.
 
         Implementations must be decorated with @export
         """
         raise NotImplementedError
 
-    def os(self):
+    def os(self) -> str:
         """Required OS function. Returns a slug of the OS name, e.g. 'windows' or 'linux'.
 
         Implementations must be decorated with export(property=True)
@@ -249,11 +256,11 @@ class OSPlugin(Plugin):
 class ChildTargetPlugin(Plugin):
     __type__ = None
 
-    def list_children(self):
+    def list_children(self) -> list[Target]:
         raise NotImplementedError
 
 
-def register(plugincls):
+def register(plugincls: Type[Plugin]) -> None:
     if not issubclass(plugincls, Plugin):
         raise ValueError("Not a subclass of Plugin")
 
@@ -315,7 +322,7 @@ def register(plugincls):
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
 
 
-def internal(*args, **kwargs):
+def internal(*args, **kwargs) -> Callable:
     """Decorator to be used on Plugin functions that should be internal only."""
 
     def decorator(obj):
@@ -330,7 +337,7 @@ def internal(*args, **kwargs):
         return decorator
 
 
-def _cache_function(func):
+def _cache_function(func: FunctionType) -> Callable:
     fname = func.__name__
 
     @functools.wraps(func)
@@ -355,7 +362,7 @@ def _cache_function(func):
     return cache_wrapper
 
 
-def arg(*args, **kwargs):
+def arg(*args, **kwargs) -> Callable:
     """Decorator to be used on Plugin functions that accept additional command line arguments.
 
     Any arguments passed to this decorator are passed directly into ArgumentParser.add_argument.
@@ -371,10 +378,10 @@ def arg(*args, **kwargs):
     return decorator
 
 
-def plugins(osfilter=None):
+def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors."""
 
-    def _walk(osfilter=None, root=None):
+    def _walk(osfilter: str = None, root: dict = None) -> Iterator[PluginDescriptor]:
         for key, obj in root.items():
             if key.startswith("_"):
                 continue
@@ -405,7 +412,7 @@ def plugins(osfilter=None):
         yield plugin_desc
 
 
-def _special_plugins(special_key):
+def _special_plugins(special_key: str) -> Iterator[PluginDescriptor]:
     """Retrieve plugin descriptors stored under a special key."""
 
     def _walk(root=None):
@@ -422,17 +429,17 @@ def _special_plugins(special_key):
     yield from _walk(_get_plugins())
 
 
-def os_plugins():
+def os_plugins() -> Iterator[PluginDescriptor]:
     """Retrieve all OS plugin descriptors."""
     yield from _special_plugins("_os")
 
 
-def child_plugins():
+def child_plugins() -> Iterator[PluginDescriptor]:
     """Retrieve all child plugin descriptors."""
     yield from _special_plugins("_child")
 
 
-def lookup(func_name, osfilter=None):
+def lookup(func_name, osfilter=None) -> Iterator[PluginDescriptor]:
     """Lookup a plugin descriptor by function name.
 
     Args:
@@ -443,7 +450,7 @@ def lookup(func_name, osfilter=None):
     yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
 
 
-def get_plugins_by_func_name(func_name, osfilter=None):
+def get_plugins_by_func_name(func_name, osfilter=None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by function name.
 
     Args:
@@ -455,19 +462,19 @@ def get_plugins_by_func_name(func_name, osfilter=None):
             yield plugin_desc
 
 
-def get_plugins_by_namespace(namespace, osfilter=None):
+def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by namespace
 
     Args:
-        func_name (str): Function name to lookup.
-        osfilter (str): OS path the plugin should be from.
+        func_name: Function name to lookup.
+        osfilter: OS path the plugin should be from.
     """
     for plugin_desc in plugins(osfilter):
         if namespace == plugin_desc["namespace"]:
             yield plugin_desc
 
 
-def load(plugin_desc):
+def load(plugin_desc: dict) -> Type[Plugin]:
     """Helper function that loads a plugin from a given plugin description.
 
     Args:
@@ -492,12 +499,12 @@ def load(plugin_desc):
         raise PluginError(f"An exception occurred while trying to load a plugin: {module}", cause=e)
 
 
-def failed():
+def failed() -> list[dict[str, Any]]:
     """Return all plugins that failed to load."""
     return _get_plugins().get("_failed", [])
 
 
-def _get_plugins():
+def _get_plugins() -> dict[str, PluginDescriptor]:
     global PLUGINS, GENERATED
     if not GENERATED:
         PLUGINS = generate()
@@ -515,7 +522,7 @@ def save_plugin_import_failure(module: str) -> None:
     )
 
 
-def generate():
+def generate() -> dict[str, Any]:
     """Internal function to generate the list of available plugins.
 
     Walks the plugins directory and imports any .py files in there.
@@ -557,7 +564,7 @@ def generate():
     return PLUGINS
 
 
-def _traverse(key, obj):
+def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:
     for p in key.split("."):
         if p not in obj:
             obj[p] = {}
@@ -567,11 +574,11 @@ def _traverse(key, obj):
     return obj
 
 
-def _modulepath(cls):
+def _modulepath(cls) -> str:
     return cls.__module__.replace(MODULE_PATH, "").lstrip(".")
 
 
-def get_plugin_classes_with_method(method_name: str) -> Generator[Type[Plugin], None, None]:
+def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
     """Yield plugin classess that have a method that matches value in `method_name`"""
     for desc in get_plugins_by_func_name(method_name):
         try:
@@ -583,7 +590,7 @@ def get_plugin_classes_with_method(method_name: str) -> Generator[Type[Plugin], 
         yield OSPlugin
 
 
-def get_plugin_classes_by_namespace(namespace: str) -> Generator[Type[Plugin], None, None]:
+def get_plugin_classes_by_namespace(namespace: str) -> Iterator[Type[Plugin]]:
     """Yield plugin classess that have __namespace__ defined that matches provided namespace"""
     for desc in get_plugins_by_namespace(namespace):
         try:
