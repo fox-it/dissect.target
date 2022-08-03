@@ -1,10 +1,6 @@
-import logging
-
 from struct import unpack
+
 from dissect import cstruct
-from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
 from dissect.regf.c_regf import (
     REG_BINARY,
     REG_DWORD,
@@ -17,21 +13,23 @@ from dissect.regf.c_regf import (
     REG_SZ,
 )
 
-log = logging.getLogger(__name__)
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 c_def = """
-    struct registry_policy_header {
-        uint32   signature;
-        uint32   version;
-    };
-    """
-c_registry_policy_header = cstruct.cstruct()
-c_registry_policy_header.load(c_def)
+struct registry_policy_header {
+    uint32   signature;
+    uint32   version;
+};
+"""
+c_adpolicy = cstruct.cstruct()
+c_adpolicy.load(c_def)
 
 ADPolicyRecord = TargetRecordDescriptor(
     "windows/adpolicy",
     [
-        ("datetime", "modification_time"),
+        ("datetime", "last_modification_time"),
         ("datetime", "last_access_time"),
         ("datetime", "creation_time"),
         ("string", "guid"),
@@ -81,22 +79,23 @@ class ADPolicyPlugin(Plugin):
             # The body consists of registry values in the following format.
             # [key;value;type;size;data]
             for policy_file in policy_dir.rglob("*.pol"):
-                fh = policy_file.open()
-                if fh.size <= 8:  # skip empty registry.pol files (only header defined)
-                    continue
-
-                policy_header = c_registry_policy_header.registry_policy_header(fh.read(8))
-                if policy_header.signature != 0x67655250:
-                    log.info(f"{self.target}: Invalid Registry.pol header encountered in file {policy_file}")
-                    continue
-
                 policy_file_stat = policy_file.stat()
+                if policy_file_stat.st_size <= 8:  # skip empty registry.pol files (only header defined)
+                    continue
+
+                fh = policy_file.open()
+                policy_header = c_adpolicy.registry_policy_header(fh)
+                if policy_header.signature != 0x67655250:
+                    self.target.log.info(
+                        f"{self.target}: Invalid Registry.pol header encountered in file {policy_file}"
+                    )
+                    continue
+
                 policy_body = fh.read()
                 policy_body = policy_body.split(b"]\x00[\x00")
 
                 for policy_line in policy_body:
-                    policy_line = policy_line.replace(b"[\x00", b"")
-                    policy_line = policy_line.replace(b"]\x00", b"")
+                    policy_line = policy_line.replace(b"[\x00", b"").replace(b"]\x00", b"")
                     values = policy_line.split(b";\x00", maxsplit=4)
 
                     if len(values) == 4:
@@ -119,7 +118,7 @@ class ADPolicyPlugin(Plugin):
                     policy_reg_data = _decode_policy_reg_data(policy_reg_type, policy_reg_data[:policy_reg_data_size])
 
                     yield ADPolicyRecord(
-                        modification_time=policy_file_stat.st_mtime,
+                        last_modification_time=policy_file_stat.st_mtime,
                         last_access_time=policy_file_stat.st_atime,
                         creation_time=policy_file_stat.st_ctime,
                         guid=policy_file.parts[4],
