@@ -126,7 +126,8 @@ class ADPolicyPlugin(Plugin):
                         value=policy_reg_value.decode("utf-16-le").rstrip("\x00"),
                         size=policy_reg_data_size,
                         data=policy_reg_data,
-                        path=policy_file._str,
+                        path=str(policy_file),
+                        _target=self.target,
                     )
 
 
