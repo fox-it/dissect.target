@@ -86,9 +86,7 @@ class ADPolicyPlugin(Plugin):
                 fh = policy_file.open()
                 policy_header = c_adpolicy.registry_policy_header(fh)
                 if policy_header.signature != 0x67655250:
-                    self.target.log.info(
-                        f"{self.target}: Invalid Registry.pol header encountered in file {policy_file}"
-                    )
+                    self.target.log.warning("Invalid Registry.pol header encountered in file %s", policy_file)
                     continue
 
                 policy_body = fh.read()
