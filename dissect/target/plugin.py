@@ -9,7 +9,6 @@ import logging
 import os
 import sys
 import traceback
-from itertools import tee
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -28,36 +27,29 @@ if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem
     from flow.record import Record, RecordDescriptor
 
-Tee = tee([], 1)[0].__class__
 PluginDescriptor = dict[str, Any]
+"""A dictionary type, for what the plugin descriptor looks like."""
 
 MODULE_PATH = "dissect.target.plugins"
+"""The path to the different plugins."""
 OUTPUTS = (
     "default",
     "record",
     "yield",
     "none",
 )
-CLASS_ATTRIBUTES = (
-    "__plugin__",
-    "__exported__",
-    "__internal__",
-    "__functions__",
-    "__exports__",
-)
-METHOD_ATTRIBUTES = (
-    "__exported__",
-    "__internal__",
-    "__output__",
-    "__record__",
-    "__args__",
-)
-
+"""The different output types supported by ``@export``."""
 
 log = logging.getLogger(__name__)
+"""A logger definition."""
 
 
 class Category:
+    """A class defining the different categories for a plugin.
+
+    This is currently unused however, the idea for the future is to
+    be able to execute multiple plugins that have the same ``Category``."""
+
     PERSISTENCE = "persistence"
 
 
@@ -76,6 +68,12 @@ def export(*args, **kwargs) -> Callable:
         - record: Yields records. Implicit when record argument is given.
         - yield: Yields printable values.
         - none: No return value.
+
+    The ``export`` decorator adds some additional private attributes to an exported method or property:
+
+    - ``__output__``: The output type to expect for this function, this is the same as ``output``.
+    - ``__record__``: The type of record to expect, this value is the same as ``record``.
+    - ``__exported__``: set to ``True`` to indicate the method or property is exported.
 
     Raises:
         ValueError: if there was an invalid output type.
@@ -159,7 +157,7 @@ class Plugin:
     call your plugin with "test.example".
 
     Example:
-        __namespace__ = 'test'
+        __namespace__ = "test"
 
     Plugins can also specify one or more categories they belong to. They can do
     this by importing the Category enum from dissect.target.plugin and specifying
@@ -168,15 +166,40 @@ class Plugin:
     Example:
         __categories__ = [Category.PERSISTENCE]
 
+    A ``Plugin`` class uses the followin private class attributes:
+
+    - ``__namespace__``
+    - ``__categories__``
+    - ``__record_descriptors__``
+
+    With the following three being assigned in :func:`register`:
+
+    - ``__plugin__``
+    - ``__functions__``
+    - ``__exports__``
+
+    Additionally, the methods and attributes of :class:`Plugin` recieve more private attributes
+    by using decoratiores decorators.
+
+    The :func:`export` decorator adds the following private attributes
+
+    - ``__exported__``: Set with the :func:`export` decorator.
+    - ``__output__``: Set with the :func:`export` decorator.
+    - ``__record__``: Set with the :func:`export` decorator.
+
+    The :func:`internal` decorator and :class:`InternalPlugin` set the ``__internal__`` attribute.
+    Finally. :func:`args` decorator sets the ``__args__`` attribute.
+
     Args:
         target: The :class:`~dissect.target.target.Target` object to load the plugin for.
-
     """
 
-    __namespace__ = None
-    __categories__ = None
-
-    __record_descriptors__ = None
+    __namespace__: str = None
+    """Defines the plugin it's namespace."""
+    __categories__: list[Category] = None
+    """Defines a list of :class:`Category` classes that the plugin uses."""
+    __record_descriptors__: list[RecordDescriptor] = None
+    """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -195,16 +218,20 @@ class Plugin:
     def check_compatible(self) -> None:
         """Perform a compatibility check with the target.
 
-        This function should return True or False on whether it's compatible
-        with the current target (self.target). For example, check if a certain
+        This function should return ``True`` or ``False`` on whether it's compatible
+        with the current target (``self.target``). For example, check if a certain
         file exists.
 
-        Should either return None or raise an exception.
+        Should either return ``None`` or raise an exception.
         """
         raise NotImplementedError
 
     def get_all_records(self) -> Iterator[Record]:
-        """Return the records from all exported methods."""
+        """Return the records from all exported methods.
+
+        Raises:
+            PluginError: If the subclass is not a namespace plugin.
+        """
         if not self.__namespace__:
             raise PluginError(f"Plugin {self.__class__.__name__} is not a namespace plugin")
 
@@ -218,7 +245,11 @@ class Plugin:
                 self.target.log.error("Error while executing `%s`", full_name, exc_info=True)
 
     def __call__(self, *args, **kwargs):
-        """A shortcut to :func:`get_all_records`."""
+        """A shortcut to :func:`get_all_records`.
+
+        Raises:
+            PluginError: if the subclass is not a namespace plugin.
+        """
         if not self.__namespace__:
             raise PluginError(f"Plugin {self.__class__.__name__} is not a callable")
         return self.get_all_records()
@@ -264,7 +295,7 @@ class OSPlugin(Plugin):
     def hostname(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with @export(property=True)
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             The hostname as string.
@@ -274,7 +305,7 @@ class OSPlugin(Plugin):
     def ips(self) -> list[str]:
         """Required OS function.
 
-        Implementations must be decorated with @export(property=True)
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             The IPs as list.
@@ -284,7 +315,7 @@ class OSPlugin(Plugin):
     def version(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with @export(property=True)
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             The OS version as string.
@@ -294,7 +325,7 @@ class OSPlugin(Plugin):
     def users(self) -> list[Record]:
         """Required OS function.
 
-        Implementations must be decorated with @export
+        Implementations must be decorated with @export.
 
         Returns:
             A list of user records.
@@ -304,7 +335,7 @@ class OSPlugin(Plugin):
     def os(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with export(property=True)
+        Implementations must be decorated with ``@export(property=True)``
 
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
@@ -329,8 +360,22 @@ class ChildTargetPlugin(Plugin):
 def register(plugincls: Type[Plugin]) -> None:
     """Register a plugin, and put related data inside :attr:`PLUGINS`.
 
+    This function uses the following private attributes that get set using decrorators:
+
+    - ``__exported__``: Set in :func:`export`.
+    - ``__internal__``: Set in :func:`internal`.
+
+    Additionally, register sets private attributes on the ``.
+
+    - ``__plugin__``: Always set to ``True``.
+    - ``__functions__``: A list of all the methods and properties that are ``__internal__`` or ``__exported__``.
+    - ``__exports__``: A list of all the methods or properties that were explicitly exported.
+
     Args:
-        plugincls: A plugin to register.
+        plugincls: A plugin class to register.
+
+    Raises:
+        ValueError: If ``plugincls`` is not a subclass of :class:`Plugin`.
     """
     if not issubclass(plugincls, Plugin):
         raise ValueError("Not a subclass of Plugin")
@@ -394,7 +439,12 @@ def register(plugincls: Type[Plugin]) -> None:
 
 
 def internal(*args, **kwargs) -> Callable:
-    """Decorator to be used on Plugin functions that should be internal only."""
+    """Decorator to be used on Plugin functions that should be internal only.
+
+    This decorator adds the ``__internal__`` private attribute to a method or property.
+    The attribute is always set to ``True``, to tell :func:`register` that it is an internal
+    method or property.
+    """
 
     def decorator(obj):
         obj.__internal__ = True
@@ -415,6 +465,9 @@ def arg(*args, **kwargs) -> Callable:
     Arguments to this decorator are directly forwarded to the ArgumentParser.add_argument functionof argparse.
     Resulting arguments are passed to the function using kwargs.
     The keyword argument name must match the argparse argument name.
+
+    This decorator adds the ``__args__`` private attribute to a method or property.
+    The attribute holds all the command line arguments that can be added for a specific ``function``.
     """
 
     def decorator(obj):
@@ -518,7 +571,7 @@ def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[P
 
 
 def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
-    """Get a plugin descriptor by namespace
+    """Get a plugin descriptor by namespace.
 
     Args:
         func_name: Function name to lookup.
@@ -667,7 +720,7 @@ class InternalPlugin(Plugin):
     """Parent class for internal plugins.
 
     InternalPlugin marks all non-private methods internal by default
-    (same as @internal decorator).
+    (same as ``@internal`` decorator).
     """
 
     def __init_subclass__(cls, **kwargs):
