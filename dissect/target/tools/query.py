@@ -186,7 +186,6 @@ def main():
                 continue
             except PluginNotFoundError as e:
                 target.log.error("Cannot find plugin `%s`", func)
-                target.log.debug("", exc_info=e)
                 continue
             except Exception:
                 target.log.error("Exception while executing function `%s`", func, exc_info=True)
