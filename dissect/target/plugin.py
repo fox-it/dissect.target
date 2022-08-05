@@ -4,14 +4,12 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
-import functools
 import importlib
 import logging
 import os
 import sys
 import traceback
 from itertools import tee
-from types import FunctionType, GeneratorType
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -408,31 +406,6 @@ def internal(*args, **kwargs) -> Callable:
         return decorator(args[0])
     else:
         return decorator
-
-
-def _cache_function(func: FunctionType) -> Callable:
-    fname = func.__name__
-
-    @functools.wraps(func)
-    def cache_wrapper(*args, **kwargs):
-        tcache = args[0].target._cache
-        fcache = tcache.get(fname, None)
-        if fcache is None:
-            fcache = {}
-            tcache[fname] = fcache
-
-        key = (args, frozenset(sorted(kwargs.items())))
-        if key not in fcache:
-            fcache[key] = func(*args, **kwargs)
-
-        if isinstance(fcache[key], (GeneratorType, Tee)):
-            # the original can't be used any more,
-            # so we need to change the cache as well
-            fcache[key], r = tee(fcache[key])
-            return r
-        return fcache[key]
-
-    return cache_wrapper
 
 
 def arg(*args, **kwargs) -> Callable:
