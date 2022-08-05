@@ -182,7 +182,7 @@ def main():
                     e.root_cause_str(),
                 )
 
-                target.log.debug(None, exc_info=e)
+                target.log.debug("", exc_info=e)
                 continue
             except PluginNotFoundError as e:
                 target.log.error("Cannot find plugin `%s`", func)
