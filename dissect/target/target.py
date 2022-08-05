@@ -13,7 +13,7 @@ from dissect.target.exceptions import (
     PluginError,
     TargetError,
     UnsupportedPluginError,
-    CannotFindPluginError,
+    PluginNotFoundError,
 )
 from dissect.target.helpers import config
 from dissect.target.helpers.record import ChildTargetRecord
@@ -572,7 +572,7 @@ class Target:
 
         # We still ended up with no compatible plugins
         if function not in self._functions:
-            raise CannotFindPluginError(f"Can't find plugin with function `{function}`")
+            raise PluginNotFoundError(f"Can't find plugin with function `{function}`")
 
         p, func = self._functions[function]
         if func is None:

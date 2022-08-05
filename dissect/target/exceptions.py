@@ -50,14 +50,14 @@ class UnsupportedPluginError(PluginError):
     """The requested plugin is not supported by the target."""
 
     def root_cause_str(self):
-        """Often with this type of Error, the root cause is more descriptive for the user"""
+        """Often with this type of Error, the root cause is more descriptive for the user."""
         e = self
         while e != self.__cause__:
             e = self.__cause__
         return e.args[0]
 
 
-class CannotFindPluginError(PluginError):
+class PluginNotFoundError(PluginError):
     """Plugin cannot be found."""
 
 

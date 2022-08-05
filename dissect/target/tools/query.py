@@ -14,7 +14,7 @@ from dissect.target.plugin import Plugin, PLUGINS
 from dissect.target.helpers import cache, hashutil
 from dissect.target.exceptions import (
     UnsupportedPluginError,
-    CannotFindPluginError,
+    PluginNotFoundError,
 )
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -177,18 +177,16 @@ def main():
                 output_type, result, cli_params_unparsed = execute_function_on_target(target, func, cli_params_unparsed)
             except UnsupportedPluginError as e:
                 target.log.error(
-                    "Unsupported plugin for `%s` root cause: %s",
+                    "Unsupported plugin for `%s`: %s",
                     func,
                     e.root_cause_str(),
-                    exc_info=False,
-                    stack_info=False,
                 )
 
                 target.log.debug(None, exc_info=e)
                 continue
-            except CannotFindPluginError as e:
+            except PluginNotFoundError as e:
                 target.log.error("Cannot find plugin `%s`", func)
-                target.log.debug(None, exc_info=e)
+                target.log.debug("", exc_info=e)
                 continue
             except Exception:
                 target.log.error("Exception while executing function `%s`", func, exc_info=True)
