@@ -720,6 +720,7 @@ class TargetCli(TargetCmd):
 
             fh = path.open()
             shutil.copyfileobj(fh, stdout)
+            stdout.flush()
 
     @arg("path")
     def cmd_hexdump(self, args, stdout):
