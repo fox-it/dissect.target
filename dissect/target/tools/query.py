@@ -181,7 +181,7 @@ def main():
                     func,
                     e.root_cause_str(),
                     exc_info=False,
-                    stack_info=False
+                    stack_info=False,
                 )
 
                 target.log.debug(None, exc_info=e)

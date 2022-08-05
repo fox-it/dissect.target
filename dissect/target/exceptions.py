@@ -52,7 +52,7 @@ class UnsupportedPluginError(PluginError):
     def root_cause_str(self):
         """Often with this type of Error, the root cause is more descriptive for the user"""
         e = self
-        while (e != self.__cause__):
+        while e != self.__cause__:
             e = self.__cause__
         return e.args[0]
 
