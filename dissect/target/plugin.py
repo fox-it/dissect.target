@@ -78,6 +78,12 @@ def export(*args, **kwargs) -> Callable:
         - record: Yields records. Implicit when record argument is given.
         - yield: Yields printable values.
         - none: No return value.
+
+    Raises:
+        ValueError: if there was an invalid output type.
+
+    Returns:
+        An exported function from a plugin.
     """
 
     def decorator(obj):
@@ -163,6 +169,10 @@ class Plugin:
 
     Example:
         __categories__ = [Category.PERSISTENCE]
+
+    Args:
+        target: The :class:`~dissect.target.target.Target` object to load the plugin for.
+
     """
 
     __namespace__ = None
@@ -319,7 +329,7 @@ class ChildTargetPlugin(Plugin):
 
 
 def register(plugincls: Type[Plugin]) -> None:
-    """Register a plugin, and put related data inside :var:`PLUGINS`.
+    """Register a plugin, and put related data inside :attr:`PLUGINS`.
 
     Args:
         plugincls: A plugin to register.
@@ -601,6 +611,9 @@ def generate() -> dict[str, Any]:
 
     Walks the plugins directory and imports any .py files in there.
     Plugins will be automatically registered due to the decorators on them.
+
+    Returns:
+        The global ``PLUGINS`` dictionary.
     """
     global PLUGINS
 
@@ -650,12 +663,12 @@ def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:
 
 
 def _modulepath(cls) -> str:
-    """Return a modulepath of a :class:`Plugin` relative to ``dissect.target.plugins``."""
+    """Returns a modulepath of a :class:`Plugin` relative to ``dissect.target.plugins``."""
     return cls.__module__.replace(MODULE_PATH, "").lstrip(".")
 
 
 def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
-    """Yields plugin classess that have a method that matches value in ``method_name``."""
+    """Returns an iterator of plugin classess that have a method that matches ``method_name``."""
     for desc in get_plugins_by_func_name(method_name):
         try:
             yield load(desc)
@@ -667,7 +680,7 @@ def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
 
 
 def get_plugin_classes_by_namespace(namespace: str) -> Iterator[Type[Plugin]]:
-    """Yields plugin classess that have __namespace__ defined that matches provided namespace."""
+    """Returns an iterator of plugin classess that have ``__namespace__`` defined that matches ``namespace``."""
     for desc in get_plugins_by_namespace(namespace):
         try:
             yield load(desc)
