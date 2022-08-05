@@ -247,7 +247,17 @@ class Volume(io.IOBase):
 
 
 def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
-    """Open ``fh`` as a :class:`dissect.target.volumes.disk.DissectVolumeSystem`."""
+    """Open a file-like object as a :class:`dissect.target.volumes.disk.DissectVolumeSystem`.
+
+    Args:
+        fh: The file-like object to open.
+
+    Raises:
+        VolumeSystemError: If it failed to open the VolumeSystem.
+
+    Returns:
+        An opened :class:`~dissect.target.volumes.disk.DissectVolumeSystem`.
+    """
     try:
         return disk.DissectVolumeSystem(fh)
     except Exception as e:
