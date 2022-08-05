@@ -14,15 +14,21 @@ if TYPE_CHECKING:
     from dissect.target.volumes.disk import DissectVolumeSystem
 
 disk = import_lazy("dissect.target.volumes.disk")
+"""A lazy import of :mod:`dissect.target.volumes.disk`."""
 lvm = import_lazy("dissect.target.volumes.lvm")
+"""A lazy import of :mod:`dissect.target.volumes.lvm`."""
 vmfs = import_lazy("dissect.target.volumes.vmfs")
+"""A lazy import of :mod:`dissect.target.volumes.vmfs`."""
 bde = import_lazy("dissect.target.volumes.bde")
+"""A lazy import of :mod:`dissect.target.volumes.bde`."""
 
 log = logging.getLogger(__name__)
+"""A logger instance for this module."""
 
 LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
-
+"""All available :class:`LogicalVolumeSystem` classes in one list."""
 ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
+"""All available :class:`EncryptedVolumeSystem` classes in one list."""
 
 
 class VolumeSystem:
@@ -251,7 +257,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
 def is_lvm_volume(volume: Volume) -> bool:
     """Determine if a logical :class:`VolumeSystem` can open this ``volume``.
 
-    It iterates through :var:`LOGICAL_VOLUME_MANAGERS` whether the ``volume`` contains the required volume signature.
+    It iterates through :attr:`LOGICAL_VOLUME_MANAGERS` whether the ``volume`` contains the required volume signature.
 
     Args:
         volume: A file-like object representing a :class:`Volume`.
@@ -274,7 +280,7 @@ def is_lvm_volume(volume: Volume) -> bool:
 def is_encrypted(volume: Volume) -> bool:
     """Determine if the ``volume`` is encrypted.
 
-    It iterates through :var:`ENCRYPTED_VOLUME_MANAGERS` whether the ``volume`` contains a encrypted header signature.
+    It iterates through :attr:`ENCRYPTED_VOLUME_MANAGERS` whether the ``volume`` contains a encrypted header signature.
 
     Args:
         volume: A file-like object representing a :class:`Volume`.
@@ -296,7 +302,7 @@ def is_encrypted(volume: Volume) -> bool:
 def open_encrypted(volume: Volume) -> Iterator[Volume]:
     """Open an encrypted ``volume``.
 
-    It iterates through :var:`ENCRYPTED_VOLUME_MANAGERS` to see which :class:`EncryptedVolumeSystem` can open this
+    It iterates through :attr:`ENCRYPTED_VOLUME_MANAGERS` to see which :class:`EncryptedVolumeSystem` can open this
     specific :class:`Volume`.
 
     Args:
@@ -318,7 +324,7 @@ def open_encrypted(volume: Volume) -> Iterator[Volume]:
 def open_lvm(volumes: list[Volume], *args, **kwargs) -> Iterator[VolumeSystem]:
     """Open a logical volume system..
 
-    It iterates through :var:`LOGICAL_VOLUME_MANAGERS` to see which :class:`LogicalVolumeSystem` can open this
+    It iterates through :attr:`LOGICAL_VOLUME_MANAGERS` to see which :class:`LogicalVolumeSystem` can open this
     specific :class:`Volume`.
 
     Args:
