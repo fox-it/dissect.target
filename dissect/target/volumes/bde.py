@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from typing import Generator
+from typing import Iterator
 
 from dissect.fve import bde
 from dissect.util.stream import AlignedStream

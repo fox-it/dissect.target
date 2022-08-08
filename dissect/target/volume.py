@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING, BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
@@ -33,8 +33,9 @@ ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVol
 
 class VolumeSystem:
     """The base class for a volume system implementation.
-    
-    Volume systems are responsible for parsing a volume system over one or more disks and returning all available volumes.
+
+    Volume systems are responsible for parsing a volume system over one or more disks and
+    returning all available volumes.
     Subclasses of ``VolumeSystem`` must implement the ``detect`` and ``_volumes`` methods.
 
     Args:
@@ -65,17 +66,13 @@ class VolumeSystem:
         """List all valid discovered volumes found on the volume system.
 
         Returns:
-            An iterator of all ``Volumes`` of the ``VolumeSystem``.
+            An iterator of all :class:`Volumes` of the ``VolumeSystem``.
         """
         raise NotImplementedError()
 
     @property
     def volumes(self) -> list[Volume]:
-        """A list of all the discovered volumes.
-
-        Returns:
-            A list of ``Volumes``.
-        """
+        """A list of all the discovered volumes."""
         if self._volumes_list is None:
             self._volumes_list = list(self._volumes())
 
@@ -85,8 +82,9 @@ class VolumeSystem:
 class EncryptedVolumeSystem(VolumeSystem):
     """An extension of the :class:`VolumeSystem` class that provides additional functionality for dealing with encryption.
 
-    It adds helper functions for interacting with the `<deeplink to Keychain here>`, so that subclasses don't have to manually interact with it.
-    
+    It adds helper functions for interacting with the :attr:`~dissect.target.helpers.keychain.KEYCHAIN`,
+    so that subclasses don't have to manually interact with it.
+
     Subclasses must set the ``PROVIDER`` class attribute to a unique string, e.g. ``bitlocker``.
 
     Args:
@@ -131,7 +129,9 @@ class EncryptedVolumeSystem(VolumeSystem):
 
 
 class LogicalVolumeSystem(VolumeSystem):
-    """An extension of the :class:`VolumeSystem` class that provides additional functionality for dealing with logical volume systems."""
+    """An extension of the :class:`VolumeSystem` class that provides additional functionality for dealing with
+    logical volume systems.
+    """
 
     @staticmethod
     def detect_volume(fh: BinaryIO) -> bool:
@@ -148,10 +148,10 @@ class LogicalVolumeSystem(VolumeSystem):
     @classmethod
     def open_all(cls, volumes: list[Volume]) -> Iterator[LogicalVolumeSystem]:
         """Open all the discovered logical volume systems from the given file-like objects.
-        
+
         There can be more than one logical volume system on a given set of file-like objects. For example, you can have
-        five disks or volumes with two separate LVM2 volume groups. This function is responsible for grouping the correct
-        disks and volumes with each other, and correctly opening each distinct logical volume system.
+        five disks or volumes with two separate LVM2 volume groups. This function is responsible for grouping
+        the correct disks and volumes with each other, and correctly opening each distinct logical volume system.
 
         Args:
             volumes: A list of file-like objects to discover and open the logical volume systems on.
@@ -186,16 +186,16 @@ class Volume(io.IOBase):
         self,
         fh: BinaryIO,
         number: int,
-        offset: int,
+        offset: Optional[int],
         size: int,
-        vtype: int,
-        name: str,
-        guid: str = None,
-        raw: BinaryIO = None,
-        disk: BinaryIO = None,
-        vs: VolumeSystem = None,
-        fs: Filesystem = None,
-        drive_letter: str = None,
+        vtype: Optional[int],
+        name: Optional[str],
+        guid: Optional[str] = None,
+        raw: Optional[BinaryIO] = None,
+        disk: Optional[BinaryIO] = None,
+        vs: Optional[VolumeSystem] = None,
+        fs: Optional[Filesystem] = None,
+        drive_letter: Optional[str] = None,
     ):
         self.fh = fh
         self.number = number
@@ -219,10 +219,6 @@ class Volume(io.IOBase):
 
     def read(self, length: int) -> bytes:
         """Read a ``length`` of bytes from this ``Volume``."""
-
-        Returns:
-            The number of bytes that were read.
-        """
         return self.fh.read(length)
 
     def readinto(self, b: bytearray) -> int:
@@ -274,13 +270,8 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
 def is_lvm_volume(volume: BinaryIO) -> bool:
     """Determine whether the given file-like object belongs to any supported logical volume system.
 
-    It iterates through :attr:`LOGICAL_VOLUME_MANAGERS` whether the ``volume`` contains the required volume signature.
-
     Args:
         volume: A file-like object to test if it is part of any logical volume system.
-
-    Returns:
-        ``True`` if the :class:`LogicalVolumeSystem` can open the specific ``volume``, else ``False``.
     """
     for logical_vs in LOGICAL_VOLUME_MANAGERS:
         try:
@@ -297,13 +288,8 @@ def is_lvm_volume(volume: BinaryIO) -> bool:
 def is_encrypted(volume: BinaryIO) -> bool:
     """Determine whether the given file-like object belongs to any supported encrypted volume system.
 
-    It iterates through :attr:`ENCRYPTED_VOLUME_MANAGERS` whether the ``volume`` contains a encrypted header signature.
-
     Args:
         volume: A file-like object to test if it is part of any encrypted volume system.
-
-    Returns:
-        ``True`` if the :class:`EncryptedVolumeSystem` can open the specific ``volume``, else ``False``.
     """
     for manager in ENCRYPTED_VOLUME_MANAGERS:
         try:
@@ -318,14 +304,11 @@ def is_encrypted(volume: BinaryIO) -> bool:
 
 def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     """Open an encrypted ``volume``.
-    
-    An encrypted volume can only be opened if the encrypted volume system can successfully decrypt the volume, 
-    meaning that the correct decryption key must be present in the <deeplink to keychain>.
-    
-    The resulting ``Volume`` object provides transparent decryption of the encrypted volume.
 
-    It iterates through :attr:`ENCRYPTED_VOLUME_MANAGERS` to see which :class:`EncryptedVolumeSystem` can open this
-    specific :class:`Volume`.
+    An encrypted volume can only be opened if the encrypted volume system can successfully decrypt the volume,
+    meaning that the correct decryption key must be present in the :attr:`~dissect.target.helpers.keychain.KEYCHAIN`.
+
+    The resulting ``Volume`` object provides transparent decryption of the encrypted volume.
 
     Args:
         volume: A file-like object representing a :class:`Volume`.
@@ -345,9 +328,6 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
 
 def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]:
     """Open a single logical volume system on a list of file-like objects.
-
-    It iterates through :attr:`LOGICAL_VOLUME_MANAGERS` to see which :class:`LogicalVolumeSystem` can open this
-    specific :class:`Volume`.
 
     Args:
         volumes: A list of file-like objects to open a logical volume system on.

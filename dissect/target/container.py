@@ -105,7 +105,7 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
     def read(self, length: int) -> bytes:
-        """Read a ``length`` of bytes from ``fh``"""
+        """Read a ``length`` of bytes from this ``Container``."""
         raise NotImplementedError()
 
     def readinto(self, b: bytearray) -> int:
@@ -113,9 +113,7 @@ class Container(io.IOBase):
         return readinto(buffer=b, fh=self)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        """Change the stream positition.
-
-        Change the stream position to ``offset``.
+        """Change the stream position to ``offset``.
 
         ``whence`` determines where to seek from:
 
@@ -130,11 +128,11 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
     def seekable(self) -> bool:
-        """Returns whether ``seek`` can be used by this container. Always ``True``."""
+        """Returns whether ``seek`` can be used by this ``Container``. Always ``True``."""
         return True
 
     def tell(self) -> int:
-        """Returns the current position of the stream."""
+        """Returns the current seek position of the ``Container``."""
         raise NotImplementedError()
 
     def close(self) -> None:
