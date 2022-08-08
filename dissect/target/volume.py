@@ -93,7 +93,7 @@ class EncryptedVolumeSystem(VolumeSystem):
         fh: The file-like object on which to open the encrypted volume system.
     """
 
-    PROVIDER = None
+    PROVIDER: str = None
 
     def __init__(self, fh, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
