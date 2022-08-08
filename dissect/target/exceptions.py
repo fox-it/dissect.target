@@ -51,10 +51,7 @@ class UnsupportedPluginError(PluginError):
 
     def root_cause_str(self) -> str:
         """Often with this type of Error, the root cause is more descriptive for the user."""
-        e = self
-        while e != self.__cause__:
-            e = self.__cause__
-        return str(e.args[0])
+        return str(self.__cause__.args[0])
 
 
 class PluginNotFoundError(PluginError):
