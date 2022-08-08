@@ -17,7 +17,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[Volume]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
         lvm_extents = defaultdict(list)
 
         for vol in volumes:

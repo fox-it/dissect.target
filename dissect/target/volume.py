@@ -151,7 +151,7 @@ class LogicalVolumeSystem(VolumeSystem):
         raise NotImplementedError()
 
     @classmethod
-    def open_all(cls, volumes: list[Volume]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
         """Open all the discovered logical volume systems from the given file-like objects.
 
         There can be more than one logical volume system on a given set of file-like objects. For example, you can have

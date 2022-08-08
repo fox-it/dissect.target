@@ -1,7 +1,6 @@
 import logging
 import pathlib
-from ctypes import Union
-from typing import BinaryIO, Iterator
+from typing import BinaryIO, Iterator, Union
 
 from dissect.fve import bde
 from dissect.util.stream import AlignedStream
