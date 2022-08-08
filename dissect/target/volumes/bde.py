@@ -1,14 +1,13 @@
 import logging
 import pathlib
-from typing import Generator
+from typing import BinaryIO, Iterator, Union
 
 from dissect.fve import bde
 from dissect.util.stream import AlignedStream
 
-from dissect.target.volume import Volume, EncryptedVolumeSystem
-from dissect.target.helpers.keychain import KeyType
 from dissect.target.exceptions import VolumeSystemError
-
+from dissect.target.helpers.keychain import KeyType
+from dissect.target.volume import EncryptedVolumeSystem, Volume
 
 log = logging.getLogger(__name__)
 
@@ -21,18 +20,18 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
 
     PROVIDER = "bitlocker"
 
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.bde = bde.BDE(fh)
 
     @staticmethod
-    def detect(fh) -> bool:
+    def detect(fh: BinaryIO) -> bool:
         try:
             return bde.is_bde_volume(fh)
         except Exception:
             return False
 
-    def _volumes(self) -> Generator[Volume, None, None]:
+    def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
             volume_details = dict(
                 number=self.fh.number,
@@ -57,21 +56,21 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
             **volume_details,
         )
 
-    def unlock_with_passphrase(self, passphrase: str):
+    def unlock_with_passphrase(self, passphrase: str) -> None:
         try:
             self.bde.unlock_with_passphrase(passphrase)
             log.debug("Unlocked BDE volume with provided passphrase")
         except ValueError:
             log.exception("Failed to unlock BDE volume with provided passphrase")
 
-    def unlock_with_recovery_key(self, recovery_key: str):
+    def unlock_with_recovery_key(self, recovery_key: str) -> None:
         try:
             self.bde.unlock_with_recovery_password(recovery_key)
             log.debug("Unlocked BDE volume with recovery key")
         except ValueError:
             log.exception("Failed to unlock BDE volume with recovery password")
 
-    def unlock_with_bek_file(self, bek_file: pathlib.Path):
+    def unlock_with_bek_file(self, bek_file: pathlib.Path) -> None:
         if not bek_file.exists():
             log.error("Provided BEK file does not exist: %s", bek_file)
             return
