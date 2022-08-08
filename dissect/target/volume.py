@@ -69,7 +69,7 @@ class VolumeSystem:
         """List all valid discovered volumes found on the volume system.
 
         Returns:
-            An iterator of all :class:`Volumes` of the ``VolumeSystem``.
+            An iterator of all :class:`Volume` of the ``VolumeSystem``.
         """
         raise NotImplementedError()
 
