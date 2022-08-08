@@ -1,21 +1,23 @@
 import logging
 import struct
 from collections import defaultdict
+from typing import BinaryIO, Iterator, Union
 
-from dissect.target.volume import LogicalVolumeSystem, Volume
 from dissect.vmfs import lvm
 from dissect.vmfs.c_vmfs import c_vmfs
+
+from dissect.target.volume import LogicalVolumeSystem, Volume
 
 log = logging.getLogger(__name__)
 
 
 class VmfsVolumeSystem(LogicalVolumeSystem):
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.lvm = lvm.LVM(fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes):
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
         lvm_extents = defaultdict(list)
 
         for vol in volumes:
@@ -32,7 +34,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
                 continue
 
     @staticmethod
-    def detect(fh):
+    def detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
         for vol in vols:
             if VmfsVolumeSystem.detect_volume(vol):
@@ -40,7 +42,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         return False
 
     @staticmethod
-    def detect_volume(fh):
+    def detect_volume(fh: BinaryIO) -> bool:
         offset = fh.tell()
         try:
             fh.seek(c_vmfs.VMFS_LVM_DEVICE_META_BASE)
@@ -52,7 +54,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         finally:
             fh.seek(offset)
 
-    def _volumes(self):
+    def _volumes(self) -> Iterator[Volume]:
         try:
             name = next(extent.fh.name for extent in self.fh if hasattr(extent.fh, "name"))
         except StopIteration:
