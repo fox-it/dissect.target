@@ -27,9 +27,9 @@ log = logging.getLogger(__name__)
 """A logger instance for this module."""
 
 LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
-"""All available :class:`LogicalVolumeSystem` classes in one list."""
+"""All available :class:`LogicalVolumeSystem` classes."""
 ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
-"""All available :class:`EncryptedVolumeSystem` classes in one list."""
+"""All available :class:`EncryptedVolumeSystem` classes."""
 
 
 class VolumeSystem:
