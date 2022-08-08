@@ -10,6 +10,7 @@ from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
+    from dissect.target.container import Container
     from dissect.target.filesystem import Filesystem
     from dissect.target.volumes.disk import DissectVolumeSystem
 
@@ -44,7 +45,7 @@ class VolumeSystem:
         serial: Serial number of the volume system, if any.
     """
 
-    def __init__(self, fh: BinaryIO, dsk: BinaryIO = None, serial: str = None):
+    def __init__(self, fh: Container, dsk: Optional[Container] = None, serial: Optional[str] = None):
         self.fh = fh
         self.disk = dsk or fh  # Provide shorthand access to source disk
         self.serial = serial
@@ -116,15 +117,16 @@ class EncryptedVolumeSystem(VolumeSystem):
 
         Args:
             identifiers: A list of different key identifiers.
-
-        Returns:
-            All the keys for a single identifier.
         """
         # normalise values before checks
         identifiers = [i.lower() for i in identifiers]
         return [key for key in self.keys if key.identifier and key.identifier.lower() in identifiers]
 
     def get_keys_without_identifier(self) -> list[keychain.Key]:
+        """Retrieve a list of keys that have no identifier (``None``).
+
+        These are the keys where no specific identifier was specified.
+        """
         return [key for key in self.keys if key.identifier is None]
 
 
@@ -308,7 +310,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
     An encrypted volume can only be opened if the encrypted volume system can successfully decrypt the volume,
     meaning that the correct decryption key must be present in the :attr:`~dissect.target.helpers.keychain.KEYCHAIN`.
 
-    The resulting ``Volume`` object provides transparent decryption of the encrypted volume.
+    The resulting :class:`Volume` object provides transparent decryption of the encrypted volume.
 
     Args:
         volume: A file-like object representing a :class:`Volume`.
