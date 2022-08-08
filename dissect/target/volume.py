@@ -81,7 +81,8 @@ class VolumeSystem:
 
 
 class EncryptedVolumeSystem(VolumeSystem):
-    """An extension of the :class:`VolumeSystem` class that provides additional functionality for dealing with encryption.
+    """An extension of the :class:`VolumeSystem` class that provides additional functionality for
+    dealing with encryption.
 
     It adds helper functions for interacting with the :attr:`~dissect.target.helpers.keychain.KEYCHAIN`,
     so that subclasses don't have to manually interact with it.
