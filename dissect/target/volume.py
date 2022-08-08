@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional, Union
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
@@ -45,7 +45,9 @@ class VolumeSystem:
         serial: Serial number of the volume system, if any.
     """
 
-    def __init__(self, fh: Container, dsk: Optional[Container] = None, serial: Optional[str] = None):
+    def __init__(
+        self, fh: Union[BinaryIO, list[BinaryIO]], dsk: Optional[Container] = None, serial: Optional[str] = None
+    ):
         self.fh = fh
         self.disk = dsk or fh  # Provide shorthand access to source disk
         self.serial = serial
@@ -244,7 +246,7 @@ class Volume(io.IOBase):
         return self.fh.seek(offset, whence)
 
     def tell(self) -> int:
-        """Returns the current position of the ``fh`` stream."""
+        """Returns the current seek position of the ``Volume``."""
         return self.fh.tell()
 
     def seekable(self) -> bool:
