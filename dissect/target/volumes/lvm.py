@@ -1,16 +1,18 @@
 from collections import defaultdict
+from typing import BinaryIO, Iterator, Union
+
+from dissect.volume import lvm
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
-from dissect.volume import lvm
 
 
 class LvmVolumeSystem(LogicalVolumeSystem):
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.lvm = lvm.LVM2(fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes):
+    def open_all(cls, volumes: list[Volume]) -> Iterator[LogicalVolumeSystem]:
         lvm_pvs = defaultdict(list)
 
         for vol in volumes:
@@ -32,7 +34,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
                 continue
 
     @staticmethod
-    def detect(fh):
+    def detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
         for vol in vols:
             if LvmVolumeSystem.detect_volume(vol):
@@ -40,7 +42,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         return False
 
     @staticmethod
-    def detect_volume(fh):
+    def detect_volume(fh: BinaryIO) -> bool:
         try:
             offset = fh.tell()
             buf = fh.read(4096)
@@ -49,7 +51,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         except Exception:  # noqa
             return False
 
-    def _volumes(self):
+    def _volumes(self) -> Iterator[Volume]:
         for num, lv in enumerate(self.lvm.volume_group.logical_volumes):
             name = f"{lv.vg.name}-{lv.metadata.name}"
             yield Volume(lv, num, None, lv.size, None, name, raw=lv, vs=self)
