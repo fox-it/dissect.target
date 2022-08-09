@@ -23,9 +23,11 @@ except Exception:
     GENERATED = False
 
 if TYPE_CHECKING:
+    from flow.record import Record, RecordDescriptor
+
     from dissect.target import Target
     from dissect.target.filesystem import Filesystem
-    from flow.record import Record, RecordDescriptor
+    from dissect.target.helpers.record import ChildTargetRecord
 
 PluginDescriptor = dict[str, Any]
 """A dictionary type, for what the plugin descriptor looks like."""
@@ -41,7 +43,6 @@ OUTPUTS = (
 """The different output types supported by ``@export``."""
 
 log = logging.getLogger(__name__)
-"""A logger definition."""
 
 
 class Category:
@@ -61,7 +62,7 @@ def export(*args, **kwargs) -> Callable:
         property (bool): Whether this export should be regarded as a property.
             Properties are implicitly cached.
         cache (bool): Whether the result of this function should be cached.
-        record (RecordDescriptor): The ``RecordDescriptor`` for the records that this function yields.
+        record (RecordDescriptor): The :class:`flow.record.RecordDescriptor` for the records that this function yields.
             If the records are dynamically made, use DynamicRecord instead.
         output (str): The output type of this function. Can be one of:
 
@@ -219,11 +220,13 @@ class Plugin:
     def check_compatible(self) -> None:
         """Perform a compatibility check with the target.
 
-        This function should return ``True`` or ``False`` on whether it's compatible
-        with the current target (``self.target``). For example, check if a certain
+        This function should return ``None`` if the plugin is compatible with
+        the current target (``self.target``). For example, check if a certain
         file exists.
+        Otherwise, it should raise a ``UnsopportedPluginError``.
 
-        Should either return ``None`` or raise an exception.
+        Raises:
+            UnsupportedPluginError: If the plugin could not be loaded.
         """
         raise NotImplementedError
 
@@ -346,13 +349,16 @@ class OSPlugin(Plugin):
 class ChildTargetPlugin(Plugin):
     """A Child target is a special plugin that can list more Targets.
 
-    For example, :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin` can list all of the Virtual Machines on the host.
+    For example, :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin` can
+    list all of the Virtual Machines on the host.
     """
 
     __type__ = None
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
-        """Yield :class:`~dissect.target.helpers.record.ChildTargetRecord` records of all possible child targets on this target.""
+        """Yield :class:`~dissect.target.helpers.record.ChildTargetRecord` records of all
+        possible child targets on this target.
+        """
         raise NotImplementedError
 
 
