@@ -62,8 +62,7 @@ def map_linux_drives(target: Target):
     Get all devices from /dev/sd* (not partitions).
     """
     for drive in glob.glob("/dev/sd*[a-z]"):
-        fh = BufferedStream(open(drive, "rb"))
-        target.disks.add(RawContainer(fh))
+        _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_solaris_drives(target):
@@ -74,9 +73,7 @@ def map_solaris_drives(target):
     for drive in os.listdir("/dev/dsk"):
         if not SOLARIS_DRIVE_REGEX.match(drive):
             continue
-
-        fh = BufferedStream(open(drive, "rb"))
-        target.disks.add(RawContainer(fh))
+        _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_esxi_drives(target):
@@ -87,9 +84,7 @@ def map_esxi_drives(target):
     for drive in Path("/vmfs/devices/disks").glob("vml.*"):
         if ":" in drive.name:
             continue
-
-        fh = BufferedStream(drive.open("rb"))
-        target.disks.add(RawContainer(fh))
+        _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_windows_drives(target):
@@ -143,6 +138,15 @@ def map_windows_drives(target):
         # https://docs.microsoft.com/en-us/windows/desktop/api/fltuser/nf-fltuser-filtergetdosname
 
         target.disks.add(disk)
+
+
+def _add_disk_as_raw_container_to_target(drive, target):
+    # Removes duplicate code in map_*_drives()
+    try:
+        fh = BufferedStream(open(drive, "rb"))
+        target.disks.add(RawContainer(fh))
+    except Exception:
+        target.log.warning(f"Unable to open drive: {drive}, skipped")
 
 
 def _read_drive_letters():
