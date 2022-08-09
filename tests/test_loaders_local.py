@@ -1,4 +1,4 @@
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loaders.local import _add_disk_as_raw_container_to_target
@@ -12,7 +12,7 @@ def test_local_loader_drive_skipping(mock_target):
         with patch.object(mock_target.disks, "add") as mock_method:
             drive = "/xdev/fake"
             _add_disk_as_raw_container_to_target(drive, mock_target)
-            assert isinstance(mock_method.call_args[0][0], RawContainer) == True
+            assert isinstance(mock_method.call_args[0][0], RawContainer) is True
     mock.assert_called_with("/xdev/fake", "rb")
 
     # Does it emit a warning instead of raising an exception?
