@@ -31,7 +31,7 @@ PluginDescriptor = dict[str, Any]
 """A dictionary type, for what the plugin descriptor looks like."""
 
 MODULE_PATH = "dissect.target.plugins"
-"""The path to the different plugins."""
+"""The base module path to the in-tree plugins."""
 OUTPUTS = (
     "default",
     "record",
@@ -48,7 +48,8 @@ class Category:
     """A class defining the different categories for a plugin.
 
     This is currently unused however, the idea for the future is to
-    be able to execute multiple plugins that have the same ``Category``."""
+    be able to execute multiple plugins that have the same ``Category``.
+    """
 
     PERSISTENCE = "persistence"
 
@@ -116,13 +117,13 @@ def get_nonprivate_attribute_names(cls: Type[Plugin]) -> list[str]:
 
 
 def get_nonprivate_attributes(cls: Type[Plugin]) -> list[Any]:
-    """Retrieve all attributes from a :class:`Plugin`."""
+    """Retrieve all public attributes of a :class:`Plugin`."""
     # Note: `dir()` might return attributes from parent class
     return [getattr(cls, attr) for attr in get_nonprivate_attribute_names(cls)]
 
 
 def get_nonprivate_methods(cls: Type[Plugin]) -> list[Callable]:
-    """Retrieve all methods from a :class:`Plugin`."""
+    """Retrieve all public methods of a :class:`Plugin`."""
     return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property)]
 
 
@@ -160,13 +161,13 @@ class Plugin:
         __namespace__ = "test"
 
     Plugins can also specify one or more categories they belong to. They can do
-    this by importing the Category enum from dissect.target.plugin and specifying
+    this by importing the :class:`Category` enum from `dissect.target.plugin` and specifying
     them in a list in the __categories__ class attribute.
 
     Example:
         __categories__ = [Category.PERSISTENCE]
 
-    A ``Plugin`` class uses the followin private class attributes:
+    A ``Plugin`` class has the following private class attributes:
 
     - ``__namespace__``
     - ``__categories__``
@@ -178,12 +179,12 @@ class Plugin:
     - ``__functions__``
     - ``__exports__``
 
-    Additionally, the methods and attributes of :class:`Plugin` recieve more private attributes
-    by using decoratiores decorators.
+    Additionally, the methods and attributes of :class:`Plugin` receive more private attributes
+    by using decorators.
 
     The :func:`export` decorator adds the following private attributes
 
-    - ``__exported__``: Set with the :func:`export` decorator.
+    - ``__exported__``
     - ``__output__``: Set with the :func:`export` decorator.
     - ``__record__``: Set with the :func:`export` decorator.
 
@@ -195,9 +196,9 @@ class Plugin:
     """
 
     __namespace__: str = None
-    """Defines the plugin it's namespace."""
+    """Defines the plugin namespace."""
     __categories__: list[Category] = None
-    """Defines a list of :class:`Category` classes that the plugin uses."""
+    """Defines a list of :class:`Category` that the plugin belongs to."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
 
@@ -227,7 +228,7 @@ class Plugin:
         raise NotImplementedError
 
     def get_all_records(self) -> Iterator[Record]:
-        """Return the records from all exported methods.
+        """Return the records of all exported methods.
 
         Raises:
             PluginError: If the subclass is not a namespace plugin.
@@ -258,10 +259,9 @@ class Plugin:
 class OSPlugin(Plugin):
     """Base class for OS plugins.
 
-    This provides a baseclass for certain common functions of OS's.
-    Which each OS plugin has to implement seperately.
+    This provides a base class for certain common functions of OS's, which each OS plugin has to implement separately.
 
-    As an example, it provides an interface for retrieving the hostname, and its users.
+    For example, it provides an interface for retrieving the hostname and users of a target.
     """
 
     def check_compatible(self) -> bool:
@@ -346,26 +346,25 @@ class OSPlugin(Plugin):
 class ChildTargetPlugin(Plugin):
     """A Child target is a special plugin that can list more Targets.
 
-    Take :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin` as an example.
-    It can list all of the Virtual Machines on the host, so dissect can open them on that host.
+    For example, :class:`~dissect.target.plugins.child.esxi.ESXiChildTargetPlugin` can list all of the Virtual Machines on the host.
     """
 
     __type__ = None
 
-    def list_children(self) -> list[Target]:
-        """List all the additional ``Targets`` available on the image."""
+    def list_children(self) -> Iterator[ChildTargetRecord]:
+        """Yield :class:`~dissect.target.helpers.record.ChildTargetRecord` records of all possible child targets on this target.""
         raise NotImplementedError
 
 
 def register(plugincls: Type[Plugin]) -> None:
     """Register a plugin, and put related data inside :attr:`PLUGINS`.
 
-    This function uses the following private attributes that get set using decrorators:
+    This function uses the following private attributes that are set using decorators:
 
     - ``__exported__``: Set in :func:`export`.
     - ``__internal__``: Set in :func:`internal`.
 
-    Additionally, register sets private attributes on the ``.
+    Additionally, ``register`` sets the following private attributes on the `plugincls`:
 
     - ``__plugin__``: Always set to ``True``.
     - ``__functions__``: A list of all the methods and properties that are ``__internal__`` or ``__exported__``.
@@ -439,7 +438,8 @@ def register(plugincls: Type[Plugin]) -> None:
 
 
 def internal(*args, **kwargs) -> Callable:
-    """Decorator to be used on Plugin functions that should be internal only.
+    """Decorator to be used on plugin functions that should be internal only.
+    Making a plugin internal means that it's only callable from the Python API and not through ``target-query``.
 
     This decorator adds the ``__internal__`` private attribute to a method or property.
     The attribute is always set to ``True``, to tell :func:`register` that it is an internal
@@ -461,13 +461,13 @@ def internal(*args, **kwargs) -> Callable:
 def arg(*args, **kwargs) -> Callable:
     """Decorator to be used on Plugin functions that accept additional command line arguments.
 
-    Command line arguments can be added using the @arg decorator.
-    Arguments to this decorator are directly forwarded to the ArgumentParser.add_argument functionof argparse.
+    Command line arguments can be added using the ``@arg`` decorator.
+    Arguments to this decorator are directly forwarded to the ``ArgumentParser.add_argument`` function of ``argparse``.
     Resulting arguments are passed to the function using kwargs.
     The keyword argument name must match the argparse argument name.
 
     This decorator adds the ``__args__`` private attribute to a method or property.
-    The attribute holds all the command line arguments that can be added for a specific ``function``.
+    This attribute holds all the command line arguments that were added to the plugin function.
     """
 
     def decorator(obj):
@@ -484,10 +484,10 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors.
 
     Args:
-        osfilter: For filtering which os to use.
+        osfilter: The OS module path the plugin should be from.
 
     Returns:
-        An iterator going through plugin descriptors.
+        An iterator of all plugin descriptors, optionally filtered on OS module path.
     """
 
     def _walk(osfilter: str = None, root: dict = None) -> Iterator[PluginDescriptor]:
@@ -575,7 +575,7 @@ def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[P
 
     Args:
         func_name: Function name to lookup.
-        osfilter: OS path the plugin should be from.
+        osfilter: The OS module path the plugin should be from.
     """
     for plugin_desc in plugins(osfilter):
         if namespace == plugin_desc["namespace"]:
@@ -613,7 +613,7 @@ def failed() -> list[dict[str, Any]]:
 
 
 def _get_plugins() -> dict[str, PluginDescriptor]:
-    """Load all plugins in global namespace."""
+    """Load the plugin registry, or generate it if it doesn't exist yet."""
     global PLUGINS, GENERATED
     if not GENERATED:
         PLUGINS = generate()
@@ -622,7 +622,7 @@ def _get_plugins() -> dict[str, PluginDescriptor]:
 
 
 def save_plugin_import_failure(module: str) -> None:
-    """Store errors during plugin import."""
+    """Store errors that occurred during plugin import."""
     stacktrace = traceback.format_exception(*sys.exc_info())
     PLUGINS["_failed"].append(
         {
@@ -689,12 +689,12 @@ def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:
 
 
 def _modulepath(cls) -> str:
-    """Returns a modulepath of a :class:`Plugin` relative to ``dissect.target.plugins``."""
+    """Returns the module path of a :class:`Plugin` relative to ``dissect.target.plugins``."""
     return cls.__module__.replace(MODULE_PATH, "").lstrip(".")
 
 
 def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
-    """Returns an iterator of plugin classess that have a method that matches ``method_name``."""
+    """Retrieve plugin classess that have a method that matches ``method_name``."""
     for desc in get_plugins_by_func_name(method_name):
         try:
             yield load(desc)
@@ -706,7 +706,7 @@ def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
 
 
 def get_plugin_classes_by_namespace(namespace: str) -> Iterator[Type[Plugin]]:
-    """Returns an iterator of plugin classess that have ``__namespace__`` defined that matches ``namespace``."""
+    """Retrieve plugin classess that have ``__namespace__`` defined that matches ``namespace``."""
     for desc in get_plugins_by_namespace(namespace):
         try:
             yield load(desc)
