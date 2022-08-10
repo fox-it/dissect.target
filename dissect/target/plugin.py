@@ -223,7 +223,7 @@ class Plugin:
         This function should return ``None`` if the plugin is compatible with
         the current target (``self.target``). For example, check if a certain
         file exists.
-        Otherwise, it should raise a ``UnsopportedPluginError``.
+        Otherwise it should raise an ``UnsopportedPluginError``.
 
         Raises:
             UnsupportedPluginError: If the plugin could not be loaded.
@@ -445,6 +445,7 @@ def register(plugincls: Type[Plugin]) -> None:
 
 def internal(*args, **kwargs) -> Callable:
     """Decorator to be used on plugin functions that should be internal only.
+
     Making a plugin internal means that it's only callable from the Python API and not through ``target-query``.
 
     This decorator adds the ``__internal__`` private attribute to a method or property.
