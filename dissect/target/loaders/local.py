@@ -221,6 +221,7 @@ def _get_windows_drive_volumes(log):
                     disk_map[disk_num] = disk
                 except Exception as e:
                     log.debug("Unable to open disk: {disk_num}, skipped", exc_info=e)
+                    continue
                 try:
                     disk.vs = volume.open(disk)
                 except Exception as e:
