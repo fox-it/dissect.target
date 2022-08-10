@@ -40,5 +40,5 @@ class IOSPlugin(OSPlugin):
         raise NotImplementedError
 
     @export(property=True)
-    def os(self):
+    def os(self) -> str:
         return OperatingSystem.IOS.value

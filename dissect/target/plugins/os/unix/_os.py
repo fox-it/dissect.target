@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from struct import unpack
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Iterator, Optional, Tuple, Union
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -110,7 +110,7 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
-    def _parse_hostname_string(self, paths: Optional[List[str]] = None) -> Optional[Dict[str, str]]:
+    def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
         """
         Returns a dict with containing the hostname and domain name portion of the path(s) specified
 
@@ -133,7 +133,7 @@ class UnixPlugin(OSPlugin):
 
             return hostname_dict
 
-    def _parse_hosts_string(self, paths: Optional[List[str]] = None) -> Dict[str, str]:
+    def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
         hosts_string = {"ip": None, "hostname": None}
 
@@ -179,7 +179,7 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s at %s", volume, mount_point)
                     self.target.fs.mount(mount_point, volume.fs)
 
-    def _parse_os_release(self, glob: Optional[str] = None) -> Dict[str, str]:
+    def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
         glob = glob or "/etc/*-release"
 
         os_release = {}

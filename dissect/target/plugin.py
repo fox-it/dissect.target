@@ -16,6 +16,7 @@ from typing import Type, List, Callable, Any, Generator
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import cache
+from dissect.target.helpers.record import RecordDescriptor
 
 try:
     from dissect.target.plugins._pluginlist import PLUGINS
@@ -216,7 +217,7 @@ class OSPlugin(Plugin):
         return True
 
     @internal(property=True)
-    def os_all(self):
+    def os_all(self) -> list[str]:
         """Walk the OSPlugin MRO and return a list of all detected operating systems.
 
         Returns:
@@ -242,7 +243,7 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
-    def create(cls, target, sysvol):
+    def create(cls, target, sysvol) -> "OSPlugin":
         """Initiate this OSPlugin with the given target and detected filesystem.
 
         Note: must be implemented as a classmethod.
@@ -256,42 +257,42 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
-    def hostname(self):
+    def hostname(self) -> str:
         """Required OS function. Returns the hostname as string.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def ips(self):
+    def ips(self) -> list[str]:
         """Required OS function. Returns the IPs as list.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def version(self):
+    def version(self) -> str:
         """Required OS function. Returns the OS version as string.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def users(self):
-        """Required OS function.
+    def users(self) -> RecordDescriptor:
+        """Required OS function. Returns the available users as Records
 
         Implementations must be decorated with @export
         """
         raise NotImplementedError
 
-    def os(self):
+    def os(self) -> str:
         """Required OS function. Returns a slug of the OS name, e.g. 'windows' or 'linux'.
 
         Implementations must be decorated with @export(property=True)
         """
         raise NotImplementedError
 
-    def architecture(self):
+    def architecture(self) -> str:
         """Required OS function. Return the target triples of a system as a string. Of which the vendor can be optional.
 
         Implementations must be decorated with @export(property=True)
@@ -301,7 +302,7 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
-    def distribution(self):
+    def distribution(self) -> str:
         """Required OS function. Return a slug of the distribution name of the system, e.g. 'Debian' or 'Gentoo'
 
         Implementations must be decorated with @export(property=True)
