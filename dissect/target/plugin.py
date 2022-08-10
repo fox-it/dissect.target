@@ -223,7 +223,7 @@ class Plugin:
         This function should return ``None`` if the plugin is compatible with
         the current target (``self.target``). For example, check if a certain
         file exists.
-        Otherwise it should raise an ``UnsopportedPluginError``.
+        Otherwise it should raise an ``UnsupportedPluginError``.
 
         Raises:
             UnsupportedPluginError: If the plugin could not be loaded.
