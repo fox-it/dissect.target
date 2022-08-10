@@ -145,8 +145,8 @@ def _add_disk_as_raw_container_to_target(drive, target):
     try:
         fh = BufferedStream(open(drive, "rb"))
         target.disks.add(RawContainer(fh))
-    except Exception:
-        target.log.warning(f"Unable to open drive: {drive}, skipped")
+    except Exception as e:
+        target.log.warning(f"Unable to open drive: {drive}, skipped", exc_info=e)
 
 
 def _read_drive_letters():
@@ -211,15 +211,16 @@ def _get_windows_drive_volumes(log):
                 except Exception as e:
                     log.debug("Error getting size for disk %s", disk_path, exc_info=e)
                     disk_size = None
-
-                disk = RawContainer(
-                    BufferedStream(
-                        open(disk_path, "rb"),
-                        size=disk_size,
+                try:
+                    disk = RawContainer(
+                        BufferedStream(
+                            open(disk_path, "rb"),
+                            size=disk_size,
+                        )
                     )
-                )
-                disk_map[disk_num] = disk
-
+                    disk_map[disk_num] = disk
+                except Exception as e:
+                    log.debug("Unable to open disk: {disk_num}, skipped", exc_info=e)
                 try:
                     disk.vs = volume.open(disk)
                 except Exception as e:
