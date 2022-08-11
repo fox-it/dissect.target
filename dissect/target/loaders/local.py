@@ -140,7 +140,7 @@ def map_windows_drives(target):
         target.disks.add(disk)
 
 
-def _add_disk_as_raw_container_to_target(drive, target):
+def _add_disk_as_raw_container_to_target(drive: str, target: str) -> None:
     # Removes duplicate code in map_*_drives()
     try:
         fh = BufferedStream(open(drive, "rb"))
@@ -220,7 +220,7 @@ def _get_windows_drive_volumes(log):
                     )
                     disk_map[disk_num] = disk
                 except Exception as e:
-                    log.debug("Unable to open disk: {disk_num}, skipped", exc_info=e)
+                    log.debug("Unable to open disk %d at %s, skipped", disk_num, disk_path, exc_info=e)
                     continue
                 try:
                     disk.vs = volume.open(disk)
