@@ -14,6 +14,7 @@ from dissect.target.helpers.utils import parse_path_uri
 from dissect.util.stream import BufferedStream
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
+LINUX_NVME_DRIVE_REGEX = re.compile(r"nvme\d+n\d+$")
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
@@ -62,6 +63,11 @@ def map_linux_drives(target: Target):
     Get all devices from /dev/sd* (not partitions).
     """
     for drive in glob.glob("/dev/sd*[a-z]"):
+        _add_disk_as_raw_container_to_target(drive, target)
+
+    for drive in os.listdir("/dev"):
+        if not LINUX_NVME_DRIVE_REGEX.match(drive):
+            continue
         _add_disk_as_raw_container_to_target(drive, target)
 
 
