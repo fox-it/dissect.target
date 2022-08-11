@@ -1,7 +1,7 @@
 from unittest.mock import patch, mock_open
 
 from dissect.target.containers.raw import RawContainer
-from dissect.target.loaders.local import _add_disk_as_raw_container_to_target
+from dissect.target.loaders.local import _add_disk_as_raw_container_to_target, LINUX_DRIVE_REGEX
 from dissect.target.target import TargetLogAdapter
 
 
@@ -22,3 +22,25 @@ def test_local_loader_drive_skipping(mock_target):
         assert mock_method.call_args[0][0] == "Unable to open drive: /xdev/fake, skipped"
         assert isinstance(mock_method.call_args[1]["exc_info"], OSError) is True
     mock.assert_called_with("/xdev/fake", "rb")
+
+    # Can we detect all sorts of Linux devices properly?
+    drive_names = {
+        "fd0": True,  # Floppy
+        "fd1": True,  # Floppy
+        "sda": True,  # SCSI
+        "sdb": True,  # SCSI
+        "sdc": True,  # SCSI
+        "sda1": False,  # Partition
+        "nvme0n1": True,  # NVMe Disk
+        "nvme0n1p1": False,  # Partition
+        "hda": True,  # IDE-Controller
+        "hdb": True,  # IDE-Controller
+        "hda1": False,  # Partition
+        "sr0": False,  # Compact Disc
+        "scd0": False,  # Compact Disc
+        "tty11": False,  # Not a disk
+        "xsdaa": False,  # Fake
+        "xhdaa": False,  # Fake
+    }
+    for name, valid in drive_names.items():
+        assert (LINUX_DRIVE_REGEX.match(name) is not None) == valid

@@ -15,6 +15,7 @@ from dissect.util.stream import BufferedStream
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 LINUX_NVME_DRIVE_REGEX = re.compile(r"nvme\d+n\d+$")
+LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd[0,1]$)|(nvme\d+n\d+$)")
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
@@ -66,9 +67,8 @@ def map_linux_drives(target: Target):
         _add_disk_as_raw_container_to_target(drive, target)
 
     for drive in os.listdir("/dev"):
-        if not LINUX_NVME_DRIVE_REGEX.match(drive):
-            continue
-        _add_disk_as_raw_container_to_target(drive, target)
+        if LINUX_DRIVE_REGEX.match(drive):
+            _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_solaris_drives(target):
