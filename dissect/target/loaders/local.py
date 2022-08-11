@@ -140,7 +140,7 @@ def map_windows_drives(target):
         target.disks.add(disk)
 
 
-def _add_disk_as_raw_container_to_target(drive: str, target: str) -> None:
+def _add_disk_as_raw_container_to_target(drive: str, target: Target) -> None:
     try:
         fh = BufferedStream(open(drive, "rb"))
         target.disks.add(RawContainer(fh))
