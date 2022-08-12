@@ -27,6 +27,7 @@ def test_local_loader_drive_skipping(mock_target):
     drive_names = {
         "fd0": True,  # Floppy
         "fd1": True,  # Floppy
+        "fd2": True,  # Floppy
         "sda": True,  # SCSI
         "sdb": True,  # SCSI
         "sdc": True,  # SCSI
