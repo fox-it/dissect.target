@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from dissect.util.stream import BufferedStream
+
 from dissect.target import filesystem, volume, Target
 from dissect.target.containers.raw import RawContainer
 from dissect.target.filesystems.dir import DirectoryFilesystem
