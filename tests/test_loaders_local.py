@@ -27,7 +27,7 @@ def test_local_loader_drive_skipping(mock_target):
 
 
 @pytest.mark.parametrize(
-    "drive_name,expected",
+    "drive_name, expected",
     [
         ("fd0", True),  # Floppy
         ("fd1", True),  # Floppy
