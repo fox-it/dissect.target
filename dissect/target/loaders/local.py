@@ -15,7 +15,7 @@ from dissect.target.helpers.utils import parse_path_uri
 
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
-LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd[0,1]$)|(nvme\d+n\d+$)")
+LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd[01]$)|(nvme\d+n\d+$)")
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
