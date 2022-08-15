@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.network_managers import LinuxNetworkManager
@@ -24,27 +24,27 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         return None
 
     @export(property=True)
-    def ips(self) -> List[str]:
+    def ips(self) -> list[str]:
         return self.network_manager.get_config_value("ips")
 
     @export(property=True)
-    def dns(self) -> List[str]:
+    def dns(self) -> list[str]:
         return self.network_manager.get_config_value("dns")
 
     @export(property=True)
-    def dhcp(self) -> List[bool]:
+    def dhcp(self) -> list[bool]:
         return self.network_manager.get_config_value("dhcp")
 
     @export(property=True)
-    def gateway(self) -> List[str]:
+    def gateway(self) -> list[str]:
         return self.network_manager.get_config_value("gateway")
 
     @export(property=True)
-    def interface(self) -> List[str]:
+    def interface(self) -> list[str]:
         return self.network_manager.get_config_value("interface")
 
     @export(property=True)
-    def netmask(self) -> List[str]:
+    def netmask(self) -> list[str]:
         return self.network_manager.get_config_value("netmask")
 
     @export(property=True)
@@ -56,7 +56,3 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.LINUX.value
-
-    @export(property=True)
-    def architecture(self) -> Optional[str]:
-        return super().architecture(self.os)

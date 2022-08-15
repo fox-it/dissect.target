@@ -3,7 +3,7 @@ from __future__ import annotations
 import gzip
 import os
 import socket
-from typing import BinaryIO, List, Iterator, Optional
+from typing import BinaryIO, Iterator, Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
@@ -159,7 +159,7 @@ class FortigatePlugin(LinuxPlugin):
         return self.config.config.system["global"].hostname[0]
 
     @export(property=True)
-    def ips(self) -> List[str]:
+    def ips(self) -> list[str]:
         r = []
         for _, conf in self.config.config.system.interface.children.items():
             if "ip" in conf:

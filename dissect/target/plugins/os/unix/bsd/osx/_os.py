@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import plistlib
-from typing import Iterator, List, Optional
+from typing import Iterator, Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
@@ -40,7 +40,7 @@ class MacPlugin(BsdPlugin):
                 pass
 
     @export(property=True)
-    def ips(self) -> Optional[List[str]]:
+    def ips(self) -> Optional[list[str]]:
         raise NotImplementedError
 
     @export(property=True)

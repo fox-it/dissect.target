@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import struct
-from typing import Iterator, List, Optional
+from typing import Iterator, Optional
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
@@ -86,7 +86,7 @@ class WindowsPlugin(OSPlugin):
             return None
 
     @export(property=True)
-    def ips(self) -> List[str]:
+    def ips(self) -> list[str]:
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces"
         fields = ["IPAddress", "DhcpIPAddress"]
         ips = set()

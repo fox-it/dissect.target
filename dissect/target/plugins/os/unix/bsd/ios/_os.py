@@ -1,9 +1,10 @@
 import plistlib
 
-from dissect.target.plugin import OSPlugin, export, OperatingSystem
+from dissect.target.plugin import export, OperatingSystem
+from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
 
-class IOSPlugin(OSPlugin):
+class IOSPlugin(BsdPlugin):
     @classmethod
     def detect(cls, target):
         for fs in target.filesystems:

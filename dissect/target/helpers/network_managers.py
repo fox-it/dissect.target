@@ -2,7 +2,7 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, NoReturn, Optional, Union
+from typing import Any, Callable, Match, Optional, Union
 from xml.etree.ElementTree import ElementTree
 
 from dissect.target.helpers.fsutil import TargetPath
@@ -34,18 +34,18 @@ class Template:
         self.sections = sections
         self.options = options
 
-    def set_name(self, name: str) -> NoReturn:
+    def set_name(self, name: str) -> None:
         """Sets the name of the the used parsing template to the name of the discovered network manager."""
         self.name = name
 
     def create_config(self, path: TargetPath) -> Union[dict, None]:
         """Create a network config dictionary based on the configured template and supplied path.
 
-        Returns:
-            A dictionary based on the provided configured template, else None
-
         Args:
             Path: Path to the to be parsed config file.
+
+        Returns:
+            A dictionary based on the provided configured template, else None
         """
 
         if not path.exists() or path.is_dir():
@@ -65,11 +65,11 @@ class Template:
     def _parse_netplan_config(self, fh: TargetPath) -> Union[dict, None]:
         """Internal function to parse a netplan YAML based configuration file into a dict.
 
-        Returns:
-            Dictionary containing the parsed YAML based configuration file.
-
         Args:
             fh: A file-like object to the configuration file to be parsed.
+
+        Returns:
+            Dictionary containing the parsed YAML based configuration file.
         """
         if PY_YAML:
             return self.parser(stream=fh.open(), Loader=yaml.FullLoader)
@@ -80,11 +80,11 @@ class Template:
     def _parse_wicked_config(self, fh: TargetPath) -> dict:
         """Internal function to parse a wicked XML based configuration file into a dict.
 
-        Returns:
-            Dictionary containing the parsed xml based Linux network manager based configuration file.
-
         Args:
             fh: A file-like object to the configuration file to be parsed.
+
+        Returns:
+            Dictionary containing the parsed xml based Linux network manager based configuration file.
         """
         # nasty workaround for namespaced XML without namespace (xlmns) definitions
         # we have to replace the ":" for this with "___" (three underscores) to make the xml config non-namespaced.
@@ -98,11 +98,11 @@ class Template:
     def _parse_configparser_config(self, fh: TargetPath) -> dict:
         """Internal function to parse ConfigParser compatible configuration files into a dict.
 
-        Returns:
-            Dictionary containing the parsed ConfigParser compatible configuration file.
-
         Args:
             fh: A file-like object to the configuration file to be parsed.
+
+        Returns:
+            Dictionary containing the parsed ConfigParser compatible configuration file.
         """
         try:
             self.parser.read_string(fh.open("rt").read(), fh.name)
@@ -115,13 +115,13 @@ class Template:
     def _parse_text_config(self, comments: str, delim: str, fh: TargetPath) -> dict:
         """Internal function to parse a basic plain text based configuration file into a dict.
 
-        Returns:
-            Dictionary with a parsed plain text based Linux network manager configuration file.
-
         Args:
             comments: A string value defining the comment style of the configuration file.
             delim: A string value defining the delimiters used in the configuration file.
             fh: A file-like object to the configuration file to be parsed.
+
+        Returns:
+            Dictionary with a parsed plain text based Linux network manager configuration file.
         """
         config = defaultdict(dict)
         option_dict = {}
@@ -136,20 +136,20 @@ class Template:
                     option_dict[option] = entry
 
         for section in self.sections:
-            config[section].update(option_dict)
+            config[section] = option_dict
 
         return dict(config)
 
     def _parse_xml_config(self, xml: ElementTree, sections: list, options: list) -> dict:
         """Internal function to parse a xml based Linux network manager based configuration file into a dict.
 
-        Returns:
-            Dictionary containing the parsed xml based Linux network manager based configuration file.
-
         Args:
             xml: An XML ElementTree object to convert to a dict
             sections: Configuration sections to look-up in the specified XML ElementTree
             options: Configuration options to look-up in the specified XML ElementTree
+
+        Returns:
+            Dictionary containing the parsed xml based Linux network manager based configuration file.
         """
         xml_dict = {}
         for section in sections:
@@ -187,21 +187,14 @@ class Parser:
         self.options = self.template.options
         self.config_globs = config_globs
 
-    def parse(self) -> dict:
+    def parse(self) -> defaultdict:
         """Returns a translated dictionary of network configuration properties.
 
         Returns:
             Dictionary containing network configuration properties for interface, dhcp, ips, gateways, dns, and netmask.
         """
 
-        template = {
-            "interface": set(),
-            "dhcp": set(),
-            "ips": set(),
-            "gateway": set(),
-            "dns": set(),
-            "netmask": set(),
-        }
+        template = defaultdict(set)
 
         for path in self.expand_config_file_paths():
             config = self.template.create_config(path)
@@ -258,8 +251,13 @@ class Parser:
             if any([translation_value in option for translation_value in translation_values]) and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: dict, section=None) -> Union[str, Callable]:
+    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
+
+        Args:
+            config: Configuration dictionary to obtain a option from.
+            option: Option value to search for in the configuration dictionary.
+            section: Section within the configuration dictionaty to look for the option value.
 
         Returns:
             Value(s) corrensponding to that network configuration option.
@@ -313,12 +311,12 @@ class NetworkManager:
     def register(self, target: Target, template: Template) -> bool:
         """Sets the detected parsing template and target the network manager.
 
-        Returns:
-            Whether the registration process was executed succesfully.
-
         Args:
             target: Target object to register to this NetworkManager class.
             template: Parsing Template object to register to this NetworkManager class.
+
+        Returns:
+            Whether the registration process was executed succesfully.
         """
         self.target = target
         self.parser = Parser(target, self.config_globs, template)
@@ -334,7 +332,7 @@ class NetworkManager:
             target.log.error("Failed to register network manager %s as active.", self.name)
             return False
 
-    def parse(self) -> NoReturn:
+    def parse(self) -> None:
         """Parse the network configuration for this network manager."""
         if self.registered:
             self.config = self.parser.parse()
@@ -343,15 +341,15 @@ class NetworkManager:
 
     @property
     def interface(self) -> set:
-        return self.config["interface"]
+        return self.config.get("interface")
 
     @property
     def ips(self) -> set:
-        return self.config["ips"]
+        return self.config.get("ips")
 
     @property
     def dns(self) -> set:
-        return self.config["dns"]
+        return self.config.get("dns")
 
     @property
     def dhcp(self) -> bool:
@@ -360,11 +358,11 @@ class NetworkManager:
 
     @property
     def gateway(self) -> set:
-        return self.config["gateway"]
+        return self.config.get("gateway")
 
     @property
     def netmask(self) -> set:
-        return self.config["netmask"]
+        return self.config.get("netmask")
 
     @property
     def registered(self) -> bool:
@@ -387,7 +385,7 @@ class NetworkManager:
 
         translated_value = set()
 
-        if self.config["dhcp"]:
+        if self.config.get("dhcp"):
             for dhcp_value in self.config.get("dhcp", ""):
                 if isinstance(dhcp_value, bool):
                     return translated_value.add(dhcp_value)
@@ -416,7 +414,7 @@ class LinuxNetworkManager:
         self.managers = []
         self.target = target
 
-    def discover(self) -> NoReturn:
+    def discover(self) -> None:
         """Discover which defined network managers are active on the target.
 
         Registers the discovered network managers as active for parsing later on.

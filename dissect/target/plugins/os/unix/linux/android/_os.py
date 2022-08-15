@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterator, List, Optional, TextIO
+from typing import Iterator, Optional, TextIO
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
@@ -45,7 +45,7 @@ class AndroidPlugin(OSPlugin):
         return self.props.props["ro.build.host"]
 
     @export(property=True)
-    def ips(self) -> List[str]:
+    def ips(self) -> list[str]:
         return []
 
     @export(property=True)

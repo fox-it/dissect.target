@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from operator import itemgetter
-from typing import List, Optional
+from typing import Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
@@ -46,7 +46,7 @@ class VyosPlugin(LinuxPlugin):
         return None
 
     @export(property=True)
-    def ips(self) -> Optional[List[str]]:
+    def ips(self) -> Optional[list[str]]:
         return None
 
     @export(property=True)

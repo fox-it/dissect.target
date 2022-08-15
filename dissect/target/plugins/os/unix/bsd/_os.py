@@ -39,7 +39,3 @@ class BsdPlugin(UnixPlugin):
     def ips(self) -> Optional[List[str]]:
         self.target.log.error(f"ips plugin not implemented for {self.__class__}")
         return None
-
-    @export(property=True)
-    def architecture(self) -> Optional[str]:
-        return super().architecture(self.os)

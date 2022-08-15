@@ -60,37 +60,8 @@ class UnixPlugin(OSPlugin):
             )
 
     @export(property=True)
-    def architecture(self, os: str = "unix") -> Optional[str]:
-        arch_strings = {
-            0x00: "Unknown",
-            0x02: "SPARC",
-            0x03: "x86",
-            0x08: "MIPS",
-            0x14: "PowerPC",
-            0x16: "S390",
-            0x28: "ARM",
-            0x2A: "SuperH",
-            0x32: "IA-64",
-            0x3E: "x86_64",
-            0xB7: "AArch64",
-            0xF3: "RISC-V",
-        }
-
-        for fs in self.target.filesystems:
-            if fs.exists("/bin/ls"):
-                fh = fs.open("/bin/ls")
-                fh.seek(4)
-                # ELF - e_ident[EI_CLASS]
-                bits = unpack("B", fh.read(1))[0]
-                fh.seek(18)
-                # ELF - e_machine
-                arch = unpack("H", fh.read(2))[0]
-                arch = arch_strings.get(arch)
-
-                if bits == 1:  # 32 bit system
-                    return f"{arch}_32-{os}"
-                else:
-                    return f"{arch}-{os}"
+    def architecture(self) -> str:
+        return self._get_architecture(self.os)
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
@@ -197,6 +168,38 @@ class UnixPlugin(OSPlugin):
                         except ValueError:
                             continue
         return os_release
+
+    def _get_architecture(self, os: str = "unix") -> Optional[str]:
+        arch_strings = {
+            0x00: "Unknown",
+            0x02: "SPARC",
+            0x03: "x86",
+            0x08: "MIPS",
+            0x14: "PowerPC",
+            0x16: "S390",
+            0x28: "ARM",
+            0x2A: "SuperH",
+            0x32: "IA-64",
+            0x3E: "x86_64",
+            0xB7: "AArch64",
+            0xF3: "RISC-V",
+        }
+
+        for fs in self.target.filesystems:
+            if fs.exists("/bin/ls"):
+                fh = fs.open("/bin/ls")
+                fh.seek(4)
+                # ELF - e_ident[EI_CLASS]
+                bits = unpack("B", fh.read(1))[0]
+                fh.seek(18)
+                # ELF - e_machine
+                arch = unpack("H", fh.read(2))[0]
+                arch = arch_strings.get(arch)
+
+                if bits == 1:  # 32 bit system
+                    return f"{arch}_32-{os}"
+                else:
+                    return f"{arch}-{os}"
 
 
 def parse_fstab(

@@ -7,7 +7,7 @@ import struct
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
-from typing import Any, BinaryIO, Dict, Iterator, List, Optional, TextIO
+from typing import Any, BinaryIO, Iterator, Optional, TextIO
 
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
@@ -121,7 +121,7 @@ class ESXiPlugin(LinuxPlugin):
         return self._cfg("/adv/Misc/HostName").partition(".")[2] or None
 
     @export(property=True)
-    def ips(self) -> List[str]:
+    def ips(self) -> list[str]:
         result = set()
         host_ip = self._cfg("/adv/Misc/HostIPAddr")
         mgmt_ip = self._cfg("/adv/Net/ManagementAddr")
@@ -171,7 +171,7 @@ class ESXiPlugin(LinuxPlugin):
             print(obj)
 
     @internal
-    def configstore(self) -> Dict[str, Any]:
+    def configstore(self) -> dict[str, Any]:
         return self._configstore
 
     @export(property=True)
@@ -179,7 +179,7 @@ class ESXiPlugin(LinuxPlugin):
         return OperatingSystem.ESXI.value
 
 
-def _mount_modules(target: Target, sysvol: Filesystem, cfg: Dict[str, str]):
+def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
     modules = [m.strip() for m in cfg["modules"].split("---")]
 
     for module in modules:
@@ -231,7 +231,7 @@ def _mount_local(target: Target, local_layer: VirtualFilesystem):
         local_layer.mount("/", local_fs)
 
 
-def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: Dict[str, str]):
+def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
     version = cfg["build"]
 
     osdata_fs = None
@@ -310,7 +310,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: Dict[str, str]):
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
 
 
-def _link_log_dir(target: Target, cfg: Dict[str, str], plugin_obj: ESXiPlugin):
+def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin):
     version = cfg["build"]
 
     # Don't really know how ESXi does this, but let's just take a shortcut for now
@@ -341,7 +341,7 @@ def _link_log_dir(target: Target, cfg: Dict[str, str], plugin_obj: ESXiPlugin):
         target.fs.symlink(log_dir, "/var/log")
 
 
-def parse_boot_cfg(fh: TextIO) -> Dict[str, str]:
+def parse_boot_cfg(fh: TextIO) -> dict[str, str]:
     cfg = {}
     for line in fh:
         line = line.strip()
@@ -355,7 +355,7 @@ def parse_boot_cfg(fh: TextIO) -> Dict[str, str]:
     return cfg
 
 
-def parse_esx_conf(fh: TextIO) -> Dict[str, Any]:
+def parse_esx_conf(fh: TextIO) -> dict[str, Any]:
     config = {}
     for line in fh:
         line = line.strip()
@@ -380,7 +380,7 @@ def parse_esx_conf(fh: TextIO) -> Dict[str, Any]:
     return config
 
 
-def _traverse(path: str, obj: Dict[str, Any], create: bool = False):
+def _traverse(path: str, obj: dict[str, Any], create: bool = False):
     parts = path.strip("/").split("/")
     path_parts = parts[:-1]
     for part in path_parts:
@@ -407,7 +407,7 @@ def _traverse(path: str, obj: Dict[str, Any], create: bool = False):
     return obj
 
 
-def parse_config_store(fh: BinaryIO) -> Dict[str, Any]:
+def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
     db = sqlite3.SQLite3(fh)
 
     store = {}
