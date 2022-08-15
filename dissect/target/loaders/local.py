@@ -1,5 +1,4 @@
 import ctypes
-import glob
 import os
 import platform
 import re
@@ -16,6 +15,7 @@ from dissect.target.helpers.utils import parse_path_uri
 
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
+LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
@@ -61,10 +61,11 @@ class LocalLoader(Loader):
 def map_linux_drives(target: Target):
     """Map Linux raw disks.
 
-    Get all devices from /dev/sd* (not partitions).
+    Iterate through /dev and match raw device names (not partitions).
     """
-    for drive in glob.glob("/dev/sd*[a-z]"):
-        _add_disk_as_raw_container_to_target(drive, target)
+    for drive in os.listdir("/dev"):
+        if LINUX_DRIVE_REGEX.match(drive):
+            _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_solaris_drives(target):
