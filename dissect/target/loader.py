@@ -169,7 +169,6 @@ register("vma", "VmaLoader")
 register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
-register("split", "SplitLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
 register("phobos", "PhobosLoader")

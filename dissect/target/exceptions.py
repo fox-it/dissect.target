@@ -49,6 +49,14 @@ class RegistryKeyNotFoundException(Error):
 class UnsupportedPluginError(PluginError):
     """The requested plugin is not supported by the target."""
 
+    def root_cause_str(self) -> str:
+        """Often with this type of Error, the root cause is more descriptive for the user."""
+        return str(self.__cause__.args[0])
+
+
+class PluginNotFoundError(PluginError):
+    """Plugin cannot be found."""
+
 
 class FileNotFoundError(FilesystemError):
     """The requested path could not be found."""

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO, Union
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
     from dissect.target.volume import VolumeSystem
@@ -39,12 +40,12 @@ class Container(io.IOBase):
     Override ``__init__`` for any opening that you may need to do, but don't forget to initialize the super class.
 
     Args:
-        fh: The source file-like object of the container.
+        fh: The source file-like object of the container or a ``Path`` object to the file.
         size: The size of the container.
         vs: An optional shorthand to set the underlying volume system, usually set later.
     """
 
-    def __init__(self, fh: BinaryIO, size: int, vs: VolumeSystem = None):
+    def __init__(self, fh: Union[BinaryIO, Path], size: int, vs: VolumeSystem = None):
         self.fh = fh
         self.size = size
 
@@ -79,7 +80,7 @@ class Container(io.IOBase):
 
         Args:
             fh: A file-like object that we want to open a ``Container`` on.
-            original: The location where the file-like object comes from.
+            original: The original argument passed to ``detect()``.
 
         Returns:
             ``True`` if this ``Container`` can be used for this file-like object, ``False`` otherwise.
@@ -96,7 +97,7 @@ class Container(io.IOBase):
 
         Args:
             path: A location to a file.
-            original: The location where the file-like object comes from.
+            original: The original argument passed to ``detect()``.
 
         Returns:
             ``True`` if this ``Container`` can be used for this path, ``False`` otherwise.
@@ -104,13 +105,15 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
     def read(self, length: int) -> bytes:
-        """Read a ``length`` of bytes from ``fh``"""
+        """Read a ``length`` of bytes from this ``Container``."""
         raise NotImplementedError()
 
-    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        """Change the stream positition.
+    def readinto(self, b: bytearray) -> int:
+        """Uses :func:`dissect.target.helpers.utils.readinto`."""
+        return readinto(buffer=b, fh=self)
 
-        Change the stream position to ``offset``.
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        """Change the stream position to ``offset``.
 
         ``whence`` determines where to seek from:
 
@@ -125,11 +128,11 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
     def seekable(self) -> bool:
-        """Returns whether ``seek`` can be used by this container. Always ``True``."""
+        """Returns whether ``seek`` can be used by this ``Container``. Always ``True``."""
         return True
 
     def tell(self) -> int:
-        """Returns the current position of the stream."""
+        """Returns the current seek position of the ``Container``."""
         raise NotImplementedError()
 
     def close(self) -> None:
@@ -165,8 +168,8 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         raw.RawContainer,
     ]
     if isinstance(item, list):
-        item = [Path(entry) if not isinstance(entry, Path) else entry for entry in item]
-    elif not isinstance(item, Path):
+        item = [Path(entry) if isinstance(entry, str) else entry for entry in item]
+    elif isinstance(item, str):
         item = Path(item)
 
     for container in containers:
