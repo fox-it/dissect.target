@@ -1,5 +1,7 @@
 import struct
 
+from typing import Optional
+
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OSPlugin, export
@@ -149,6 +151,24 @@ class WindowsPlugin(OSPlugin):
             bits = arch_strings.get(arch)
 
             return {"arch": arch, "bitness": bits}
+        except RegistryError:
+            pass
+
+    @export(property=True)
+    def codepage(self) -> Optional[str]:
+        """
+        Returns a string value of the current active codepage on the system
+
+        Returns:
+            str: The current active code page on the system (ACP)
+        """
+
+        key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
+
+        try:
+            # Current active codepage value
+            acp = self.target.registry.key(key).value("ACP").value
+            return acp
         except RegistryError:
             pass
 
