@@ -25,11 +25,29 @@ class RegistryHive:
         return self.key("")
 
     def key(self, key: str) -> RegistryKey:
-        """Returns the key at the specified location."""
+        """Retrieve the ``key`` from the specified location.
+
+        Args:
+            key: A specific registry location.
+
+        Returns:
+            The :class:`RegistryKey` specified by ``key``.
+
+        Raises:
+            RegistryKeyNotFoundError: if the registrykey could not be found.
+        """
         raise NotImplementedError()
 
     def keys(self, keys: Union[str, list[str]]) -> Iterator[RegistryKey]:
-        """Iterate a number of keys."""
+        """Retrieve all the keys inside the ``keys`` variable from the registry.
+
+        Args:
+            keys: A single key to find, or a list of keys to iterate over.
+
+        Returns:
+            An iterator that iterates over all the keys inside ``keys`` and tries to return those it can.
+            It will not return the ``keys`` it cannot find.
+        """
         keys = [keys] if not isinstance(keys, list) else keys
         for key in keys:
             try:
@@ -39,7 +57,11 @@ class RegistryHive:
 
 
 class RegistryKey:
-    """Base class for registry keys."""
+    """Base class for registry keys.
+
+    Args:
+        hive: A registry hive that contains this ``RegistryKey`` instance.
+    """
 
     def __init__(self, hive: Optional[RegistryHive] = None):
         self.hive = hive
@@ -65,19 +87,46 @@ class RegistryKey:
         raise NotImplementedError()
 
     def subkey(self, subkey: str) -> RegistryKey:
-        """Returns the specified subkey from this key."""
+        """Retrieve a ``subkey`` that is part of this specific ``RegistryKey`` instance.
+
+        Args:
+            subkey: The name of the key to retrieve
+
+        Returns:
+            Another ``RegistryKey`` object where this object is the parent.
+
+        Raises:
+            RegistryKeyNotFoundError: If the ``subkey`` was not part of this ``RegistryKey`` instance.
+        """
         raise NotImplementedError()
 
     def subkeys(self) -> list[RegistryKey]:
-        """Returns a list of subkeys from this key."""
+        """Retrieve all the subkeys that are contained in this ``RegistryKey`` instance.
+
+        Returns:
+            A list of subkeys from this key.
+        """
         raise NotImplementedError()
 
     def value(self, value: str) -> RegistryValue:
-        """Returns the specified value from this key."""
+        """Retrieve the :class:`RegistryValue` associated to this ``RegistryKey``.
+
+        Args:
+            value: The value to look for inside this ``RegistryKey`` instance.
+
+        Returns:
+            The value associated with this ``RegistryKey`` instance.
+
+        Raises:
+            RegistryValueNotFoundError: If ``value`` was not a part of this ``RegistryKey`` instance."""
         raise NotImplementedError()
 
     def values(self) -> list[RegistryValue]:
-        """Returns a list of values from this key."""
+        """Retrieve all the values that are contained in this ``RegistryKey`` instance.
+
+        Returns:
+            A list of values from this ``RegistryKey`` instance.
+        """
         raise NotImplementedError()
 
     def __repr__(self):
