@@ -160,6 +160,17 @@ class WindowsPlugin(OSPlugin):
         except RegistryError:
             pass
 
+    @export(property=True)
+    def codepage(self) -> Optional[str]:
+        """Returns the current active codepage on the system."""
+
+        key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
+
+        try:
+            return self.target.registry.key(key).value("ACP").value
+        except RegistryError:
+            pass
+
     @export(record=WindowsUserRecord)
     def users(self) -> Iterator[WindowsUserRecord]:
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
