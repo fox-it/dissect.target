@@ -4,11 +4,13 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
+import enum
 import importlib
 import logging
 import os
 import sys
 import traceback
+
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -43,6 +45,19 @@ OUTPUTS = (
 """The different output types supported by ``@export``."""
 
 log = logging.getLogger(__name__)
+
+
+class OperatingSystem(enum.Enum):
+    LINUX = "linux"
+    WINDOWS = "windows"
+    ESXI = "exsi"
+    BSD = "bsd"
+    OSX = "osx"
+    UNIX = "unix"
+    ANDROID = "android"
+    VYOS = "vyos"
+    IOS = "ios"
+    FORTIGATE = "fortigate"
 
 
 class Category:
