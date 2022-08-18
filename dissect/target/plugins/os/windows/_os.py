@@ -1,5 +1,6 @@
-import struct
+from __future__ import annotations
 
+import struct
 from typing import Optional
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
@@ -156,19 +157,12 @@ class WindowsPlugin(OSPlugin):
 
     @export(property=True)
     def codepage(self) -> Optional[str]:
-        """
-        Returns a string value of the current active codepage on the system
-
-        Returns:
-            str: The current active code page on the system (ACP)
-        """
+        """Returns the current active codepage on the system."""
 
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
 
         try:
-            # Current active codepage value
-            acp = self.target.registry.key(key).value("ACP").value
-            return acp
+            return self.target.registry.key(key).value("ACP").value
         except RegistryError:
             pass
 
