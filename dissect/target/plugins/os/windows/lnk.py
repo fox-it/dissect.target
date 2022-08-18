@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, arg
 from dissect.target.target import Target
 from dissect.util import ts
-from typing import Iterator, Union
+from typing import Iterator, Union, Optional
 
 LnkRecord = TargetRecordDescriptor(
     "windows/filesystem/lnk",
@@ -37,16 +37,16 @@ class LnkPlugin(Plugin):
         super().__init__(target)
         self.folders = ["programdata", "users", "windows"]
 
-    def check_compatible(self) -> Union[bool, Exception]:
+    def check_compatible(self) -> None:
         for folder in self.folders:
             if self.target.fs.path(f"sysvol/{folder}").exists():
-                return True
+                return None
         raise UnsupportedPluginError("No folders containing link files found")
 
     @arg("--path", "-p", dest="path", default=None, help="Path to .lnk file in target")
     @export(record=LnkRecord)
-    def lnk(self, path: str) -> Iterator[LnkRecord]:
-        """Parse all .lnk files in /Users, /ProgramData, and /Windows or from a specified path in record format.
+    def lnk(self, path: Optional[str]) -> Iterator[LnkRecord]:
+        """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
             lnk_path (uri): Path of the link (.lnk) file.
@@ -77,9 +77,6 @@ class LnkPlugin(Plugin):
             lnk_net_name = lnk_device_name = None
 
             if lnk_file.link_header:
-                import ipdb
-
-                ipdb.set_trace()
                 lnk_path = str(entry)
                 lnk_name = lnk_file.stringdata.name_string.string if lnk_file.flag("has_name") else None
 
@@ -154,10 +151,8 @@ class LnkPlugin(Plugin):
                     target_atime=target_atime,
                     target_ctime=target_ctime,
                 )
-            else:
-                continue
 
-    def lnk_entries(self, path: str = None) -> Iterator[TargetPath]:
+    def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
         if path:
             yield self.target.fs.path(path)
         else:
