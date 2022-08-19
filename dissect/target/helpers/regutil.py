@@ -6,7 +6,7 @@ import struct
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
-from typing import Any, BinaryIO, Iterator, Optional, Union
+from typing import Any, BinaryIO, Iterator, Optional, TextIO, Union
 
 from dissect.regf import regf
 from dissect.target.exceptions import (
@@ -18,7 +18,12 @@ from dissect.target.helpers.fsutil import TargetPath
 
 
 class RegistryHive:
-    """Base class for registry hives."""
+    """Base class for registry hives.
+
+    This class represents a collection of :class:`RegistryKey`.
+    You can compare it to a Filesystem for Registry objects.
+    Where :class:`RegistryKey` objects represent the directories.
+    """
 
     def root(self) -> RegistryKey:
         """Return the root of the hive."""
@@ -59,8 +64,10 @@ class RegistryHive:
 class RegistryKey:
     """Base class for registry keys.
 
+    This class represents a directory on the ``hive`` and can hold multiple subkeys.
+
     Args:
-        hive: A registry hive that contains this ``RegistryKey`` instance.
+        hive: A Registry hive that contains this ``RegistryKey`` instance.
     """
 
     def __init__(self, hive: Optional[RegistryHive] = None):
@@ -90,7 +97,7 @@ class RegistryKey:
         """Retrieve a ``subkey`` that is part of this specific ``RegistryKey`` instance.
 
         Args:
-            subkey: The name of the key to retrieve
+            subkey: The name of the key to retrieve.
 
         Returns:
             Another ``RegistryKey`` object where this object is the parent.
@@ -166,6 +173,22 @@ class VirtualHive(RegistryHive):
         # self._root.hive = self
 
     def make_keys(self, path: str) -> VirtualKey:
+        """Create the ``path`` structure and map it to ``root``.
+
+        Args:
+            path: A ``\\\\`` seperated string. Similar to a directory structure.
+                For every part in a ``path``, it creates a VirtualKey, and chains
+                them together.
+                So ``path=test\\\\data\\\\something\\\\`` becomes::
+
+                    "" <- root node
+                    ├─ test
+                    |  ├─ data
+                    |  |  ├─ something
+
+        Returns:
+            The last VirtualKey in the chain of ``path``.
+        """
         path = path.strip("\\")
         key = self._root
         prev = None
@@ -189,22 +212,41 @@ class VirtualHive(RegistryHive):
             # we copy it into a VirtualKey.
             if not isinstance(key, VirtualKey):
                 vkey = VirtualKey(self, "\\".join(parts[: i + 1]))
-                vkey.top = key
                 prev.add_subkey(part, vkey)
                 key = vkey
+                vkey.top = key
 
         return key
 
     def map_hive(self, path: str, hive: RegistryHive) -> None:
+        """Map ``path`` as a chain of registry keys and associate it with the root node.
+
+        Args:
+            path: The path to the registry key to associate.
+            hive: The collection of keys to associate it with.
+        """
         vkey = self.make_keys(path)
         vkey.top = hive.root()
 
     def map_key(self, path: str, key: str) -> None:
+        """Map ``key`` as a registry key on ``path``.
+
+        Args:
+            path: The path to to the registry key.
+            key: The name of the registry key.
+        """
         keypath, _, name = path.strip("\\").rpartition("\\")
         vkey = self.make_keys(keypath)
         vkey.add_subkey(name, key)
 
-    def map_value(self, path: str, name: str, value) -> None:
+    def map_value(self, path: str, name: str, value: RegistryValue) -> None:
+        """Map ``value`` with ``name`` to a registry key at ``path``.
+
+        Args:
+            path: The path to the value, this is a :class:`RegistryKey`.
+            name: The name for the :class:`RegistryValue` object.
+            value: The value associated with the created value.
+        """
         vkey = self.make_keys(path)
         vkey.add_value(name, value)
 
@@ -362,7 +404,7 @@ class HiveCollection(RegistryHive):
     def __iter__(self):
         return iter(self.hives)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int):
         return self.hives[index]
 
     def add(self, hive: RegistryHive) -> None:
@@ -382,15 +424,8 @@ class HiveCollection(RegistryHive):
 
         return res
 
-    def keys(self, keys) -> Iterator[RegistryKey]:
-        """Iterate values."""
-        vkeys = [keys] if not isinstance(keys, list) else keys
-        for key in vkeys:
-            try:
-                for sub in self.key(key):
-                    yield sub
-            except RegistryError:
-                pass
+    def keys(self, keys: Union[list, str]) -> Iterator[RegistryKey]:
+        yield from super().keys(keys)
 
     def iterhives(self) -> Iterator[RegistryHive]:
         return iter(self.hives)
@@ -605,7 +640,7 @@ class RegFlex:
     def __init__(self):
         self.hives: dict[str, RegFlexHive] = {}
 
-    def map_definition(self, fh: BinaryIO) -> None:
+    def map_definition(self, fh: TextIO) -> None:
         vkey: RegFlexKey = None
         vhive: RegFlexHive = None
 
