@@ -592,14 +592,10 @@ def load(plugin_desc: dict) -> Type[Plugin]:
     Raises:
         PluginError: Raised when any other exception occurs while trying to load the plugin.
     """
-    module = plugin_desc["module"]
-    if module.startswith("dissect.target"):
-        name_to_load = module
-    else:
-        name_to_load = ".".join([MODULE_PATH, module])
+    module = plugin_desc["fullname"].rsplit(".", 1)[0]
 
     try:
-        module = importlib.import_module(name_to_load)
+        module = importlib.import_module(module)
         return getattr(module, plugin_desc["class"])
     except Exception as e:
         raise PluginError(f"An exception occurred while trying to load a plugin: {module}", cause=e)
@@ -644,35 +640,59 @@ def generate() -> dict[str, Any]:
     if "_failed" not in PLUGINS:
         PLUGINS["_failed"] = []
 
-    plugins_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "plugins")
-    for path, _, files in os.walk(plugins_dir):
-        path = path.replace(plugins_dir, "").replace(os.sep, ".").lstrip(".")
+    plugins_dir = Path(__file__).parent / "plugins"
+    for path in plugins_dir.glob("**/*"):
+        module_path = ".".join(path.relative_to(plugins_dir).parts).split(".py")[0]
 
-        if not len(path) or "__pycache__" in path:
+        if not len(module_path) or "__pycache__" in module_path or "__init__" in module_path:
             continue
 
-        mod = ".".join([MODULE_PATH, path])
+        mod = ".".join([MODULE_PATH, module_path])
 
-        try:
-            importlib.import_module(mod)
-        except Exception as e:
-            log.error("Unable to import %s", mod)
-            log.debug("Error while trying to import module %s", mod, exc_info=e)
-            save_plugin_import_failure(mod)
+        load_module_from_path(mod)
 
-        for f in files:
-            if f.endswith(".py") and not f.startswith("__init__"):
-                name = f.split(".py")[0]
-                modf = ".".join([mod, name])
-
-                try:
-                    importlib.import_module(modf)
-                except Exception as e:
-                    log.error("Unable to import %s", modf)
-                    log.debug("Error while trying to import module %s", modf, exc_info=e)
-                    save_plugin_import_failure(modf)
+    load_from_environment_variable()
 
     return PLUGINS
+
+
+def load_from_environment_variable():
+    plugin_dirs = os.environ.get("DISSECT_PLUGINS", [])
+
+    if plugin_dirs:
+        plugin_dirs = plugin_dirs.split(",")
+
+    for plugin_path in plugin_dirs:
+        register_from_files(Path(plugin_path))
+
+
+def register_from_files(directory_path: Path) -> None:
+    for path in directory_path.iterdir():
+        if path.is_file() and ".py" == path.suffix:
+            load_module_from_file(path)
+        elif path.is_dir():
+            register_from_files(path)
+
+
+def load_module_from_file(path: Path):
+    try:
+        spec = importlib.util.spec_from_file_location(path.stem, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules[module.__name__] = module
+    except Exception as e:
+        log.error("Unable to import %s", path)
+        log.debug("Error while trying to import module %s", path, exc_info=e)
+        save_plugin_import_failure(path)
+
+
+def load_module_from_path(module_path: str) -> None:
+    try:
+        importlib.import_module(module_path)
+    except Exception as e:
+        log.error("Unable to import %s", module_path)
+        log.debug("Error while trying to import module %s", module_path, exc_info=e)
+        save_plugin_import_failure(module_path)
 
 
 def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:
