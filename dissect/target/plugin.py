@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import enum
 import importlib
+import importlib.util
 import logging
 import os
 import sys
 import traceback
-
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -641,17 +642,11 @@ def generate() -> dict[str, Any]:
         PLUGINS["_failed"] = []
 
     plugins_dir = Path(__file__).parent / "plugins"
-    for path in plugins_dir.glob("**/*"):
-        module_path = ".".join(path.relative_to(plugins_dir).parts).split(".py")[0]
-
-        if not len(module_path) or "__pycache__" in module_path or "__init__" in module_path:
-            continue
-
-        mod = ".".join([MODULE_PATH, module_path])
+    for path in filter_files(plugins_dir):
+        relative_path = path.relative_to(plugins_dir)
+        mod = ".".join((MODULE_PATH,) + relative_path.parts).split(".py")[0]
 
         load_module_from_path(mod)
-
-    load_from_environment_variable()
 
     return PLUGINS
 
@@ -663,15 +658,18 @@ def load_from_environment_variable():
         plugin_dirs = plugin_dirs.split(",")
 
     for plugin_path in plugin_dirs:
-        register_from_files(Path(plugin_path))
+        for path in filter_files(Path(plugin_path)):
+            if path.is_file() and ".py" == path.suffix:
+                load_module_from_file(path)
 
 
-def register_from_files(directory_path: Path) -> None:
-    for path in directory_path.iterdir():
-        if path.is_file() and ".py" == path.suffix:
-            load_module_from_file(path)
-        elif path.is_dir():
-            register_from_files(path)
+def filter_files(directory_path: Path) -> Iterator[Path]:
+    for path in directory_path.glob("**/*"):
+
+        if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
+            continue
+
+        yield path
 
 
 def load_module_from_file(path: Path):

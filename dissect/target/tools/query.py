@@ -3,31 +3,26 @@
 
 import argparse
 import logging
-import sys
 import pathlib
+import sys
 from datetime import datetime
 
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
-
 from dissect.target import Target
-from dissect.target.plugin import Plugin, PLUGINS
+from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
-from dissect.target.exceptions import (
-    UnsupportedPluginError,
-    PluginNotFoundError,
-)
+from dissect.target.plugin import PLUGINS, Plugin, load_from_environment_variable
+from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     configure_generic_arguments,
-    process_generic_arguments,
-    persist_execution_report,
-    generate_argparse_for_bound_method,
-    generate_argparse_for_unbound_method,
-    generate_argparse_for_plugin_class,
-    get_attr_for_attr_path,
     execute_function_on_target,
+    generate_argparse_for_bound_method,
+    generate_argparse_for_plugin_class,
+    generate_argparse_for_unbound_method,
+    get_attr_for_attr_path,
+    persist_execution_report,
+    process_generic_arguments,
 )
-
-from dissect.target.report import ExecutionReport
+from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -98,6 +93,8 @@ def main():
         parser.exit()
 
     process_generic_arguments(args)
+
+    load_from_environment_variable()
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
