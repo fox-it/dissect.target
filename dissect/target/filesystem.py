@@ -1342,22 +1342,25 @@ class RootFilesystemEntry(FilesystemEntry):
         return self._exec("attr")
 
 
-def open(fh, *args, **kwargs):
-    filesystems = [
-        ntfs.NtfsFilesystem,
-        extfs.ExtFilesystem,
-        xfs.XfsFilesystem,
-        fat.FatFilesystem,
-        ffs.FfsFilesystem,
-        vmfs.VmfsFilesystem,
-        exfat.ExfatFilesystem,
-        ad1.AD1Filesystem,
-    ]
+FILESYSTEMS = [
+    (ntfs, "NtfsFilesystem"),
+    (extfs, "ExtFilesystem"),
+    (xfs, "XfsFilesystem"),
+    (fat, "FatFilesystem"),
+    (ffs, "FfsFilesystem"),
+    (vmfs, "VmfsFilesystem"),
+    (exfat, "ExfatFilesystem"),
+    (ad1, "AD1Filesystem"),
+]
 
-    for fs in filesystems:
+
+def open(fh, *args, **kwargs):
+
+    for fs, argument in FILESYSTEMS:
+        filesystem = getattr(fs, argument)
         try:
-            if fs.detect(fh):
-                instance = fs(fh, *args, **kwargs)
+            if filesystem.detect(fh):
+                instance = filesystem(fh, *args, **kwargs)
                 instance.volume = fh
                 return instance
         except ImportError as e:
