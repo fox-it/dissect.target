@@ -13,6 +13,7 @@ __all__ = [
     "open",
     "Loader",
     "RawLoader",
+    "register",
 ]
 
 log = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ class Loader:
         raise NotImplementedError()
 
 
-def register(modname: str, clsname: str) -> None:
+def register(modname: str, clsname: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
     This function registers a loader using ``modname`` relative to the ``MODULE_PATH``.
@@ -107,7 +108,11 @@ def register(modname: str, clsname: str) -> None:
         modname: The module where to find the loader.
         clsname: The class to load.
     """
-    modpath = f"{MODULE_PATH}.{modname}"
+    if internal:
+        modpath = f"{MODULE_PATH}.{modname}"
+    else:
+        modpath = modname
+
     LOADERS.append(getattr(import_lazy(modpath), clsname))
 
 
