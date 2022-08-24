@@ -6,24 +6,20 @@ import struct
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from typing import Any, BinaryIO, Iterator, Optional, TextIO, Union
 
 from dissect.regf import regf
+
 from dissect.target.exceptions import (
     RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
-from dissect.target.helpers.fsutil import TargetPath
 
 
 class RegistryHive:
-    """Base class for registry hives.
-
-    This class represents a collection of :class:`RegistryKey`.
-    You can compare it to a Filesystem for Registry objects.
-    Where :class:`RegistryKey` objects represent the directories.
-    """
+    """Base class for registry hives."""
 
     def root(self) -> RegistryKey:
         """Return the root key of the hive."""
@@ -34,9 +30,6 @@ class RegistryHive:
 
         Args:
             key: A path to a registry key within this hive.
-
-        Returns:
-            The :class:`RegistryKey` specified by ``key``.
 
         Raises:
             RegistryKeyNotFoundError: If the registry key could not be found.
@@ -51,7 +44,6 @@ class RegistryHive:
 
         Returns:
             An iterator that iterates over all the keys inside ``keys`` and tries to return those it can.
-            It will not return the ``keys`` it cannot find.
         """
         keys = [keys] if not isinstance(keys, list) else keys
         for key in keys:
@@ -63,8 +55,6 @@ class RegistryHive:
 
 class RegistryKey:
     """Base class for registry keys.
-
-    This class represents a directory on the ``hive`` and can hold multiple subkeys.
 
     Args:
         hive: The registry hive to which this registry key belongs.
@@ -99,20 +89,13 @@ class RegistryKey:
         Args:
             subkey: The name of the subkey to retrieve.
 
-        Returns:
-            Another ``RegistryKey`` object where this object is the parent.
-
         Raises:
             RegistryKeyNotFoundError: If this key has no subkey with the requested name.
         """
         raise NotImplementedError()
 
     def subkeys(self) -> list[RegistryKey]:
-        """Retrieve all the subkeys that are contained in this ``RegistryKey`` instance.
-
-        Returns:
-            A list of subkeys from this key.
-        """
+        """Returns a list of subkeys from this key."""
         raise NotImplementedError()
 
     def value(self, value: str) -> RegistryValue:
@@ -121,20 +104,13 @@ class RegistryKey:
         Args:
             value: The name of the value to retrieve.
 
-        Returns:
-            The value associated with this ``RegistryKey`` instance.
-
         Raises:
             RegistryValueNotFoundError: If this key has no value with the requested name.
         """
         raise NotImplementedError()
 
     def values(self) -> list[RegistryValue]:
-        """Returns a list of all the values from this key.
-
-        Returns:
-            A list of values from this ``RegistryKey`` instance.
-        """
+        """Returns a list of all the values from this key."""
         raise NotImplementedError()
 
     def __repr__(self):
@@ -145,7 +121,6 @@ class RegistryValue:
     """Base class for registry values.
 
     This value can be compared to a ``file`` on a filesystem.
-    It has a name, and a value associated with it.
 
     Args:
         hive: The registry hive to which this registry value belongs.
@@ -168,15 +143,8 @@ class RegistryValue:
     def type(self) -> int:
         """Returns the type of this value.
 
-        These values are types such as::
-
-        - BYTES: Binary blob.
-        - DWORD, DWORD_LITTLE_ENDIAN, DWORD_BIG_ENDIAN: 32-bit number.
-        - SZ, EXPAND_SZ, MULTI_SZ: Null terminated string.
-        - LINK: The target path of a symbolic link.
-        - MULTI_SZ: Multiple Null terminated strings.
-        - NONE: No defined value type.
-        - QWORD, QWORD_LITTLE_ENDIAN: A 64-bit number.
+        These values have different types, where these types can be found at:
+        https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         """
         raise NotImplementedError()
 
@@ -189,14 +157,13 @@ class VirtualHive(RegistryHive):
 
     def __init__(self):
         self._root = VirtualKey(self, "VROOT")
-        # self._root.hive = self
 
     def make_keys(self, path: str) -> VirtualKey:
         """Create a key structure in this virtual hive from the given path.
 
         ``path`` must be a valid registry path to some arbitrary key in the registry. This method will traverse
         all the components of the path and create a key if it does not already exist.
-        
+
         Example:
             path=test\\\\data\\\\something\\\\`` becomes::
 
@@ -242,7 +209,7 @@ class VirtualHive(RegistryHive):
 
     def map_hive(self, path: str, hive: RegistryHive) -> None:
         """Map a different registry hive to a path in this registry hive.
-        
+
         Future traversals to this path will continue from the root of the mapped hive.
 
         Args:
@@ -253,7 +220,7 @@ class VirtualHive(RegistryHive):
         vkey.top = hive.root()
 
     def map_key(self, path: str, key: RegistryKey) -> None:
-        """Map an arbitrary :class:`RegistryKey` to a path in this hive. 
+        """Map an arbitrary :class:`RegistryKey` to a path in this hive.
 
         Args:
             path: The path at which to map the registry key.
@@ -451,7 +418,13 @@ class HiveCollection(RegistryHive):
         return res
 
     def keys(self, keys: Union[list, str]) -> Iterator[RegistryKey]:
-        yield from super().keys(keys)
+        keys = [keys] if not isinstance(keys, list) else keys
+        for key in keys:
+            try:
+                for sub in self.key(key):
+                    yield sub
+            except RegistryError:
+                pass
 
     def iterhives(self) -> Iterator[RegistryHive]:
         return iter(self.hives)
@@ -589,8 +562,8 @@ class ValueCollection(RegistryValue):
 class RegfHive(RegistryHive):
     """Registry implementation for regf hives."""
 
-    def __init__(self, filepath: TargetPath, fh: Optional[BinaryIO] = None):
-        fh = fh or filepath.open()
+    def __init__(self, filepath: Path, fh: Optional[BinaryIO] = None):
+        fh = fh or filepath.open("rb")
         self.hive = regf.RegistryHive(fh)
         self.filepath = filepath
 
