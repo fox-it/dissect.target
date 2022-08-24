@@ -26,28 +26,28 @@ class RegistryHive:
     """
 
     def root(self) -> RegistryKey:
-        """Return the root entry of the hive."""
+        """Return the root key of the hive."""
         return self.key("")
 
     def key(self, key: str) -> RegistryKey:
-        """Retrieve the ``key`` from the specified location.
+        """Retrieve a registry key from a specific path.
 
         Args:
-            key: A specific registry location.
+            key: A path to a registry key within this hive.
 
         Returns:
             The :class:`RegistryKey` specified by ``key``.
 
         Raises:
-            RegistryKeyNotFoundError: if the registrykey could not be found.
+            RegistryKeyNotFoundError: If the registry key could not be found.
         """
         raise NotImplementedError()
 
     def keys(self, keys: Union[str, list[str]]) -> Iterator[RegistryKey]:
-        """Retrieve all the keys inside the ``keys`` variable from the registry.
+        """Retrieve all the registry keys in this hive from the given paths.
 
         Args:
-            keys: A single key to find, or a list of keys to iterate over.
+            keys: A single path to find, or a list of paths to iterate over.
 
         Returns:
             An iterator that iterates over all the keys inside ``keys`` and tries to return those it can.
@@ -67,7 +67,7 @@ class RegistryKey:
     This class represents a directory on the ``hive`` and can hold multiple subkeys.
 
     Args:
-        hive: A Registry hive that contains this ``RegistryKey`` instance.
+        hive: The registry hive to which this registry key belongs.
     """
 
     def __init__(self, hive: Optional[RegistryHive] = None):
@@ -94,16 +94,16 @@ class RegistryKey:
         raise NotImplementedError()
 
     def subkey(self, subkey: str) -> RegistryKey:
-        """Retrieve a ``subkey`` that is part of this specific ``RegistryKey`` instance.
+        """Returns a specific subkey from this key.
 
         Args:
-            subkey: The name of the key to retrieve.
+            subkey: The name of the subkey to retrieve.
 
         Returns:
             Another ``RegistryKey`` object where this object is the parent.
 
         Raises:
-            RegistryKeyNotFoundError: If the ``subkey`` was not part of this ``RegistryKey`` instance.
+            RegistryKeyNotFoundError: If this key has no subkey with the requested name.
         """
         raise NotImplementedError()
 
@@ -116,20 +116,21 @@ class RegistryKey:
         raise NotImplementedError()
 
     def value(self, value: str) -> RegistryValue:
-        """Retrieve the :class:`RegistryValue` associated to this ``RegistryKey``.
+        """Returns a specific value from this key.
 
         Args:
-            value: The value to look for inside this ``RegistryKey`` instance.
+            value: The name of the value to retrieve.
 
         Returns:
             The value associated with this ``RegistryKey`` instance.
 
         Raises:
-            RegistryValueNotFoundError: If ``value`` was not a part of this ``RegistryKey`` instance."""
+            RegistryValueNotFoundError: If this key has no value with the requested name.
+        """
         raise NotImplementedError()
 
     def values(self) -> list[RegistryValue]:
-        """Retrieve all the values that are contained in this ``RegistryKey`` instance.
+        """Returns a list of all the values from this key.
 
         Returns:
             A list of values from this ``RegistryKey`` instance.
@@ -147,8 +148,7 @@ class RegistryValue:
     It has a name, and a value associated with it.
 
     Args:
-        hive: A Registry hive that contains this ``RegistryValue`` instance.
-
+        hive: The registry hive to which this registry value belongs.
     """
 
     def __init__(self, hive: Optional[RegistryHive] = None):
@@ -192,21 +192,24 @@ class VirtualHive(RegistryHive):
         # self._root.hive = self
 
     def make_keys(self, path: str) -> VirtualKey:
-        """Create the ``path`` structure and map it to ``root``.
+        """Create a key structure in this virtual hive from the given path.
 
-        Args:
-            path: A ``\\\\`` seperated string. Similar to a directory structure.
-                For every part in a ``path``, it creates a VirtualKey, and chains
-                them together.
-                So ``path=test\\\\data\\\\something\\\\`` becomes::
+        ``path`` must be a valid registry path to some arbitrary key in the registry. This method will traverse
+        all the components of the path and create a key if it does not already exist.
+        
+        Example:
+            path=test\\\\data\\\\something\\\\`` becomes::
 
                     "" <- root node
                     ├─ test
                     |  ├─ data
                     |  |  ├─ something
 
+        Args:
+            path: The registry path to create a key structure for.
+
         Returns:
-            The last VirtualKey in the chain of ``path``.
+            The :class:`VirtualKey` for the last path component.
         """
         path = path.strip("\\")
         key = self._root
@@ -238,33 +241,35 @@ class VirtualHive(RegistryHive):
         return key
 
     def map_hive(self, path: str, hive: RegistryHive) -> None:
-        """Map ``path`` as a chain of registry keys and associate it with the root node.
+        """Map a different registry hive to a path in this registry hive.
+        
+        Future traversals to this path will continue from the root of the mapped hive.
 
         Args:
-            path: The path to the registry key to associate.
-            hive: The collection of keys to associate it with.
+            path: The path at which to map the registry hive.
+            hive: The hive to map to the path.
         """
         vkey = self.make_keys(path)
         vkey.top = hive.root()
 
-    def map_key(self, path: str, key: str) -> None:
-        """Map ``key`` as a registry key on ``path``.
+    def map_key(self, path: str, key: RegistryKey) -> None:
+        """Map an arbitrary :class:`RegistryKey` to a path in this hive. 
 
         Args:
-            path: The path to to the registry key.
-            key: The name of the registry key.
+            path: The path at which to map the registry key.
+            key: The :class:`RegistryKey` to map in this hive.
         """
         keypath, _, name = path.strip("\\").rpartition("\\")
         vkey = self.make_keys(keypath)
         vkey.add_subkey(name, key)
 
-    def map_value(self, path: str, name: str, value: RegistryValue) -> None:
-        """Map ``value`` with ``name`` to a registry key at ``path``.
+    def map_value(self, path: str, name: str, value: Union[Any, RegistryValue]) -> None:
+        """Map an arbitrary value to a path and value name in this hive.
 
         Args:
-            path: The path to the value, this is a :class:`RegistryKey`.
-            name: The name for the :class:`RegistryValue` object.
-            value: The value associated with the created value.
+            path: The path to the registry key that should hold the value.
+            name: The name at which to store the value.
+            value: The value to map to the specified location.
         """
         vkey = self.make_keys(path)
         vkey.add_value(name, value)
@@ -304,11 +309,11 @@ class VirtualKey(RegistryKey):
         return key.lower() in self._subkeys
 
     def add_subkey(self, name: str, key: str):
-        """Adds a subkey to self._subkeys."""
+        """Add a subkey to this key."""
         self._subkeys[name.lower()] = key
 
     def add_value(self, name: str, value: Union[Any, RegistryValue]):
-        """Adds a ``value`` with ``name`` to the self._values dictionary."""
+        """Add a value to this key."""
         if not isinstance(value, RegistryValue):
             value = VirtualValue(self.hive, name, value)
         self._values[name.lower()] = value
@@ -431,7 +436,7 @@ class HiveCollection(RegistryHive):
     def add(self, hive: RegistryHive) -> None:
         self.hives.append(hive)
 
-    def key(self, key: str) -> RegistryKey:
+    def key(self, key: str) -> KeyCollection:
         res = KeyCollection()
 
         for hive in self:
@@ -482,7 +487,7 @@ class KeyCollection(RegistryKey):
         except IndexError:
             raise RegistryKeyNotFoundError()
 
-    def add(self, key: RegistryKey):
+    def add(self, key: Union[KeyCollection, RegistryKey]):
         if isinstance(key, KeyCollection):
             self.keys.extend(key.keys)
         else:
@@ -500,7 +505,7 @@ class KeyCollection(RegistryKey):
     def timestamp(self) -> datetime:
         return self._key().timestamp
 
-    def subkey(self, subkey: str) -> RegistryKey:
+    def subkey(self, subkey: str) -> KeyCollection:
         ret = KeyCollection()
         for key in self:
             try:
@@ -513,7 +518,7 @@ class KeyCollection(RegistryKey):
 
         return ret
 
-    def subkeys(self) -> list[RegistryKey]:
+    def subkeys(self) -> list[KeyCollection]:
         ret = defaultdict(KeyCollection)
         for key in self:
             for sub in key.subkeys():
@@ -521,7 +526,7 @@ class KeyCollection(RegistryKey):
 
         return ret.values()
 
-    def value(self, value: str) -> RegistryValue:
+    def value(self, value: str) -> ValueCollection:
         ret = ValueCollection()
         for key in self:
             try:
@@ -534,7 +539,7 @@ class KeyCollection(RegistryKey):
 
         return ret
 
-    def values(self) -> list[RegistryValue]:
+    def values(self) -> list[ValueCollection]:
         ret = defaultdict(ValueCollection)
         for key in self:
             for value in key.values():
@@ -658,20 +663,16 @@ class RegfValue(RegistryValue):
 
 
 class RegFlex:
-    """A representation of a RegFlex file.
-
-    This is a file where it stores the registry information in a string format.
-    This class maps those entries to hyves keys and values inside :func:`map_definition`.
-    """
+    """A parser for text registry dumps (.reg files)."""
 
     def __init__(self):
         self.hives: dict[str, RegFlexHive] = {}
 
     def map_definition(self, fh: TextIO) -> None:
-        """Map a registry's textual definition to a hive, keys and values.
+        """Parse a text registry export to a hive with keys and values.
 
         Args:
-            fh: The file containing the registry information.
+            fh: A file-like object opened in text mode of the registry export to parse.
         """
         vkey: RegFlexKey = None
         vhive: RegFlexHive = None
@@ -735,16 +736,13 @@ class RegFlexValue(VirtualValue):
 
 
 def parse_flex_value(value: str) -> Any:
-    """Parse values from text registry dumps.
+    """Parse values from text registry exports.
 
     Args:
-        value: the value to parse.
-
-    Returns:
-        The parsed value. This can either be a integer, string, or binary data.
+        value: The value to parse.
 
     Raises:
-        NotImplementedError: If the type in ``value`` was not recognized for parsing.
+        NotImplementedError: If ``value`` is not of a supported type for parsing.
     """
     if value.startswith('"'):
         return value.strip('"')
