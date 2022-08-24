@@ -143,6 +143,21 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
 
+CONTAINERS = [
+    (ewf, "EwfContainer"),
+    (vmdk, "VmdkContainer"),
+    (vhdx, "VhdxContainer"),
+    (vhd, "VhdContainer"),
+    (qcow2, "QCow2Container"),
+    (vdi, "VdiContainer"),
+    (split, "SplitContainer"),
+]
+
+
+def register(module, class_name):
+    CONTAINERS.append((import_lazy(module), class_name))
+
+
 def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     """Open a :class:`Container` from the given object.
 
@@ -157,22 +172,13 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         ContainerError: When a compatible :class`Container` was found but it failed to open.
         ContainerError: When no compatible :class`Container` implementations were found.
     """
-    containers = [
-        ewf.EwfContainer,
-        vmdk.VmdkContainer,
-        vhdx.VhdxContainer,
-        vhd.VhdContainer,
-        qcow2.QCow2Container,
-        vdi.VdiContainer,
-        split.SplitContainer,
-        raw.RawContainer,
-    ]
     if isinstance(item, list):
         item = [Path(entry) if isinstance(entry, str) else entry for entry in item]
     elif isinstance(item, str):
         item = Path(item)
 
-    for container in containers:
+    for module, class_name in CONTAINERS + [(raw, "RawContainer")]:
+        container = getattr(module, class_name)
         try:
             if container.detect(item):
                 return container(item, *args, **kwargs)

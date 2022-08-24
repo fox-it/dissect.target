@@ -1354,6 +1354,10 @@ FILESYSTEMS = [
 ]
 
 
+def register(module: str, class_name: str):
+    FILESYSTEMS.append((import_lazy(module), class_name))
+
+
 def open(fh, *args, **kwargs):
 
     for fs, argument in FILESYSTEMS:
