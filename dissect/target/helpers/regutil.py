@@ -26,7 +26,7 @@ class RegistryHive:
     """
 
     def root(self) -> RegistryKey:
-        """Return the root of the hive."""
+        """Return the root entry of the hive."""
         return self.key("")
 
     def key(self, key: str) -> RegistryKey:
@@ -141,7 +141,15 @@ class RegistryKey:
 
 
 class RegistryValue:
-    """Base class for registry values."""
+    """Base class for registry values.
+
+    This value can be compared to a ``file`` on a filesystem.
+    It has a name, and a value associated with it.
+
+    Args:
+        hive: A Registry hive that contains this ``RegistryValue`` instance.
+
+    """
 
     def __init__(self, hive: Optional[RegistryHive] = None):
         self.hive = hive
@@ -158,7 +166,18 @@ class RegistryValue:
 
     @property
     def type(self) -> int:
-        """Returns the type of this value."""
+        """Returns the type of this value.
+
+        These values are types such as::
+
+        - BYTES: Binary blob.
+        - DWORD, DWORD_LITTLE_ENDIAN, DWORD_BIG_ENDIAN: 32-bit number.
+        - SZ, EXPAND_SZ, MULTI_SZ: Null terminated string.
+        - LINK: The target path of a symbolic link.
+        - MULTI_SZ: Multiple Null terminated strings.
+        - NONE: No defined value type.
+        - QWORD, QWORD_LITTLE_ENDIAN: A 64-bit number.
+        """
         raise NotImplementedError()
 
     def __repr__(self):
@@ -285,9 +304,11 @@ class VirtualKey(RegistryKey):
         return key.lower() in self._subkeys
 
     def add_subkey(self, name: str, key: str):
+        """Adds a subkey to self._subkeys."""
         self._subkeys[name.lower()] = key
 
     def add_value(self, name: str, value: Union[Any, RegistryValue]):
+        """Adds a ``value`` with ``name`` to the self._values dictionary."""
         if not isinstance(value, RegistryValue):
             value = VirtualValue(self.hive, name, value)
         self._values[name.lower()] = value
@@ -637,10 +658,21 @@ class RegfValue(RegistryValue):
 
 
 class RegFlex:
+    """A representation of a RegFlex file.
+
+    This is a file where it stores the registry information in a string format.
+    This class maps those entries to hyves keys and values inside :func:`map_definition`.
+    """
+
     def __init__(self):
         self.hives: dict[str, RegFlexHive] = {}
 
     def map_definition(self, fh: TextIO) -> None:
+        """Map a registry's textual definition to a hive, keys and values.
+
+        Args:
+            fh: The file containing the registry information.
+        """
         vkey: RegFlexKey = None
         vhive: RegFlexHive = None
 
@@ -703,7 +735,17 @@ class RegFlexValue(VirtualValue):
 
 
 def parse_flex_value(value: str) -> Any:
-    """Parse values from text registry dumps."""
+    """Parse values from text registry dumps.
+
+    Args:
+        value: the value to parse.
+
+    Returns:
+        The parsed value. This can either be a integer, string, or binary data.
+
+    Raises:
+        NotImplementedError: If the type in ``value`` was not recognized for parsing.
+    """
     if value.startswith('"'):
         return value.strip('"')
 
