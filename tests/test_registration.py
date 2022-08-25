@@ -81,7 +81,10 @@ def test_new_plugin_registration(environment_path: Path):
 
 
 def test_new_filesystem_registration(environment_path: Path):
-    copy_different_plugin_files(environment_path, "filesystem.py")
+    path = environment_path / "test_dir"
+    path.mkdir()
+    (path / "__init__.py").touch()
+    copy_different_plugin_files(path, "filesystem.py")
     values = [x for (_, x) in FILESYSTEMS]
     assert "TestFilesystem" in values
 

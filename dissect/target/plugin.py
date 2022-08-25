@@ -658,9 +658,10 @@ def load_from_environment_variable():
         plugin_dirs = plugin_dirs.split(",")
 
     for plugin_path in plugin_dirs:
-        for path in filter_files(Path(plugin_path)):
+        parent_path = Path(plugin_path)
+        for path in filter_files(parent_path):
             if path.is_file() and ".py" == path.suffix:
-                load_module_from_file(path)
+                load_module_from_file(path, parent_path)
 
 
 def filter_files(directory_path: Path) -> Iterator[Path]:
@@ -672,9 +673,11 @@ def filter_files(directory_path: Path) -> Iterator[Path]:
         yield path
 
 
-def load_module_from_file(path: Path):
+def load_module_from_file(path: Path, parent_path: Path):
     try:
-        spec = importlib.util.spec_from_file_location(path.stem, path)
+        relative_path = path.relative_to(parent_path).parts
+        module_name = ".".join(relative_path.parts).split(".py")[0]
+        spec = importlib.util.spec_from_file_location(module_name, path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         sys.modules[module.__name__] = module
