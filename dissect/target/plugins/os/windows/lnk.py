@@ -1,11 +1,13 @@
+from typing import Iterator, Optional
+
 from dissect.shellitem.lnk import Lnk
+from dissect.util import ts
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, arg
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.target import Target
-from dissect.util import ts
-from typing import Iterator, Union, Optional
 
 LnkRecord = TargetRecordDescriptor(
     "windows/filesystem/lnk",
