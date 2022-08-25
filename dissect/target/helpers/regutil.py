@@ -18,7 +18,7 @@ from dissect.target.exceptions import (
 )
 
 ValueType = Union[int, str, bytes, list[str]]
-"""The :class:`RegistryValue` value type."""
+"""The possible value types that can be returned from the registry."""
 
 
 class RegistryHive:
