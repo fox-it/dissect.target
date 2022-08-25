@@ -160,7 +160,7 @@ class VirtualHive(RegistryHive):
         all the components of the path and create a key if it does not already exist.
 
         Example:
-            with ``path=test\\\\data\\\\something\\\\`` it becomes::
+            The path ``test\\data\\something\\`` becomes::
 
                     "" <- root node
                     ├─ test
