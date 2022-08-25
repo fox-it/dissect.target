@@ -41,9 +41,6 @@ class RegistryHive:
 
         Args:
             keys: A single path to find, or a list of paths to iterate over.
-
-        Returns:
-            An iterator that iterates over all the keys inside ``keys`` and tries to return those it can.
         """
         keys = [keys] if not isinstance(keys, list) else keys
         for key in keys:
@@ -120,8 +117,6 @@ class RegistryKey:
 class RegistryValue:
     """Base class for registry values.
 
-    This value can be compared to a ``file`` on a filesystem.
-
     Args:
         hive: The registry hive to which this registry value belongs.
     """
@@ -143,8 +138,8 @@ class RegistryValue:
     def type(self) -> int:
         """Returns the type of this value.
 
-        These values have different types, where these types can be found at:
-        https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
+        Reference:
+            - https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         """
         raise NotImplementedError()
 
@@ -165,7 +160,7 @@ class VirtualHive(RegistryHive):
         all the components of the path and create a key if it does not already exist.
 
         Example:
-            path=test\\\\data\\\\something\\\\`` becomes::
+            with ``path=test\\\\data\\\\something\\\\`` it becomes::
 
                     "" <- root node
                     ├─ test
