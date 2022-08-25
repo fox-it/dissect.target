@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, Optional, TextIO, Union
 
 from dissect.regf import regf
 
@@ -16,6 +16,9 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+
+ValueType = Union[int, str, bytes, list[str]]
+"""The :class:`RegistryValue` value type."""
 
 
 class RegistryHive:
@@ -130,7 +133,7 @@ class RegistryValue:
         raise NotImplementedError()
 
     @property
-    def value(self) -> Any:
+    def value(self) -> ValueType:
         """Returns the value of this value."""
         raise NotImplementedError()
 
@@ -225,7 +228,7 @@ class VirtualHive(RegistryHive):
         vkey = self.make_keys(keypath)
         vkey.add_subkey(name, key)
 
-    def map_value(self, path: str, name: str, value: Union[Any, RegistryValue]) -> None:
+    def map_value(self, path: str, name: str, value: Union[ValueType, RegistryValue]) -> None:
         """Map an arbitrary value to a path and value name in this hive.
 
         Args:
@@ -274,7 +277,7 @@ class VirtualKey(RegistryKey):
         """Add a subkey to this key."""
         self._subkeys[name.lower()] = key
 
-    def add_value(self, name: str, value: Union[Any, RegistryValue]):
+    def add_value(self, name: str, value: Union[ValueType, RegistryValue]):
         """Add a value to this key."""
         if not isinstance(value, RegistryValue):
             value = VirtualValue(self.hive, name, value)
@@ -355,7 +358,7 @@ class VirtualKey(RegistryKey):
 class VirtualValue(RegistryValue):
     """Virtual value implementation."""
 
-    def __init__(self, hive: RegistryHive, name: str, value: Any):
+    def __init__(self, hive: RegistryHive, name: str, value: ValueType):
         self._name = name
         self._value = value
         super().__init__(hive=hive)
@@ -365,7 +368,7 @@ class VirtualValue(RegistryValue):
         return self._name
 
     @property
-    def value(self) -> Any:
+    def value(self) -> ValueType:
         return self._value
 
     @property
@@ -546,7 +549,7 @@ class ValueCollection(RegistryValue):
         return self._value().name
 
     @property
-    def value(self) -> Any:
+    def value(self) -> ValueType:
         return self._value().value
 
     @property
@@ -622,7 +625,7 @@ class RegfValue(RegistryValue):
         return self.kv.name
 
     @property
-    def value(self) -> Any:
+    def value(self) -> ValueType:
         return self.kv.value
 
     @property
@@ -692,18 +695,18 @@ class RegFlexKey(VirtualKey):
 
 
 class RegFlexValue(VirtualValue):
-    def __init__(self, name: str, value: Any):
+    def __init__(self, name: str, value: ValueType):
         self._parsed_value = None
         super().__init__(name, value)
 
     @property
-    def value(self) -> Any:
+    def value(self) -> ValueType:
         if not self._parsed_value:
             self._parsed_value = parse_flex_value(self._value)
         return self._parsed_value
 
 
-def parse_flex_value(value: str) -> Any:
+def parse_flex_value(value: str) -> ValueType:
     """Parse values from text registry exports.
 
     Args:
