@@ -2,6 +2,7 @@ import argparse
 import logging
 
 from dissect.target import Target, filesystem
+from dissect.target.plugin import load_from_environment_variable
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     process_generic_arguments,
@@ -9,6 +10,7 @@ from dissect.target.tools.utils import (
 
 try:
     from fuse import FUSE
+
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
@@ -34,6 +36,8 @@ def main():
         parser.exit("fusepy is not installed: pip install fusepy")
 
     process_generic_arguments(args)
+
+    load_from_environment_variable()
 
     t = Target.open(args.target)
     vfs = filesystem.VirtualFilesystem()
