@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -81,10 +82,7 @@ def test_new_plugin_registration(environment_path: Path):
 
 
 def test_new_filesystem_registration(environment_path: Path):
-    path = environment_path / "test_dir"
-    path.mkdir()
-    (path / "__init__.py").touch()
-    copy_different_plugin_files(path, "filesystem.py")
+    copy_different_plugin_files(environment_path, "filesystem.py")
     values = [x for (_, x) in FILESYSTEMS]
     assert "TestFilesystem" in values
 
@@ -98,3 +96,13 @@ def test_register_container(environment_path: Path):
     copy_different_plugin_files(environment_path, "container.py")
     values = [x for (_, x) in CONTAINERS]
     assert "TestContainer" in values
+
+
+def test_filesystem_module_registration(environment_path: Path):
+    path = environment_path / "test_dir"
+    path.mkdir()
+    (path / "test.py").touch()
+
+    load_from_environment_variable()
+
+    assert "test_dir.test" in sys.modules.keys()

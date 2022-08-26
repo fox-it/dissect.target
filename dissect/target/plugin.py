@@ -676,7 +676,7 @@ def filter_files(directory_path: Path) -> Iterator[Path]:
 def load_module_from_file(path: Path, parent_path: Path):
     try:
         relative_path = path.relative_to(parent_path).parts
-        module_name = ".".join(relative_path.parts).split(".py")[0]
+        module_name = ".".join(relative_path).split(".py")[0]
         spec = importlib.util.spec_from_file_location(module_name, path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
