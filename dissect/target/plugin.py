@@ -644,9 +644,8 @@ def generate() -> dict[str, Any]:
     plugins_dir = Path(__file__).parent / "plugins"
     for path in filter_files(plugins_dir):
         relative_path = path.relative_to(plugins_dir)
-        mod = ".".join((MODULE_PATH,) + relative_path.parts).split(".py")[0]
-
-        load_module_from_path(mod)
+        module_tupple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
+        load_module_from_path(".".join(module_tupple))
 
     return PLUGINS
 
@@ -666,7 +665,6 @@ def load_from_environment_variable():
 
 def filter_files(directory_path: Path) -> Iterator[Path]:
     for path in directory_path.glob("**/*"):
-
         if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
             continue
 
@@ -675,9 +673,9 @@ def filter_files(directory_path: Path) -> Iterator[Path]:
 
 def load_module_from_file(path: Path, parent_path: Path):
     try:
-        relative_path = path.relative_to(parent_path).parts
-        module_name = ".".join(relative_path).split(".py")[0]
-        spec = importlib.util.spec_from_file_location(module_name, path)
+        relative_path = path.relative_to(parent_path)
+        module_tupple = (*relative_path.parent.parts, relative_path.stem)
+        spec = importlib.util.spec_from_file_location(".".join(module_tupple), path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         sys.modules[module.__name__] = module
