@@ -7,6 +7,8 @@ import pathlib
 import sys
 from datetime import datetime
 
+from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
+
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
@@ -22,7 +24,6 @@ from dissect.target.tools.utils import (
     persist_execution_report,
     process_generic_arguments,
 )
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
