@@ -60,16 +60,6 @@ class OperatingSystem(enum.Enum):
     FORTIGATE = "fortigate"
 
 
-class Category:
-    """A class defining the different categories for a plugin.
-
-    This is currently unused however, the idea for the future is to
-    be able to execute multiple plugins that have the same ``Category``.
-    """
-
-    PERSISTENCE = "persistence"
-
-
 def export(*args, **kwargs) -> Callable:
     """Decorator to be used on Plugin functions that should be exported.
 
@@ -167,21 +157,11 @@ def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]) -> list[RecordDescr
 class Plugin:
     """Base class for plugins.
 
-    Plugins can optionally be namespaced by specifying the __namespace__
+    Plugins can optionally be namespaced by specifying the ``__namespace__``
     class attribute. Namespacing results in your plugin needing to be prefixed
     with this namespace when being called. For example, if your plugin has
-    specified "test" as namespace and a function called "example", you must
-    call your plugin with "test.example".
-
-    Example:
-        __namespace__ = "test"
-
-    Plugins can also specify one or more categories they belong to. They can do
-    this by importing the :class:`Category` enum from `dissect.target.plugin` and specifying
-    them in a list in the __categories__ class attribute.
-
-    Example:
-        __categories__ = [Category.PERSISTENCE]
+    specified ``test`` as namespace and a function called ``example``, you must
+    call your plugin with ``test.example``::
 
     A ``Plugin`` class has the following private class attributes:
 
@@ -213,8 +193,6 @@ class Plugin:
 
     __namespace__: str = None
     """Defines the plugin namespace."""
-    __categories__: list[Category] = None
-    """Defines a list of :class:`Category` that the plugin belongs to."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
 
