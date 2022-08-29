@@ -49,8 +49,8 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
     @export(property=True)
     def version(self) -> str:
-        name = self.os_release.get("NAME")
-        version = self.os_release.get("VERSION", self.os_release.get("DISTRIB_RELEASE"))
+        name = self._os_release.get("NAME")
+        version = self._os_release.get("VERSION", self._os_release.get("DISTRIB_RELEASE"))
         return f"{name} {version}"
 
     @export(property=True)
