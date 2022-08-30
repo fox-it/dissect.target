@@ -8,7 +8,7 @@ import pytest
 from dissect.target.container import CONTAINERS
 from dissect.target.filesystem import FILESYSTEMS
 from dissect.target.loader import LOADERS
-from dissect.target.plugin import PLUGINS, filter_files, load_directory_list
+from dissect.target.plugin import PLUGINS, filter_files, load_modules_from_paths
 
 
 @pytest.fixture
@@ -30,13 +30,13 @@ def copy_different_plugin_files(path: Path, file_name: str):
 
 def test_load_environment_variable_empty_string():
     with patch("dissect.target.plugin.filter_files") as mocked_filter_files:
-        load_directory_list([])
+        load_modules_from_paths([])
         mocked_filter_files.assert_not_called()
 
 
 def test_load_environment_variable_comma_seperated_string():
     with patch("dissect.target.plugin.filter_files") as mocked_filter_files:
-        load_directory_list([Path(""), Path("")])
+        load_modules_from_paths([Path(""), Path("")])
         mocked_filter_files.assert_has_calls(calls=[call(Path(""))])
 
 
@@ -65,14 +65,14 @@ def test_filter_directory(tmp_path: Path, file_name: str, empty_list: bool):
 
 def test_new_plugin_registration(environment_path: Path):
     copy_different_plugin_files(environment_path, "plugin.py")
-    load_directory_list([environment_path])
+    load_modules_from_paths([environment_path])
 
     assert "plugin" in PLUGINS
 
 
 def test_new_filesystem_registration(environment_path: Path):
     copy_different_plugin_files(environment_path, "filesystem.py")
-    load_directory_list([environment_path])
+    load_modules_from_paths([environment_path])
 
     values = [x for (_, x) in FILESYSTEMS]
 
@@ -81,14 +81,14 @@ def test_new_filesystem_registration(environment_path: Path):
 
 def test_loader_registration(environment_path: Path):
     copy_different_plugin_files(environment_path, "loader.py")
-    load_directory_list([environment_path])
+    load_modules_from_paths([environment_path])
 
     assert "TestLoader" == LOADERS[-1].__name__
 
 
 def test_register_container(environment_path: Path):
     copy_different_plugin_files(environment_path, "container.py")
-    load_directory_list([environment_path])
+    load_modules_from_paths([environment_path])
 
     values = [x for (_, x) in CONTAINERS]
 
@@ -108,6 +108,6 @@ def test_filesystem_module_registration(environment_path: Path, filename: str, e
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch()
 
-    load_directory_list([environment_path])
+    load_modules_from_paths([environment_path])
 
     assert expected_module in sys.modules.keys()

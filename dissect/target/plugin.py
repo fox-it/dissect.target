@@ -649,7 +649,8 @@ def generate() -> dict[str, Any]:
     return PLUGINS
 
 
-def load_directory_list(plugin_dirs: list[Path]) -> None:
+def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
+    """Iterate over the ``plugin_dirs`` and load all ``*.py`` files."""
     for plugin_path in plugin_dirs:
         for path in filter_files(plugin_path):
             if path.is_file() and ".py" == path.suffix:
@@ -657,6 +658,23 @@ def load_directory_list(plugin_dirs: list[Path]) -> None:
 
 
 def filter_files(directory_path: Path) -> Iterator[Path]:
+    """Iterate over all the files and directories in ``directory_path``.
+
+    These files have a specific filter, where they do not return if any of the
+    following information is inside the path:
+
+    - __pycache__
+    - __init__
+
+    Furthermore, it logs a warning if ``directory_path`` does not exist.
+
+    Args:
+        directory_path: The path to a directory or file to dynamically load.
+    """
+    if not directory_path.exists():
+        log.error(f"Path {directory_path} does not exist.")
+        return
+
     for path in directory_path.glob("**/*"):
         if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
             continue
@@ -665,6 +683,15 @@ def filter_files(directory_path: Path) -> Iterator[Path]:
 
 
 def load_module_from_file(path: Path, parent_path: Path):
+    """Loads a module from a file indicated by ``path``.
+
+    The module used for loading the file is ``path`` relative to the ``parent_path``.
+    Then we add that module to sys.modules so it can be found everywhere.
+
+    Args:
+        path: The file to load the module for.
+        parent_path: The original directory we use as a base for the iteration.
+    """
     try:
         relative_path = path.relative_to(parent_path)
         module_tupple = (*relative_path.parent.parts, relative_path.stem)
@@ -679,6 +706,7 @@ def load_module_from_file(path: Path, parent_path: Path):
 
 
 def load_module_from_paths(module_path: str) -> None:
+    """Load a module relative to ``module_path``."""
     try:
         importlib.import_module(module_path)
     except Exception as e:

@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from dissect.target import Target, plugin
 from dissect.target.helpers import docs, keychain
-from dissect.target.plugin import Plugin, load_directory_list
+from dissect.target.plugin import Plugin, load_modules_from_paths
 from dissect.target.tools.logging import configure_logging
 
 
@@ -35,16 +35,24 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
     if args.keychain_value:
         keychain.register_wildcard_value(args.keychain_value)
 
-    data = args.plugin_dir or []
-    data += load_paths_from_environment_variable()
-    load_directory_list(data)
+    paths = load_module_paths(args.plugin_dir or [])
+    load_modules_from_paths(paths)
 
 
-def load_paths_from_environment_variable() -> list[Path]:
+def load_module_paths(path_list: list[Path]):
+    """Create a deduplicated list of paths."""
+    output_list = environment_variable_paths() + path_list
+
+    return list(dict.fromkeys(output_list))
+
+
+def environment_variable_paths() -> list[Path]:
     plugin_dirs = os.environ.get("DISSECT_PLUGINS", [])
 
     if plugin_dirs:
         plugin_dirs = [Path(directory) for directory in plugin_dirs.split(",")]
+    else:
+        plugin_dirs = []
 
     return plugin_dirs
 
