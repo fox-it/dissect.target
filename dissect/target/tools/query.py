@@ -12,7 +12,7 @@ from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
-from dissect.target.plugin import PLUGINS, Plugin, load_from_environment_variable
+from dissect.target.plugin import PLUGINS, Plugin
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -94,8 +94,6 @@ def main():
         parser.exit()
 
     process_generic_arguments(args)
-
-    load_from_environment_variable()
 
     if args.no_cache:
         cache.IGNORE_CACHE = True

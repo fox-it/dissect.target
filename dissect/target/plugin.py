@@ -8,7 +8,6 @@ import enum
 import importlib
 import importlib.util
 import logging
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -645,22 +644,16 @@ def generate() -> dict[str, Any]:
     for path in filter_files(plugins_dir):
         relative_path = path.relative_to(plugins_dir)
         module_tupple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
-        load_module_from_path(".".join(module_tupple))
+        load_module_from_paths(".".join(module_tupple))
 
     return PLUGINS
 
 
-def load_from_environment_variable():
-    plugin_dirs = os.environ.get("DISSECT_PLUGINS", [])
-
-    if plugin_dirs:
-        plugin_dirs = plugin_dirs.split(",")
-
+def load_directory_list(plugin_dirs: list[Path]) -> None:
     for plugin_path in plugin_dirs:
-        parent_path = Path(plugin_path)
-        for path in filter_files(parent_path):
+        for path in filter_files(plugin_path):
             if path.is_file() and ".py" == path.suffix:
-                load_module_from_file(path, parent_path)
+                load_module_from_file(path, plugin_path)
 
 
 def filter_files(directory_path: Path) -> Iterator[Path]:
@@ -685,7 +678,7 @@ def load_module_from_file(path: Path, parent_path: Path):
         save_plugin_import_failure(path)
 
 
-def load_module_from_path(module_path: str) -> None:
+def load_module_from_paths(module_path: str) -> None:
     try:
         importlib.import_module(module_path)
     except Exception as e:

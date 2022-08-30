@@ -10,7 +10,6 @@ import sys
 
 from dissect.target import Target
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.plugin import load_from_environment_variable
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     process_generic_arguments,
@@ -108,8 +107,6 @@ def main():
     args = parser.parse_args()
 
     process_generic_arguments(args)
-
-    load_from_environment_variable()
 
     t = Target.open(args.target)
     path = t.fs.path(args.path)

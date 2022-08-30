@@ -29,7 +29,7 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 from dissect.target.helpers import fsutil, regutil
-from dissect.target.plugin import arg, load_from_environment_variable
+from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -1065,8 +1065,6 @@ def main():
     args = parser.parse_args()
 
     process_generic_arguments(args)
-
-    load_from_environment_variable()
 
     targets = list(Target.open_all(args.targets))
 
