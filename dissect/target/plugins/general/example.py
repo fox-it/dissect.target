@@ -1,13 +1,27 @@
 from typing import Iterator
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export
+
+from dissect.target.helpers.descriptor_extensions import (
+    RegistryRecordDescriptorExtension,
+    UserRecordDescriptorExtension,
+)
+from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
+from dissect.target.plugin import Plugin, arg, export, internal
 
 
-ExampleRecordDescriptor = TargetRecordDescriptor(
+ExampleRecordRecord = TargetRecordDescriptor(
     "example/descriptor",
     [
         ("string", "field_a"),
         ("string", "field_b"),
+    ],
+)
+
+ExampleUserRegistryRecord = create_extended_descriptor(
+    [RegistryRecordDescriptorExtension, UserRecordDescriptorExtension]
+)(
+    "example/registry/user",
+    [
+        ("datetime", "ts"),
     ],
 )
 
@@ -75,15 +89,59 @@ class ExamplePlugin(Plugin):
         """
         return f"Example plugin. Flag argument: {flag!r}"
 
-    @export(record=ExampleRecordDescriptor)
-    def example_record(self) -> Iterator[ExampleRecordDescriptor]:
+    @export(record=ExampleRecordRecord)
+    def example_record(self) -> Iterator[ExampleRecordRecord]:
         """Example plugin that generates records.
 
         To create a new plugin function that yields records, you must define a record descriptor
         and pass it to ``@export``. This will implicitly mark the output type as ``record``.
         """
-        yield ExampleRecordDescriptor(
+        yield ExampleRecordRecord(
             field_a="example",
             field_b="record",
             _target=self.target,
         )
+
+    @export(record=ExampleUserRegistryRecord)
+    def example_user_registry_record(self) -> Iterator[ExampleUserRegistryRecord]:
+        """Example plugin that generates records with registry key and user information.
+
+        To include registry or user information in a record, you must create a new record descriptor using
+        :func:`~dissect.target.helpers.record.create_extended_descriptor` with
+        :class:`~dissect.target.helpers.descriptor_extensions.RegistryRecordDescriptorExtension` and/or
+        :class:`~dissect.target.helpers.descriptor_extensions.UserRecordDescriptorExtension as extensions.
+        """
+        for key in self.target.registry.keys("HKCU\\SOFTWARE"):
+            user = self.target.registry.get_user(key)
+            yield ExampleUserRegistryRecord(
+                ts=key.ts,
+                _key=key,
+                _user=user,
+                _target=self.target,
+            )
+
+    @export(output="yield")
+    def example_yield(self) -> Iterator[str]:
+        """Example plugin that yields text lines.
+
+        Setting ``output="yield"`` is useful for creating generators of text, such as human-readable timelines.
+        """
+        for i in range(10):
+            yield f"Example line {i}"
+
+    @export(output="none")
+    def example_none(self) -> None:
+        """Example plugin with no return value.
+
+        Setting ``output="none"`` means you don't return a value. This is useful when you want to print something
+        on your own, such as verbose information.
+        """
+        print("Example output with no return value.")
+
+    @internal
+    def example_internal(self) -> str:
+        """Example internal plugin.
+
+        Use the ``@internal`` plugin to mark your plugin as internal and hide it from the plugin overview.
+        """
+        return "Example internal plugin."
