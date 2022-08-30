@@ -166,7 +166,6 @@ class Plugin:
     A ``Plugin`` class has the following private class attributes:
 
     - ``__namespace__``
-    - ``__categories__``
     - ``__record_descriptors__``
 
     With the following three being assigned in :func:`register`:
@@ -432,7 +431,6 @@ def register(plugincls: Type[Plugin]) -> None:
     root["functions"] = plugincls.__functions__
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
-    root["categories"] = plugincls.__categories__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
 
 
