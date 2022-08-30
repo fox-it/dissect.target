@@ -643,8 +643,8 @@ def generate() -> dict[str, Any]:
     plugins_dir = Path(__file__).parent / "plugins"
     for path in filter_files(plugins_dir):
         relative_path = path.relative_to(plugins_dir)
-        module_tupple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
-        load_module_from_paths(".".join(module_tupple))
+        module_tuple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
+        load_module_from_paths(".".join(module_tuple))
 
     return PLUGINS
 
@@ -694,8 +694,8 @@ def load_module_from_file(path: Path, parent_path: Path):
     """
     try:
         relative_path = path.relative_to(parent_path)
-        module_tupple = (*relative_path.parent.parts, relative_path.stem)
-        spec = importlib.util.spec_from_file_location(".".join(module_tupple), path)
+        module_tuple = (*relative_path.parent.parts, relative_path.stem)
+        spec = importlib.util.spec_from_file_location(".".join(module_tuple), path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         sys.modules[module.__name__] = module

@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.tools.utils import (
-    load_module_paths,
     environment_variable_paths,
+    load_module_paths,
     persist_execution_report,
 )
 
@@ -46,13 +46,11 @@ def test_persist_execution_report():
     ],
 )
 def test_load_environment_variable(env_value, expected_output):
-    if env_value:
-        os.environ.update({"DISSECT_PLUGINS": env_value})
-
-    assert environment_variable_paths() == expected_output
+    with patch.object(os, "environ", {"DISSECT_PLUGINS": env_value}):
+        assert environment_variable_paths() == expected_output
 
 
 def test_load_module_paths():
     assert load_module_paths([Path(""), Path("")]) == [Path("")]
-    os.environ.update({"DISSECT_PLUGINS": ","})
-    assert load_module_paths([Path(""), Path("")]) == [Path("")]
+    with patch.object(os, "environ", {"DISSECT_PLUGINS": ","}):
+        assert load_module_paths([Path(""), Path("")]) == [Path("")]
