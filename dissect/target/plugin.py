@@ -657,8 +657,8 @@ def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
                 load_module_from_file(path, plugin_path)
 
 
-def filter_files(directory_path: Path) -> Iterator[Path]:
-    """Iterate over all the files and directories in ``directory_path``.
+def filter_files(plugin_path: Path) -> Iterator[Path]:
+    """Iterate over all the files and directories in ``plugin_path``.
 
     These files have a specific filter, where they do not return if any of the
     following information is inside the path:
@@ -666,16 +666,18 @@ def filter_files(directory_path: Path) -> Iterator[Path]:
     - __pycache__
     - __init__
 
-    Furthermore, it logs a warning if ``directory_path`` does not exist.
+    Furthermore, it logs a warning if ``plugin_path`` does not exist.
 
     Args:
-        directory_path: The path to a directory or file to dynamically load.
+        plugin_path: The path to a directory or file to dynamically load.
     """
-    if not directory_path.exists():
-        log.error(f"Path {directory_path} does not exist.")
+    if not plugin_path.exists():
+        log.error(f"Path {plugin_path} does not exist.")
         return
 
-    for path in directory_path.glob("**/*"):
+    path_iterator = [plugin_path] if plugin_path.is_file() else plugin_path.glob("**/*")
+
+    for path in path_iterator:
         if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
             continue
 

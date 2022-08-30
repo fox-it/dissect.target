@@ -13,8 +13,8 @@ from dissect.target.plugin import PLUGINS, filter_files, load_modules_from_paths
 
 @pytest.fixture
 def environment_path(tmp_path: Path):
-    os.environ.update({"DISSECT_PLUGINS": str(tmp_path.absolute())})
-    yield tmp_path
+    with patch.object(os, "environ", {"DISSECT_PLUGINS": str(tmp_path.absolute())}):
+        yield tmp_path
 
 
 def registry_file(path: str):
@@ -41,19 +41,29 @@ def test_load_environment_variable_comma_seperated_string():
 
 
 def test_filter_file(tmp_path: Path):
-    assert list(filter_files(tmp_path)) == []
+    file = tmp_path / "hello.py"
+    file.touch()
+
+    assert list(filter_files(file)) == [file]
+
+    test_file = tmp_path / "non_existent_file"
+    assert list(filter_files(test_file)) == []
+
+    test_file = tmp_path / "__init__.py"
+    test_file.touch()
+    assert list(filter_files(test_file)) == []
 
 
 @pytest.mark.parametrize(
-    "file_name, empty_list",
+    "filename, empty_list",
     [
         ("__init__.py", True),
         ("__pycache__/help.pyc", True),
         ("hello/test.py", False),
     ],
 )
-def test_filter_directory(tmp_path: Path, file_name: str, empty_list: bool):
-    file = tmp_path / file_name
+def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool):
+    file = tmp_path / filename
     file.parent.mkdir(parents=True, exist_ok=True)
     file.touch()
 
@@ -89,6 +99,15 @@ def test_loader_registration(environment_path: Path):
 def test_register_container(environment_path: Path):
     copy_different_plugin_files(environment_path, "container.py")
     load_modules_from_paths([environment_path])
+
+    values = [x for (_, x) in CONTAINERS]
+
+    assert "TestContainer" in values
+
+
+def test_register_file(environment_path: Path):
+    copy_different_plugin_files(environment_path, "container.py")
+    load_modules_from_paths([environment_path / "container.py"])
 
     values = [x for (_, x) in CONTAINERS]
 
