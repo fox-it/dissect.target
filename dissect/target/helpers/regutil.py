@@ -663,7 +663,7 @@ class RegFlex:
                     self.hives[hive] = RegFlexHive()
 
                 vhive = self.hives[hive]
-                vkey = RegFlexKey(path)
+                vkey = RegFlexKey(vhive, path)
                 continue
 
             if line.startswith('"'):
@@ -681,7 +681,7 @@ class RegFlex:
                             break
                     value = "".join(value)
 
-                vkey.add_value(name, RegFlexValue(name, value))
+                vkey.add_value(name, RegFlexValue(vhive, name, value))
 
         vhive.map_key(vkey.path, vkey)
 
@@ -695,9 +695,9 @@ class RegFlexKey(VirtualKey):
 
 
 class RegFlexValue(VirtualValue):
-    def __init__(self, name: str, value: ValueType):
+    def __init__(self, hive: RegistryHive, name: str, value: ValueType):
         self._parsed_value = None
-        super().__init__(name, value)
+        super().__init__(hive, name, value)
 
     @property
     def value(self) -> ValueType:
@@ -720,9 +720,9 @@ def parse_flex_value(value: str) -> ValueType:
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
-        return struct.unpack(">i", binascii.unhexlify(value))[0]
+        return struct.unpack(">i", bytes.fromhex(value))[0]
     elif "hex" in vtype:
-        value = binascii.unhexlify(value.replace(",", ""))
+        value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
             return value
 
@@ -731,8 +731,16 @@ def parse_flex_value(value: str) -> ValueType:
         vtype = int(vtype[4:5], 16)
         if vtype == regf.REG_NONE:
             return value if value else None
+        elif vtype == regf.REG_SZ:
+            return regf.try_decode_sz(value)
         elif vtype == regf.REG_EXPAND_SZ:
             return regf.try_decode_sz(value)
+        elif vtype == regf.REG_BINARY:
+            return value
+        elif vtype == regf.REG_DWORD:
+            return struct.unpack("<I", value)[0]
+        elif vtype == regf.REG_DWORD_BIG_ENDIAN:
+            return struct.unpack(">I", value)[0]
         elif vtype == regf.REG_MULTI_SZ:
             d = BytesIO(value)
 
@@ -746,6 +754,6 @@ def parse_flex_value(value: str) -> ValueType:
 
             return r
         elif vtype == regf.REG_QWORD:
-            return struct.unpack(">q", value)[0]
+            return struct.unpack(">Q", value)[0]
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
