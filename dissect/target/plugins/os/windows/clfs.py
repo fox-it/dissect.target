@@ -72,7 +72,7 @@ class ClfsPlugin(Plugin):
 
         Sources:
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-the-common-log-file-system
-        """
+        """  # noqa: E501
 
         for blf_path, blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
