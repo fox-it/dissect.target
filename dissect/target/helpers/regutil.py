@@ -1,7 +1,6 @@
 """ Registry related abstractions """
 from __future__ import annotations
 
-import binascii
 import struct
 from collections import defaultdict
 from datetime import datetime
