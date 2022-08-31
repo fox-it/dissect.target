@@ -1,10 +1,13 @@
+from typing import Iterator
+
 from dissect.clfs import blf, container
 from dissect.clfs.exceptions import InvalidBLFError, InvalidRecordBlockError
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
-from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
+from dissect.target.target import Target
 
 
 ClfsRecord = TargetRecordDescriptor(
@@ -35,12 +38,10 @@ class ClfsPlugin(Plugin):
     the memory implementation for dissect is working.
     """
 
-    __namespace__ = "clfs"
-
     BLF_PATH = "sysvol/windows/system32/config/"  # Unsure at time of writing if this is the only location
 
-    def __init__(self, target):
-        super(ClfsPlugin, self).__init__(target)
+    def __init__(self, target: Target):
+        super().__init__(target)
         self._blfs = []
 
         blfdir = self.target.fs.path(self.BLF_PATH)
@@ -59,12 +60,12 @@ class ClfsPlugin(Plugin):
                 except InvalidBLFError as e:
                     self.target.log.warning(f"Could not validate BLF: {blf_path}", exc_info=e)
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
         if not self._blfs:
             raise UnsupportedPluginError("No BLF files found")
 
     @export(record=ClfsRecord)
-    def clfs(self):
+    def clfs(self) -> Iterator[ClfsRecord]:
         """Parse the containers associated with a valid BLF file.
 
         Containers are used to store the transactional logs in the form of records.
