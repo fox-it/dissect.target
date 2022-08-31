@@ -1,13 +1,10 @@
-import ntpath
-
 from dissect.clfs import blf, container
 from dissect.clfs.exceptions import InvalidBLFError, InvalidRecordBlockError
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers import fsutil
 from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import TargetRecordDescriptor
-
-
-BLF_PATH = "sysvol/windows/system32/config/"  # Unsure at time of writing if this is the only location
 
 
 ClfsRecord = TargetRecordDescriptor(
@@ -29,7 +26,7 @@ ClfsRecord = TargetRecordDescriptor(
 
 
 class ClfsPlugin(Plugin):
-    """CLFS Plugin
+    """CLFS Plugin.
 
     Dissect plugin for parsing the Base Log Files of a Microsoft Windows system.
 
@@ -40,35 +37,43 @@ class ClfsPlugin(Plugin):
 
     __namespace__ = "clfs"
 
+    BLF_PATH = "sysvol/windows/system32/config/"  # Unsure at time of writing if this is the only location
+
     def __init__(self, target):
         super(ClfsPlugin, self).__init__(target)
         self._blfs = []
 
-        blfdir = self.target.fs.path(BLF_PATH)
+        blfdir = self.target.fs.path(self.BLF_PATH)
 
-        if blfdir.exists():
+        if blfdir.exists() and blfdir.is_dir():
             blf_files = blfdir.glob("*.blf")
 
-            for blf_file in blf_files:
-
-                fh = blf_file.open()
+            for blf_path in blf_files:
+                fh = blf_path.open()
 
                 try:
-                    blf_instance = blf.BLF(fh=fh)
-                    self._blfs.append(blf_instance)
+                    blf_instance = blf.BLF(fh)
+                    self._blfs.append((blf_path, blf_instance))
                 except InvalidRecordBlockError as e:
-                    self.target.log.warning(f"Invalid record block: {blf_file}", exc_info=e)
+                    self.target.log.warning(f"Invalid record block: {blf_path}", exc_info=e)
                 except InvalidBLFError as e:
-                    self.target.log.warning(f"Could not validate BLF: {blf_file}", exc_info=e)
+                    self.target.log.warning(f"Could not validate BLF: {blf_path}", exc_info=e)
 
     def check_compatible(self):
         if not self._blfs:
-            raise UnsupportedPluginError("No BLF's found")
+            raise UnsupportedPluginError("No BLF files found")
 
     @export(record=ClfsRecord)
     def clfs(self):
+        """Parse the containers associated with a valid BLF file.
 
-        for blf_instance in self._blfs:
+        Containers are used to store the transactional logs in the form of records.
+
+        Sources:
+            - https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-the-common-log-file-system
+        """
+
+        for blf_path, blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
             for base_record in blf_instance.base_records():
 
@@ -87,26 +92,25 @@ class ClfsPlugin(Plugin):
                         if stream.lsn_base.PhysicalOffset <= 0:
                             continue
 
-                        # Strip the prepended directory to accomodate for dissect FS
-                        container_name = ntpath.basename(blf_container.name)
-                        container_file = self.target.fs.path(BLF_PATH + container_name)
+                        container_path = fsutil.normalize(blf_container.name.replace("%BLF%", str(blf_path.parent)))
+                        container_file = self.target.fs.path(container_path)
 
                         fh = container_file.open()
-                        trans = container.Container(fh=fh, offset=stream.offset)
+                        trans = container.Container(fh, offset=stream.offset)
 
                         # Open each container and yield the results for each record found within that container
                         for record_offset, record_data, block_data in trans.records():
-
                             yield ClfsRecord(
                                 stream_name=stream.name,
                                 stream_id=stream.id,
                                 type=stream.type,
                                 file_attributes=stream.file_attributes,
                                 offset=stream.offset,
-                                container_name=container_name,
+                                container_name=container_file.name,
                                 container_id=stream.lsn_base.Offset.ContainerId,
                                 container_size=blf_container.size,
                                 record_offset=record_offset,
                                 record_data=record_data,
                                 block_data=block_data,
+                                _target=self.target,
                             )
