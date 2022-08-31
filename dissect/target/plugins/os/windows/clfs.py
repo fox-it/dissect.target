@@ -1,6 +1,6 @@
 import ntpath
 
-from dissect.clfs import blf, blf_container
+from dissect.clfs import blf, container
 from dissect.clfs.exceptions import InvalidBLFError, InvalidRecordBlockError
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
@@ -70,33 +70,32 @@ class ClfsPlugin(Plugin):
 
         for blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
-            for base_record in blf_instance.get_base_records():
-                for stream in base_record.streams:
-                    # Stream container ID for physical container
-                    s_container_id = stream.lsn_base.offset.container_id
+            for base_record in blf_instance.base_records():
 
-                    for container in base_record.containers:
+                for stream in base_record.streams:
+
+                    for blf_container in base_record.containers:
                         # Check if the stream ID is matching the container ID
-                        if container.id != s_container_id:
+                        if blf_container.id != stream.lsn_base.Offset.ContainerId:
                             continue
 
                         # We can encounter the same container ID for the shadow blocks
-                        if container.type != stream.type:
+                        if blf_container.type != stream.type:
                             continue
 
                         # Invalid LSN (-1)
-                        if stream.lsn_base.physical_offset <= 0:
+                        if stream.lsn_base.PhysicalOffset <= 0:
                             continue
 
                         # Strip the prepended directory to accomodate for dissect FS
-                        container_name = ntpath.basename(container.name)
+                        container_name = ntpath.basename(blf_container.name)
                         container_file = self.target.fs.path(BLF_PATH + container_name)
 
                         fh = container_file.open()
-                        trans = blf_container.Container(fh=fh, offset=stream.offset)
+                        trans = container.Container(fh=fh, offset=stream.offset)
 
                         # Open each container and yield the results for each record found within that container
-                        for record_offset, record_data, block_data in trans.parse_container():
+                        for record_offset, record_data, block_data in trans.records():
 
                             yield ClfsRecord(
                                 stream_name=stream.name,
@@ -105,8 +104,8 @@ class ClfsPlugin(Plugin):
                                 file_attributes=stream.file_attributes,
                                 offset=stream.offset,
                                 container_name=container_name,
-                                container_id=s_container_id,
-                                container_size=container.size,
+                                container_id=stream.lsn_base.Offset.ContainerId,
+                                container_size=blf_container.size,
                                 record_offset=record_offset,
                                 record_data=record_data,
                                 block_data=block_data,
