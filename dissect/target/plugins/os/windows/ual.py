@@ -180,7 +180,7 @@ class UalPlugin(Plugin):
 
         fh = identity_db.open()
         try:
-            self.identity_db_parser = ual.UalParser(fh)
+            self.identity_db_parser = ual.UAL(fh)
         except Error as e:
             self.target.log.warning("Error opening UAL SystemIdentity.mdb database", exc_info=e)
             return
@@ -197,7 +197,7 @@ class UalPlugin(Plugin):
         for mdb_path in self.mdb_paths:
             fh = mdb_path.open()
             try:
-                parser = ual.UalParser(fh)
+                parser = ual.UAL(fh)
             except Error as e:
                 self.target.log.warning(f"Error opening {mdb_path} database", exc_info=e)
                 continue
