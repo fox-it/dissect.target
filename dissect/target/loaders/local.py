@@ -1,5 +1,4 @@
 import ctypes
-import os
 import platform
 import re
 from pathlib import Path

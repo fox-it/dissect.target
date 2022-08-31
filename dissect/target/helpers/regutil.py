@@ -199,9 +199,9 @@ class VirtualHive(RegistryHive):
             # we copy it into a VirtualKey.
             if not isinstance(key, VirtualKey):
                 vkey = VirtualKey(self, "\\".join(parts[: i + 1]))
+                vkey.top = key
                 prev.add_subkey(part, vkey)
                 key = vkey
-                vkey.top = key
 
         return key
 
