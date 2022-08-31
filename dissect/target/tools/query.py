@@ -12,7 +12,10 @@ from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 from dissect.target import Target
 from dissect.target.plugin import Plugin, PLUGINS
 from dissect.target.helpers import cache, hashutil
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import (
+    UnsupportedPluginError,
+    PluginNotFoundError,
+)
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     process_generic_arguments,
@@ -172,8 +175,17 @@ def main():
         for func in functions:
             try:
                 output_type, result, cli_params_unparsed = execute_function_on_target(target, func, cli_params_unparsed)
-            except UnsupportedPluginError:
-                target.log.error("Unsupported plugin for `%s`", func, exc_info=True)
+            except UnsupportedPluginError as e:
+                target.log.error(
+                    "Unsupported plugin for `%s`: %s",
+                    func,
+                    e.root_cause_str(),
+                )
+
+                target.log.debug("", exc_info=e)
+                continue
+            except PluginNotFoundError:
+                target.log.error("Cannot find plugin `%s`", func)
                 continue
             except Exception:
                 target.log.error("Exception while executing function `%s`", func, exc_info=True)

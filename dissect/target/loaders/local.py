@@ -1,9 +1,9 @@
 import ctypes
-import glob
-import os
 import platform
 import re
 from pathlib import Path
+
+from dissect.util.stream import BufferedStream
 
 from dissect.target import filesystem, volume, Target
 from dissect.target.containers.raw import RawContainer
@@ -11,9 +11,10 @@ from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
 from dissect.target.helpers.utils import parse_path_uri
-from dissect.util.stream import BufferedStream
+
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
+LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
@@ -59,11 +60,11 @@ class LocalLoader(Loader):
 def map_linux_drives(target: Target):
     """Map Linux raw disks.
 
-    Get all devices from /dev/sd* (not partitions).
+    Iterate through /dev and match raw device names (not partitions).
     """
-    for drive in glob.glob("/dev/sd*[a-z]"):
-        fh = BufferedStream(open(drive, "rb"))
-        target.disks.add(RawContainer(fh))
+    for drive in Path("/dev").iterdir():
+        if LINUX_DRIVE_REGEX.match(drive.name):
+            _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_solaris_drives(target):
@@ -71,12 +72,10 @@ def map_solaris_drives(target):
 
     Iterate through /dev/dsk and match raw device names (not slices or partitions).
     """
-    for drive in os.listdir("/dev/dsk"):
-        if not SOLARIS_DRIVE_REGEX.match(drive):
+    for drive in Path("/dev/dsk").iterdir():
+        if not SOLARIS_DRIVE_REGEX.match(drive.name):
             continue
-
-        fh = BufferedStream(open(drive, "rb"))
-        target.disks.add(RawContainer(fh))
+        _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_esxi_drives(target):
@@ -87,9 +86,7 @@ def map_esxi_drives(target):
     for drive in Path("/vmfs/devices/disks").glob("vml.*"):
         if ":" in drive.name:
             continue
-
-        fh = BufferedStream(drive.open("rb"))
-        target.disks.add(RawContainer(fh))
+        _add_disk_as_raw_container_to_target(drive, target)
 
 
 def map_windows_drives(target):
@@ -143,6 +140,14 @@ def map_windows_drives(target):
         # https://docs.microsoft.com/en-us/windows/desktop/api/fltuser/nf-fltuser-filtergetdosname
 
         target.disks.add(disk)
+
+
+def _add_disk_as_raw_container_to_target(drive: Path, target: Target) -> None:
+    try:
+        fh = BufferedStream(open(drive, "rb"))
+        target.disks.add(RawContainer(fh))
+    except Exception as e:
+        target.log.warning(f"Unable to open drive: {drive}, skipped", exc_info=e)
 
 
 def _read_drive_letters():
@@ -207,15 +212,17 @@ def _get_windows_drive_volumes(log):
                 except Exception as e:
                     log.debug("Error getting size for disk %s", disk_path, exc_info=e)
                     disk_size = None
-
-                disk = RawContainer(
-                    BufferedStream(
-                        open(disk_path, "rb"),
-                        size=disk_size,
+                try:
+                    disk = RawContainer(
+                        BufferedStream(
+                            open(disk_path, "rb"),
+                            size=disk_size,
+                        )
                     )
-                )
-                disk_map[disk_num] = disk
-
+                    disk_map[disk_num] = disk
+                except Exception as e:
+                    log.debug("Unable to open disk %d at %s, skipped", disk_num, disk_path, exc_info=e)
+                    continue
                 try:
                     disk.vs = volume.open(disk)
                 except Exception as e:
