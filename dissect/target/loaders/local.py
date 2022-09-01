@@ -1,5 +1,4 @@
 import ctypes
-import os
 import platform
 import re
 from pathlib import Path
@@ -11,7 +10,6 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
-from dissect.target.helpers.utils import parse_path_uri
 
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
@@ -23,8 +21,7 @@ WINDOWS_DRIVE_FIXED = 3
 class LocalLoader(Loader):
     @staticmethod
     def detect(path):
-        _, path_part, _ = parse_path_uri(path)
-        return path_part == "local"
+        return str(path) == "local"
 
     def map(self, target):
 

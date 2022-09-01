@@ -60,21 +60,14 @@ class Target:
     """
 
     def __init__(self, path: Union[str, Path] = None):
-        # WIP, part of the introduction of URI-style paths.
-        # Since pathlib.Path does not support URIs, bigger refactoring
-        # is needed in order to fully utilise URI's scheme / path / query
-        # for Target configuration.
-        self.path_scheme, self.path, self.path_query = parse_path_uri(path)
-        if self.path is not None:
-            self.path = Path(self.path)
 
+        self.path, self._loader, self.path_query, self.path_scheme = parse_path_uri(path)
         self.props: dict[Any, Any] = dict()
         self.log = getlogger(self)
 
         self._name = None
         self._plugins: list[plugin.Plugin] = []
         self._functions: dict[str, FunctionTuple] = {}
-        self._loader = None
         self._os_plugin: plugin.OSPlugin = None
         self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}
         self._cache = dict()
@@ -214,10 +207,9 @@ class Target:
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
-        if not isinstance(path, Path):
-            path = Path(path)
+        path, specified_loader, _, _ = parse_path_uri(path)
 
-        loader_cls = loader.find_loader(path)
+        loader_cls = specified_loader or loader.find_loader(path)
         if loader_cls:
             loader_instance = loader_cls(path)
             return cls._load(path, loader_instance)
@@ -258,15 +250,15 @@ class Target:
 
         # Treat every path as a unique target spec
         for path in paths:
-            if not isinstance(path, Path):
-                path = Path(path)
+
+            path, specified_loader, _, _ = parse_path_uri(path)
 
             found_loader = False
 
             # Search for targets one directory deep
             for entry in _find(path):
 
-                loader_cls = loader.find_loader(entry)
+                loader_cls = specified_loader or loader.find_loader(entry)
 
                 if not loader_cls:
                     continue

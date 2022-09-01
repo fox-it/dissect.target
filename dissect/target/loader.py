@@ -18,6 +18,7 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 LOADERS: list[Loader] = []
+LOADERS_BY_SCHEME: dict[str, Loader] = {}
 MODULE_PATH = "dissect.target.loaders"
 
 DirLoader: Loader = import_lazy("dissect.target.loaders.dir").DirLoader
@@ -51,7 +52,8 @@ class Loader:
     :class:`TarLoader <dissect.target.loaders.tar.TarLoader>` for some creative examples.
 
     Args:
-        path: The target path to load.
+        path: The target path to load. In case of an URL a pseudo path will be passed including
+              host and port name
     """
 
     def __init__(self, path: Path):
@@ -108,7 +110,9 @@ def register(modname: str, clsname: str) -> None:
         clsname: The class to load.
     """
     modpath = f"{MODULE_PATH}.{modname}"
-    LOADERS.append(getattr(import_lazy(modpath), clsname))
+    loader = getattr(import_lazy(modpath), clsname)
+    LOADERS.append(loader)
+    LOADERS_BY_SCHEME[modname] = loader
 
 
 def find_loader(item: Path) -> Optional[Loader]:

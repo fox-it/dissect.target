@@ -1,7 +1,9 @@
 import re
 import urllib.parse
+from pathlib import Path
 from enum import Enum
-from typing import BinaryIO
+from typing import BinaryIO, Union
+from dissect.target.loader import Loader, LOADERS_BY_SCHEME
 
 
 class StrEnum(str, Enum):
@@ -16,12 +18,51 @@ def list_to_frozen_set(function):
     return wrapper
 
 
-def parse_path_uri(path):
+def parse_path_uri(path: Union[str, Path]) -> (Path, Loader, dict, str):
+    """Converts a path string into a path while taking URIs into account.
+
+    If the path string contains an URI the scheme will be used to infer
+    the loader by using the LOADERS_BY_SCHEME dict. In case of an URI
+    the path will be set to the remainder of the string (including
+    host and port) to form a pseudo path that can easily be used by
+    URI-based loaders.
+
+    If no loader can be inferred, the loader will be set to None
+    and the default detection mechanisms of the caller should proceed,
+    this should also apply to the 'file://' and 'raw://' schemes.
+
+    Additionally to remain backward compatible with the previous version
+    of this function, the scheme string and query parameters will be returned.
+    The scheme string will be returned even if the loader has not been
+    inferred.
+
+    Args:
+        path: string describing the path of a target or Path.
+
+    Returns:
+        - a Path object (wrapped around the provided path string)
+        - the inferred loader or None
+        - query parameters (always a dict)
+        - scheme string if any (or an empty string)
+    """
+
     if path is None:
-        return None, None, None
-    parsed_path = urllib.parse.urlparse(str(path))
+        return None, None, {}, ""
+
+    # In case we have a path object
+    path = str(path)
+    inferred_loader = None
+    # urlparse isn't good enough, parses C:\ as scheme C!
+    # also urlparse path == '' which is useless for practical use as pseudo path
+    scheme = path.split("://")[0] if path.find("://") > -1 else ""
+    # we *can* use urllib to extract the query string though
+    parsed_path = urllib.parse.urlparse(path)
     parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    return parsed_path.scheme, parsed_path.path, parsed_query
+    if scheme != "":
+        inferred_loader = LOADERS_BY_SCHEME.get(scheme)
+        # because we want to keep the 'pseudo path' we have to do this part ourselves
+        path = path[len(scheme) + 3 :].split("?")[0]
+    return Path(path), inferred_loader, parsed_query, scheme
 
 
 SLUG_RE = re.compile(r"[/\\ ]")
