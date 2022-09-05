@@ -1,19 +1,24 @@
+from __future__ import annotations
+
 import struct
+from typing import Iterator, Optional
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OSPlugin, export, OperatingSystem
+from dissect.target.target import Target
 
 
 class WindowsPlugin(OSPlugin):
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         # Just run this here for now
         self.add_mounts()
 
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
             if fs.exists("/windows/system32") or fs.exists("/winnt"):
                 return fs
@@ -21,7 +26,7 @@ class WindowsPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> WindowsPlugin:
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
@@ -39,8 +44,7 @@ class WindowsPlugin(OSPlugin):
 
         return cls(target)
 
-    @export
-    def add_mounts(self):
+    def add_mounts(self) -> None:
         self.target.props["mounts_added"] = True
         try:
             for key in self.target.registry.keys("HKLM\\System\\MountedDevices"):
@@ -74,7 +78,7 @@ class WindowsPlugin(OSPlugin):
             self.target.log.warning("Failed to map drive letters", exc_info=e)
 
     @export(property=True)
-    def hostname(self):
+    def hostname(self) -> Optional[str]:
         key = "HKLM\\SYSTEM\\ControlSet001\\Control\\Computername\\Computername"
         try:
             return self.target.registry.value(key, "Computername").value
@@ -82,7 +86,7 @@ class WindowsPlugin(OSPlugin):
             return None
 
     @export(property=True)
-    def ips(self):
+    def ips(self) -> list[str]:
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces"
         fields = ["IPAddress", "DhcpIPAddress"]
         ips = set()
@@ -107,7 +111,7 @@ class WindowsPlugin(OSPlugin):
         return list(ips)
 
     @export(property=True)
-    def version(self):
+    def version(self) -> Optional[str]:
         key = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
         csd_version = str()
 
@@ -126,7 +130,7 @@ class WindowsPlugin(OSPlugin):
             pass
 
     @export(property=True)
-    def architecture(self):
+    def architecture(self) -> Optional[str]:
         """
         Returns a dict containing the architecture and bitness of the system
 
@@ -148,12 +152,27 @@ class WindowsPlugin(OSPlugin):
             arch = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
             bits = arch_strings.get(arch)
 
-            return {"arch": arch, "bitness": bits}
+            # return {"arch": arch, "bitness": bits}
+            if bits == 64:
+                return f"{arch}-win{bits}".lower()
+            else:
+                return f"{arch}_{bits}-win{bits}".lower()
+        except RegistryError:
+            pass
+
+    @export(property=True)
+    def codepage(self) -> Optional[str]:
+        """Returns the current active codepage on the system."""
+
+        key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
+
+        try:
+            return self.target.registry.key(key).value("ACP").value
         except RegistryError:
             pass
 
     @export(record=WindowsUserRecord)
-    def users(self):
+    def users(self) -> Iterator[WindowsUserRecord]:
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
         sids = set()
         for k in self.target.registry.keys(key):
@@ -181,5 +200,5 @@ class WindowsPlugin(OSPlugin):
                 )
 
     @export(property=True)
-    def os(self):
-        return "windows"
+    def os(self) -> str:
+        return OperatingSystem.WINDOWS.value

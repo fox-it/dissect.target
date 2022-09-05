@@ -1,19 +1,22 @@
+from __future__ import annotations
+
 import plistlib
+from typing import Iterator, Optional
 
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.filesystem import Filesystem
+from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
+from dissect.target.target import Target
 
 
-class MacPlugin(OSPlugin):
+class MacPlugin(BsdPlugin):
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
     SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"
 
-    def __init__(self, target):
-        super().__init__(target)
-        self.target = target
-
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
             if fs.exists("/Library") and fs.exists("/Applications"):
                 return fs
@@ -21,12 +24,12 @@ class MacPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> MacPlugin:
         target.fs.mount("/", sysvol)
         return cls(target)
 
     @export(property=True)
-    def hostname(self):
+    def hostname(self) -> Optional[str]:
         for path in ["/Library/Preferences/SystemConfiguration/preferences.plist"]:
             try:
                 preferencesPlist = self.target.fs.open(path).read().rstrip()
@@ -37,11 +40,11 @@ class MacPlugin(OSPlugin):
                 pass
 
     @export(property=True)
-    def ips(self):
+    def ips(self) -> Optional[list[str]]:
         raise NotImplementedError
 
     @export(property=True)
-    def version(self):
+    def version(self) -> Optional[str]:
         for path in ["/System/Library/CoreServices/SystemVersion.plist"]:
             try:
                 systemVersionPlist = self.target.fs.open(path).read().rstrip()
@@ -53,10 +56,10 @@ class MacPlugin(OSPlugin):
             except FileNotFoundError:
                 pass
 
-    @export(property=True)
-    def users(self):
+    @export(record=UnixUserRecord)
+    def users(self) -> Iterator[UnixUserRecord]:
         raise NotImplementedError
 
     @export(property=True)
-    def os(self):
-        return "osx"
+    def os(self) -> str:
+        return OperatingSystem.OSX.value

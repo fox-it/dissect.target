@@ -1,219 +1,43 @@
+from __future__ import annotations
+
 import logging
 import re
 import uuid
 from struct import unpack
-from typing import Generator, Tuple, Union
+from typing import Iterator, Optional, Tuple, Union
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OSPlugin, export
+from dissect.target.plugin import OSPlugin, OperatingSystem, export
+from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 
-class LinuxPlugin(OSPlugin):
-    def __init__(self, target):
+class UnixPlugin(OSPlugin):
+    def __init__(self, target: Target):
         super().__init__(target)
-
-        self.add_mounts()
+        self._add_mounts()
+        self._hostname_dict = self._parse_hostname_string()
+        self._hosts_dict = self._parse_hosts_string()
+        self._os_release = self._parse_os_release()
 
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
-            if fs.exists("/var") and fs.exists("/etc") and not fs.exists("/Library"):
+            if fs.exists("/var") and fs.exists("/etc"):
                 return fs
 
         return None
 
     @classmethod
-    def create(cls, target, sysvol):
+    def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
         target.fs.mount("/", sysvol)
         return cls(target)
 
-    def add_mounts(self):
-        fstab = self.target.fs.path("/etc/fstab")
-
-        volumes_to_mount = [v for v in self.target.volumes if v.fs]
-
-        for dev_id, volume_name, _, mount_point in parse_fstab(fstab, self.target.log):
-
-            for volume in volumes_to_mount:
-                fs_id = None
-                last_mount = None
-
-                if dev_id and volume.fs.__fstype__ == "xfs":
-                    fs_id = volume.fs.xfs.uuid
-                elif dev_id and volume.fs.__fstype__ == "extfs":
-                    fs_id = volume.fs.extfs.uuid
-                    last_mount = volume.fs.extfs.last_mount
-                elif dev_id and volume.fs.__fstype__ == "fat":
-                    fs_id = volume.fs.fatfs.volume_id
-
-                if (
-                    (fs_id and (fs_id == dev_id))
-                    or (volume.name and (volume.name == volume_name))
-                    or (last_mount and (last_mount == mount_point))
-                ):
-                    self.target.log.debug("Mounting %s at %s", volume, mount_point)
-                    self.target.fs.mount(mount_point, volume.fs)
-
-    def _hostname(self):
-        hostname = None
-
-        for path in ["/etc/hostname", "/etc/HOSTNAME"]:
-            try:
-                hostname = self.target.fs.path(path).open("rt").read().rstrip()
-                break
-            except FileNotFoundError:
-                pass
-
-        ips = []
-        try:
-            ips = self.ips
-        except Exception:
-            pass
-
-        try:
-            fh = self.target.fs.path("/etc/hosts").open("rt")
-
-            for line in fh:
-                if line.startswith("#"):
-                    continue
-
-                parts = re.split(r"\s+", line.strip())
-                if parts[0] in ips:
-                    hostname = parts[1]
-                    break
-
-                if parts[0] == "127.0.0.1" and "localhost" not in parts[1]:
-                    hostname = parts[1]
-                    break
-        except FileNotFoundError:
-            pass
-
-        return hostname
-
-    @export(property=True)
-    def hostname(self):
-        hostname = self._hostname()
-        if hostname and "." in hostname:
-            hostname = hostname.split(".")[0]
-        return hostname
-
-    @export(property=True)
-    def domain(self):
-        hostname = self._hostname()
-        if hostname and "." in hostname:
-            return hostname.split(".", 1)[1]
-        return None
-
-    @export(property=True)
-    def ips(self):
-        import configparser
-
-        result = []
-
-        try:
-            for file_ in self.target.fs.path("/etc/sysconfig/network-scripts").glob("ifcfg-*"):
-                if file_.name == "ifcfg-lo":
-                    continue
-
-                for line in file_.open("rt"):
-                    key, _, value = line.strip().partition("=")
-                    if key == "IPADDR":
-                        result.append(value.strip('"'))
-                        break
-
-        except FileNotFoundError:
-            pass
-
-        if result:
-            return result
-
-        # Photon/Systemd
-        try:
-            for file_ in self.target.fs.path("/etc/systemd/network").glob("*.network"):
-                conf = configparser.ConfigParser()
-                conf.readfp(file_.open("rt"))
-
-                ip = conf.get("Network", "address")
-                if "/" in ip:
-                    ip = ip.split("/")[0]
-                result.append(ip)
-        except FileNotFoundError:
-            pass
-
-        if result:
-            return result
-
-        # AppC
-        try:
-            fh = self.target.fs.path("/etc/sysconfig/ip.start").open("rt")
-            for line in fh:
-                p = line.strip().split(" ")
-                if p[:3] == ["ip", "addr", "add"]:
-                    result.append(p[3].split("/")[0])
-        except FileNotFoundError:
-            pass
-
-        # netplan
-        try:
-            import yaml
-
-            for file_ in self.target.fs.path("/etc/netplan").glob("*.yaml"):
-                try:
-                    obj = yaml.load(file_.open("rt"), Loader=yaml.FullLoader)
-                    ethernets = obj["network"]["ethernets"]
-                    for networks in ethernets.values():
-                        for ip in networks["addresses"]:
-                            result.append(ip.split("/")[0])
-                except Exception:
-                    continue
-        except (FileNotFoundError, ImportError):
-            pass
-
-        return result
-
-    @export(property=True)
-    def version(self):
-        dist_info = {}
-
-        for path in ["/etc/os-release", "/usr/lib/os-release", "/etc/lsb-release"]:
-            release_file = self.target.fs.path(path)
-            if not release_file.exists():
-                continue
-
-            try:
-                for line in release_file.open("rt"):
-                    parts = line.strip().split("=", 1)
-                    if len(parts) != 2:
-                        continue
-
-                    dist_info[parts[0].upper()] = parts[1].strip('"')
-            except Exception:
-                continue
-
-        if dist_info:
-            if "PRETTY_NAME" in dist_info:
-                return dist_info["PRETTY_NAME"]
-
-            if "DISTRIB_DESCRIPTION" in dist_info:
-                return dist_info["DISTRIB_DESCRIPTION"]
-
-        paths = ["/etc/fedora-release", "/etc/redhat-release", "/etc/SuSE-release"]
-
-        for path in paths:
-            file_ = self.target.fs.path(path)
-            if not file_.exists():
-                continue
-
-            return file_.open("rt").readline().strip()
-
-        return "Linux Unknown"
-
     @export(record=UnixUserRecord)
-    def users(self):
+    def users(self) -> Iterator[UnixUserRecord]:
         passwd = self.target.fs.path("/etc/passwd")
         if not passwd.exists():
             return
@@ -236,14 +60,116 @@ class LinuxPlugin(OSPlugin):
             )
 
     @export(property=True)
-    def architecture(self):
-        """
-        Returns a dict containing the architecture and bitness of the system
+    def architecture(self) -> str:
+        return self._get_architecture(self.os)
 
-        Returns:
-            Dict: arch: architecture, bitness: bits
-        """
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
+        hosts_string = self._hosts_dict.get("hostname", "localhost")
+        return self._hostname_dict.get("hostname", hosts_string)
 
+    @export(property=True)
+    def domain(self) -> Optional[str]:
+        domain = self._hostname_dict.get("domain", "localhost")
+        if domain == "localhost":
+            domain = self._hosts_dict["hostname", "localhost"]
+            if domain == self.hostname:
+                return domain  # domain likely not defined, so localhost is the domain.
+        return domain
+
+    @export(property=True)
+    def os(self) -> str:
+        return OperatingSystem.UNIX.value
+
+    def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
+        """
+        Returns a dict with containing the hostname and domain name portion of the path(s) specified
+
+        Args:
+            paths (list): list of paths
+        """
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME"]
+        hostname_string = None
+
+        for path in paths:
+            for fs in self.target.filesystems:
+                if fs.exists(path):
+                    hostname_string = fs.path(path).open("rt").read().rstrip()
+
+            if hostname_string and "." in hostname_string:
+                hostname_string = hostname_string.split(".", maxsplit=1)
+                hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
+            else:
+                hostname_dict = {"hostname": hostname_string, "domain": None}
+
+            return hostname_dict
+
+    def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
+        paths = paths or ["/etc/hosts"]
+        hosts_string = {"ip": None, "hostname": None}
+
+        for path in paths:
+            for fs in self.target.filesystems:
+                if fs.exists(path):
+                    for line in fs.path(path).open("rt").readlines():
+                        line = line.split()
+                        if not line:
+                            continue
+
+                        if (line[0].startswith("127.0.") or line[0].startswith("::1")) and line[
+                            1
+                        ].lower() != "localhost":
+                            hosts_string = {"ip": line[0], "hostname": line[1]}
+        return hosts_string
+
+    def _add_mounts(self) -> None:
+        fstab = self.target.fs.path("/etc/fstab")
+
+        volumes_to_mount = [v for v in self.target.volumes if v.fs]
+
+        for dev_id, volume_name, _, mount_point in parse_fstab(fstab, self.target.log):
+
+            for volume in volumes_to_mount:
+                fs_id = None
+                last_mount = None
+
+                if dev_id:
+                    if volume.fs.__fstype__ == "xfs":
+                        fs_id = volume.fs.xfs.uuid
+                    elif volume.fs.__fstype__ == "extfs":
+                        fs_id = volume.fs.extfs.uuid
+                        last_mount = volume.fs.extfs.last_mount
+                    elif volume.fs.__fstype__ == "fat":
+                        fs_id = volume.fs.fatfs.volume_id
+
+                if (
+                    (fs_id and (fs_id == dev_id))
+                    or (volume.name and (volume.name == volume_name))
+                    or (last_mount and (last_mount == mount_point))
+                ):
+                    self.target.log.debug("Mounting %s at %s", volume, mount_point)
+                    self.target.fs.mount(mount_point, volume.fs)
+
+    def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
+        glob = glob or "/etc/*-release"
+
+        os_release = {}
+
+        for path in self.target.fs.glob(glob):
+            if self.target.fs.path(path).exists():
+
+                with self.target.fs.path(path).open("rt") as release_file:
+                    for line in release_file:
+                        if line.startswith("#"):
+                            continue
+                        try:
+                            name, value = line.split("=", maxsplit=1)
+                            os_release[name] = value.replace('"', "").replace("\n", "")
+                        except ValueError:
+                            continue
+        return os_release
+
+    def _get_architecture(self, os: str = "unix") -> Optional[str]:
         arch_strings = {
             0x00: "Unknown",
             0x02: "SPARC",
@@ -254,101 +180,33 @@ class LinuxPlugin(OSPlugin):
             0x28: "ARM",
             0x2A: "SuperH",
             0x32: "IA-64",
-            0x3E: "x86-64",
+            0x3E: "x86_64",
             0xB7: "AArch64",
             0xF3: "RISC-V",
         }
 
         for fs in self.target.filesystems:
-            if fs.exists("/bin/true"):
-                fh = fs.open("/bin/true")
+            if fs.exists("/bin/ls"):
+                fh = fs.open("/bin/ls")
                 fh.seek(4)
+                # ELF - e_ident[EI_CLASS]
                 bits = unpack("B", fh.read(1))[0]
-                fh.seek(16)
+                fh.seek(18)
+                # ELF - e_machine
                 arch = unpack("H", fh.read(2))[0]
+                arch = arch_strings.get(arch)
 
-                return {"arch": arch_strings.get(arch), "bitness": 64 if bits == 2 else 32}
-
-    @export(property=True)
-    def os(self):
-        return "linux"
-
-
-class CentOSPlugin(LinuxPlugin):
-    @classmethod
-    def detect(cls, target):
-        for fs in target.filesystems:
-            if fs.exists("/etc/sysconfig/network-scripts"):
-                return fs
-
-        return None
-
-    @export(property=True)
-    def ips(self):
-        r = []
-
-        path = self.target.fs.path("/etc/sysconfig/network-scripts")
-        for file_ in path.glob("ifcfg-*"):
-            fh = file_.open("rt")
-
-            d = {}
-            for line in fh:
-                p = line.strip().split("=", 1)
-                if len(p) != 2:
-                    continue
-                k, v = p
-                d[k.lower()] = v.strip('"').strip("'")
-            fh.close()
-
-            for k, v in d.items():
-                if k.startswith("ipaddr"):
-                    ip = v.split("/")[0]
-                    if ip in ("127.0.0.1", "0.0.0.0"):
-                        continue
-
-                    r.append(ip)
-        return r
-
-
-class SuSEPlugin(LinuxPlugin):
-    @classmethod
-    def detect(cls, target):
-        for fs in target.filesystems:
-            if fs.exists("/etc/sysconfig/network"):
-                return fs
-
-        return None
-
-    @export(property=True)
-    def ips(self):
-        r = []
-        path = self.target.fs.path("/etc/sysconfig/network")
-        for file_ in path.glob("ifcfg-*"):
-            fh = file_.open("rt")
-
-            d = {}
-            for line in fh:
-                p = line.strip().split("=", 1)
-                if len(p) != 2:
-                    continue
-                k, v = p
-                d[k.lower()] = v.strip('"').strip("'")
-            fh.close()
-
-            ip = d["ipaddr"].split("/")[0]
-            if ip == "127.0.0.1":
-                continue
-
-            r.append(ip)
-        return r
+                if bits == 1:  # 32 bit system
+                    return f"{arch}_32-{os}"
+                else:
+                    return f"{arch}-{os}"
 
 
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
-) -> Generator[Tuple[Union[uuid.UUID, str], str, str, str], None, None]:
-    """
-    Parse fstab file and return a generator that streams the details of entries,
+) -> Iterator[Tuple[Union[uuid.UUID, str], str, str, str]]:
+    """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
 
