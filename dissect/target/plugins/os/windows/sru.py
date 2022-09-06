@@ -1,10 +1,11 @@
-from flow.record.fieldtypes import uri
-
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
+from flow.record.fieldtypes import uri
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
 
 NetworkDataRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/network_data",
@@ -57,6 +58,8 @@ EnergyUsageRecord = TargetRecordDescriptor(
         ("varint", "charge_level"),
         ("varint", "cycle_count"),
         ("varint", "configuration_hash"),
+        ("varint", "battery_count"),
+        ("varint", "battery_charge_limited"),
     ],
 )
 
@@ -239,6 +242,8 @@ FIELD_MAPPINGS = {
     "BackgroundNumReadOperations": "background_num_read_operations",
     "BackgroundNumWriteOperations": "background_num_write_operations",
     "BackgroundNumberOfFlushes": "background_number_of_flushes",
+    "BatteryChargeLimited": "battery_charge_limited",
+    "BatteryCount": "battery_count",
     "BinaryData": "binary_data",
     "BytesInBound": "bytes_inbound",
     "BytesOutBound": "bytes_outbound",
