@@ -6,7 +6,7 @@ import pytest
 
 from dissect.target.plugin import (
     environment_variable_paths,
-    load_module_paths,
+    load_external_module_paths,
     save_plugin_import_failure,
 )
 
@@ -39,9 +39,9 @@ def test_load_environment_variable(env_value, expected_output):
 
 
 def test_load_module_paths():
-    assert load_module_paths([Path(""), Path("")]) == [Path("")]
+    assert load_external_module_paths([Path(""), Path("")]) == [Path("")]
 
 
 def test_load_paths_with_env():
     with patch.object(os, "environ", {"DISSECT_PLUGINS": ":"}):
-        assert load_module_paths([Path(""), Path("")]) == [Path("")]
+        assert load_external_module_paths([Path(""), Path("")]) == [Path("")]

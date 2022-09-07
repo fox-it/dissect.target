@@ -716,7 +716,7 @@ def load_module_from_name(module_path: str) -> None:
         save_plugin_import_failure(module_path)
 
 
-def load_module_paths(path_list: list[Path]):
+def load_external_module_paths(path_list: list[Path]):
     """Create a deduplicated list of paths."""
     output_list = environment_variable_paths() + path_list
 

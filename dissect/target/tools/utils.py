@@ -7,7 +7,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from dissect.target import Target, plugin
 from dissect.target.helpers import docs, keychain
-from dissect.target.plugin import Plugin, load_module_paths, load_modules_from_paths
+from dissect.target.plugin import (
+    Plugin,
+    load_external_module_paths,
+    load_modules_from_paths,
+)
 from dissect.target.tools.logging import configure_logging
 
 
@@ -34,7 +38,7 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
     if args.keychain_value:
         keychain.register_wildcard_value(args.keychain_value)
 
-    paths = load_module_paths(args.plugin_path or [])
+    paths = load_external_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)
 
 
