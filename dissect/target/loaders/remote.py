@@ -1,14 +1,10 @@
-from io import BufferedReader
 from urllib.parse import urlparse
 import socket
 import ssl
 from struct import pack, unpack
 
-from dissect.util.stream import BufferedStream
-
-from dissect.target.containers.raw import RawContainer, AlignedStream, BufferedStream
+from dissect.target.containers.raw import RawContainer, AlignedStream
 from dissect.target.loader import Loader
-from dissect.target.helpers.utils import parse_path_uri
 
 
 class RemoteStream(AlignedStream):
@@ -66,7 +62,6 @@ class RemoteStreamConnection:
             packet_size = len(packet)
             data += packet
             received += packet_size
-            remainder = length - received
             if packet_size == 0:
                 timeout += 1
         if timeout >= timemax:
@@ -88,7 +83,7 @@ class RemoteStreamConnection:
         while data is None and self._reconnects < 3:
             try:
                 data = _reader(disk_id, offset, length)
-            except Exception as e:
+            except Exception:
                 self._ssl_sock.close()
                 self._is_connected = False
                 self._reconnects += 1

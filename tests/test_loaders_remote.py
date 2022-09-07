@@ -22,7 +22,7 @@ def test_remote_loader_detect(uri, expected):
 @patch.object(ssl, "SSLContext", autospec=True)
 @patch.object(socket, "socket", autospec=True)
 def test_remote_loader_stream(mock_socket_class, mock_context):
-    rsc = RemoteStreamConnection("remote://127.0.0.1",9001)
+    rsc = RemoteStreamConnection("remote://127.0.0.1", 9001)
     assert rsc.is_connected() is False
     rsc.connect()
     rsc._ssl_sock.recv = MagicMock(return_value=b"ABC")
