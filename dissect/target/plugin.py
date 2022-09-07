@@ -706,7 +706,7 @@ def load_module_from_file(path: Path, parent_path: Path):
         save_plugin_import_failure(str(path))
 
 
-def load_module_from_paths(module_path: str) -> None:
+def load_module_from_name(module_path: str) -> None:
     """Load a module relative to ``module_path``."""
     try:
         importlib.import_module(module_path)
