@@ -18,7 +18,7 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
     args_parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     args_parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
     args_parser.add_argument(
-        "--plugin-dir",
+        "--plugin-path",
         action="store",
         nargs="+",
         type=Path,
@@ -35,7 +35,7 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
     if args.keychain_value:
         keychain.register_wildcard_value(args.keychain_value)
 
-    paths = load_module_paths(args.plugin_dir or [])
+    paths = load_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)
 
 
