@@ -726,7 +726,7 @@ def load_module_paths(path_list: list[Path]):
 def environment_variable_paths() -> list[Path]:
     env_var = os.environ.get("DISSECT_PLUGINS")
 
-    plugin_dirs = env_var.split(",") if env_var else []
+    plugin_dirs = env_var.split(":") if env_var else []
 
     return [Path(directory) for directory in plugin_dirs]
 

@@ -30,7 +30,7 @@ def test_save_plugin_import_failure():
     [
         (None, []),
         ("", []),
-        (",", [Path(""), Path("")]),
+        (":", [Path(""), Path("")]),
     ],
 )
 def test_load_environment_variable(env_value, expected_output):
@@ -43,5 +43,5 @@ def test_load_module_paths():
 
 
 def test_load_paths_with_env():
-    with patch.object(os, "environ", {"DISSECT_PLUGINS": ","}):
+    with patch.object(os, "environ", {"DISSECT_PLUGINS": ":"}):
         assert load_module_paths([Path(""), Path("")]) == [Path("")]
