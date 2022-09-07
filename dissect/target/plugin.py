@@ -25,11 +25,10 @@ except Exception:
     GENERATED = False
 
 if TYPE_CHECKING:
-    from flow.record import Record, RecordDescriptor
-
     from dissect.target import Target
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
+    from flow.record import Record, RecordDescriptor
 
 PluginDescriptor = dict[str, Any]
 """A dictionary type, for what the plugin descriptor looks like."""
@@ -644,7 +643,7 @@ def generate() -> dict[str, Any]:
     for path in filter_files(plugins_dir):
         relative_path = path.relative_to(plugins_dir)
         module_tuple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
-        load_module_from_paths(".".join(module_tuple))
+        load_module_from_name(".".join(module_tuple))
 
     return PLUGINS
 
@@ -683,7 +682,7 @@ def filter_files(plugin_path: Path) -> Iterator[Path]:
         yield path
 
 
-def load_module_from_file(path: Path, parent_path: Path):
+def load_module_from_file(path: Path, base_path: Path):
     """Loads a module from a file indicated by ``path``.
 
     The module used for loading the file is ``path`` relative to the ``parent_path``.
@@ -694,7 +693,7 @@ def load_module_from_file(path: Path, parent_path: Path):
         parent_path: The original directory we use as a base for the iteration.
     """
     try:
-        relative_path = path.relative_to(parent_path)
+        relative_path = path.relative_to(base_path)
         module_tuple = (*relative_path.parent.parts, relative_path.stem)
         spec = importlib.util.spec_from_file_location(".".join(module_tuple), path)
         module = importlib.util.module_from_spec(spec)
