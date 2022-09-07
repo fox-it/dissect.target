@@ -669,7 +669,7 @@ def filter_files(plugin_path: Path) -> Iterator[Path]:
     Furthermore, it logs an error if ``plugin_path`` does not exist.
 
     Args:
-        plugin_path: The path to a directory or file to dynamically load.
+        plugin_path: The path to a directory or file to walk and filter.
     """
     if not plugin_path.exists():
         log.error("Path %s does not exist.", plugin_path)
@@ -685,14 +685,13 @@ def filter_files(plugin_path: Path) -> Iterator[Path]:
 
 
 def load_module_from_file(path: Path, base_path: Path):
-    """Loads a module from a file indicated by ``path``.
+    """Loads a module from a file indicated by ``path`` relative to ``base_path``.
 
-    The module used for loading the file is ``path`` relative to the ``parent_path``.
-    Then we add that module to sys.modules so it can be found everywhere.
+    The module is added to ``sys.modules`` so it can be found everywhere.
 
     Args:
-        path: The file to load the module for.
-        parent_path: The original directory we use as a base for the iteration.
+        path: The file to load as module.
+        base_path: The base directory of the module.
     """
     try:
         relative_path = path.relative_to(base_path)
@@ -708,7 +707,7 @@ def load_module_from_file(path: Path, base_path: Path):
 
 
 def load_module_from_name(module_path: str) -> None:
-    """Load a module relative to ``module_path``."""
+    """Load a module from ``module_path``."""
     try:
         importlib.import_module(module_path)
     except Exception as e:
