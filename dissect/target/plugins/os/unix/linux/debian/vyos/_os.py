@@ -1,11 +1,16 @@
-from operator import itemgetter
+from __future__ import annotations
 
-from dissect.target.plugin import export
-from dissect.target.plugins.os.unix._os import LinuxPlugin
+from operator import itemgetter
+from typing import Optional
+
+from dissect.target.filesystem import Filesystem
+from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.target import Target
 
 
 class VyosPlugin(LinuxPlugin):
-    def __init__(self, target):
+    def __init__(self, target: Target):
         self.target = target
 
         versions = []
@@ -24,7 +29,7 @@ class VyosPlugin(LinuxPlugin):
         super().__init__(target)
 
     @classmethod
-    def detect(cls, target):
+    def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
             boot_dir = fs.path("/boot")
 
@@ -41,13 +46,13 @@ class VyosPlugin(LinuxPlugin):
         return None
 
     @export(property=True)
-    def ips(self):
-        pass
+    def ips(self) -> Optional[list[str]]:
+        return None
 
     @export(property=True)
-    def version(self):
-        return f"Vyos {self._version}"
+    def version(self) -> str:
+        return self._version
 
     @export(property=True)
-    def os(self):
-        return "vyos"
+    def os(self) -> str:
+        return OperatingSystem.VYOS.value

@@ -1,0 +1,11 @@
+Machine Name,Policy Target,Subcategory,Subcategory GUID,Inclusion Setting,Exclusion Setting,Setting Value
+,System,Audit Credential Validation,{0cce923f-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Kerberos Authentication Service,{0cce9242-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Kerberos Service Ticket Operations,{0cce9240-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Other Account Logon Events,{0cce9241-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Process Creation,{0cce922b-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Process Termination,{0cce922c-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Detailed Directory Service Replication,{0cce923e-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Directory Service Changes,{0cce923c-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Directory Service Replication,{0cce923d-69ae-11d9-bed3-505054503030},Success and Failure,,3
+,System,Audit Special Logon,{0cce921b-69ae-11d9-bed3-505054503030},Success and Failure,,3

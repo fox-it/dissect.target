@@ -68,6 +68,7 @@ setup(
             "asn1crypto",
             "defusedxml",
             "dissect.cim>=3.0.dev,<4.0.dev",
+            "dissect.clfs>=1.0.dev,<2.0.dev",
             "dissect.esedb>=3.0.dev,<4.0.dev",
             "dissect.etl>=3.0.dev,<4.0.dev",
             "dissect.extfs>=3.0.dev,<4.0.dev",

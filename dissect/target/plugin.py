@@ -4,11 +4,13 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
+import enum
 import importlib
 import logging
 import os
 import sys
 import traceback
+
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -45,14 +47,17 @@ OUTPUTS = (
 log = logging.getLogger(__name__)
 
 
-class Category:
-    """A class defining the different categories for a plugin.
-
-    This is currently unused however, the idea for the future is to
-    be able to execute multiple plugins that have the same ``Category``.
-    """
-
-    PERSISTENCE = "persistence"
+class OperatingSystem(enum.Enum):
+    LINUX = "linux"
+    WINDOWS = "windows"
+    ESXI = "exsi"
+    BSD = "bsd"
+    OSX = "osx"
+    UNIX = "unix"
+    ANDROID = "android"
+    VYOS = "vyos"
+    IOS = "ios"
+    FORTIGATE = "fortigate"
 
 
 def export(*args, **kwargs) -> Callable:
@@ -152,26 +157,15 @@ def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]) -> list[RecordDescr
 class Plugin:
     """Base class for plugins.
 
-    Plugins can optionally be namespaced by specifying the __namespace__
+    Plugins can optionally be namespaced by specifying the ``__namespace__``
     class attribute. Namespacing results in your plugin needing to be prefixed
     with this namespace when being called. For example, if your plugin has
-    specified "test" as namespace and a function called "example", you must
-    call your plugin with "test.example".
-
-    Example:
-        __namespace__ = "test"
-
-    Plugins can also specify one or more categories they belong to. They can do
-    this by importing the :class:`Category` enum from `dissect.target.plugin` and specifying
-    them in a list in the __categories__ class attribute.
-
-    Example:
-        __categories__ = [Category.PERSISTENCE]
+    specified ``test`` as namespace and a function called ``example``, you must
+    call your plugin with ``test.example``::
 
     A ``Plugin`` class has the following private class attributes:
 
     - ``__namespace__``
-    - ``__categories__``
     - ``__record_descriptors__``
 
     With the following three being assigned in :func:`register`:
@@ -198,8 +192,6 @@ class Plugin:
 
     __namespace__: str = None
     """Defines the plugin namespace."""
-    __categories__: list[Category] = None
-    """Defines a list of :class:`Category` that the plugin belongs to."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
 
@@ -439,7 +431,6 @@ def register(plugincls: Type[Plugin]) -> None:
     root["functions"] = plugincls.__functions__
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
-    root["categories"] = plugincls.__categories__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
 
 

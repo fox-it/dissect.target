@@ -1,5 +1,4 @@
 import ctypes
-import os
 import platform
 import re
 from pathlib import Path
@@ -63,8 +62,8 @@ def map_linux_drives(target: Target):
 
     Iterate through /dev and match raw device names (not partitions).
     """
-    for drive in os.listdir("/dev"):
-        if LINUX_DRIVE_REGEX.match(drive):
+    for drive in Path("/dev").iterdir():
+        if LINUX_DRIVE_REGEX.match(drive.name):
             _add_disk_as_raw_container_to_target(drive, target)
 
 
@@ -73,8 +72,8 @@ def map_solaris_drives(target):
 
     Iterate through /dev/dsk and match raw device names (not slices or partitions).
     """
-    for drive in os.listdir("/dev/dsk"):
-        if not SOLARIS_DRIVE_REGEX.match(drive):
+    for drive in Path("/dev/dsk").iterdir():
+        if not SOLARIS_DRIVE_REGEX.match(drive.name):
             continue
         _add_disk_as_raw_container_to_target(drive, target)
 
@@ -143,7 +142,7 @@ def map_windows_drives(target):
         target.disks.add(disk)
 
 
-def _add_disk_as_raw_container_to_target(drive: str, target: Target) -> None:
+def _add_disk_as_raw_container_to_target(drive: Path, target: Target) -> None:
     try:
         fh = BufferedStream(open(drive, "rb"))
         target.disks.add(RawContainer(fh))
