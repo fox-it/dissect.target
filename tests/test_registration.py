@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
-
 from dissect.target.container import CONTAINERS
 from dissect.target.filesystem import FILESYSTEMS
 from dissect.target.loader import LOADERS
@@ -18,7 +17,7 @@ def environment_path(tmp_path: Path):
 
 
 def registry_file(path: str):
-    return Path(__file__).parent / f"plugin_register/{path}"
+    return Path(__file__).parent / f"data/plugin_register/{path}"
 
 
 def copy_different_plugin_files(path: Path, file_name: str):
