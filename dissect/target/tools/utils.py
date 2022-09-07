@@ -51,10 +51,7 @@ def environment_variable_paths() -> list[Path]:
 
     plugin_dirs = env_var.split(",") if env_var else []
 
-    if plugin_dirs:
-        plugin_dirs = [Path(directory) for directory in plugin_dirs]
-
-    return plugin_dirs
+    return [Path(directory) for directory in plugin_dirs]
 
 
 def generate_argparse_for_bound_method(

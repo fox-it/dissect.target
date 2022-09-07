@@ -658,21 +658,20 @@ def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
 
 
 def filter_files(plugin_path: Path) -> Iterator[Path]:
-    """Iterate over all the files and directories in ``plugin_path``.
+    """Walk all the files and directories in ``plugin_path`` and excluding specific paths.
 
-    These files have a specific filter, where they do not return if any of the
-    following information is inside the path:
+    Do not walk or yield paths containing the following names:
 
     - __pycache__
     - __init__
 
-    Furthermore, it logs a warning if ``plugin_path`` does not exist.
+    Furthermore, it logs an error if ``plugin_path`` does not exist.
 
     Args:
         plugin_path: The path to a directory or file to dynamically load.
     """
     if not plugin_path.exists():
-        log.error(f"Path {plugin_path} does not exist.")
+        log.error("Path %s does not exist.", plugin_path)
         return
 
     path_iterator = [plugin_path] if plugin_path.is_file() else plugin_path.glob("**/*")
@@ -704,7 +703,7 @@ def load_module_from_file(path: Path, parent_path: Path):
     except Exception as e:
         log.error("Unable to import %s", path)
         log.debug("Error while trying to import module %s", path, exc_info=e)
-        save_plugin_import_failure(path)
+        save_plugin_import_failure(str(path))
 
 
 def load_module_from_paths(module_path: str) -> None:
