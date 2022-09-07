@@ -8,6 +8,7 @@ import enum
 import importlib
 import importlib.util
 import logging
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -25,10 +26,11 @@ except Exception:
     GENERATED = False
 
 if TYPE_CHECKING:
+    from flow.record import Record, RecordDescriptor
+
     from dissect.target import Target
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
-    from flow.record import Record, RecordDescriptor
 
 PluginDescriptor = dict[str, Any]
 """A dictionary type, for what the plugin descriptor looks like."""
@@ -713,6 +715,21 @@ def load_module_from_name(module_path: str) -> None:
         log.error("Unable to import %s", module_path)
         log.debug("Error while trying to import module %s", module_path, exc_info=e)
         save_plugin_import_failure(module_path)
+
+
+def load_module_paths(path_list: list[Path]):
+    """Create a deduplicated list of paths."""
+    output_list = environment_variable_paths() + path_list
+
+    return list(dict.fromkeys(output_list))
+
+
+def environment_variable_paths() -> list[Path]:
+    env_var = os.environ.get("DISSECT_PLUGINS")
+
+    plugin_dirs = env_var.split(",") if env_var else []
+
+    return [Path(directory) for directory in plugin_dirs]
 
 
 def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:

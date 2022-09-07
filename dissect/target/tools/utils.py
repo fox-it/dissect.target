@@ -1,14 +1,13 @@
 import argparse
 import inspect
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from dissect.target import Target, plugin
 from dissect.target.helpers import docs, keychain
-from dissect.target.plugin import Plugin, load_modules_from_paths
+from dissect.target.plugin import Plugin, load_module_paths, load_modules_from_paths
 from dissect.target.tools.logging import configure_logging
 
 
@@ -37,21 +36,6 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
 
     paths = load_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)
-
-
-def load_module_paths(path_list: list[Path]):
-    """Create a deduplicated list of paths."""
-    output_list = environment_variable_paths() + path_list
-
-    return list(dict.fromkeys(output_list))
-
-
-def environment_variable_paths() -> list[Path]:
-    env_var = os.environ.get("DISSECT_PLUGINS")
-
-    plugin_dirs = env_var.split(",") if env_var else []
-
-    return [Path(directory) for directory in plugin_dirs]
 
 
 def generate_argparse_for_bound_method(

@@ -1,15 +1,8 @@
-import os
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from dissect.target.tools.utils import (
-    environment_variable_paths,
-    load_module_paths,
-    persist_execution_report,
-)
+from dissect.target.tools.utils import persist_execution_report
 
 
 def test_persist_execution_report():
@@ -35,25 +28,3 @@ def test_persist_execution_report():
             mocked_json_dumps.called_once_with(report_data)
 
             mocked_write_text.assert_called_once_with(test_output)
-
-
-@pytest.mark.parametrize(
-    "env_value, expected_output",
-    [
-        (None, []),
-        ("", []),
-        (",", [Path(""), Path("")]),
-    ],
-)
-def test_load_environment_variable(env_value, expected_output):
-    with patch.object(os, "environ", {"DISSECT_PLUGINS": env_value}):
-        assert environment_variable_paths() == expected_output
-
-
-def test_load_module_paths():
-    assert load_module_paths([Path(""), Path("")]) == [Path("")]
-
-
-def test_load_paths_with_env():
-    with patch.object(os, "environ", {"DISSECT_PLUGINS": ","}):
-        assert load_module_paths([Path(""), Path("")]) == [Path("")]
