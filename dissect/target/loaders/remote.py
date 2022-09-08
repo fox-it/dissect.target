@@ -40,8 +40,8 @@ class RemoteStreamConnection:
 
     def __init__(self, hostname, port):
         self._is_connected = False
-        self._hostname = hostname
-        self._port = port
+        self.hostname = hostname
+        self.port = port
         self._socket = None
         self._ssl_sock = None
 
@@ -57,8 +57,8 @@ class RemoteStreamConnection:
         context.load_default_certs()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(self.SOCKET_TIMEOUT)
-        ssl_sock = context.wrap_socket(self._socket, server_hostname=self._hostname)
-        ssl_sock.connect((self._hostname, self._port))
+        ssl_sock = context.wrap_socket(self._socket, server_hostname=self.hostname)
+        ssl_sock.connect((self.hostname, self.port))
         self._ssl_sock = ssl_sock
         self._is_connected = True
 
