@@ -18,7 +18,7 @@ def list_to_frozen_set(function):
     return wrapper
 
 
-def parse_path_uri(path: Union[str, Path]) -> (Path, Loader, dict, str):
+def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loader], dict, str]:
     """Converts a path string into a path while taking URIs into account.
 
     If the path string contains an URI the scheme will be used to infer
