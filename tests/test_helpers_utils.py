@@ -2,6 +2,7 @@ import pytest
 
 from unittest.mock import mock_open
 from pathlib import Path
+
 from dissect.target.helpers.utils import readinto, slugify, parse_path_uri
 from dissect.target.loader import LOADERS_BY_SCHEME
 
