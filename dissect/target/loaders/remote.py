@@ -129,15 +129,18 @@ class RemoteStreamConnection:
 
 
 class RemoteLoader(Loader):
-    def map(self, target):
+    
+    def __init__(self, path):
+        super().__init__(path)
         # Temporary fix, wait for URI handling feature...
         def _temp_fix_path(path):
             return str(path).replace("remote:/", "remote://")
 
         url = urlparse(_temp_fix_path(self.path))
-        stream = RemoteStreamConnection(url.hostname, url.port)
-
-        for disk in stream.info():
+        self.stream = RemoteStreamConnection(url.hostname, url.port)
+    
+    def map(self, target):
+        for disk in self.stream.info():
             target.disks.add(RawContainer(disk))
 
     @staticmethod
