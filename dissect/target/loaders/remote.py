@@ -81,7 +81,6 @@ class RemoteStreamConnection:
         return data
 
     def read(self, disk_id, offset, length):
-
         if length < 1:
             raise NotImplementedError("RemoteStreamConnection does not support size = -1")
 
