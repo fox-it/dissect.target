@@ -51,7 +51,6 @@ class RemoteStreamConnection:
         self._context.load_default_certs()
 
     def connect(self):
-
         if self._is_connected:
             return
 
