@@ -129,6 +129,7 @@ class RemoteStreamConnection:
 class RemoteLoader(Loader):
     def __init__(self, path):
         super().__init__(path)
+
         # Temporary fix, wait for URI handling feature...
         def _temp_fix_path(path):
             return str(path).replace("remote:/", "remote://")
