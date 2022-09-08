@@ -1,8 +1,9 @@
-from urllib.parse import urlparse
 import socket
 import ssl
+
 from io import DEFAULT_BUFFER_SIZE
 from struct import pack, unpack
+from urllib.parse import urlparse
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
@@ -43,20 +44,20 @@ class RemoteStreamConnection:
         self.port = port
         self._socket = None
         self._ssl_sock = None
+        self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        # Insecure version for PoC, needs to change!
+        self._context.verify_mode = ssl.CERT_NONE
+        self._context.check_hostname = False
+        self._context.load_default_certs()
 
     def connect(self):
 
         if self._is_connected:
             return
 
-        context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-        # Insecure version for PoC, needs to change!
-        context.verify_mode = ssl.CERT_NONE
-        context.check_hostname = False
-        context.load_default_certs()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(self.SOCKET_TIMEOUT)
-        ssl_sock = context.wrap_socket(self._socket, server_hostname=self.hostname)
+        ssl_sock = self._context.wrap_socket(self._socket, server_hostname=self.hostname)
         ssl_sock.connect((self.hostname, self.port))
         self._ssl_sock = ssl_sock
         self._is_connected = True
@@ -128,7 +129,6 @@ class RemoteStreamConnection:
 
 
 class RemoteLoader(Loader):
-    
     def __init__(self, path):
         super().__init__(path)
         # Temporary fix, wait for URI handling feature...
@@ -137,7 +137,7 @@ class RemoteLoader(Loader):
 
         url = urlparse(_temp_fix_path(self.path))
         self.stream = RemoteStreamConnection(url.hostname, url.port)
-    
+
     def map(self, target):
         for disk in self.stream.info():
             target.disks.add(RawContainer(disk))
