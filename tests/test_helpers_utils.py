@@ -36,6 +36,21 @@ def test_filesystem_readinto():
         ("tar://archive.tar.gz", (Path("archive.tar.gz"), LOADERS_BY_SCHEME["tar"], {}, "tar")),
         # works with absolute path
         ("tar:///root/archive.tar.gz", (Path("/root/archive.tar.gz"), LOADERS_BY_SCHEME["tar"], {}, "tar")),
+        # remote uri
+        ("tar://127.0.0.1:1234?b=1", (Path("127.0.0.1:1234"), LOADERS_BY_SCHEME["tar"], {"b": ["1"]}, "tar")),
+        (
+            "tar://127.0.0.1:1234/path/to/web?b=1",
+            (Path("127.0.0.1:1234/path/to/web"), LOADERS_BY_SCHEME["tar"], {"b": ["1"]}, "tar"),
+        ),
+        (
+            "tar://127.0.0.1:1234//path/to/web?b=1",
+            (Path("127.0.0.1:1234/path/to/web"), LOADERS_BY_SCHEME["tar"], {"b": ["1"]}, "tar"),
+        ),
+        # normalized slashes
+        (
+            "tar://127.0.0.1:1234///path/to//////web?b=1",
+            (Path("127.0.0.1:1234/path/to/web"), LOADERS_BY_SCHEME["tar"], {"b": ["1"]}, "tar"),
+        ),
         # file:// is same as nothing
         ("file:///root/archive.tar.gz", (Path("/root/archive.tar.gz"), None, {}, "file")),
         # non-existant scheme yields None value, so equals file://
@@ -48,6 +63,9 @@ def test_filesystem_readinto():
         # unparseable url, gets treated as path
         ("://?a=1", (Path(":/?a=1"), None, {"a": ["1"]}, "")),
         ("aaa.bbb", (Path("aaa.bbb"), None, {}, "")),
+        # relative paths
+        ("vmx://~/data/archive.zip?a=1", (Path("~/data/archive.zip"), LOADERS_BY_SCHEME["vmx"], {"a": ["1"]}, "vmx")),
+        ("vmx://../data/archive.zip?a=1", (Path("../data/archive.zip"), LOADERS_BY_SCHEME["vmx"], {"a": ["1"]}, "vmx")),
     ],
 )
 def test_parse_path_uri(path, expected):

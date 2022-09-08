@@ -1,5 +1,6 @@
 import re
 import urllib.parse
+from os import PathLike
 from pathlib import Path
 from enum import Enum
 from typing import BinaryIO, Union
@@ -49,20 +50,23 @@ def parse_path_uri(path: Union[str, Path]) -> (Path, Loader, dict, str):
     if path is None:
         return None, None, {}, ""
 
-    # In case we have a path object
-    path = str(path)
-    inferred_loader = None
-    # urlparse isn't good enough, parses C:\ as scheme C!
-    # also urlparse path == '' which is useless for practical use as pseudo path
-    scheme = path.split("://")[0] if path.find("://") > -1 else ""
-    # we *can* use urllib to extract the query string though
-    parsed_path = urllib.parse.urlparse(path)
+    parsed_path = urllib.parse.urlparse(str(path))
     parsed_query = urllib.parse.parse_qs(parsed_path.query, keep_blank_values=True)
-    if scheme != "":
-        inferred_loader = LOADERS_BY_SCHEME.get(scheme)
-        # because we want to keep the 'pseudo path' we have to do this part ourselves
-        path = path[len(scheme) + 3 :].split("?")[0]
-    return Path(path), inferred_loader, parsed_query, scheme
+
+    # Then, always it got wrapped in a Path if it was something else (backward compat)
+    if not isinstance(path, PathLike):
+        path = Path(path)
+
+    # if we have no scheme or it's invalid (or a Windows drive letter),
+    # return the path and the parsed query (backward compat)
+    if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
+        return path, None, parsed_query, ""
+
+    # Otherwise use the scheme to infer the loader
+    inferred_loader = LOADERS_BY_SCHEME.get(parsed_path.scheme)
+
+    # also create a useful 'pseudo path' for pragmatic purposes to use as URL
+    return Path(f"{parsed_path.netloc}{parsed_path.path}"), inferred_loader, parsed_query, parsed_path.scheme
 
 
 SLUG_RE = re.compile(r"[/\\ ]")
