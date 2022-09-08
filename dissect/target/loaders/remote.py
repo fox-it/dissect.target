@@ -1,17 +1,18 @@
 from urllib.parse import urlparse
 import socket
 import ssl
+from io import DEFAULT_BUFFER_SIZE
 from struct import pack, unpack
 
-from dissect.target.containers.raw import RawContainer, AlignedStream
+from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
+from dissect.util.stream import AlignedStream
 
 
 class RemoteStream(AlignedStream):
     def __init__(self, stream, disk_id, size=-1):
         self.stream = stream
         self.disk_id = disk_id
-        self._pos = 0
         super().__init__(size)
 
     def _read(self, offset, length):
@@ -21,21 +22,33 @@ class RemoteStream(AlignedStream):
 
 
 class RemoteStreamConnection:
+
+    # Max. number of times we try to reconnect (still tweaking this)
+    MAX_RECONNECTS = 3
+
+    # Max. number of read retries
+    MAX_RETRY_READ = 3
+
+    # Socket timeout, connections can be slow, so not too low
+    # Also there might be an initial waiting time of 10s because of the
+    # previous connection! So it must be at least 10s.
+    SOCKET_TIMEOUT = 60
+
+    COMMAND_INFO = 1
+    COMMAND_QUIT = 2
+    COMMAND_READ = 50
+
     def __init__(self, hostname, port):
         self._is_connected = False
         self._hostname = hostname
         self._port = port
         self._socket = None
         self._ssl_sock = None
-        self._reconnects = 0
 
     def connect(self):
 
         if self._is_connected:
             return
-
-        if self._reconnects >= 3:
-            raise ConnectionError("Maximum number of reconnects has been reached.")
 
         context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         # Insecure version for PoC, needs to change!
@@ -43,7 +56,7 @@ class RemoteStreamConnection:
         context.check_hostname = False
         context.load_default_certs()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(30)
+        self._socket.settimeout(self.SOCKET_TIMEOUT)
         ssl_sock = context.wrap_socket(self._socket, server_hostname=self._hostname)
         ssl_sock.connect((self._hostname, self._port))
         self._ssl_sock = ssl_sock
@@ -56,15 +69,15 @@ class RemoteStreamConnection:
         timeout = 0
         data = b""
         received = 0
-        timemax = 3
-        while received < length and timeout < timemax:
-            packet = self._ssl_sock.recv(min(length - received, 2048))
+
+        while received < length and timeout < self.MAX_RETRY_READ:
+            packet = self._ssl_sock.recv(min(length - received, DEFAULT_BUFFER_SIZE))
             packet_size = len(packet)
             data += packet
             received += packet_size
             if packet_size == 0:
                 timeout += 1
-        if timeout >= timemax:
+        if timeout >= self.MAX_RETRY_READ:
             return None
         return data
 
@@ -75,33 +88,33 @@ class RemoteStreamConnection:
 
         def _reader(disk_id, offset, length):
             self.connect()
-            self._ssl_sock.send(pack(">BQQ", 50 + disk_id, offset, length))
+            self._ssl_sock.send(pack(">BQQ", self.COMMAND_READ + disk_id, offset, length))
             return self._receive_bytes(length)
 
         data = None
-
-        while data is None and self._reconnects < 3:
+        reconnects = 0
+        while data is None and reconnects < self.MAX_RECONNECTS:
             try:
                 data = _reader(disk_id, offset, length)
             except Exception:
                 self._ssl_sock.close()
                 self._is_connected = False
-                self._reconnects += 1
+                reconnects += 1
                 continue
 
-        if self._reconnects >= 3:
+        if reconnects >= self.MAX_RECONNECTS:
             raise ConnectionError("Unable to establish connection with remote agent")
 
         return data
 
     def close(self):
         if self.is_connected:
-            self._ssl_sock.send(pack(">BQQ", 2, 0, 0))
+            self._ssl_sock.send(pack(">BQQ", self.COMMAND_QUIT, 0, 0))
         return True
 
     def info(self):
         self.connect()
-        self._ssl_sock.send(pack(">BQQ", 1, 0, 0))
+        self._ssl_sock.send(pack(">BQQ", self.COMMAND_INFO, 0, 0))
         number_of_disks = unpack("<B", self._ssl_sock.recv(1))[0]
         remainder = number_of_disks * 16
         data = self._receive_bytes(remainder)
@@ -109,8 +122,8 @@ class RemoteStreamConnection:
 
         for i in range(0, number_of_disks):
             part = data[(i * 16) : ((i * 16) + 16)]
-            info = unpack("<QQ", part)
-            disks.append(RemoteStream(self, i, info[0] * info[1]))
+            (disk_size, _) = unpack("<QQ", part)
+            disks.append(RemoteStream(self, i, disk_size))
 
         return disks
 
