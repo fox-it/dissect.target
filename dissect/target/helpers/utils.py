@@ -3,6 +3,7 @@ import urllib.parse
 from pathlib import Path
 from enum import Enum
 from typing import BinaryIO, Union
+
 from dissect.target.loader import Loader, LOADERS_BY_SCHEME
 
 
