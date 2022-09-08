@@ -4,7 +4,6 @@ import ssl
 
 from unittest.mock import patch, MagicMock, call
 
-
 from dissect.target.loaders.remote import RemoteLoader, RemoteStreamConnection, RemoteStream
 
 

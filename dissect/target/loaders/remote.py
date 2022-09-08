@@ -17,8 +17,7 @@ class RemoteStream(AlignedStream):
 
     def _read(self, offset, length):
         length = min(length, max(0, self.size - offset)) if self.size else length
-        data = self.stream.read(self.disk_id, offset, length)
-        return data
+        return self.stream.read(self.disk_id, offset, length)
 
 
 class RemoteStreamConnection:
