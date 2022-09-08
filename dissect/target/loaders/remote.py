@@ -136,9 +136,8 @@ class RemoteLoader(Loader):
 
         url = urlparse(_temp_fix_path(self.path))
         stream = RemoteStreamConnection(url.hostname, url.port)
-        disks = stream.info()
 
-        for disk in disks:
+        for disk in stream.info():
             target.disks.add(RawContainer(disk))
 
     @staticmethod
