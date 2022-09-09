@@ -36,4 +36,4 @@ class TestContainer(Container):
         pass
 
 
-register(TestContainer.__module__, TestContainer.__name__)
+register(__name__, TestContainer.__name__, internal=False)

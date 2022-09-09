@@ -99,7 +99,7 @@ def test_register_container(environment_path: Path):
     copy_different_plugin_files(environment_path, "container.py")
     load_modules_from_paths([environment_path])
 
-    values = [x for (_, x) in CONTAINERS]
+    values = [container.__name__ for container in CONTAINERS]
 
     assert "TestContainer" in values
 
@@ -108,7 +108,7 @@ def test_register_file(environment_path: Path):
     copy_different_plugin_files(environment_path, "container.py")
     load_modules_from_paths([environment_path / "container.py"])
 
-    values = [x for (_, x) in CONTAINERS]
+    values = [container.__name__ for container in CONTAINERS]
 
     assert "TestContainer" in values
 

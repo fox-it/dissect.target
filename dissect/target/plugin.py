@@ -655,7 +655,8 @@ def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
     for plugin_path in plugin_dirs:
         for path in filter_files(plugin_path):
             if path.is_file() and ".py" == path.suffix:
-                load_module_from_file(path, plugin_path)
+                base_path = plugin_path.parent if path == plugin_path else plugin_path
+                load_module_from_file(path, base_path)
 
 
 def filter_files(plugin_path: Path) -> Iterator[Path]:

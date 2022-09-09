@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO, Type, Union
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
@@ -12,22 +12,11 @@ from dissect.target.helpers.utils import readinto
 if TYPE_CHECKING:
     from dissect.target.volume import VolumeSystem
 
-raw = import_lazy("dissect.target.containers.raw")
+CONTAINERS: list[Type[Container]] = []
+MODULE_PATH = "dissect.target.containers"
+
+RawContainer = import_lazy("dissect.target.containers.raw").RawContainer
 """A lazy import of :mod:`dissect.target.containers.raw`"""
-ewf = import_lazy("dissect.target.containers.ewf")
-"""A lazy import of :mod:`dissect.target.containers.ewf`"""
-vmdk = import_lazy("dissect.target.containers.vmdk")
-"""A lazy import of :mod:`dissect.target.containers.vmdk`"""
-vhdx = import_lazy("dissect.target.containers.vhdx")
-"""A lazy import of :mod:`dissect.target.containers.vhdx`"""
-vhd = import_lazy("dissect.target.containers.vhd")
-"""A lazy import of :mod:`dissect.target.containers.vhd`"""
-qcow2 = import_lazy("dissect.target.containers.qcow2")
-"""A lazy import of :mod:`dissect.target.containers.qcow2`"""
-split = import_lazy("dissect.target.containers.split")
-"""A lazy import of :mod:`dissect.target.containers.split`"""
-vdi = import_lazy("dissect.target.containers.vdi")
-"""A lazy import of :mod:`dissect.target.containers.vdi`"""
 
 log = logging.getLogger(__name__)
 
@@ -143,19 +132,22 @@ class Container(io.IOBase):
         raise NotImplementedError()
 
 
-CONTAINERS = [
-    (ewf, "EwfContainer"),
-    (vmdk, "VmdkContainer"),
-    (vhdx, "VhdxContainer"),
-    (vhd, "VhdContainer"),
-    (qcow2, "QCow2Container"),
-    (vdi, "VdiContainer"),
-    (split, "SplitContainer"),
-]
+def register(module: str, class_name: str, internal: bool = True):
+    """Registers a ``Container`` class inside ``CONTAINERS``.
 
+    This function registers a loader using ``module`` relative to the ``MODULE_PATH``.
+    It lazily imports the module, and retrieves the specific class from it.
 
-def register(module, class_name):
-    CONTAINERS.append((import_lazy(module), class_name))
+    Args:
+        module: The module where to find the loader.
+        class_name: The class to load.
+        internal: Whether it is an internal module or not.
+    """
+
+    if internal:
+        module = ".".join([MODULE_PATH, module])
+
+    CONTAINERS.append(getattr(import_lazy(module), class_name))
 
 
 def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
@@ -177,8 +169,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     elif isinstance(item, str):
         item = Path(item)
 
-    for module, class_name in CONTAINERS + [(raw, "RawContainer")]:
-        container = getattr(module, class_name)
+    for container in CONTAINERS + [RawContainer]:
         try:
             if container.detect(item):
                 return container(item, *args, **kwargs)
@@ -188,3 +179,14 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
             raise ContainerError(f"Failed to open container {item}", cause=e)
 
     raise ContainerError(f"Failed to detect container for {item}")
+
+
+register("ewf", "EwfContainer")
+register("vmdk", "VmdkContainer")
+register("ewf", "EwfContainer")
+register("vmdk", "VmdkContainer")
+register("vhdx", "VhdxContainer")
+register("vhd", "VhdContainer")
+register("qcow2", "QCow2Container")
+register("vdi", "VdiContainer")
+register("split", "SplitContainer")
