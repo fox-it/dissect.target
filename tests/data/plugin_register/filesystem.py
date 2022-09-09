@@ -21,4 +21,4 @@ class TestFilesystem(Filesystem):
         return True
 
 
-register(TestFilesystem.__module__, TestFilesystem.__name__)
+register(__name__, TestFilesystem.__name__, internal=False)

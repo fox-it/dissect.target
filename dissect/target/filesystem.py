@@ -5,7 +5,7 @@ import logging
 import os
 import stat
 from collections import defaultdict
-from typing import Any, BinaryIO, Callable, Iterator, List, Optional, Union
+from typing import Any, BinaryIO, Callable, Iterator, List, Optional, Type, Union
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -18,14 +18,8 @@ from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.volume import Volume
 
-ntfs = import_lazy("dissect.target.filesystems.ntfs")
-extfs = import_lazy("dissect.target.filesystems.extfs")
-xfs = import_lazy("dissect.target.filesystems.xfs")
-fat = import_lazy("dissect.target.filesystems.fat")
-ffs = import_lazy("dissect.target.filesystems.ffs")
-vmfs = import_lazy("dissect.target.filesystems.vmfs")
-exfat = import_lazy("dissect.target.filesystems.exfat")
-ad1 = import_lazy("dissect.target.filesystems.ad1")
+FILESYSTEMS: list[Type[Filesystem]] = []
+MODULE_PATH = "dissect.target.filesystems"
 
 log = logging.getLogger(__name__)
 
@@ -1342,32 +1336,43 @@ class RootFilesystemEntry(FilesystemEntry):
         return self._exec("attr")
 
 
-FILESYSTEMS = [
-    (ntfs, "NtfsFilesystem"),
-    (extfs, "ExtFilesystem"),
-    (xfs, "XfsFilesystem"),
-    (fat, "FatFilesystem"),
-    (ffs, "FfsFilesystem"),
-    (vmfs, "VmfsFilesystem"),
-    (exfat, "ExfatFilesystem"),
-    (ad1, "AD1Filesystem"),
-]
+def register(module: str, class_name: str, internal: bool = True):
+    """Registers a ``Filesystem`` class inside ``FILESYSTEMS``.
 
+    This function registers a loader using ``module`` relative to the ``MODULE_PATH``.
+    It lazily imports the module, and retrieves the specific class from it.
 
-def register(module: str, class_name: str):
-    FILESYSTEMS.append((import_lazy(module), class_name))
+    Args:
+        module: The module where to find the loader.
+        class_name: The class to load.
+        internal: Whether it is an internal module or not.
+    """
+
+    if internal:
+        module = ".".join([MODULE_PATH, module])
+
+    FILESYSTEMS.append(getattr(import_lazy(module), class_name))
 
 
 def open(fh, *args, **kwargs):
 
-    for fs, argument in FILESYSTEMS:
-        filesystem = getattr(fs, argument)
+    for filesystem in FILESYSTEMS:
         try:
             if filesystem.detect(fh):
                 instance = filesystem(fh, *args, **kwargs)
                 instance.volume = fh
                 return instance
         except ImportError as e:
-            log.warning("Failed to import %s", fs, exc_info=e)
+            log.warning("Failed to import %s", filesystem, exc_info=e)
 
     raise FilesystemError(f"Failed to open filesystem for {fh}")
+
+
+register("ntfs", "NtfsFilesystem")
+register("extfs", "ExtFilesystem")
+register("xfs", "XfsFilesystem")
+register("fat", "FatFilesystem")
+register("ffs", "FfsFilesystem")
+register("vmfs", "VmfsFilesystem")
+register("exfat", "ExfatFilesystem")
+register("ad1", "AD1Filesystem")

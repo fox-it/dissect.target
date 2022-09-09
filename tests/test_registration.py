@@ -83,7 +83,7 @@ def test_new_filesystem_registration(environment_path: Path):
     copy_different_plugin_files(environment_path, "filesystem.py")
     load_modules_from_paths([environment_path])
 
-    values = [x for (_, x) in FILESYSTEMS]
+    values = [filesystem.__name__ for filesystem in FILESYSTEMS]
 
     assert "TestFilesystem" in values
 
