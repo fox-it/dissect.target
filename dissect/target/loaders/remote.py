@@ -38,9 +38,9 @@ class RemoteStreamConnection:
     COMMAND_READ = 50
 
     def __init__(self, hostname, port):
-        self._is_connected = False
         self.hostname = hostname
         self.port = port
+        self._is_connected = False
         self._socket = None
         self._ssl_sock = None
         self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
