@@ -91,9 +91,10 @@ def test_registration(environment_path: Path, filename: str, plugin_list: list, 
     copy_different_plugin_files(environment_path, filename)
     load_modules_from_paths([environment_path])
 
-    values = [plugin_cls.__name__ for plugin_cls in plugin_list]
+    # The plugins are registered at the end of the list.
+    values = plugin_list[-1].__name__
 
-    assert class_name in values
+    assert class_name == values
 
 
 def test_register_file(environment_path: Path):
