@@ -11,7 +11,7 @@ def mocked_ewf_detect():
     mocked_ewf = Mock()
     mocked_ewf.EwfContainer.detect.return_value = True
     mocked_ewf.EwfContainer.detect
-    with patch.object(container, "CONTAINERS", [(mocked_ewf, "EwfContainer")]):
+    with patch.object(container, "CONTAINERS", [mocked_ewf.EwfContainer]):
         yield mocked_ewf.EwfContainer
 
 
