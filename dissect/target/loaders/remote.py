@@ -17,7 +17,6 @@ class RemoteStream(AlignedStream):
         super().__init__(size)
 
     def _read(self, offset, length):
-        length = min(length, max(0, self.size - offset)) if self.size else length
         return self.stream.read(self.disk_id, offset, length)
 
 
