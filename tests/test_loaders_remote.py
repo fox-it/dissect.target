@@ -26,6 +26,7 @@ def test_remote_loader_stream(mock_socket_class, mock_context):
     rsc.connect()
     rsc._ssl_sock.recv = MagicMock(return_value=b"ABC")
     rs = RemoteStream(rsc, 0, 3)
+    rs.align = 1
     rs.seek(1)
     rs.read(2)
     rs.close()
@@ -35,8 +36,8 @@ def test_remote_loader_stream(mock_socket_class, mock_context):
         call().load_default_certs(),
         call().wrap_socket(rsc._socket, server_hostname="remote://127.0.0.1"),
         call().wrap_socket().connect(("remote://127.0.0.1", 9001)),
-        call().wrap_socket().send(b"2\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03"),
-        call().wrap_socket().recv(3),
+        call().wrap_socket().send(b"2\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02"),
+        call().wrap_socket().recv(2),
     ]
     assert mock_context.mock_calls == expected
     assert rs.tell() == 3
