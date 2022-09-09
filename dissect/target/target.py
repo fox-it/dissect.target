@@ -16,8 +16,9 @@ from dissect.target.exceptions import (
     PluginNotFoundError,
 )
 from dissect.target.helpers import config
+from dissect.target.helpers.loaderutil import parse_path_uri
 from dissect.target.helpers.record import ChildTargetRecord
-from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
+from dissect.target.helpers.utils import StrEnum, slugify
 from dissect.target.plugins.general import default
 
 log = logging.getLogger(__name__)
