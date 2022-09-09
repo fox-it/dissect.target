@@ -92,7 +92,9 @@ def test_loader_registration(environment_path: Path):
     copy_different_plugin_files(environment_path, "loader.py")
     load_modules_from_paths([environment_path])
 
-    assert "TestLoader" == LOADERS[-1].__name__
+    values = [loader.__name__ for loader in LOADERS]
+
+    assert "TestLoader" in values
 
 
 def test_register_container(environment_path: Path):

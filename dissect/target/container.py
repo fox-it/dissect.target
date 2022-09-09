@@ -135,11 +135,11 @@ class Container(io.IOBase):
 def register(module: str, class_name: str, internal: bool = True):
     """Registers a ``Container`` class inside ``CONTAINERS``.
 
-    This function registers a loader using ``module`` relative to the ``MODULE_PATH``.
+    This function registers a container using ``module`` relative to the ``MODULE_PATH``.
     It lazily imports the module, and retrieves the specific class from it.
 
     Args:
-        module: The module where to find the loader.
+        module: The module where to find the container.
         class_name: The class to load.
         internal: Whether it is an internal module or not.
     """

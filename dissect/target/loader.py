@@ -98,22 +98,21 @@ class Loader:
         raise NotImplementedError()
 
 
-def register(modname: str, clsname: str, internal: bool = True) -> None:
+def register(module: str, class_name: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
     This function registers a loader using ``modname`` relative to the ``MODULE_PATH``.
     It lazily imports the module, and retrieves the specific class from it.
 
     Args:
-        modname: The module where to find the loader.
-        clsname: The class to load.
+        module: The module where to find the loader.
+        class_name: The class to load.
+        internal: Whether it is an internal module or not.
     """
     if internal:
-        modpath = f"{MODULE_PATH}.{modname}"
-    else:
-        modpath = modname
+        module = ".".join([MODULE_PATH, module])
 
-    LOADERS.append(getattr(import_lazy(modpath), clsname))
+    LOADERS.append(getattr(import_lazy(module), class_name))
 
 
 def find_loader(item: Path) -> Optional[Loader]:
