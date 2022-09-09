@@ -79,31 +79,21 @@ def test_new_plugin_registration(environment_path: Path):
     assert "plugin" in PLUGINS
 
 
-def test_new_filesystem_registration(environment_path: Path):
-    copy_different_plugin_files(environment_path, "filesystem.py")
+@pytest.mark.parametrize(
+    "filename, plugin_list, class_name",
+    [
+        ("loader.py", LOADERS, "TestLoader"),
+        ("filesystem.py", FILESYSTEMS, "TestFilesystem"),
+        ("container.py", CONTAINERS, "TestContainer"),
+    ],
+)
+def test_registration(environment_path: Path, filename: str, plugin_list: list, class_name: str):
+    copy_different_plugin_files(environment_path, filename)
     load_modules_from_paths([environment_path])
 
-    values = [filesystem.__name__ for filesystem in FILESYSTEMS]
+    values = [plugin_cls.__name__ for plugin_cls in plugin_list]
 
-    assert "TestFilesystem" in values
-
-
-def test_loader_registration(environment_path: Path):
-    copy_different_plugin_files(environment_path, "loader.py")
-    load_modules_from_paths([environment_path])
-
-    values = [loader.__name__ for loader in LOADERS]
-
-    assert "TestLoader" in values
-
-
-def test_register_container(environment_path: Path):
-    copy_different_plugin_files(environment_path, "container.py")
-    load_modules_from_paths([environment_path])
-
-    values = [container.__name__ for container in CONTAINERS]
-
-    assert "TestContainer" in values
+    assert class_name in values
 
 
 def test_register_file(environment_path: Path):
