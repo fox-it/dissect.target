@@ -1,3 +1,4 @@
+import logging
 import socket
 import ssl
 
@@ -9,6 +10,7 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
 from dissect.util.stream import AlignedStream
 
+log = logging.getLogger(__name__)
 
 class RemoteStream(AlignedStream):
     def __init__(self, stream, disk_id, size=-1):
@@ -93,7 +95,8 @@ class RemoteStreamConnection:
         while data is None and reconnects < self.MAX_RECONNECTS:
             try:
                 data = _reader(disk_id, offset, length)
-            except Exception:
+            except Exception as exc_reader_error:
+                log.error(f"Error while reading data from remote disk #%d.", disk_id, exc_info=exc_reader_error)
                 self._ssl_sock.close()
                 self._is_connected = False
                 reconnects += 1
