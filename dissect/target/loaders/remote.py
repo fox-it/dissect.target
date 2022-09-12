@@ -10,10 +10,11 @@ from struct import pack, unpack
 from urllib.parse import urlparse
 from typing import Optional, Union, List
 
+from dissect.util.stream import AlignedStream
+
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
 from dissect.target.target import Target
-from dissect.util.stream import AlignedStream
 
 log = logging.getLogger(__name__)
 
