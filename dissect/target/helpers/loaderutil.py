@@ -73,7 +73,7 @@ def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loa
         path: string describing the path of a target or Path.
 
     Returns:
-        A tuple containing: 
+        A tuple containing:
         - a Path object (wrapped around the provided path string)
         - the inferred loader or None
         - query parameters (always a dict)
