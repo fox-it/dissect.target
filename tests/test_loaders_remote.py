@@ -14,13 +14,13 @@ from dissect.target.loaders.remote import RemoteLoader, RemoteStreamConnection, 
         ("/path/to/file", False),
     ],
 )
-def test_remote_loader_detect(uri, expected):
+def test_remote_loader_detect(uri: str, expected: bool) -> None:
     assert RemoteLoader.detect(uri) == expected
 
 
 @patch.object(ssl, "SSLContext", autospec=True)
 @patch.object(socket, "socket", autospec=True)
-def test_remote_loader_stream(mock_socket_class, mock_context):
+def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicMock) -> None:
     rsc = RemoteStreamConnection("remote://127.0.0.1", 9001)
     assert rsc.is_connected() is False
     rsc.connect()

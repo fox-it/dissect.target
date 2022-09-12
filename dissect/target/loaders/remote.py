@@ -1,25 +1,30 @@
+from __future__ import annotations
+
 import logging
 import socket
 import ssl
 
 from io import DEFAULT_BUFFER_SIZE
+from pathlib import Path
 from struct import pack, unpack
 from urllib.parse import urlparse
+from typing import Optional, Union, List
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
+from dissect.target.target import Target
 from dissect.util.stream import AlignedStream
 
 log = logging.getLogger(__name__)
 
 
 class RemoteStream(AlignedStream):
-    def __init__(self, stream, disk_id, size=-1):
+    def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: Optional[int] = -1):
         self.stream = stream
         self.disk_id = disk_id
         super().__init__(size)
 
-    def _read(self, offset, length):
+    def _read(self, offset: int, length: int) -> bytes:
         return self.stream.read(self.disk_id, offset, length)
 
 
@@ -40,7 +45,7 @@ class RemoteStreamConnection:
     COMMAND_QUIT = 2
     COMMAND_READ = 50
 
-    def __init__(self, hostname, port):
+    def __init__(self, hostname: str, port: int):
         self.hostname = hostname
         self.port = port
         self._is_connected = False
@@ -52,7 +57,7 @@ class RemoteStreamConnection:
         self._context.check_hostname = False
         self._context.load_default_certs()
 
-    def connect(self):
+    def connect(self) -> None:
         if self._is_connected:
             return
 
@@ -63,10 +68,10 @@ class RemoteStreamConnection:
         self._ssl_sock = ssl_sock
         self._is_connected = True
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         return self._is_connected
 
-    def _receive_bytes(self, length):
+    def _receive_bytes(self, length: int) -> bytes:
         timeout = 0
         data = b""
         received = 0
@@ -82,7 +87,7 @@ class RemoteStreamConnection:
             return None
         return data
 
-    def read(self, disk_id, offset, length):
+    def read(self, disk_id: int, offset: int, length: int) -> Union[bytes, None]:
         if length < 1:
             raise NotImplementedError("RemoteStreamConnection does not support size = -1")
 
@@ -108,12 +113,11 @@ class RemoteStreamConnection:
 
         return data
 
-    def close(self):
+    def close(self) -> None:
         if self.is_connected:
             self._ssl_sock.send(pack(">BQQ", self.COMMAND_QUIT, 0, 0))
-        return True
 
-    def info(self):
+    def info(self) -> List[RemoteStream]:
         self.connect()
         self._ssl_sock.send(pack(">BQQ", self.COMMAND_INFO, 0, 0))
         number_of_disks = unpack("<B", self._ssl_sock.recv(1))[0]
@@ -130,20 +134,20 @@ class RemoteStreamConnection:
 
 
 class RemoteLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path: Union[Path, str]):
         super().__init__(path)
 
         # Temporary fix, wait for URI handling feature...
-        def _temp_fix_path(path):
+        def _temp_fix_path(path: Union[Path, str]):
             return str(path).replace("remote:/", "remote://")
 
         url = urlparse(_temp_fix_path(self.path))
         self.stream = RemoteStreamConnection(url.hostname, url.port)
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         for disk in self.stream.info():
             target.disks.add(RawContainer(disk))
 
     @staticmethod
-    def detect(path):
+    def detect(path: Union[Path, str]) -> bool:
         return str(path).startswith("remote:")
