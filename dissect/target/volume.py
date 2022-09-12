@@ -283,7 +283,8 @@ def is_lvm_volume(volume: BinaryIO) -> bool:
             if logical_vs.detect_volume(volume):
                 return True
         except ImportError as e:
-            log.warning("Failed to import %s", logical_vs, exc_info=e)
+            log.warning("Failed to import %s", logical_vs)
+            log.debug("", exc_info=e)
         except Exception as e:
             raise VolumeSystemError(f"Failed to detect logical volume for {volume}", cause=e)
 
@@ -301,7 +302,8 @@ def is_encrypted(volume: BinaryIO) -> bool:
             if manager.detect(volume):
                 return True
         except ImportError as e:
-            log.warning("Failed to import %s", manager, exc_info=e)
+            log.warning("Failed to import %s", manager)
+            log.debug("", exc_info=e)
         except Exception as e:
             raise VolumeSystemError(f"Failed to detect encrypted volume for {volume}", cause=e)
     return False
@@ -326,6 +328,9 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
             if manager_cls.detect(volume):
                 volume_manager = manager_cls(volume)
                 yield from volume_manager.volumes
+        except ImportError as e:
+            log.warning("Failed to import %s", manager_cls)
+            log.debug("", exc_info=e)
         except VolumeSystemError:
             log.exception(f"Failed to open an encrypted volume {volume} with volume manager {manager_cls}")
     return None
@@ -344,6 +349,7 @@ def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]
         try:
             yield from logical_vs.open_all(volumes)
         except ImportError as e:
-            log.warning("Failed to import %s", logical_vs, exc_info=e)
+            log.warning("Failed to import %s", logical_vs)
+            log.debug("", exc_info=e)
         except Exception as e:
             raise VolumeSystemError(f"Failed to load logical volume system for {volumes}", cause=e)
