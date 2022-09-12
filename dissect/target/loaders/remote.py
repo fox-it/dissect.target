@@ -149,5 +149,5 @@ class RemoteLoader(Loader):
             target.disks.add(RawContainer(disk))
 
     @staticmethod
-    def detect(path: Union[Path, str]) -> bool:
+    def detect(path: Path) -> bool:
         return str(path).startswith("remote:")
