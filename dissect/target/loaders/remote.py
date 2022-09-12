@@ -117,7 +117,7 @@ class RemoteStreamConnection:
         if self.is_connected:
             self._ssl_sock.send(pack(">BQQ", self.COMMAND_QUIT, 0, 0))
 
-    def info(self) -> List[RemoteStream]:
+    def info(self) -> list[RemoteStream]:
         self.connect()
         self._ssl_sock.send(pack(">BQQ", self.COMMAND_INFO, 0, 0))
         number_of_disks = unpack("<B", self._ssl_sock.recv(1))[0]
