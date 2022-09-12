@@ -21,7 +21,7 @@ WINDOWS_DRIVE_FIXED = 3
 class LocalLoader(Loader):
     @staticmethod
     def detect(path):
-        return str(path).startswith("local")
+        return str(path)=="local"
 
     def map(self, target):
 
