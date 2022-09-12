@@ -1,7 +1,7 @@
 import logging
 import struct
 
-from dissect import vmfs
+import dissect.vmfs as vmfs
 from dissect.vmfs.c_vmfs import c_vmfs
 
 from dissect.target.exceptions import (

@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import enum
 import importlib
+import importlib.util
 import logging
 import os
 import sys
 import traceback
-
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
 
 from dissect.target.exceptions import PluginError
@@ -592,14 +593,10 @@ def load(plugin_desc: dict) -> Type[Plugin]:
     Raises:
         PluginError: Raised when any other exception occurs while trying to load the plugin.
     """
-    module = plugin_desc["module"]
-    if module.startswith("dissect.target"):
-        name_to_load = module
-    else:
-        name_to_load = ".".join([MODULE_PATH, module])
+    module = plugin_desc["fullname"].rsplit(".", 1)[0]
 
     try:
-        module = importlib.import_module(name_to_load)
+        module = importlib.import_module(module)
         return getattr(module, plugin_desc["class"])
     except Exception as e:
         raise PluginError(f"An exception occurred while trying to load a plugin: {module}", cause=e)
@@ -644,35 +641,95 @@ def generate() -> dict[str, Any]:
     if "_failed" not in PLUGINS:
         PLUGINS["_failed"] = []
 
-    plugins_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "plugins")
-    for path, _, files in os.walk(plugins_dir):
-        path = path.replace(plugins_dir, "").replace(os.sep, ".").lstrip(".")
-
-        if not len(path) or "__pycache__" in path:
-            continue
-
-        mod = ".".join([MODULE_PATH, path])
-
-        try:
-            importlib.import_module(mod)
-        except Exception as e:
-            log.error("Unable to import %s", mod)
-            log.debug("Error while trying to import module %s", mod, exc_info=e)
-            save_plugin_import_failure(mod)
-
-        for f in files:
-            if f.endswith(".py") and not f.startswith("__init__"):
-                name = f.split(".py")[0]
-                modf = ".".join([mod, name])
-
-                try:
-                    importlib.import_module(modf)
-                except Exception as e:
-                    log.error("Unable to import %s", modf)
-                    log.debug("Error while trying to import module %s", modf, exc_info=e)
-                    save_plugin_import_failure(modf)
+    plugins_dir = Path(__file__).parent / "plugins"
+    for path in filter_files(plugins_dir):
+        relative_path = path.relative_to(plugins_dir)
+        module_tuple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
+        load_module_from_name(".".join(module_tuple))
 
     return PLUGINS
+
+
+def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
+    """Iterate over the ``plugin_dirs`` and load all ``*.py`` files."""
+    for plugin_path in plugin_dirs:
+        for path in filter_files(plugin_path):
+            if path.is_file() and ".py" == path.suffix:
+                base_path = plugin_path.parent if path == plugin_path else plugin_path
+                load_module_from_file(path, base_path)
+
+
+def filter_files(plugin_path: Path) -> Iterator[Path]:
+    """Walk all the files and directories in ``plugin_path`` and excluding specific paths.
+
+    Do not walk or yield paths containing the following names:
+
+    - __pycache__
+    - __init__
+
+    Furthermore, it logs an error if ``plugin_path`` does not exist.
+
+    Args:
+        plugin_path: The path to a directory or file to walk and filter.
+    """
+    if not plugin_path.exists():
+        log.error("Path %s does not exist.", plugin_path)
+        return
+
+    path_iterator = [plugin_path] if plugin_path.is_file() else plugin_path.glob("**/*")
+
+    for path in path_iterator:
+        if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
+            continue
+
+        yield path
+
+
+def load_module_from_file(path: Path, base_path: Path):
+    """Loads a module from a file indicated by ``path`` relative to ``base_path``.
+
+    The module is added to ``sys.modules`` so it can be found everywhere.
+
+    Args:
+        path: The file to load as module.
+        base_path: The base directory of the module.
+    """
+    try:
+        relative_path = path.relative_to(base_path)
+        module_tuple = (*relative_path.parent.parts, relative_path.stem)
+        spec = importlib.util.spec_from_file_location(".".join(module_tuple), path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        sys.modules[module.__name__] = module
+    except Exception as e:
+        log.error("Unable to import %s", path)
+        log.debug("Error while trying to import module %s", path, exc_info=e)
+        save_plugin_import_failure(str(path))
+
+
+def load_module_from_name(module_path: str) -> None:
+    """Load a module from ``module_path``."""
+    try:
+        importlib.import_module(module_path)
+    except Exception as e:
+        log.error("Unable to import %s", module_path)
+        log.debug("Error while trying to import module %s", module_path, exc_info=e)
+        save_plugin_import_failure(module_path)
+
+
+def load_external_module_paths(path_list: list[Path]):
+    """Create a deduplicated list of paths."""
+    output_list = environment_variable_paths() + path_list
+
+    return list(dict.fromkeys(output_list))
+
+
+def environment_variable_paths() -> list[Path]:
+    env_var = os.environ.get("DISSECT_PLUGINS")
+
+    plugin_dirs = env_var.split(":") if env_var else []
+
+    return [Path(directory) for directory in plugin_dirs]
 
 
 def _traverse(key: str, obj: dict[str, Any]) -> dict[str, Any]:

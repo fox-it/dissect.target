@@ -3,11 +3,15 @@ import inspect
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, List, Tuple, Any, Optional, Type, Dict
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-from dissect.target import plugin, Target
-from dissect.target.plugin import Plugin
-from dissect.target.helpers import keychain, docs
+from dissect.target import Target, plugin
+from dissect.target.helpers import docs, keychain
+from dissect.target.plugin import (
+    Plugin,
+    load_external_module_paths,
+    load_modules_from_paths,
+)
 from dissect.target.tools.logging import configure_logging
 
 
@@ -16,6 +20,13 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
     args_parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     args_parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     args_parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
+    args_parser.add_argument(
+        "--plugin-path",
+        action="store",
+        nargs="+",
+        type=Path,
+        help="a file or directory containing plugins and extensions",
+    )
 
 
 def process_generic_arguments(args: argparse.Namespace) -> None:
@@ -26,6 +37,9 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
 
     if args.keychain_value:
         keychain.register_wildcard_value(args.keychain_value)
+
+    paths = load_external_module_paths(args.plugin_path or [])
+    load_modules_from_paths(paths)
 
 
 def generate_argparse_for_bound_method(
