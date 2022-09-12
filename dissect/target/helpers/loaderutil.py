@@ -55,7 +55,7 @@ def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loa
     """Converts a path string into a path while taking URIs into account.
 
     If the path string contains an URI the scheme will be used to infer
-    the loader by using the LOADERS_BY_SCHEME dict. In case of an URI
+    the loader by using the ``LOADERS_BY_SCHEME`` dict. In case of an URI
     the path will be set to the remainder of the string (including
     host and port) to form a pseudo path that can easily be used by
     URI-based loaders.
