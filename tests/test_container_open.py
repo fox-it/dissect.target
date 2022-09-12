@@ -8,9 +8,11 @@ from dissect.target import container
 
 @pytest.fixture
 def mocked_ewf_detect():
-    with patch("dissect.target.container.ewf") as mocked_containers:
-        mocked_containers.EwfContainer.detect.return_value = True
-        yield mocked_containers.EwfContainer.detect
+    mocked_ewf = Mock()
+    mocked_ewf.EwfContainer.detect.return_value = True
+    mocked_ewf.EwfContainer.detect
+    with patch.object(container, "CONTAINERS", [mocked_ewf.EwfContainer]):
+        yield mocked_ewf.EwfContainer
 
 
 @pytest.mark.parametrize(

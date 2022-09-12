@@ -9,6 +9,7 @@ from dissect.target.tools.utils import (
 
 try:
     from fuse import FUSE
+
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
