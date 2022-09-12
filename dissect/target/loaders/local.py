@@ -1,6 +1,7 @@
 import ctypes
 import platform
 import re
+import urllib
 from pathlib import Path
 
 from dissect.util.stream import BufferedStream
@@ -21,7 +22,7 @@ WINDOWS_DRIVE_FIXED = 3
 class LocalLoader(Loader):
     @staticmethod
     def detect(path):
-        return str(path) == "local"
+        return urllib.parse.urlparse(str(path)).path == "local"
 
     def map(self, target):
 
