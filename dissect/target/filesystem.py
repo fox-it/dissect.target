@@ -1337,7 +1337,7 @@ class RootFilesystemEntry(FilesystemEntry):
 
 
 def register(module: str, class_name: str, internal: bool = True):
-    """Registers a ``Filesystem`` class inside ``FILESYSTEMS``.
+    """Register a filesystem implementation to use when opening a filesystem.
 
     This function registers a filesystem using ``module`` relative to the ``MODULE_PATH``.
     It lazily imports the module, and retrieves the specific class from it.

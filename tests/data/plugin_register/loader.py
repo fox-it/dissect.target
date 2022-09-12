@@ -14,4 +14,4 @@ class TestLoader(Loader):
         pass
 
 
-register(TestLoader.__module__, TestLoader.__name__, internal=False)
+register(__name__, TestLoader.__name__, internal=False)
