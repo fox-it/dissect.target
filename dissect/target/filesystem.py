@@ -1363,7 +1363,8 @@ def open(fh, *args, **kwargs):
                 instance.volume = fh
                 return instance
         except ImportError as e:
-            log.warning("Failed to import %s", filesystem, exc_info=e)
+            log.warning("Failed to import %s", filesystem)
+            log.debug("", exc_info=e)
 
     raise FilesystemError(f"Failed to open filesystem for {fh}")
 

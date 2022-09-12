@@ -136,7 +136,8 @@ def find_loader(item: Path) -> Optional[Loader]:
             if loader.detect(item):
                 return loader
         except ImportError as exception:
-            log.warning("Failed to import %s", loader, exc_info=exception)
+            log.warning("Failed to import %s", loader)
+            log.debug("", exc_info=exception)
 
 
 def open(item: Union[str, Path], *args, **kwargs):
