@@ -4,11 +4,9 @@ from os import PathLike
 from pathlib import Path
 from typing import Optional, Union
 
-from dissect.target.loader import Loader, LOADERS_BY_SCHEME
-
-
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+from dissect.target.loader import Loader, LOADERS_BY_SCHEME
 
 
 def add_virtual_ntfs_filesystem(
