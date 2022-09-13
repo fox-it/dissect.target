@@ -8,7 +8,7 @@ from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
 from struct import pack, unpack
 from urllib.parse import urlparse
-from typing import Union
+from typing import Optional, Union
 
 from dissect.util.stream import AlignedStream
 
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 
 class RemoteStream(AlignedStream):
-    def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: int = -1):
+    def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: Optional[int] = None):
         self.stream = stream
         self.disk_id = disk_id
         super().__init__(size)
