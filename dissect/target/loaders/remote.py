@@ -137,12 +137,7 @@ class RemoteStreamConnection:
 class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str]):
         super().__init__(path)
-
-        # Temporary fix, wait for URI handling feature...
-        def _temp_fix_path(path: Union[Path, str]):
-            return str(path).replace("remote:/", "remote://")
-
-        url = urlparse(_temp_fix_path(self.path))
+        url = urlparse("remote://" + str(self.path))
         self.stream = RemoteStreamConnection(url.hostname, url.port)
 
     def map(self, target: Target) -> None:
@@ -151,4 +146,5 @@ class RemoteLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return str(path).startswith("remote:")
+        # You can only activate this loader by URI-scheme "remote://"
+        return False
