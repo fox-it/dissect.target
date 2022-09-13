@@ -68,7 +68,7 @@ def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loa
     inferred.
 
     Args:
-        path: String describing the path of a target or Path.
+        path: String or Path describing the path of a target.
 
     Returns:
         A tuple containing:
