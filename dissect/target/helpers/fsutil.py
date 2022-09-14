@@ -665,8 +665,7 @@ class TargetPath(Path, PureDissectPath):
             s = str(self.absolute())
         # Now we have no symlinks in the path, it's safe to normalize it.
         normed = self._flavour.pathmod.normpath(s)
-        obj = self._from_parts((self._fs, normed,), init=False)
-        obj._init(template=self)
+        obj = self._from_parts((self._fs, normed,))
         return obj
 
     def owner(self):
@@ -694,8 +693,7 @@ class TargetPath(Path, PureDissectPath):
         Return the path to which the symbolic link points.
         """
         path = self._accessor.readlink(self)
-        obj = self._from_parts((self._fs, path,), init=False)
-        obj._init(template=self)
+        obj = self._from_parts((self._fs, path,))
         return obj
 
     def touch(self, *args, **kwargs):
