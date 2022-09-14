@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import urllib.parse
 from os import PathLike
@@ -49,6 +51,35 @@ def _try_open(fs, path):
             pass
 
 
+class URIPath:
+
+    """
+    Converts a Path to a URIPath by extending the PATH
+    information with URI data.
+    """
+
+    _uri_info = {}
+
+    def __init__(self, scheme: str, hostname: str, port: int, path: str):
+        self.scheme = scheme
+        self.hostname = hostname
+        self.port = port
+        self.path = path
+
+    @classmethod
+    def from_path(cls, path: Path) -> URIPath:
+        server = cls._uri_info.get(id(path))
+        if server is None:
+            return None
+        return cls(server["scheme"], server["hostname"], server["port"], str(path))
+
+    @classmethod
+    def path(cls, scheme: Optional[str] = None, hostname=Optional[str], port=Optional[int], path=Optional[str]) -> Path:
+        path_object = Path(path)
+        cls._uri_info[id(path_object)] = {"scheme": scheme, "hostname": hostname, "port": port}
+        return path_object
+
+
 def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loader], dict, str]:
     """Converts a path string into a path while taking URIs into account.
 
@@ -97,4 +128,9 @@ def parse_path_uri(path: Union[str, Path]) -> tuple[Optional[Path], Optional[Loa
     inferred_loader = LOADERS_BY_SCHEME.get(parsed_path.scheme)
 
     # also create a useful 'pseudo path' for pragmatic purposes to use as URL
-    return Path(f"{parsed_path.netloc}{parsed_path.path}"), inferred_loader, parsed_query, parsed_path.scheme
+    return (
+        URIPath.path(parsed_path.scheme, parsed_path.hostname, parsed_path.port, parsed_path.path),
+        inferred_loader,
+        parsed_query,
+        parsed_path.scheme,
+    )

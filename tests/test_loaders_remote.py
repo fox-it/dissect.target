@@ -1,10 +1,10 @@
-import pytest
 import socket
 import ssl
 
 from unittest.mock import patch, MagicMock, call
 
-from dissect.target.loaders.remote import RemoteLoader, RemoteStreamConnection, RemoteStream
+from dissect.target.loaders.remote import RemoteStreamConnection, RemoteStream
+
 
 @patch.object(ssl, "SSLContext", autospec=True)
 @patch.object(socket, "socket", autospec=True)

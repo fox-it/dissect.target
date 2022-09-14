@@ -7,12 +7,12 @@ import ssl
 from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
 from struct import pack, unpack
-from urllib.parse import urlparse
 from typing import Optional, Union
 
 from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
+from dissect.target.helpers.loaderutil import URIPath
 from dissect.target.loader import Loader
 from dissect.target.target import Target
 
@@ -125,11 +125,10 @@ class RemoteStreamConnection:
         remainder = number_of_disks * 16
         data = self._receive_bytes(remainder)
         disks = []
-
-        for i in range(0, number_of_disks, 16):
+        for i in range(0, number_of_disks * 16, 16):
             part = data[i : i + 16]
             (disk_size, _) = unpack("<QQ", part)
-            disks.append(RemoteStream(self, i, disk_size))
+            disks.append(RemoteStream(self, int(i / 16), disk_size))
 
         return disks
 
@@ -137,8 +136,8 @@ class RemoteStreamConnection:
 class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str]):
         super().__init__(path)
-        url = urlparse("remote://" + str(self.path))
-        self.stream = RemoteStreamConnection(url.hostname, url.port)
+        uri = URIPath.from_path(path)
+        self.stream = RemoteStreamConnection(uri.hostname, uri.port)
 
     def map(self, target: Target) -> None:
         for disk in self.stream.info():
