@@ -4,6 +4,8 @@ from pathlib import Path
 
 from dissect.target.helpers.loaderutil import parse_path_uri, URIPath
 from dissect.target.loader import LOADERS_BY_SCHEME
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.filesystems.dir import DirectoryFilesystem
 
 
 @pytest.mark.parametrize(
@@ -67,6 +69,8 @@ from dissect.target.loader import LOADERS_BY_SCHEME
             "vmx:///../data/archive.zip?a=1",
             (URIPath.path("vmx", "", "", "/../data/archive.zip"), LOADERS_BY_SCHEME["vmx"], {"a": ["1"]}, "vmx"),
         ),
+        # Targetpaths
+        (TargetPath(DirectoryFilesystem("/")), (TargetPath(DirectoryFilesystem("/")), None, {}, "")),
     ],
 )
 def test_parse_path_uri(path, expected):
