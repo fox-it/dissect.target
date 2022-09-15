@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import socket
 import ssl
+import time
 
 from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
@@ -32,15 +33,15 @@ class RemoteStream(AlignedStream):
 class RemoteStreamConnection:
 
     # Max. number of times we try to reconnect (still tweaking this)
-    MAX_RECONNECTS = 3
+    MAX_RECONNECTS = 30
 
     # Max. number of read retries
-    MAX_RETRY_READ = 3
+    MAX_RETRY_READ = 1
 
     # Socket timeout, connections can be slow, so not too low
     # Also there might be an initial waiting time of 10s because of the
     # previous connection! So it must be at least 10s.
-    SOCKET_TIMEOUT = 60
+    SOCKET_TIMEOUT = 30
 
     COMMAND_INFO = 1
     COMMAND_QUIT = 2
@@ -57,60 +58,65 @@ class RemoteStreamConnection:
         self._context.verify_mode = ssl.CERT_NONE
         self._context.check_hostname = False
         self._context.load_default_certs()
+        self.log = log
+
+    def is_connected(self) -> bool:
+        return self._is_connected
 
     def connect(self) -> None:
         if self._is_connected:
             return
 
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(self.SOCKET_TIMEOUT)
-        ssl_sock = self._context.wrap_socket(self._socket, server_hostname=self.hostname)
-        ssl_sock.connect((self.hostname, self.port))
-        self._ssl_sock = ssl_sock
-        self._is_connected = True
-
-    def is_connected(self) -> bool:
-        return self._is_connected
+        reconnects = 0
+        time_to_wait = 10
+        while self._is_connected is False:
+            self.log.debug("Connecting to agent")
+            try:
+                self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._socket.settimeout(self.SOCKET_TIMEOUT)
+                ssl_sock = self._context.wrap_socket(self._socket, server_hostname=self.hostname)
+                ssl_sock.connect((self.hostname, self.port))
+                self._ssl_sock = ssl_sock
+                self._is_connected = True
+                self.log.debug("Connection established with agent")
+            except Exception:
+                if reconnects > self.MAX_RECONNECTS:
+                    raise ConnectionError("Unable to reconnect with remote agent.")
+                if self._ssl_sock is not None:
+                    self._ssl_sock.close()
+                if self._socket is not None:
+                    self._socket.close()
+                self.log.debug("Unable to connect to agent, next attempt in %d sec.", time_to_wait)
+                time.sleep(time_to_wait)
+                reconnects += 1
+                pass
 
     def _receive_bytes(self, length: int) -> bytes:
-        timeout = 0
         data = b""
         received = 0
-
-        while received < length and timeout < self.MAX_RETRY_READ:
+        while received < length:
             packet = self._ssl_sock.recv(min(length - received, DEFAULT_BUFFER_SIZE))
             packet_size = len(packet)
             data += packet
             received += packet_size
-            if packet_size == 0:
-                timeout += 1
-        if timeout >= self.MAX_RETRY_READ:
-            return None
+
         return data
 
     def read(self, disk_id: int, offset: int, length: int) -> Union[bytes, None]:
-        if length < 1:
-            raise NotImplementedError("RemoteStreamConnection does not support size = -1")
-
-        def _reader(disk_id, offset, length):
+        data = b""
+        received = 0
+        while received < length:
             self.connect()
             self._ssl_sock.send(pack(">BQQ", self.COMMAND_READ + disk_id, offset, length))
-            return self._receive_bytes(length)
-
-        data = None
-        reconnects = 0
-        while data is None and reconnects < self.MAX_RECONNECTS:
             try:
-                data = _reader(disk_id, offset, length)
-            except Exception as exc_reader_error:
-                log.error("Error while reading data from remote disk #%d.", disk_id, exc_info=exc_reader_error)
+                data += self._receive_bytes(length)
+                received += length
+            except Exception:
+                self.log.debug("Unable to read data from agent, re-connecting")
                 self._ssl_sock.close()
+                self._socket.close()
                 self._is_connected = False
-                reconnects += 1
-                continue
-
-        if reconnects >= self.MAX_RECONNECTS:
-            raise ConnectionError("Unable to establish connection with remote agent")
+                pass
 
         return data
 
@@ -140,6 +146,7 @@ class RemoteLoader(Loader):
         self.stream = RemoteStreamConnection(uri.hostname, uri.port)
 
     def map(self, target: Target) -> None:
+        self.stream.log = target.log
         for disk in self.stream.info():
             target.disks.add(RawContainer(disk))
 
