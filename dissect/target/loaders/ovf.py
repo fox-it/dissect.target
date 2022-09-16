@@ -4,7 +4,7 @@ from dissect.target.loader import Loader
 
 
 class OvfLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)

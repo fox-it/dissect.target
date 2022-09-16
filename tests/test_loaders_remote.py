@@ -1,21 +1,9 @@
-import pytest
 import socket
 import ssl
 
 from unittest.mock import patch, MagicMock, call
 
-from dissect.target.loaders.remote import RemoteLoader, RemoteStreamConnection, RemoteStream
-
-
-@pytest.mark.parametrize(
-    "uri, expected",
-    [
-        ("remote://somewhere", True),
-        ("/path/to/file", False),
-    ],
-)
-def test_remote_loader_detect(uri: str, expected: bool) -> None:
-    assert RemoteLoader.detect(uri) == expected
+from dissect.target.loaders.remote import RemoteStreamConnection, RemoteStream
 
 
 @patch.object(ssl, "SSLContext", autospec=True)

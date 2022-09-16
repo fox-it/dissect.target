@@ -5,7 +5,7 @@ from dissect.target.loader import Loader
 
 
 class VmaLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = path.resolve()
         super().__init__(path)
         self.xva = vma.VMA(open(path, "rb"))

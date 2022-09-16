@@ -22,7 +22,7 @@ class VmcxLoader(Loader):
     targetting a Hyper-V host and loading child VMs.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)

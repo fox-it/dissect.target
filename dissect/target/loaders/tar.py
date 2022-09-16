@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 class TarLoader(Loader):
-    def __init__(self, path: Union[Path, str]):
+    def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
 
         if self.is_compressed(path):

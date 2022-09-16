@@ -112,7 +112,7 @@ class ResLoader(Loader):
 
 
 class ResFile(filesystem.VirtualFile):
-    def __init__(self, fs, path, entry):
+    def __init__(self, fs, path, entry, **kwargs):
         super().__init__(fs, path, entry)
 
     def stat(self):

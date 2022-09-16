@@ -17,6 +17,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import config
 from dissect.target.helpers.record import ChildTargetRecord
+from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
 from dissect.target.plugins.general import default
 
@@ -214,12 +215,12 @@ class Target:
         Returns:
             A Target with a linked :class:`~dissect.target.loader.Loader` object.
         """
-        if not isinstance(path, Path):
-            path = Path(path)
 
-        loader_cls = loader.find_loader(path)
+        path, parsed_path = extract_path_info(path)
+
+        loader_cls = loader.find_loader(path, parsed_path=parsed_path)
         if loader_cls:
-            loader_instance = loader_cls(path)
+            loader_instance = loader_cls(path, parsed_path=parsed_path)
             return cls._load(path, loader_instance)
         return cls.open_raw(path)
 
@@ -258,15 +259,15 @@ class Target:
 
         # Treat every path as a unique target spec
         for path in paths:
-            if not isinstance(path, Path):
-                path = Path(path)
+
+            path, parsed_path = extract_path_info(path)
 
             found_loader = False
 
             # Search for targets one directory deep
             for entry in _find(path):
 
-                loader_cls = loader.find_loader(entry)
+                loader_cls = loader.find_loader(entry, parsed_path=parsed_path)
 
                 if not loader_cls:
                     continue
@@ -276,7 +277,7 @@ class Target:
 
                 for sub_entry in loader_cls.find_all(entry):
                     try:
-                        ldr = loader_cls(sub_entry)
+                        ldr = loader_cls(sub_entry, parsed_path=parsed_path)
                     except Exception as e:
                         getlogger(sub_entry).error("Failed to initiate loader", exc_info=e)
                         continue
