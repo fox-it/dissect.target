@@ -124,10 +124,10 @@ class RemoteStreamConnection:
         remainder = number_of_disks * 16
         data = self._receive_bytes(remainder)
         disks = []
-        for i in range(0, number_of_disks * 16, 16):
+        for i in range(0, number_of_disks, 16):
             part = data[i : i + 16]
             (disk_size, _) = unpack("<QQ", part)
-            disks.append(RemoteStream(self, int(i / 16), disk_size))
+            disks.append(RemoteStream(self, i, disk_size))
 
         return disks
 

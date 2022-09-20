@@ -121,7 +121,7 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
     LOADERS_BY_SCHEME[module_name] = loader
 
 
-def find_loader(item: Path, parsed_parth: Optional[urllib.parse.ParseResult] = None) -> Optional[Loader]:
+def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None) -> Optional[Loader]:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -137,7 +137,7 @@ def find_loader(item: Path, parsed_parth: Optional[urllib.parse.ParseResult] = N
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
-    if parsed_path := kwargs.get("parsed_path"):
+    if parsed_path is not None:
         if loader := LOADERS_BY_SCHEME.get(parsed_path.scheme):
             return loader
 
@@ -163,9 +163,9 @@ def open(item: Union[str, Path], *args, **kwargs):
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
-    item, kwargs["parsed_path"] = extract_path_info(item)
+    item, parsed_path = extract_path_info(item)
 
-    if loader := find_loader(item, **kwargs):
+    if loader := find_loader(item, parsed_path=parsed_path):
         return loader(item, *args, **kwargs)
 
 
