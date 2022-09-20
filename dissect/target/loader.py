@@ -121,7 +121,7 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
     LOADERS_BY_SCHEME[module_name] = loader
 
 
-def find_loader(item: Path, **kwargs) -> Optional[Loader]:
+def find_loader(item: Path, parsed_parth: Optional[urllib.parse.ParseResult] = None) -> Optional[Loader]:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
