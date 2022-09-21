@@ -493,7 +493,7 @@ TEMPLATES = {
         ["netctl"],
         ["address", "gateway", "dns", "ip"],
     ),
-    "netplan": Template("netplan", yaml.load, ["network"], ["addresses", "dhcp4", "gateway4"]),
+    "netplan": Template("netplan", yaml.load if PY_YAML else None, ["network"], ["addresses", "dhcp4", "gateway4"]),
     "NetworkManager": Template(
         "NetworkManager",
         ConfigParser(delimiters=("="), comment_prefixes="#", dict_type=dict),
