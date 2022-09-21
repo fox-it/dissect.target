@@ -139,7 +139,7 @@ def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = No
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
-    if parsed_path is not None:
+    if parsed_path:
         if loader := LOADERS_BY_SCHEME.get(parsed_path.scheme):
             return loader
 
