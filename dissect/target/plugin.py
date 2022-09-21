@@ -1,4 +1,4 @@
-""" Dissect plugin system.
+"""Dissect plugin system.
 
 See dissect/target/plugins/general/example.py for an example plugin.
 """
@@ -92,7 +92,9 @@ def export(*args, **kwargs) -> Callable:
 
     def decorator(obj):
         # Properties are implicitly cached
-        obj = cache.wrap(obj)
+        # Important! Currently it's crucial that this is *always* called
+        # See the comment in Plugin.__init_subclass__ for more detail regarding Plugin.get_all_records
+        obj = cache.wrap(obj, no_cache=not kwargs.get("cache", True), cls=kwargs.get("cls", None))
 
         output = kwargs.get("output", "default")
         if output not in OUTPUTS:
@@ -205,7 +207,13 @@ class Plugin:
 
         record_descriptors = get_descriptors_on_nonprivate_methods(cls)
         cls.__record_descriptors__ = record_descriptors
-        cls.get_all_records = export(output="record", record=record_descriptors)(cls.get_all_records)
+        # This is a bit tricky currently
+        # cls.get_all_records is the *function* Plugin.get_all_records, not from the subclass
+        # export() currently will _always_ return a new object because it always calls ``cache.wrap(obj)``
+        # This allows this to work, otherwise the Plugin.get_all_records would get all the plugin attributes set on it
+        cls.get_all_records = export(output="record", record=record_descriptors, cache=False, cls=cls)(
+            cls.get_all_records
+        )
 
     def __init__(self, target: Target):
         self.target = target
@@ -238,14 +246,13 @@ class Plugin:
             try:
                 yield from method()
             except Exception:
-                full_name = f"{self.__namespace__}.{method_name}" if self.__namespace__ else method_name
-                self.target.log.error("Error while executing `%s`", full_name, exc_info=True)
+                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name, exc_info=True)
 
     def __call__(self, *args, **kwargs):
         """A shortcut to :func:`get_all_records`.
 
         Raises:
-            PluginError: if the subclass is not a namespace plugin.
+            PluginError: If the subclass is not a namespace plugin.
         """
         if not self.__namespace__:
             raise PluginError(f"Plugin {self.__class__.__name__} is not a callable")
@@ -618,6 +625,9 @@ def _get_plugins() -> dict[str, PluginDescriptor]:
 
 def save_plugin_import_failure(module: str) -> None:
     """Store errors that occurred during plugin import."""
+    if "_failed" not in PLUGINS:
+        PLUGINS["_failed"] = []
+
     stacktrace = traceback.format_exception(*sys.exc_info())
     PLUGINS["_failed"].append(
         {

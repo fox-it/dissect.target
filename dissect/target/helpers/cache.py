@@ -58,9 +58,15 @@ class CacheWriter:
 
 
 class Cache:
-    def __init__(self, func):
+    def __init__(self, func, no_cache=False, cls=None):
         self.func = func
-        self.fname = func.__name__
+        self.no_cache = no_cache
+
+        module = inspect.getmodule(cls or func)
+        module = f"{module.__name__}." if module else ""
+        qualname = f"{cls.__name__}.{func.__name__}" if cls else func.__qualname__
+
+        self.fname = f"{module}{qualname}"
         self.wrapper = None
 
     def open_reader(self, path, output):
@@ -80,10 +86,9 @@ class Cache:
         if not cache_dir:
             return None
 
-        module = inspect.getmodule(self.func).__name__
         path_key = base64.b64encode(repr(key).encode()).decode("utf8")
         ext = "zstd" if HAS_ZSTD else "rec"
-        fname = f"{module}.{self.func.__name__}.{path_key}.{ext}"
+        fname = f"{self.fname}.{path_key}.{ext}"
         return os.path.join(cache_dir, os.path.basename(target.path), fname)
 
     def call(self, *args, **kwargs):
@@ -91,6 +96,7 @@ class Cache:
 
         output = getattr(self.wrapper, "__output__", None)
         if output not in ("record", "yield"):
+            # Cache property and default outputs on the target object itself
             func_cache = target._cache.setdefault(self.fname, {})
             key = (args[1:], frozenset(sorted(kwargs.items())))
 
@@ -139,12 +145,16 @@ class Cache:
         if read_file_cache:
             target.log.debug("Reading from cache file: %s", cache_file)
             if os.access(cache_file, os.R_OK, effective_ids=True):
-                return self.open_reader(cache_file, output)
+                if os.stat(cache_file).st_size != 0:
+                    try:
+                        return self.open_reader(cache_file, output)
+                    except Exception as e:
+                        target.log.warning("Cache will NOT be used. Error opening cache file: %s", cache_file)
+                        target.log.debug("", exc_info=e)
+                else:
+                    target.log.warning("Cache will NOT be used. File is empty: %s", cache_file)
             else:
-                target.log.warning(
-                    "Cache will NOT be used. No permissions to read cache file: %s",
-                    cache_file,
-                )
+                target.log.warning("Cache will NOT be used. No permissions to read cache file: %s", cache_file)
         elif write_file_cache:
             dir_mode = getattr(target._config, "CACHE_DIR_MODE", 0o777) if target._config else 0o777
             file_mode = getattr(target._config, "CACHE_FILE_MODE", 0o666) if target._config else 0o666
@@ -209,11 +219,13 @@ class Cache:
         return self.func(*args, **kwargs)
 
 
-def wrap(func):
-    cache = Cache(func)
+def wrap(func, no_cache=False, cls=None):
+    cache = Cache(func, no_cache=no_cache, cls=cls)
 
     @functools.wraps(func)
     def cache_wrapper(*args, **kwargs):
+        if cache.no_cache:
+            return cache.func(*args, **kwargs)
         return cache.call(*args, **kwargs)
 
     cache.wrapper = cache_wrapper
