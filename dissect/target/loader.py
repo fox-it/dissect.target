@@ -168,6 +168,7 @@ def open(item: Union[str, Path], *args, **kwargs):
     item, parsed_path = extract_path_info(item)
 
     if loader := find_loader(item, parsed_path=parsed_path):
+        kwargs['parsed_path'] = parsed_path
         return loader(item, *args, **kwargs)
 
 
