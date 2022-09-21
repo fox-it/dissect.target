@@ -4,6 +4,16 @@ The Dissect module tying all other Dissect modules together. It provides a progr
 allow easy access to various data sources inside disk images or file collections (a.k.a. targets). For more information,
 please see [the documentation](https://dissect.readthedocs.io/en/latest/projects/dissect.target).
 
+## Installation
+
+`dissect.target` is available on [PyPI](https://pypi.org/project/dissect.target/).
+
+```bash
+pip install dissect.target
+```
+
+This module is also automatically installed if you install the `dissect` package.
+
 ## Tools inside this project
 
 ### target-query
