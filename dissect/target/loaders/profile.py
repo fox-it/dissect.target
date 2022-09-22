@@ -8,7 +8,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 
 class ProfileLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = Path(path).resolve()
         super().__init__(path)
 

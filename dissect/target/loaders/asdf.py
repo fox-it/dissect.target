@@ -8,7 +8,7 @@ from dissect.target.loaders.tar import TarFile
 class AsdfLoader(Loader):
     METADATA_PREFIX = "$asdf$"
 
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)

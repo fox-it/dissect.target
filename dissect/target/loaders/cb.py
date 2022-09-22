@@ -13,7 +13,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 
 class CbLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         path = str(path)
         super().__init__(path)
         self.uri = urlparse(path)

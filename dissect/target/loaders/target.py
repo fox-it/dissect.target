@@ -11,7 +11,7 @@ from dissect.target.loader import Loader
 
 
 class TargetLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         super().__init__(path)
         self.base_dir = path.parent
         self.definition = yaml.safe_load(path.open("rb"))

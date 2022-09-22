@@ -53,7 +53,7 @@ DOMAIN_TRANSLATION = {
 
 
 class ITunesLoader(Loader):
-    def __init__(self, path):
+    def __init__(self, path, **kwargs):
         super().__init__(path)
 
         self.backup = ITunesBackup(self.path)

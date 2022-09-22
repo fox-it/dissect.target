@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import urllib
+
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, Optional, Union
 
 from dissect.target.helpers.lazy import import_lazy
+from dissect.target.helpers.loaderutil import extract_path_info
 
 if TYPE_CHECKING:
     from dissect.target import Target
@@ -19,6 +22,7 @@ __all__ = [
 log = logging.getLogger(__name__)
 
 LOADERS: list[Loader] = []
+LOADERS_BY_SCHEME: dict[str, Loader] = {}
 MODULE_PATH = "dissect.target.loaders"
 
 DirLoader: Loader = import_lazy("dissect.target.loaders.dir").DirLoader
@@ -55,7 +59,7 @@ class Loader:
         path: The target path to load.
     """
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, **kwargs):
         self.path = path
 
     def __repr__(self):
@@ -98,7 +102,7 @@ class Loader:
         raise NotImplementedError()
 
 
-def register(module: str, class_name: str, internal: bool = True) -> None:
+def register(module_name: str, class_name: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
     This function registers a loader using ``modname`` relative to the ``MODULE_PATH``.
@@ -110,12 +114,16 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
         internal: Whether it is an internal module or not.
     """
     if internal:
-        module = ".".join([MODULE_PATH, module])
+        module = ".".join([MODULE_PATH, module_name])
+    else:
+        module = module_name
 
-    LOADERS.append(getattr(import_lazy(module), class_name))
+    loader = getattr(import_lazy(module), class_name)
+    LOADERS.append(loader)
+    LOADERS_BY_SCHEME[module_name] = loader
 
 
-def find_loader(item: Path) -> Optional[Loader]:
+def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None) -> Optional[Loader]:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -131,6 +139,10 @@ def find_loader(item: Path) -> Optional[Loader]:
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
+    if parsed_path:
+        if loader := LOADERS_BY_SCHEME.get(parsed_path.scheme):
+            return loader
+
     for loader in LOADERS + [DirLoader]:
         try:
             if loader.detect(item):
@@ -153,10 +165,10 @@ def open(item: Union[str, Path], *args, **kwargs):
     Returns:
         A :class:`Loader` class for the specific target if one exists.
     """
-    if not isinstance(item, Path):
-        item = Path(item)
+    item, parsed_path = extract_path_info(item)
 
-    if loader := find_loader(item):
+    if loader := find_loader(item, parsed_path=parsed_path):
+        kwargs["parsed_path"] = parsed_path
         return loader(item, *args, **kwargs)
 
 
@@ -175,6 +187,7 @@ register("vma", "VmaLoader")
 register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
+register("remote", "RemoteLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
 register("phobos", "PhobosLoader")

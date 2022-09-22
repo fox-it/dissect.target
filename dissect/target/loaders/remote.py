@@ -7,7 +7,6 @@ import ssl
 from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
 from struct import pack, unpack
-from urllib.parse import urlparse
 from typing import Optional, Union
 
 from dissect.util.stream import AlignedStream
@@ -125,7 +124,6 @@ class RemoteStreamConnection:
         remainder = number_of_disks * 16
         data = self._receive_bytes(remainder)
         disks = []
-
         for i in range(0, number_of_disks, 16):
             part = data[i : i + 16]
             (disk_size, _) = unpack("<QQ", part)
@@ -135,15 +133,10 @@ class RemoteStreamConnection:
 
 
 class RemoteLoader(Loader):
-    def __init__(self, path: Union[Path, str]):
+    def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
-
-        # Temporary fix, wait for URI handling feature...
-        def _temp_fix_path(path: Union[Path, str]):
-            return str(path).replace("remote:/", "remote://")
-
-        url = urlparse(_temp_fix_path(self.path))
-        self.stream = RemoteStreamConnection(url.hostname, url.port)
+        uri = kwargs.get("parsed_path")
+        self.stream = RemoteStreamConnection(uri.hostname, uri.port)
 
     def map(self, target: Target) -> None:
         for disk in self.stream.info():
@@ -151,4 +144,5 @@ class RemoteLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return str(path).startswith("remote:")
+        # You can only activate this loader by URI-scheme "remote://"
+        return False
