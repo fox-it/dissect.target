@@ -148,7 +148,7 @@ class RemoteStreamConnection:
         for i in range(0, number_of_disks * response_size, response_size):
             part = data[i : i + response_size]
             (disk_size, _) = unpack("<QQ", part)
-            disks.append(RemoteStream(self, int(i / response_size), disk_size))
+            disks.append(RemoteStream(self, i // response_size, disk_size))
 
         return disks
 
