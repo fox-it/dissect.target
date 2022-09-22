@@ -91,7 +91,7 @@ class RemoteStreamConnection:
                     self._ssl_sock.close()
                 if self._socket is not None:
                     self._socket.close()
-                # Directly re-connects seem to be less succesful, allowing some time to re-connect
+                # Directly re-connecting seem to be less succesful, allow some time to re-connect
                 # seems to yield best results in practice
                 self.log.debug("Unable to connect to agent, next attempt in %d sec.", self.RECONNECT_WAIT)
                 time.sleep(self.RECONNECT_WAIT)
