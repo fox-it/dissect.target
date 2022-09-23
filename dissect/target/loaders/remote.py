@@ -4,6 +4,7 @@ import logging
 import socket
 import ssl
 import time
+import urllib
 
 from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
@@ -56,7 +57,7 @@ class RemoteStreamConnection:
     COMMAND_QUIT = 2
     COMMAND_READ = 50
 
-    def __init__(self, hostname: str, port: int):
+    def __init__(self, hostname: str, port: int, **kwargs):
         self.hostname = hostname
         self.port = port
         self._is_connected = False
@@ -65,6 +66,16 @@ class RemoteStreamConnection:
         self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         self._context.verify_mode = ssl.CERT_REQUIRED
         self._context.load_default_certs()
+
+        if options := kwargs.get("options"):
+            client_key = options.get("key")
+            client_crt = options.get("crt")
+            noverify = options.get("noverify")
+            if client_key and client_crt:
+                self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
+            if noverify:
+                self._context.verify_mode = ssl.CERT_NONE
+
         self.log = log
 
     def is_connected(self) -> bool:
@@ -167,9 +178,10 @@ class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         uri = kwargs.get("parsed_path")
+        options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
         if uri is None:
             raise LoaderError("No URI connection details has been passed.")
-        self.stream = RemoteStreamConnection(uri.hostname, uri.port)
+        self.stream = RemoteStreamConnection(uri.hostname, uri.port, options=options)
 
     def map(self, target: Target) -> None:
         self.stream.log = target.log
