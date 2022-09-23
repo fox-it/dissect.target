@@ -36,6 +36,10 @@ class RemoteStreamConnection:
     # Max. number of times we try to reconnect (still tweaking this)
     MAX_RECONNECTS = 30
 
+    # Max. number of short reads, short reads might happen because of internal bugs
+    # this is a mechanism to make sure the client will not just hang
+    MAX_SHORT_READS = 10
+
     # Time to wait before attempting to reconnect
     RECONNECT_WAIT = 10
 
@@ -59,6 +63,7 @@ class RemoteStreamConnection:
         self._socket = None
         self._ssl_sock = None
         self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+        self._context.verify_mode = ssl.CERT_REQUIRED
         self._context.load_default_certs()
         self.log = log
 
@@ -100,11 +105,16 @@ class RemoteStreamConnection:
     def _receive_bytes(self, length: int) -> bytes:
         data = b""
         received = 0
+        short_reads = 0
         while received < length:
             packet = self._ssl_sock.recv(min(length - received, DEFAULT_BUFFER_SIZE))
             packet_size = len(packet)
             data += packet
             received += packet_size
+            if packet_size == 0:
+                short_reads += 1
+            if short_reads >= self.MAX_SHORT_READS:
+                raise TimeoutError("Too many short reads.")
 
         return data
 
