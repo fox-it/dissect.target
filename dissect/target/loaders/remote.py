@@ -50,7 +50,7 @@ class RemoteStreamConnection:
 
     # Remote agent understands 3 commands:
     # 1      INFO: return disk size and sector size for each remote disk
-    # 2      QUIT: shutdown remote agent
+    # 2      QUIT: stops the agent on the remote machine
     # 50 + X READ: read disk number X (starts with 0)
     COMMAND_INFO = 1
     COMMAND_QUIT = 2
