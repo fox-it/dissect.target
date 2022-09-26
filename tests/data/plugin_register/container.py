@@ -14,11 +14,11 @@ class TestContainer(Container):
 
     @staticmethod
     def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        return True
+        return False
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, Path]) -> bool:
-        return True
+        return False
 
     def read(self, length: int) -> bytes:
         return self.fh.read(length)
