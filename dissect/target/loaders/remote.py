@@ -178,9 +178,9 @@ class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         uri = kwargs.get("parsed_path")
-        options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
         if uri is None:
             raise LoaderError("No URI connection details has been passed.")
+        options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
         self.stream = RemoteStreamConnection(uri.hostname, uri.port, options=options)
 
     def map(self, target: Target) -> None:
