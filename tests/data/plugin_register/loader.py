@@ -7,7 +7,7 @@ from dissect.target.loader import Loader, register
 class TestLoader(Loader):
     @staticmethod
     def detect(path: Path) -> bool:
-        return True
+        return False
 
     def map(self, target) -> None:
         target.disks.add(container.open(self.path))

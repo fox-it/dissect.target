@@ -18,7 +18,7 @@ class TestFilesystem(Filesystem):
         pass
 
     def detect(fh: BinaryIO):
-        return True
+        return False
 
 
 register(__name__, TestFilesystem.__name__, internal=False)
