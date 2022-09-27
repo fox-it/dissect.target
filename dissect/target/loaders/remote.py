@@ -67,6 +67,11 @@ class RemoteStreamConnection:
         self._context.verify_mode = ssl.CERT_REQUIRED
         self._context.load_default_certs()
 
+        self._max_reconnects = self.MAX_RECONNECTS
+        self._max_shortreads = self.MAX_SHORT_READS
+        self._reconnect_wait = self.RECONNECT_WAIT
+        self._socket_timeout = self.SOCKET_TIMEOUT
+
         if options := kwargs.get("options"):
             client_key = options.get("key")
             client_crt = options.get("crt")
@@ -75,6 +80,10 @@ class RemoteStreamConnection:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
             if noverify:
                 self._context.verify_mode = ssl.CERT_NONE
+            self._max_reconnects = options.get("reconnects", max(0,self._max_reconnects))
+            self._max_shortreads = options.get("shortreads", max(0,self._max_shortreads))
+            self._reconnect_wait = options.get("reconnectwait", max(0,self._reconnect_wait))
+            self._socket_timeout = options.get("sockettimeout", max(0,self._socket_timeout))
 
         self.log = log
 
@@ -91,7 +100,7 @@ class RemoteStreamConnection:
             # Even during the handshake things can go wrong with unreliable connections
             try:
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._socket.settimeout(self.SOCKET_TIMEOUT)
+                self._socket.settimeout(self._socket_timeout)
                 ssl_sock = self._context.wrap_socket(self._socket, server_hostname=self.hostname)
                 ssl_sock.connect((self.hostname, self.port))
                 self._ssl_sock = ssl_sock
@@ -101,7 +110,7 @@ class RemoteStreamConnection:
                 # If the max. connections are exceeded it is probably no use anymore because
                 # the remote system has become unreachable and we need to report back to the
                 # user that we can no longer contact the remote machine.
-                if reconnects > self.MAX_RECONNECTS:
+                if reconnects > self._max_reconnects:
                     raise ConnectionError("Unable to reconnect with remote agent.")
                 if self._ssl_sock is not None:
                     self._ssl_sock.close()
@@ -109,8 +118,8 @@ class RemoteStreamConnection:
                     self._socket.close()
                 # Directly re-connecting seem to be less succesful, allow some time to re-connect
                 # seems to yield best results in practice
-                self.log.debug("Unable to connect to agent, next attempt in %d sec.", self.RECONNECT_WAIT)
-                time.sleep(self.RECONNECT_WAIT)
+                self.log.debug("Unable to connect to agent, next attempt in %d sec.", self._reconnect_wait)
+                time.sleep(self._reconnect_wait)
                 reconnects += 1
 
     def _receive_bytes(self, length: int) -> bytes:
@@ -124,7 +133,7 @@ class RemoteStreamConnection:
             received += packet_size
             if packet_size == 0:
                 short_reads += 1
-            if short_reads >= self.MAX_SHORT_READS:
+            if short_reads > self._max_shortreads:
                 raise TimeoutError("Too many short reads.")
 
         return data
