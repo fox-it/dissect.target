@@ -1,6 +1,6 @@
 import re
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import UnsupportedPluginError, RegistryKeyNotFoundError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
@@ -21,11 +21,7 @@ TrustedDocsRecord = create_extended_descriptor([RegistryRecordDescriptorExtensio
 
 
 class TrustedDocsPlugin(Plugin):
-    """Return Microsoft Office Trusted Document registry keys.
-
-    Trusted Document keys are used by Microsoft to cache for a document that the user enabled the editing and/or macros.
-    Therefore, this may reveal if for any malicious Office document the macros have been enabled.
-    """
+    """Plugin to obtain Microsoft Office Trusted Document registry keys."""
 
     KEY = "HKEY_CURRENT_USER\\Software\\Microsoft\\Office"
 
@@ -33,33 +29,47 @@ class TrustedDocsPlugin(Plugin):
         if not len(list(self.target.registry.key(self.KEY))) > 0:
             raise UnsupportedPluginError("No Trusted Document keys found")
 
+    def _find_subkey(self, key, subkey_name: str):
+        try:
+            searched_key = key.subkey(subkey_name)
+            if searched_key.subkeys():
+                yield from searched_key.subkeys()
+            else:
+                yield searched_key
+        except RegistryKeyNotFoundError:
+            pass
+
     def _iterate_keys(self):
-        """Yields all Microsoft Office keys, regardless of the version and application and looks for the Security key"""
+        """Yields all Microsoft Office keys that contain a TrustRecords subkey."""
         for key in self.target.registry.iterkeys(self.KEY):
             for version_key in key.subkeys():
                 for application_key in version_key.subkeys():
-                    for application_subkey in application_key.subkeys():
-                        if application_subkey.name == "Security":
-                            yield from application_subkey.subkeys()
+                    yield from (
+                        y
+                        for x in self._find_subkey(application_key, "Security")
+                        for y in self._find_subkey(x, "TrustRecords")
+                    )
 
     @export(record=TrustedDocsRecord)
     def trusteddocs(self):
-        """Return Microsoft Office Trusted Document registry keys for all Office applications"""
-        user = self.target.registry.get_user(self.target.registry.key(self.KEY))
-        for security_key in self._iterate_keys():
-            pattern = re.compile(r"[0-9]\\(.*)\\Security")
-            application = pattern.search(security_key.path).group(1)
+        """Return Microsoft Office TrustRecords registry keys for all Office applications.
 
-            if security_key.name == "Trusted Documents":
-                for trusted_docs_key in security_key.subkeys():
-                    for value in trusted_docs_key.values():
-                        yield TrustedDocsRecord(
-                            ts=trusted_docs_key.ts,
-                            type=value.type,
-                            application=application,
-                            document_path=value.name,
-                            value=value.value,
-                            _key=trusted_docs_key,
-                            _user=user,
-                            _target=self.target,
-                        )
+        Microsoft uses Trusted Documents to cache whether the user enabled the editing and/or macros for that document.
+        Therefore, this may reveal if macros have been enabled for a malicious Office document.
+        """
+        user = self.target.registry.get_user(self.target.registry.key(self.KEY))
+        pattern = re.compile(r"[0-9]\\(.*)\\Security")
+
+        for key in self._iterate_keys():
+            application = pattern.search(key.path).group(1)
+            for value in key.values():
+                yield TrustedDocsRecord(
+                    ts=key.ts,
+                    type=value.type,
+                    application=application,
+                    document_path=self.target.path.resolve(value.name),
+                    value=value.value,
+                    _key=key,
+                    _user=user,
+                    _target=self.target,
+                )
