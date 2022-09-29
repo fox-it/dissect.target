@@ -34,8 +34,8 @@ class TrustedDocsPlugin(Plugin):
     def _find_subkey(self, key: RegfKey, subkey_name: str) -> Iterator[RegfKey]:
         try:
             searched_key = key.subkey(subkey_name)
-            if searched_key.subkeys():
-                yield from searched_key.subkeys()
+            if subkeys := searched_key.subkeys():
+                yield from subkeys
             else:
                 yield searched_key
         except RegistryKeyNotFoundError:
