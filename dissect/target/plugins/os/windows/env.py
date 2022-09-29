@@ -1,10 +1,6 @@
-from collections import namedtuple
 import re
-
-# From Python 3.9 on OrderedDict should once again be imported from collections
-from typing import Generator, OrderedDict, List, Set, Union
-
-from flow.record import RecordDescriptor
+from collections import namedtuple, OrderedDict
+from typing import Iterator, List, Optional, Set
 
 from dissect.target import Target
 from dissect.target.exceptions import RegistryError
@@ -141,7 +137,7 @@ class EnvironmentVariablePlugin(Plugin):
     USER_VARIABLES = [
         EnvVarDetails(
             "%userprofile%",
-            ("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\{user.sid}",),
+            ("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\{user_sid}",),
             "ProfileImagePath",
         ),
         EnvVarDetails(
@@ -154,7 +150,7 @@ class EnvironmentVariablePlugin(Plugin):
         ),
         EnvVarDetails(
             "%onedrive%",
-            ("HKU\\{user.sid}\\Environment",),
+            ("HKU\\{user_sid}\\Environment",),
             "Onedrive",
         ),
         EnvVarDetails(
@@ -163,7 +159,7 @@ class EnvironmentVariablePlugin(Plugin):
             (
                 "HKLM\\SOFTWARE\\DefaultUserEnvironment",
                 "HKLM\\SYSTEM\\CurrentControlSet\\Session Manager\\Environment",
-                "HKU\\{user.sid}\\Environment",
+                "HKU\\{user_sid}\\Environment",
             ),
             "TEMP",
         ),
@@ -173,7 +169,7 @@ class EnvironmentVariablePlugin(Plugin):
             (
                 "HKLM\\SOFTWARE\\DefaultUserEnvironment",
                 "HKLM\\SYSTEM\\CurrentControlSet\\Session Manager\\Environment",
-                "HKU\\{user.sid}\\Environment",
+                "HKU\\{user_sid}\\Environment",
             ),
             "TMP",
         ),
@@ -184,7 +180,7 @@ class EnvironmentVariablePlugin(Plugin):
             (
                 "HKLM\\SOFTWARE\\DefaultUserEnvironment",
                 "HKLM\\SYSTEM\\CurrentControlSet\\Session Manager\\Environment",
-                "HKU\\{user.sid}\\Environment",
+                "HKU\\{user_sid}\\Environment",
             ),
             "Path",
         ),
@@ -271,10 +267,10 @@ class EnvironmentVariablePlugin(Plugin):
 
         return self._env
 
-    def _get_user_env_vars(self, user: Union[RecordDescriptor, None] = None) -> OrderedDict[str, str]:
-        """Get the environment variables as seen by the given user.
+    def _get_user_env_vars(self, user_sid: Optional[str] = None) -> OrderedDict[str, str]:
+        """Get the environment variables as seen by the user of the given user SID.
 
-        If no user is given, the function gives back the system environment
+        If no user_sid is given, the function gives back the system environment
         variables.
 
         An OrderedDict is returned with the variable names as the keys and the
@@ -282,19 +278,19 @@ class EnvironmentVariablePlugin(Plugin):
         of variables earlier in the order.
         """
         env_vars = self._get_system_env_vars()
-        if user is not None:
+        if user_sid is not None:
             env_vars = env_vars.copy()
             user_env_var_details = []
 
             for env_var_details in self.USER_VARIABLES:
-                reg_keys = tuple(reg_key.format(user=user) for reg_key in env_var_details.reg_keys)
+                reg_keys = tuple(reg_key.format(user_sid=user_sid) for reg_key in env_var_details.reg_keys)
                 env_var_details = env_var_details._replace(reg_keys=reg_keys)
                 user_env_var_details.append(env_var_details)
 
             user_vars = self._get_env_vars(user_env_var_details)
 
             # To preserve the order in USER_VARIABLES, variables which are also
-            # present in the system env_vars OrederedDict must be removed
+            # present in the system env_vars OrderedDict must be removed
             # before updating it with the user_vars.
             for user_var in user_vars.keys():
                 if user_var in env_vars:
@@ -308,23 +304,23 @@ class EnvironmentVariablePlugin(Plugin):
         pass
 
     @internal
-    def expand_env(self, path: str, user: Union[RecordDescriptor, None] = None) -> str:
-        env_vars = self._get_user_env_vars(user)
+    def expand_env(self, path: str, user_sid: Optional[str] = None) -> str:
+        env_vars = self._get_user_env_vars(user_sid)
         return self._expand_env(path, env_vars)
 
     @internal
-    def user_env(self, user: Union[RecordDescriptor, None] = None) -> OrderedDict[str, str]:
+    def user_env(self, user_sid: Optional[str] = None) -> OrderedDict[str, str]:
         """Return a dict of all found (user) environment variables."""
-        return self._get_user_env_vars(user)
+        return self._get_user_env_vars(user_sid)
 
     @property
     @internal
     def env(self) -> OrderedDict[str, str]:
-        """Return a dict of all found environment variables."""
-        return self._get_user_env_vars(None)
+        """Return a dict of all found system environment variables."""
+        return self._get_system_env_vars()
 
     @export(record=EnvironmentRecord)
-    def environment_variables(self) -> Generator[EnvironmentRecord, None, None]:
+    def environment_variables(self) -> Iterator[EnvironmentRecord]:
         """Return all environment variables on a Windows system.
 
         Environment variables are dynamic-named values that can affect the way processes are running on the system.
@@ -343,7 +339,7 @@ class EnvironmentVariablePlugin(Plugin):
             )
 
         for user in self.target.users():
-            for name, value in self._get_user_env_vars(user).items():
+            for name, value in self._get_user_env_vars(user.sid).items():
                 yield EnvironmentRecord(
                     name=name,
                     value=value,
@@ -371,7 +367,7 @@ class EnvironmentVariablePlugin(Plugin):
         return self._get_pathext()
 
     @export(record=PathextRecord)
-    def path_extensions(self) -> Generator[PathextRecord, None, None]:
+    def path_extensions(self) -> Iterator[PathextRecord]:
         """Return all found path extensions."""
         for pathext in self._get_pathext():
             yield PathextRecord(

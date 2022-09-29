@@ -39,8 +39,8 @@ class MockEnvironmentVariablePlugin(EnvironmentVariablePlugin):
         EnvVarDetails(
             "%path%",
             (
-                "{user.sid}/path1;;;",
-                "{user.sid}/path2;;;",
+                "{user_sid}/path1;;;",
+                "{user_sid}/path2;;;",
             ),
             "PATH",
         ),
@@ -134,7 +134,10 @@ def test__get_system_env_vars(env_plugin):
 
 @pytest.mark.parametrize("user, results", TEST_USER_ENV_VARS)
 def test__get_user_env_vars(env_plugin, user, results):
-    env_vars = env_plugin._get_user_env_vars(user)
+    user_sid = None
+    if user:
+        user_sid = user.sid
+    env_vars = env_plugin._get_user_env_vars(user_sid)
 
     for variable, value in results:
         assert env_vars[variable] == value
@@ -146,8 +149,11 @@ def test_expand_env(env_plugin, user, _):
 
     with mock.patch.object(env_plugin, "_get_user_env_vars"):
         with mock.patch.object(env_plugin, "_expand_env"):
-            expanded_path = env_plugin.expand_env(path, user)
-            env_plugin._get_user_env_vars.assert_called_with(user)
+            user_sid = None
+            if user:
+                user_sid = user.sid
+            expanded_path = env_plugin.expand_env(path, user_sid)
+            env_plugin._get_user_env_vars.assert_called_with(user_sid)
             env_plugin._expand_env.assert_called_with(path, env_plugin._get_user_env_vars.return_value)
             assert expanded_path == env_plugin._expand_env.return_value
 
@@ -155,9 +161,19 @@ def test_expand_env(env_plugin, user, _):
 @pytest.mark.parametrize("user, _", TEST_USER_ENV_VARS)
 def test_user_env(env_plugin, user, _):
     with mock.patch.object(env_plugin, "_get_user_env_vars"):
-        env_vars = env_plugin.user_env(user)
-        env_plugin._get_user_env_vars.assert_called_with(user)
+        user_sid = None
+        if user:
+            user_sid = user.sid
+        env_vars = env_plugin.user_env(user_sid)
+        env_plugin._get_user_env_vars.assert_called_with(user_sid)
         assert env_vars == env_plugin._get_user_env_vars.return_value
+
+
+def test_env(env_plugin):
+    with mock.patch.object(env_plugin, "_get_system_env_vars"):
+        env_vars = env_plugin.env
+        env_plugin._get_system_env_vars.assert_called()
+        assert env_vars == env_plugin._get_system_env_vars.return_value
 
 
 def test_environment_variables(env_plugin):
@@ -167,7 +183,7 @@ def test_environment_variables(env_plugin):
             # unwind the generator, so all functions are called
             [_ for _ in records]
             env_plugin._get_system_env_vars.assert_called()
-            env_plugin._get_user_env_vars.assert_called_once_with(MockUser)
+            env_plugin._get_user_env_vars.assert_called_once_with(MockUser.sid)
             assert records[0].name == "sys-name"
             assert records[0].value == "sys-value"
             assert records[0].username is None
