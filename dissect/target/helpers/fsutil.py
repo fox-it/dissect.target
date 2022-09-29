@@ -789,8 +789,7 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
 
     try:
         for entry in path_entry.scandir():
-            isdir = entry.isdir()
-            if isdir:
+            if entry.is_dir():
                 dirs.append(entry)
             else:
                 files.append(entry)
@@ -837,7 +836,7 @@ def glob_ext(direntry, pattern):
             if base_name:
                 yield entry
             # Patterns ending with a slash should match only directories
-            elif entry.isdir():
+            elif entry.is_dir():
                 yield entry
         return
 
@@ -888,7 +887,7 @@ def glob_ext0(direntry, base_name):
         # directory separator.  'q*x/' should match only directories.
         if direntry.is_dir():
             return [direntry]
-    elif direntry.isdir():
+    elif direntry.is_dir():
         try:
             return [direntry.get(base_name)]
         except FileNotFoundError:
