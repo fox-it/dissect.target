@@ -803,7 +803,7 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
         yield [path_entry], dirs, files
 
     for direntry in dirs:
-        if followlinks or not direntry.islink():
+        if followlinks or not direntry.is_symlink():
             for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks):
                 yield [path_entry] + xpath, xdirs, xfiles
 
