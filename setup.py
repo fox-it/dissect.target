@@ -60,7 +60,7 @@ setup(
         "dissect.util>=3.0.dev,<4.0.dev",
         "dissect.hypervisor>=3.0.dev,<4.0.dev",
         "dissect.volume>=3.0.dev,<4.0.dev",
-        "flow.record~=3.2",
+        "flow.record~=3.5",
         "structlog",
     ],
     extras_require={
