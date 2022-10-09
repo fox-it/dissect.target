@@ -9,15 +9,19 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 
+# KAPE doesn't have the correct filenames for several files, like $J or $Secure_$SDS
+# The same applies to Velociraptor offline collector Windows.KapeFiles.Targets
+USNJRNL_PATHS = ["$Extend/$J", "$Extend/$UsnJrnl$J"]
+
 class KapeLoader(DirLoader):
     @staticmethod
     def detect(path: Path) -> bool:
         os_type, dirs = find_dirs(path)
         if os_type == "windows":
             for dir_path in dirs:
-                # KAPE doesn't have the correct filenames for several files, like $J or $Secure_$SDS
-                if dir_path.joinpath("$Extend/$J").exists():
-                    return True
+                for path in USNJRNL_PATHS:
+                    if dir_path.joinpath(path).exists():
+                        return True
 
         return False
 
@@ -26,5 +30,5 @@ class KapeLoader(DirLoader):
             target,
             self.path,
             sds_path="$Secure_$SDS",
-            usnjrnl_path="$Extend/$J",
+            usnjrnl_path=USNJRNL_PATHS,
         )
