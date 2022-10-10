@@ -2,7 +2,7 @@
 
 The Dissect module tying all other Dissect modules together. It provides a programming API and command line tools which
 allow easy access to various data sources inside disk images or file collections (a.k.a. targets). For more information,
-please see [the documentation](https://dissect.readthedocs.io/en/latest/projects/dissect.target).
+please see [the documentation](https://docs.dissect.tools/en/latest/projects/dissect.target/index.html).
 
 ## Installation
 
@@ -18,7 +18,7 @@ This module is also automatically installed if you install the `dissect` package
 
 ### target-query
 `target-query` is a tool used to query specific data inside one or more targets.
-These queries are available in the form of functions that reside within [plugins](https://dissect.readthedocs.io/en/latest/advanced/plugins).
+These queries are available in the form of functions that reside within [plugins](https://docs.dissect.tools/en/latest/advanced/plugins.html).
 Each plugin is focussed on providing specific functionality.
 
 This functionality can range from parsing log sources, such as command history logs (i.e. bash history,
@@ -38,7 +38,7 @@ target-query -f <FUNCTION_NAME> /example_path/*.vmdk
 ```
 
 Not every target plugin will function on every target, they are OS specific.
-More information on how to use `target-query` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-query).
+More information on how to use `target-query` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-query.html).
 
 ### target-shell
 `target-shell` gives you the ability to access a target using a virtual shell environment. Once a shell is opened
@@ -65,7 +65,7 @@ Opening a shell on a target is straight-forward. You can do so by specifying a p
 Further interacting with the target can be done using the commands listed above.
 You can exit the shell by running `exit` or by pressing `CTRL+D`.
 
-More information on how to use `target-shell` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-shell).
+More information on how to use `target-shell` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-shell.html).
 
 ### target-fs
 With `target-fs` you can interact with the filesystem of a target using a set of familiar Unix commands.
@@ -78,7 +78,7 @@ target-fs <path_to_target> <command> <path_for_command>
 
 **NOTE:** As with any shell command, you have to properly escape backlashes and spaces. Unless you use single or double quotes (`'`, `"`).
 
-More information on how to use `target-fs` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-fs).
+More information on how to use `target-fs` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-fs.html).
 
 ### target-reg
 With `target-reg` you can easily query the registry of Windows targets and print the results in a tree. A `+` symbol indicates that it is a registry key (i.e. may have subkeys). A `-` symbol indicates a registry value.
@@ -91,7 +91,7 @@ user@dissect~$ target-reg targets/EXAMPLE.E01 -k "HKEY_LOCAL_MACHINE\SOFTWARE\Mi
 [...]
 ```
 
-More information on how to use `target-reg` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-reg).
+More information on how to use `target-reg` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-reg.html).
 
 ### target-dump
 With `target-dump` you can export records of a specific `function` used in target-query to a file.
@@ -104,7 +104,7 @@ target-dump -f <comma_seperated_functions> <path_to_target>
 
 Futhermore, the tool can apply certain compression algorithms to the dump, to create small archives of the output.
 
-More information on how to use `target-dump` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-dump).
+More information on how to use `target-dump` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-dump.html).
 
 ### target-dd
 With `target-dd` you can export (a part of) a target to a file or to stdout. At the moment, `target-dd` can be used for targets that have only one disk.
@@ -115,7 +115,7 @@ The basic structure of a `target-dd` command is as follows:
 target-dd --write <output_file> --offset <offset_on_target_in_bytes> --bytes <nr_of_bytes_to_read> <path_to_target>
 ```
 
-More information on how to use `target-dd` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-dd).
+More information on how to use `target-dd` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-dd.html).
 
 ### target-mount
 With `target-mount` you can mount the filesystem of a target to any arbitrary directory on your analysis machine, similar to the `mount` command on Unix systems.
@@ -141,7 +141,7 @@ terminal session. It is recommended to either open a second terminal, let this c
 appending `&` to the command or use a terminal multiplexer like `tmux` to start a second session. Using one
 of these methods enables you to interact with the mountpoint.
 
-More information on how to use `target-mount` is found in [the documentation](https://dissect.readthedocs.io/en/latest/tools/target-mount).
+More information on how to use `target-mount` is found in [the documentation](https://docs.dissect.tools/en/latest/tools/target-mount.html).
 
 ## Build and test instructions
 
@@ -162,12 +162,12 @@ tox
 ```
 
 For a more elaborate explanation on how to build and test the project, please see [the
-documentation](https://dissect.readthedocs.io/en/latest/contributing/developing.html#building-testing).
+documentation](https://docs.dissect.tools/en/latest/contributing/developing.html#building-testing).
 
 ## Contributing
 
 The Dissect project encourages any contribution to the codebase. To make your contribution fit into the project, please
-refer to [the style guide](https://dissect.readthedocs.io/en/latest/contributing/style-guide.html).
+refer to [the style guide](https://docs.dissect.tools/en/latest/contributing/style-guide.html).
 
 ## Copyright and license
 
