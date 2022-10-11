@@ -277,6 +277,28 @@ def test_filesystem_virtual_symlink_to_symlink_get(vfs):
     assert some_file is some_file2
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "",
+        "/",
+    ],
+)
+@pytest.mark.parametrize(
+    "entry_name",
+    [
+        "/path/to/some/file",
+        "/path/to/some",
+        "/dirlink1",
+    ],
+)
+def test_filesystem_virtual_entry_get_self(vfs, path, entry_name):
+    some_entry = vfs.get(entry_name)
+    some_entry2 = some_entry.get(path)
+
+    assert some_entry is some_entry2
+
+
 def test_filesystem_virtual_filesystem_get():
     vfs = VirtualFilesystem()
     file_entry = VirtualFile(vfs, "file", None)

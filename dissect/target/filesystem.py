@@ -861,6 +861,9 @@ class VirtualFile(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualFile: {self.path}")
 
     def get(self, path):
+        path = fsutil.normalize(path).strip("/")
+        if not path:
+            return self
         raise NotADirectoryError(f"'{self.path}' is not a directory")
 
     def iterdir(self):
