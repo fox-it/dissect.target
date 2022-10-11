@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 from dissect.target.helpers import fsutil
 from dissect.target.plugin import Plugin, internal
@@ -12,7 +13,7 @@ REPLACEMENTS = [
     (r"/systemroot/", r"/%systemroot%/"),
 ]
 
-SEARCH_PATHS = [
+FALLBACK_SEARCH_PATHS = [
     "sysvol/windows/system32",
     "sysvol/windows/syswow64",
     "sysvol/windows",
@@ -24,16 +25,21 @@ class ResolverPlugin(Plugin):
         pass
 
     @internal
-    def resolve(self, path):
+    def resolve(self, path: str, user: Optional[str] = None):
+        """Resolve a partial path string to a file or directory present in the target.
+
+        For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
+        tried. If a user SID is provided that user's %path% variable is used.
+        """
         if not path:
             return path
 
         if self.target.os == "windows":
-            return self.resolve_windows(path)
+            return self.resolve_windows(path, user_sid=user)
         else:
-            return self.resolve_default(path)
+            return self.resolve_default(path, user_id=user)
 
-    def resolve_windows(self, path):
+    def resolve_windows(self, path: str, user_sid: Optional[str] = None):
         # Normalize first so the replacements are easier
         path = fsutil.normalize(path)
 
@@ -60,9 +66,22 @@ class ResolverPlugin(Plugin):
             if self.target.fs.exists(quoted[0]):
                 return quoted[0]
 
-        # Windows supports some path resolution when leaving out the extension or full path
-        # The string given to this function may be a command string including arguments, so split on spaces and
-        # for each part, check if a file exists with an allowed extension and in any of the search paths.
+        # Construct a list of search paths to look in. If a user SID is given, both the system and user search paths are
+        # used, else only the system search paths.
+        search_paths = []
+        user_env_vars = self.target.user_env(user_sid)
+        user_path_env = user_env_vars.get("%path%")
+        if user_path_env:
+            for path_env in user_path_env.split(";"):
+                # Normalize because environment variable may contain backslashes
+                path_env = fsutil.normalize(path_env).rstrip("/")
+                search_paths.append(path_env)
+        if not search_paths:
+            search_paths = FALLBACK_SEARCH_PATHS
+
+        # Windows supports some path resolution when leaving out the extension or full path.
+        # The string given to this function may be a command string including arguments, so split on spaces and,
+        # appending one part at a time, check if a file exists with an allowed extension and in any of the search paths.
         # If it does, it's probably the file we're looking for.
         lookup = ""
         parts = path.split(" ")
@@ -70,19 +89,17 @@ class ResolverPlugin(Plugin):
 
         for part in parts:
             lookup = " ".join([lookup, part]) if lookup else part
-
             for ext in pathext:
                 lookup_ext = lookup + ext
                 if self.target.fs.exists(lookup_ext):
                     return lookup_ext
 
-                for search_path in SEARCH_PATHS:
-                    fpath = "/".join([search_path, lookup_ext])
-                    if self.target.fs.exists(fpath):
-                        return fpath
+                for search_path in search_paths:
+                    lookup_path = "/".join([search_path, lookup_ext])
+                    if self.target.fs.exists(lookup_path):
+                        return lookup_path
 
         return path
 
-    @staticmethod
-    def resolve_default(path):
+    def resolve_default(self, path: str, user_id: Optional[str] = None):
         return fsutil.normalize(path)

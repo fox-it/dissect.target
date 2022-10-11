@@ -17,8 +17,7 @@ def make_dummy_target():
     return target
 
 
-@pytest.fixture
-def mock_target():
+def make_mock_target():
     with tempfile.NamedTemporaryFile(prefix="MockTarget-") as tmp_file:
         target = make_dummy_target()
         target.path = pathlib.Path(tmp_file.name)
@@ -26,9 +25,15 @@ def mock_target():
 
 
 @pytest.fixture
+def mock_target():
+    yield from make_mock_target()
+
+
+@pytest.fixture
 def make_mock_targets(request):
     def _make_targets(size):
-        return [make_dummy_target() for _ in range(size)]
+        for _ in range(size):
+            yield from make_mock_target()
 
     return _make_targets
 
@@ -78,7 +83,8 @@ def hive_hku():
 
 
 @pytest.fixture
-def target_win(mock_target, hive_hklm, fs_win):
+def target_win(hive_hklm, fs_win):
+    mock_target = next(make_mock_target())
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
     mock_target.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
@@ -91,7 +97,9 @@ def target_win(mock_target, hive_hklm, fs_win):
 
 
 @pytest.fixture
-def target_unix(mock_target, fs_unix):
+def target_unix(fs_unix):
+    mock_target = next(make_mock_target())
+
     mock_target.filesystems.add(fs_unix)
     mock_target.fs.mount("/", fs_unix)
     mock_target.apply()
