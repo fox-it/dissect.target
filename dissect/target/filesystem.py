@@ -908,7 +908,7 @@ class VirtualSymlink(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualSymlink: {self.path}")
 
     def get(self, path):
-        return self.fs.get(fsutil.join(self.path, path))
+        return self.fs.get(path, self)
 
     def iterdir(self):
         yield from self.readlink_ext().iterdir()
