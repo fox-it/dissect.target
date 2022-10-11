@@ -253,6 +253,30 @@ def test_filesystem_link_resolve(entry, link_dict):
     assert link.readlink_ext() == actual_file
 
 
+def test_filesystem_virtual_symlink_to_dir_get(vfs):
+    some_file = vfs.get("/path/to/some/file")
+    symlink = vfs.get("/dirlink1")
+
+    some_file2 = symlink.get("file")
+
+    assert some_file is some_file2
+
+
+def test_filesystem_virtual_symlink_to_file_get(vfs):
+    symlink = vfs.get("/filelink1")
+    with pytest.raises(NotADirectoryError):
+        symlink.get("does_not_exist")
+
+
+def test_filesystem_virtual_symlink_to_symlink_get(vfs):
+    some_file = vfs.get("/path/to/some/file")
+    symlink = vfs.get("/dirlink2")
+
+    some_file2 = symlink.get("file")
+
+    assert some_file is some_file2
+
+
 def test_filesystem_virtual_filesystem_get():
     vfs = VirtualFilesystem()
     file_entry = VirtualFile(vfs, "file", None)
