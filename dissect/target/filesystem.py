@@ -1167,40 +1167,35 @@ class RootFilesystem(Filesystem):
     def get(self, path, relentry=None):
         self.target.log.debug("%r::get(%r)", self, path)
 
-        path = fsutil.normalize(path)
-        fullpath = fsutil.join(relentry.path, path) if relentry else path
+        entry = relentry or self._root_entry
+        path = fsutil.normalize(path).strip("/")
+        full_path = fsutil.join(entry.path, path)
 
-        p = path.strip("/")
-        if not p:
-            return relentry if relentry else self._root_entry
+        if not path:
+            return entry
 
         exc = []
         entries = []
 
-        if relentry:
-            root_entries = relentry.entries
-        else:
-            root_entries = [layer.root for layer in self.layers]
-
-        for entry in root_entries:
+        for sub_entry in entry.entries:
             try:
-                entries.append(self._get_from_entry(p, entry))
+                entries.append(self._get_from_entry(path, sub_entry))
             except FilesystemError as e:
                 exc.append(e)
 
         if not entries:
             if all([isinstance(ex, NotADirectoryError) for ex in exc]):
-                raise NotADirectoryError(fullpath)
+                raise NotADirectoryError(full_path)
             elif all([isinstance(ex, NotASymlinkError) for ex in exc]):
-                raise NotASymlinkError(fullpath)
-            raise FileNotFoundError(fullpath)
+                raise NotASymlinkError(full_path)
+            raise FileNotFoundError(full_path)
 
-        return RootFilesystemEntry(self, fullpath, entries)
+        return RootFilesystemEntry(self, full_path, entries)
 
     def _get_from_entry(self, path, entry):
         parts = path.split("/")
 
-        for _, part in enumerate(parts):
+        for part in parts:
             if entry.is_symlink():
                 # Resolve using the RootFilesystem instead of the entry's Filesystem
                 entry = fsutil.resolve_link(fs=self, entry=entry)

@@ -12,6 +12,8 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     MappedFile,
+    RootFilesystem,
+    RootFilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -633,3 +635,60 @@ def test_filesystem_virtual_filesystem_symlink(vfs_path, link_path):
     assert isinstance(link_entry, VirtualSymlink)
     assert link_entry.path == link_path
     assert link_entry.target == vfs_path
+
+
+def test_filesystem_root_filesystem_get():
+    vfs1 = VirtualFilesystem()
+
+    vfs1_entry = VirtualFile(vfs1, "vfs1_entry", Mock())
+    vfs1.map_file_entry("/vfs1_entry", vfs1_entry)
+
+    vfs1.symlink("/vfs1/vfs2/", "/link_to_vfs2")
+    vfs1_link = vfs1.get("/link_to_vfs2")
+
+    vfs2 = VirtualFilesystem()
+
+    vfs2_entry = VirtualFile(vfs2, "vfs2_entry", Mock())
+    vfs2.map_file_entry("/vfs2_entry", vfs2_entry)
+
+    vfs2_shared_entry = VirtualFile(vfs2, "shared_entry", Mock())
+    vfs2.map_file_entry("/shared_entry", vfs2_shared_entry)
+
+    target = Mock()
+    rootfs = RootFilesystem(target)
+    rootfs.mount("/vfs1", vfs1)
+    rootfs.mount("/vfs1/vfs2", vfs2)
+
+    entry_path = "/vfs1/vfs1_entry"
+    rootfs_entry = rootfs.get(entry_path)
+    assert rootfs_entry.path == entry_path
+    assert len(rootfs_entry.entries) == 1
+    assert vfs1_entry in rootfs_entry.entries
+
+    entry_path = "/vfs1/vfs2/vfs2_entry"
+    rootfs_entry = rootfs.get(entry_path)
+    assert rootfs_entry.path == entry_path
+    assert len(rootfs_entry.entries) == 1
+    assert vfs2_entry in rootfs_entry.entries
+
+    entry_path = "/vfs1"
+    rootfs_entry = rootfs.get(entry_path)
+    assert rootfs_entry.path == entry_path
+    assert len(rootfs_entry.entries) == 2
+    assert isinstance(rootfs_entry.entries[0], VirtualDirectory)
+    assert isinstance(rootfs_entry.entries[1], VirtualDirectory)
+
+    entry_path = "/vfs1/link_to_vfs2"
+    rootfs_entry = rootfs.get(entry_path)
+    assert rootfs_entry.path == entry_path
+    assert len(rootfs_entry.entries) == 1
+    assert vfs1_link in rootfs_entry.entries
+
+    entry_path = "/vfs1/link_to_vfs2/vfs2_entry"
+    rootfs_entry = rootfs.get(entry_path)
+    assert rootfs_entry.path == entry_path
+    assert len(rootfs_entry.entries) == 1
+    nested_rootfs_entry = rootfs_entry.entries[0]
+    assert isinstance(nested_rootfs_entry, RootFilesystemEntry)
+    assert len(nested_rootfs_entry.entries) == 1
+    assert vfs2_entry in nested_rootfs_entry.entries
