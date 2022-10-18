@@ -5,16 +5,80 @@ from defusedxml import ElementTree
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.fsutil import Path
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-re_camel_to_snake = r"(?<!^)(?<![A-Z])(?=[A-Z])|(\.(?=[a-zA-Z]))"
+re_camel_to_snake = r"(?<!^)(?<![A-Z])(?=[A-Z])|([\.](?=[a-zA-Z]))"
+
+
+def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
+    """Parse data from a .wer file."""
+    record_values = {}
+    record_fields = []
+    key = None
+    for line in wer_file.read_text("utf-16").splitlines():
+        if match := re.match(re.compile(r"(.+)=(.+)"), line.rstrip()):
+            record_type = "string"
+            name, value = match.group(1), match.group(2)
+
+            # dynamic entry with key and value on separate lines
+            if "].Name" in name and not key:
+                key = value
+                # set key and continue to get value on the next line
+                continue
+
+            # dynamic entry with key and value on the same line
+            elif "]." in name and not key:
+                category, name = name.split(".", 1)
+                key = f"{category.split('[')[0]}{name}".replace(".", "")
+
+            if "EventTime" in name:
+                value = wintimestamp(int(value))
+                record_type = "datetime"
+                key = "ts"
+
+            key = re.sub(re_camel_to_snake, "_", key if key else name).lower().replace(" ", "")
+
+            record_values[key] = value
+            record_fields.append((record_type, key))
+            # reset key necessary for dynamic entries and ts
+            key = None
+
+    return record_fields, record_values
+
+
+def _collect_wer_metadata(metadata_xml_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
+    """Parse data from a metadata .xml file linked to a .wer file."""
+    record_fields = []
+    record_values = {}
+    file = metadata_xml_file.read_text("utf-16")
+
+    tree = ElementTree.fromstring(file)
+    for metadata in tree.iter("WERReportMetadata"):
+        for category in metadata:
+            for value in category:
+                if record_value := value.text.strip("\t\n"):
+                    key = re.sub(re_camel_to_snake, "_", f"{category.tag}{value.tag}").lower()
+                    record_fields.append(("string", key))
+                    record_values[key] = record_value
+
+    return record_fields, record_values
+
+
+def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
+    record_fields.extend(
+        [
+            ("path", "wer_file_path"),
+            ("path", "metadata_file_path"),
+        ]
+    )
+    return TargetRecordDescriptor(record_name, record_fields)
 
 
 class WindowsErrorReportingPlugin(Plugin):
-    """Plugin for parsing Windows Error Reporting files"""
+    """Plugin for parsing Windows Error Reporting files."""
 
     WER_LOG_DIRS = [
         "sysvol/ProgramData/Microsoft/Windows/WER/ReportArchive",
@@ -36,70 +100,6 @@ class WindowsErrorReportingPlugin(Plugin):
         if self.wer_files:
             return
         raise UnsupportedPluginError("No Windows Error Reporting directories found.")
-
-    @staticmethod
-    def _collect_wer_data(wer_file: TargetPath) -> tuple[list[tuple[str, str]], dict[str, str]]:
-        """Parse data from a .wer file"""
-        record_values = {}
-        record_fields = []
-        key = None
-        for line in wer_file.open().read().decode("utf-16").split("\n"):
-            if match := re.match(re.compile(r"(.+)=(.+)"), line.rstrip()):
-                record_type = "string"
-                name, value = match.group(1), match.group(2)
-
-                # dynamic entry with key and value on separate lines
-                if "].Name" in name and not key:
-                    key = value.replace(" ", "_").lower()
-                    # set key and continue to get value on the next line
-                    continue
-
-                # dynamic entry with key and value on the same line
-                elif "]." in name and not key:
-                    category, name = name.split(".", 1)
-                    key = f"{category.split('[')[0]}{name}".replace(".", "")
-
-                if "EventTime" in name:
-                    value = wintimestamp(int(value))
-                    record_type = "datetime"
-                    key = "ts"
-
-                key = re.sub(re_camel_to_snake, "_", key if key else name).lower()
-
-                record_values[key] = value
-                record_fields.append((record_type, key))
-                # reset key necessary for dynamic entries and ts
-                key = None
-
-        return record_fields, record_values
-
-    @staticmethod
-    def _collect_wer_metadata(metadata_xml_file: TargetPath) -> tuple[list[tuple[str, str]], dict[str, str]]:
-        """Parse data from a metadata .xml file linked to a .wer file"""
-        record_fields = []
-        record_values = {}
-        file = metadata_xml_file.open().read().decode("utf-16")
-
-        tree = ElementTree.fromstring(file)
-        for metadata in tree.iter("WERReportMetadata"):
-            for category in metadata:
-                for value in category:
-                    if record_value := value.text.strip("\t\n"):
-                        key = re.sub(re_camel_to_snake, "_", f"{category.tag}{value.tag}").lower()
-                        record_fields.append(("string", key))
-                        record_values[key] = record_value
-
-        return record_fields, record_values
-
-    @staticmethod
-    def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
-        record_fields.extend(
-            [
-                ("path", "wer_file_path"),
-                ("path", "metadata_file_path"),
-            ]
-        )
-        return TargetRecordDescriptor(record_name, record_fields)
 
     @export(record=DynamicDescriptor(["path", "string", "datetime"]))
     def wer(self) -> Iterator[DynamicDescriptor]:
@@ -142,14 +142,14 @@ class WindowsErrorReportingPlugin(Plugin):
             for file in files:
                 if file.suffix == ".wer":
                     wer_values["wer_file_path"] = file
-                    wer_report_fields, wer_report_values = self._collect_wer_data(file)
+                    wer_report_fields, wer_report_values = _collect_wer_data(file)
                     wer_fields.extend(wer_report_fields)
                     wer_values = wer_report_values | wer_values
                 elif ".WERInternalMetadata" in file.suffixes:
                     wer_values["metadata_file_path"] = file
-                    metadata_fields, metadata_values = self._collect_wer_metadata(file)
+                    metadata_fields, metadata_values = _collect_wer_metadata(file)
                     wer_fields.extend(metadata_fields)
                     wer_values = metadata_values | wer_values
 
-            record = self._create_record_descriptor("filesystem/windows/WER/report", wer_fields)
+            record = _create_record_descriptor("filesystem/windows/wer/report", wer_fields)
             yield record(**wer_values)
