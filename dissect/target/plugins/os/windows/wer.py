@@ -10,7 +10,9 @@ from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescrip
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-re_camel_to_snake = r"(?<!^)(?<![A-Z])(?=[A-Z])|([\.](?=[a-zA-Z]))"
+camel_case_pattern = re.compile(r"(\S)([A-Z][a-z]+)")
+camel_case_pattern_2 = re.compile(r"([a-z0-9])([A-Z])")
+camel_case_pattern_3 = re.compile(r"(\w)[.\s](\w)")
 
 
 def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
@@ -32,14 +34,14 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
             # dynamic entry with key and value on the same line
             elif "]." in name and not key:
                 category, name = name.split(".", 1)
-                key = f"{category.split('[')[0]}{name}".replace(".", "")
+                key = f"{category.split('[')[0]}{name}"
 
             if "EventTime" in name:
                 value = wintimestamp(int(value))
                 record_type = "datetime"
                 key = "ts"
 
-            key = re.sub(re_camel_to_snake, "_", key if key else name).lower().replace(" ", "")
+            key = _key_to_snake_case(key if key else name)
 
             record_values[key] = value
             record_fields.append((record_type, key))
@@ -60,7 +62,7 @@ def _collect_wer_metadata(metadata_xml_file: Path) -> tuple[list[tuple[str, str]
         for category in metadata:
             for value in category:
                 if record_value := value.text.strip("\t\n"):
-                    key = re.sub(re_camel_to_snake, "_", f"{category.tag}{value.tag}").lower()
+                    key = _key_to_snake_case(f"{category.tag}{value.tag}")
                     record_fields.append(("string", key))
                     record_values[key] = record_value
 
@@ -75,6 +77,12 @@ def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, s
         ]
     )
     return TargetRecordDescriptor(record_name, record_fields)
+
+
+def _key_to_snake_case(key: str) -> str:
+    res = camel_case_pattern.sub(r"\1_\2", key)
+    res = camel_case_pattern_2.sub(r"\1_\2", res)
+    return camel_case_pattern_3.sub(r"\1_\2", res).lower()
 
 
 class WindowsErrorReportingPlugin(Plugin):
