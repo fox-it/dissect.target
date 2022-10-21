@@ -66,7 +66,6 @@ class RemoteStreamConnection:
         self._context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
         self._context.verify_mode = ssl.CERT_REQUIRED
         self._context.load_default_certs()
-
         self._max_reconnects = self.MAX_RECONNECTS
         self._max_shortreads = self.MAX_SHORT_READS
         self._reconnect_wait = self.RECONNECT_WAIT
@@ -75,11 +74,14 @@ class RemoteStreamConnection:
         if options := kwargs.get("options"):
             client_key = options.get("key")
             client_crt = options.get("crt")
+            server_ca = options.get("ca")
             noverify = options.get("noverify")
             if client_key and client_crt:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
             if noverify:
                 self._context.verify_mode = ssl.CERT_NONE
+            if server_ca:
+                self._context.load_verify_locations(server_ca)
             self._max_reconnects = options.get("reconnects", max(0, self._max_reconnects))
             self._max_shortreads = options.get("shortreads", max(0, self._max_shortreads))
             self._reconnect_wait = options.get("reconnectwait", max(0, self._reconnect_wait))

@@ -9,7 +9,7 @@ from dissect.target.loaders.remote import RemoteStreamConnection, RemoteStream
 @patch.object(ssl, "SSLContext", autospec=True)
 @patch.object(socket, "socket", autospec=True)
 def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicMock) -> None:
-    rsc = RemoteStreamConnection("remote://127.0.0.1", 9001)
+    rsc = RemoteStreamConnection("remote://127.0.0.1", 9001, options={"ca": "A", "key": "B", "crt": "C"})
     assert rsc.is_connected() is False
     rsc.connect()
     rsc._ssl_sock.recv = MagicMock(return_value=b"ABC")
@@ -22,6 +22,8 @@ def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicM
     expected = [
         call(ssl.PROTOCOL_TLSv1_2),
         call().load_default_certs(),
+        call().load_cert_chain(certfile="C", keyfile="B"),
+        call().load_verify_locations("A"),
         call().wrap_socket(rsc._socket, server_hostname="remote://127.0.0.1"),
         call().wrap_socket().connect(("remote://127.0.0.1", 9001)),
         call().wrap_socket().send(b"2\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02"),
