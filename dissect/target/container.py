@@ -57,8 +57,13 @@ class Container(io.IOBase):
         i = item[0] if isinstance(item, list) else item
         if hasattr(i, "read"):
             return cls.detect_fh(i, item)
-        else:
-            return cls.detect_path(i, item)
+        elif cls.detect_path(i, item):
+            return True
+        elif i.exists():
+            with i.open("rb") as fh:
+                return cls.detect_fh(fh, item)
+
+        return False
 
     @staticmethod
     def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
@@ -169,15 +174,35 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     elif isinstance(item, str):
         item = Path(item)
 
-    for container in CONTAINERS + [RawContainer]:
-        try:
-            if container.detect(item):
-                return container(item, *args, **kwargs)
-        except ImportError as e:
-            log.warning("Failed to import %s", container)
-            log.debug("", exc_info=e)
-        except Exception as e:
-            raise ContainerError(f"Failed to open container {item}", cause=e)
+    first = item[0] if isinstance(item, list) else item
+    first_fh = None
+    first_fh_opened = False
+    first_path = None
+
+    if hasattr(first, "read"):
+        first_fh = first
+    else:
+        first_path = first
+        if first_path.exists():
+            first_fh = first.open("rb")
+            first_fh_opened = True
+
+    try:
+        for container in CONTAINERS + [RawContainer]:
+            try:
+                # Path must be leading for things like SplitContainer, but fall back to fh if we have one
+                if (first_path and container.detect_path(first_path, item)) or (
+                    first_fh and container.detect_fh(first_fh, item)
+                ):
+                    return container(item, *args, **kwargs)
+            except ImportError as e:
+                log.warning("Failed to import %s", container)
+                log.debug("", exc_info=e)
+            except Exception as e:
+                raise ContainerError(f"Failed to open container {item}", cause=e)
+    finally:
+        if first_fh_opened:
+            first_fh.close()
 
     raise ContainerError(f"Failed to detect container for {item}")
 
