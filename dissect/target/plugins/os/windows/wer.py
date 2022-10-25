@@ -10,9 +10,7 @@ from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescrip
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-camel_case_pattern = re.compile(r"(\S)([A-Z][a-z]+)")
-camel_case_pattern_2 = re.compile(r"([a-z0-9])([A-Z])")
-camel_case_pattern_3 = re.compile(r"(\w)[.\s](\w)")
+camel_case_patterns = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"(\w)[.\s](\w)")]
 
 
 def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
@@ -21,9 +19,9 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
     record_fields = []
     key = None
     for line in wer_file.read_text("utf-16").splitlines():
-        if match := re.match(re.compile(r"(.+)=(.+)"), line.rstrip()):
+        if len(line_split := line.rstrip().split("=", 1)) == 2:
+            name, value = line_split
             record_type = "string"
-            name, value = match.group(1), match.group(2)
 
             # dynamic entry with key and value on separate lines
             if "].Name" in name and not key:
@@ -44,7 +42,7 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
             key = _key_to_snake_case(key if key else name)
 
             record_values[key] = value
-            record_fields.append((record_type, key))
+            record_fields.append((record_type, key)) if key != "ts" else record_fields.insert(0, (record_type, key))
             # reset key necessary for dynamic entries and ts
             key = None
 
@@ -80,9 +78,9 @@ def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, s
 
 
 def _key_to_snake_case(key: str) -> str:
-    res = camel_case_pattern.sub(r"\1_\2", key)
-    res = camel_case_pattern_2.sub(r"\1_\2", res)
-    return camel_case_pattern_3.sub(r"\1_\2", res).lower()
+    for pattern in camel_case_patterns:
+        key = pattern.sub(r"\1_\2", key)
+    return key.lower()
 
 
 class WindowsErrorReportingPlugin(Plugin):
@@ -125,39 +123,41 @@ class WindowsErrorReportingPlugin(Plugin):
 
         Yields dynamically created records based on the fields in the files. A record at least contains the following
         fields:
-            wer_file_path (path): File path to the WER report on the target.
+            ts (datetime): The moment in time when the error event took place.
             version (string): WER file version.
             event_type (string): WER file event type.
-            event_time (datetime): The moment in time when the error event took place.
             consent (string): WER file consent to be sent to Microsoft.
-            report_identifier: WER file report identifier
-            app_session_guid: GUID for the app session causing/reporting the error.
-            target_app_id: WER file target app ID which may contain the application hash.
-            target_app_ver: WER file target app version.
-            boot_id: WER file boot ID.
-            response_type: WER file response type.
-            friendly_event_name: Human readable event name.
-            app_name: WER file application name.
-            app_path: Path to application that caused/reported the error.
-            report_description: WER file report description.
-            application_identity: WER file application identity.
-            metadata_hash: WER file metadata hash.
+            report_identifier (string): WER file report identifier
+            app_session_guid (string): GUID for the app session causing/reporting the error.
+            target_app_id (string): WER file target app ID which may contain the application hash.
+            target_app_ver (string): WER file target app version.
+            boot_id (string): WER file boot ID.
+            response_type (string): WER file response type.
+            friendly_event_name (string): Human readable event name.
+            app_name (string): WER file application name.
+            app_path (string): Path to application that caused/reported the error.
+            report_description (string): WER file report description.
+            application_identity (string): WER file application identity.
+            metadata_hash (string): WER file metadata hash.
+            wer_file_path (path): File path to the WER report on the target.
+            metadata_file_path (path): File path to the metadata XML file on the target (if present).
         """
         for files in self.wer_files:
-            wer_fields = []
-            wer_values = {"_target": self.target}
+            record_fields = []
+            record_values = {"_target": self.target}
 
             for file in files:
                 if file.suffix == ".wer":
-                    wer_values["wer_file_path"] = file
+                    record_values["wer_file_path"] = file
                     wer_report_fields, wer_report_values = _collect_wer_data(file)
-                    wer_fields.extend(wer_report_fields)
-                    wer_values = wer_report_values | wer_values
+                    # make sure wer_report_fields are the first entries in the list
+                    record_fields = wer_report_fields + record_fields
+                    record_values = record_values | wer_report_values
                 elif ".WERInternalMetadata" in file.suffixes:
-                    wer_values["metadata_file_path"] = file
+                    record_values["metadata_file_path"] = file
                     metadata_fields, metadata_values = _collect_wer_metadata(file)
-                    wer_fields.extend(metadata_fields)
-                    wer_values = metadata_values | wer_values
+                    record_fields.extend(metadata_fields)
+                    record_values = metadata_values | record_values
 
-            record = _create_record_descriptor("filesystem/windows/wer/report", wer_fields)
-            yield record(**wer_values)
+            record = _create_record_descriptor("filesystem/windows/wer/report", record_fields)
+            yield record(**record_values)
