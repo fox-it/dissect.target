@@ -1,0 +1,33 @@
+on:
+  repository_dispatch:
+    types: [on-demand-test]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.9"
+            python-include: "python3.9"
+            tox-env: "py39"
+          - python-version: "pypy3.9"
+            python-include: "pypy3.9"
+            tox-env: "pypy39"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+      - run: git lfs pull
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: "setup.py"
+      - run: pip install tox
+      - run: sed -i 's/\[tool.setuptools_scm\]/\[tool.setuptools_scm\]\nlocal_scheme = "no-local-version"/' pyproject.toml
+      - env:
+          C_INCLUDE_PATH: ${{ env.pythonLocation }}/include/${{ matrix.python-include }}
+        run: tox -e ${{ matrix.tox-env }}
