@@ -114,11 +114,14 @@ class ESXiPlugin(LinuxPlugin):
 
     @export(property=True)
     def hostname(self) -> str:
-        return self._cfg("/adv/Misc/HostName").split(".", 1)[0]
+        if hostname := self._cfg("/adv/Misc/HostName"):
+            return hostname.split(".", 1)[0]
+        return "localhost"
 
     @export(property=True)
     def domain(self) -> Optional[str]:
-        return self._cfg("/adv/Misc/HostName").partition(".")[2] or None
+        if hostname := self._cfg("/adv/Misc/HostName"):
+            return hostname.partition(".")[2]
 
     @export(property=True)
     def ips(self) -> list[str]:
