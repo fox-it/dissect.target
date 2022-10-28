@@ -27,8 +27,8 @@ IndexRecord = TargetRecordDescriptor(
         ("uri", "path"),
     ],
 )
-ThumbcacheRecord = TargetRecordDescriptor("thumbcache/thumbcache", GENERIC_THUMBCACHE_FIELDS)
-IconcacheRecord = TargetRecordDescriptor("thumbcache/iconcache", GENERIC_THUMBCACHE_FIELDS)
+ThumbcacheRecord = TargetRecordDescriptor("windows/thumbcache/thumbcache", GENERIC_THUMBCACHE_FIELDS)
+IconcacheRecord = TargetRecordDescriptor("windows/thumbcache/iconcache", GENERIC_THUMBCACHE_FIELDS)
 
 
 class ThumbcachePlugin(Plugin):
