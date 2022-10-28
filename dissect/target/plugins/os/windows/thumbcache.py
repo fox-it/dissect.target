@@ -46,7 +46,7 @@ class ThumbcachePlugin(Plugin):
                 return None
         raise UnsupportedPluginError("There was no cache path for that plugin")
 
-    def plugin(self, record_type: TargetRecordDescriptor, prefix: str):
+    def _parse_thumbcache(self, record_type: TargetRecordDescriptor, prefix: str):
         for cache_path in self.get_cache_paths():
             try:
                 cache = Thumbcache(cache_path, prefix=prefix)
