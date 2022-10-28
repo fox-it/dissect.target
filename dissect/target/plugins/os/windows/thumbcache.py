@@ -1,5 +1,6 @@
 from typing import Iterator
 
+from dissect.thumbcache.exceptions import Error
 from dissect.thumbcache.thumbcache import Thumbcache
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -68,8 +69,12 @@ class ThumbcachePlugin(Plugin):
                         last_modified=index_entry.last_modified,
                         path=str(cache.index_file),
                     )
-            except Exception as e:
+            except Error as e:
+                # A specific thumbcache exception occurred, log the error.
                 self.target.log.error(e)
+            except Exception as e:
+                # A different exception occurred, log the exception.
+                self.target.log.critical(e, exc_info=True)
                 pass
 
     @export(record=ThumbcacheRecord)
