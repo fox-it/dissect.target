@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, Union
 
 from dissect.thumbcache.exceptions import Error
 from dissect.thumbcache.thumbcache import Thumbcache
@@ -46,7 +46,9 @@ class ThumbcachePlugin(Plugin):
                 return None
         raise UnsupportedPluginError("There was no cache path for that plugin")
 
-    def _parse_thumbcache(self, record_type: TargetRecordDescriptor, prefix: str):
+    def _parse_thumbcache(
+        self, record_type: TargetRecordDescriptor, prefix: str
+    ) -> Iterator[Union[ThumbcacheRecord, IconcacheRecord, IndexRecord]]:
         for cache_path in self.get_cache_paths():
             try:
                 cache = Thumbcache(cache_path, prefix=prefix)
@@ -78,9 +80,9 @@ class ThumbcachePlugin(Plugin):
                 pass
 
     @export(record=ThumbcacheRecord)
-    def thumbcache(self):
-        yield from self.plugin(ThumbcacheRecord, "thumbcache")
+    def thumbcache(self) -> Iterator[ThumbcacheRecord]:
+        yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache")
 
     @export(record=IconcacheRecord)
-    def iconcache(self):
-        yield from self.plugin(IconcacheRecord, "iconcache")
+    def iconcache(self) -> Iterator[IconcacheRecord]:
+        yield from self._parse_thumbcache(IconcacheRecord, "iconcache")
