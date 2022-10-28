@@ -18,7 +18,7 @@ GENERIC_THUMBCACHE_FIELDS = [
     ("uri", "path"),
 ]
 IndexRecord = TargetRecordDescriptor(
-    "thumbcache/index",
+    "windows/thumbcache/index",
     [
         ("string", "identifier"),
         ("boolean", "in_use"),
