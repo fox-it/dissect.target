@@ -17,6 +17,7 @@ class FirefoxPlugin(Plugin):
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
         ".mozilla/firefox",
+        "snap/firefox/common/.mozilla",
     ]
 
     def __init__(self, target):
