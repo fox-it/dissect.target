@@ -18,7 +18,7 @@ class VboxLoader(Loader):
         return path.suffix.lower() == ".vbox"
 
     def map(self, target):
-        for disk, _ in self.vbox.snapshots():
+        for disk in self.vbox.disks():
             parent = self.open(disk)
             target.disks.add(VdiContainer(parent))
 
