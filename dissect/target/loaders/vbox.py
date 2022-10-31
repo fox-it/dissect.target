@@ -1,4 +1,4 @@
-from dissect.hypervisor import vdi
+from dissect.hypervisor.descriptor.vbox import VBox
 
 from dissect.target import container
 from dissect.target.loader import Loader
@@ -10,7 +10,7 @@ class VboxLoader(Loader):
 
         super().__init__(path)
         with path.open("r") as fh:
-            self.vbox = vdi.Vbox(fh)
+            self.vbox = VBox(fh)
         self.base_dir = path.parent
 
     @staticmethod
