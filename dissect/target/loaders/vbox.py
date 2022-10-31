@@ -1,6 +1,6 @@
 from dissect.hypervisor import vdi
 
-from dissect.target.containers.vdi import VdiContainer
+from dissect.target import container
 from dissect.target.loader import Loader
 
 
@@ -20,7 +20,7 @@ class VboxLoader(Loader):
     def map(self, target):
         for disk in self.vbox.disks():
             parent = self.open(disk)
-            target.disks.add(VdiContainer(parent))
+            target.disks.add(container.open(parent))
 
     def open(self, path):
         return self.base_dir.joinpath(path).open("rb")

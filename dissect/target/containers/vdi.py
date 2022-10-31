@@ -22,8 +22,7 @@ class VdiContainer(Container):
     def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         magic = fh.read(68)
         fh.seek(-68, io.SEEK_CUR)
-
-        return magic[-4:] == 0xBEDA107F
+        return magic[-4:] == b"\x7f\x10\xda\xbe"
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
