@@ -1,88 +1,103 @@
 import errno
 import logging
-from stat import S_IFDIR, S_IFREG
 from functools import lru_cache
+from typing import BinaryIO, Optional
 
 from fuse import FuseOSError, Operations
 
-from dissect.target import filesystem
+from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 log = logging.getLogger(__name__)
 
 
 class DissectMount(Operations):
-    def __init__(self, fs):
+    def __init__(self, fs: Filesystem):
         self.fs = fs
+        self.file_handles: dict[int, BinaryIO] = {}
+        self.dir_handles: dict[int, FilesystemEntry] = {}
 
-    def _get(self, path):
+    @lru_cache(1024 * 1024)
+    def _get(self, path: str) -> FilesystemEntry:
         try:
             return self.fs.get(path)
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    @lru_cache(4096)
-    def getattr(self, path, fh=None):
-        log.debug("fuse::getattr(%s, %s)", path, fh)
-
+    @lru_cache(1024 * 1024)
+    def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
         try:
             st = fe.stat()
-            ret = dict(
+            return dict(
                 (key, getattr(st, key))
                 for key in ("st_atime", "st_ctime", "st_gid", "st_mode", "st_mtime", "st_nlink", "st_size", "st_uid")
             )
-        except NotImplementedError:
-            ret = {
-                "st_atime": 0,
-                "st_ctime": 0,
-                "st_gid": 0,
-                "st_mode": ((S_IFDIR if fe.is_dir() else S_IFREG) | 0o755),
-                "st_mtime": 0,
-                "st_nlink": 0,
-                "st_size": fe.entry.size if fe.is_file() and isinstance(fe, filesystem.VirtualFile) else 0,
-                "st_uid": 0,
-            }
         except Exception:
-            log.exception("Exception in fuse::getattr")
             raise FuseOSError(errno.EIO)
-
-        return ret
 
     getxattr = None
 
     listxattr = None
 
-    def read(self, path, size, offset, fh):
-        log.debug("fuse::read(%s, %d, %d, %s)" % (path, size, offset, fh))
-        fe = self._get(path)
+    def open(self, path: str, flags: int) -> int:
+        entry = self._get(path)
 
         try:
-            fh = fe.open()
-            fh.seek(offset)
-            return fh.read(size)
+            fh = entry.open()
+        except Exception:
+            raise FuseOSError(errno.ENOENT)
+
+        fno = id(fh)
+        self.file_handles[fno] = fh
+        return fno
+
+    def opendir(self, path: str) -> int:
+        entry = self._get(path)
+
+        fno = id(entry)
+        self.dir_handles[fno] = entry
+        return fno
+
+    def read(self, path: str, size: int, offset: int, fh: int):
+        if fh not in self.file_handles:
+            raise FuseOSError(errno.EBADFD)
+
+        fobj = self.file_handles[fh]
+
+        try:
+            fobj.seek(offset)
+            return fobj.read(size)
         except Exception:
             log.exception("Exception in fuse::read")
             raise FuseOSError(errno.EIO)
 
-    def readdir(self, path, fh):  # noqa
-        log.debug("fuse::readdir(%s)", path)
-        fe = self._get(path)
+    def readdir(self, path: str, fh: int):
+        if fh not in self.dir_handles:
+            raise FuseOSError(errno.EBADFD)
+
+        fobj = self.dir_handles[fh]
 
         try:
-            dirs = [".", ".."] + [str(x) for x in fe.listdir()]
+            yield "."
+            yield ".."
 
-            for d in dirs:
-                yield d
+            for entry in fobj.iterdir():
+                yield entry
         except Exception:
             log.exception("Exception in fuse::readdir")
             raise FuseOSError(errno.EIO)
 
-    def readlink(self, path):
-        log.debug("fuse::readlink(%s)", path)
+    def readlink(self, path: str) -> str:
         fe = self._get(path)
 
         try:
             return fe.readlink()
         except Exception:
             raise FuseOSError(errno.EIO)
+
+    def release(self, path: str, fh: int) -> int:
+        del self.file_handles[fh]
+
+    def releasedir(self, path: str, fh: int) -> int:
+        del self.dir_handles[fh]
