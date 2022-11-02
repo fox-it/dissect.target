@@ -51,7 +51,7 @@ log = logging.getLogger(__name__)
 class OperatingSystem(enum.Enum):
     LINUX = "linux"
     WINDOWS = "windows"
-    ESXI = "exsi"
+    ESXI = "esxi"
     BSD = "bsd"
     OSX = "osx"
     UNIX = "unix"
