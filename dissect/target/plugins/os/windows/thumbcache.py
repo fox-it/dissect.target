@@ -1,12 +1,14 @@
-from typing import Iterator, Union
+from pathlib import Path
+from typing import Iterator, Optional, Union
 
 from dissect.thumbcache.exceptions import Error
 from dissect.thumbcache.thumbcache import Thumbcache
+from dissect.thumbcache.tools.extract_with_index import dump_entry_data_through_index
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 
 GENERIC_THUMBCACHE_FIELDS = [
     ("string", "identifier"),
@@ -45,31 +47,41 @@ class ThumbcachePlugin(Plugin):
             if len(list(cache_path.glob("*_idx.db"))) == 0:
                 raise UnsupportedPluginError("There was no cache path for that plugin")
 
+    def _create_entries(self, cache: Thumbcache, record_type: TargetRecordDescriptor):
+        for path, entry in cache.entries():
+            yield record_type(
+                identifier=entry.identifier,
+                hash=entry.hash,
+                extension=entry.extension,
+                header_checksum=entry.header_checksum,
+                data_checksum=entry.data_checksum,
+                path=str(path),
+                data_size=len(entry.data),
+            )
+        for index_entry in cache.index_entries():
+            yield IndexRecord(
+                identifier=index_entry.identifier.hex(),
+                in_use=index_entry.in_use(),
+                flags=index_entry.flags,
+                last_modified=index_entry.last_modified,
+                path=str(cache.index_file),
+            )
+
     def _parse_thumbcache(
-        self, record_type: TargetRecordDescriptor, prefix: str
+        self,
+        record_type: TargetRecordDescriptor,
+        prefix: str,
+        output_dir: Optional[Path],
     ) -> Iterator[Union[ThumbcacheRecord, IconcacheRecord, IndexRecord]]:
         for cache_path in self.get_cache_paths():
             try:
-                cache = Thumbcache(cache_path, prefix=prefix)
 
-                for path, entry in cache.entries():
-                    yield record_type(
-                        identifier=entry.identifier,
-                        hash=entry.hash,
-                        extension=entry.extension,
-                        header_checksum=entry.header_checksum,
-                        data_checksum=entry.data_checksum,
-                        path=str(path),
-                        data_size=len(entry.data),
-                    )
-                for index_entry in cache.index_entries():
-                    yield IndexRecord(
-                        identifier=index_entry.identifier.hex(),
-                        in_use=index_entry.in_use(),
-                        flags=index_entry.flags,
-                        last_modified=index_entry.last_modified,
-                        path=str(cache.index_file),
-                    )
+                if output_dir:
+                    dump_entry_data_through_index(cache_path, output_dir, prefix)
+                else:
+                    cache = Thumbcache(cache_path, prefix=prefix)
+                    yield from self._create_entries(cache, record_type)
+
             except Error as e:
                 # A specific thumbcache exception occurred, log the error.
                 self.target.log.error(e)
@@ -78,10 +90,12 @@ class ThumbcachePlugin(Plugin):
                 self.target.log.critical(e, exc_info=True)
                 pass
 
+    @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract thumbcache thumbnails to.")
     @export(record=ThumbcacheRecord)
-    def thumbcache(self) -> Iterator[ThumbcacheRecord]:
-        yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache")
+    def thumbcache(self, output_dir: Optional[Path] = None) -> Iterator[ThumbcacheRecord]:
+        yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache", output_dir)
 
+    @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract iconcache thumbnails to.")
     @export(record=IconcacheRecord)
-    def iconcache(self) -> Iterator[IconcacheRecord]:
-        yield from self._parse_thumbcache(IconcacheRecord, "iconcache")
+    def iconcache(self, output_dir: Optional[Path] = None) -> Iterator[IconcacheRecord]:
+        yield from self._parse_thumbcache(IconcacheRecord, "iconcache", output_dir)
