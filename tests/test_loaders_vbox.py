@@ -1,6 +1,6 @@
 from unittest.mock import call, patch
 
-from dissect.target.loaders.vbox import VboxLoader
+from dissect.target.loaders.vbox import VBoxLoader
 
 
 @patch("pathlib.Path")
@@ -8,7 +8,7 @@ from dissect.target.loaders.vbox import VboxLoader
 def test_vbox_loader(VBox, Path, mock_target) -> None:
     VBox.return_value = VBox
     VBox.disks.return_value = [Path("/mock.vdi")]
-    vbox_loader = VboxLoader(Path("/mock.vbox"))
+    vbox_loader = VBoxLoader(Path("/mock.vbox"))
     vbox_loader.map(mock_target)
     expected = [call.disks()]
     del VBox.mock_calls[0]

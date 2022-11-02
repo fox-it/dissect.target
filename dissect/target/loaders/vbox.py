@@ -4,7 +4,7 @@ from dissect.target import container
 from dissect.target.loader import Loader
 
 
-class VboxLoader(Loader):
+class VBoxLoader(Loader):
     def __init__(self, path, **kwargs):
         path = path.resolve()
 
