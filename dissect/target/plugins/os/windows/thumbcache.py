@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Iterator, Optional, Union
 
-from dissect.thumbcache.exceptions import Error
-from dissect.thumbcache.thumbcache import Thumbcache
+from dissect.thumbcache import Error, Thumbcache
 from dissect.thumbcache.tools.extract_with_index import dump_entry_data_through_index
 
 from dissect.target.exceptions import UnsupportedPluginError
