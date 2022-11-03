@@ -54,7 +54,7 @@ def main():
         vfs.map_file_fh(fname, v)
 
     # This is kinda silly because fusepy will convert this back into string arguments
-    options = _parse_options(args.options)
+    options = _parse_options(args.options) if args.options else {}
 
     options["allow_other"] = True
     options["ro"] = True
