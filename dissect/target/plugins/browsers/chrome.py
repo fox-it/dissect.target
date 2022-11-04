@@ -18,6 +18,7 @@ class ChromePlugin(Plugin):
         "Local Settings/Application Data/Google/Chrome/User Data/Default",
         "AppData/local/Google/Chromium/User Data/Default",
         ".config/google-chrome/Default",
+        "snap/chromium/common/chromium/Default",
     ]
 
     def __init__(self, target):
