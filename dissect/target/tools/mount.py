@@ -1,5 +1,6 @@
 import argparse
 import logging
+from typing import Union
 
 from dissect.target import Target, filesystem
 from dissect.target.tools.utils import (
@@ -17,6 +18,8 @@ except ImportError:
     HAS_FUSE = False
 
 log = logging.getLogger(__name__)
+logging.lastResort = None
+logging.raiseExceptions = False
 
 
 def main():
@@ -28,11 +31,13 @@ def main():
     )
     parser.add_argument("target", metavar="TARGET", help="target to load")
     parser.add_argument("mount", metavar="MOUNT", help="path to mount to")
+    parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
-    args = parser.parse_args()
 
     if not HAS_FUSE:
         parser.exit("fusepy is not installed: pip install fusepy")
+
+    args = parser.parse_args()
 
     process_generic_arguments(args)
 
@@ -48,8 +53,32 @@ def main():
         fname = f"volumes/{v.name}"
         vfs.map_file_fh(fname, v)
 
-    log.info("Mounting to %s", args.mount)
-    FUSE(DissectMount(vfs), args.mount, foreground=True, allow_other=True, nothreads=True, ro=True)
+    # This is kinda silly because fusepy will convert this back into string arguments
+    options = _parse_options(args.options) if args.options else {}
+
+    options["allow_other"] = True
+    options["ro"] = True
+
+    print(f"Mounting to {args.mount} with options: {_format_options(options)}")
+    try:
+        FUSE(DissectMount(vfs), args.mount, **options)
+    except RuntimeError:
+        parser.exit("FUSE error")
+
+
+def _parse_options(options: str) -> dict[str, Union[str, bool]]:
+    result = {}
+    for opt in options.split(","):
+        if "=" in opt:
+            key, _, value = opt.partition("=")
+            result[key] = value
+        else:
+            result[opt] = True
+    return result
+
+
+def _format_options(options: dict[str, Union[str, bool]]) -> str:
+    return ",".join([key if value is True else f"{key}={value}" for key, value in options.items()])
 
 
 if __name__ == "__main__":
