@@ -9,6 +9,8 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 log = logging.getLogger(__name__)
 
+CACHE_SIZE = 1024 * 1024
+
 
 class DissectMount(Operations):
     def __init__(self, fs: Filesystem):
@@ -16,14 +18,14 @@ class DissectMount(Operations):
         self.file_handles: dict[int, BinaryIO] = {}
         self.dir_handles: dict[int, FilesystemEntry] = {}
 
-    @lru_cache(1024 * 1024)
+    @lru_cache(CACHE_SIZE)
     def _get(self, path: str) -> FilesystemEntry:
         try:
             return self.fs.get(path)
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    @lru_cache(1024 * 1024)
+    @lru_cache(CACHE_SIZE)
     def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
