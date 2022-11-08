@@ -57,6 +57,16 @@ class RemoteStreamConnection:
     COMMAND_QUIT = 2
     COMMAND_READ = 50
 
+    # This values can be injected by other tooling to let the Remote Loader
+    # take advantage of embedded SSL artefacts.
+    CONFIG_KEY = None
+    CONFIG_CRT = None
+
+    @staticmethod
+    def configure(key, crt):
+        RemoteStreamConnection.CONFIG_KEY = key
+        RemoteStreamConnection.CONFIG_CRT = crt
+
     def __init__(self, hostname: str, port: int, **kwargs):
         self.hostname = hostname
         self.port = port
@@ -71,6 +81,9 @@ class RemoteStreamConnection:
         self._reconnect_wait = self.RECONNECT_WAIT
         self._socket_timeout = self.SOCKET_TIMEOUT
 
+        flag_cert_chain_loaded = False
+        flag_verify_locations_loaded = False
+
         if options := kwargs.get("options"):
             client_key = options.get("key")
             client_crt = options.get("crt")
@@ -78,14 +91,22 @@ class RemoteStreamConnection:
             noverify = options.get("noverify")
             if client_key and client_crt:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
+                flag_cert_chain_loaded = True
             if noverify:
                 self._context.verify_mode = ssl.CERT_NONE
             if server_ca:
                 self._context.load_verify_locations(server_ca)
+                flag_verify_locations_loaded = True
             self._max_reconnects = options.get("reconnects", max(0, self._max_reconnects))
             self._max_shortreads = options.get("shortreads", max(0, self._max_shortreads))
             self._reconnect_wait = options.get("reconnectwait", max(0, self._reconnect_wait))
             self._socket_timeout = options.get("sockettimeout", max(0, self._socket_timeout))
+
+        if flag_cert_chain_loaded is False and self.CONFIG_KEY is not None and self.CONFIG_CRT is not None:
+            self._context.load_cert_chain_str(certfile=self.CONFIG_CRT, keyfile=self.CONFIG_KEY)
+
+        if flag_verify_locations_loaded is False and self.CONFIG_CRT is not None:
+            self._context.load_verify_locations(cadata=self.CONFIG_CRT)
 
         self.log = log
 
