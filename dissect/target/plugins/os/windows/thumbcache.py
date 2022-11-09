@@ -43,8 +43,9 @@ class ThumbcachePlugin(Plugin):
 
     def check_compatible(self) -> None:
         for cache_path in self.get_cache_paths():
-            if len(list(cache_path.glob("*_idx.db"))) == 0:
-                raise UnsupportedPluginError("There was no cache path for that plugin")
+            if len(list(cache_path.glob("*_idx.db"))) > 0:
+                return
+        raise UnsupportedPluginError("There was no cache path for that plugin")
 
     def _create_entries(self, cache: Thumbcache, record_type: TargetRecordDescriptor):
         for path, entry in cache.entries():
