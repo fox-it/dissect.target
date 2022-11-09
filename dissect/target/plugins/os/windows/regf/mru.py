@@ -211,8 +211,11 @@ class MRUPlugin(Plugin):
     def acmru(self):
         """Return the ACMru (Windows Search) data.
 
-        The HKCU\\Software\\Microsoft\\Search Assistant\\ACMru registry key contains information about the recent search
-        terms used with Windows default search.
+        The following keys are being searched:
+          - ``HKCU\\Software\\Microsoft\\Search Assistant\\ACMru``:
+            This registry key contains information about the recent search
+          - ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery``:
+            This registry key contains the most recent search history using windows explorer. (Windows >=7)
 
         Sources:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
@@ -228,7 +231,6 @@ class MRUPlugin(Plugin):
 
         for key in self.target.registry.keys(KEY):
             user = self.target.registry.get_user(key)
-
             for subkey in key.subkeys():
                 for value in subkey.values():
                     yield ACMruRecord(
@@ -241,6 +243,11 @@ class MRUPlugin(Plugin):
                         _user=user,
                         _key=subkey,
                     )
+
+        KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery"
+
+        for key in self.target.registry.keys(KEY):
+            yield from parse_mru_ex_key(self.target, key, ACMruRecord)
 
     @export(record=MapNetworkDriveMRURecord)
     def networkdrive(self):
