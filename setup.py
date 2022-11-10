@@ -75,6 +75,7 @@ setup(
             "dissect.fat>=3.0.dev,<4.0.dev",
             "dissect.ffs>=3.0.dev,<4.0.dev",
             "dissect.sql>=3.0.dev,<4.0.dev",
+            "dissect.thumbcache>=1.0.dev,<2.0.dev",
             "dissect.xfs>=3.0.dev,<4.0.dev",
             "ipython",
             "fusepy",
