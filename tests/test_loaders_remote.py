@@ -32,3 +32,11 @@ def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicM
     assert mock_context.mock_calls == expected
     assert rs.tell() == 3
     assert rsc.is_connected() is True
+
+
+@patch.object(ssl, "SSLContext", autospec=False)
+@patch.object(socket, "socket", autospec=True)
+def test_remote_loader_stream_embedded(mock_socket_class: MagicMock, mock_context: MagicMock) -> None:
+    RemoteStreamConnection.configure("K", "C")
+    RemoteStreamConnection("remote://127.0.0.1", 9001)
+    mock_context.assert_has_calls([call().load_cert_chain_str(certfile="C", keyfile="K")])
