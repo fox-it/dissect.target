@@ -1,4 +1,6 @@
+import os
 import stat
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 from unittest.mock import Mock
 
 import pytest
@@ -8,7 +10,13 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     SymlinkRecursionError,
 )
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import (
+    MappedFile,
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+    VirtualSymlink,
+)
 from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
 from dissect.target.filesystems.ffs import FfsFilesystemEntry
 from dissect.target.filesystems.tar import TarFilesystemEntry
@@ -18,6 +26,8 @@ try:
     from dissect.target.filesystems.vmfs import VmfsFilesystemEntry
 except ImportError:
     VmfsFilesystemEntry = None
+
+from dissect.target.helpers import fsutil
 
 from ._utils import absolute_path
 
@@ -361,3 +371,265 @@ def test_filesystem_virtual_filesystem_get_unequal_vfs_paths(vfs, vfs_path1, vfs
 def test_filesystem_virtual_filesystem_get_erroring_vfs_paths(vfs, vfs_path, exception):
     with pytest.raises(exception):
         vfs.get(vfs_path)
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        ("/some/dir",),
+        ("some/dir/",),
+        ("/some/dir/",),
+        ("some/dir",),
+        (
+            "/some/dir/",
+            "some/dir/other/dir",
+        ),
+    ],
+)
+def test_filesystem_virtual_filesystem_makedirs(paths):
+    vfs = VirtualFilesystem()
+
+    for vfspath in paths:
+        vfs.makedirs(vfspath)
+
+        partial_path = ""
+        for part in vfspath.strip("/").split("/"):
+            partial_path = fsutil.join(partial_path, part)
+            vfs_entry = vfs.get(partial_path)
+
+            assert isinstance(vfs_entry, VirtualDirectory)
+            assert vfs_entry.path == partial_path.strip("/")
+
+
+def test_filesystem_virtual_filesystem_makedirs_root():
+    vfs = VirtualFilesystem()
+    vfspath = "/"
+
+    vfs.makedirs(vfspath)
+
+    vfs_entry = vfs.get(vfspath)
+
+    assert vfs_entry is vfs.root
+
+
+def test_filesystem_virtual_filesystem_map_fs(vfs):
+    root_vfs = VirtualFilesystem()
+    map_path = "/some/dir/"
+    file_path = "/path/to/some/file"
+    root_file_path = fsutil.join(map_path, file_path)
+
+    root_vfs.map_fs(map_path, vfs)
+
+    vfs_entry = vfs.get(file_path)
+    root_vfs_entry = vfs.get(root_file_path)
+
+    assert vfs_entry is root_vfs_entry
+
+    with pytest.raises(FileNotFoundError):
+        root_vfs.get(file_path)
+
+
+def test_filesystem_virtual_filesystem_mount(vfs):
+    assert vfs.mount == vfs.map_fs
+
+
+def test_filesystem_virtual_filesystem_map_dir():
+    vfs = VirtualFilesystem()
+    vfs_path = "/map/point/"
+    with TemporaryDirectory() as tmp_dir:
+        with TemporaryDirectory(dir=tmp_dir) as some_dir:
+            with TemporaryDirectory(dir=tmp_dir) as other_dir:
+                with TemporaryDirectory(dir=other_dir) as second_lvl_dir:
+                    with NamedTemporaryFile(dir=some_dir) as some_file:
+                        some_file.write(b"1337")
+                        some_file.seek(0)
+
+                        vfs.map_dir(vfs_path, tmp_dir)
+
+                        entry_name = fsutil.join(vfs_path, os.path.relpath(some_dir, tmp_dir))
+                        dir_entry = vfs.get(entry_name)
+                        assert isinstance(dir_entry, VirtualDirectory)
+
+                        entry_name = fsutil.join(vfs_path, os.path.relpath(second_lvl_dir, tmp_dir))
+                        dir_entry = vfs.get(entry_name)
+                        assert isinstance(dir_entry, VirtualDirectory)
+
+                        entry_name = fsutil.join(vfs_path, os.path.relpath(some_file.name, tmp_dir))
+                        file_entry = vfs.get(entry_name)
+                        assert isinstance(file_entry, MappedFile)
+
+                        fp = file_entry.open()
+                        assert fp.read() == b"1337"
+
+
+@pytest.mark.parametrize(
+    "vfs_path",
+    [
+        "/path/to/file",
+        "path/to/file",
+        "/path///to/file",
+    ],
+)
+def test_filesystem_virtual_filesystem_map_file(vfs_path):
+    vfs = VirtualFilesystem()
+    real_path = "/tmp/foo"
+
+    vfs.map_file(vfs_path, real_path)
+
+    vfs_path = fsutil.normalize(vfs_path).strip("/")
+    vfs_entry = vfs.get(vfs_path)
+
+    assert isinstance(vfs_entry, MappedFile)
+    assert vfs_entry.path == vfs_path
+    assert vfs_entry.entry == real_path
+
+
+def test_filesystem_virtual_filesystem_map_file_as_dir():
+    vfs = VirtualFilesystem()
+    real_path = "/tmp/foo"
+
+    with pytest.raises(AttributeError):
+        vfs.map_file("/path/to/dir/", real_path)
+
+
+@pytest.mark.parametrize(
+    "vfs_path",
+    [
+        "/path/to/file",
+        "path/to/file",
+        "/path///to/file",
+    ],
+)
+def test_filesystem_virtual_filesystem_map_file_fh(vfs_path):
+    vfs = VirtualFilesystem()
+    fh = Mock()
+
+    vfs.map_file_fh(vfs_path, fh)
+
+    vfs_path = fsutil.normalize(vfs_path).strip("/")
+    vfs_entry = vfs.get(vfs_path)
+
+    assert isinstance(vfs_entry, VirtualFile)
+    assert vfs_entry.path == vfs_path
+    assert vfs_entry.entry is fh
+
+
+def test_filesystem_virtual_filesystem_map_file_fh_as_dir():
+    vfs = VirtualFilesystem()
+    fh = Mock()
+
+    with pytest.raises(AttributeError):
+        vfs.map_file_fh("/path/to/dir/", fh)
+
+
+@pytest.mark.parametrize(
+    "vfs_path",
+    [
+        "/path/to/entry",
+        "path/to/entry",
+        "path/to/entry/",
+        "/path/to/entry/",
+        "//path///to/entry//",
+        "/entry",
+        "entry",
+        "entry/",
+        "/entry/",
+        "/",
+    ],
+)
+def test_filesystem_virtual_filesystem_map_file_entry(vfs_path):
+    vfs = VirtualFilesystem()
+    entry_path = fsutil.normalize(vfs_path).strip("/")
+    dir_entry = VirtualDirectory(vfs, entry_path)
+
+    file_name = fsutil.join(vfs_path, "test")
+    file_entry = VirtualFile(vfs, file_name, Mock())
+    dir_entry.add("test", file_entry)
+
+    vfs.map_file_entry(vfs_path, dir_entry)
+
+    vfs_entry = vfs.get(vfs_path)
+
+    if vfs_path == "/":
+        assert vfs.get(file_name) is file_entry
+    else:
+        assert vfs_entry is dir_entry
+
+
+@pytest.mark.parametrize(
+    "vfs_path, link_path",
+    [
+        (
+            "/path/to/entry",
+            "/path/to/link",
+        ),
+        (
+            "path/to/entry",
+            "path/to/link",
+        ),
+        (
+            "path/to/entry/",
+            "path/to/link/",
+        ),
+        (
+            "/path/to/entry/",
+            "/path/to/link/",
+        ),
+        (
+            "//path///to/entry//",
+            "//path///to/link//",
+        ),
+    ],
+)
+def test_filesystem_virtual_filesystem_link(vfs_path, link_path):
+    vfs = VirtualFilesystem()
+    entry_path = fsutil.normalize(vfs_path).strip("/")
+    file_object = Mock()
+    file_entry = VirtualFile(vfs, entry_path, file_object)
+    vfs.map_file_entry(vfs_path, file_entry)
+
+    vfs.link(vfs_path, link_path)
+
+    link_path = fsutil.normalize(link_path).strip("/")
+    link_entry = vfs.get(link_path)
+
+    assert link_entry is file_entry
+
+
+@pytest.mark.parametrize(
+    "vfs_path, link_path",
+    [
+        (
+            "/path/to/entry",
+            "/path/to/link",
+        ),
+        (
+            "path/to/entry",
+            "path/to/link",
+        ),
+        (
+            "path/to/entry/",
+            "path/to/link/",
+        ),
+        (
+            "/path/to/entry/",
+            "/path/to/link/",
+        ),
+        (
+            "//path///to/entry//",
+            "//path///to/link//",
+        ),
+    ],
+)
+def test_filesystem_virtual_filesystem_symlink(vfs_path, link_path):
+    vfs = VirtualFilesystem()
+
+    vfs.symlink(vfs_path, link_path)
+
+    vfs_path = fsutil.normalize(vfs_path).strip("/")
+    link_path = fsutil.normalize(link_path).strip("/")
+    link_entry = vfs.get(link_path)
+
+    assert isinstance(link_entry, VirtualSymlink)
+    assert link_entry.path == link_path
+    assert link_entry.target == vfs_path
