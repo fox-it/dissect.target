@@ -946,15 +946,15 @@ class VirtualSymlink(FilesystemEntry):
 class VirtualFilesystem(Filesystem):
     __fstype__ = "virtual"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.root = VirtualDirectory(self, "/")
 
     @staticmethod
-    def detect(fh):
+    def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on VirtualFilesystem class")
 
-    def get(self, path, relentry=None):
+    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         entry = relentry or self.root
         path = fsutil.normalize(path).strip("/")
         full_path = fsutil.join(entry.path, path)
@@ -998,7 +998,7 @@ class VirtualFilesystem(Filesystem):
 
         return entry
 
-    def makedirs(self, path):
+    def makedirs(self, path: str) -> VirtualDirectory:
         """Create virtual directories into the VFS from the given path."""
         path = fsutil.normalize(path).strip("/")
         directory = self.root
@@ -1018,18 +1018,16 @@ class VirtualFilesystem(Filesystem):
 
         return directory
 
-    def map_fs(self, vfspath, fs):
+    def map_fs(self, vfspath: str, fs: Filesystem) -> None:
         """Mount a dissect filesystem to a directory in the VFS"""
-        vfspath = fsutil.normalize(vfspath).strip("/")
-
-        directory = self.makedirs(vfspath) if vfspath else self.root
+        directory = self.makedirs(vfspath)
         directory.top = fs.get("/")
 
     mount = map_fs
 
-    def map_dir(self, vfspath, realpath):
+    def map_dir(self, vfspath: str, realpath: str) -> None:
         """Recursively map a directory from the host machine into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
+        vfspath = fsutil.normalize(vfspath).strip("/")
         base = os.path.abspath(realpath)
 
         for root, dirs, files in os.walk(base):
@@ -1040,44 +1038,58 @@ class VirtualFilesystem(Filesystem):
             vfsroot = fsutil.join(vfspath, relroot)
             directory = self.makedirs(vfsroot)
 
-            for d in dirs:
-                self.makedirs(fsutil.join(vfsroot, d))
+            for dir_ in dirs:
+                vfs_dir = fsutil.join(vfsroot, dir_)
+                self.makedirs(vfs_dir)
 
-            for f in files:
-                fullpath = os.path.join(root, f)
-                directory.add(f, MappedFile(self, fsutil.join(vfsroot, f), fullpath))
+            for file_ in files:
+                vfs_file_path = fsutil.join(vfsroot, file_)
+                real_file_path = os.path.join(root, file_)
+                directory.add(file_, MappedFile(self, vfs_file_path, real_file_path))
 
-    def map_file(self, vfspath, realpath):
+    def map_file(self, vfspath: str, realpath: str) -> None:
         """Map a file from the host machine into the VFS."""
         vfspath = fsutil.normalize(vfspath)
-        self.map_file_entry(vfspath, MappedFile(self, vfspath, realpath))
+        if vfspath[-1] == "/":
+            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
+        file_path = vfspath.lstrip("/")
+        self.map_file_entry(vfspath, MappedFile(self, file_path, realpath))
 
-    def map_file_fh(self, vfspath, fh):
+    def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
         """Map a file handle into the VFS."""
         vfspath = fsutil.normalize(vfspath)
-        self.map_file_entry(vfspath, VirtualFile(self, vfspath, fh))
+        if vfspath[-1] == "/":
+            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
+        file_path = vfspath.lstrip("/")
+        self.map_file_entry(vfspath, VirtualFile(self, file_path, fh))
 
-    def map_file_entry(self, vfspath, entry):
-        """Map a FilesystemEntry into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
-        if not vfspath or vfspath == "/":
+    def map_file_entry(self, vfspath: str, entry: FilesystemEntry) -> None:
+        """Map a FilesystemEntry into the VFS.
+
+        Any missing subdirectories up to, but not including, the last part of
+        ``vfspath`` will be created.
+        """
+        vfspath = fsutil.normalize(vfspath).strip("/")
+        if not vfspath:
             self.root.top = entry
         else:
             if "/" in vfspath:
-                directory = self.makedirs(fsutil.dirname(vfspath))
+                sub_dirs = fsutil.dirname(vfspath)
+                directory = self.makedirs(sub_dirs)
             else:
                 directory = self.root
 
-            directory.add(fsutil.basename(vfspath), entry)
+            entry_name = fsutil.basename(vfspath)
+            directory.add(entry_name, entry)
 
-    def link(self, src, dst):
+    def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location."""
-        dst = fsutil.normalize(dst)
         self.map_file_entry(dst, self.get(src))
 
-    def symlink(self, src, dst):
+    def symlink(self, src: str, dst: str) -> None:
         """Create a symlink to another location."""
-        dst = fsutil.normalize(dst)
+        src = fsutil.normalize(src).strip("/")
+        dst = fsutil.normalize(dst).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
 
