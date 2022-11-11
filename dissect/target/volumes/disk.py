@@ -1,6 +1,5 @@
 from typing import BinaryIO, Iterator, Union
 
-from dissect.util.stream import RelativeStream
 from dissect.volume import disk
 
 from dissect.target.volume import Volume, VolumeSystem
@@ -25,7 +24,7 @@ class DissectVolumeSystem(VolumeSystem):
         for v in self._disk.partitions:
             name = v.name or f"part_{v.offset:08x}"
             yield Volume(
-                RelativeStream(self.fh, v.offset),
+                v.open(),
                 v.number,
                 v.offset,
                 v.size,
