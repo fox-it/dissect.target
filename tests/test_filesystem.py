@@ -3,7 +3,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from dissect.target.exceptions import SymlinkRecursionError
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    NotADirectoryError,
+    SymlinkRecursionError,
+)
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
 from dissect.target.filesystems.ffs import FfsFilesystemEntry
@@ -18,7 +22,8 @@ except ImportError:
 from ._utils import absolute_path
 
 
-def make_vfs():
+@pytest.fixture
+def vfs():
     vfs = VirtualFilesystem()
     vfs.map_file_entry("/path/to/some/file", VirtualFile(vfs, "file", None))
 
@@ -27,12 +32,12 @@ def make_vfs():
     vfs.symlink("/path/to/some/file", "filelink1")
     vfs.symlink("filelink1", "filelink2")
 
+    vfs.map_fs("/path/to/other", vfs)
+
     return vfs
 
 
-def test_get():
-    vfs = make_vfs()
-
+def test_get(vfs):
     assert vfs.get("dirlink1").name == "dirlink1"
     assert vfs.get("dirlink1").is_symlink()
     assert vfs.get("dirlink1").is_dir()
@@ -246,3 +251,67 @@ def test_filesystem_link_resolve(entry, link_dict):
     vfs.map_file_entry(vfspath="path/to/target", entry=actual_file)
 
     assert link.readlink_ext() == actual_file
+
+
+def test_filesystem_virtual_filesystem_get():
+    vfs = VirtualFilesystem()
+    file_entry = VirtualFile(vfs, "file", None)
+    vfs.map_file_entry("path/to/some/file", file_entry)
+
+    assert vfs.get("") is vfs.root
+    assert vfs.get("path/to/some/file") is file_entry
+
+
+@pytest.mark.parametrize(
+    "vfs_path1, vfs_path2",
+    [
+        ("path/to/some/file", "/path/to/some/file"),
+        ("path/to/some/file", "/path/to/some/file/"),
+        ("path/to/some/file", "//path/to////some/file///"),
+        ("path/to/some/file", "path/././to/some/./file"),
+        ("path/to/some/file", "path/to/../to/some/../../../path/to/some/file"),
+        ("path/to/some/file", "/dirlink1/file"),
+        # as symlinks are resolved before continuing along the path, we have to
+        # go back up 3 times to get back to the root
+        ("path/to/some/file", "/dirlink1/../../../dirlink1/file"),
+        ("path/to/some/file", "/dirlink1/../../../path/to/some/file"),
+        ("path/to/some/file", "/dirlink2/file"),
+        ("path/to/some/file", "/dirlink2/../../../dirlink1/file"),
+        ("path/to/some/file", "/path/to/other/path/to/some/file"),
+        ("path/to/some/file", "/path/to/other/dirlink1/file"),
+        ("/", ""),
+        ("/", "/path/to/../../"),
+        ("/", "/dirlink2/../../../"),
+    ],
+)
+def test_filesystem_virtual_filesystem_get_equal_vfs_paths(vfs, vfs_path1, vfs_path2):
+    assert vfs.get(vfs_path1) is vfs.get(vfs_path2)
+
+
+@pytest.mark.parametrize(
+    "vfs_path1, vfs_path2",
+    [
+        ("path/to/some/file", "/filelink1"),
+        ("path/to/some/file", "/filelink2"),
+        ("/filelink1", "/filelink2"),
+        ("path/to/some", "/dirlink1"),
+        ("path/to/some", "/dirlink2"),
+        ("/dirlink1", "/dirlink2"),
+    ],
+)
+def test_filesystem_virtual_filesystem_get_unequal_vfs_paths(vfs, vfs_path1, vfs_path2):
+    assert vfs.get(vfs_path1) is not vfs.get(vfs_path2)
+
+
+@pytest.mark.parametrize(
+    "vfs_path, exception",
+    [
+        ("/path/to/some/file/.", NotADirectoryError),
+        ("/path/to/some/file/..", NotADirectoryError),
+        ("/path/to/some/non-exisiting-file", FileNotFoundError),
+        ("/path/to/other/path/to/some/non-exisiting-file", FileNotFoundError),
+    ],
+)
+def test_filesystem_virtual_filesystem_get_erroring_vfs_paths(vfs, vfs_path, exception):
+    with pytest.raises(exception):
+        vfs.get(vfs_path)

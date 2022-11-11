@@ -960,22 +960,31 @@ class VirtualFilesystem(Filesystem):
             return entry
 
         parts = path.split("/")
-        for i, part in enumerate(parts):
 
-            if part == ".":
+        for i, part in enumerate(parts):
+            # If the entry of the previous part (or the starting relentry /
+            # root entry) is a symlink, resolve it first so things like entry.up
+            # work if it is a symlink to a directory.
+            # Note that this will never resolve the final part of the path if
+            # that happens to be a symlink, so things like fs.is_symlink() will
+            # work.
+            if entry.is_symlink():
+                entry = entry.readlink_ext()
+
+            if not entry.is_dir():
+                # An entry for the current part can only be retrieved if the
+                # entry of the previous part (or the starting relentry / root
+                # entry) is a directory.
+                raise NotADirectoryError(full_path)
+            elif part == ".":
                 continue
             elif part == "..":
                 entry = entry.up
                 if not entry:
                     entry = self.root
-            elif entry.is_dir():
+            else:
                 if part in entry:
                     entry = entry[part]
-                    if entry.is_symlink() and i + 1 < len(parts):
-                        # Only resolve intermediate symlinks not the final
-                        # part, otherwise things like fs.is_symlink() etc.
-                        # would not work.
-                        entry = entry.readlink_ext()
                 elif entry.top:
                     try:
                         return entry.top.get(fsutil.join(*parts[i:]))
@@ -983,8 +992,6 @@ class VirtualFilesystem(Filesystem):
                         raise FileNotFoundError(full_path, cause=e)
                 else:
                     raise FileNotFoundError(full_path)
-            else:
-                raise NotADirectoryError(full_path)
 
         return entry
 
