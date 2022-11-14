@@ -62,6 +62,10 @@ def target_win_mru(target_win_users):
     acmru_key = VirtualKey(user_hive, "Software\\Microsoft\\Search Assistant\\ACMru\\5603")
     acmru_key.add_value("000", VirtualValue(user_hive, "000", "value"))
     acmru_key.add_value("001", VirtualValue(user_hive, "001", "value"))
+    # ACMru wordwheel query
+    wordwheel_key = VirtualKey(user_hive, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery")
+    wordwheel_key.add_value("MRUListEx", VirtualValue(user_hive, "MRUListEx", b"\x00\x00\x00\x00\xFF\xFF\xFF\xFF"))
+    wordwheel_key.add_value("0", VirtualValue(user_hive, "0", b"h\x00e\x00l\x00l\x00o\x00\x00\x00"))
 
     # Map Network Drive MRU
     networkdrive_key = VirtualKey(
@@ -99,6 +103,7 @@ def target_win_mru(target_win_users):
         opensave_key,
         lastvisited_key,
         acmru_key,
+        wordwheel_key,
         networkdrive_key,
         mstsc_key,
         excel_15_file_key,
@@ -126,9 +131,9 @@ def test_mru_plugin(target_win_mru):
     assert len(recentdocs) == 1
     assert len(opensave) == 4
     assert len(lastvisited) == 2
-    assert len(acmru) == 2
+    assert len(acmru) == 3
     assert len(networkdrive) == 2
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru.get_all_records())) == 22
+    assert len(list(target_win_mru.mru.get_all_records())) == 23
