@@ -209,8 +209,6 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
 
 register("ewf", "EwfContainer")
 register("vmdk", "VmdkContainer")
-register("ewf", "EwfContainer")
-register("vmdk", "VmdkContainer")
 register("vhdx", "VhdxContainer")
 register("vhd", "VhdContainer")
 register("qcow2", "QCow2Container")
