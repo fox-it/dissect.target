@@ -142,7 +142,7 @@ class FfsFilesystemEntry(FilesystemEntry):
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
 
-        # FFS2 has a birth time
+        # FFS2 has a birth time, FFS1 does not
         if btime := self.entry.btime:
             st_info.st_birthtime = btime.timestamp()
 
