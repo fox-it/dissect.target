@@ -214,9 +214,9 @@ class MRUPlugin(Plugin):
 
         The following keys are being searched:
           - ``HKCU\\Software\\Microsoft\\Search Assistant\\ACMru``:
-            This registry key contains information about the recent search
+            This registry key contains the most recent search history from Windows default search.
           - ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery``:
-            This registry key contains the most recent search history using windows explorer. (Windows >=7)
+            This registry key contains the most recent search history from Windows Explorer. (Windows >=7)
 
         Sources:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
