@@ -11,13 +11,13 @@ from dissect.target import filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
     FilesystemError,
     PluginError,
+    PluginNotFoundError,
     TargetError,
     UnsupportedPluginError,
-    PluginNotFoundError,
 )
 from dissect.target.helpers import config
-from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.loaderutil import extract_path_info
+from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
 from dissect.target.plugins.general import default
 
@@ -676,9 +676,8 @@ class DiskCollection(Collection):
                 for vol in disk.vs.volumes:
                     self.target.volumes.add(vol)
             except Exception as e:
-                self.target.log.warning(
-                    "Can't identify volume system, adding as raw volume instead: %s", disk, exc_info=e
-                )
+                self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
+                self.target.log.debug("", exc_info=e)
                 vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
                 self.target.volumes.add(vol)
 
@@ -691,7 +690,8 @@ class VolumeCollection(Collection):
                 self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
             self.target.filesystems.add(vol.fs)
         except FilesystemError as e:
-            self.target.log.warning("Can't identify filesystem: %s", vol, exc_info=e)
+            self.target.log.warning("Can't identify filesystem: %s", vol)
+            self.target.log.debug("", exc_info=e)
 
     def apply(self):
         lvm_volumes = []
