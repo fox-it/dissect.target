@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 # The same applies to Velociraptor offline collector Windows.KapeFiles.Targets
 USNJRNL_PATHS = ["$Extend/$J", "$Extend/$UsnJrnl$J"]
 
+
 class KapeLoader(DirLoader):
     @staticmethod
     def detect(path: Path) -> bool:
