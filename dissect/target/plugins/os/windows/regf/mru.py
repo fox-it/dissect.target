@@ -123,7 +123,7 @@ class MRUPlugin(Plugin):
     def run(self):
         """Return the RunMRU data.
 
-        The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU registry key contains information
+        The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU`` registry key contains information
         about the most recent commands that have been performed by the Run application
 
         Sources:
@@ -138,8 +138,9 @@ class MRUPlugin(Plugin):
     def recentdocs(self):
         """Return the RecentDocs data.
 
-        The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs registry key contains information
-        about the last 10 documents that the currently logged on user accessed or executed via Windows Explorer.
+        The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs`` registry key contains
+        information about the last 10 documents that the currently logged on user accessed or executed via Windows
+        Explorer.
 
         Sources:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
@@ -154,8 +155,8 @@ class MRUPlugin(Plugin):
     def opensave(self):
         """Return the OpenSaveMRU data.
 
-        The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU registry key contains
-        information about the most recently opened or saved files.
+        The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU`` registry key
+        contains information about the most recently opened or saved files.
 
         Sources:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
@@ -170,8 +171,8 @@ class MRUPlugin(Plugin):
     def lastvisited(self):
         """Return the LastVisitedMRU data.
 
-        The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU registry key contains
-        information about the executable used by an application to open the files that are documented at the
+        The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU`` registry key
+        contains information about the executable used by an application to open the files that are documented at the
         OpenSaveMRU registry key. Also each value tracks the directory location for the last file that was accessed by
         that application.
 
@@ -211,24 +212,26 @@ class MRUPlugin(Plugin):
     def acmru(self):
         """Return the ACMru (Windows Search) data.
 
-        The HKCU\\Software\\Microsoft\\Search Assistant\\ACMru registry key contains information about the recent search
-        terms used with Windows default search.
+        The following keys are being searched:
+          - ``HKCU\\Software\\Microsoft\\Search Assistant\\ACMru``:
+            This registry key contains the most recent search history from Windows default search.
+          - ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery``:
+            This registry key contains the most recent search history from Windows Explorer. (Windows >=7)
 
         Sources:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
 
         Known categories:
-        - 5001: Internet Search Assistant
-        - 5603: Windows XP files and folder search
-        - 5604: "Word or phrase in a file" dialog box
-        - 5647: "For computers or people" selection in Search Results dialog box
+            - 5001: Internet Search Assistant
+            - 5603: Windows XP files and folder search
+            - 5604: "Word or phrase in a file" dialog box
+            - 5647: "For computers or people" selection in Search Results dialog box
         """
 
         KEY = "HKCU\\Software\\Microsoft\\Search Assistant\\ACMru"
 
         for key in self.target.registry.keys(KEY):
             user = self.target.registry.get_user(key)
-
             for subkey in key.subkeys():
                 for value in subkey.values():
                     yield ACMruRecord(
@@ -241,6 +244,11 @@ class MRUPlugin(Plugin):
                         _user=user,
                         _key=subkey,
                     )
+
+        KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery"
+
+        for key in self.target.registry.keys(KEY):
+            yield from parse_mru_ex_key(self.target, key, ACMruRecord)
 
     @export(record=MapNetworkDriveMRURecord)
     def networkdrive(self):
