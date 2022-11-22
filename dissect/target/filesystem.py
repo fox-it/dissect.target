@@ -861,6 +861,9 @@ class VirtualFile(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualFile: {self.path}")
 
     def get(self, path):
+        path = fsutil.normalize(path).strip("/")
+        if not path:
+            return self
         raise NotADirectoryError(f"'{self.path}' is not a directory")
 
     def iterdir(self):
@@ -908,7 +911,7 @@ class VirtualSymlink(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualSymlink: {self.path}")
 
     def get(self, path):
-        return self.fs.get(fsutil.join(self.path, path))
+        return self.fs.get(path, self)
 
     def iterdir(self):
         yield from self.readlink_ext().iterdir()
@@ -943,15 +946,15 @@ class VirtualSymlink(FilesystemEntry):
 class VirtualFilesystem(Filesystem):
     __fstype__ = "virtual"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.root = VirtualDirectory(self, "/")
 
     @staticmethod
-    def detect(fh):
+    def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on VirtualFilesystem class")
 
-    def get(self, path, relentry=None):
+    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         entry = relentry or self.root
         path = fsutil.normalize(path).strip("/")
         full_path = fsutil.join(entry.path, path)
@@ -960,22 +963,31 @@ class VirtualFilesystem(Filesystem):
             return entry
 
         parts = path.split("/")
-        for i, part in enumerate(parts):
 
-            if part == ".":
+        for i, part in enumerate(parts):
+            # If the entry of the previous part (or the starting relentry /
+            # root entry) is a symlink, resolve it first so things like entry.up
+            # work if it is a symlink to a directory.
+            # Note that this will never resolve the final part of the path if
+            # that happens to be a symlink, so things like fs.is_symlink() will
+            # work.
+            if entry.is_symlink():
+                entry = entry.readlink_ext()
+
+            if not entry.is_dir():
+                # An entry for the current part can only be retrieved if the
+                # entry of the previous part (or the starting relentry / root
+                # entry) is a directory.
+                raise NotADirectoryError(full_path)
+            elif part == ".":
                 continue
             elif part == "..":
                 entry = entry.up
                 if not entry:
                     entry = self.root
-            elif entry.is_dir():
+            else:
                 if part in entry:
                     entry = entry[part]
-                    if entry.is_symlink() and i + 1 < len(parts):
-                        # Only resolve intermediate symlinks not the final
-                        # part, otherwise things like fs.is_symlink() etc.
-                        # would not work.
-                        entry = entry.readlink_ext()
                 elif entry.top:
                     try:
                         return entry.top.get(fsutil.join(*parts[i:]))
@@ -983,12 +995,10 @@ class VirtualFilesystem(Filesystem):
                         raise FileNotFoundError(full_path, cause=e)
                 else:
                     raise FileNotFoundError(full_path)
-            else:
-                raise NotADirectoryError(full_path)
 
         return entry
 
-    def makedirs(self, path):
+    def makedirs(self, path: str) -> VirtualDirectory:
         """Create virtual directories into the VFS from the given path."""
         path = fsutil.normalize(path).strip("/")
         directory = self.root
@@ -1008,18 +1018,16 @@ class VirtualFilesystem(Filesystem):
 
         return directory
 
-    def map_fs(self, vfspath, fs):
+    def map_fs(self, vfspath: str, fs: Filesystem) -> None:
         """Mount a dissect filesystem to a directory in the VFS"""
-        vfspath = fsutil.normalize(vfspath).strip("/")
-
-        directory = self.makedirs(vfspath) if vfspath else self.root
+        directory = self.makedirs(vfspath)
         directory.top = fs.get("/")
 
     mount = map_fs
 
-    def map_dir(self, vfspath, realpath):
+    def map_dir(self, vfspath: str, realpath: str) -> None:
         """Recursively map a directory from the host machine into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
+        vfspath = fsutil.normalize(vfspath).strip("/")
         base = os.path.abspath(realpath)
 
         for root, dirs, files in os.walk(base):
@@ -1030,44 +1038,58 @@ class VirtualFilesystem(Filesystem):
             vfsroot = fsutil.join(vfspath, relroot)
             directory = self.makedirs(vfsroot)
 
-            for d in dirs:
-                self.makedirs(fsutil.join(vfsroot, d))
+            for dir_ in dirs:
+                vfs_dir = fsutil.join(vfsroot, dir_)
+                self.makedirs(vfs_dir)
 
-            for f in files:
-                fullpath = os.path.join(root, f)
-                directory.add(f, MappedFile(self, fsutil.join(vfsroot, f), fullpath))
+            for file_ in files:
+                vfs_file_path = fsutil.join(vfsroot, file_)
+                real_file_path = os.path.join(root, file_)
+                directory.add(file_, MappedFile(self, vfs_file_path, real_file_path))
 
-    def map_file(self, vfspath, realpath):
+    def map_file(self, vfspath: str, realpath: str) -> None:
         """Map a file from the host machine into the VFS."""
         vfspath = fsutil.normalize(vfspath)
-        self.map_file_entry(vfspath, MappedFile(self, vfspath, realpath))
+        if vfspath[-1] == "/":
+            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
+        file_path = vfspath.lstrip("/")
+        self.map_file_entry(vfspath, MappedFile(self, file_path, realpath))
 
-    def map_file_fh(self, vfspath, fh):
+    def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
         """Map a file handle into the VFS."""
         vfspath = fsutil.normalize(vfspath)
-        self.map_file_entry(vfspath, VirtualFile(self, vfspath, fh))
+        if vfspath[-1] == "/":
+            raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
+        file_path = vfspath.lstrip("/")
+        self.map_file_entry(vfspath, VirtualFile(self, file_path, fh))
 
-    def map_file_entry(self, vfspath, entry):
-        """Map a FilesystemEntry into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
-        if not vfspath or vfspath == "/":
+    def map_file_entry(self, vfspath: str, entry: FilesystemEntry) -> None:
+        """Map a FilesystemEntry into the VFS.
+
+        Any missing subdirectories up to, but not including, the last part of
+        ``vfspath`` will be created.
+        """
+        vfspath = fsutil.normalize(vfspath).strip("/")
+        if not vfspath:
             self.root.top = entry
         else:
             if "/" in vfspath:
-                directory = self.makedirs(fsutil.dirname(vfspath))
+                sub_dirs = fsutil.dirname(vfspath)
+                directory = self.makedirs(sub_dirs)
             else:
                 directory = self.root
 
-            directory.add(fsutil.basename(vfspath), entry)
+            entry_name = fsutil.basename(vfspath)
+            directory.add(entry_name, entry)
 
-    def link(self, src, dst):
+    def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location."""
-        dst = fsutil.normalize(dst)
         self.map_file_entry(dst, self.get(src))
 
-    def symlink(self, src, dst):
+    def symlink(self, src: str, dst: str) -> None:
         """Create a symlink to another location."""
-        dst = fsutil.normalize(dst)
+        src = fsutil.normalize(src).strip("/")
+        dst = fsutil.normalize(dst).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
 
@@ -1145,40 +1167,35 @@ class RootFilesystem(Filesystem):
     def get(self, path, relentry=None):
         self.target.log.debug("%r::get(%r)", self, path)
 
-        path = fsutil.normalize(path)
-        fullpath = fsutil.join(relentry.path, path) if relentry else path
+        entry = relentry or self._root_entry
+        path = fsutil.normalize(path).strip("/")
+        full_path = fsutil.join(entry.path, path)
 
-        p = path.strip("/")
-        if not p:
-            return relentry if relentry else self._root_entry
+        if not path:
+            return entry
 
         exc = []
         entries = []
 
-        if relentry:
-            root_entries = relentry.entries
-        else:
-            root_entries = [layer.root for layer in self.layers]
-
-        for entry in root_entries:
+        for sub_entry in entry.entries:
             try:
-                entries.append(self._get_from_entry(p, entry))
+                entries.append(self._get_from_entry(path, sub_entry))
             except FilesystemError as e:
                 exc.append(e)
 
         if not entries:
             if all([isinstance(ex, NotADirectoryError) for ex in exc]):
-                raise NotADirectoryError(fullpath)
+                raise NotADirectoryError(full_path)
             elif all([isinstance(ex, NotASymlinkError) for ex in exc]):
-                raise NotASymlinkError(fullpath)
-            raise FileNotFoundError(fullpath)
+                raise NotASymlinkError(full_path)
+            raise FileNotFoundError(full_path)
 
-        return RootFilesystemEntry(self, fullpath, entries)
+        return RootFilesystemEntry(self, full_path, entries)
 
     def _get_from_entry(self, path, entry):
         parts = path.split("/")
 
-        for _, part in enumerate(parts):
+        for part in parts:
             if entry.is_symlink():
                 # Resolve using the RootFilesystem instead of the entry's Filesystem
                 entry = fsutil.resolve_link(fs=self, entry=entry)
