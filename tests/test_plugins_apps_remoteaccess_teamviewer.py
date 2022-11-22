@@ -8,7 +8,7 @@ from ._utils import absolute_path
 def test_teamviewer_plugin_global_log(target_win_users, fs_win):
 
     teamviewer_logfile = absolute_path("data/TestTeamviewer.log")
-    target_logfile_name = "sysvol/Program Files/TeamViewer/TestTeamviewer.log"
+    target_logfile_name = "/sysvol/Program Files/TeamViewer/TestTeamviewer.log"
 
     _, _, map_path = target_logfile_name.partition("sysvol/")
     fs_win.map_file(map_path, teamviewer_logfile)

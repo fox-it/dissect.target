@@ -16,6 +16,8 @@ ShimcacheRecord = TargetRecordDescriptor(
     "windows/shimcache",
     [
         ("datetime", "last_modified"),
+        ("string", "name"),
+        ("varint", "index"),
         ("uri", "path"),
     ],
 )
@@ -321,6 +323,8 @@ class ShimcachePlugin(Plugin):
             hostname (string): The target hostname.
             domain (string): The target domain.
             last_modified (datetime): The last modified date.
+            name (string): The value name.
+            index (varint): The index of the entry.
             path (uri): The parsed path.
         """
         for key in self.target.registry.keys(self.KEYS):
@@ -339,12 +343,12 @@ class ShimcachePlugin(Plugin):
                     self.target.log.warning("Error parsing ShimCache entry: %s %s", key, value_name)
                     continue
 
-                yield from self._get_records(cache)
+                yield from self._get_records(value_name, cache)
 
     def _get_records(
-        self, cache: Generator[ShimCacheGeneratorType, None, None]
+        self, name: str, cache: Generator[ShimCacheGeneratorType, None, None]
     ) -> Generator[ShimcacheRecord, None, None]:
-        for item in cache:
+        for index, item in enumerate(cache):
             if isinstance(item, CRCMismatchException):
                 self.target.log.warning("A CRC mismatch occured for entry: %s", item)
                 continue
@@ -355,6 +359,8 @@ class ShimcachePlugin(Plugin):
 
             yield ShimcacheRecord(
                 last_modified=ts,
+                name=name,
+                index=index,
                 path=path,
                 _target=self.target,
             )

@@ -13,7 +13,10 @@ from dissect.target.tools.fs import _extract_path, cp
 def vfs(files) -> VirtualFilesystem:
     vfs = VirtualFilesystem()
     for file in files:
-        vfs.map_file_entry(file, VirtualFile(vfs, file, None))
+        if file[-1] == "/":
+            vfs.makedirs(file)
+        else:
+            vfs.map_file_entry(file, VirtualFile(vfs, file, None))
     return vfs
 
 
