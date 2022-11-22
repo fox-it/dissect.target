@@ -191,4 +191,3 @@ register("target", "TargetLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
 register("phobos", "PhobosLoader")
-register("virtuozzo", "VirtuozzoLoader")
