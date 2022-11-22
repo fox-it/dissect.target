@@ -255,4 +255,4 @@ def test_gracefull_shutdown_crc(mocked_shimcache, target_win):
 
     with patch(f"{ShimcachePlugin.__module__}.ShimcacheRecord") as mocked_record:
         list_gen = list_generator([CRCMismatchException(), (0, "path")])
-        assert list(plugin._get_records(list_gen)) == [mocked_record.return_value]
+        assert list(plugin._get_records(None, list_gen)) == [mocked_record.return_value]
