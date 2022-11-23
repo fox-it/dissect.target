@@ -19,7 +19,7 @@ class VirtuozzoTargetPlugin(ChildTargetPlugin):
 
     Sources:
         - https://docs.virtuozzo.com/virtuozzo_hybrid_server_7_command_line_reference/managing-system/configuration-files.html
-    """
+    """  # noqa: E501
 
     __type__ = "virtuozzo"
 
