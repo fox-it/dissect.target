@@ -25,18 +25,14 @@ class VirtuozzoTargetPlugin(ChildTargetPlugin):
 
     PATH = "/vz/root"
 
-    def __init__(self, target):
-        super().__init__(target)
-        self.vz_containers = [p for p in self.target.fs.iterdir(self.PATH)]
-
     def check_compatible(self) -> None:
         if not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("No /vz/root folder found")
 
     def list_children(self):
-        for container in self.vz_containers:
+        for container in self.target.fs.path(self.PATH).iterdir():
             yield ChildTargetRecord(
-                type=self.__type__, 
-                path=str(self.target.fs.path(self.PATH).joinpath(container)), 
-                _target=self.target
+                type=self.__type__,
+                path=str(container),
+                _target=self.target,
             )
