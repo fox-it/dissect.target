@@ -106,7 +106,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
                 record_fields[field_name] = value
 
-            yield DefenderLogRecordDescriptor(**record_fields)
+            yield DefenderLogRecordDescriptor(**record_fields, _target=self.target)
 
 
 def parse_iso_datetime(datetime_value: str) -> datetime:
