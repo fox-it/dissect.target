@@ -1,4 +1,3 @@
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 
@@ -25,9 +24,8 @@ class VirtuozzoTargetPlugin(ChildTargetPlugin):
 
     PATH = "/vz/root"
 
-    def check_compatible(self) -> None:
-        if not self.target.fs.path(self.PATH).exists():
-            raise UnsupportedPluginError("No /vz/root folder found")
+    def check_compatible(self) -> bool:
+        return self.target.fs.path(self.PATH).exists()
 
     def list_children(self):
         for container in self.target.fs.path(self.PATH).iterdir():
