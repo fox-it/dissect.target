@@ -1,6 +1,6 @@
 from typing import Generator
 
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path as _path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -11,18 +11,18 @@ from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 
-MuicacheRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
+MuiCacheRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/muicache",
     [
         ("varint", "index"),
         ("string", "name"),
         ("string", "value"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
 
-class MuicachePlugin(Plugin):
+class MuiCachePlugin(Plugin):
     """Plugin that iterates various MUIcache locations."""
 
     KEYS = [
@@ -31,17 +31,14 @@ class MuicachePlugin(Plugin):
         "HKCU\\Software\\Microsoft\\Windows\\ShellNoRoam\\MUICache",  # NT < 6.0
     ]
 
-    FIELD_NAMES = [
-        "FriendlyAppName",
-        "ApplicationCompany",
-    ]
+    FIELD_NAMES = ("FriendlyAppName", "ApplicationCompany")
 
     def check_compatible(self):
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:
             raise UnsupportedPluginError("No registry muicache key found")
 
-    @export(record=MuicacheRecord)
-    def muicache(self) -> MuicacheRecord:
+    @export(record=MuiCacheRecord)
+    def muicache(self) -> MuiCacheRecord:
         """Iterate various MUIcache key locations.
 
         The MUIcache registry key stores information about executed GUI-based programs. The key is part of
@@ -52,13 +49,13 @@ class MuicachePlugin(Plugin):
             - https://www.magnetforensics.com/blog/forensic-analysis-of-muicache-files-in-windows/
             - https://forensafe.com/blogs/muicache.html
 
-        Yields MuicacheRecords with fields:
+        Yields MuiCacheRecords with fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             index (varint): The index of the entry.
             name (string): The value name.
             value (string): The value.
-            path (uri): The executable path.
+            path (path): The executable path.
         """
         for reg_path in self.KEYS:
             for key in self.target.registry.keys(reg_path):
@@ -69,24 +66,24 @@ class MuicachePlugin(Plugin):
                 else:
                     yield from self._get_records(key)
 
-    def _get_records(self, key: RegistryKey) -> Generator[MuicacheRecord, None, None]:
+    def _get_records(self, key: RegistryKey) -> Generator[MuiCacheRecord, None, None]:
         for index, entry in enumerate(key.values()):
             user = self.target.registry.get_user(key)
             try:
-                if entry.name.endswith(tuple(self.FIELD_NAMES)):
+                if entry.name.endswith(self.FIELD_NAMES):
                     path, name = entry.name.rsplit(".", 1)
                 else:
                     name = None
                     path = entry.name.rsplit(",-", 1)[0]
 
                 value = entry.value
-                path = uri.from_windows(path)
+                path = str(_path.from_windows(path))
 
                 # Filter on the type of the registry value
                 if type(value) is bytes:
                     continue
 
-                yield MuicacheRecord(
+                yield MuiCacheRecord(
                     index=index,
                     name=name,
                     value=value,
