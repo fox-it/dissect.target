@@ -1,22 +1,32 @@
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import TargetRecordDescriptor
-
 
 GENERIC_HISTORY_RECORD_FIELDS = [
-    ("datetime", "lastvisited"),
+    ("datetime", "ts"),
     ("string", "browser"),
     ("string", "id"),
     ("uri", "url"),
     ("string", "title"),
+    ("string", "description"),
     ("string", "rev_host"),
+    ("varint", "visit_type"),
     ("varint", "visit_count"),
     ("string", "hidden"),
     ("string", "typed"),
-    ("string", "source"),
+    ("varint", "session"),
+    ("varint", "from_visit"),
+    ("uri", "from_url"),
+    ("path", "source"),
 ]
 
-BrowserHistoryRecord = TargetRecordDescriptor("browsers/history", GENERIC_HISTORY_RECORD_FIELDS)
+BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
+)
 
 
 class BrowserPlugin(Plugin):
@@ -64,15 +74,21 @@ class BrowserPlugin(Plugin):
         Yields BrowserHistoryRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
+            ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
             url (uri): History URL.
             title (string): Page title.
+            description (string): Page description.
             rev_host (string): Reverse hostname.
-            lastvisited (datetime): Last visited date and time.
+            visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
             typed (string): Typed value.
+            session (varint): Session value.
+            from_visit (varint): Record ID of the "from" visit.
+            from_url (uri): URL of the "from" visit.
+            source: (path): The source file of the history record.
         """
         for e in self._func("history"):
             yield e
