@@ -46,7 +46,7 @@ def tmpdir_name():
 
 @pytest.fixture
 def fs_win(tmpdir_name):
-    fs = VirtualFilesystem(case_sensitive=False)
+    fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
     fs.map_dir("windows/system32", tmpdir_name)
     fs.map_dir("windows/system32/config/", tmpdir_name)
     yield fs
@@ -90,7 +90,7 @@ def target_win(hive_hklm, fs_win):
     mock_target.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
 
     mock_target.filesystems.add(fs_win)
-    mock_target.fs.mount("C:\\", fs_win)
+    mock_target.fs.mount("C:", fs_win)
     mock_target.apply()
 
     yield mock_target

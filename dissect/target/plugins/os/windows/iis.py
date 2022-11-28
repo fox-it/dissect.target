@@ -247,7 +247,7 @@ class IISLogsPlugin(plugin.Plugin):
 
     @plugin.internal
     def iter_log_paths(self, log_dir: str) -> Generator[Path, None, None]:
-        log_dir = fsutil.normalize(log_dir)
+        log_dir = fsutil.normalize(log_dir, alt_separator=self.target.fs.alt_separator)
         yield from self.target.fs.path(log_dir).glob("*/*.log")
 
     @plugin.export(record=BasicRecordDescriptor)

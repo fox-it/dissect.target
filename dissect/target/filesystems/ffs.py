@@ -61,7 +61,7 @@ class FfsFilesystemEntry(FilesystemEntry):
         return self
 
     def get(self, path):
-        entry_path = fsutil.join(self.path, path)
+        entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
         return FfsFilesystemEntry(self.fs, entry_path, entry)
 
@@ -90,7 +90,7 @@ class FfsFilesystemEntry(FilesystemEntry):
 
     def scandir(self):
         for entry in self._iterdir():
-            entry_path = fsutil.join(self.path, entry.name)
+            entry_path = fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator)
             yield FfsFilesystemEntry(self.fs, entry_path, entry)
 
     def is_dir(self):

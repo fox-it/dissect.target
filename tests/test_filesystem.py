@@ -396,7 +396,7 @@ def test_filesystem_virtual_filesystem_makedirs(paths):
 
         partial_path = ""
         for part in vfspath.strip("/").split("/"):
-            partial_path = fsutil.join(partial_path, part)
+            partial_path = fsutil.join(partial_path, part, alt_separator=vfs.alt_separator)
             vfs_entry = vfs.get(partial_path)
 
             assert isinstance(vfs_entry, VirtualDirectory)
@@ -418,7 +418,7 @@ def test_filesystem_virtual_filesystem_map_fs(vfs):
     root_vfs = VirtualFilesystem()
     map_path = "/some/dir/"
     file_path = "/path/to/some/file"
-    root_file_path = fsutil.join(map_path, file_path)
+    root_file_path = fsutil.join(map_path, file_path, alt_separator=vfs.alt_separator)
 
     root_vfs.map_fs(map_path, vfs)
 
@@ -448,15 +448,21 @@ def test_filesystem_virtual_filesystem_map_dir():
 
                         vfs.map_dir(vfs_path, tmp_dir)
 
-                        entry_name = fsutil.join(vfs_path, os.path.relpath(some_dir, tmp_dir))
+                        rel_path = os.path.relpath(some_dir, tmp_dir)
+                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
                         dir_entry = vfs.get(entry_name)
                         assert isinstance(dir_entry, VirtualDirectory)
 
-                        entry_name = fsutil.join(vfs_path, os.path.relpath(second_lvl_dir, tmp_dir))
+                        rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
+                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
                         dir_entry = vfs.get(entry_name)
                         assert isinstance(dir_entry, VirtualDirectory)
 
-                        entry_name = fsutil.join(vfs_path, os.path.relpath(some_file.name, tmp_dir))
+                        rel_path = os.path.relpath(some_file.name, tmp_dir)
+                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
                         file_entry = vfs.get(entry_name)
                         assert isinstance(file_entry, MappedFile)
 
@@ -478,7 +484,7 @@ def test_filesystem_virtual_filesystem_map_file(vfs_path):
 
     vfs.map_file(vfs_path, real_path)
 
-    vfs_path = fsutil.normalize(vfs_path).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     vfs_entry = vfs.get(vfs_path)
 
     assert isinstance(vfs_entry, MappedFile)
@@ -508,7 +514,7 @@ def test_filesystem_virtual_filesystem_map_file_fh(vfs_path):
 
     vfs.map_file_fh(vfs_path, fh)
 
-    vfs_path = fsutil.normalize(vfs_path).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     vfs_entry = vfs.get(vfs_path)
 
     assert isinstance(vfs_entry, VirtualFile)
@@ -541,10 +547,10 @@ def test_filesystem_virtual_filesystem_map_file_fh_as_dir():
 )
 def test_filesystem_virtual_filesystem_map_file_entry(vfs_path):
     vfs = VirtualFilesystem()
-    entry_path = fsutil.normalize(vfs_path).strip("/")
+    entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     dir_entry = VirtualDirectory(vfs, entry_path)
 
-    file_name = fsutil.join(vfs_path, "test")
+    file_name = fsutil.join(vfs_path, "test", alt_separator=vfs.alt_separator)
     file_entry = VirtualFile(vfs, file_name, Mock())
     dir_entry.add("test", file_entry)
 
@@ -585,14 +591,14 @@ def test_filesystem_virtual_filesystem_map_file_entry(vfs_path):
 )
 def test_filesystem_virtual_filesystem_link(vfs_path, link_path):
     vfs = VirtualFilesystem()
-    entry_path = fsutil.normalize(vfs_path).strip("/")
+    entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     file_object = Mock()
     file_entry = VirtualFile(vfs, entry_path, file_object)
     vfs.map_file_entry(vfs_path, file_entry)
 
     vfs.link(vfs_path, link_path)
 
-    link_path = fsutil.normalize(link_path).strip("/")
+    link_path = fsutil.normalize(link_path, alt_separator=vfs.alt_separator).strip("/")
     link_entry = vfs.get(link_path)
 
     assert link_entry is file_entry
@@ -628,8 +634,8 @@ def test_filesystem_virtual_filesystem_symlink(vfs_path, link_path):
 
     vfs.symlink(vfs_path, link_path)
 
-    vfs_path = fsutil.normalize(vfs_path).strip("/")
-    link_path = fsutil.normalize(link_path).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    link_path = fsutil.normalize(link_path, alt_separator=vfs.alt_separator).strip("/")
     link_entry = vfs.get(link_path)
 
     assert isinstance(link_entry, VirtualSymlink)

@@ -64,7 +64,7 @@ class VmcxLoader(Loader):
                         continue
 
                     filepath = drive["pathname"]
-                    filename = fsutil.basename(filepath)
+                    filename = fsutil.basename(filepath, alt_separator="\\")
                     relative_path = self.base_dir.joinpath(filename)
                     if relative_path.exists():
                         disk_path = relative_path

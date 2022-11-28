@@ -55,7 +55,8 @@ class ExtFilesystemEntry(FilesystemEntry):
         return self
 
     def get(self, path):
-        return ExtFilesystemEntry(self.fs, fsutil.join(self.path, path), self.fs._get_node(path, self.entry))
+        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return ExtFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
     def open(self):
         if self.is_dir():
@@ -88,7 +89,8 @@ class ExtFilesystemEntry(FilesystemEntry):
                 if fname in (".", ".."):
                     continue
 
-                yield ExtFilesystemEntry(self.fs, fsutil.join(self.path, fname), f)
+                path = fsutil.join(self.path, fname, alt_separator=self.fs.alt_separator)
+                yield ExtFilesystemEntry(self.fs, path, f)
 
     def is_dir(self):
         try:

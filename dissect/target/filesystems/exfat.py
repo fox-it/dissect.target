@@ -32,7 +32,7 @@ class ExfatFilesystem(Filesystem):
     def get(self, path):
         """Returns a ExfatFilesystemEntry object corresponding to the given pathname"""
         try:
-            dirname, file = fsutil.split(path)
+            dirname, file = fsutil.split(path, alt_separator=self.alt_separator)
             if path == dirname and not file:
                 entry = self._gen_dict_extract(dirname)
             elif dirname and file:
@@ -76,7 +76,7 @@ class ExfatFilesystem(Filesystem):
             if path == "/":
                 yield self.get(file)
             else:
-                paths.append(fsutil.join(path, file))
+                paths.append(fsutil.join(path, file, alt_separator=self.alt_separator))
 
             for path in paths:
                 yield self.get(path)

@@ -41,14 +41,14 @@ class ResolverPlugin(Plugin):
 
     def resolve_windows(self, path: str, user_sid: Optional[str] = None):
         # Normalize first so the replacements are easier
-        path = fsutil.normalize(path)
+        path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
         for entry, environment in REPLACEMENTS:
             path = re.sub(entry, re.escape(environment), path, flags=re.IGNORECASE)
 
         path = self.target.expand_env(path)
         # Normalize again because environment variable expansion may have introduced backslashes again
-        path = fsutil.normalize(path)
+        path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
         # The \??\ pseudo path is used to point to the directory containing
         # (the user's) devices, e.g. \??\C:\foo\bar.
@@ -74,7 +74,7 @@ class ResolverPlugin(Plugin):
         if user_path_env:
             for path_env in user_path_env.split(";"):
                 # Normalize because environment variable may contain backslashes
-                path_env = fsutil.normalize(path_env).rstrip("/")
+                path_env = fsutil.normalize(path_env, alt_separator=self.target.fs.alt_separator).rstrip("/")
                 search_paths.append(path_env)
         if not search_paths:
             search_paths = FALLBACK_SEARCH_PATHS
@@ -102,4 +102,4 @@ class ResolverPlugin(Plugin):
         return path
 
     def resolve_default(self, path: str, user_id: Optional[str] = None):
-        return fsutil.normalize(path)
+        return fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)

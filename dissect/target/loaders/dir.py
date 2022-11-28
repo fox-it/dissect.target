@@ -31,8 +31,14 @@ def map_dirs(target: Target, path: Path, **kwargs) -> None:
     """
     os_type, dirs = find_dirs(path)
 
+    alt_separator = ""
+    case_sensitive = True
+    if os_type == "windows":
+        alt_separator = "\\"
+        case_sensitive = False
+
     for path in dirs:
-        dfs = DirectoryFilesystem(path, case_sensitive=os_type != "windows")
+        dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
         target.filesystems.add(dfs)
 
         if os_type == "windows":

@@ -94,7 +94,7 @@ class CbFilesystemEntry(FilesystemEntry):
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = [
             mode | 0o755,
-            fsutil.generate_addr(self.path),
+            fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
             id(self.fs),
             0,
             0,

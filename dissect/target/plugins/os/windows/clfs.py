@@ -93,7 +93,8 @@ class ClfsPlugin(Plugin):
                         if stream.lsn_base.PhysicalOffset <= 0:
                             continue
 
-                        container_path = fsutil.normalize(blf_container.name.replace("%BLF%", str(blf_path.parent)))
+                        container_path = blf_container.name.replace("%BLF%", str(blf_path.parent))
+                        container_path = fsutil.normalize(container_path, alt_separator=blf_path._flavour.altsep)
                         container_file = self.target.fs.path(container_path)
 
                         fh = container_file.open()
