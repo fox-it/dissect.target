@@ -1,3 +1,4 @@
+import os
 import pathlib
 import tempfile
 
@@ -5,7 +6,6 @@ import pytest
 
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.helpers import fsutil
 
 
 def test_target_path_checks_dirfs(tmpdir_name, target_win):
@@ -13,7 +13,7 @@ def test_target_path_checks_dirfs(tmpdir_name, target_win):
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         tf.write(b"dummy")
         tf.flush()
-        tmpfile_name = fsutil.basename(tf.name)
+        tmpfile_name = os.path.basename(tf.name)
 
         fs = DirectoryFilesystem(path=pathlib.Path(tmpdir_name))
         target_win.filesystems.add(fs)
@@ -28,7 +28,7 @@ def test_target_path_checks_mapped_dir(tmpdir_name, target_win):
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         tf.write(b"dummy")
         tf.flush()
-        tmpfile_name = fsutil.basename(tf.name)
+        tmpfile_name = os.path.basename(tf.name)
 
         target_win.filesystems.entries[0].map_dir("test-dir", tmpdir_name)
         assert target_win.fs.path("C:\\test-dir\\").is_dir()

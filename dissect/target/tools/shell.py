@@ -343,7 +343,7 @@ class TargetCli(TargetCmd):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        path = fsutil.abspath(path, cwd=str(self.cwd))
+        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.target.fs.path(path)
 
     def resolveglobpath(self, path):
@@ -505,7 +505,7 @@ class TargetCli(TargetCmd):
         # Entry is an NTFSEntry and has alternative datastream
         if hasattr(entry, "deref") and ":" in name:
             # retrieve the ads from the NTFS entry
-            ads_path = fsutil.join(fsutil.dirname(entry.path), name)
+            ads_path = fsutil.join(fsutil.dirname(entry.path, separator=entry.fs.alt_separator), name)
             entry = entry.fs.get(ads_path)
 
         stat = entry.lstat()

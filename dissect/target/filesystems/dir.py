@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dissect.target.exceptions import FileNotFoundError, FilesystemError, IsADirectoryError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
@@ -8,9 +9,9 @@ from dissect.target.helpers import fsutil
 class DirectoryFilesystem(Filesystem):
     __fstype__ = "dir"
 
-    def __init__(self, path, case_sensitive=True):
+    def __init__(self, path: Path, alt_separator: str = "", case_sensitive: bool = True) -> None:
         self.base_path = path
-        super().__init__(case_sensitive=case_sensitive)
+        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive)
 
     @staticmethod
     def detect(fh):
@@ -54,7 +55,8 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         return self
 
     def get(self, path):
-        return self.fs.get(fsutil.join(self.path, path))
+        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return self.fs.get(path)
 
     def open(self):
         if self.is_dir():
@@ -79,7 +81,8 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             yield from self.readlink_ext().scandir()
         else:
             for item in self.entry.iterdir():
-                yield DirectoryFilesystemEntry(self.fs, fsutil.join(self.path, item.name), item)
+                path = fsutil.join(self.path, item.name, alt_separator=self.fs.alt_separator)
+                yield DirectoryFilesystemEntry(self.fs, path, item)
 
     def exists(self):
         try:

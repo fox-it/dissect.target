@@ -42,7 +42,8 @@ class AD1Filesystem(Filesystem):
 
 class AD1FilesystemEntry(FilesystemEntry):
     def get(self, path):
-        return AD1FilesystemEntry(self.fs, fsutil.join(self.path, path), self.fs._get_node(path, self.entry))
+        path = fsutil.join(self.path, path, alt_separator=self.alt_separator)
+        return AD1FilesystemEntry(self.fs, path, self.fs._get_node(path, self.entry))
 
     def open(self):
         if self.is_dir():
@@ -61,7 +62,8 @@ class AD1FilesystemEntry(FilesystemEntry):
             raise NotADirectoryError(self.path)
 
         for fname, file_ in self.entry.listdir().items():
-            yield AD1FilesystemEntry(self.fs, f"{self.path}/{fname}", file_)
+            path = fsutil.join(self.path, fname, alt_separator=self.alt_separator)
+            yield AD1FilesystemEntry(self.fs, path, file_)
 
     def is_file(self):
         return self.entry.is_file()
@@ -83,4 +85,5 @@ class AD1FilesystemEntry(FilesystemEntry):
 
     def lstat(self):
         size = self.entry.size if self.entry.is_file() else 0
-        return fsutil.stat_result([stat.S_IFREG, fsutil.generate_addr(self.path), id(self.fs), 0, 0, 0, size, 0, 0, 0])
+        entry_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.stat_result([stat.S_IFREG, entry_addr, id(self.fs), 0, 0, 0, size, 0, 0, 0])

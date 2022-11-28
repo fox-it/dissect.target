@@ -13,7 +13,7 @@ import logging
 import posixpath
 import re
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
-from typing import Any, Sequence, Set, Tuple, Union
+from typing import Any, List, Sequence, Set, Tuple, Union
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
@@ -25,53 +25,64 @@ from dissect.target.exceptions import (
 
 log = logging.getLogger(__name__)
 
-re_normalize_path = re.compile(r"[\\/]+")
+re_normalize_path = re.compile(r"[/]+")
+re_normalize_sbs_path = re.compile(r"[\\/]+")
 re_glob_magic = re.compile(r"[*?[]")
 re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]\/?")
 
 
-def normalize(path):
-    return re_normalize_path.sub("/", path)
+def normalize(path: str, alt_separator: str = "") -> str:
+    if alt_separator == "\\":
+        return re_normalize_sbs_path.sub("/", path)
+    else:
+        return re_normalize_path.sub("/", path)
 
 
-def join(*args):
-    return posixpath.join(*[normalize(part) for part in args])
+def join(*args, alt_separator: str = "") -> str:
+    return posixpath.join(*[normalize(part, alt_separator=alt_separator) for part in args])
 
 
-def dirname(path):
-    return posixpath.dirname(normalize(path))
+def dirname(path: str, alt_separator: str = "") -> str:
+    return posixpath.dirname(normalize(path, alt_separator=alt_separator))
 
 
-def basename(path):
-    return posixpath.basename(normalize(path))
+def basename(path: str, alt_separator: str = "") -> str:
+    return posixpath.basename(normalize(path, alt_separator=alt_separator))
 
 
-def split(path):
-    return posixpath.split(normalize(path))
+def split(path: str, alt_separator: str = "") -> str:
+    return posixpath.split(normalize(path, alt_separator=alt_separator))
 
 
-def isabs(path):
-    return posixpath.isabs(normalize(path))
+def isabs(path: str, alt_separator: str = "") -> str:
+    return posixpath.isabs(normalize(path, alt_separator=alt_separator))
 
 
-def normpath(path):
-    return posixpath.normpath(normalize(path))
+def normpath(path: str, alt_separator: str = "") -> str:
+    return posixpath.normpath(normalize(path, alt_separator=alt_separator))
 
 
-def abspath(path, cwd=None):
+def abspath(path: str, cwd: str = "", alt_separator: str = "") -> str:
     cwd = cwd or "/"
-    path = normalize(path)
+    cwd = normalize(cwd, alt_separator=alt_separator)
+    path = normalize(path, alt_separator=alt_separator)
     if not isabs(path):
         path = join(cwd, path)
     return posixpath.normpath(path)
 
 
-def relpath(path, start):
-    return posixpath.relpath(normalize(path), normalize(start))
+def relpath(path: str, start: str, alt_separator: str = "") -> str:
+    return posixpath.relpath(
+        normalize(path, alt_separator=alt_separator),
+        normalize(start, alt_separator=alt_separator),
+    )
 
 
-def generate_addr(path: Union[str, Path]) -> int:
-    return int(hashlib.sha256(str(path).encode()).hexdigest()[:8], 16)
+def generate_addr(path: Union[str, Path], alt_separator: str = "") -> int:
+    if not alt_separator and isinstance(path, Path):
+        alt_separator = path._flavour.altsep
+    path = normalize(str(path), alt_separator=alt_separator)
+    return int(hashlib.sha256(path.encode()).hexdigest()[:8], 16)
 
 
 splitext = posixpath.splitext
@@ -250,11 +261,10 @@ class _DissectFlavour(_PosixFlavour):
 
         return instance
 
-    def __init__(self, case_sensitive=False, alt_separator=None):
+    def __init__(self, case_sensitive=False, alt_separator=""):
         super().__init__()
+        self.altsep = alt_separator
         self.case_sensitive = case_sensitive
-        if alt_separator:
-            self.altsep = alt_separator
 
     def casefold(self, s):
         return s if self.case_sensitive else s.lower()
@@ -539,10 +549,12 @@ class _DissectPathParents(_PathParents):
     def __init__(self, path):
         super().__init__(path)
         self._fs = path._fs
+        self._flavour = path._flavour
 
     def __getitem__(self, idx):
         result = super().__getitem__(idx)
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
 
@@ -563,12 +575,19 @@ class PureDissectPath(PurePath):
                 % args
             )
 
-        self = super()._from_parts(args[1:], *_args, **_kwargs)  # noqa
+        alt_separator = fs.alt_separator
+        path_args = []
+        for arg in args[1:]:
+            if isinstance(arg, str):
+                arg = normalize(arg, alt_separator=alt_separator)
+            path_args.append(arg)
+
+        self = super()._from_parts(path_args, *_args, **_kwargs)
         self._fs = fs
 
         self._flavour = _DissectFlavour(
-            case_sensitive=fs.case_sensitive,
-            alt_separator=fs.alt_separator
+            alt_separator=fs.alt_separator,
+            case_sensitive=fs.case_sensitive
         )
 
         return self
@@ -576,26 +595,31 @@ class PureDissectPath(PurePath):
     def _make_child(self, args):
         child = super()._make_child(args)  # noqa
         child._fs = self._fs
+        child._flavour = self._flavour
         return child
 
     def with_name(self, name):
         result = super().with_name(name)
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
     def with_stem(self, stem):
         result = super().with_stem(stem)
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
     def with_suffix(self, suffix):
         result = super().with_suffix(suffix)
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
     def relative_to(self, *other):
         result = super().relative_to(*other)
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
     def __rtruediv__(self, key):
@@ -608,6 +632,7 @@ class PureDissectPath(PurePath):
     def parent(self):
         result = super().parent
         result._fs = self._fs
+        result._flavour = self._flavour
         return result
 
     @property
@@ -627,6 +652,7 @@ class TargetPath(Path, PureDissectPath):
     def _make_child_relpath(self, part):
         child = super()._make_child_relpath(part)  # noqa
         child._fs = self._fs
+        child._flavour = self._flavour
         return child
 
     def get(self):
@@ -814,9 +840,9 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
         yield [path_entry], dirs, files
 
 
-def glob_split(pattern):
+def glob_split(pattern: str, alt_separator: str = "") -> str:
     # re_glob_index expects a normalized pattern
-    pattern = normalize(pattern)
+    pattern = normalize(pattern, alt_separator=alt_separator)
 
     first_glob = re_glob_index.search(pattern)
 
@@ -827,8 +853,8 @@ def glob_split(pattern):
     return pattern[:pos], pattern[pos:]
 
 
-def glob_ext(direntry, pattern):
-    dir_name, base_name = split(pattern)
+def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> filesystem.FilesystemEntry:
+    dir_name, base_name = split(pattern, alt_separator=direntry.fs.alt_separator)
 
     if not has_glob_magic(pattern):
         try:
@@ -868,7 +894,7 @@ def glob_ext(direntry, pattern):
 # takes a literal base_name (so it only has to check for its existence).
 
 
-def glob_ext1(direntry, pattern):
+def glob_ext1(direntry: filesystem.FilesystemEntry, pattern: str) -> filesystem.FilesystemEntry:
     if not direntry.is_dir():
         return
 
@@ -884,7 +910,7 @@ def glob_ext1(direntry, pattern):
             yield e
 
 
-def glob_ext0(direntry, base_name):
+def glob_ext0(direntry: filesystem.FilesystemEntry, base_name: str) -> List[filesystem.FilesystemEntry]:
     if base_name == "":
         # `os.path.split()` returns an empty base_name for paths ending with a
         # directory separator.  'q*x/' should match only directories.
@@ -910,22 +936,24 @@ def resolve_link(
     It stops resolving once it detects an infinite recursion loop.
     """
 
-    link = entry.readlink()
+    link = normalize(entry.readlink(), alt_separator=entry.fs.alt_separator)
+    path = normalize(entry.path, alt_separator=entry.fs.alt_separator)
 
     # Create hash for entry based on path and link
-    hash_entry = hash(f"{entry.path}{link}")
+    link_id = f"{path}{link}"
+    hash_entry = hash(link_id)
 
     if not previous_links:
         previous_links = set()
 
     # Check whether the current entry was already resolved once.
     if hash_entry in previous_links:
-        raise SymlinkRecursionError("Symlink loop detected for %s" % f"{entry.path}{link}")
+        raise SymlinkRecursionError(f"Symlink loop detected for {link_id}")
 
     previous_links.add(hash_entry)
 
     if not isabs(link):
-        cur_dirname = dirname(normpath(entry.path))
+        cur_dirname = dirname(normpath(path))
         link = normpath(join(cur_dirname, link))
 
     # retrieve file from root

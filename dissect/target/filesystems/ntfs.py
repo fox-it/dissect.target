@@ -88,7 +88,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(
             self.fs,
-            fsutil.join(self.path, path),
+            fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
             self.fs._get_record(path, self.dereference()),
         )
 
@@ -114,9 +114,8 @@ class NtfsFilesystemEntry(FilesystemEntry):
 
     def scandir(self) -> Iterator[NtfsFilesystemEntry]:
         for index_entry in self._iterdir():
-            yield NtfsFilesystemEntry(
-                self.fs, fsutil.join(self.path, index_entry.attribute.file_name), index_entry=index_entry
-            )
+            path = fsutil.join(self.path, index_entry.attribute.file_name, alt_separator=self.fs.alt_separator)
+            yield NtfsFilesystemEntry(self.fs, path, index_entry=index_entry)
 
     def is_dir(self) -> bool:
         return self.dereference().is_dir()

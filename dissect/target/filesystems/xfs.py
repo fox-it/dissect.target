@@ -55,7 +55,8 @@ class XfsFilesystemEntry(FilesystemEntry):
         return self
 
     def get(self, path):
-        return XfsFilesystemEntry(self.fs, fsutil.join(self.path, path), self.fs._get_node(path, self.entry))
+        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return XfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
     def open(self):
         if self.is_dir():
@@ -89,7 +90,8 @@ class XfsFilesystemEntry(FilesystemEntry):
 
                 if filename is None:
                     continue
-                yield XfsFilesystemEntry(self.fs, fsutil.join(self.path, filename), f)
+                path = fsutil.join(self.path, filename, alt_separator=self.fs.alt_separator)
+                yield XfsFilesystemEntry(self.fs, path, f)
 
     def is_dir(self):
         try:

@@ -67,7 +67,8 @@ class VmfsFilesystemEntry(FilesystemEntry):
 
     def get(self, path):
         """Get a filesystem entry relative from the current one."""
-        return VmfsFilesystemEntry(self.fs, fsutil.join(self.path, path), self.fs._get_node(path, self.entry))
+        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return VmfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
     def open(self):
         """Returns file handle (file-like object)."""
@@ -97,7 +98,8 @@ class VmfsFilesystemEntry(FilesystemEntry):
     def scandir(self):
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         for f in self._iterdir():
-            yield VmfsFilesystemEntry(self.fs, fsutil.join(self.path, f.name), f)
+            path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
+            yield VmfsFilesystemEntry(self.fs, path, f)
 
     def is_dir(self):
         """Return whether this entry is a directory. Resolves symlinks when possible."""

@@ -59,7 +59,8 @@ class FatFilesystem(Filesystem):
 class FatFilesystemEntry(FilesystemEntry):
     def get(self, path):
         """Get a filesystem entry relative from the current one."""
-        return FatFilesystemEntry(self.fs, fsutil.join(self.path, path), self.fs._get_entry(path, self.entry))
+        full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return FatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
     def open(self):
         """Returns file handle (file-like object)."""
@@ -85,7 +86,8 @@ class FatFilesystemEntry(FilesystemEntry):
         for f in self.entry.iterdir():
             if f.name in (".", ".."):
                 continue
-            yield FatFilesystemEntry(self.fs, fsutil.join(self.path, f.name), f)
+            path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
+            yield FatFilesystemEntry(self.fs, path, f)
 
     def is_symlink(self):
         """Return whether this entry is a link."""

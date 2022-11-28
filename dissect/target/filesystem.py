@@ -32,15 +32,15 @@ class Filesystem:
 
     def __init__(
         self,
+        alt_separator: str = "",
         case_sensitive: bool = True,
-        alt_separator: Optional[str] = None,
         volume: Optional[Volume] = None,
     ) -> None:
         """The base initializer for the class.
 
         Args:
             case_sensitive: Defines if the paths in the Filesystem are case sensitive or not.
-            alt_separator: The seperator used to distingish between directories in a path.
+            alt_separator: The alternative separator used to distingish between directories in a path.
             volume: A volume associated with the filesystem.
 
         Raises:
@@ -203,7 +203,7 @@ class Filesystem:
         Returns:
             An iterator of FilesystemEntry's that match the pattern.
         """
-        path, pattern = fsutil.glob_split(pattern)
+        path, pattern = fsutil.glob_split(pattern, alt_separator=self.alt_separator)
         try:
             entry = self.get(path)
         except FileNotFoundError:
@@ -403,7 +403,7 @@ class FilesystemEntry:
         """
         self.fs = fs
         self.path = path
-        self.name = fsutil.basename(path)
+        self.name = fsutil.basename(path, alt_separator=self.fs.alt_separator)
         self.entry = entry
 
     def __repr__(self):
@@ -762,7 +762,8 @@ class VirtualDirectory(FilesystemEntry):
                 yield entry
 
     def _stat(self):
-        return fsutil.stat_result([stat.S_IFDIR, fsutil.generate_addr(self.path), id(self.fs), 0, 0, 0, 0, 0, 0, 0])
+        path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 0, 0, 0, 0, 0, 0, 0])
 
     def stat(self):
         if self.top:
@@ -861,7 +862,7 @@ class VirtualFile(FilesystemEntry):
         raise TypeError(f"lattr is not allowed on VirtualFile: {self.path}")
 
     def get(self, path):
-        path = fsutil.normalize(path).strip("/")
+        path = fsutil.normalize(path, alt_separator=self.fs.alt_separator).strip("/")
         if not path:
             return self
         raise NotADirectoryError(f"'{self.path}' is not a directory")
@@ -877,7 +878,8 @@ class VirtualFile(FilesystemEntry):
 
     def stat(self):
         size = getattr(self.entry, "size", 0)
-        return fsutil.stat_result([stat.S_IFREG, fsutil.generate_addr(self.path), id(self.fs), 0, 0, 0, size, 0, 0, 0])
+        file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 0, 0, 0, size, 0, 0, 0])
 
     lstat = stat
 
@@ -926,9 +928,8 @@ class VirtualSymlink(FilesystemEntry):
         return self.readlink_ext().stat()
 
     def lstat(self):
-        return fsutil.stat_result(
-            [stat.S_IFLNK, fsutil.generate_addr(self.path), id(self.fs), 0, 0, 0, len(self.target), 0, 0, 0]
-        )
+        link_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
+        return fsutil.stat_result([stat.S_IFLNK, link_addr, id(self.fs), 0, 0, 0, len(self.target), 0, 0, 0])
 
     def is_dir(self):
         return self.readlink_ext().is_dir()
@@ -956,8 +957,8 @@ class VirtualFilesystem(Filesystem):
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         entry = relentry or self.root
-        path = fsutil.normalize(path).strip("/")
-        full_path = fsutil.join(entry.path, path)
+        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)
 
         if not path:
             return entry
@@ -990,7 +991,7 @@ class VirtualFilesystem(Filesystem):
                     entry = entry[part]
                 elif entry.top:
                     try:
-                        return entry.top.get(fsutil.join(*parts[i:]))
+                        return entry.top.get(fsutil.join(*parts[i:], alt_separator=self.alt_separator))
                     except FilesystemError as e:
                         raise FileNotFoundError(full_path, cause=e)
                 else:
@@ -1000,7 +1001,7 @@ class VirtualFilesystem(Filesystem):
 
     def makedirs(self, path: str) -> VirtualDirectory:
         """Create virtual directories into the VFS from the given path."""
-        path = fsutil.normalize(path).strip("/")
+        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
         directory = self.root
 
         if not path:
@@ -1009,7 +1010,7 @@ class VirtualFilesystem(Filesystem):
         parts = path.split("/")
         for i, part in enumerate(parts):
             if part not in directory:
-                vdir = VirtualDirectory(self, fsutil.join(*parts[: i + 1]))
+                vdir = VirtualDirectory(self, fsutil.join(*parts[: i + 1], alt_separator=self.alt_separator))
                 vdir.up = directory
 
                 directory.add(part, vdir)
@@ -1027,7 +1028,7 @@ class VirtualFilesystem(Filesystem):
 
     def map_dir(self, vfspath: str, realpath: str) -> None:
         """Recursively map a directory from the host machine into the VFS."""
-        vfspath = fsutil.normalize(vfspath).strip("/")
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).strip("/")
         base = os.path.abspath(realpath)
 
         for root, dirs, files in os.walk(base):
@@ -1035,21 +1036,21 @@ class VirtualFilesystem(Filesystem):
             if relroot == ".":
                 relroot = ""
 
-            vfsroot = fsutil.join(vfspath, relroot)
+            vfsroot = fsutil.join(vfspath, relroot, alt_separator=self.alt_separator)
             directory = self.makedirs(vfsroot)
 
             for dir_ in dirs:
-                vfs_dir = fsutil.join(vfsroot, dir_)
+                vfs_dir = fsutil.join(vfsroot, dir_, alt_separator=self.alt_separator)
                 self.makedirs(vfs_dir)
 
             for file_ in files:
-                vfs_file_path = fsutil.join(vfsroot, file_)
+                vfs_file_path = fsutil.join(vfsroot, file_, alt_separator=self.alt_separator)
                 real_file_path = os.path.join(root, file_)
                 directory.add(file_, MappedFile(self, vfs_file_path, real_file_path))
 
     def map_file(self, vfspath: str, realpath: str) -> None:
         """Map a file from the host machine into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         if vfspath[-1] == "/":
             raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
         file_path = vfspath.lstrip("/")
@@ -1057,7 +1058,7 @@ class VirtualFilesystem(Filesystem):
 
     def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
         """Map a file handle into the VFS."""
-        vfspath = fsutil.normalize(vfspath)
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         if vfspath[-1] == "/":
             raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
         file_path = vfspath.lstrip("/")
@@ -1069,17 +1070,17 @@ class VirtualFilesystem(Filesystem):
         Any missing subdirectories up to, but not including, the last part of
         ``vfspath`` will be created.
         """
-        vfspath = fsutil.normalize(vfspath).strip("/")
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).strip("/")
         if not vfspath:
             self.root.top = entry
         else:
             if "/" in vfspath:
-                sub_dirs = fsutil.dirname(vfspath)
+                sub_dirs = fsutil.dirname(vfspath, alt_separator=self.alt_separator)
                 directory = self.makedirs(sub_dirs)
             else:
                 directory = self.root
 
-            entry_name = fsutil.basename(vfspath)
+            entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
             directory.add(entry_name, entry)
 
     def link(self, src: str, dst: str) -> None:
@@ -1088,8 +1089,8 @@ class VirtualFilesystem(Filesystem):
 
     def symlink(self, src: str, dst: str) -> None:
         """Create a symlink to another location."""
-        src = fsutil.normalize(src).strip("/")
-        dst = fsutil.normalize(dst).strip("/")
+        src = fsutil.normalize(src, alt_separator=self.alt_separator).strip("/")
+        dst = fsutil.normalize(dst, alt_separator=self.alt_separator).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
 
@@ -1100,9 +1101,9 @@ class RootFilesystem(Filesystem):
         self.target = target
         self.layers = []
         self.mounts = {}
-        self._root_entry = RootFilesystemEntry(self, "/", [])
-        self._case_sensitive = True
         self._alt_separator = "/"
+        self._case_sensitive = True
+        self._root_entry = RootFilesystemEntry(self, "/", [])
         self.root = self.add_layer()
         super().__init__()
 
@@ -1129,7 +1130,7 @@ class RootFilesystem(Filesystem):
 
     def link(self, dst, src):
         """Hard link a RootFilesystemEntry to another location."""
-        dst = fsutil.normalize(dst)
+        dst = fsutil.normalize(dst, alt_separator=self.alt_separator)
         self.root.map_file_entry(dst, self.get(src))
 
     def symlink(self, dst, src):
@@ -1168,8 +1169,8 @@ class RootFilesystem(Filesystem):
         self.target.log.debug("%r::get(%r)", self, path)
 
         entry = relentry or self._root_entry
-        path = fsutil.normalize(path).strip("/")
-        full_path = fsutil.join(entry.path, path)
+        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)
 
         if not path:
             return entry
@@ -1310,7 +1311,8 @@ class RootFilesystemEntry(FilesystemEntry):
             # non case-sensitive FSes, the different entries from the
             # overlaying FSes may have different casing of the name.
             entry_name = entries[0].name
-            yield RootFilesystemEntry(selfentry.fs, fsutil.join(selfentry.path, entry_name), entries)
+            path = fsutil.join(selfentry.path, entry_name, alt_separator=selfentry.fs.alt_separator)
+            yield RootFilesystemEntry(selfentry.fs, path, entries)
 
     def is_file(self):
         self.fs.target.log.debug("%r::is_file()", self)
