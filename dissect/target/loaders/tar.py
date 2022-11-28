@@ -48,7 +48,7 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
-                entry = TarFile(vol, member.name, member.name, self.tar)
+                entry = TarFile(volume, member.name, member.name, self.tar)
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
