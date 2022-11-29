@@ -1,17 +1,17 @@
 import ctypes
 import platform
 import re
+from functools import cache
 from pathlib import Path
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target import filesystem, volume, Target
+from dissect.target import Target, filesystem, volume
 from dissect.target.containers.raw import RawContainer
-from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.exceptions import LoaderError
-from dissect.target.loader import Loader
+from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.utils import parse_path_uri
-
+from dissect.target.loader import Loader
 
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
 LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
@@ -207,6 +207,12 @@ def _get_windows_drive_volumes(log):
 
             if disk_num not in disk_map:
                 disk_path = f"\\\\.\\PhysicalDrive{disk_num}"
+
+                # Check if drive can be accessed (skip emulated drives like RAM disks)
+                if not _is_physical_drive(disk_path):
+                    log.debug(f"Skipped drive {disk_num}, not a physical drive (could be emulation or ram disk)")
+                    continue
+
                 try:
                     disk_size = _windows_get_disk_size(disk_path)
                 except Exception as e:
@@ -298,6 +304,7 @@ def map_windows_mounted_drives(target: Target, force_dirfs: bool = False, fallba
         target.disks.add(disks[disk_num])
 
 
+@cache
 def _windows_get_devices():
     """Internal function to query all devices.
 
@@ -321,6 +328,11 @@ def _windows_get_devices():
 
     devices = [d.decode() for d in devices_buf.raw.rstrip(b"\x00").split(b"\x00")]
     return devices
+
+
+def _is_physical_drive(path):
+    path = path.replace("\\\\.\\", "")
+    return path in _windows_get_devices()
 
 
 def _windows_get_disk_size(path):

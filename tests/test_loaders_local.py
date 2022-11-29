@@ -1,11 +1,37 @@
-import pytest
 from pathlib import Path
+from unittest.mock import call, mock_open, patch
 
-from unittest.mock import patch, mock_open
+import pytest
 
 from dissect.target.containers.raw import RawContainer
-from dissect.target.loaders.local import _add_disk_as_raw_container_to_target, LINUX_DRIVE_REGEX
+from dissect.target.loaders.local import (
+    LINUX_DRIVE_REGEX,
+    _add_disk_as_raw_container_to_target,
+    _get_windows_drive_volumes,
+)
 from dissect.target.target import TargetLogAdapter
+
+
+@patch("builtins.open", create=True)
+@patch("ctypes.windll.kernel32.GetDriveTypeA", create=True, return_value=3)
+@patch("ctypes.windll", create=True)
+@patch("dissect.util.stream.BufferedStream", create=True)
+@patch("dissect.target.loaders.local._read_drive_letters", create=True, return_value=[b"Z:"])
+@patch("dissect.target.volume.Volume", create=True)
+@patch("dissect.target.target.TargetLogAdapter", create=True)
+@patch("dissect.target.loaders.local._windows_get_volume_disk_extents", create=True)
+def test_local_loader_skip_emulated_drive(extents, log, *args):
+    class Dummy:
+        def __init__(self, data):
+            self.__dict__ = data
+
+    dummy = Dummy(
+        {"NumberOfDiskExtents": 1, "Extents": [Dummy({"DiskNumber": "999", "StartingOffset": 0, "ExtentLength": 0})]}
+    )
+    extents.return_value = dummy
+    for volume in _get_windows_drive_volumes(log):
+        pass
+    assert call.debug("Skipped drive 999, not a physical drive (could be emulation or ram disk)") in log.mock_calls
 
 
 def test_local_loader_drive_skipping(mock_target):
