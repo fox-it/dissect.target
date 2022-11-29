@@ -39,6 +39,7 @@ class BrowserPlugin(Plugin):
         "firefox",
         "chrome",
         "iexplore",
+        "edge"
     ]
 
     def __init__(self, target):
@@ -66,7 +67,7 @@ class BrowserPlugin(Plugin):
     def history(self):
         """Return browser history records from all browsers installed.
 
-        Historical browser records for Internet Explorer, Chrome and Firefox are returned.
+        Historical browser records for Internet Explorer, Chrome, Firefox and Edge (Chromium) are returned.
 
         Yields BrowserHistoryRecords with the following fields:
             hostname (string): The target hostname.
