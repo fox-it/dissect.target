@@ -330,7 +330,7 @@ def _windows_get_devices():
     return devices
 
 
-def _is_physical_drive(path):
+def _is_physical_drive(path: str) -> bool:
     path = path.replace("\\\\.\\", "")
     return path in _windows_get_devices()
 

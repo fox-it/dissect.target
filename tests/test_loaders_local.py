@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import call, mock_open, patch
+from unittest.mock import call, mock_open, patch, MagicMock
 
 import pytest
 
@@ -20,7 +20,7 @@ from dissect.target.target import TargetLogAdapter
 @patch("dissect.target.volume.Volume", create=True)
 @patch("dissect.target.target.TargetLogAdapter", create=True)
 @patch("dissect.target.loaders.local._windows_get_volume_disk_extents", create=True)
-def test_local_loader_skip_emulated_drive(extents, log, *args):
+def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *args) -> None:
     class Dummy:
         def __init__(self, data):
             self.__dict__ = data
