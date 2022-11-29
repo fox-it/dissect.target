@@ -1,20 +1,22 @@
 from pathlib import Path
 from typing import BinaryIO, Iterator, Tuple
 
-from dissect.esedb import esedb, table, record
+from dissect.esedb import esedb, record, table
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.browsers.browser import GENERIC_HISTORY_RECORD_FIELDS, try_idna
-from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.browsers.browser import (
+    GENERIC_HISTORY_RECORD_FIELDS,
+    try_idna,
+)
 from dissect.target.plugins.general.users import UserDetails
 from dissect.target.target import Target
 
-
 IEBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browsers/ie/history", GENERIC_HISTORY_RECORD_FIELDS
+    "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 
 
@@ -76,19 +78,24 @@ class InternetExplorerPlugin(Plugin):
     def history(self) -> Iterator[IEBrowserHistoryRecord]:
         """Return browser history records from Internet Explorer.
 
-        Yields BrowserHistoryRecords with the following fields:
+        Yields IEBrowserHistoryRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            hostname (string): The target hostname.
+            ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
             url (uri): History URL.
             title (string): Page title.
+            description (string): Page description.
             rev_host (string): Reverse hostname.
-            lastvisited (datetime): Last visited date and time.
+            visit_type (varint): Visit type.
             visit_count (varint): Amount of visits.
             hidden (string): Hidden value.
             typed (string): Typed value.
+            session (varint): Session value.
+            from_visit (varint): Record ID of the "from" visit.
+            from_url (uri): URL of the "from" visit.
+            source: (path): The source file of the history record.
         """
         for user, cdir in self.users_dirs:
             cache_file = cdir.joinpath(self.CACHE_FILENAME)
@@ -102,20 +109,25 @@ class InternetExplorerPlugin(Plugin):
 
                 _, _, url = container_record.get("Url", "").rstrip("\x00").partition("@")
 
-                last_visited_time = (
-                    wintimestamp(container_record.get("AccessedTime")) if container_record.get("AccessedTime") else None
-                )
+                ts = None
+                if accessed_time := container_record.get("AccessedTime"):
+                    ts = wintimestamp(accessed_time)
 
                 yield IEBrowserHistoryRecord(
-                    lastvisited=last_visited_time,
+                    ts=ts,
                     browser="iexplore",
                     id=container_record.get("EntryId"),
                     url=try_idna(url),
                     title=None,
+                    description=None,
                     rev_host=None,
+                    visit_type=None,
                     visit_count=container_record.get("AccessCount"),
                     hidden=None,
                     typed=None,
+                    session=None,
+                    from_visit=None,
+                    from_url=None,
                     source=str(cache_file),
                     _target=self.target,
                     _user=user,
