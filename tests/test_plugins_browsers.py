@@ -1,7 +1,7 @@
-import tempfile
 import gzip
+import tempfile
 
-from dissect.target.plugins.browsers import iexplore, firefox, chrome
+from dissect.target.plugins.browsers import chrome, firefox, iexplore
 
 from ._utils import absolute_path
 
@@ -52,10 +52,10 @@ def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     target_win.add_plugin(firefox.FirefoxPlugin)
 
     records = list(target_win.firefox.history())
-    assert len(records) == 29
+    assert len(records) == 24
 
     records = list(target_win.browser.history())
-    assert len(records) == 29
+    assert len(records) == 24
 
 
 def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
@@ -75,7 +75,7 @@ def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     target_win.add_plugin(chrome.ChromePlugin)
 
     records = list(target_win.chrome.history())
-    assert len(records) == 7
+    assert len(records) == 10
 
     records = list(target_win.browser.history())
-    assert len(records) == 7
+    assert len(records) == 10
