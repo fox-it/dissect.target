@@ -75,7 +75,7 @@ class MuiCachePlugin(Plugin):
                     path = entry.name.rsplit(",-", 1)[0]
 
                 value = entry.value
-                path = str(_path.from_windows(path))
+                path = _path.from_windows(path)
 
                 # Filter on the type of the registry value
                 if type(value) is bytes:
