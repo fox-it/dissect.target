@@ -39,7 +39,7 @@ class BrowserPlugin(Plugin):
         "firefox",
         "chrome",
         "iexplore",
-        "edge"
+        "edge",
     ]
 
     def __init__(self, target):

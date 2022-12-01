@@ -25,7 +25,7 @@ class EdgePlugin(Plugin):
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",
         # Macos
-        "Library/Application Support/Microsoft Edge/Default"
+        "Library/Application Support/Microsoft Edge/Default",
     ]
 
     def __init__(self, target):
