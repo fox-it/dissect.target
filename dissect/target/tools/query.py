@@ -6,13 +6,19 @@ import logging
 import pathlib
 import sys
 from datetime import datetime
+from typing import List
 
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record import (
+    RecordDescriptor,
+    RecordPrinter,
+    RecordStreamWriter,
+    RecordWriter,
+)
 
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
-from dissect.target.plugin import PLUGINS, Plugin
+from dissect.target.plugin import PLUGINS, Plugin, _special_plugins, plugins
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -31,6 +37,15 @@ logging.raiseExceptions = False
 
 
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
+INTERNAL_FUNCS = ["get_all_records"]
+
+QueryRecord = RecordDescriptor(
+    "query",
+    [
+        ("string", "request"),
+        ("string", "result"),
+    ],
+)
 
 
 def record_output(strings=False, json=False):
@@ -43,6 +58,45 @@ def record_output(strings=False, json=False):
         return RecordPrinter(fp)
 
     return RecordStreamWriter(fp)
+
+
+def wildcard(funclist: List[str], internal_funcs: List[str]) -> (List[str], List[str]):
+    pluginlist = []
+
+    # List of functions (includes implied)
+    allfunc = []
+    # Subset of functions implied by wildcard (these are not allowed to error)
+    implied = []
+
+    # Collect all available plugins, even special ones
+    for available in plugins():
+        pluginlist.append(available)
+
+    for available in _special_plugins("_os"):
+        pluginlist.append(available)
+
+    for funcname in funclist:
+        # Either wildcard or dot notation (enables full path notation for plugin)
+        if funcname.count(".") or funcname[-1:] == "*":
+            # Due to hierarchy, only suffix wild card makes sense (i.e. not going to wildcard your OS)
+            pattern = funcname.rstrip("*")
+            for plugin in pluginlist:
+                if plugin["module"].startswith(pattern):
+                    for exported in plugin["exports"]:
+                        # Skip internal functions
+                        if exported in internal_funcs:
+                            continue
+                        # Prepend namespace if necessary
+                        if plugin["namespace"] is not None:
+                            implied.append(f"{plugin['namespace']}.{exported}")
+                        else:
+                            implied.append(exported)
+        else:
+            allfunc.append(funcname)
+
+    allfunc.extend(implied)
+
+    return (implied, allfunc)
 
 
 def main():
@@ -125,7 +179,8 @@ def main():
     if not args.function:
         parser.error("argument -f/--function is required")
 
-    functions = args.function.split(",")
+    # Process wild cards and register implied functions
+    implied, functions = wildcard(args.function.split(","), INTERNAL_FUNCS)
 
     # Show help for a function
     if "-h" in rest or "--help" in rest:
@@ -187,6 +242,11 @@ def main():
                 target.log.error("Exception while executing function `%s`", func, exc_info=True)
                 continue
 
+            # If the output is not a record and we're using a wildcard, then make a record of it
+            if func in implied and output_type != "record":
+                result = [QueryRecord(request=func, result=result)]
+                output_type = "record"
+
             if first_seen_output_type and output_type != first_seen_output_type:
                 target.log.error(
                     (
@@ -231,15 +291,23 @@ def main():
         if len(record_entries):
             rs = record_output(args.strings, args.json)
             for entry in record_entries:
-                for record_entries in entry:
-                    if args.hash:
-                        rs.write(hashutil.hash_uri_records(target, record_entries))
+                try:
+                    for record_entries in entry:
+                        if args.hash:
+                            rs.write(hashutil.hash_uri_records(target, record_entries))
+                        else:
+                            rs.write(record_entries)
+                        count += 1
+                        if args.limit is not None and count >= args.limit:
+                            break_out = True
+                            break
+                except Exception as problem:
+                    # Ignore errors if wildcard
+                    if func in implied:
+                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=problem)
+                        pass
                     else:
-                        rs.write(record_entries)
-                    count += 1
-                    if args.limit is not None and count >= args.limit:
-                        break_out = True
-                        break
+                        raise problem
 
                 if break_out:
                     break
