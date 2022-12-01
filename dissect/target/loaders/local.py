@@ -210,7 +210,7 @@ def _get_windows_drive_volumes(log):
 
                 # Check if drive can be accessed (skip emulated drives like RAM disks)
                 if not _is_physical_drive(disk_path):
-                    log.debug(f"Skipped drive {disk_num}, not a physical drive (could be emulation or ram disk)")
+                    log.debug("Skipped drive %d from %s, not a physical drive (could be emulation or ram disk)", disk_num, drive_path)
                     continue
 
                 try:
