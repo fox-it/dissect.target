@@ -31,7 +31,12 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
     extents.return_value = dummy
     for volume in _get_windows_drive_volumes(log):
         pass
-    assert call.debug("Skipped drive 999, not a physical drive (could be emulation or ram disk)") in log.mock_calls
+    assert (
+        call.debug(
+            "Skipped drive %d from %s, not a physical drive (could be emulation or ram disk)", "999", "\\\\.\\z:"
+        )
+        in log.mock_calls
+    )
 
 
 def test_local_loader_drive_skipping(mock_target):
