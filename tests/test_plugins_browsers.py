@@ -1,7 +1,7 @@
 import gzip
 import tempfile
 
-from dissect.target.plugins.browsers import chrome, firefox, iexplore
+from dissect.target.plugins.browsers import chrome, firefox, iexplore, edge
 
 from ._utils import absolute_path
 
@@ -79,3 +79,26 @@ def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
     records = list(target_win.browser.history())
     assert len(records) == 10
+
+
+def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
+
+    edge_db = absolute_path("data/edge-history.sqlite")
+
+    user = target_win_users.user_details.find(username="John")
+    webcache_dir = user.home_path.joinpath("AppData/Local/Microsoft/Edge/User Data/Default")
+    webcache_file = webcache_dir.joinpath("History")
+
+    webcache_dir = str(webcache_dir)[3:]  # drop C:/
+    webcache_file = str(webcache_file)[3:]  # drop C:/
+
+    fs_win.map_dir("Users\\John", tmpdir_name)
+    fs_win.map_file(webcache_file, edge_db)
+
+    target_win.add_plugin(edge.EdgePlugin)
+
+    records = list(target_win.edge.history())
+    assert len(records) == 9
+
+    records = list(target_win.browser.history())
+    assert len(records) == 9
