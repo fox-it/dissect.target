@@ -6,7 +6,7 @@ import logging
 import pathlib
 import sys
 from datetime import datetime
-from typing import List
+from typing import Callable, List
 
 from flow.record import (
     RecordDescriptor,
@@ -111,7 +111,9 @@ def main():
     parser.add_argument("-f", "--function", help="function to execute")
     parser.add_argument("--child", help="load a specific child path or index")
     parser.add_argument("--children", action="store_true", help="include children")
-    parser.add_argument("-l", "--list", action="store_true", help="list available plugins and loaders")
+    parser.add_argument(
+        "-l", "--list", nargs="?", const=True, action="store", help="list available plugins and loaders"
+    )
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -164,15 +166,21 @@ def main():
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    if args.list:
+    if args.list is not None:
         t = Target()
+
         fparser = generate_argparse_for_bound_method(t.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
-        t.plugins(**vars(fargs))
+
+        tf = None
+        if type(args.list) == str:
+            tf: Callable[[str], bool] = (lambda s: lambda t: t.lower().count(s.lower()) > 0)(args.list)
+
+        t.plugins(**vars(fargs), termfilter=tf)
 
         fparser = generate_argparse_for_bound_method(t.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
-        t.loaders(**vars(fargs))
+        t.loaders(**vars(fargs), termfilter=tf)
 
         parser.exit()
 

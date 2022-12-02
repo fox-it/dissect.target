@@ -1,22 +1,23 @@
 import textwrap
-from typing import Dict, List, Union, Type
+from typing import Dict, List, Type, Union
 
 from dissect.target import plugin
 from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview
 from dissect.target.plugin import Plugin, arg, export
 
 
-def categorize_plugins() -> dict:
+def categorize_plugins(termfilter=None) -> dict:
     """Categorize plugins based on the module it's from."""
 
     output_dict = dict()
     for plugin_dict in get_exported_plugins():
+        if termfilter and not termfilter(plugin_dict["module"]):
+            continue
         tmp_dict = dictify_module_recursive(
             list_of_items=plugin_dict["module"].split("."),
             last_value=plugin.load(plugin_dict),
         )
         update_dict_recursive(output_dict, tmp_dict)
-
     return output_dict
 
 
@@ -100,9 +101,8 @@ class PluginListPlugin(Plugin):
 
     @export(output="none")
     @arg("--docs", dest="print_docs", action="store_true")
-    def plugins(self, print_docs=False):
-
-        categorized_plugins = dict(sorted(categorize_plugins().items()))
+    def plugins(self, print_docs=False, termfilter=None):
+        categorized_plugins = dict(sorted(categorize_plugins(termfilter).items()))
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 
         plugins_list = textwrap.indent(
