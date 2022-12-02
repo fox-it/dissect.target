@@ -1,6 +1,6 @@
 from typing import Generator
 
-from flow.record.fieldtypes import path as _path
+from flow.record.fieldtypes import path
 
 from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
@@ -69,23 +69,20 @@ class MuiCachePlugin(Plugin):
             user = self.target.registry.get_user(key)
             try:
                 if entry.name.endswith(self.FIELD_NAMES):
-                    path, name = entry.name.rsplit(".", 1)
+                    entry_path, name = entry.name.rsplit(".", 1)
                 else:
                     name = None
-                    path = entry.name.rsplit(",-", 1)[0]
-
-                value = entry.value
-                path = _path.from_windows(path)
+                    entry_path = entry.name.rsplit(",-", 1)[0]
 
                 # Filter on the type of the registry value
-                if type(value) is bytes:
+                if isinstance(entry.value, bytes):
                     continue
 
                 yield MuiCacheRecord(
                     index=index,
                     name=name,
-                    value=value,
-                    path=path,
+                    value=entry.value,
+                    path=path.from_windows(entry_path),
                     _target=self.target,
                     _key=key,
                     _user=user,
