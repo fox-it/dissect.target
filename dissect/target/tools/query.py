@@ -60,7 +60,7 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
-def wildcard(funclist: List[str], internal_funcs: List[str]) -> (List[str], List[str]):
+def get_wildcard_functions(funclist: List[str], no_wildcard_funcs: List[str]) -> (List[str], List[str]):
     pluginlist = []
 
     # List of functions (includes implied)
