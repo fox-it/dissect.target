@@ -37,7 +37,7 @@ logging.raiseExceptions = False
 
 
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
-INTERNAL_FUNCS = ["get_all_records"]
+NO_WILDCARD_FUNCS = ["get_all_records"]
 
 QueryRecord = RecordDescriptor(
     "query",
