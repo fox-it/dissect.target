@@ -77,7 +77,7 @@ def get_wildcard_functions(funclist: List[str], no_wildcard_funcs: List[str]) ->
 
     for funcname in funclist:
         # Either wildcard or dot notation (enables full path notation for plugin)
-        if funcname.count(".") or funcname[-1:] == "*":
+        if funcname.count(".") or funcname[-1] == "*":
             # Due to hierarchy, only suffix wild card makes sense (i.e. not going to wildcard your OS)
             pattern = funcname.rstrip("*")
             for plugin in pluginlist:
