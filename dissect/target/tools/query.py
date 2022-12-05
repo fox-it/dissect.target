@@ -40,10 +40,10 @@ USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 NO_WILDCARD_FUNCS = ["get_all_records"]
 
 QueryRecord = RecordDescriptor(
-    "query",
+    "dissect/target/query",
     [
-        ("string", "request"),
-        ("string", "result"),
+        ("string", "function"),
+        ("string", "value"),
     ],
 )
 
