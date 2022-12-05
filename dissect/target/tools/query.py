@@ -18,7 +18,7 @@ from flow.record import (
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
-from dissect.target.plugin import PLUGINS, Plugin, _special_plugins, plugins
+from dissect.target.plugin import PLUGINS, Plugin, os_plugins, plugins
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -84,7 +84,7 @@ def get_wildcard_functions(funclist: List[str], no_wildcard_funcs: List[str]) ->
                 if plugin["module"].startswith(pattern):
                     for exported in plugin["exports"]:
                         # Skip internal functions
-                        if exported in internal_funcs:
+                        if exported in no_wildcard_funcs:
                             continue
                         # Prepend namespace if necessary
                         if plugin["namespace"] is not None:
@@ -180,7 +180,7 @@ def main():
         parser.error("argument -f/--function is required")
 
     # Process wild cards and register implied functions
-    implied_functions, functions = wildcard(args.function.split(","), INTERNAL_FUNCS)
+    implied_functions, functions = get_wildcard_functions(args.function.split(","), NO_WILDCARD_FUNCS)
 
     # Show help for a function
     if "-h" in rest or "--help" in rest:
@@ -243,8 +243,8 @@ def main():
                 continue
 
             # If the output is not a record and we're using a wildcard, then make a record of it
-            if func in implied and output_type != "record":
-                result = [QueryRecord(request=func, result=result)]
+            if func in implied_functions and output_type != "record":
+                result = [QueryRecord(function=func, value=result)]
                 output_type = "record"
 
             if first_seen_output_type and output_type != first_seen_output_type:
@@ -303,7 +303,7 @@ def main():
                             break
                 except Exception as problem:
                     # Ignore errors if wildcard
-                    if func in implied:
+                    if func in implied_functions:
                         target.log.error(f"Exception occurred while processing output of {func}", exc_info=problem)
                         pass
                     else:

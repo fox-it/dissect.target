@@ -1,32 +1,30 @@
 from unittest.mock import patch
 
-from dissect.target.tools.query import wildcard
+from dissect.target.tools.query import get_wildcard_functions
 
 
 @patch(
     "dissect.target.tools.query.plugins", return_value=[{"module": "a.b.c", "namespace": "q", "exports": ["d", "e"]}]
 )
-@patch(
-    "dissect.target.tools.query._special_plugins", return_value=[{"module": "p.q", "namespace": "p", "exports": ["z"]}]
-)
+@patch("dissect.target.tools.query.os_plugins", return_value=[{"module": "p.q", "namespace": "p", "exports": ["z"]}])
 def test_tools_query(*args):
 
-    implicit, allfuncs = wildcard(["a.b.*", "p.*", "f"], ["d"])
+    implicit, allfuncs = get_wildcard_functions(["a.b.*", "p.*", "f"], ["d"])
     assert implicit == ["q.e", "p.z"]
     assert allfuncs == ["f", "q.e", "p.z"]
 
-    implicit, allfuncs = wildcard(["a.b.*", "f"], [])
+    implicit, allfuncs = get_wildcard_functions(["a.b.*", "f"], [])
     assert implicit == ["q.d", "q.e"]
     assert allfuncs == ["f", "q.d", "q.e"]
 
-    implicit, allfuncs = wildcard(["a.b.c"], [])
+    implicit, allfuncs = get_wildcard_functions(["a.b.c"], [])
     assert implicit == ["q.d", "q.e"]
     assert allfuncs == ["q.d", "q.e"]
 
-    implicit, allfuncs = wildcard(["a"], [])
+    implicit, allfuncs = get_wildcard_functions(["a"], [])
     assert implicit == []
     assert allfuncs == ["a"]
 
-    implicit, allfuncs = wildcard([], [])
+    implicit, allfuncs = get_wildcard_functions([], [])
     assert implicit == []
     assert allfuncs == []
