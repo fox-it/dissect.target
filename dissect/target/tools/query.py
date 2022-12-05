@@ -72,7 +72,7 @@ def get_wildcard_functions(funclist: List[str], no_wildcard_funcs: List[str]) ->
     for available in plugins():
         pluginlist.append(available)
 
-    for available in _special_plugins("_os"):
+    for available in os_plugins():
         pluginlist.append(available)
 
     for funcname in funclist:
