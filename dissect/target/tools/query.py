@@ -180,7 +180,7 @@ def main():
         parser.error("argument -f/--function is required")
 
     # Process wild cards and register implied functions
-    implied, functions = wildcard(args.function.split(","), INTERNAL_FUNCS)
+    implied_functions, functions = wildcard(args.function.split(","), INTERNAL_FUNCS)
 
     # Show help for a function
     if "-h" in rest or "--help" in rest:
