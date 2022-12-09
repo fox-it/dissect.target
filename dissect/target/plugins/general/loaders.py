@@ -11,7 +11,7 @@ class LoaderListPlugin(Plugin):
         return True
 
     @export(output="none")
-    def loaders(self):
+    def loaders(self, termfilter=None):
         """List the available loaders."""
 
         loaders = itertools.chain(LOADERS, [DirLoader])
@@ -20,4 +20,6 @@ class LoaderListPlugin(Plugin):
 
         print("Available loaders:")
         for loader_name in loader_names:
+            if termfilter and not termfilter(loader_name):
+                continue
             print(f"    {loader_name}")

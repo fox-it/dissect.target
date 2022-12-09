@@ -6,13 +6,19 @@ import logging
 import pathlib
 import sys
 from datetime import datetime
+from typing import Callable, List
 
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record import (
+    RecordDescriptor,
+    RecordPrinter,
+    RecordStreamWriter,
+    RecordWriter,
+)
 
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
-from dissect.target.plugin import PLUGINS, Plugin
+from dissect.target.plugin import PLUGINS, Plugin, _special_plugins, plugins
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     configure_generic_arguments,
@@ -31,6 +37,15 @@ logging.raiseExceptions = False
 
 
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
+INTERNAL_FUNCS = ["get_all_records"]
+
+QueryRecord = RecordDescriptor(
+    "query",
+    [
+        ("string", "request"),
+        ("string", "result"),
+    ],
+)
 
 
 def record_output(strings=False, json=False):
@@ -45,6 +60,45 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
+def wildcard(funclist: List[str], internal_funcs: List[str]) -> (List[str], List[str]):
+    pluginlist = []
+
+    # List of functions (includes implied)
+    allfunc = []
+    # Subset of functions implied by wildcard (these are not allowed to error)
+    implied = []
+
+    # Collect all available plugins, even special ones
+    for available in plugins():
+        pluginlist.append(available)
+
+    for available in _special_plugins("_os"):
+        pluginlist.append(available)
+
+    for funcname in funclist:
+        # Either wildcard or dot notation (enables full path notation for plugin)
+        if funcname.count(".") or funcname[-1:] == "*":
+            # Due to hierarchy, only suffix wild card makes sense (i.e. not going to wildcard your OS)
+            pattern = funcname.rstrip("*")
+            for plugin in pluginlist:
+                if plugin["module"].startswith(pattern):
+                    for exported in plugin["exports"]:
+                        # Skip internal functions
+                        if exported in internal_funcs:
+                            continue
+                        # Prepend namespace if necessary
+                        if plugin["namespace"] is not None:
+                            implied.append(f"{plugin['namespace']}.{exported}")
+                        else:
+                            implied.append(exported)
+        else:
+            allfunc.append(funcname)
+
+    allfunc.extend(implied)
+
+    return (implied, allfunc)
+
+
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -57,7 +111,9 @@ def main():
     parser.add_argument("-f", "--function", help="function to execute")
     parser.add_argument("--child", help="load a specific child path or index")
     parser.add_argument("--children", action="store_true", help="include children")
-    parser.add_argument("-l", "--list", action="store_true", help="list available plugins and loaders")
+    parser.add_argument(
+        "-l", "--list", nargs="?", const=True, action="store", help="list available plugins and loaders"
+    )
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -110,22 +166,29 @@ def main():
                 "The --rewrite-cache option will be ignored as --no-cache or --only-read-cache are specified",
             )
 
-    if args.list:
+    if args.list is not None:
         t = Target()
+
         fparser = generate_argparse_for_bound_method(t.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
-        t.plugins(**vars(fargs))
+
+        tf = None
+        if type(args.list) == str:
+            tf: Callable[[str], bool] = (lambda s: lambda t: t.lower().count(s.lower()) > 0)(args.list)
+
+        t.plugins(**vars(fargs), termfilter=tf)
 
         fparser = generate_argparse_for_bound_method(t.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
-        t.loaders(**vars(fargs))
+        t.loaders(**vars(fargs), termfilter=tf)
 
         parser.exit()
 
     if not args.function:
         parser.error("argument -f/--function is required")
 
-    functions = args.function.split(",")
+    # Process wild cards and register implied functions
+    implied, functions = wildcard(args.function.split(","), INTERNAL_FUNCS)
 
     # Show help for a function
     if "-h" in rest or "--help" in rest:
@@ -187,6 +250,11 @@ def main():
                 target.log.error("Exception while executing function `%s`", func, exc_info=True)
                 continue
 
+            # If the output is not a record and we're using a wildcard, then make a record of it
+            if func in implied and output_type != "record":
+                result = [QueryRecord(request=func, result=result)]
+                output_type = "record"
+
             if first_seen_output_type and output_type != first_seen_output_type:
                 target.log.error(
                     (
@@ -231,15 +299,23 @@ def main():
         if len(record_entries):
             rs = record_output(args.strings, args.json)
             for entry in record_entries:
-                for record_entries in entry:
-                    if args.hash:
-                        rs.write(hashutil.hash_uri_records(target, record_entries))
+                try:
+                    for record_entries in entry:
+                        if args.hash:
+                            rs.write(hashutil.hash_uri_records(target, record_entries))
+                        else:
+                            rs.write(record_entries)
+                        count += 1
+                        if args.limit is not None and count >= args.limit:
+                            break_out = True
+                            break
+                except Exception as problem:
+                    # Ignore errors if wildcard
+                    if func in implied:
+                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=problem)
+                        pass
                     else:
-                        rs.write(record_entries)
-                    count += 1
-                    if args.limit is not None and count >= args.limit:
-                        break_out = True
-                        break
+                        raise problem
 
                 if break_out:
                     break
