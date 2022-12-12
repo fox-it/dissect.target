@@ -46,7 +46,7 @@ try:
 
     # remove `-` as an autocomplete delimeter on Linux
     # https://stackoverflow.com/questions/27288340/python-cmd-on-linux-does-not-autocomplete-special-characters-or-symbols
-    readline.set_completer_delims(readline.get_completer_delims().replace("-", ""))
+    readline.set_completer_delims(readline.get_completer_delims().replace("-", "").replace("$", ""))
 except ImportError:
     # Readline is not available on Windows
     log.warning("Readline module is not available")
@@ -146,9 +146,12 @@ class TargetCmd(cmd.Cmd):
         Command execution helper that chains initial command and piped
         subprocesses (if any) together
         """
-        argparts = (
-            [] if command_args_str is None else list(shlex.shlex(command_args_str, posix=True, punctuation_chars=True))
-        )
+
+        argparts = []
+        if command_args_str is not None:
+            lexer = shlex.shlex(command_args_str, posix=True, punctuation_chars=True)
+            lexer.wordchars += "$"
+            argparts = list(lexer)
 
         try:
             if "|" in argparts:
