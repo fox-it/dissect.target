@@ -1,5 +1,5 @@
-import tempfile
 import pathlib
+import tempfile
 from io import BytesIO
 
 import pytest
@@ -90,7 +90,6 @@ def target_win(hive_hklm, fs_win):
     mock_target.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
 
     mock_target.filesystems.add(fs_win)
-    mock_target.fs.mount("C:", fs_win)
     mock_target.apply()
 
     yield mock_target
