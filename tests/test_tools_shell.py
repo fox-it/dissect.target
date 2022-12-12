@@ -11,4 +11,4 @@ def test_target_cli_ls(target_win, capsys, monkeypatch):
     cli.onecmd("ls")
 
     captured = capsys.readouterr()
-    assert captured.out == "\n".join(["C:", "sysvol"]) + "\n"
+    assert captured.out == "\n".join(["c:", "sysvol"]) + "\n"
