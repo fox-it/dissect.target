@@ -1,8 +1,8 @@
+import logging
 import stat
 import tarfile
-import logging
-from typing import Union
 from pathlib import Path
+from typing import Union
 
 from dissect.util.stream import BufferedStream
 
@@ -10,7 +10,6 @@ from dissect.target import filesystem, target
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
-
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +55,7 @@ class TarLoader(Loader):
                     parts = member.name.lstrip("/").split("/")
                 volume_name = parts[0]
 
-                if volume_name == "c:":
+                if volume_name.lower() == "c:":
                     volume_name = "sysvol"
 
                 if volume_name not in volumes:
