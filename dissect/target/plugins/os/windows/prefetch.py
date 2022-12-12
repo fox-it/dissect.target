@@ -1,11 +1,13 @@
-from flow.record.fieldtypes import uri
+from io import BytesIO
 
 from dissect import cstruct
+from dissect.util import lzxpress_huffman
+from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import uri
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.util import lzxpress_huffman
-from dissect.util.ts import wintimestamp
 
 PrefetchRecord = TargetRecordDescriptor(
     "filesystem/ntfs/prefetch",
@@ -171,7 +173,7 @@ class Prefetch:
     def __init__(self, fh):
         header_detect = prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
         if header_detect.signature == b"MAM\x04":
-            fh = lzxpress_huffman.decompress(fh)
+            fh = BytesIO(lzxpress_huffman.decompress(fh))
 
         self.fh = fh
         self.fh.seek(0)
