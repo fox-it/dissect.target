@@ -466,13 +466,31 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             for entry in self.get_quarantined_entry_resources():
                 if entry.detection_type != b"file":
                     continue
-                location = resourcedata_directory.joinpath(entry.resource_id[0:2]).joinpath(entry.resource_id)
-                if not location.exists():
-                    self.target.log.info(f"Could not find a ResourceData file for {entry.resource_id}.")
+                subdirectory = resourcedata_directory.joinpath(entry.resource_id[0:2])
+                if not subdirectory.exists():
+                    self.target.log.warning(f"Could not find a ResourceData subdirectory for {entry.resource_id}")
                     continue
-                if location in recovered_files:
+
+                resourcedata_location = None
+
+                # Sometimes, the resourcedata file containing the quarantined file does not have the exact same name
+                # as the entry's resource_id. Instead, it only matches a part of the resource_id. What we do is loop
+                # over all files in the resourcedata subdirectory, and check whether we can find a filename that
+                # fully fits into the resource_id. If so, we assume that that is the matching file and break.
+                for possible_file in subdirectory.glob("*"):
+                    _, _, filename = str(possible_file).rpartition("/")
+                    if filename in entry.resource_id:
+                        resourcedata_location = resourcedata_directory.joinpath(entry.resource_id[0:2]).joinpath(
+                            filename
+                        )
+                        break
+                if resourcedata_location is None:
+                    self.target.log.warning(f"Could not find a ResourceData file for {entry.resource_id}.")
                     continue
-                fh = location.open()
+                if resourcedata_location in recovered_files:
+                    # We already recovered this file
+                    continue
+                fh = resourcedata_location.open()
                 # TODO: What filename do we want for recovery? Detection path seems OK but what if different files
                 # have the same filename but are stored in different directories? Resource id seems most 'truthful'
                 # but might be confusing for analysts.
@@ -484,7 +502,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 fh.close()
 
                 # Make sure we do not recover the same file multiple times if it has multiple entries
-                recovered_files.append(location)
+                recovered_files.append(resourcedata_location)
 
 
 def parse_iso_datetime(datetime_value: str) -> datetime:
