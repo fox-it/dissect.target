@@ -38,4 +38,4 @@ class VdiContainer(Container):
         return self.vdi.tell()
 
     def close(self) -> None:
-        pass
+        self.vdi.fh.close()
