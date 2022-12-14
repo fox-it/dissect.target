@@ -33,4 +33,4 @@ class VhdxContainer(Container):
         return self.vhdx.tell()
 
     def close(self) -> None:
-        pass
+        self.vhdx.fh.close()
