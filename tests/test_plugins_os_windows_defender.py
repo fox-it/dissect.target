@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
+
 from dissect.target.plugins.os.windows import defender
 
 from ._utils import absolute_path
@@ -33,7 +34,6 @@ def test_defender_evtx_logs(target_win, fs_win, tmpdir_name):
 
 
 def test_defender_quarantine_entries(target_win, fs_win, tmpdir_name):
-
     quarantine_dir = absolute_path("data/defender-quarantine")
 
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)

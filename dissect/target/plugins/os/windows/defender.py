@@ -65,7 +65,7 @@ DEFENDER_EVTX_FIELDS = [
     ("string", "Version"),
 ]
 
-DefenderLogRecordDescriptor = TargetRecordDescriptor(
+DefenderLogRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/evtx",
     [("datetime", "ts")] + DEFENDER_EVTX_FIELDS,
 )
@@ -77,7 +77,6 @@ EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 
 defender_def = """
-
 /* ======== Generic Windows ======== */
 /* https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-win32_stream_id */
 
@@ -136,14 +135,14 @@ enum FIELD_TYPE : WORD {
 };
 
 struct QuarantineEntryFileHeader {
-    char        magic_header[4];
-    char        unknown[4];
-    char        null_padding[32];
-    uint32_t    Section1Size;
-    uint32_t    Section2Size;
-    char        Section1CrC[4];
-    char        Section2CrC[4];
-    char        magic_padding[4];
+    CHAR        MagicHeader[4];
+    CHAR        Unknown[4];
+    CHAR        _Padding[32];
+    DWORD       Section1Size;
+    DWORD       Section2Size;
+    DWORD       Section1CrC;
+    DWORD       Section2CrC;
+    char        MagicFooter[4];
 };
 
 struct QuarantineEntrySection1 {
@@ -186,7 +185,7 @@ DEFENDER_QUARANTINE_FOLDER_PATH = "sysvol/programdata/microsoft/windows defender
 QUARANTINE_ENTRIES_FOLDER_NAME = "Entries"
 QUARANTINE_RESOURCEDATA_FOLDER_NAME = "ResourceData"
 
-DefenderFileQuarantineRecordDescriptor = TargetRecordDescriptor(
+DefenderFileQuarantineRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/quarantine/file",
     [
         ("datetime", "ts"),
@@ -203,7 +202,7 @@ DefenderFileQuarantineRecordDescriptor = TargetRecordDescriptor(
     ],
 )
 
-DefenderBehaviorQuarantineRecordDescriptor = TargetRecordDescriptor(
+DefenderBehaviorQuarantineRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/quarantine/behavior",
     [
         ("datetime", "ts"),
@@ -276,7 +275,7 @@ DEFENDER_RC4_KEY = [
 # fmt: on
 
 
-def rc4_decrypt_defender_data(data):
+def rc4_crypt(data):
     sbox = list(range(256))
     j = 0
     for i in range(256):
@@ -297,7 +296,7 @@ def rc4_decrypt_defender_data(data):
         val = sbox[(sbox[i] + sbox[j]) % 256]
         out[k] = val ^ data[k]
 
-    return out
+    return bytes(out)
 
 
 def recover_quarantined_file(handle, filename: str) -> Iterator[tuple[str, bytes]]:
@@ -340,8 +339,9 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         quarantine_directory = self.target.fs.path(DEFENDER_QUARANTINE_FOLDER_PATH)
         entries_directory = quarantine_directory.joinpath(QUARANTINE_ENTRIES_FOLDER_NAME)
 
-        if entries_directory.exists() and entries_directory.is_dir():
-            for guid_path in entries_directory.glob("*"):
+        if not entries_directory.is_dir():
+            return
+            for guid_path in entries_directory.iterdir():
                 handle = guid_path.open()
                 try:
                     # Decrypt & Parse the header so that we know the section sizes
@@ -445,7 +445,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 )
                 yield DefenderFileQuarantineRecordDescriptor(**fields, _target=self.target)
             else:
-                self.target.log.warning(f"Unknown Defender Detection Type {self.detection_type}")
+                self.target.log.warning("Unknown Defender Detection Type %s", self.detection_type)
 
     @plugin.arg(
         "--output",
@@ -477,7 +477,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 # as the entry's resource_id. Instead, it only matches a part of the resource_id. What we do is loop
                 # over all files in the resourcedata subdirectory, and check whether we can find a filename that
                 # fully fits into the resource_id. If so, we assume that that is the matching file and break.
-                for possible_file in subdirectory.glob("*"):
+                for possible_file in subdirectory.iterdir():
                     _, _, filename = str(possible_file).rpartition("/")
                     if filename in entry.resource_id:
                         resourcedata_location = resourcedata_directory.joinpath(entry.resource_id[0:2]).joinpath(
