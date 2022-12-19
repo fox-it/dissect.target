@@ -1,11 +1,9 @@
 import os
-from configparser import ConfigParser
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
-
 from dissect.target.plugins.os.windows import defender
 
 from ._utils import absolute_path
@@ -44,7 +42,7 @@ def test_defender_quarantine_entries(target_win, fs_win, tmpdir_name):
 
     assert len(records) == 1
 
-    # Test whether the quarantining of a Cobalt Strike beacon is    properly parsed.
+    # Test whether the quarantining of a Mimikatz binary is properly parsed.
     mimikatz_record = records[0]
     detection_date = datetime.strptime("2022-12-02", "%Y-%m-%d").date()
 
@@ -75,9 +73,9 @@ def test_defender_quarantine_recovery(target_win, fs_win, tmpdir_name):
     payload_filename = "A6C8322B8A19AEED96EFBD045206966DA4C9619D"
     security_descriptor_filename = "A6C8322B8A19AEED96EFBD045206966DA4C9619D.security_descriptor"
     zone_identifier_filename = "A6C8322B8A19AEED96EFBD045206966DA4C9619D.ZoneIdentifierDATA"
-    expected_zone_identifier = {
-        "ZoneTransfer": {"zoneid": "3", "referrerurl": "C:\\Users\\user\\Downloads\\mimikatz_trunk.zip"}
-    }
+    expected_zone_identifier_content = (
+        b"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\user\\Downloads\\mimikatz_trunk.zip\r\n"
+    )
     expected_owner = "S-1-5-21-2614236324-1336345114-3023566343-1000"
     expected_group = "S-1-5-21-2614236324-1336345114-3023566343-513"
 
@@ -105,16 +103,6 @@ def test_defender_quarantine_recovery(target_win, fs_win, tmpdir_name):
         assert descriptor.group == expected_group
 
     # Verify valid zone identifier for mimikatz file
-    # First parse the recovered file as an INI
-    zone_identifier = ConfigParser()
-    zone_identifier.read(recovery_dst.joinpath(zone_identifier_filename))
-
-    # Verify that sections are correct
-    assert zone_identifier.sections() == list(expected_zone_identifier.keys())
-    for section in expected_zone_identifier.keys():
-        for option, value in expected_zone_identifier[section].items():
-            # Verify that option exists for this section
-            assert option in zone_identifier.options(section)
-
-            # Verify that option has the expected value
-            assert zone_identifier.get(section, option) == value
+    with open(recovery_dst.joinpath(zone_identifier_filename), "rb") as zone_identifier_file:
+        zone_identifier_buf = zone_identifier_file.read()
+        assert expected_zone_identifier_content == zone_identifier_buf
