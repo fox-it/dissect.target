@@ -247,7 +247,7 @@ def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iter
     return filter(filter_func, records)
 
 
-def rc4_crypt(data) -> bytes:
+def rc4_crypt(data: bytes) -> bytes:
     """
     RC4 encrypt / decrypt using the Defender Quarantine RC4 Key
     """
@@ -274,15 +274,13 @@ def rc4_crypt(data) -> bytes:
     return bytes(out)
 
 
-def recover_quarantined_file(handle, filename: str) -> Iterator[tuple[str, bytes]]:
-    """
-    For a given handle to a quarantined file, recover the various data streams present in the handle, yielding tuples
-    of the output filename and the corresponding output data.
+def recover_quarantined_file_streams(handle, filename: str) -> Iterator[tuple[str, bytes]]:
+    """Recover the various data streams present in a quarantined file
+
+    Yields tuples of the output filename and the corresponding output data.
     """
 
-    buf = handle.read()
-    buf = rc4_crypt(buf)
-    buf = BytesIO(buf)
+    buf = BytesIO(rc4_crypt(handle.read()))
 
     while True:
         try:
@@ -302,7 +300,7 @@ def recover_quarantined_file(handle, filename: str) -> Iterator[tuple[str, bytes
 
 
 class QuarantineEntry:
-    def __init__(self, fh):
+    def __init__(self, fh: BinaryIO):
         # Decrypt & Parse the header so that we know the section sizes
         self.header = c_defender.QuarantineEntryFileHeader(rc4_crypt(fh.read(60)))
 
@@ -368,10 +366,22 @@ class QuarantineEntryResource:
 
 
 class MicrosoftDefenderPlugin(plugin.Plugin):
-    """Plugin that parses artifacts created by Microsoft Defender. This includes the EVTX logs, as well as recovery
-    of artefacts from the quarantine folder."""
+    """Plugin that parses artifacts created by Microsoft Defender.
+
+    This includes the EVTX logs, as well as recovery of artefacts from the quarantine folder.
+    """
 
     __namespace__ = "defender"
+
+    def check_compatible(self):
+        # Either the Defender log folder or the quarantine folder has to exist for this plugin to be compatible.
+
+        return any(
+            [
+                self.target.fs.path(DEFENDER_LOG_DIR).exists(),
+                self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
+            ]
+        )
 
     @plugin.export(record=DefenderLogRecord)
     def evtx(self) -> Generator[Record, None, None]:
@@ -400,40 +410,39 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
     @plugin.export(record=DefenderFileQuarantineRecord)
-    def quarantine(self) -> Generator[Record, None, None]:
-        """
-        Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
+    def quarantine(self) -> Iterator[DefenderFileQuarantineRecord]:
+        """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
         quarantine.
         """
-        for quarantine_entry in self.get_quarantine_entries():
+        for entry in self.get_quarantine_entries():
             # These fields are present for both behavior and file based detections
             fields = {
-                "ts": quarantine_entry.timestamp,
-                "quarantine_id": quarantine_entry.quarantine_id,
-                "scan_id": quarantine_entry.scan_id,
-                "threat_id": quarantine_entry.threat_id,
-                "detection_name": quarantine_entry.detection_name,
+                "ts": entry.timestamp,
+                "quarantine_id": entry.quarantine_id,
+                "scan_id": entry.scan_id,
+                "threat_id": entry.threat_id,
+                "detection_name": entry.detection_name,
             }
-            for quarantine_entry_resource in quarantine_entry.resources:
-                fields.update({"detection_type": quarantine_entry_resource.detection_type})
-                if quarantine_entry_resource.detection_type == b"internalbehavior":
+            for resource in entry.resources:
+                fields.update({"detection_type": resource.detection_type})
+                if resource.detection_type == b"internalbehavior":
                     yield DefenderBehaviorQuarantineRecord(**fields, _target=self.target)
-                elif quarantine_entry_resource.detection_type == b"file":
+                elif resource.detection_type == b"file":
                     # These fields are only available for file based detections
                     fields.update(
                         {
-                            "detection_path": quarantine_entry_resource.detection_path,
-                            "creation_time": quarantine_entry_resource.creation_time,
-                            "last_write_time": quarantine_entry_resource.last_write_time,
-                            "last_accessed_time": quarantine_entry_resource.last_access_time,
-                            "resource_id": quarantine_entry_resource.resource_id,
+                            "detection_path": resource.detection_path,
+                            "creation_time": resource.creation_time,
+                            "last_write_time": resource.last_write_time,
+                            "last_accessed_time": resource.last_access_time,
+                            "resource_id": resource.resource_id,
                         }
                     )
                     yield DefenderFileQuarantineRecord(**fields, _target=self.target)
                 else:
-                    self.target.log.warning("Unknown Defender Detection Type %s", self.detection_type)
+                    self.target.log.warning("Unknown Defender Detection Type %s", resource.detection_type)
 
     @plugin.arg(
         "--output",
@@ -445,8 +454,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
     )
     @plugin.export(output="none")
     def recover(self, output_dir: Path) -> None:
-        """
-        Recovers files that have been placed into quarantine by Microsoft Defender.
+        """Recover files that have been placed into quarantine by Microsoft Defender.
 
         Microsoft Defender RC4 encrypts the output of the 'BackupRead' function when it places a file into quarantine.
         This means multiple data streams can be contained in a single quarantined file, including zone identifier
@@ -459,16 +467,16 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         if resourcedata_directory.exists() and resourcedata_directory.is_dir():
             recovered_files = []
             for entry in self.get_quarantine_entries():
-                for entry_resource in entry.resources:
-                    if entry_resource.detection_type != b"file":
+                for resource in entry.resources:
+                    if resource.detection_type != b"file":
                         # We can only recover file entries
                         continue
                     # First two letters of the resource ID is the subdirectory that will contain the quarantined file.
-                    resource_id_key = entry_resource.resource_id[0:2]
+                    resource_id_key = resource.resource_id[0:2]
                     subdirectory = resourcedata_directory.joinpath(resource_id_key)
                     if not subdirectory.exists():
                         self.target.log.warning(
-                            f"Could not find a ResourceData subdirectory for {entry_resource.resource_id}"
+                            f"Could not find a ResourceData subdirectory for {resource.resource_id}"
                         )
                         continue
 
@@ -480,11 +488,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # fully fits into the resource_id. If so, we assume that that is the matching file and break.
                     for possible_file in subdirectory.iterdir():
                         _, _, filename = str(possible_file).rpartition("/")
-                        if filename in entry_resource.resource_id:
+                        if filename in resource.resource_id:
                             resourcedata_location = resourcedata_directory.joinpath(resource_id_key).joinpath(filename)
                             break
                     if resourcedata_location is None:
-                        self.target.log.warning(f"Could not find a ResourceData file for {entry_resource.resource_id}.")
+                        self.target.log.warning(f"Could not find a ResourceData file for {resource.resource_id}.")
                         continue
                     if resourcedata_location in recovered_files:
                         # We already recovered this file
@@ -494,7 +502,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # based on the information we have from the associated quarantine entry, there is a potential that
                     # different files have the same filename. Analysts can use the quarantine records to cross
                     # reference.
-                    for dest_filename, dest_buf in recover_quarantined_file(fh, entry_resource.resource_id):
+                    for dest_filename, dest_buf in recover_quarantined_file_streams(fh, resource.resource_id):
                         output_filename = output_dir.joinpath(dest_filename)
                         self.target.log.info(f"Saving {output_filename}")
                         with open(output_filename, "wb") as output_file:
@@ -503,17 +511,6 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
                     # Make sure we do not recover the same file multiple times if it has multiple entries
                     recovered_files.append(resourcedata_location)
-
-    def check_compatible(self):
-        """
-        Either the Defender log folder or the quarantine folder has to exist for this plugin to be compatible.
-        """
-        return any(
-            [
-                self.target.fs.path(DEFENDER_LOG_DIR).exists(),
-                self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
-            ]
-        )
 
     def get_quarantine_entries(self) -> Iterator[QuarantineEntry]:
         """
@@ -527,12 +524,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         for guid_path in entries_directory.iterdir():
             if not guid_path.exists() or not guid_path.is_file():
                 continue
-            entry_fh = guid_path.open()
-            quarantine_entry = QuarantineEntry(entry_fh)
-            entry_fh.close()
+            with guid_path.open() as entry_fh:
+                entry = QuarantineEntry(entry_fh)
 
             # Warn on discovery of fields that we do not have knowledge of what they are / do.
-            for entry_resource in quarantine_entry.resources:
-                for unknown_field in entry_resource.unknown_fields:
+            for resource in entry.resources:
+                for unknown_field in resource.unknown_fields:
                     self.target.log.warning(f"Encountered an unknown field identifier: {unknown_field.Identifier}")
-            yield quarantine_entry
+            yield entry
