@@ -1,65 +1,31 @@
-from dissect.sql import sqlite3
-from dissect.sql.exceptions import Error as SQLError
-from dissect.util.ts import webkittimestamp
-
-from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target import Target
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.browsers.browser import (
-    GENERIC_HISTORY_RECORD_FIELDS,
-    try_idna,
-)
-
-ChromeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
+from dissect.target.plugins.browsers.chromium import (
+    ChromiumPlugin,
+    ChromiumBrowserHistoryRecord,
 )
 
 
 class ChromePlugin(Plugin):
-    """Chrome browser plugin."""
+    """Chrome browser plugin.
+
+    ChromiumPlugin contains all logic and configuration.
+    """
 
     __namespace__ = "chrome"
 
-    DIRS = [
-        "AppData/Local/Google/Chrome/User Data/Default",
-        "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
-        "Local Settings/Application Data/Google/Chrome/User Data/Default",
-        "AppData/local/Google/Chromium/User Data/Default",
-        ".config/google-chrome/Default",
-        "snap/chromium/common/chromium/Default",
-    ]
-
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
-
-        self.users_dirs = []
-        for user_details in self.target.user_details.all_with_home():
-            for d in self.DIRS:
-                cur_dir = user_details.home_path.joinpath(d)
-                if not cur_dir.exists():
-                    continue
-                self.users_dirs.append((user_details.user, cur_dir))
+        self.chromium_hist: ChromiumPlugin = ChromiumPlugin(self.target)
 
     def check_compatible(self):
-        if not len(self.users_dirs):
-            raise UnsupportedPluginError("No Chrome directories found")
+        self.chromium_hist.check_compatible()
 
-    def _iter_db(self, filename):
-        for user, cur_dir in self.users_dirs:
-            db_file = cur_dir.joinpath(filename)
-            try:
-                yield user, db_file, sqlite3.SQLite3(db_file.open())
-            except FileNotFoundError:
-                self.target.log.warning("Could not find %s file: %s", filename, db_file)
-            except SQLError as e:
-                self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
-
-    @export(record=ChromeBrowserHistoryRecord)
+    @export(record=ChromiumBrowserHistoryRecord)
     def history(self):
-        """Return browser history records from Chrome.
+        """Return browser history records from Google Chrome.
 
-        Yields ChromeBrowserHistoryRecord with the following fields:
+        Yields ChromiumBrowserHistoryRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -78,39 +44,4 @@ class ChromePlugin(Plugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
-        for user, db_file, db in self._iter_db("History"):
-            try:
-                urls = {row.id: row for row in db.table("urls").rows()}
-                visits = {}
-
-                for row in db.table("visits").rows():
-                    visits[row.id] = row
-                    url = urls[row.url]
-
-                    if row.from_visit and row.from_visit in visits:
-                        from_visit = visits[row.from_visit]
-                        from_url = urls[from_visit.url]
-                    else:
-                        from_visit, from_url = None, None
-
-                    yield ChromeBrowserHistoryRecord(
-                        ts=webkittimestamp(row.visit_time),
-                        browser="chrome",
-                        id=row.id,
-                        url=try_idna(url.url),
-                        title=url.title,
-                        description=None,
-                        rev_host=None,
-                        visit_type=None,
-                        visit_count=url.visit_count,
-                        hidden=url.hidden,
-                        typed=None,
-                        session=None,
-                        from_visit=row.from_visit or None,
-                        from_url=try_idna(from_url.url) if from_url else None,
-                        source=str(db_file),
-                        _target=self.target,
-                        _user=user,
-                    )
-            except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+        yield from self.chromium_hist.chrome()
