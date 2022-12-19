@@ -306,8 +306,8 @@ class QuarantineEntry:
         # Decrypt & Parse the header so that we know the section sizes
         self.header = c_defender.QuarantineEntryFileHeader(rc4_crypt(fh.read(60)))
 
-        # TODO: This comment should be changed
-        # Decrypt & Parse the Quarantine Entry. However, it is not yet a Quarantine Entry Resource.
+        # Decrypt & Parse Section 1. This will tell us some information about this quarantine entry.
+        # These properties are shared for all quarantine entry resources associated with this quarantine entry.
         self.metadata = c_defender.QuarantineEntrySection1(rc4_crypt(fh.read(self.header.Section1Size)))
 
         self.timestamp = ts.wintimestamp(self.metadata.Timestamp)
