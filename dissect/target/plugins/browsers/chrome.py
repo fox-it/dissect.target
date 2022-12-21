@@ -1,47 +1,45 @@
 from dissect.target import Target
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.browsers.chromium import (
-    ChromiumPlugin,
-    ChromiumBrowserHistoryRecord,
+from dissect.target.plugins.browsers.browser import GENERIC_HISTORY_RECORD_FIELDS
+from dissect.target.plugins.browsers.chromiummixin import ChromiumMixin
+
+ChromeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 
 
-class ChromePlugin(Plugin):
+class ChromePlugin(ChromiumMixin, Plugin):
     """Chrome browser plugin.
 
-    ChromiumPlugin contains all logic and configuration.
+    Yields: ChromeBrowserHistoryRecord
     """
 
     __namespace__ = "chrome"
 
+    DIRS: list = [
+        # Windows
+        "AppData/Local/Google/Chrome/User Data/Default",
+        "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
+        "Local Settings/Application Data/Google/Chrome/User Data/Default",
+        "AppData/local/Google/Chromium/User Data/Default",
+        # Linux
+        ".config/google-chrome/Default",
+        "snap/chromium/common/chromium/Default",
+        # Macos
+        "Library/Application Support/Google/Chrome/Default",
+    ]
+    HISTORY_RECORD = ChromeBrowserHistoryRecord
+
     def __init__(self, target: Target):
         super().__init__(target)
-        self.chromium_hist: ChromiumPlugin = ChromiumPlugin(self.target)
 
     def check_compatible(self):
-        self.chromium_hist.check_compatible()
+        """Perform a compatibility check with the target."""
+        ChromiumMixin.check_compatible(self)
 
-    @export(record=ChromiumBrowserHistoryRecord)
+    @export(record=HISTORY_RECORD)
     def history(self):
-        """Return browser history records from Google Chrome.
-
-        Yields ChromiumBrowserHistoryRecords with the following fields:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
-            ts (datetime): Visit timestamp.
-            browser (string): The browser from which the records are generated from.
-            id (string): Record ID.
-            url (uri): History URL.
-            title (string): Page title.
-            description (string): Page description.
-            rev_host (string): Reverse hostname.
-            visit_type (varint): Visit type.
-            visit_count (varint): Amount of visits.
-            hidden (string): Hidden value.
-            typed (string): Typed value.
-            session (varint): Session value.
-            from_visit (varint): Record ID of the "from" visit.
-            from_url (uri): URL of the "from" visit.
-            source: (path): The source file of the history record.
-        """
-        yield from self.chromium_hist.chrome()
+        """Return browser history records for Google Chrome."""
+        yield from ChromiumMixin.history(self, "chrome")
