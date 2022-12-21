@@ -49,7 +49,7 @@ class ChromiumMixin:
         Raises:
             SQLError: If the history file could not be processed.
         """
-        for user, db_file, db in self._iter_db("History", browser_name):
+        for user, db_file, db in self._iter_db("History"):
             try:
                 urls = {row.id: row for row in db.table("urls").rows()}
                 visits: dict = {}
@@ -86,12 +86,11 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    def _iter_db(self, filename: str, browser_name: str) -> Iterator[SQLite3]:
+    def _iter_db(self, filename: str) -> Iterator[SQLite3]:
         """Generate a connection to a sqlite history database files.
 
         Args:
             filename: The filename as string of the database where the history is stored.
-            browser_name: The name of the browser as a string.
         Yields:
             connection to db_file (SQLite3)
         Raises:
