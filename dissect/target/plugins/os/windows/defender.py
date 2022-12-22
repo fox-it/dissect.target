@@ -471,28 +471,14 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     if resource.detection_type != b"file":
                         # We can only recover file entries
                         continue
-                    # First two letters of the resource ID is the subdirectory that will contain the quarantined file.
-                    resource_id_key = resource.resource_id[0:2]
-                    subdirectory = resourcedata_directory.joinpath(resource_id_key)
-                    if not subdirectory.exists():
-                        self.target.log.warning(
-                            f"Could not find a ResourceData subdirectory for {resource.resource_id}"
-                        )
+                    # First two characters of the resource ID is the subdirectory that will contain the quarantined file
+                    subdir = resource.resource_id[0:2]
+                    resourcedata_location = resourcedata_directory.joinpath(subdir).joinpath(resource.resource_id)
+                    if not resourcedata_location.exists():
+                        self.target.log.warning(f"Could not find a ResourceData file for {entry.resource_id}.")
                         continue
-
-                    resourcedata_location = None
-
-                    # Sometimes, the resourcedata file containing the quarantined file does not have the exact same name
-                    # as the entry's resource_id. Instead, it only matches a part of the resource_id. What we do is loop
-                    # over all files in the resourcedata subdirectory, and check whether we can find a filename that
-                    # fully fits into the resource_id. If so, we assume that that is the matching file and break.
-                    for possible_file in subdirectory.iterdir():
-                        _, _, filename = str(possible_file).rpartition("/")
-                        if filename in resource.resource_id:
-                            resourcedata_location = resourcedata_directory.joinpath(resource_id_key).joinpath(filename)
-                            break
-                    if resourcedata_location is None:
-                        self.target.log.warning(f"Could not find a ResourceData file for {resource.resource_id}.")
+                    if not resourcedata_location.is_file():
+                        self.target.log.warning(f"{resourcedata_location} is not a file!")
                         continue
                     if resourcedata_location in recovered_files:
                         # We already recovered this file
