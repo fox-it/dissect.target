@@ -1,5 +1,7 @@
 from typing import Iterator
 
+from flow.record import Record
+
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
@@ -9,26 +11,23 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     try_idna,
-)
-
-ChromiumBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 
 
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
-    def history(self, browser_name: str = None) -> Iterator[ChromiumBrowserHistoryRecord]:
+    def history(self, browser_name: str = None) -> Iterator[Record]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
             browser_name: The name of the browser as a string.
         Yields:
-            ChromiumBrowserHistoryRecord with the following fields:
+            Records with the following fields:
                 hostname (string): The target hostname.
                 domain (string): The target domain.
                 ts (datetime): Visit timestamp.
@@ -64,7 +63,7 @@ class ChromiumMixin:
                     else:
                         from_visit, from_url = None, None
 
-                    yield ChromiumBrowserHistoryRecord(
+                    yield self.HISTORY_RECORD(
                         ts=webkittimestamp(row.visit_time),
                         browser=browser_name,
                         id=row.id,
@@ -134,3 +133,25 @@ class ChromiumMixin:
         """
         if not len(self._build_userdirs(self.DIRS)):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
+
+
+class ChromiumPlugin(ChromiumMixin, Plugin):
+    """Chromium browser plugin."""
+
+    ChromiumBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+    __namespace__ = "chromium"
+
+    DIRS = [
+        # Linux
+        "snap/chromium/common/chromium/Default",
+        # Windows
+        "AppData/Local/Chromium/User Data/Default",
+    ]
+    HISTORY_RECORD = ChromiumBrowserHistoryRecord
+
+    @export(record=HISTORY_RECORD)
+    def history(self):
+        """Return browser history records for Chromium browser."""
+        yield from ChromiumMixin.history(self, "chromium")
