@@ -231,7 +231,7 @@ FIELD_IDENTIFIER = c_defender.FIELD_IDENTIFIER
 
 
 def parse_iso_datetime(datetime_value: str) -> datetime:
-    """Parse ISO8601 serialized datetime with `Z` ending"""
+    """Parse ISO8601 serialized datetime with `Z` ending."""
     return datetime.strptime(datetime_value, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
 
 
@@ -248,9 +248,7 @@ def filter_records(records: Iterable, field_name: str, field_value: Any) -> Iter
 
 
 def rc4_crypt(data: bytes) -> bytes:
-    """
-    RC4 encrypt / decrypt using the Defender Quarantine RC4 Key
-    """
+    """RC4 encrypt / decrypt using the Defender Quarantine RC4 Key."""
     sbox = list(range(256))
     j = 0
     for i in range(256):
@@ -274,13 +272,13 @@ def rc4_crypt(data: bytes) -> bytes:
     return bytes(out)
 
 
-def recover_quarantined_file_streams(handle, filename: str) -> Iterator[tuple[str, bytes]]:
-    """Recover the various data streams present in a quarantined file
+def recover_quarantined_file_streams(fh: BinaryIO, filename: str) -> Iterator[tuple[str, bytes]]:
+    """Recover the various data streams present in a quarantined file.
 
     Yields tuples of the output filename and the corresponding output data.
     """
 
-    buf = BytesIO(rc4_crypt(handle.read()))
+    buf = BytesIO(rc4_crypt(fh.read()))
 
     while True:
         try:
@@ -483,25 +481,21 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     if resourcedata_location in recovered_files:
                         # We already recovered this file
                         continue
-                    fh = resourcedata_location.open()
-                    # We restore the file with the resource_id as its filename. While we could 'guess' the filename
-                    # based on the information we have from the associated quarantine entry, there is a potential that
-                    # different files have the same filename. Analysts can use the quarantine records to cross
-                    # reference.
-                    for dest_filename, dest_buf in recover_quarantined_file_streams(fh, resource.resource_id):
-                        output_filename = output_dir.joinpath(dest_filename)
-                        self.target.log.info(f"Saving {output_filename}")
-                        with open(output_filename, "wb") as output_file:
-                            output_file.write(dest_buf)
-                    fh.close()
+                    with resourcedata_location.open() as fh:
+                        # We restore the file with the resource_id as its filename. While we could 'guess' the filename
+                        # based on the information we have from the associated quarantine entry, there is a potential
+                        # that different files have the same filename. Analysts can use the quarantine records to cross
+                        # reference.
+                        for dest_filename, dest_buf in recover_quarantined_file_streams(fh, resource.resource_id):
+                            output_filename = output_dir.joinpath(dest_filename)
+                            self.target.log.info(f"Saving {output_filename}")
+                            output_filename.write_bytes(dest_buf)
 
                     # Make sure we do not recover the same file multiple times if it has multiple entries
                     recovered_files.append(resourcedata_location)
 
     def get_quarantine_entries(self) -> Iterator[QuarantineEntry]:
-        """
-        For a given target, return quarantine entries of Windows Defender
-        """
+        """Yield Windows Defender quarantine entries."""
         quarantine_directory = self.target.fs.path(DEFENDER_QUARANTINE_DIR)
         entries_directory = quarantine_directory.joinpath("entries")
 

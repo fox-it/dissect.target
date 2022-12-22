@@ -103,6 +103,4 @@ def test_defender_quarantine_recovery(target_win, fs_win, tmpdir_name):
         assert descriptor.group == expected_group
 
     # Verify valid zone identifier for mimikatz file
-    with open(recovery_dst.joinpath(zone_identifier_filename), "rb") as zone_identifier_file:
-        zone_identifier_buf = zone_identifier_file.read()
-        assert expected_zone_identifier_content == zone_identifier_buf
+    assert recovery_dst.joinpath(zone_identifier_filename).read_bytes() == expected_zone_identifier_content
