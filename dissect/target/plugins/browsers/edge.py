@@ -8,18 +8,16 @@ from dissect.target.plugins.browsers.chromium import ChromiumMixin
 class EdgePlugin(ChromiumMixin, Plugin):
     """Edge browser plugin."""
 
-    EdgeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/history", GENERIC_HISTORY_RECORD_FIELDS
     )
     __namespace__ = "edge"
-
     DIRS = [
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
     ]
-    HISTORY_RECORD = EdgeBrowserHistoryRecord
 
     @export(record=HISTORY_RECORD)
     def history(self):

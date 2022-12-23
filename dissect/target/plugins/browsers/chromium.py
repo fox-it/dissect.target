@@ -22,7 +22,6 @@ class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
-
     HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
@@ -144,11 +143,7 @@ class ChromiumMixin:
 class ChromiumPlugin(ChromiumMixin, Plugin):
     """Chromium browser plugin."""
 
-    ChromiumBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
-    )
     __namespace__ = "chromium"
-
     DIRS = [
         # Linux
         "snap/chromium/common/chromium/Default",

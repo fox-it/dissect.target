@@ -8,17 +8,15 @@ from dissect.target.plugins.browsers.chromium import ChromiumMixin
 class ChromePlugin(ChromiumMixin, Plugin):
     """Chrome browser plugin."""
 
-    HISTORY_RECORD = ChromeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
     )
     __namespace__ = "chrome"
-
     DIRS = [
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
         "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
         "Local Settings/Application Data/Google/Chrome/User Data/Default",
-        "AppData/local/Google/Chromium/User Data/Default",
         # Linux
         ".config/google-chrome/Default",
         # Macos
