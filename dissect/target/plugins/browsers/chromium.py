@@ -21,6 +21,12 @@ from dissect.target.plugins.browsers.browser import (
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
+    DIRS = []
+
+    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+
     def history(self, browser_name: str = None) -> Iterator[Record]:
         """Return browser history records from supported Chromium-based browsers.
 
@@ -149,9 +155,8 @@ class ChromiumPlugin(ChromiumMixin, Plugin):
         # Windows
         "AppData/Local/Chromium/User Data/Default",
     ]
-    HISTORY_RECORD = ChromiumBrowserHistoryRecord
 
-    @export(record=HISTORY_RECORD)
+    @export(record=ChromiumMixin.HISTORY_RECORD)
     def history(self):
         """Return browser history records for Chromium browser."""
         yield from ChromiumMixin.history(self, "chromium")

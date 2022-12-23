@@ -68,7 +68,7 @@ class BrowserPlugin(Plugin):
     def history(self):
         """Return browser history records from all browsers installed.
 
-        Historical browser records for Chrome, Chromoium, Edge (Chromium), Firefox, and Internet Explorer are returned.
+        Historical browser records for Chrome, Chromium, Edge (Chromium), Firefox, and Internet Explorer are returned.
 
         Yields BrowserHistoryRecords with the following fields:
             hostname (string): The target hostname.

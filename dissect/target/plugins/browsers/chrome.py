@@ -8,7 +8,7 @@ from dissect.target.plugins.browsers.chromium import ChromiumMixin
 class ChromePlugin(ChromiumMixin, Plugin):
     """Chrome browser plugin."""
 
-    ChromeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    HISTORY_RECORD = ChromeBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
     )
     __namespace__ = "chrome"
@@ -24,7 +24,6 @@ class ChromePlugin(ChromiumMixin, Plugin):
         # Macos
         "Library/Application Support/Google/Chrome/Default",
     ]
-    HISTORY_RECORD = ChromeBrowserHistoryRecord
 
     @export(record=HISTORY_RECORD)
     def history(self):
