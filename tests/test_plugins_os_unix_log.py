@@ -63,7 +63,7 @@ def test_atop_plugin(target_unix, fs_unix):
     assert results[0].sgid == 0
     assert results[0].fsgid == 0
     assert results[0].nthr == 1
-    assert results[0].isproc == True
+    assert bool(results[0].isproc) is True
     assert results[0].state == "S"
     assert results[0].excode == -2147483648
     assert results[0].elaps == 0
@@ -72,6 +72,6 @@ def test_atop_plugin(target_unix, fs_unix):
     assert results[0].nthrrun == 0
     assert results[0].ctid == 0
     assert results[0].vpid == 0
-    assert results[0].wasinactive == False
+    assert bool(results[0].wasinactive) is False
     assert results[0].container == ""
     assert str(results[0].filepath) == "atop_20221111"

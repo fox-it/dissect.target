@@ -57,145 +57,141 @@ struct rawheader {
 };
 
 struct rawrecord {
-	time_t		curtime;	    /* current time (epoch)         */
+    time_t		curtime;	    /* current time (epoch)         */
 
-	unsigned short	flags;		/* various flags                */
-	unsigned short	sfuture[3];	/* future use                   */
+    unsigned short	flags;		/* various flags                */
+    unsigned short	sfuture[3];	/* future use                   */
 
-	unsigned int	scomplen;	/* length of compressed sstat   */
-	unsigned int	pcomplen;	/* length of compressed tstat's */
-	unsigned int	interval;	/* interval (number of seconds) */
-	unsigned int	ndeviat;	/* number of tasks in list      */
-	unsigned int	nactproc;	/* number of processes in list  */
-	unsigned int	ntask;		/* total number of tasks        */
-	unsigned int    totproc;	/* total number of processes	*/
-	unsigned int    totrun;		/* number of running  threads	*/
-	unsigned int    totslpi;	/* number of sleeping threads(S)*/
-	unsigned int    totslpu;	/* number of sleeping threads(D)*/
-	unsigned int	totzomb;	/* number of zombie processes   */
-	unsigned int	nexit;		/* number of exited processes   */
-	unsigned int	noverflow;	/* number of overflow processes */
-	unsigned int	ifuture[6];	/* future use                   */
-  int padding;
+    unsigned int	scomplen;	/* length of compressed sstat   */
+    unsigned int	pcomplen;	/* length of compressed tstat's */
+    unsigned int	interval;	/* interval (number of seconds) */
+    unsigned int	ndeviat;	/* number of tasks in list      */
+    unsigned int	nactproc;	/* number of processes in list  */
+    unsigned int	ntask;		/* total number of tasks        */
+    unsigned int    totproc;	/* total number of processes	*/
+    unsigned int    totrun;		/* number of running  threads	*/
+    unsigned int    totslpi;	/* number of sleeping threads(S)*/
+    unsigned int    totslpu;	/* number of sleeping threads(D)*/
+    unsigned int	totzomb;	/* number of zombie processes   */
+    unsigned int	nexit;		/* number of exited processes   */
+    unsigned int	noverflow;	/* number of overflow processes */
+    unsigned int	ifuture[6];	/* future use                   */
+    int padding;
 };
 """
 atop_tstat_def = """
 #define	PNAMLEN		15
 #define	CMDLEN		255
 
-/* 
-** structure containing only relevant process-info extracted 
+/*
+** structure containing only relevant process-info extracted
 ** from kernel's process-administration
 */
 struct tstat {
-	/* GENERAL TASK INFO 					*/
-	struct gen {
-		int	tgid;		/* threadgroup identification 	*/
-		int	pid;		/* process identification 	*/
-		int	ppid;           /* parent process identification*/
-		int	ruid;		/* real  user  identification 	*/
-		int	euid;		/* eff.  user  identification 	*/
-		int	suid;		/* saved user  identification 	*/
-		int	fsuid;		/* fs    user  identification 	*/
-		int	rgid;		/* real  group identification 	*/
-		int	egid;		/* eff.  group identification 	*/
-		int	sgid;		/* saved group identification 	*/
-		int	fsgid;		/* fs    group identification 	*/
-		int	nthr;		/* number of threads in tgroup 	*/
-		char	name[PNAMLEN+1];/* process name string       	*/
-		char 	isproc;		/* boolean: process level?      */
-		char 	state;		/* process state ('E' = exited)	*/
-		int	excode;		/* process exit status		*/
-		time_t 	btime;		/* process start time (epoch)	*/
-		time_t 	elaps;		/* process elaps time (hertz)	*/
-		char	cmdline[CMDLEN+1];/* command-line string       	*/
-		int	nthrslpi;	/* # threads in state 'S'       */
-		int	nthrslpu;	/* # threads in state 'D'       */
-		int	nthrrun;	/* # threads in state 'R'       */
+    /* GENERAL TASK INFO 					*/
+    struct gen {
+        int	tgid;		/* threadgroup identification 	*/
+        int	pid;		/* process identification 	*/
+        int	ppid;           /* parent process identification*/
+        int	ruid;		/* real  user  identification 	*/
+        int	euid;		/* eff.  user  identification 	*/
+        int	suid;		/* saved user  identification 	*/
+        int	fsuid;		/* fs    user  identification 	*/
+        int	rgid;		/* real  group identification 	*/
+        int	egid;		/* eff.  group identification 	*/
+        int	sgid;		/* saved group identification 	*/
+        int	fsgid;		/* fs    group identification 	*/
+        int	nthr;		/* number of threads in tgroup 	*/
+        char	name[PNAMLEN+1];/* process name string       	*/
+        char 	isproc;		/* boolean: process level?      */
+        char 	state;		/* process state ('E' = exited)	*/
+        int	excode;		/* process exit status		*/
+        time_t 	btime;		/* process start time (epoch)	*/
+        time_t 	elaps;		/* process elaps time (hertz)	*/
+        char	cmdline[CMDLEN+1];/* command-line string       	*/
+        int	nthrslpi;	/* # threads in state 'S'       */
+        int	nthrslpu;	/* # threads in state 'D'       */
+        int	nthrrun;	/* # threads in state 'R'       */
+        int	ctid;		/* OpenVZ container ID		*/
+        int	vpid;		/* OpenVZ virtual PID		*/
+        int	wasinactive;	/* boolean: task inactive	*/
+        char	container[16];	/* Docker container id (12 pos)	*/
+    } gen;
 
-		int	ctid;		/* OpenVZ container ID		*/
-		int	vpid;		/* OpenVZ virtual PID		*/
+    /* CPU STATISTICS						*/
+    struct cpu {
+        count_t	utime;		/* time user   text (ticks) 	*/
+        count_t	stime;		/* time system text (ticks) 	*/
+        int	nice;		/* nice value                   */
+        int	prio;		/* priority                     */
+        int	rtprio;		/* realtime priority            */
+        int	policy;		/* scheduling policy            */
+        int	curcpu;		/* current processor            */
+        int	sleepavg;       /* sleep average percentage     */
+        int	ifuture[4];	/* reserved for future use	*/
+        char	wchan[16];	/* wait channel string    	*/
+        count_t	rundelay;	/* schedstat rundelay (nanosec)	*/
+        count_t	cfuture[1];	/* reserved for future use	*/
+    } cpu;
 
-		int	wasinactive;	/* boolean: task inactive	*/
+    /* DISK STATISTICS						*/
+    struct dsk {
+        count_t	rio;		/* number of read requests 	*/
+        count_t	rsz;		/* cumulative # sectors read	*/
+        count_t	wio;		/* number of write requests 	*/
+        count_t	wsz;		/* cumulative # sectors written	*/
+        count_t	cwsz;		/* cumulative # written sectors */
+        /* being cancelled              */
+        count_t	cfuture[4];	/* reserved for future use	*/
+    } dsk;
 
-		char	container[16];	/* Docker container id (12 pos)	*/
-	} gen;
+    /* MEMORY STATISTICS						*/
+    struct mem {
+        count_t	minflt;		/* number of page-reclaims 	*/
+        count_t	majflt;		/* number of page-faults 	*/
+        count_t	vexec;		/* virtmem execfile (Kb)        */
+        count_t	vmem;		/* virtual  memory  (Kb)	*/
+        count_t	rmem;		/* resident memory  (Kb)	*/
+        count_t	pmem;		/* resident memory  (Kb)	*/
+        count_t vgrow;		/* virtual  growth  (Kb)    	*/
+        count_t rgrow;		/* resident growth  (Kb)     	*/
+        count_t vdata;		/* virtmem data     (Kb)     	*/
+        count_t vstack;		/* virtmem stack    (Kb)     	*/
+        count_t vlibs;		/* virtmem libexec  (Kb)     	*/
+        count_t vswap;		/* swap space used  (Kb)     	*/
+        count_t	vlock;		/* virtual locked   (Kb) 	*/
+        count_t	cfuture[3];	/* reserved for future use	*/
+    } mem;
 
-	/* CPU STATISTICS						*/
-	struct cpu {
-		count_t	utime;		/* time user   text (ticks) 	*/
-		count_t	stime;		/* time system text (ticks) 	*/
-		int	nice;		/* nice value                   */
-		int	prio;		/* priority                     */
-		int	rtprio;		/* realtime priority            */
-		int	policy;		/* scheduling policy            */
-		int	curcpu;		/* current processor            */
-		int	sleepavg;       /* sleep average percentage     */
-		int	ifuture[4];	/* reserved for future use	*/
-		char	wchan[16];	/* wait channel string    	*/
-		count_t	rundelay;	/* schedstat rundelay (nanosec)	*/
-		count_t	cfuture[1];	/* reserved for future use	*/
-	} cpu;
+    /* NETWORK STATISTICS						*/
+    struct net {
+        count_t tcpsnd;		/* number of TCP-packets sent	*/
+        count_t tcpssz;		/* cumulative size packets sent	*/
+        count_t	tcprcv;		/* number of TCP-packets recved	*/
+        count_t tcprsz;		/* cumulative size packets rcvd	*/
+        count_t	udpsnd;		/* number of UDP-packets sent	*/
+        count_t udpssz;		/* cumulative size packets sent	*/
+        count_t	udprcv;		/* number of UDP-packets recved	*/
+        count_t udprsz;		/* cumulative size packets sent	*/
+        count_t	avail1;		/* */
+        count_t	avail2;		/* */
+        count_t	cfuture[4];	/* reserved for future use	*/
+    } net;
 
-	/* DISK STATISTICS						*/
-	struct dsk {
-		count_t	rio;		/* number of read requests 	*/
-		count_t	rsz;		/* cumulative # sectors read	*/
-		count_t	wio;		/* number of write requests 	*/
-		count_t	wsz;		/* cumulative # sectors written	*/
-		count_t	cwsz;		/* cumulative # written sectors */
-					/* being cancelled              */
-		count_t	cfuture[4];	/* reserved for future use	*/
-	} dsk;
-
-	/* MEMORY STATISTICS						*/
-	struct mem {
-		count_t	minflt;		/* number of page-reclaims 	*/
-		count_t	majflt;		/* number of page-faults 	*/
-		count_t	vexec;		/* virtmem execfile (Kb)        */
-		count_t	vmem;		/* virtual  memory  (Kb)	*/
-		count_t	rmem;		/* resident memory  (Kb)	*/
-		count_t	pmem;		/* resident memory  (Kb)	*/
-		count_t vgrow;		/* virtual  growth  (Kb)    	*/
-		count_t rgrow;		/* resident growth  (Kb)     	*/
-		count_t vdata;		/* virtmem data     (Kb)     	*/
-		count_t vstack;		/* virtmem stack    (Kb)     	*/
-		count_t vlibs;		/* virtmem libexec  (Kb)     	*/
-		count_t vswap;		/* swap space used  (Kb)     	*/
-		count_t	vlock;		/* virtual locked   (Kb) 	*/
-		count_t	cfuture[3];	/* reserved for future use	*/
-	} mem;
-
-	/* NETWORK STATISTICS						*/
-	struct net {
-		count_t tcpsnd;		/* number of TCP-packets sent	*/
-		count_t tcpssz;		/* cumulative size packets sent	*/
-		count_t	tcprcv;		/* number of TCP-packets recved	*/
-		count_t tcprsz;		/* cumulative size packets rcvd	*/
-		count_t	udpsnd;		/* number of UDP-packets sent	*/
-		count_t udpssz;		/* cumulative size packets sent	*/
-		count_t	udprcv;		/* number of UDP-packets recved	*/
-		count_t udprsz;		/* cumulative size packets sent	*/
-		count_t	avail1;		/* */
-		count_t	avail2;		/* */
-		count_t	cfuture[4];	/* reserved for future use	*/
-	} net;
-
-	struct gpu {
-		char	state;		// A - active, E - Exit, '\0' - no use
-		char	cfuture[3];	//
-		short	nrgpus;		// number of GPUs for this process
-		int32_t	gpulist;	// bitlist with GPU numbers
-
-		int	gpubusy;	// gpu busy perc process lifetime      -1 = n/a
-		int	membusy;	// memory busy perc process lifetime   -1 = n/a
-		count_t	timems;		// milliseconds accounting   -1 = n/a
-					// value 0   for active process,
-					// value > 0 after termination
-		count_t	memnow;		// current    memory consumption in KiB
-		count_t	memcum;		// cumulative memory consumption in KiB
-		count_t	sample;		// number of samples
-	} gpu;
+    struct gpu {
+        char	state;		// A - active, E - Exit, '\0' - no use
+        char	cfuture[3];	//
+        short	nrgpus;		// number of GPUs for this process
+        int32_t	gpulist;	// bitlist with GPU numbers
+        int	gpubusy;	// gpu busy perc process lifetime      -1 = n/a
+        int	membusy;	// memory busy perc process lifetime   -1 = n/a
+        count_t	timems;		// milliseconds accounting   -1 = n/a
+        // value 0   for active process,
+        // value > 0 after termination
+        count_t	memnow;		// current    memory consumption in KiB
+        count_t	memcum;		// cumulative memory consumption in KiB
+        count_t	sample;		// number of samples
+    } gpu;
 };
 """
 
@@ -255,7 +251,7 @@ class AtopFile:
             try:
                 record = c_atop.rawrecord(self.fh)
                 # system level statistics is not parsed
-                system = self.fh.read(record.scomplen)
+                self.fh.read(record.scomplen)
                 process = self._decompress(self.fh.read(record.pcomplen))
                 for _ in range(record.ndeviat):
                     yield c_atop.tstat(process)
@@ -325,7 +321,7 @@ class AtopPlugin(Plugin):
         for f in self.target.fs.path(self.ATOP_PATH).glob(self.ATOP_GLOB):
             atop = AtopFile(f.open())
 
-            if not atop.version in atop_versions:
+            if atop.version not in atop_versions:
                 log.warning(f"The version {atop.version} of the Atop log file {f.name} is incompatible")
                 continue
 
