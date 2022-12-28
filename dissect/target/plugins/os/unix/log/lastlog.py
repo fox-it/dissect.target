@@ -1,4 +1,5 @@
 import datetime
+from typing import BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect import cstruct
@@ -16,7 +17,7 @@ LastlogRecord = TargetRecordDescriptor(
     ],
 )
 
-c_lastlog = """
+lastlog_def = """
 #define UT_NAMESIZE 32
 #define UT_HOSTSIZE 256
 #define size        292
@@ -34,19 +35,18 @@ struct entry {
 };
 """
 
-lastlog = cstruct.cstruct()
-lastlog.load(c_lastlog)
+c_lastlog = cstruct.cstruct()
+c_lastlog.load(lastlog_def)
 
 
-class LastLogFile(object):
-    def __init__(self, fp):
-        self.fp = fp
+class LastLogFile:
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
 
     def __iter__(self):
         while True:
             try:
-                e = lastlog.entry(self.fp)
-                yield e
+                yield lastlog.entry(self.fh)
             except EOFError:
                 break
 
@@ -70,7 +70,7 @@ class LastLogPlugin(Plugin):
         except FileNotFoundError:
             return
 
-        users = dict()
+        users = {}
         for user in self.target.users():
             users[user.uid] = user.name
 
@@ -79,13 +79,13 @@ class LastLogPlugin(Plugin):
         for idx, entry in enumerate(log):
 
             # if ts=0 the uid has never logged in before
-            if entry.ut_host.decode().strip("\x00") == "" or entry.ll_time.tv_sec == 0:
+            if entry.ut_host.strip(b"\x00") == b"" or entry.ll_time.tv_sec == 0:
                 continue
 
             yield LastlogRecord(
                 ts=datetime.datetime.utcfromtimestamp(entry.ll_time.tv_sec),
                 uid=idx,
-                ut_user=users[idx] if idx in users else None,
+                ut_user=users.get(idx),
                 ut_tty=entry.ut_user.decode().strip("\x00"),
                 ut_host=entry.ut_host.decode(errors="ignore").strip("\x00"),
                 _target=self.target,

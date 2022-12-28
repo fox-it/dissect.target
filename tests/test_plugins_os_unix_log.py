@@ -18,7 +18,7 @@ def test_wtmp_plugin(target_unix, fs_unix):
 
 def test_lastlog_plugin(target_unix_users, fs_unix):
 
-    data_file = absolute_path("data/unix-logs/lastlog2")
+    data_file = absolute_path("data/unix-logs/lastlog")
     fs_unix.map_file("/var/log/lastlog", data_file)
 
     target_unix_users.add_plugin(LastLogPlugin)
