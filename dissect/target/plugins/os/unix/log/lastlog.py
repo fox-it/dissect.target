@@ -1,10 +1,10 @@
-import datetime
 from typing import BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect import cstruct
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.util import ts
 
 LastlogRecord = TargetRecordDescriptor(
     "linux/log/lastlog",
@@ -83,7 +83,7 @@ class LastLogPlugin(Plugin):
                 continue
 
             yield LastlogRecord(
-                ts=datetime.datetime.utcfromtimestamp(entry.ll_time.tv_sec),
+                ts=ts.from_unix(entry.ll_time.tv_sec),
                 uid=idx,
                 ut_user=users.get(idx),
                 ut_tty=entry.ut_user.decode().strip("\x00"),
