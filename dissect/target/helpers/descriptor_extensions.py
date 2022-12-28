@@ -81,3 +81,25 @@ class TargetRecordDescriptorExtension(RecordDescriptorExtensionBase):
         # Reserved keywords are never part of the args of a Record's __init__.
         record_kwargs["_source"] = source
         return record_kwargs
+
+
+class UnixUserRecordDescriptorExtension(RecordDescriptorExtensionBase):
+    _default_fields = [("string", "name"), ("string", "uid"), ("string", "gid"), ("string", "home")]
+
+    _input_fields = ("_user",)
+
+    def _fill_default_fields(self, record_kwargs):
+        user = record_kwargs.get("_user", None)
+
+        name = None
+        uid = None
+        gid = None
+        home = None
+        if user:
+            name = user.name
+            uid = user.uid
+            gid = user.gid
+            home = user.home
+
+        record_kwargs.update({"name": name, "uid": uid, "gid": gid, "home": home})
+        return record_kwargs

@@ -3,10 +3,10 @@ import re
 
 from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.descriptor_extensions import UnixUserRecordDescriptorExtension
 
-BashHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "linux/bashhistory",
+CommandHistoryRecord = create_extended_descriptor([UnixUserRecordDescriptorExtension])(
+    "linux/history",
     [
         ("datetime", "ts"),
         ("wstring", "command"),
@@ -14,25 +14,45 @@ BashHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     ],
 )
 
+COMMAND_HISTORY_FILES = [".bash_history", ".zsh_history", ".fish_history", "fish_history", ".python_history"]
+IGNORED_HOMES = ["/bin", "/usr/sbin", "/sbin"]
 
-class BashHistoryPlugin(Plugin):
+
+class CommandHistoryPlugin(Plugin):
     def check_compatible(self):
-        pass
-
-    @export(record=BashHistoryRecord)
-    def bashhistory(self):
-        """Return bash history for all users.
-
-        When using the BASH shell, history of the used commands is kept on the system. It is kept in a hidden file
-        named ".bash_history" and may expose commands that were used by an adversary.
-        """
         for user_details in self.target.user_details.all_with_home():
             for file_ in user_details.home_path.iterdir():
-                if not file_.name.startswith(".bash_history"):
+                if file_.name in COMMAND_HISTORY_FILES:
+                    return True
+        return False
+
+    @export(record=CommandHistoryRecord)
+    def bashhistory(self):
+        """
+        Deprecated, use commandhistory function.
+        """
+        return self.commandhistory()
+
+    @export(record=CommandHistoryRecord)
+    def commandhistory(self):
+        """Return shell history for all users.
+
+        When using a shell, history of the used commands is kept on the system. It is kept in a hidden file
+        named ".$SHELL_history" and may expose commands that were used by an adversary.
+        """
+
+        for user_details in self.target.user_details.all_with_home():
+
+            for ih in IGNORED_HOMES:
+                if ih in user_details.user.home:
+                    continue
+
+            for file_ in user_details.home_path.iterdir():
+                if file_.name not in COMMAND_HISTORY_FILES:
                     continue
 
                 try:
-                    for line in file_.open("rt"):
+                    for line in file_.open("rt", errors="ignore"):  # Ignore Non-ASCII characters in bash_history
                         cmd_ts = None
                         if line.startswith("#") or len(line.strip()) == 0:
                             matches = re.search(r"^#([0-9]{10})$", line.strip())
@@ -61,7 +81,7 @@ class BashHistoryPlugin(Plugin):
                         else:
                             command = line.strip()
 
-                        yield BashHistoryRecord(
+                        yield CommandHistoryRecord(
                             ts=cmd_ts,
                             command=command,
                             source=str(file_),
@@ -69,4 +89,4 @@ class BashHistoryPlugin(Plugin):
                             _user=user_details.user,
                         )
                 except Exception:
-                    self.target.log.exception("Failed to parse bash history: %s", file_)
+                    self.target.log.exception("Failed to parse command history: %s", file_)
