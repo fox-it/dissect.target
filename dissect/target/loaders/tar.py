@@ -1,10 +1,7 @@
 import logging
-import stat
 import tarfile
 from pathlib import Path
 from typing import Union
-
-from dissect.util.stream import BufferedStream
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import TarFilesystemEntry
