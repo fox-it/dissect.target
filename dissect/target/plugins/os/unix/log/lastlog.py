@@ -1,12 +1,13 @@
 from typing import BinaryIO
 
-from dissect.target.exceptions import FileNotFoundError
 from dissect import cstruct
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
 from dissect.util import ts
 
-LastlogRecord = TargetRecordDescriptor(
+from dissect.target.exceptions import FileNotFoundError
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
+
+LastLogRecord = TargetRecordDescriptor(
     "linux/log/lastlog",
     [
         ("datetime", "ts"),
@@ -46,7 +47,7 @@ class LastLogFile:
     def __iter__(self):
         while True:
             try:
-                yield lastlog.entry(self.fh)
+                yield c_lastlog.entry(self.fh)
             except EOFError:
                 break
 
@@ -56,7 +57,7 @@ class LastLogPlugin(Plugin):
         lastlog = self.target.fs.path("/var/log/lastlog")
         return lastlog.exists()
 
-    @export(record=[LastlogRecord])
+    @export(record=[LastLogRecord])
     def lastlog(self):
         """Return last logins information from /var/log/lastlog.
 
@@ -82,7 +83,7 @@ class LastLogPlugin(Plugin):
             if entry.ut_host.strip(b"\x00") == b"" or entry.ll_time.tv_sec == 0:
                 continue
 
-            yield LastlogRecord(
+            yield LastLogRecord(
                 ts=ts.from_unix(entry.ll_time.tv_sec),
                 uid=idx,
                 ut_user=users.get(idx),
