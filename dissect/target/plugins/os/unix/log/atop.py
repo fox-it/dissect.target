@@ -1,13 +1,13 @@
 import logging
+import zlib
 from io import BytesIO
 from typing import BinaryIO, Iterator
-import zlib
 
-from dissect.cstruct import cstruct, Instance
+from dissect.cstruct import Instance, cstruct
 from flow.record.fieldtypes import path
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import export, Plugin
+from dissect.target.plugin import Plugin, export
 
 log = logging.getLogger(__name__)
 
