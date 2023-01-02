@@ -11,7 +11,8 @@ if TYPE_CHECKING:
 ROOT_FILESYSTEM = "uploads"
 
 
-def find_os_directory(path: Path):
+def find_os_directory(path: Path) -> Optional[Path]:
+``
     # As of Velociraptor version 0.6.7 the structure of the Velociraptor Offline Collector varies by operating system
     # Generic.Collectors.File (Unix, OS-X) root filesystem is 'uploads/'
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) root filesystem is
