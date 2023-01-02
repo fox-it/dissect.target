@@ -20,10 +20,10 @@ def find_os_directory(path: Path):
     if os_type in ["linux", "osx"]:
         return dirs[0]
 
-    # Look for first folder in 'uploads' e.g. 'uploads/mft/%5C%5C.%5CC%3A', 'uploads/lazy_ntfs/%5C%5C.%5CC%3A'
+    # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
     if not os_type:
-        accessor_path = [p for p in path.joinpath(ROOT_FILESYSTEM).iterdir()][0]
-        windows_path = [p for p in accessor_path.iterdir()][0]
+        # Filter out files that start with '.'
+        windows_path = [p for p in path.joinpath(ROOT_FILESYSTEM + "/mft").iterdir() if not p.name.startswith(".")][0]
         os_type, dirs = find_dirs(windows_path)
         if os_type == "windows":
             return dirs[0]
