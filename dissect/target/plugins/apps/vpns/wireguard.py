@@ -84,7 +84,7 @@ class WireGuardPlugin(Plugin):
         if len(self.configs) > 0:
             return True
 
-    @export(record=WireGuardInterfaceRecord or WireGuardPeerRecord)
+    @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
     def config(self) -> Iterator[Union[WireGuardInterfaceRecord, WireGuardPeerRecord]]:
         """
         Parses interface config files from wireguard installations.
