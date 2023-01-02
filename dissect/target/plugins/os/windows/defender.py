@@ -5,9 +5,10 @@ from typing import Any, BinaryIO, Generator, Iterable, Iterator
 
 import dissect.util.ts as ts
 from dissect.cstruct import Structure, cstruct
+from flow.record import Record
+
 from dissect.target import plugin
 from dissect.target.helpers.record import TargetRecordDescriptor
-from flow.record import Record
 
 DEFENDER_EVTX_FIELDS = [
     ("uint32", "EventID"),
