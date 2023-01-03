@@ -3,9 +3,11 @@
     @author JSCU CNI
 """
 
-from dissect.target.plugins.os.unix.docker import DockerPlugin
-from ._utils import absolute_path
 from datetime import datetime
+
+from dissect.target.plugins.os.unix.docker import DockerPlugin
+
+from ._utils import absolute_path
 
 
 def test_docker_plugin_containers(target_unix_users, fs_unix):

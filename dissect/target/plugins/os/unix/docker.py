@@ -1,9 +1,9 @@
-from dissect.target.plugin import Plugin, export, internal
-from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target import Target
-
 import json
 import re
+
+from dissect.target import Target
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export, internal
 
 DockerContainerRecord = TargetRecordDescriptor(
     "linux/docker/container",
