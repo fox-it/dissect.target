@@ -16,16 +16,15 @@ def find_os_directory(path: Path) -> Optional[Path]:
     # Generic.Collectors.File (Unix, OS-X) root filesystem is 'uploads/'
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) root filesystem is
     # 'uploads/<file-accessor>/<drive-name>/'
-    os_type, dirs = find_dirs(path.joinpath(FILESYSTEMS_ROOT))
+    fs_root = path.joinpath(FILESYSTEMS_ROOT)
+    os_type, dirs = find_dirs(fs_root)
     if os_type in ["linux", "osx"]:
         return dirs[0]
-
     # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
-    if not os_type and path.joinpath(FILESYSTEMS_ROOT).joinpath("mft").exists():
+    mft_root = fs_root.joinpath("mft")
+    if not os_type and mft_root.exists():
         # Filter out files that start with '.'
-        windows_path = [
-            p for p in path.joinpath(FILESYSTEMS_ROOT).joinpath("mft").iterdir() if not p.name.startswith(".")
-        ][0]
+        windows_path = [p for p in mft_root.iterdir() if not p.name.startswith(".")][0]
         os_type, dirs = find_dirs(windows_path)
         if os_type == "windows":
             return dirs[0]
