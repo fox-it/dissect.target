@@ -46,7 +46,11 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
+<<<<<<< HEAD
                 entry = TarFilesystemEntry(volume, member.name, member)
+=======
+                entry = TarFile(volume, member.name, member, self.tar)
+>>>>>>> Change member.name to member object
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
@@ -65,7 +69,11 @@ class TarLoader(Loader):
 
                 volume = volumes[volume_name]
 
+<<<<<<< HEAD
                 entry = TarFilesystemEntry(volume, "/".join(parts[1:]), member)
+=======
+                entry = TarFile(volume, "/".join(parts[1:]), member, self.tar)
+>>>>>>> Change member.name to member object
             volume.map_file_entry(entry.path, entry)
 
         for vol_name, vol in volumes.items():
