@@ -7,6 +7,7 @@ from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import TarFilesystemEntry
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
+from dissect.util.stream import BufferedStream
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class TarLoader(Loader):
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
 
-        self.tar = tarfile.open(path)
+        self.tar = tarfile.open(path, ignore_zeros=True)
 
     @staticmethod
     def detect(path: Path):
