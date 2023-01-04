@@ -40,8 +40,7 @@ WireGuardPeerRecord = TargetRecordDescriptor(
 
 
 class WireGuardPlugin(Plugin):
-    """
-    WireGuard configuration parser.
+    """WireGuard configuration parser.
 
     Resources:
     - https://manpages.debian.org/testing/wireguard-tools/wg.8.en.html#CONFIGURATION_FILE_FORMAT
@@ -86,9 +85,7 @@ class WireGuardPlugin(Plugin):
 
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
     def config(self) -> Iterator[Union[WireGuardInterfaceRecord, WireGuardPeerRecord]]:
-        """
-        Parses interface config files from wireguard installations.
-        """
+        """Parses interface config files from wireguard installations."""
 
         for config_path in self.configs:
             config = _parse_config(config_path.read_text())
@@ -127,8 +124,8 @@ class WireGuardPlugin(Plugin):
 
 
 def _parse_config(content: str) -> ConfigParser:
-    """
-    Parses WireGuard config ini stanza files using Python's ConfigParser module.
+    """Parses WireGuard config ini stanza files using Python's ConfigParser module.
+
     We create our own MultiDict definition from an ordered dict, since we want
     to allow multiple 'Peer' sections. We prepend section names with numbers;
     'Interface', 'Peer1', 'Peer2', 'Peer2', etc.
