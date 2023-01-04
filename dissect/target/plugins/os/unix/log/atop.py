@@ -232,7 +232,7 @@ class AtopFile:
 
         self.fh = fh
         self.header = c_atop.rawheader(self.fh)
-        self.version = self._version()
+        self.version = self.version()
 
     def __iter__(self) -> Iterator[Instance]:
         while True:
@@ -240,16 +240,16 @@ class AtopFile:
                 record = c_atop.rawrecord(self.fh)
                 # system level statistics is not parsed
                 self.fh.read(record.scomplen)
-                process = self._decompress(self.fh.read(record.pcomplen))
+                process = self.decompress(self.fh.read(record.pcomplen))
                 for _ in range(record.ndeviat):
                     yield c_atop.tstat(process)
             except EOFError:
                 break
 
-    def _decompress(self, data: Instance) -> bytes:
+    def decompress(self, data: Instance) -> bytes:
         return BytesIO(zlib.decompress(data))
 
-    def _version(self) -> str:
+    def version(self) -> str:
         major_version = (self.header.aversion >> 8) & 0x7F
         minor_version = self.header.aversion & 0xFF
         return f"{major_version}.{minor_version}"
