@@ -10,6 +10,7 @@ from dissect.target import filesystem, target
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
+from dissect.util.stream import BufferedStream
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class TarLoader(Loader):
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
 
-        self.tar = tarfile.open(path)
+        self.tar = tarfile.open(path, ignore_zeros=True)
 
     @staticmethod
     def detect(path: Path):
@@ -88,7 +89,7 @@ class TarFile(filesystem.VirtualFile):
         super().__init__(fs, path, tar_path)
         self.tar = tar_file
 
-    def open(self):
+    def open(self) -> BufferedStream:
         try:
             f = self.tar.extractfile(self.entry)
             if hasattr(f, "raw"):
@@ -97,9 +98,9 @@ class TarFile(filesystem.VirtualFile):
         except Exception:
             raise FileNotFoundError()
 
-    def stat(self):
-        info = self.tar.getmember(self.entry)
-        mode = (stat.S_IFDIR if info.isdir() else stat.S_IFREG) | info.mode
+    def stat(self) -> fsutil.stat_result:
+        info = self.entry
+        mode = stat.S_IFDIR if info.isdir() else (stat.S_IFLNK if info.issym() else stat.S_IFREG) | info.mode
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         return fsutil.stat_result(
             [
@@ -115,3 +116,13 @@ class TarFile(filesystem.VirtualFile):
                 0,
             ]
         )
+
+    lstat = stat
+
+    def readlink(self) -> Union[str, None]:
+        if self.is_symlink():
+            symlink = self.entry.linkname
+            return symlink
+
+    def is_symlink(self) -> bool:
+        return stat.S_ISLNK(self.stat().st_mode)
