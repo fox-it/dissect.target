@@ -52,7 +52,7 @@ except ImportError:
     log.warning("Readline module is not available")
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
-STAT_TEMPLATE = """  File: {path}
+STAT_TEMPLATE = """  File: {path} {symlink}
   Size: {size}          {filetype}
  Inode: {inode}   Links: {nlink}
 Access: ({modeord}/{modestr})  Uid: ( {uid} )   Gid: ( {gid} )
@@ -486,16 +486,23 @@ class TargetCli(TargetCmd):
     @arg("-h", "--human-readable", action="store_true")
     def cmd_ls(self, args, stdout):
         """list directory contents"""
-        path = self.checkdir(args.path)
-        if not path:
+
+        path = self.resolvepath(args.path)
+
+        if not path or not path.exists():
             return
 
-        directory_contents = self.scandir(path, color=True)
+        if path.is_dir():
+            contents = self.scandir(path, color=True)
+        elif path.is_file():
+            contents = [(path, path.name)]
+
         if not args.l:
-            print("\n".join([name for _, name in directory_contents]), file=stdout)
+            print("\n".join([name for _, name in contents]), file=stdout)
         else:
-            print(f"total {len(directory_contents)}", file=stdout)
-            for target_path, name in directory_contents:
+            if len(contents) > 1:
+                print(f"total {len(contents)}", file=stdout)
+            for target_path, name in contents:
                 try:
                     self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
                 except FileNotFoundError:
@@ -504,6 +511,7 @@ class TargetCli(TargetCmd):
     def print_extensive_file_stat(self, stdout, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
         entry = target_path.get()
+        symlink = ""
 
         # Entry is an NTFSEntry and has alternative datastream
         if hasattr(entry, "deref") and ":" in name:
@@ -511,10 +519,18 @@ class TargetCli(TargetCmd):
             ads_path = fsutil.join(fsutil.dirname(entry.path, separator=entry.fs.alt_separator), name)
             entry = entry.fs.get(ads_path)
 
-        stat = entry.lstat()
+        try:
+            stat = entry.stat()
+        except FileNotFoundError:  # Incase symlinks cant be found, due to them not being picked up by acquire
+            stat = entry.lstat()
+
+        if entry.is_symlink():
+            symlink = f"-> {entry.readlink()}"
+
         utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
+
         print(
-            f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}",
+            f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name} {symlink}",
             file=stdout,
         )
 
@@ -545,9 +561,20 @@ class TargetCli(TargetCmd):
         if not path:
             return
 
-        s = path.stat() if args.dereference else path.lstat()
+        symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
+
+        if path.is_symlink() and args.dereference:
+            s = path.stat()
+        elif path.is_symlink():
+            s = path.lstat()
+        elif args.dereference:
+            s = path.stat()
+        else:
+            s = path.stat()
+
         res = STAT_TEMPLATE.format(
             path=path,
+            symlink=symlink,
             size=s.st_size,
             filetype="",
             inode=s.st_ino,
