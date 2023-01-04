@@ -16,18 +16,12 @@ typedef long long count_t;
 
 #define _UTSNAME_LENGTH 65
 struct utsname {
-    /* Name of the implementation of the operating system.  */
-    char sysname[_UTSNAME_LENGTH];
-    /* Name of this node on the network.  */
-    char nodename[_UTSNAME_LENGTH];
-    /* Current release level of this implementation.  */
-    char release[_UTSNAME_LENGTH];
-    /* Current version level of this release.  */
-    char version[_UTSNAME_LENGTH];
-    /* Name of the hardware type the system is running on.  */
-    char machine[_UTSNAME_LENGTH];
-    /* Name of the domain of this node on the network.  */
-    char domainname[_UTSNAME_LENGTH];
+    char sysname[_UTSNAME_LENGTH];     /* Name of the implementation of the operating system.  */
+    char nodename[_UTSNAME_LENGTH];    /* Name of this node on the network.  */
+    char release[_UTSNAME_LENGTH];     /* Current release level of this implementation.  */
+    char version[_UTSNAME_LENGTH];     /* Current version level of this release.  */
+    char machine[_UTSNAME_LENGTH];     /* Name of the hardware type the system is running on.  */
+    char domainname[_UTSNAME_LENGTH];  /* Name of the domain of this node on the network.  */
 };
 
 struct rawheader {
@@ -177,18 +171,17 @@ struct tstat {
     } net;
 
     struct gpu {
-        char	state;		// A - active, E - Exit, '\0' - no use
-        char	cfuture[3];	//
-        short	nrgpus;		// number of GPUs for this process
-        int32_t	gpulist;	// bitlist with GPU numbers
-        int	gpubusy;	// gpu busy perc process lifetime      -1 = n/a
-        int	membusy;	// memory busy perc process lifetime   -1 = n/a
-        count_t	timems;		// milliseconds accounting   -1 = n/a
-        // value 0   for active process,
-        // value > 0 after termination
-        count_t	memnow;		// current    memory consumption in KiB
-        count_t	memcum;		// cumulative memory consumption in KiB
-        count_t	sample;		// number of samples
+        char	state;		 /* A - active, E - Exit, '\0' - no use */
+        char	cfuture[3];
+        short	nrgpus;		 /* number of GPUs for this process */
+        int32_t	gpulist;	 /* bitlist with GPU numbers */
+        int	gpubusy;	     /* gpu busy perc process lifetime      -1 = n/a */
+        int	membusy;	     /* memory busy perc process lifetime   -1 = n/a */
+        count_t	timems;		 /* milliseconds accounting -1 = n/a */
+        /* value 0 for active process, value > 0 after termination */
+        count_t	memnow;		 /* current    memory consumption in KiB */
+        count_t	memcum;		 /* cumulative memory consumption in KiB */
+        count_t	sample;		 /* number of samples */
     } gpu;
 };
 """
@@ -264,9 +257,9 @@ class AtopFile:
 
 class AtopPlugin(Plugin):
 
-    ATOP_PATH = "/var/log/atop"
     ATOP_GLOB = "atop_*"
     ATOP_MAGIC = 0xFEEDBEEF
+    ATOP_PATH = "/var/log/atop"
     ATOP_VERSIONS = ["2.6", "2.7"]
 
     def check_compatible(self) -> bool:
