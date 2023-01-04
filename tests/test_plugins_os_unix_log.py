@@ -1,7 +1,7 @@
-from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
-from dissect.target.plugins.os.unix.log.lastlog import LastlogPlugin
-from dissect.target.plugins.os.unix.log.btmp import BtmpPlugin
 from dissect.target.plugins.os.unix.log.atop import AtopPlugin
+from dissect.target.plugins.os.unix.log.btmp import BtmpPlugin
+from dissect.target.plugins.os.unix.log.lastlog import LastlogPlugin
+from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
 
 from ._utils import absolute_path
 

@@ -1,4 +1,3 @@
-import logging
 import zlib
 from io import BytesIO
 from typing import BinaryIO, Iterator
@@ -9,9 +8,8 @@ from flow.record.fieldtypes import path
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-log = logging.getLogger(__name__)
-
-atop_versions = ["2.6", "2.7"]
+# The structs rawheader and rawrecord have added padding compared to the structs in the source code
+# https://github.com/Atoptool/atop/blob/master/rawlog.h, https://github.com/Atoptool/atop/blob/master/photoproc.h
 atop_def = """
 typedef unsigned long long time_t;
 typedef long long count_t;
@@ -234,14 +232,11 @@ AtopRecord = TargetRecordDescriptor(
 
 
 class AtopFile:
-    """Parse general task information of processes of an Atop log file.
-
-    Sources:
-        - https://github.com/Atoptool/atop/blob/master/rawlog.h
-        - https://github.com/Atoptool/atop/blob/master/photoproc.h
-    """
+    """Parse general task information of processes of an Atop log file."""
 
     def __init__(self, fh: BinaryIO):
+        fh.seek(0)
+
         self.fh = fh
         self.header = c_atop.rawheader(self.fh)
         self.version = self._version()
@@ -272,6 +267,7 @@ class AtopPlugin(Plugin):
     ATOP_PATH = "/var/log/atop"
     ATOP_GLOB = "atop_*"
     ATOP_MAGIC = 0xFEEDBEEF
+    ATOP_VERSIONS = ["2.6", "2.7"]
 
     def check_compatible(self) -> bool:
         return self.target.fs.path(self.ATOP_PATH).exists()
@@ -319,14 +315,18 @@ class AtopPlugin(Plugin):
             filepath (path): The file name.
         """
         for f in self.target.fs.path(self.ATOP_PATH).glob(self.ATOP_GLOB):
-            atop = AtopFile(f.open())
+            fh = f.open()
 
-            if atop.version not in atop_versions:
-                log.warning(f"The version {atop.version} of the Atop log file {f.name} is incompatible")
+            atop_magic = int.from_bytes(fh.read(4), "little")
+
+            if not atop_magic == self.ATOP_MAGIC:
+                self.target.log.warning(f"The Atop log file {f.name} has an invalid magic header")
                 continue
 
-            if not atop.header.magic == self.ATOP_MAGIC:
-                log.warning(f"The Atop log file {f.name} has an invalid magic header")
+            atop = AtopFile(fh)
+
+            if atop.version not in self.ATOP_VERSIONS:
+                self.target.log.warning(f"The version {atop.version} of the Atop log file {f.name} is incompatible")
                 continue
 
             for entry in atop:
