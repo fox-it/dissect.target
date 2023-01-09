@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import sys
 from unittest.mock import Mock, patch
 
@@ -58,6 +58,18 @@ def test_amcache_old_format(target_win, fs_win):
     assert len(drivers) == 0
 
 
+def test_amcache_windows_11_applaunches(target_win, fs_win):
+    applaunch_file = absolute_path("data/PcaAppLaunchDic.txt")
+    fs_win.map_file("windows/appcompat/pca/PcaAppLaunchDic.txt", applaunch_file)
+
+    target_win.add_plugin(AmcachePlugin)
+    applaunches = list(target_win.amcache.applaunches())
+
+    assert len(applaunches) == 55
+    assert applaunches[0].ts == datetime.strptime("2022-12-17 13:27:53.096000", "%Y-%m-%d %H:%M:%S.%f")
+    assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
+
+
 def new_read_key_subkeys(self, key):
     base_values = {
         "AppxPackageFullName": "Microsoft.Microsoft3DViewer_7.2105.4012.0_x64__8wekyb3d8bbwe",
@@ -93,7 +105,7 @@ def new_read_key_subkeys(self, key):
     mock_values.append(mock_value)
 
     mock_entry = Mock()
-    mock_entry.timestamp = datetime.datetime(2021, 12, 31)
+    mock_entry.timestamp = datetime(2021, 12, 31)
     mock_entry.values = Mock(return_value=mock_values)
 
     yield mock_entry
