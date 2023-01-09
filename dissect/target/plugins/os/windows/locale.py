@@ -1,5 +1,12 @@
-from dissect.target.helpers.record import WindowsKeyboardRecord
 from dissect.target.plugin import Plugin, export, internal
+
+WindowsKeyboardRecord = TargetRecordDescriptor(
+    "windows/keyboard",
+    [
+        ("string", "layout"),
+        ("string", "id"),
+    ],
+)
 
 
 class LocalePlugin(Plugin):
@@ -10,7 +17,7 @@ class LocalePlugin(Plugin):
             for k in self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout\\DosKeybCodes")
             for lang in k.values()
         }
-   
+
     def check_compatible(self):
         pass
 
