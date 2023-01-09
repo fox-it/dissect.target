@@ -3,9 +3,9 @@ import re
 
 from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.descriptor_extensions import UnixUserRecordDescriptorExtension
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 
-CommandHistoryRecord = create_extended_descriptor([UnixUserRecordDescriptorExtension])(
+CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "linux/history",
     [
         ("datetime", "ts"),
