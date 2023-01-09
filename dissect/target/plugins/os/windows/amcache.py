@@ -637,7 +637,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                     continue
                 parts = line.rstrip().split("|")
                 yield AppLaunchAppcompatRecord(
-                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f".replace(tzinfo=timezone.utc),
+                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
                     path=parts[0],
                     _target=self.target,
                 )
