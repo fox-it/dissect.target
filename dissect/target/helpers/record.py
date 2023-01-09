@@ -136,25 +136,6 @@ UnixUserRecord = TargetRecordDescriptor(
     ],
 )
 
-WindowsKeyboardRecord = TargetRecordDescriptor(
-    "windows/keyboard",
-    [
-        ("string", "layout"),
-        ("string", "id"),
-    ],
-)
-
-UnixKeyboardRecord = TargetRecordDescriptor(
-    "linux/keyboard",
-    [
-        ("string", "layout"),
-        ("string", "model"),
-        ("string", "variant"),
-        ("string", "options"),
-        ("string", "backspace"),
-    ],
-)
-
 EmptyRecord = RecordDescriptor(
     "empty",
     [],

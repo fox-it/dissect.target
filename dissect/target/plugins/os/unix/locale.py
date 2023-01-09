@@ -1,6 +1,16 @@
 from dissect.target.exceptions import FileNotFoundError
-from dissect.target.helpers.record import UnixKeyboardRecord
 from dissect.target.plugin import Plugin, export
+
+UnixKeyboardRecord = TargetRecordDescriptor(
+    "linux/keyboard",
+    [
+        ("string", "layout"),
+        ("string", "model"),
+        ("string", "variant"),
+        ("string", "options"),
+        ("string", "backspace"),
+    ],
+)
 
 
 class LocalePlugin(Plugin):
@@ -73,7 +83,7 @@ class LocalePlugin(Plugin):
                     backspace=k.get("BACKSPACE"),
                     _target=self.target,
                 )
-                # note that you might still want to exit if LAYOUT is not None. Add if appropriate 
+                # note that you might still want to exit if LAYOUT is not None. Add if appropriate
 
         # TODO
         # /etc/sysconfig/keyboard
