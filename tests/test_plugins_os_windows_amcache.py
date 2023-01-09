@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 import sys
 from unittest.mock import Mock, patch
 
@@ -66,7 +66,7 @@ def test_amcache_windows_11_applaunches(target_win, fs_win):
     applaunches = list(target_win.amcache.applaunches())
 
     assert len(applaunches) == 55
-    assert applaunches[0].ts == datetime.strptime("2022-12-17 13:27:53.096000", "%Y-%m-%d %H:%M:%S.%f")
+    assert applaunches[0].ts == datetime.datetime(2022, 12, 17, 13, 27, 53, 96000, tzinfo=datetime.timezone.utc)
     assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
 
 
@@ -105,7 +105,7 @@ def new_read_key_subkeys(self, key):
     mock_values.append(mock_value)
 
     mock_entry = Mock()
-    mock_entry.timestamp = datetime(2021, 12, 31)
+    mock_entry.timestamp = datetime.datetime(2021, 12, 31)
     mock_entry.values = Mock(return_value=mock_values)
 
     yield mock_entry
