@@ -341,10 +341,10 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             self.amcache.add(regutil.RegfHive(fpath))
 
         if self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt").exists():
-            self.amcache_applaunchdic = True
+            self.amcache_applaunch = True
 
     def check_compatible(self):
-        if not len(self.amcache) > 0 and not self.amcache_applaunchdic:
+        if not len(self.amcache) > 0 and not self.amcache_applaunch:
             raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 
     def read_key_subkeys(self, key):
@@ -637,7 +637,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                     continue
                 parts = line.rstrip().split("|")
                 yield AppLaunchAppcompatRecord(
-                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f"),
+                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f".replace(tzinfo=timezone.utc),
                     path=parts[0],
                     _target=self.target,
                 )
