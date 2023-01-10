@@ -9,9 +9,7 @@ from ._utils import absolute_path
 
 
 def test_locale_plugin_windows(target_win_users, hive_hku, hive_hklm):
-    """
-    Hive structure originates from a Windows Server 2019 installation.
-    """
+    # Hive structure originates from a Windows Server 2019 installation.
 
     # language dict
     doskeybcodes_key_name = "SYSTEM\\ControlSet001\\Control\\Keyboard Layout\\DosKeybCodes"
@@ -54,9 +52,7 @@ def test_locale_plugin_windows(target_win_users, hive_hku, hive_hklm):
 
 
 def test_locale_plugin_unix(target_unix_users, fs_unix):
-    """
-    Locale locations originate from Ubuntu 20.
-    """
+    # Locale locations originate from Ubuntu 20.
 
     fs_unix.map_file_fh("/etc/timezone", BytesIO(textwrap.dedent("Europe/Amsterdam").encode()))
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(textwrap.dedent("LANG=en_US.UTF-8").encode()))

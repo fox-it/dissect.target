@@ -15,17 +15,12 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 
 
 class LocalePlugin(Plugin):
-    def __init__(self, target):
-        super().__init__(target)
-
     def check_compatible(self):
         pass
 
     @export(property=True)
     def timezone(self):
-        """
-        Get the timezone of the system.
-        """
+        """Get the timezone of the system."""
 
         # /etc/timezone should contain a simple timezone string
         # on most unix systems
@@ -45,9 +40,7 @@ class LocalePlugin(Plugin):
 
     @export(property=True)
     def language(self):
-        """
-        Get the configured locale(s) of the system.
-        """
+        """Get the configured locale(s) of the system."""
         locale_paths = ["/etc/default/locale", "/etc/locale.conf"]
 
         for locale_path in locale_paths:
@@ -59,9 +52,7 @@ class LocalePlugin(Plugin):
 
     @export(record=UnixKeyboardRecord)
     def keyboard(self):
-        """
-        Get the keyboard layout(s) of the system.
-        """
+        """Get the keyboard layout(s) of the system."""
 
         paths = ["/etc/default/keyboard", "/etc/vconsole.conf"] + list(
             self.target.fs.glob("/etc/X11/xorg.conf.d/*-keyboard.conf")

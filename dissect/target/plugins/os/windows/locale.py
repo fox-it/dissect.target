@@ -24,9 +24,7 @@ class LocalePlugin(Plugin):
 
     @export(record=WindowsKeyboardRecord)
     def keyboard(self):
-        """
-        Yield records of installed keyboards on the system.
-        """
+        """Yield records of installed keyboards on the system."""
         found_keyboards = []
         for key in self.target.registry.keys("HKCU\\Keyboard Layout\\Preload"):
             for language in key.values():
@@ -41,9 +39,7 @@ class LocalePlugin(Plugin):
 
     @export(property=True)
     def language(self):
-        """
-        Get a list of installed languages on the system.
-        """
+        """Get a list of installed languages on the system."""
         # HKCU\\Control Panel\\International\\User Profile" Languages
         found_languages = []
         for up in self.target.registry.keys("HKCU\\Control Panel\\International\\User Profile"):
@@ -55,8 +51,6 @@ class LocalePlugin(Plugin):
 
     @export(property=True)
     def timezone(self):
-        """
-        Get the configured timezone of the system.
-        """
+        """Get the configured timezone of the system."""
         tzi = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
         return tzi.value("TimeZoneKeyName").value
