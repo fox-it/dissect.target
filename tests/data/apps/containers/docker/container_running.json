@@ -117,7 +117,23 @@
     "RestartCount": 0,
     "HasBeenStartedBefore": true,
     "HasBeenManuallyStopped": false,
-    "MountPoints": {},
+    "MountPoints": {
+      "/test": {
+        "Source": "/tmp/test",
+        "Destination": "/test",
+        "RW": true,
+        "Name": "",
+        "Driver": "",
+        "Type": "bind",
+        "Propagation": "rprivate",
+        "Spec": {
+          "Type": "bind",
+          "Source": "/tmp/test",
+          "Target": "/test"
+        },
+        "SkipMountpointCreation": false
+      }
+    },
     "SecretReferences": null,
     "ConfigReferences": null,
     "AppArmorProfile": "docker-default",
