@@ -124,6 +124,7 @@ class MftTimelinePlugin(Plugin):
 
             for record in fs.ntfs.mft.segments():
                 segment = record.segment
+
                 try:
                     paths = record.full_paths(ignore_dos)
 
