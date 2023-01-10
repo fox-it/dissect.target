@@ -1,4 +1,5 @@
 from dissect.target.plugin import Plugin, export, internal
+from dissect.target.helpers.record import TargetRecordDescriptor
 
 WindowsKeyboardRecord = TargetRecordDescriptor(
     "windows/keyboard",

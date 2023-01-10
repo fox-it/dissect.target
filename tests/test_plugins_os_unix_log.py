@@ -7,7 +7,7 @@ from ._utils import absolute_path
 
 def test_wtmp_plugin(target_unix, fs_unix):
 
-    data_file = absolute_path("data/unix-logs/wtmp")
+    data_file = absolute_path("data/unix/logs/wtmp")
     fs_unix.map_file("var/log/wtmp", data_file)
 
     target_unix.add_plugin(WtmpPlugin)
@@ -18,7 +18,7 @@ def test_wtmp_plugin(target_unix, fs_unix):
 
 def test_lastlog_plugin(target_unix_users, fs_unix):
 
-    data_file = absolute_path("data/unix-logs/lastlog")
+    data_file = absolute_path("data/unix/logs/lastlog")
     fs_unix.map_file("/var/log/lastlog", data_file)
 
     target_unix_users.add_plugin(LastLogPlugin)
@@ -33,7 +33,7 @@ def test_lastlog_plugin(target_unix_users, fs_unix):
 
 def test_btmp_plugin(target_unix, fs_unix):
 
-    data_file = absolute_path("data/unix-logs/btmp")
+    data_file = absolute_path("data/unix/logs/btmp")
     fs_unix.map_file("var/log/btmp", data_file)
 
     target_unix.add_plugin(BtmpPlugin)

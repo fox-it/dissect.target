@@ -1,5 +1,6 @@
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.record import TargetRecordDescriptor
 
 UnixKeyboardRecord = TargetRecordDescriptor(
     "linux/keyboard",
@@ -50,7 +51,7 @@ class LocalePlugin(Plugin):
         locale_paths = ["/etc/default/locale", "/etc/locale.conf"]
 
         for locale_path in locale_paths:
-            if (path := self.target.fs.path(local_path)).exists():
+            if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
                         return line.replace("LANG=", "").replace('"', "").strip()

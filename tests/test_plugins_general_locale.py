@@ -60,7 +60,7 @@ def test_locale_plugin_unix(target_unix_users, fs_unix):
 
     fs_unix.map_file_fh("/etc/timezone", BytesIO(textwrap.dedent("Europe/Amsterdam").encode()))
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(textwrap.dedent("LANG=en_US.UTF-8").encode()))
-    fs_unix.map_file("/etc/default/keyboard", absolute_path("data/unix-logs/locale/keyboard"))
+    fs_unix.map_file("/etc/default/keyboard", absolute_path("data/unix/configs/keyboard"))
     target_unix_users.add_plugin(UnixLocalePlugin)
 
     assert target_unix_users.timezone == "Europe/Amsterdam"
