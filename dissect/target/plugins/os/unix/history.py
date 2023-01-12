@@ -1,9 +1,11 @@
 import datetime
 import re
 
-from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.descriptor_extensions import (
+    UserRecordDescriptorExtension,
+)
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.plugin import Plugin, export
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "linux/history",
@@ -52,38 +54,33 @@ class CommandHistoryPlugin(Plugin):
                     continue
 
                 try:
+                    next_cmd_ts = None
+
                     for line in file_.open("rt", errors="ignore"):  # Ignore Non-ASCII characters in bash_history
                         cmd_ts = None
-                        if line.startswith("#") or len(line.strip()) == 0:
-                            matches = re.search(r"^#([0-9]{10})$", line.strip())
+                        line = line.strip()
+
+                        # Skip empty lines
+                        if not line:
+                            continue
+
+                        if line.startswith("#"):  # Parse timestamp if possible
+                            matches = re.search(r"^#([0-9]{10})$", line)
                             if matches:
                                 ts = matches.group(1)
                                 try:
-                                    cmd_ts = datetime.datetime.utcfromtimestamp(float(ts))
+                                    next_cmd_ts = datetime.datetime.utcfromtimestamp(float(ts))
                                 except (ValueError, TypeError):
                                     continue
                             continue
 
-                        matches = re.search(
-                            r"^.*\s\d+\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\s(.*)$",
-                            line.strip(),
-                        )
-                        if matches:
-                            cmd_ts = datetime.datetime(
-                                int(matches.group(1)),
-                                int(matches.group(2)),
-                                int(matches.group(3)),
-                                int(matches.group(4)),
-                                int(matches.group(5)),
-                                int(matches.group(6)),
-                            )
-                            command = matches.group(7)
-                        else:
-                            command = line.strip()
+                        if next_cmd_ts:
+                            cmd_ts = next_cmd_ts
+                            next_cmd_ts = None
 
                         yield CommandHistoryRecord(
                             ts=cmd_ts,
-                            command=command,
+                            command=line,
                             source=str(file_),
                             _target=self.target,
                             _user=user_details.user,
