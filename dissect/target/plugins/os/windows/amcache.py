@@ -193,7 +193,7 @@ AppLaunchAppcompatRecord = TargetRecordDescriptor(
     "windows/appcompat/AppLaunch",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -638,7 +638,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 parts = line.rstrip().split("|")
                 yield AppLaunchAppcompatRecord(
                     ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
-                    path=parts[0],
+                    path=path.from_windows(parts[0]),
                     _target=self.target,
                 )
 
