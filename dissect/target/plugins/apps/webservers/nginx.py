@@ -56,6 +56,11 @@ class NginxPlugin(plugin.Plugin):
 
         for line in log_lines:
             m = regex.match(line)
+
+            if not m:
+                self.target.log.warning(f"No regex match found for Nginx log format for log line: {line}")
+                return
+
             yield WebserverRecord(
                 ts=parse_datetime(m.group("datetime")),
                 ipaddr=m.group("ipaddress"),

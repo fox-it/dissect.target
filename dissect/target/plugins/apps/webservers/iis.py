@@ -271,6 +271,7 @@ class IISLogsPlugin(plugin.Plugin):
     def history(self) -> Generator[TargetRecordDescriptor, None, None]:
         return self.logs()
 
+
 def replace_dash_with_none(data: dict) -> dict:
     """Replace "-" placeholder in dict values with None"""
     return {k: (None if v == "-" else v) for k, v in data.items()}
