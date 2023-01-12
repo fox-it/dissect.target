@@ -6,17 +6,18 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Tuple, Union
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OSPlugin, OperatingSystem, export
+from dissect.target.helpers.record import UnixShadowRecord, UnixUserRecord
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 
 class UnixPlugin(OSPlugin):
-    def __init__(self, target: Target):
+    def __init__(self, target: Target) -> None:
         super().__init__(target)
         self._add_mounts()
         self._hostname_dict = self._parse_hostname_string()
@@ -38,24 +39,102 @@ class UnixPlugin(OSPlugin):
 
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
-        passwd = self.target.fs.path("/etc/passwd")
-        if not passwd.exists():
-            return
+        """Recover users from /etc/passwd, /etc/master.passwd or /var/log/syslog session logins."""
 
-        for line in passwd.open("rt"):
+        # Yield users found in passwd files.
+        PASSWD_FILES = ["/etc/passwd", "/etc/master.passwd"]
+
+        for passwd_file in PASSWD_FILES:
+            if (path := self.target.fs.path(passwd_file)).exists():
+                for line in path.open("rt"):
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
 
-            pwent = line.split(":")
+                    pwent = dict(enumerate(line.split(":")))
             yield UnixUserRecord(
-                name=pwent[0],
-                passwd=pwent[1],
-                uid=pwent[2],
-                gid=pwent[3],
-                gecos=pwent[4],
-                home=pwent[5],
-                shell=pwent[6],
+                        name=pwent.get(0),
+                        passwd=pwent.get(1),
+                        uid=pwent.get(2),
+                        gid=pwent.get(3),
+                        home=pwent.get(5),
+                        shell=pwent.get(6),
+                        source=passwd_file,
+                        _target=self.target,
+                    )
+
+        # Find users not in passwd files by parsing recent
+        # syslog ldap, kerberos and x-session logins.
+        if (path := self.target.fs.path("/var/log/syslog")).exists():
+            busses = []
+            sessions = []
+            cur_session = -1
+            needles = {
+                ("setting HOME=", "home"),
+                ("setting SHELL=", "shell"),
+                ("setting USER=", "name"),
+            }
+
+            for line in path.open("rt"):
+
+                # Detect the beginning of a new session activation in the syslog
+                #
+                # dbus-update-activation-environment starts a new session with
+                # DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR and/or DISPLAY
+                # Using DBUS_SESSION_BUS_ADDRESS seems to work fine for now.
+                if "setting DBUS_SESSION_BUS_ADDRESS=" in line:
+                    bus = line.split("DBUS_SESSION_BUS_ADDRESS=")[1].strip()
+                    if bus in busses:
+                        continue
+                    busses.append(bus)
+                    cur_session += 1
+                    sessions.append({"bus": bus, "name": None, "home": None, "shell": None, "uid": None})
+
+                # Search the following lines for more information on the previousley detected session.
+                for n, k in needles:
+                    if n in line and "dbus-update-activation-environment" in line:
+                        sessions[cur_session][k] = line.split(n)[1].strip()
+
+            for user in sessions:
+                yield UnixUserRecord(
+                    name=user["name"],
+                    home=user["home"],
+                    shell=user["shell"],
+                    source="/var/log/syslog",
+                    _target=self.target,
+                )
+
+    @export(record=UnixShadowRecord)
+    def passwords(self):
+        """Recover shadow records from /etc/shadow files."""
+
+        if (path := self.target.fs.path("/etc/shadow")).exists():
+            for line in path.open("rt"):
+                line = line.strip()
+                if line == "":
+                    continue
+
+                shent = dict(enumerate(line.split(":")))
+                crypt = self._extract_crypt_details(shent)
+
+                # do not return a shadow record if we have no hash
+                if crypt.get("hash") is None or crypt.get("hash") == "":
+                    continue
+
+                yield UnixShadowRecord(
+                    name=shent.get(0),
+                    crypt=shent.get(1),
+                    algorithm=crypt.get("algo"),
+                    crypt_param=crypt.get("param"),
+                    salt=crypt.get("salt"),
+                    hash=crypt.get("hash"),
+                    last_change=shent.get(2),
+                    min_age=shent.get(3),
+                    max_age=shent.get(4),
+                    warning_period=shent.get(5),
+                    inactivity_period=shent.get(6),
+                    expiration_date=shent.get(7),
+                    unused_field=shent.get(8),
                 _target=self.target,
             )
 
@@ -200,6 +279,53 @@ class UnixPlugin(OSPlugin):
                     return f"{arch}_32-{os}"
                 else:
                     return f"{arch}-{os}"
+
+    def _extract_crypt_details(self, shent):
+        """Extract different parts of a shadow entry such as
+        the used crypto algorithm, any parameters, the used salt and hash.
+        """
+
+        crypt = {"algo": None, "param": None, "salt": None, "hash": None}
+        c_parts = shent.get(1).split("$")
+
+        algos = {
+            "$0$": "des",
+            "$1$": "md5",
+            "$2$": "bcrypt",
+            "$2a$": "bcrypt",
+            "$2b$": "bcrypt",
+            "$2x$": "bcrypt",
+            "$2y$": "eksbcrypt",
+            "$5$": "sha256",
+            "$6$": "sha512",
+            "$y$": "yescrypt",
+            "$gy$": "gost-yescrypt",
+            "$7$": "scrypt",
+        }
+
+        # yescrypt and scrypt are structured as: $id$param$salt$hash
+        if len(c_parts) == 5:
+            crypt = {
+                "algo": "$" + c_parts[1] + "$",
+                "param": c_parts[2],
+                "salt": c_parts[3],
+                "hash": c_parts[4],
+            }
+
+        # others are usually structured as: $id$salt$hash
+        elif len(c_parts) == 4:
+            crypt = {
+                "algo": "$" + c_parts[1] + "$",
+                "param": None,
+                "salt": c_parts[2],
+                "hash": c_parts[3],
+            }
+
+        # display a nicer alrogrithm name
+        if crypt["algo"] in algos:
+            crypt["algo"] = algos[crypt["algo"]]
+
+        return crypt
 
 
 def parse_fstab(

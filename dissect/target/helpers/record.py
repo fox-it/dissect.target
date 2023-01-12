@@ -130,9 +130,28 @@ UnixUserRecord = TargetRecordDescriptor(
         ("string", "passwd"),
         ("varint", "uid"),
         ("varint", "gid"),
-        ("string", "gecos"),
         ("uri", "home"),
         ("string", "shell"),
+        ("string", "source"),
+    ],
+)
+
+UnixShadowRecord = TargetRecordDescriptor(
+    "linux/shadow",
+    [
+        ("string", "name"),
+        ("string", "crypt"),
+        ("string", "salt"),
+        ("string", "hash"),
+        ("string", "algorithm"),
+        ("string", "crypt_param"),
+        ("string", "last_change"),
+        ("varint", "min_age"),
+        ("varint", "max_age"),
+        ("varint", "warning_period"),
+        ("string", "inactivity_period"),
+        ("string", "expiration_date"),
+        ("string", "unused_field"),
     ],
 )
 

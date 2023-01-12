@@ -1,0 +1,4 @@
+Jan 11 13:37:00 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/12345/bus
+Jan 11 13:37:01 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting SHELL=/bin/bash
+Jan 11 13:37:02 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting HOME=/home/user
+Jan 11 13:37:03 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting USER=user
