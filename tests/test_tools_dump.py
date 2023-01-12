@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugins.os.windows import amcache, iis
+from dissect.target.plugins.apps.webservers import iis
+from dissect.target.plugins.os.windows import amcache
 from dissect.target.tools.dump import run, state, utils
 
 from ._utils import absolute_path
@@ -12,8 +13,8 @@ from ._utils import absolute_path
 
 @pytest.fixture
 def target_win_iis_amcache(target_win, fs_win):
-    config_path = absolute_path("data/iis-applicationHost-iis.config")
-    data_dir = absolute_path("data/iis-logs-iis")
+    config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
+    data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
 
     fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
     fs_win.map_dir("Users/John/iis-logs", data_dir)

@@ -267,6 +267,9 @@ class IISLogsPlugin(plugin.Plugin):
             self.target.log.info("Parsing IIS log file %s in %s format", log_file, log_format)
             yield from parse_func(log_file)
 
+    @plugin.export(record=BasicRecordDescriptor)
+    def history(self) -> Generator[TargetRecordDescriptor, None, None]:
+        return self.logs()
 
 def replace_dash_with_none(data: dict) -> dict:
     """Replace "-" placeholder in dict values with None"""

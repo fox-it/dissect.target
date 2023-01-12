@@ -3,14 +3,14 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
-from dissect.target.plugins.os.windows import iis
+from dissect.target.plugins.apps.webservers import iis
 
 from ._utils import absolute_path
 
 
 def test_iis_plugin_iis_format(target_win, fs_win, tmpdir_name):
-    config_path = absolute_path("data/iis-applicationHost-iis.config")
-    data_dir = absolute_path("data/iis-logs-iis")
+    config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
+    data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
 
     fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
     fs_win.map_dir("Users/John/iis-logs", data_dir)
@@ -31,8 +31,8 @@ def test_iis_plugin_iis_format(target_win, fs_win, tmpdir_name):
 
 
 def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
-    config_path = absolute_path("data/iis-applicationHost-w3c.config")
-    data_dir = absolute_path("data/iis-logs-w3c")
+    config_path = absolute_path("data/webservers/iis/iis-applicationHost-w3c.config")
+    data_dir = absolute_path("data/webservers/iis/iis-logs-w3c")
 
     fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
     fs_win.map_dir("Users/John/w3c-logs", data_dir)
