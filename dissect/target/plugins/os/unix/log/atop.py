@@ -14,7 +14,7 @@ atop_def = """
 typedef unsigned long long time_t;
 typedef long long count_t;
 
-#define _UTSNAME_LENGTH 65
+#define  _UTSNAME_LENGTH  65
 
 struct utsname {
     char  sysname[_UTSNAME_LENGTH];     /* Name of the implementation of the operating system. */
@@ -69,13 +69,10 @@ struct rawrecord {
 };
 """
 atop_tstat_def = """
-#define PNAMLEN  15
-#define CMDLEN  255
+#define  PNAMLEN  15
+#define  CMDLEN   255
 
-/*
-* structure containing only relevant process-info extracted
-* from kernel's process-administration
-*/
+/* structure containing only relevant process-info extracted from kernel's process-administration */
 struct tstat {
     /* GENERAL TASK INFO */
     struct gen {
@@ -173,14 +170,13 @@ struct tstat {
         int32_t  gpulist;     /* bitlist with GPU numbers */
         int      gpubusy;     /* gpu busy perc process lifetime      -1 = n/a */
         int      membusy;     /* memory busy perc process lifetime   -1 = n/a */
-        count_t  timems;      /* milliseconds accounting -1 = n/a, value 0 for active process
-        * , value > 0 after termination */
+        count_t  timems;      /* milliseconds accounting -1 = n/a, value 0 for active process, value > 0 after termination */
         count_t  memnow;      /* current    memory consumption in KiB */
         count_t  memcum;      /* cumulative memory consumption in KiB */
         count_t  sample;      /* number of samples */
     } gpu;
 };
-"""
+"""  # noqa: E501
 
 c_atop = cstruct()
 c_atop.load(atop_def)
