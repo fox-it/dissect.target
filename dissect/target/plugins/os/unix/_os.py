@@ -10,14 +10,14 @@ from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixShadowRecord, UnixUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export, arg
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 
 class UnixPlugin(OSPlugin):
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
         self._hostname_dict = self._parse_hostname_string()
@@ -38,21 +38,24 @@ class UnixPlugin(OSPlugin):
         return cls(target)
 
     @export(record=UnixUserRecord)
-    def users(self) -> Iterator[UnixUserRecord]:
+    @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")
+    def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
         """Recover users from /etc/passwd, /etc/master.passwd or /var/log/syslog session logins."""
 
         # Yield users found in passwd files.
         PASSWD_FILES = ["/etc/passwd", "/etc/master.passwd"]
+        USERS_CACHE = []
 
         for passwd_file in PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt"):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
 
                     pwent = dict(enumerate(line.split(":")))
-            yield UnixUserRecord(
+                    USERS_CACHE.append(pwent.get(0))
+                    yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
                         uid=pwent.get(2),
@@ -65,7 +68,8 @@ class UnixPlugin(OSPlugin):
 
         # Find users not in passwd files by parsing recent
         # syslog ldap, kerberos and x-session logins.
-        if (path := self.target.fs.path("/var/log/syslog")).exists():
+        # Must be enabled using the --sessions flag
+        if sessions and (path := self.target.fs.path("/var/log/syslog")).exists():
             busses = []
             sessions = []
             cur_session = -1
@@ -96,6 +100,11 @@ class UnixPlugin(OSPlugin):
                         sessions[cur_session][k] = line.split(n)[1].strip()
 
             for user in sessions:
+                # Only return users we didn't already
+                # find in previously parsed passwd files.
+                if user["name"] in USERS_CACHE:
+                    continue
+
                 yield UnixUserRecord(
                     name=user["name"],
                     home=user["home"],
@@ -135,8 +144,8 @@ class UnixPlugin(OSPlugin):
                     inactivity_period=shent.get(6),
                     expiration_date=shent.get(7),
                     unused_field=shent.get(8),
-                _target=self.target,
-            )
+                    _target=self.target,
+                )
 
     @export(property=True)
     def architecture(self) -> str:

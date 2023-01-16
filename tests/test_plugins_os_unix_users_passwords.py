@@ -27,11 +27,11 @@ def test_unix_passwd_syslog(target_unix_users, fs_unix):
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent("").encode()))
     target_unix_users.add_plugin(UnixPlugin)
 
-    results = list(target_unix_users.users())
+    results = list(target_unix_users.users(sessions=True))
     assert len(results) == 1
     assert results[0].source == "/var/log/syslog"
-    assert results[0].name == "user"
-    assert results[0].home == "/home/user"
+    assert results[0].name == "john.doe"
+    assert results[0].home == "/home/local/john.doe"
     assert results[0].shell == "/bin/bash"
 
 
