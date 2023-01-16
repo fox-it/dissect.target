@@ -128,12 +128,25 @@ class Template:
         fh = fh.open("rt")
 
         for line in fh.readlines():
-            if line.startswith(comments):
+            line = line.strip()
+
+            if not line or line.startswith(comments):
                 continue
+
+            key, value = line.split(delim, maxsplit=1)
+            key = key.strip()
+            value = value.strip()
+
             for option in self.options:
-                if option in line:
-                    entry = line.split(delim, maxsplit=1)[1].rstrip()
-                    option_dict[option] = entry
+                if option == key:
+                    # This key may have multiple values
+                    if key == "dns-nameservers":
+                        value = value.split(delim)
+
+                    if option_dict.get(key):
+                        option_dict[key].append(value) if isinstance(value, str) else option_dict[key].extend(value)
+                    else:
+                        option_dict[key] = [value] if isinstance(value, str) else value
 
         for section in self.sections:
             config[section] = option_dict
@@ -200,7 +213,10 @@ class Parser:
             config = self.template.create_config(path)
 
             for key, value in self.translate_network_config(config):
-                template[key].add(value)
+                if isinstance(value, list):
+                    template[key].update(value)
+                else:
+                    template[key].add(value)
         return template
 
     def translate_network_config(self, config_dict: dict) -> list[tuple[str, Any]]:
@@ -243,12 +259,13 @@ class Parser:
             "interface": ["name", "iface", "device"],
             "dhcp": ["bootproto", "dhcp", "dhcp4", "dhcpserver", "method"],
             "ips": ["ip", "address1", "addresses", "ipaddr", "address"],
+            "netmask": ["netmask"],
             "gateway": ["gateway4", "gateway"],
-            "dns": ["dns", "dns1"],
+            "dns": ["dns", "dns1", "dns-nameservers"],
         }
 
         for translation_key, translation_values in translation_table.items():
-            if any([translation_value in option for translation_value in translation_values]) and value:
+            if option in translation_values and value:
                 return translation_key
 
     def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
@@ -329,7 +346,7 @@ class NetworkManager:
             return True
         else:
             self.target, self.parser = None, None
-            target.log.error("Failed to register network manager %s as active.", self.name)
+            target.log.debug("Failed to register network manager %s as active.", self.name)
             return False
 
     def parse(self) -> None:
@@ -345,11 +362,11 @@ class NetworkManager:
 
     @property
     def ips(self) -> set:
-        return self.config.get("ips")
+        return NetworkManager.clean_ips(self.config.get("ips", set()))
 
     @property
     def dns(self) -> set:
-        return self.config.get("dns")
+        return NetworkManager.clean_ips(self.config.get("dns", set()))
 
     @property
     def dhcp(self) -> bool:
@@ -358,11 +375,11 @@ class NetworkManager:
 
     @property
     def gateway(self) -> set:
-        return self.config.get("gateway")
+        return NetworkManager.clean_ips(self.config.get("gateway", set()))
 
     @property
     def netmask(self) -> set:
-        return self.config.get("netmask")
+        return NetworkManager.clean_ips(self.config.get("netmask", set()))
 
     @property
     def registered(self) -> bool:
@@ -388,7 +405,7 @@ class NetworkManager:
         if self.config.get("dhcp"):
             for dhcp_value in self.config.get("dhcp", ""):
                 if isinstance(dhcp_value, bool):
-                    return translated_value.add(dhcp_value)
+                    return {translated_value.add(dhcp_value)}
 
                 for key, value in translation_table.items():
                     if dhcp_value.lower() in value:
@@ -397,6 +414,31 @@ class NetworkManager:
             translated_value.add(False)
 
         return translated_value
+
+    @staticmethod
+    def clean_ips(rogue_ips: set) -> set:
+        """Clean ip values before returning them."""
+        ips = set()
+        for ip_value in rogue_ips:
+
+            # Remove broadcast and localhost
+            if ip_value.startswith("0.0.0.0/") or ip_value == "127.0.0.1":
+                continue
+
+            # Remove netmask cidr notation, eg. 1.2.3.4/24
+            if "/" in ip_value:
+                ip_value = ip_value.split("/")[0]
+
+            # Remove encapsulated "'s
+            if '"' in ip_value:
+                ip_value = ip_value.replace('"', "")
+
+            # Strip values
+            ip_value = ip_value.strip()
+
+            ips.add(ip_value)
+
+        return ips
 
     def __repr__(self) -> str:
         return f"<NetworkManager {self.name}>"
@@ -440,49 +482,61 @@ class LinuxNetworkManager:
 
 
 MANAGERS = [
+    # Arch Linux netctl
     NetworkManager(
         "netctl",
         ("/etc/netctl/examples/*", "/usr/lib/systemd/system/netctl*.service"),
         ("/etc/netctl/*"),
     ),
+    # NetworkManager is a python configuration tool for networking, for various Linux distro's
     NetworkManager(
         "NetworkManager",
         ("/usr/bin/nmcli", "/usr/bin/nmtui", "/etc/NetworkManager/NetworkManager.conf", "/usr/lib/NetworkManager/*"),
         ("/etc/NetworkManager/system-connections/*"),
     ),
+    # Photon/Systemd Debian/Ubuntu network manager
     NetworkManager(
         "systemd-networkd",
-        ("/lib/systemd/system/systemd-networkd.servic*"),
+        ("/etc/systemd/network/*.network", "/lib/systemd/system/systemd-networkd.servic*"),
         (
             "/etc/systemd/network/*.network",
             "/run/systemd/network/*.network",
             "/usr/lib/systemd/network/*.network",
         ),
     ),
+    # Debian/Ubuntu WICD/Wicked network manager
     NetworkManager(
         "wicd",
-        ("/usr/sbin/wicd", "/etc/dbus-1/system.d/wicd.*", "/etc/wicd/*.conf"),
+        ("/etc/wicd/wire*-*.conf", "/usr/sbin/wicd", "/etc/dbus-1/system.d/wicd.*", "/etc/wicd/*.conf"),
         ("/etc/wicd/wire*-*.conf"),
     ),
     NetworkManager(
         "wicked",
-        ("/usr/sbin/wicked*", "/usr/lib/systemd/system/wicked.*", "/etc/dbus-1/system.d/org.opensuse.Network.*"),
+        (
+            "/etc/wicked/ifconfig/*.xml",
+            "/usr/sbin/wicked*",
+            "/usr/lib/systemd/system/wicked.*",
+            "/etc/dbus-1/system.d/org.opensuse.Network.*",
+        ),
         ("/etc/wicked/ifconfig/*.xml"),
     ),
+    # Ubuntu netplan
     NetworkManager(
         "netplan",
-        ("/usr/sbin/netplan", "/usr/share/dbus-1/system.d/io.netplan.Netplan.conf"),
+        ("/etc/netplan/*.yaml", "/usr/sbin/netplan", "/usr/share/dbus-1/system.d/io.netplan.Netplan.conf"),
         ("/etc/netplan/*.yaml"),
     ),
+    # CentOS/Red Hat/Fedora/SuSe sysconfig folder/files
     NetworkManager(
         "ifupdown",
-        ("/usr/sbin/ifup", "/usr/sbin/ifdown"),
+        ("/etc/sysconfig/network-scripts/ifcfg-*", "/usr/sbin/ifup", "/usr/sbin/ifdown"),
         ("/etc/sysconfig/network-scripts/ifcfg-*", "/etc/sysconfig/network/ifcfg-*"),
     ),
+    # Interfaces folder/files
     NetworkManager(
         "interfaces",
-        ("/usr/sbin/ifup", "/usr/sbin/ifdown", "/usr/sbin/ifquery"),
-        ("/etc/network/interfaces"),
+        ("/etc/network/interfaces", "/usr/sbin/ifup", "/usr/sbin/ifdown", "/usr/sbin/ifquery"),
+        ("/etc/network/interfaces", "/etc/network/interfaces.d/*"),
     ),
 ]
 
@@ -513,5 +567,7 @@ TEMPLATES = {
         ["ifupdown"],
         ["ipaddr", "bootproto", "dns", "gateway", "name", "device", "dns1"],
     ),
-    "interfaces": Template("interfaces", None, ["interfaces"], ["iface", "address", "gateway"]),
+    "interfaces": Template(
+        "interfaces", None, ["interfaces"], ["iface", "address", "gateway", "netmask", "dns-nameservers"]
+    ),
 }
