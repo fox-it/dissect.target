@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union
 
 from flow.record.fieldtypes import uri
 
@@ -191,6 +192,17 @@ class GenericPlugin(Plugin):
             return datetime.fromtimestamp(last_seen)
 
         return None
+
+    @export(property=True)
+    def installdate(self) -> Union[datetime, str]:
+        """Returns the installdate of the system."""
+
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+
+        try:
+            return datetime.utcfromtimestamp(self.target.registry.key(key).value("InstallDate").value)
+        except RegistryError:
+            return "unknown"
 
     @export(record=AppInitRecord)
     def appinit(self):
