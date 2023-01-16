@@ -120,7 +120,7 @@ class UnixPlugin(OSPlugin):
         if (path := self.target.fs.path("/etc/shadow")).exists():
             for line in path.open("rt"):
                 line = line.strip()
-                if line == "":
+                if line == "" or line.startswith("#"):
                     continue
 
                 shent = dict(enumerate(line.split(":")))
