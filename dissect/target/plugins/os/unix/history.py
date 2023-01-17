@@ -33,6 +33,7 @@ class CommandHistoryPlugin(Plugin):
         """
         Deprecated, use commandhistory function.
         """
+        self.target.log.warn("Function 'bashhistory' is deprecated, use the 'commandhistory' function instead.")
         return self.commandhistory()
 
     @export(record=CommandHistoryRecord)
@@ -56,7 +57,7 @@ class CommandHistoryPlugin(Plugin):
                 try:
                     next_cmd_ts = None
 
-                    for line in file_.open("rt", errors="ignore"):  # Ignore Non-ASCII characters in bash_history
+                    for line in file_.open("rt", errors="replace"):  # Ignore Non-UTF-8 characters in bash_history
                         cmd_ts = None
                         line = line.strip()
 
