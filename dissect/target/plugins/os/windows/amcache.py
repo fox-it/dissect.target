@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import uri, path
 
 from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
@@ -631,8 +631,8 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
 
-        if (path := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
-            for line in path.open("rt"):
+        if (fh := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
+            for line in fh.open("rt"):
                 if line.startswith("#") or line.strip() == "":
                     continue
                 parts = line.rstrip().split("|")
