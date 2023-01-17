@@ -1,6 +1,8 @@
 from dissect.target.plugin import Plugin, export, internal
 from dissect.target.helpers.record import TargetRecordDescriptor
 
+from dissect.target.exceptions import RegistryKeyNotFoundError, RegistryValueNotFoundError
+
 WindowsKeyboardRecord = TargetRecordDescriptor(
     "windows/keyboard",
     [
@@ -20,7 +22,13 @@ class LocalePlugin(Plugin):
         }
 
     def check_compatible(self):
-        pass
+        try:
+            self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout\\DosKeybCodes")
+            self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
+            assert len(self.target.registry.key("HKCU\\Keyboard Layout\\Preload").keys) > 0
+            assert len(self.target.registry.key("HKCU\\Control Panel\\International\\User Profile").keys) > 0
+        except (RegistryKeyNotFoundError, RegistryValueNotFoundError, AssertionError):
+            return False
 
     @export(record=WindowsKeyboardRecord)
     def keyboard(self):

@@ -75,7 +75,6 @@ class LocalePlugin(Plugin):
                     backspace=k.get("BACKSPACE"),
                     _target=self.target,
                 )
-                # note that you might still want to exit if LAYOUT is not None. Add if appropriate
 
         # TODO
         # /etc/sysconfig/keyboard
