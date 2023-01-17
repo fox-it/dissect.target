@@ -48,9 +48,6 @@ class DockerPlugin(Plugin):
 
     DOCKER_PATH = "/var/lib/docker"
 
-    def __init__(self, target: Target) -> None:
-        super().__init__(target)
-
     def check_compatible(self) -> bool:
         return self.target.fs.path(self.DOCKER_PATH).exists()
 
@@ -63,14 +60,11 @@ class DockerPlugin(Plugin):
         if (fp := self.target.fs.path(images_path)).exists():
             repositories = json.loads(fp.read_text()).get("Repositories")
         else:
-            return False
+            self.target.log.debug(f"No docker images found, file {images_path} does not exist.")
+            return
 
-        for repository in repositories:
-            name = repository
-            tags = repositories[name]
-
-            for tag in tags:
-                hash = tags[tag]
+        for name, tags in repositories.items():
+            for tag, hash in tags.items():
                 image_metadata_path = f"{self.DOCKER_PATH}/image/overlay2/imagedb/content/sha256/{hash.split(':')[-1]}"
                 created = None
 
@@ -97,16 +91,14 @@ class DockerPlugin(Plugin):
             if (fp := self.target.fs.path(f"{container}/config.v2.json")).exists():
                 config = json.loads(fp.read_text())
 
-                if config.get("State").get("FinishedAt") == "0001-01-01T00:00:00Z":
-                    finished = False
-                else:
-                    finished = _convert_timestamp(config.get("State").get("FinishedAt"))
+                # If FinishedAt is set to epoch 0, the container is 'currently' running.
+                finished = _convert_timestamp(config.get("State").get("FinishedAt"))
 
                 if config.get("State").get("Running"):
-                    ports = config.get("NetworkSettings").get("Ports", [])
+                    ports = config.get("NetworkSettings").get("Ports", {})
                     pid = config.get("Pid")
                 else:
-                    ports = config.get("Config").get("ExposedPorts")
+                    ports = config.get("Config").get("ExposedPorts", {})
                     pid = False
 
                 volumes = []
@@ -146,7 +138,7 @@ def _convert_timestamp(timestamp: str) -> str:
         return timestamp
 
 
-def _convert_ports(ports: list) -> dict:
+def _convert_ports(ports: dict) -> dict:
     """
     Depending on the state of the container (turned on or off) we
     can salvage forwarded ports for the container in different
@@ -160,14 +152,14 @@ def _convert_ports(ports: list) -> dict:
     """
 
     fports = {}
-    for p in ports:
+    for key, value in ports.items():
 
-        if type(ports[p]) == list:
+        if isinstance(value, list):
             # NOTE: We ignore IPv6 assignments here.
-            fports[p] = f"{ports[p][0]['HostIp']}:{ports[p][0]['HostPort']}"
-        elif type(ports[p]) == dict:
+            fports[key] = f"{value[0]['HostIp']}:{value[0]['HostPort']}"
+        elif isinstance(value, dict):
             # NOTE: We make the assumption the default broadcast ip 0.0.0.0 was used.
-            fports[p] = f"0.0.0.0:{p.split('/')[0]}"
+            fports[key] = f"0.0.0.0:{key.split('/')[0]}"
 
     return fports
 

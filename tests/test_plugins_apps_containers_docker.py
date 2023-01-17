@@ -49,7 +49,7 @@ def test_docker_plugin_containers(target_unix_users, fs_unix):
     assert result.created == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)
     assert bool(result.running) is True
     assert result.started == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)
-    assert result.finished == datetime.datetime(1970, 1, 1, 00, 00, 00)
+    assert result.finished == datetime.datetime(1, 1, 1, 00, 00, 00, 000000, tzinfo=datetime.timezone.utc)
     assert result.ports == str({"1234/tcp": "0.0.0.0:1234", "5678/tcp": "0.0.0.0:5678"})
     assert result.names == "example_container_name"
     assert result.source == f"/var/lib/docker/containers/{id}/config.v2.json"
