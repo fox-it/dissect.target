@@ -1,15 +1,12 @@
 from datetime import datetime, timezone
 
-from flow.record.fieldtypes import uri, path
+from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import path, uri
 
-from dissect.target.exceptions import (
-    RegistryKeyNotFoundError,
-    UnsupportedPluginError,
-)
+from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.util.ts import wintimestamp
 
 AMCACHE_FILE_KEYS = {
     "0": "product_name",

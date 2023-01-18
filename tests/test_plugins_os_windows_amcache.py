@@ -1,11 +1,12 @@
 import datetime
 import sys
 from unittest.mock import Mock, patch
-from flow.record.fieldtypes import path
 
 import pytest
+from flow.record.fieldtypes import path
 
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
+
 from ._utils import absolute_path
 
 
