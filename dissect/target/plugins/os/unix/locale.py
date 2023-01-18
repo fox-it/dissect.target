@@ -1,6 +1,5 @@
-from dissect.target.exceptions import FileNotFoundError
-from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 UnixKeyboardRecord = TargetRecordDescriptor(
     "linux/keyboard",

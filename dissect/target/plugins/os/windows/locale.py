@@ -1,7 +1,9 @@
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.exceptions import (
+    RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
+)
 from dissect.target.helpers.record import TargetRecordDescriptor
-
-from dissect.target.exceptions import RegistryKeyNotFoundError, RegistryValueNotFoundError
+from dissect.target.plugin import Plugin, export
 
 WindowsKeyboardRecord = TargetRecordDescriptor(
     "windows/keyboard",
