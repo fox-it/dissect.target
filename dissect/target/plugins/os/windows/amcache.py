@@ -1,15 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from flow.record.fieldtypes import uri
+from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import path, uri
 
-from dissect.target.exceptions import (
-    RegistryKeyNotFoundError,
-    UnsupportedPluginError,
-)
+from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.util.ts import wintimestamp
 
 AMCACHE_FILE_KEYS = {
     "0": "product_name",
@@ -189,6 +186,14 @@ ContainerAppcompatRecord = TargetRecordDescriptor(
     ],
 )
 
+AppLaunchAppcompatRecord = TargetRecordDescriptor(
+    "windows/appcompat/AppLaunch",
+    [
+        ("datetime", "ts"),
+        ("path", "path"),
+    ],
+)
+
 
 class AmcachePluginOldMixin:
     def _replace_indices_with_fields(self, mapping, record):
@@ -317,6 +322,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
     Resources:
         https://binaryforay.blogspot.com/2015/04/appcompatcache-changes-in-windows-10.html
         https://www.ssi.gouv.fr/uploads/2019/01/anssi-coriin_2019-analysis_amcache.pdf
+        https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
 
     """
 
@@ -325,14 +331,18 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
     def __init__(self, target):
         super().__init__(target)
         self.amcache = regutil.HiveCollection()
+        self.amcache_applaunch = False
 
         fpath = self.target.fs.path("sysvol/windows/appcompat/programs/amcache.hve")
         if fpath.exists():
             self.amcache.add(regutil.RegfHive(fpath))
 
+        if self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt").exists():
+            self.amcache_applaunch = True
+
     def check_compatible(self):
-        if not len(self.amcache) > 0:
-            raise UnsupportedPluginError("Could not load amcache.hve")
+        if not len(self.amcache) > 0 and not self.amcache_applaunch:
+            raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 
     def read_key_subkeys(self, key):
         try:
@@ -606,6 +616,28 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         """
         if self.amcache:
             yield from self.parse_inventory_device_container()
+
+    @export(record=AppLaunchAppcompatRecord)
+    def applaunches(self):
+        """Return AppLaunchAppcompatRecord records from Amcache applaunch files (Windows 11 22H2 or later).
+
+        TODO: Research C:\\Windows\\appcompat\\pca\\PcaGeneralDb0.txt and
+              C:\\Windows\\appcompat\\pca\\PcaGeneralDb1.txt files.
+
+        Sources:
+            - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
+        """
+
+        if (fh := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
+            for line in fh.open("rt"):
+                if line.startswith("#") or line.strip() == "":
+                    continue
+                parts = line.rstrip().split("|")
+                yield AppLaunchAppcompatRecord(
+                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
+                    path=path.from_windows(parts[0]),
+                    _target=self.target,
+                )
 
 
 def parse_win_datetime(value: str):
