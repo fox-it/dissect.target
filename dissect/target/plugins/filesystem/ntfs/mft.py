@@ -1,9 +1,8 @@
 import logging
 
-from flow.record.fieldtypes import uri
-
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
+from flow.record.fieldtypes import uri
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -79,32 +78,37 @@ class MftPlugin(Plugin):
             try:
                 for record in fs.ntfs.mft.segments():
                     segment = record.segment
-                    inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
-                    owner, _ = get_owner_and_group(record, fs)
-                    resident = None
-                    size = None
 
-                    if not record.is_dir():
-                        for data_attribute in record.attributes.DATA:
-                            if data_attribute.name == "":
-                                resident = data_attribute.resident
-                                break
+                    try:
+                        inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
+                        owner, _ = get_owner_and_group(record, fs)
+                        resident = None
+                        size = None
 
-                        size = get_record_size(record)
+                        if not record.is_dir():
+                            for data_attribute in record.attributes.DATA:
+                                if data_attribute.name == "":
+                                    resident = data_attribute.resident
+                                    break
 
-                    for path in record.full_paths():
-                        path = f"{drive_letter}{path}"
-                        yield from self.mft_records(
-                            drive_letter=drive_letter,
-                            record=record,
-                            segment=segment,
-                            path=path,
-                            owner=owner,
-                            size=size,
-                            resident=resident,
-                            inuse=inuse,
-                            volume_uuid=volume_uuid,
-                        )
+                            size = get_record_size(record)
+
+                        for path in record.full_paths():
+                            path = f"{drive_letter}{path}"
+                            yield from self.mft_records(
+                                drive_letter=drive_letter,
+                                record=record,
+                                segment=segment,
+                                path=path,
+                                owner=owner,
+                                size=size,
+                                resident=resident,
+                                inuse=inuse,
+                                volume_uuid=volume_uuid,
+                            )
+                    except Exception as e:
+                        self.target.log.warning("An error occured parsing MFT segment %d: %s", segment, str(e))
+                        self.target.log.debug("", exc_info=e)
 
             except Exception:
                 log.exception("An error occured constructing FilesystemRecords")
