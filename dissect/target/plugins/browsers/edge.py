@@ -9,6 +9,7 @@ class EdgePlugin(ChromiumMixin, Plugin):
     """Edge browser plugin."""
 
     __namespace__ = "edge"
+
     DIRS = [
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",

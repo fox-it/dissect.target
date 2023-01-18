@@ -144,6 +144,7 @@ class ChromiumPlugin(ChromiumMixin, Plugin):
     """Chromium browser plugin."""
 
     __namespace__ = "chromium"
+
     DIRS = [
         # Linux
         "snap/chromium/common/chromium/Default",

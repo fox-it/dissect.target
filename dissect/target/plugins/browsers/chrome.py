@@ -9,6 +9,7 @@ class ChromePlugin(ChromiumMixin, Plugin):
     """Chrome browser plugin."""
 
     __namespace__ = "chrome"
+
     DIRS = [
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
