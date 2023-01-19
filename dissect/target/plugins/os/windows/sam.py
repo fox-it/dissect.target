@@ -1,12 +1,12 @@
+from hashlib import md5, sha256
 from struct import pack
-from typing import Iterator, Tuple
+from typing import Iterator
 
 from Crypto.Cipher import AES, ARC4, DES
-from Crypto.Hash import MD5, SHA256
 from dissect import cstruct
 from dissect.util import ts
 
-from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -225,6 +225,69 @@ SamRecord = TargetRecordDescriptor(
 )
 
 
+def expand_des_key(key: bytes) -> bytes:
+    # Expand the key from a 7-byte password key into an 8-byte DES key
+    key = bytearray(key[:7]).ljust(7, b"\x00")
+    s = bytearray(
+        [
+            ((key[0] >> 1) & 0x7F) << 1,
+            ((key[0] & 0x01) << 6 | ((key[1] >> 2) & 0x3F)) << 1,
+            ((key[1] & 0x03) << 5 | ((key[2] >> 3) & 0x1F)) << 1,
+            ((key[2] & 0x07) << 4 | ((key[3] >> 4) & 0x0F)) << 1,
+            ((key[3] & 0x0F) << 3 | ((key[4] >> 5) & 0x07)) << 1,
+            ((key[4] & 0x1F) << 2 | ((key[5] >> 6) & 0x03)) << 1,
+            ((key[5] & 0x3F) << 1 | ((key[6] >> 7) & 0x01)) << 1,
+            (key[6] & 0x7F) << 1,
+        ]
+    )
+    return bytes(s)
+
+
+def rid_to_key(rid: int) -> tuple[bytes, bytes]:
+    s = rid.to_bytes(4, "little", signed=False)
+    k1 = expand_des_key(bytes([s[0], s[1], s[2], s[3], s[0], s[1], s[2]]))
+    k2 = expand_des_key(bytes([s[3], s[0], s[1], s[2], s[3], s[0], s[1]]))
+
+    return k1, k2
+
+
+def aes_decrypt(key: bytes, value: bytes, iv: bytes) -> bytes:
+    plaintext = b""
+    cipher = AES.new(key, AES.MODE_CBC, IV=iv)
+    n = 16
+    for block in [value[i : i + n] for i in range(0, len(value), n)]:
+        plaintext += cipher.decrypt(block)
+
+    return plaintext
+
+
+def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
+    sh = c_sam.SAM_HASH(enc_hash)
+
+    if sh.revision not in [0x01, 0x02]:
+        raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
+
+    d1, d2 = map(lambda k: DES.new(k, DES.MODE_ECB), rid_to_key(rid))
+
+    if sh.revision == 0x01:  # LM/NT revision 0x01 involving RC4
+        sh_hash = enc_hash[len(c_sam.SAM_HASH) :]
+        if not sh_hash:  # Empty hash
+            return b""
+
+        rc4_key = md5(samkey + pack("<L", rid) + apwd).digest()
+        obfkey = ARC4.new(rc4_key).encrypt(sh_hash)
+
+    else:  # LM/NT revision 0x02 involving AES
+        sh = c_sam.SAM_HASH_AES(enc_hash)
+        if not sh.data_offset:  # Empty hash
+            return b""
+
+        sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
+        obfkey = aes_decrypt(key=samkey, value=sh_hash, iv=sh.salt)[:16]
+
+    return d1.decrypt(obfkey[:8]) + d2.decrypt(obfkey[8:])
+
+
 class SamPlugin(Plugin):
     """SAM plugin.
 
@@ -272,12 +335,12 @@ class SamPlugin(Plugin):
             raise ValueError(f"Unsupported SAM Key Data revision encountered: {fk.revision}")
 
         if fk.revision == 0x01:  # SAM key revision 0x01 involving RC4 (samsrv.dll: KEDecryptKeyWithRC4)
-            rc4_key = MD5.new(fk.salt + aqwerty + syskey + anum).digest()
+            rc4_key = md5(fk.salt + aqwerty + syskey + anum).digest()
             samkey_data = ARC4.new(rc4_key).encrypt(fk.key + fk.checksum)
             samkey = samkey_data[:16]
             checksum = samkey_data[16:]
 
-            if checksum != MD5.new(samkey + anum + samkey + aqwerty).digest():
+            if checksum != md5(samkey + anum + samkey + aqwerty).digest():
                 raise ValueError("SAM key checksum validation failed!")
             return samkey
 
@@ -287,75 +350,12 @@ class SamPlugin(Plugin):
             checksum_data = f_key[
                 len(c_sam.SAM_KEY_AES) + fk.data_len : len(c_sam.SAM_KEY_AES) + fk.data_len + fk.checksum_len
             ]
-            samkey = SamPlugin.perform_aes(key=syskey, value=key_data, iv=fk.salt)[:16]
-            checksum = SamPlugin.perform_aes(key=syskey, value=checksum_data, iv=fk.salt)[:32]
+            samkey = aes_decrypt(key=syskey, value=key_data, iv=fk.salt)[:16]
+            checksum = aes_decrypt(key=syskey, value=checksum_data, iv=fk.salt)[:32]
 
-            if checksum != SHA256.new(samkey).digest():
+            if checksum != sha256(samkey).digest():
                 raise ValueError("SAM key checksum validation failed!")
             return samkey
-
-    @staticmethod
-    def expand_des_key(key: bytes) -> bytes:
-        # Expand the key from a 7-byte password key into an 8-byte DES key
-        key = bytearray(key[:7]).ljust(7, b"\x00")
-        s = bytearray(
-            [
-                ((key[0] >> 1) & 0x7F) << 1,
-                ((key[0] & 0x01) << 6 | ((key[1] >> 2) & 0x3F)) << 1,
-                ((key[1] & 0x03) << 5 | ((key[2] >> 3) & 0x1F)) << 1,
-                ((key[2] & 0x07) << 4 | ((key[3] >> 4) & 0x0F)) << 1,
-                ((key[3] & 0x0F) << 3 | ((key[4] >> 5) & 0x07)) << 1,
-                ((key[4] & 0x1F) << 2 | ((key[5] >> 6) & 0x03)) << 1,
-                ((key[5] & 0x3F) << 1 | ((key[6] >> 7) & 0x01)) << 1,
-                (key[6] & 0x7F) << 1,
-            ]
-        )
-        return bytes(s)
-
-    @staticmethod
-    def rid_to_key(rid: int) -> tuple[bytes, bytes]:
-        s = rid.to_bytes(4, "little", signed=False)
-        k1 = SamPlugin.expand_des_key(bytes([s[0], s[1], s[2], s[3], s[0], s[1], s[2]]))
-        k2 = SamPlugin.expand_des_key(bytes([s[3], s[0], s[1], s[2], s[3], s[0], s[1]]))
-
-        return k1, k2
-
-    @staticmethod
-    def perform_aes(key: bytes, value: bytes, iv: bytes) -> bytes:
-        plaintext = b""
-        cipher = AES.new(key, AES.MODE_CBC, IV=iv)
-        n = 16
-        for block in [value[i : i + n] for i in range(0, len(value), n)]:
-            plaintext += cipher.decrypt(block)
-
-        return plaintext
-
-    @staticmethod
-    def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
-        sh = c_sam.SAM_HASH(enc_hash)
-
-        if sh.revision not in [0x01, 0x02]:
-            raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
-
-        d1, d2 = map(lambda k: DES.new(k, DES.MODE_ECB), SamPlugin.rid_to_key(rid))
-
-        if sh.revision == 0x01:  # LM/NT revision 0x01 involving RC4
-            sh_hash = enc_hash[len(c_sam.SAM_HASH) :]
-            if not sh_hash:  # Empty hash
-                return b""
-
-            rc4_key = MD5.new(samkey + pack("<L", rid) + apwd).digest()
-            obfkey = ARC4.new(rc4_key).encrypt(sh_hash)
-
-        else:  # LM/NT revision 0x02 involving AES
-            sh = c_sam.SAM_HASH_AES(enc_hash)
-            if not sh.data_offset:  # Empty hash
-                return b""
-
-            sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
-            obfkey = SamPlugin.perform_aes(key=samkey, value=sh_hash, iv=sh.salt)[:16]
-
-        return d1.decrypt(obfkey[:8]) + d2.decrypt(obfkey[8:])
 
     @export(record=SamRecord)
     def sam(self) -> Iterator[SamRecord]:
@@ -412,8 +412,8 @@ class SamPlugin(Plugin):
                 u_lmpw = v_data[v.lmpw_ofs : v.lmpw_ofs + v.lmpw_len]
                 u_ntpw = v_data[v.ntpw_ofs : v.ntpw_ofs + v.ntpw_len]
 
-                lm_hash = self.decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
-                nt_hash = self.decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
+                lm_hash = decrypt_single_hash(f.rid, samkey, u_lmpw, almpassword).hex()
+                nt_hash = decrypt_single_hash(f.rid, samkey, u_ntpw, antpassword).hex()
 
                 yield SamRecord(
                     rid=f.rid,

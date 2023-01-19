@@ -105,17 +105,13 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
 
     # Create SYSTEM keys
     system_key = VirtualKey(hive_hklm, system_key_name)
-    data_key = VirtualKey(hive_hklm, "Data")
-    data_key.add_classname("6d1ae431")
+    data_key = VirtualKey(hive_hklm, "Data", class_name="6d1ae431")
     system_key.add_subkey("Data", data_key)
-    gbg_key = VirtualKey(hive_hklm, "GBG")
-    gbg_key.add_classname("1ddbd1f5")
+    gbg_key = VirtualKey(hive_hklm, "GBG", class_name="1ddbd1f5")
     system_key.add_subkey("GBG", gbg_key)
-    jd_key = VirtualKey(hive_hklm, "JD")
-    jd_key.add_classname("5f3df852")
+    jd_key = VirtualKey(hive_hklm, "JD", class_name="5f3df852")
     system_key.add_subkey("JD", jd_key)
-    skew1_key = VirtualKey(hive_hklm, "Skew1")
-    skew1_key.add_classname("c42b803c")
+    skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="c42b803c")
     system_key.add_subkey("Skew1", skew1_key)
     hive_hklm.map_key(system_key_name, system_key)
 
@@ -303,17 +299,13 @@ def test_sam_plugin_rev2(target_win_users, hive_hklm):
 
     # Create SYSTEM keys
     system_key = VirtualKey(hive_hklm, system_key_name)
-    data_key = VirtualKey(hive_hklm, "Data")
-    data_key.add_classname("36f1befb")
+    data_key = VirtualKey(hive_hklm, "Data", class_name="36f1befb")
     system_key.add_subkey("Data", data_key)
-    gbg_key = VirtualKey(hive_hklm, "GBG")
-    gbg_key.add_classname("bae89edb")
+    gbg_key = VirtualKey(hive_hklm, "GBG", class_name="bae89edb")
     system_key.add_subkey("GBG", gbg_key)
-    jd_key = VirtualKey(hive_hklm, "JD")
-    jd_key.add_classname("626b21ce")
+    jd_key = VirtualKey(hive_hklm, "JD", class_name="626b21ce")
     system_key.add_subkey("JD", jd_key)
-    skew1_key = VirtualKey(hive_hklm, "Skew1")
-    skew1_key.add_classname("e6f92d89")
+    skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="e6f92d89")
     system_key.add_subkey("Skew1", skew1_key)
     hive_hklm.map_key(system_key_name, system_key)
 
