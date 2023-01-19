@@ -79,6 +79,7 @@ setup(
             "dissect.xfs>=3.0.dev,<4.0.dev",
             "ipython",
             "fusepy",
+            "pycryptodome",
             "pyyaml",
             "yara-python",
             # dissect.target's caching uses flow.record functionlity which depends on the

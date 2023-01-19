@@ -1,22 +1,24 @@
+import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualKey
 
 try:
     from Crypto.Hash import MD4
+
     from dissect.target.plugins.os.windows.sam import SamPlugin
-    
+
     HAVE_CRYPTO = True
 except ImportError:
     HAVE_CRYPTO = False
 
-sam_key_name = "SAM\\SAM\\Domains\\Account"
-system_key_name = "SYSTEM\\ControlSet001\\Control\\LSA"
+SAM_KEY_PATH = "SAM\\SAM\\Domains\\Account"
+SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
 
 
 @pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev1(target_win_users, hive_hklm):
-    sam_key = VirtualKey(hive_hklm, sam_key_name)
+    sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
         "F",
         bytes.fromhex(
@@ -107,10 +109,10 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
     users_key.add_subkey("000003E8", e8_key)
 
     sam_key.add_subkey("Users", users_key)
-    hive_hklm.map_key(sam_key_name, sam_key)
+    hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
     # Create SYSTEM keys
-    system_key = VirtualKey(hive_hklm, system_key_name)
+    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
     data_key = VirtualKey(hive_hklm, "Data", class_name="6d1ae431")
     system_key.add_subkey("Data", data_key)
     gbg_key = VirtualKey(hive_hklm, "GBG", class_name="1ddbd1f5")
@@ -119,7 +121,7 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
     system_key.add_subkey("JD", jd_key)
     skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="c42b803c")
     system_key.add_subkey("Skew1", skew1_key)
-    hive_hklm.map_key(system_key_name, system_key)
+    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
 
     target_win_users.add_plugin(SamPlugin)
     results = list(target_win_users.sam())
@@ -143,7 +145,7 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
 
 @pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev2(target_win_users, hive_hklm):
-    sam_key = VirtualKey(hive_hklm, sam_key_name)
+    sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
         "F",
         bytes.fromhex(
@@ -301,10 +303,10 @@ def test_sam_plugin_rev2(target_win_users, hive_hklm):
     users_key.add_subkey("000003E8", e8_key)
 
     sam_key.add_subkey("Users", users_key)
-    hive_hklm.map_key(sam_key_name, sam_key)
+    hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
     # Create SYSTEM keys
-    system_key = VirtualKey(hive_hklm, system_key_name)
+    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
     data_key = VirtualKey(hive_hklm, "Data", class_name="36f1befb")
     system_key.add_subkey("Data", data_key)
     gbg_key = VirtualKey(hive_hklm, "GBG", class_name="bae89edb")
@@ -313,7 +315,7 @@ def test_sam_plugin_rev2(target_win_users, hive_hklm):
     system_key.add_subkey("JD", jd_key)
     skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="e6f92d89")
     system_key.add_subkey("Skew1", skew1_key)
-    hive_hklm.map_key(system_key_name, system_key)
+    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
 
     target_win_users.add_plugin(SamPlugin)
     results = list(target_win_users.sam())
