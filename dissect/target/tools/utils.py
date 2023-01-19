@@ -208,3 +208,25 @@ def persist_execution_report(output_dir: Path, report_data: Dict, timestamp: dat
     report_full_path = output_dir / report_filename
     report_full_path.write_text(json.dumps(report_data, sort_keys=True, indent=4))
     return report_full_path
+
+
+def print_target_info(target):
+    """print target information"""
+    print("Disks")
+    for d in target.disks:
+        print(f"- {str(d)}")
+    print()
+    print("Volumes")
+    for v in target.volumes:
+        print(f"- {str(v)}")
+    print()
+    print(f"Hostname      : {target.hostname}")
+    print(f"OS family     : {target.os}, {target._os_plugin.__name__}")
+    print(f"OS version    : {target.version}")
+    print(f"Arch          : {target.architecture}")
+    print(f"Domain        : {target.domain}")
+    print(f"IPs           : {', '.join(target.ips)}")
+    print(f"Install date  : {target.installdate}")
+    print(f"Last activity : {target.activity}")
+    print(f"Language(s)   : {', '.join(target.language)}")
+    print(f"Timezone      : {target.timezone}")

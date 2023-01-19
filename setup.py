@@ -97,6 +97,7 @@ setup(
             "target-dump=dissect.target.tools.dump.run:main",
             "target-dd=dissect.target.tools.dd:main",
             "target-fs=dissect.target.tools.fs:main",
+            "target-info=dissect.target.tools.info:main",
             "target-mount=dissect.target.tools.mount:main",
             "target-query=dissect.target.tools.query:main",
             "target-reg=dissect.target.tools.reg:main",
