@@ -266,10 +266,10 @@ class SamPlugin(Plugin):
         fk = c_sam.SAM_KEY(f_key)
 
         if f.revision not in [0x02, 0x03]:
-            raise PluginError(f"Unsupported Domain Account F revision encountered: {f.revision}")
+            raise ValueError(f"Unsupported Domain Account F revision encountered: {f.revision}")
 
         if fk.revision not in [0x01, 0x02]:
-            raise PluginError(f"Unsupported SAM Key Data revision encountered: {fk.revision}")
+            raise ValueError(f"Unsupported SAM Key Data revision encountered: {fk.revision}")
 
         if fk.revision == 0x01:  # SAM key revision 0x01 involving RC4 (samsrv.dll: KEDecryptKeyWithRC4)
             rc4_key = MD5.new(fk.salt + aqwerty + syskey + anum).digest()
@@ -278,7 +278,7 @@ class SamPlugin(Plugin):
             checksum = samkey_data[16:]
 
             if checksum != MD5.new(samkey + anum + samkey + aqwerty).digest():
-                raise PluginError("SAM key checksum validation failed!")
+                raise ValueError("SAM key checksum validation failed!")
             return samkey
 
         else:  # SAM key revision 0x02 involving AES  (samsrv.dll: KEDecryptKeyWithAES)
@@ -291,7 +291,7 @@ class SamPlugin(Plugin):
             checksum = SamPlugin.perform_aes(key=syskey, value=checksum_data, iv=fk.salt)[:32]
 
             if checksum != SHA256.new(samkey).digest():
-                raise PluginError("SAM key checksum validation failed!")
+                raise ValueError("SAM key checksum validation failed!")
             return samkey
 
     @staticmethod
@@ -313,7 +313,7 @@ class SamPlugin(Plugin):
         return bytes(s)
 
     @staticmethod
-    def rid_to_key(rid: int) -> Tuple[bytes, bytes]:
+    def rid_to_key(rid: int) -> tuple[bytes, bytes]:
         s = rid.to_bytes(4, "little", signed=False)
         k1 = SamPlugin.expand_des_key(bytes([s[0], s[1], s[2], s[3], s[0], s[1], s[2]]))
         k2 = SamPlugin.expand_des_key(bytes([s[3], s[0], s[1], s[2], s[3], s[0], s[1]]))
@@ -335,7 +335,7 @@ class SamPlugin(Plugin):
         sh = c_sam.SAM_HASH(enc_hash)
 
         if sh.revision not in [0x01, 0x02]:
-            raise PluginError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
+            raise ValueError(f"Unsupported LM/NT hash revision encountered: {sh.revision}")
 
         d1, d2 = map(lambda k: DES.new(k, DES.MODE_ECB), SamPlugin.rid_to_key(rid))
 
@@ -390,7 +390,7 @@ class SamPlugin(Plugin):
         almpassword = b"LMPASSWORD\0"
         antpassword = b"NTPASSWORD\0"
 
-        for users_key in self.target.registry.iterkeys(f"{self.SAM_KEY}\\Users"):
+        for users_key in self.target.registry.keys(f"{self.SAM_KEY}\\Users"):
             for user_key in users_key.subkeys():
                 if user_key.name == "Names":
                     continue
