@@ -56,7 +56,7 @@ setup(
         "dissect.eventlog>=3.0.dev,<4.0.dev",
         "dissect.evidence>=3.0.dev,<4.0.dev",
         "dissect.ntfs>=3.0.dev,<4.0.dev",
-        "dissect.regf>=3.0.dev,<4.0.dev",
+        "dissect.regf>=3.3.dev,<4.0.dev",
         "dissect.util>=3.0.dev,<4.0.dev",
         "dissect.hypervisor>=3.0.dev,<4.0.dev",
         "dissect.volume>=3.0.dev,<4.0.dev",

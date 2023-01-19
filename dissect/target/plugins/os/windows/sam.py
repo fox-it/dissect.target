@@ -251,16 +251,6 @@ def rid_to_key(rid: int) -> tuple[bytes, bytes]:
     return k1, k2
 
 
-def aes_decrypt(key: bytes, value: bytes, iv: bytes) -> bytes:
-    plaintext = b""
-    cipher = AES.new(key, AES.MODE_CBC, IV=iv)
-    n = 16
-    for block in [value[i : i + n] for i in range(0, len(value), n)]:
-        plaintext += cipher.decrypt(block)
-
-    return plaintext
-
-
 def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
     sh = c_sam.SAM_HASH(enc_hash)
 
@@ -283,7 +273,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
             return b""
 
         sh_hash = enc_hash[len(c_sam.SAM_HASH_AES) :]
-        obfkey = aes_decrypt(key=samkey, value=sh_hash, iv=sh.salt)[:16]
+        obfkey = AES.new(samkey, AES.MODE_CBC, sh.salt).decrypt(sh_hash)[:16]
 
     return d1.decrypt(obfkey[:8]) + d2.decrypt(obfkey[8:])
 
@@ -350,8 +340,8 @@ class SamPlugin(Plugin):
             checksum_data = f_key[
                 len(c_sam.SAM_KEY_AES) + fk.data_len : len(c_sam.SAM_KEY_AES) + fk.data_len + fk.checksum_len
             ]
-            samkey = aes_decrypt(key=syskey, value=key_data, iv=fk.salt)[:16]
-            checksum = aes_decrypt(key=syskey, value=checksum_data, iv=fk.salt)[:32]
+            samkey = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(key_data)[:16]
+            checksum = AES.new(syskey, AES.MODE_CBC, fk.salt).decrypt(checksum_data)[:32]
 
             if checksum != sha256(samkey).digest():
                 raise ValueError("SAM key checksum validation failed!")
