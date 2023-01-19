@@ -1,15 +1,21 @@
-from Crypto.Hash import MD4
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualKey
-from dissect.target.plugins.os.windows.sam import SamPlugin
+
+try:
+    from Crypto.Hash import MD4
+    from dissect.target.plugins.os.windows.sam import SamPlugin
+    
+    HAVE_CRYPTO = True
+except ImportError:
+    HAVE_CRYPTO = False
 
 sam_key_name = "SAM\\SAM\\Domains\\Account"
 system_key_name = "SYSTEM\\ControlSet001\\Control\\LSA"
 
 
+@pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev1(target_win_users, hive_hklm):
-
     sam_key = VirtualKey(hive_hklm, sam_key_name)
     sam_key.add_value(
         "F",
@@ -135,8 +141,8 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
     assert results[2].nt == MD4.new("L0ngLiv3LM!".encode("utf-16-le")).digest().hex()
 
 
+@pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev2(target_win_users, hive_hklm):
-
     sam_key = VirtualKey(hive_hklm, sam_key_name)
     sam_key.add_value(
         "F",
