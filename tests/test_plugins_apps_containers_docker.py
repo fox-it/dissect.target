@@ -1,6 +1,6 @@
 import datetime
 
-from dissect.target.plugins.apps.containers.docker import DockerPlugin
+from dissect.target.plugins.apps.containers.docker import DockerPlugin, _convert_timestamp
 
 from ._utils import absolute_path
 
@@ -54,3 +54,16 @@ def test_docker_plugin_containers(target_unix_users, fs_unix):
     assert result.names == "example_container_name"
     assert result.source == f"/var/lib/docker/containers/{id}/config.v2.json"
     assert result.volumes == ["/tmp/test:/test"]
+
+
+def test_docker_plugin_timestamps():
+    """Test the docker convert_timestamp function."""
+
+    # Should not alter already correct timestamps
+    assert _convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
+    assert _convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
+
+    # Should convert nanosecond timestamps to microsecond timestamps
+    assert _convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
+    assert _convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
+    assert _convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"

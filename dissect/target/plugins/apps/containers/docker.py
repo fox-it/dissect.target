@@ -91,9 +91,6 @@ class DockerPlugin(Plugin):
             if (fp := self.target.fs.path(f"{container}/config.v2.json")).exists():
                 config = json.loads(fp.read_text())
 
-                # If FinishedAt is set to epoch 0, the container is 'currently' running.
-                finished = _convert_timestamp(config.get("State").get("FinishedAt"))
-
                 if config.get("State").get("Running"):
                     ports = config.get("NetworkSettings").get("Ports", {})
                     pid = config.get("Pid")
@@ -115,7 +112,7 @@ class DockerPlugin(Plugin):
                     running=config.get("State").get("Running"),
                     pid=pid,
                     started=_convert_timestamp(config.get("State").get("StartedAt")),
-                    finished=finished,
+                    finished=_convert_timestamp(config.get("State").get("FinishedAt")),
                     ports=_convert_ports(ports),
                     names=config.get("Name").replace("/", "", 1),
                     volumes=volumes,
@@ -128,14 +125,24 @@ def _convert_timestamp(timestamp: str) -> str:
     """
     Docker sometimes uses (unpadded) 9 digit nanosecond precision
     in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
+
     Python has no native %n nanosecond strptime directive, so we
     strip the last three digits from the timestamp to force
     compatbility with the 6 digit %f microsecond directive.
     """
-    if re.search(r"\.([0-9]{9})Z$", timestamp[19:]):
-        return re.sub(r"([0-9]{3})Z$", r"Z", timestamp)
-    else:
+
+    regex = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
+    timestamp_nanoseconds_plus_postfix = timestamp[19:]
+    match = regex.match(timestamp_nanoseconds_plus_postfix)
+
+    # Timestamp does not have nanoseconds if there is no match.
+    if not match:
         return timestamp
+
+    # Take the first six digits and reconstruct the timestamp.
+    match = match.groupdict()
+    microseconds = match["nanoseconds"][:6]
+    return f"{timestamp[:19]}.{microseconds}{match['postfix']}"
 
 
 def _convert_ports(ports: dict) -> dict:
