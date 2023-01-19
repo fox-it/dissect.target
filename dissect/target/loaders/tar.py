@@ -7,7 +7,6 @@ from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import TarFilesystemEntry
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
-from dissect.util.stream import BufferedStream
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +20,9 @@ class TarLoader(Loader):
                 f"Tar file {path!r} is compressed, which will affect performance. "
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
-
+        # Some issues exist with some tar entries, causing all entries afterwards to become invisible.
+        # Using `ignore_zeros=True` resolves this issue, but is a workaround.
+        # A propper solution should be implemented in the future
         self.tar = tarfile.open(path, ignore_zeros=True)
 
     @staticmethod
@@ -46,11 +47,7 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
-<<<<<<< HEAD
                 entry = TarFilesystemEntry(volume, member.name, member)
-=======
-                entry = TarFile(volume, member.name, member, self.tar)
->>>>>>> Change member.name to member object
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
@@ -69,11 +66,7 @@ class TarLoader(Loader):
 
                 volume = volumes[volume_name]
 
-<<<<<<< HEAD
                 entry = TarFilesystemEntry(volume, "/".join(parts[1:]), member)
-=======
-                entry = TarFile(volume, "/".join(parts[1:]), member, self.tar)
->>>>>>> Change member.name to member object
             volume.map_file_entry(entry.path, entry)
 
         for vol_name, vol in volumes.items():

@@ -519,10 +519,7 @@ class TargetCli(TargetCmd):
             ads_path = fsutil.join(fsutil.dirname(entry.path, separator=entry.fs.alt_separator), name)
             entry = entry.fs.get(ads_path)
 
-        try:
-            stat = entry.stat()
-        except FileNotFoundError:  # Incase symlinks cant be found, due to them not being picked up by acquire
-            stat = entry.lstat()
+        stat = entry.lstat()
 
         if entry.is_symlink():
             symlink = f"-> {entry.readlink()}"
@@ -563,14 +560,7 @@ class TargetCli(TargetCmd):
 
         symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
 
-        if path.is_symlink() and args.dereference:
-            s = path.stat()
-        elif path.is_symlink():
-            s = path.lstat()
-        elif args.dereference:
-            s = path.stat()
-        else:
-            s = path.stat()
+        s = path.stat() if args.dereference else path.lstat()
 
         res = STAT_TEMPLATE.format(
             path=path,
