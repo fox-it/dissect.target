@@ -35,21 +35,22 @@ class LocalePlugin(Plugin):
             timezone = "/".join(zoneinfo_path[-2:])
             return timezone
 
-        return
-
     @export(property=True)
     def language(self):
         """Get the configured locale(s) of the system."""
         locale_paths = ["/etc/default/locale", "/etc/locale.conf"]
 
+        found_languages = []
+
         for locale_path in locale_paths:
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        return [
+                        found_languages.append(
                             line.replace("LANG=", "").replace('"', "").replace(".UTF-8", "").replace("_", "-").strip()
-                        ]
-                return
+                        )
+
+        return found_languages
 
     @export(record=UnixKeyboardRecord)
     def keyboard(self):
