@@ -3,8 +3,10 @@ import sys
 from unittest.mock import Mock, patch
 
 import pytest
+from flow.record.fieldtypes import path
 
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
+
 from ._utils import absolute_path
 
 
@@ -56,6 +58,20 @@ def test_amcache_old_format(target_win, fs_win):
     assert len(application_shortcuts) == 0
     assert len(containers) == 16
     assert len(drivers) == 0
+
+
+def test_amcache_windows_11_applaunches(target_win, fs_win):
+    applaunch_file = absolute_path("data/PcaAppLaunchDic.txt")
+    fs_win.map_file("windows/appcompat/pca/PcaAppLaunchDic.txt", applaunch_file)
+
+    target_win.add_plugin(AmcachePlugin)
+    applaunches = list(target_win.amcache.applaunches())
+
+    assert len(applaunches) == 55
+    assert applaunches[0].ts == datetime.datetime(2022, 12, 17, 13, 27, 53, 96000, tzinfo=datetime.timezone.utc)
+    assert applaunches[0].path == path.from_windows(
+        "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
+    )
 
 
 def new_read_key_subkeys(self, key):

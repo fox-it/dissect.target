@@ -387,8 +387,12 @@ class TasksPlugin(Plugin):
             - https://en.wikipedia.org/wiki/Windows_Task_Scheduler
         """
         for f in self.files:
-            for entry in self.parse_task(f):
-                yield entry
+            try:
+                for entry in self.parse_task(f):
+                    yield entry
+            except Exception as e:
+                self.target.log.warning("An error occured parsing task %s: %s", f, str(e))
+                self.target.log.debug("", exc_info=e)
 
     def parse_task(self, entry):
         try:
