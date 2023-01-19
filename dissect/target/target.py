@@ -76,6 +76,7 @@ class Target:
         self._plugins: list[plugin.Plugin] = []
         self._functions: dict[str, FunctionTuple] = {}
         self._loader = None
+        self._os = None
         self._os_plugin: plugin.OSPlugin = None
         self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}
         self._cache = dict()
@@ -424,13 +425,23 @@ class Target:
     def _init_os(self) -> None:
         """Internal function that attemps to load an OSPlugin for this target."""
         if self._os_plugin:
-            self.add_plugin(self._os_plugin)
+            # If self._os_plugin is already assigned, we expect it to be fully
+            # configured and possibly already instantiated (if not, it will
+            # be), hence no os_plugin.create() is run and no detection is
+            # attempted.
+            os_plugin = self._os_plugin
+
+            if isinstance(os_plugin, plugin.OSPlugin):
+                self._os_plugin = os_plugin.__class__
+
+            self._os = self.add_plugin(os_plugin)
             return
 
         if not len(self.disks) and not len(self.volumes) and not len(self.filesystems):
             raise TargetError(f"Failed to load target. No disks, volumes or filesystems: {self.path}")
 
         candidates = []
+
         for plugin_desc in plugin.os_plugins():
             # Subclassed OS Plugins used to also subclass the detection of the
             # parent. This meant that in order for a subclassed OS Plugin to be a
@@ -460,6 +471,9 @@ class Target:
             self.log.info("Found compatible OS plugin: %s", plugin_desc["class"])
             candidates.append((plugin_desc, os_plugin, fs))
 
+        fs = None
+        os_plugin = default.DefaultPlugin
+
         if candidates:
             plugin_desc, os_plugin, fs = candidates[0]
             for candidate_plugin_desc, candidate_plugin, candidate_fs in candidates[1:]:
@@ -468,20 +482,27 @@ class Target:
                     plugin_desc, os_plugin, fs = candidate_plugin_desc, candidate_plugin, candidate_fs
 
             self.log.debug("Selected OS plugin: %s", plugin_desc["class"])
-
-            self._os_plugin = os_plugin
-            self._register_plugin_functions(os_plugin.create(self, fs))
         else:
             # No OS detected
             self.log.warning("Failed to find OS plugin, falling back to default")
-            self.add_plugin(default.DefaultPlugin)
 
-    def add_plugin(self, plugin_cls: type[plugin.Plugin], check_compatible: bool = True) -> None:
+        self._os_plugin = os_plugin
+        self._os = self.add_plugin(os_plugin.create(self, fs))
+
+    def add_plugin(
+        self,
+        plugin_cls: Union[plugin.Plugin, type[plugin.Plugin]],
+        check_compatible: bool = True,
+    ) -> plugin.Plugin:
         """Add and register a plugin by class.
 
         Args:
-            plugin_cls: Class of the plugin to add and register.
+            plugin_cls: The plugin to add and register, this can either be a class or instance. When this is a class,
+                        it will be instantiated.
             check_compatible: A flag that determines if we check whether the plugin is compatible with the ``Target``.
+
+        Returns:
+            The ``plugin_cls`` instance.
 
         Raises:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
@@ -515,6 +536,8 @@ class Target:
                 )
 
         self._register_plugin_functions(p)
+
+        return p
 
     def _register_plugin_functions(self, plugin_inst: plugin.Plugin) -> None:
         """Internal function that registers all the exported functions from a given plugin.
