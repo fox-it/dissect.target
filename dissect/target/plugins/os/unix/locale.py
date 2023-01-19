@@ -46,7 +46,9 @@ class LocalePlugin(Plugin):
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        return line.replace("LANG=", "").replace('"', "").strip()
+                        return [
+                            line.replace("LANG=", "").replace('"', "").replace(".UTF-8", "").replace("_", "-").strip()
+                        ]
                 return
 
     @export(record=UnixKeyboardRecord)
