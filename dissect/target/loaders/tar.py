@@ -7,6 +7,7 @@ from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import TarFilesystemEntry
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
+from dissect.util.stream import BufferedStream
 
 log = logging.getLogger(__name__)
 
