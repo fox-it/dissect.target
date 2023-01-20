@@ -12,10 +12,11 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Type
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import cache
+from dissect.target.helpers.record import EmptyRecord
 
 try:
     from dissect.target.plugins._pluginlist import PLUGINS
@@ -271,7 +272,8 @@ class OSPlugin(Plugin):
         """OSPlugin's use a different compatibility check, override the default one."""
         return True
 
-    def detect(cls, fs: Filesystem) -> bool:
+    @classmethod
+    def detect(cls, fs: Filesystem) -> Optional[Filesystem]:
         """Provide detection of this OSPlugin on a given filesystem.
 
         Note: must be implemented as a classmethod.
@@ -280,11 +282,12 @@ class OSPlugin(Plugin):
             fs: :class:`~dissect.target.filesystem.Filesystem` to detect the OS on.
 
         Returns:
-            ``True`` if the OS was detected on the filesystem, else ``False``.
+            The root filesystem / sysvol when found.
         """
         raise NotImplementedError
 
-    def create(cls, target: Target, sysvol: Filesystem) -> None:
+    @classmethod
+    def create(cls, target: Target, sysvol: Filesystem) -> OSPlugin:
         """Initiate this OSPlugin with the given target and detected filesystem.
 
         Note: must be implemented as a classmethod.
@@ -292,10 +295,14 @@ class OSPlugin(Plugin):
         Args:
             target: The Target object.
             sysvol: The filesystem that was detected in the detect() function.
+
+        Returns:
+            An instantiated version of the OSPlugin.
         """
         raise NotImplementedError
 
-    def hostname(self) -> str:
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
         """Required OS function.
 
         Implementations must be decorated with ``@export(property=True)``.
@@ -305,6 +312,7 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @export(property=True)
     def ips(self) -> list[str]:
         """Required OS function.
 
@@ -315,7 +323,8 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
-    def version(self) -> str:
+    @export(property=True)
+    def version(self) -> Optional[str]:
         """Required OS function.
 
         Implementations must be decorated with ``@export(property=True)``.
@@ -325,6 +334,7 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @export(record=EmptyRecord)
     def users(self) -> list[Record]:
         """Required OS function.
 
@@ -335,6 +345,7 @@ class OSPlugin(Plugin):
         """
         raise NotImplementedError
 
+    @export(property=True)
     def os(self) -> str:
         """Required OS function.
 
@@ -720,6 +731,7 @@ def load_module_from_file(path: Path, base_path: Path):
 def load_module_from_name(module_path: str) -> None:
     """Load a module from ``module_path``."""
     try:
+        # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
         importlib.import_module(module_path)
     except Exception as e:
         log.error("Unable to import %s", module_path)

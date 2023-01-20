@@ -17,7 +17,9 @@ class DefaultPlugin(OSPlugin):
 
     @classmethod
     def create(cls, target, sysvol):
-        pass
+        if sysvol:
+            target.fs.mount("/", sysvol)
+        return cls(target)
 
     @export(property=True)
     def hostname(self):
@@ -25,7 +27,7 @@ class DefaultPlugin(OSPlugin):
 
     @export(property=True)
     def ips(self):
-        pass
+        return []
 
     @export(property=True)
     def version(self):
