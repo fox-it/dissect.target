@@ -57,10 +57,10 @@ setup(
         "dissect.evidence>=3.0.dev,<4.0.dev",
         "dissect.hypervisor>=3.0.dev,<4.0.dev",
         "dissect.ntfs>=3.0.dev,<4.0.dev",
-        "dissect.regf>=3.0.dev,<4.0.dev",
+        "dissect.regf>=3.3.dev,<4.0.dev",
         "dissect.util>=3.0.dev,<4.0.dev",
         "dissect.volume>=3.0.dev,<4.0.dev",
-        "flow.record~=3.7",
+        "flow.record~=3.8",
         "structlog",
     ],
     extras_require={
@@ -81,6 +81,7 @@ setup(
             "dissect.xfs>=3.0.dev,<4.0.dev",
             "ipython",
             "fusepy",
+            "pycryptodome",
             "pyyaml",
             "yara-python",
             # dissect.target's caching uses flow.record functionlity which depends on the

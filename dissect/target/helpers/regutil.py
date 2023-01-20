@@ -73,6 +73,11 @@ class RegistryKey:
         raise NotImplementedError()
 
     @property
+    def class_name(self) -> str:
+        """Returns the class name of this key."""
+        raise NotImplementedError()
+
+    @property
     def path(self) -> str:
         """Returns the path of this key."""
         raise NotImplementedError()
@@ -261,9 +266,10 @@ class VirtualHive(RegistryHive):
 class VirtualKey(RegistryKey):
     """Virtual key implementation."""
 
-    def __init__(self, hive: RegistryHive, path: str):
+    def __init__(self, hive: RegistryHive, path: str, class_name: Optional[str] = None):
         self._path: str = path
         self._name: str = path.split("\\")[-1]
+        self._class_name: str = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
         self.top: RegistryKey = None
@@ -285,6 +291,10 @@ class VirtualKey(RegistryKey):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def class_name(self) -> str:
+        return self._class_name
 
     @property
     def path(self) -> str:
@@ -464,6 +474,10 @@ class KeyCollection(RegistryKey):
             self.keys.append(key)
 
     @property
+    def class_name(self) -> str:
+        return self._key().class_name
+
+    @property
     def name(self) -> str:
         return self._key().name
 
@@ -584,6 +598,10 @@ class RegfKey(RegistryKey):
     @property
     def name(self) -> str:
         return self.key.name
+
+    @property
+    def class_name(self) -> str:
+        return self.key.class_name
 
     @property
     def path(self) -> str:
