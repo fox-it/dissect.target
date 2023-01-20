@@ -1,3 +1,6 @@
+from pathlib import Path
+from unittest.mock import mock_open, patch
+
 from dissect.target.plugins.os.windows import iis
 
 from ._utils import absolute_path
@@ -66,3 +69,12 @@ def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
     assert {r.log_format for r in records} == {"W3C"}
     assert {r.log_file for r in records} == {"C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"}
     assert {r.hostname for r in records} == {target_win.hostname}
+
+
+def test_iis_plugin_iis_nonutf8(target_win, fs_win, tmpdir_name):
+    server = iis.IISLogsPlugin(target_win)
+    # should not crash on invalid bytes
+    with (patch("pathlib.Path.open", new_callable=mock_open, read_data=b"aaa\xa7")):
+        assert len(list(server.parse_iis_format_log(Path("/iis")))) == 0
+    with (patch("pathlib.Path.open", new_callable=mock_open, read_data=b"aaa\xa7")):
+        assert len(list(server.parse_w3c_format_log(Path("/iis")))) == 0
