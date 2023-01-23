@@ -52,6 +52,7 @@ setup(
     name="dissect.target",
     packages=list(map(lambda v: "dissect." + v, find_packages("dissect"))),
     install_requires=[
+        "defusedxml",
         "dissect.cstruct>=3.0.dev,<4.0.dev",
         "dissect.eventlog>=3.0.dev,<4.0.dev",
         "dissect.evidence>=3.0.dev,<4.0.dev",
@@ -66,7 +67,6 @@ setup(
     extras_require={
         "full": [
             "asn1crypto",
-            "defusedxml",
             "dissect.cim>=3.0.dev,<4.0.dev",
             "dissect.clfs>=1.0.dev,<2.0.dev",
             "dissect.esedb>=3.0.dev,<4.0.dev",
