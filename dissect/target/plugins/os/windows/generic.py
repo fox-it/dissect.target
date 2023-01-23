@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Union
+from typing import Optional
 
 from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import uri
@@ -195,7 +195,7 @@ class GenericPlugin(Plugin):
         return None
 
     @export(property=True)
-    def install_date(self) -> Union[datetime, str]:
+    def install_date(self) -> Optional[datetime]:
         """Returns the installdate of the system."""
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
