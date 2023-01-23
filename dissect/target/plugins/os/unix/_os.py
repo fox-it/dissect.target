@@ -98,10 +98,14 @@ class UnixPlugin(OSPlugin):
                     if n in line and "dbus-update-activation-environment" in line:
                         sessions[cur_session][k] = line.split(n)[1].strip()
 
+            seen_sessions = set()
+
             for user in sessions:
                 # Only return users we didn't already find in previously parsed passwd files.
-                if user["name"] in seen_users:
+                if user["name"] in seen_users or user["name"] in seen_sessions:
                     continue
+
+                seen_sessions.add(user["name"])
 
                 yield UnixUserRecord(
                     name=user["name"],
