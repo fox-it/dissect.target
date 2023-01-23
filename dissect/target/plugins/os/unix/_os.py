@@ -69,7 +69,6 @@ class UnixPlugin(OSPlugin):
         # syslog ldap, kerberos and x-session logins.
         # Must be enabled using the --sessions flag
         if sessions and (path := self.target.fs.path("/var/log/syslog")).exists():
-            busses = []
             sessions = []
             cur_session = -1
             needles = {
@@ -87,9 +86,6 @@ class UnixPlugin(OSPlugin):
                 # Using DBUS_SESSION_BUS_ADDRESS seems to work fine for now.
                 if "setting DBUS_SESSION_BUS_ADDRESS=" in line:
                     bus = line.split("DBUS_SESSION_BUS_ADDRESS=")[1].strip()
-                    if bus in busses:
-                        continue
-                    busses.append(bus)
                     cur_session += 1
                     sessions.append({"bus": bus, "name": None, "home": None, "shell": None, "uid": None})
 

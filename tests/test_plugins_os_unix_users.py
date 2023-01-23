@@ -28,8 +28,22 @@ def test_unix_passwd_syslog(target_unix_users, fs_unix):
     target_unix_users.add_plugin(UnixPlugin)
 
     results = list(target_unix_users.users(sessions=True))
-    assert len(results) == 1
+    assert len(results) == 3
+
+    # first user session of john.doe
     assert results[0].source == "/var/log/syslog"
     assert results[0].name == "john.doe"
     assert results[0].home == "/home/local/john.doe"
     assert results[0].shell == "/bin/bash"
+
+    # second user session of john.doe with different session vars
+    assert results[1].source == "/var/log/syslog"
+    assert results[1].name == "john.doe"
+    assert results[1].home == "/root"
+    assert results[1].shell == "/bin/sh"
+
+    # first user session of jane.doe
+    assert results[2].source == "/var/log/syslog"
+    assert results[2].name == "jane.doe"
+    assert results[2].home == "/home/local/jane.doe"
+    assert results[2].shell == "/bin/zsh"
