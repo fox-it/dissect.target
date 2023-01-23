@@ -52,7 +52,7 @@ class UnixPlugin(OSPlugin):
                         continue
 
                     pwent = dict(enumerate(line.split(":")))
-                    seen_users.add(pwent.get(0))
+                    seen_users.add((pwent.get(0), pwent.get(5), pwent.get(6)))
                     yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
@@ -98,14 +98,13 @@ class UnixPlugin(OSPlugin):
                     if n in line and "dbus-update-activation-environment" in line:
                         sessions[cur_session][k] = line.split(n)[1].strip()
 
-            seen_sessions = set()
-
             for user in sessions:
-                # Only return users we didn't already find in previously parsed passwd files.
-                if user["name"] in seen_users or user["name"] in seen_sessions:
+                # Only return users we didn't already find in previously parsed passwd files and past sessions.
+                current_user = (user["name"], user["home"], user["shell"])
+                if current_user in seen_users:
                     continue
 
-                seen_sessions.add(user["name"])
+                seen_users.add(current_user)
 
                 yield UnixUserRecord(
                     name=user["name"],
