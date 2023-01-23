@@ -2,7 +2,6 @@ import json
 import re
 from typing import Iterator
 
-from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -34,6 +33,8 @@ DockerImageRecord = TargetRecordDescriptor(
         ("datetime", "created"),
     ],
 )
+
+DOCKER_NS_REGEX = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
 
 
 class DockerPlugin(Plugin):
@@ -131,9 +132,8 @@ def _convert_timestamp(timestamp: str) -> str:
     compatbility with the 6 digit %f microsecond directive.
     """
 
-    regex = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
     timestamp_nanoseconds_plus_postfix = timestamp[19:]
-    match = regex.match(timestamp_nanoseconds_plus_postfix)
+    match = DOCKER_NS_REGEX.match(timestamp_nanoseconds_plus_postfix)
 
     # Timestamp does not have nanoseconds if there is no match.
     if not match:
