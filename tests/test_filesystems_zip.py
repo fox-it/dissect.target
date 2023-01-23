@@ -1,8 +1,8 @@
 import io
 import zipfile
+
 import pytest
 
-from dissect.target import container
 from dissect.target.filesystems.zip import ZipFilesystem
 
 
@@ -36,19 +36,19 @@ def zip_relative():
 
 
 @pytest.mark.parametrize(
-    "obj",
+    "obj, base",
     [
-        "zip_simple",
-        "zip_base",
-        "zip_relative",
+        ("zip_simple", ""),
+        ("zip_base", "base/"),
+        ("zip_relative", ""),
     ],
 )
-def test_filesystems_zip(obj, request):
+def test_filesystems_zip(obj, base, request):
     fh = request.getfixturevalue(obj)
 
     assert ZipFilesystem.detect(fh)
 
-    fs = ZipFilesystem(fh)
+    fs = ZipFilesystem(fh, base)
     assert isinstance(fs, ZipFilesystem)
 
     assert fs.get("./file_1").open().read() == b"file 1 contents"
