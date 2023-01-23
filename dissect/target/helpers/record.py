@@ -133,6 +133,7 @@ UnixUserRecord = TargetRecordDescriptor(
         ("string", "gecos"),
         ("uri", "home"),
         ("string", "shell"),
+        ("string", "source"),
     ],
 )
 
