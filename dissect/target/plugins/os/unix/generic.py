@@ -5,6 +5,7 @@ from typing import Union
 from dissect.target.plugin import Plugin, export
 from dissect.util import ts
 
+
 class GenericPlugin(Plugin):
     def check_compatible(self):
         pass

@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Union
 
+from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryError
@@ -194,15 +195,15 @@ class GenericPlugin(Plugin):
         return None
 
     @export(property=True)
-    def installdate(self) -> Union[datetime, str]:
+    def install_date(self) -> Union[datetime, str]:
         """Returns the installdate of the system."""
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
         try:
-            return datetime.utcfromtimestamp(self.target.registry.key(key).value("InstallDate").value)
+            return wintimestamp(self.target.registry.key(key).value("InstallDate").value)
         except RegistryError:
-            return "unknown"
+            return
 
     @export(record=AppInitRecord)
     def appinit(self):
