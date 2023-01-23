@@ -28,6 +28,7 @@ class ZipFilesystem(Filesystem):
 
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base.strip("/") if base else ""
+        self.alt_separator = alt_separator
 
         self._fs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
 
