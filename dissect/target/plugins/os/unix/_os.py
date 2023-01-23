@@ -6,7 +6,6 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Tuple, Union
 
-from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixShadowRecord, UnixUserRecord
