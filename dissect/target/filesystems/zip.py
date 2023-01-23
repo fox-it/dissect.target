@@ -9,7 +9,13 @@ from typing import BinaryIO, Optional
 from dissect.util.stream import BufferedStream
 
 from dissect.target.exceptions import FileNotFoundError, FilesystemError
-from dissect.target.filesystem import Filesystem, VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import (
+    Filesystem,
+    FilesystemEntry,
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+)
 from dissect.target.helpers import fsutil
 
 log = logging.getLogger(__name__)
@@ -33,6 +39,8 @@ class ZipFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
+        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive, *args, **kwargs)
+
         fh.seek(0)
 
         self.zip = zipfile.ZipFile(fh, mode="r")
@@ -42,9 +50,6 @@ class ZipFilesystem(Filesystem):
         self._fs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
 
         for member in self.zip.infolist():
-            if member.is_dir():
-                continue
-
             mname = member.filename.strip("/")
             if not mname.startswith(self.base):
                 continue
@@ -55,8 +60,6 @@ class ZipFilesystem(Filesystem):
 
             file_entry = ZipFilesystemEntry(self, rel_name, member)
             self._fs.map_file_entry(rel_name, file_entry)
-
-        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive, *args, **kwargs)
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
@@ -76,16 +79,30 @@ class ZipFilesystem(Filesystem):
         return self._fs.get(path)
 
 
-class ZipFilesystemEntry(VirtualFile):
+class ZipFilesystemEntry(VirtualDirectory, VirtualFile):
+    def __init__(self, fs: Filesystem, path: str, entry: zipfile.ZipInfo) -> None:
+        if entry.is_dir():
+            VirtualDirectory.__init__(self, fs, path)
+        FilesystemEntry.__init__(self, fs, path, entry)
+
     def _resolve(self) -> ZipFilesystemEntry:
         return self
 
+    def get(self, path: str) -> ZipFilesystemEntry:
+        if self.is_file():
+            return super(VirtualFile, self).get(path)
+        else:
+            return super(VirtualDirectory, self).get(path)
+
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
-        try:
-            return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
-        except Exception:
-            raise FileNotFoundError()
+        if self.is_file():
+            try:
+                return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
+            except Exception:
+                raise FileNotFoundError()
+        else:
+            return super(VirtualDirectory, self).open()
 
     def is_dir(self) -> bool:
         """Return whether this entry is a directory. Resolves symlinks when possible."""
@@ -130,7 +147,7 @@ class ZipFilesystemEntry(VirtualFile):
                 0,
                 self.entry.file_size,
                 0,
-                datetime(*self.entry.date_time, tzinfo=timezone.utc),
+                datetime(*self.entry.date_time, tzinfo=timezone.utc).timestamp(),
                 0,
             ]
         )
