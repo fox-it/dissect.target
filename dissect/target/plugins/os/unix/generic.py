@@ -28,7 +28,7 @@ class GenericPlugin(Plugin):
 
     @export(property=True)
     def install_date(self) -> Optional[datetime]:
-        """Return the likely install date of the filesystem."""
+        """Return the likely install date of the operating system."""
 
         files = [
             # Debian
@@ -56,5 +56,6 @@ class GenericPlugin(Plugin):
         #
         # If the change time and modify time of the root dir are equal,
         # this is likely the creation timestamp of the root fs.
-        if self.target.fs.stat("/").st_ctime == self.target.fs.stat("/").st_mtime:
-            return ts.from_unix(self.target.fs.stat("/").st_ctime)
+        root_stat = self.target.fs.stat("/")
+        if root_stat.st_ctime == root_stat.st_mtime:
+            return ts.from_unix(root_stat.st_ctime)

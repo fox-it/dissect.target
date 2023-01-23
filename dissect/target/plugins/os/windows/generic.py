@@ -196,7 +196,7 @@ class GenericPlugin(Plugin):
 
     @export(property=True)
     def install_date(self) -> Optional[datetime]:
-        """Returns the installdate of the system."""
+        """Returns the install date of the system."""
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
