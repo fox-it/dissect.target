@@ -125,11 +125,7 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def ntversion(self):
         """Return the Windows NT version."""
-        key, value = ("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentVersion")
-        try:
-            return self.target.registry.value(key, value).value
-        except RegistryError:
-            pass
+        return self.target._os._nt_version()
 
     @export(output="yield")
     def pathenvironment(self):
