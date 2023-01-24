@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from os import stat
 
 from dissect.target.filesystem import VirtualFilesystem
@@ -23,8 +23,8 @@ def test_auth_plugin(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1)
-    assert results[0].msg == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
@@ -42,8 +42,8 @@ def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1)
-    assert results[0].msg == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
@@ -61,8 +61,8 @@ def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1)
-    assert results[0].msg == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
@@ -78,5 +78,5 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
     assert len(results) == 2
     assert isinstance(results[0], type(AuthLogRecord()))
     assert isinstance(results[1], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 12, 31, 3, 14, 0)
-    assert results[1].ts == datetime(year + 1, 1, 1, 13, 37, 0)
+    assert results[0].ts == datetime(year, 12, 31, 3, 14, 0, tzinfo=timezone.utc)
+    assert results[1].ts == datetime(year + 1, 1, 1, 13, 37, 0, tzinfo=timezone.utc)

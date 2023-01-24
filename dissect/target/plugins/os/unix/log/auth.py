@@ -1,17 +1,27 @@
-from dissect.target.helpers.fsutil import TargetPath, decompress_and_readlines
+import re
+from datetime import datetime, timezone
+from itertools import chain
+from typing import Generator
+
+from dissect.util import ts
+from flow.record.fieldtypes import path
+
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-
-from datetime import datetime
-import re
 
 AuthLogRecord = TargetRecordDescriptor(
     "linux/log/auth",
     [
         ("datetime", "ts"),
-        ("string", "msg"),
+        ("string", "message"),
+        ("string", "source"),
     ],
 )
+
+ts_regex = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
+RE_TS = re.compile(ts_regex)
+RE_TS_AND_HOSTNAME = re.compile(ts_regex + r"\s\w+\s")
 
 
 class AuthPlugin(Plugin):
@@ -20,32 +30,27 @@ class AuthPlugin(Plugin):
 
     @export(record=[AuthLogRecord])
     def securelog(self):
+        """Return contents of /var/log/auth.log* and /var/log/secure*."""
         return self.authlog()
 
     @export(record=[AuthLogRecord])
     def authlog(self):
-        """
-        Yields AuthLogRecords from /var/log/auth.log* and /var/log/secure*
-        """
-        auth_files: [TargetPath] = list(self.target.fs.path("/var/log/").glob("auth.log*")) + list(
-            self.target.fs.path("/var/log/").glob("secure*")
-        )
-
-        RE_TS = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
-        RE_TS_AND_HOSTNAME = RE_TS + r"\s\w+\s"
+        """Return contents of /var/log/auth.log* and /var/log/secure*."""
+        authlogs = list(self.target.fs.path("/var/log/").glob("auth.log*"))
+        securelogs = list(self.target.fs.path("/var/log/").glob("secure*"))
+        auth_files: Generator[TargetPath] = chain(authlogs, securelogs)
 
         for auth_file in auth_files:
 
             file_ctime = self.target.fs.get(str(auth_file)).stat().st_ctime
-            year_file_created = datetime.fromtimestamp(file_ctime).year
+            year_file_created = ts.from_unix(file_ctime).year
             last_seen_year = year_file_created
             last_seen_month = 0
 
-            for line in decompress_and_readlines(auth_file):
+            for line in open_decompress(auth_file, "rt"):
                 if line.startswith("#"):
                     continue
 
-                line = line.decode() if type(line) == bytes else line
                 line = line.rstrip()
 
                 # This assumes no custom date_format template in syslog-ng or systemd (M d H:M:S)
@@ -59,11 +64,12 @@ class AuthPlugin(Plugin):
                     last_seen_year += 1
                 last_seen_month = abs_ts.month
 
-                abs_ts = abs_ts.replace(year=last_seen_year)
+                abs_ts = abs_ts.replace(year=last_seen_year, tzinfo=timezone.utc)
                 msg = line.replace(re.search(RE_TS_AND_HOSTNAME, line).group(0), "").strip()
 
                 yield AuthLogRecord(
                     ts=abs_ts,
-                    msg=msg,
+                    message=msg,
+                    source=path.from_posix(auth_file),
                     _target=self.target,
                 )
