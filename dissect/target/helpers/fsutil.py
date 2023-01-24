@@ -5,10 +5,8 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
-import bz2
 import errno
 import fnmatch
-import gzip
 import hashlib
 import io
 import logging

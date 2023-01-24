@@ -1,10 +1,10 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator, Optional
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath, decompress_and_readlines
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 COMMON_REGEX = (
@@ -93,7 +93,7 @@ class ApachePlugin(plugin.Plugin):
 
     @staticmethod
     def parse_datetime(ts: str) -> datetime:
-        return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z")
+        return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=timezone.utc)
 
     def parse_logs(self, log_lines: [str], path: TargetPath) -> Iterator[Optional[WebserverRecord]]:
         for line in log_lines:
@@ -115,5 +115,5 @@ class ApachePlugin(plugin.Plugin):
     @plugin.export(record=WebserverRecord)
     def history(self):
         for path in self.get_log_paths():
-            log_lines = [line.strip() for line in decompress_and_readlines(path)]
+            log_lines = [line.strip() for line in open_decompress(path, "rt")]
             yield from self.parse_logs(log_lines, path)

@@ -51,5 +51,6 @@ class WebserverPlugin(Plugin):
 
     @export(record=WebserverRecord)
     def history(self):
+        """Returns history log file records from installed webservers (apache, caddy, iis and nginx)."""
         for record in self._func("history"):
             yield record
