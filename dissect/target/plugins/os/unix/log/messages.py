@@ -51,9 +51,9 @@ class MessagesPlugin(Plugin):
         Sources:
             - https://geek-university.com/linux/var-log-messages-file/
         """
-        syslogs = list(self.target.fs.path("/var/log/").glob("syslog*"))
-        messages = list(self.target.fs.path("/var/log/").glob("messages*"))
-        log_files: Generator[TargetPath] = chain(syslogs, messages)
+        syslogs = self.target.fs.path("/var/log/").glob("syslog*")
+        messages = self.target.fs.path("/var/log/").glob("messages*")
+        log_files: Iterator[TargetPath] = chain(syslogs, messages)
 
         for log_file in log_files:
 

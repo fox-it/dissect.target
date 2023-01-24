@@ -966,15 +966,15 @@ def resolve_link(
 
 
 def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextIO]:
-    """Open and decompress a file. Can handle regular files, gz and bz2 files.
+    """Open and decompress a file. Handles gz and bz2 files. Uncompressed files are opened as-is.
 
-    Does not check if the TargetPath exists.
+    Assumes that the ``path`` exists.
 
-    Examples:
-    bytes_buf = open_decompress("/dir/file.gz").read()
-
-    for line in open_decompress("/dir/file.gz", "rt"):
-        print(line)
+    Example:
+        bytes_buf = open_decompress(Path("/dir/file.gz")).read()
+    
+        for line in open_decompress(Path("/dir/file.gz"), "rt"):
+            print(line)
     """
 
     if path.suffix == ".gz":
