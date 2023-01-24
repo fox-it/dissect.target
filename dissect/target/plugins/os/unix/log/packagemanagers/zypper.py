@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import decompress_and_readlines
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.os.unix.log.packagemanagers.model import PackageManagerLogRecord, OperationTypes
 
 
@@ -46,7 +46,7 @@ class ZypperPlugin(plugin.Plugin):
                 continue
 
             ts, operation, *log_arguments = line.split("|")
-            ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+            ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
             operation = OperationTypes.infer(operation)
 
             record = PackageManagerLogRecord(package_manager="zypper", ts=ts, operation=operation.value)
@@ -63,7 +63,7 @@ class ZypperPlugin(plugin.Plugin):
         log_file_paths = self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB)
 
         for path in log_file_paths:
-            log_lines = [line.strip() for line in decompress_and_readlines(path)]
+            log_lines = [line.strip() for line in open_decompress(path, "rt")]
 
             yield from self.parse_logs(log_lines)
 

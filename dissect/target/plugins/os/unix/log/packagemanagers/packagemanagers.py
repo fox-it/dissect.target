@@ -28,6 +28,7 @@ class PackageManagerPlugin(Plugin):
 
     @export(record=PackageManagerLogRecord)
     def package_manager_logs(self):
+        """Returns logs from apt, yum and zypper package managers."""
         for plugin in self._plugins:
             # running the logs function for each plugin
             getattr(plugin, "logs")()

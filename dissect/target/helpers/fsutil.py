@@ -5,17 +5,15 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
-import bz2
 import errno
 import fnmatch
-import gzip
 import hashlib
 import io
 import logging
 import posixpath
 import re
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
-from typing import Any, List, Sequence, Set, Tuple, Union
+from typing import Any, BinaryIO, List, Sequence, Set, TextIO, Tuple, Union
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
@@ -967,21 +965,22 @@ def resolve_link(
     return entry
 
 
-def decompress_and_read(path: TargetPath) -> bytes:
-    if path.suffix == ".gz":
-        return gzip.GzipFile(fileobj=path.open()).read()
-    elif path.suffix == ".bz2":
-        bytestream = path.open().read()
-        return bz2.decompress(bytestream)
-    else:
-        return path.open().read()
+def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextIO]:
+    """Open and decompress a file. Can handle regular files, gz and bz2 files.
+    Does not check if the TargetPath exists.
+    Examples:
+    bytes_buf = open_decompress("/dir/file.gz").read()
+    for line in open_decompress("/dir/file.gz", "rt"):
+        print(line)
+    """
 
-
-def decompress_and_readlines(path: TargetPath) -> [str]:
     if path.suffix == ".gz":
-        return gzip.GzipFile(fileobj=path.open()).read().decode().splitlines()
+        import gzip
+
+        return gzip.open(path.open(), mode)
     elif path.suffix == ".bz2":
-        bytestream = path.open().read()
-        return bz2.decompress(bytestream).decode().splitlines()
+        import bz2
+
+        return bz2.open(path.open(), mode)
     else:
-        return path.open("rt").readlines()
+        return path.open(mode)

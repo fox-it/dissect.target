@@ -1,10 +1,10 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import decompress_and_readlines
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.os.unix.log.packagemanagers.model import PackageManagerLogRecord, OperationTypes
 
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
@@ -64,7 +64,7 @@ class AptPlugin(plugin.Plugin):
         log_file_paths = self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB)
 
         for path in log_file_paths:
-            log_lines = [line.strip() for line in decompress_and_readlines(path)]
+            log_lines = [line.strip() for line in open_decompress(path, "rt")]
 
             yield from self.parse_logs(log_lines)
 
@@ -100,6 +100,7 @@ def split_into_records(chunk: [str]) -> [PackageManagerLogRecord]:
         elif line.startswith("Start-Date"):
             dt_string = line.split("Start-Date: ")[1]
             ts = datetime.strptime(dt_string, "%Y-%m-%d  %H:%M:%S")
+            ts.replace(tzinfo=timezone.utc)
 
         elif line.startswith("Requested-By"):
             user = line.split("Requested-By: ")[1]
@@ -111,10 +112,10 @@ def split_into_records(chunk: [str]) -> [PackageManagerLogRecord]:
         operation = OperationTypes.infer(operation)
 
         yield PackageManagerLogRecord(
+            ts=ts,
             package_manager="apt",
             package_name=name,
             operation=operation.value,
-            ts=ts,
             user=user,
             command=command,
         )
