@@ -1,7 +1,12 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+from itertools import chain
+from typing import Generator
 
-from dissect.target.helpers.fsutil import TargetPath, decompress_and_readlines
+from dissect.util import ts
+from flow.record.fieldtypes import path
+
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -13,7 +18,7 @@ MessagesRecord = TargetRecordDescriptor(
         ("varint", "pid"),
         ("string", "message"),
         ("string", "raw"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -29,11 +34,15 @@ class MessagesPlugin(Plugin):
 
     @export(record=MessagesRecord)
     def syslog(self):
+        """Return contents of /var/log/messages* and /var/log/syslog*.
+
+        See ``messages`` for more information.
+        """
         return self.messages()
 
     @export(record=MessagesRecord)
     def messages(self):
-        """Return contents of /var/log/messages.
+        """Return contents of /var/log/messages* and /var/log/syslog*.
 
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
@@ -42,39 +51,33 @@ class MessagesPlugin(Plugin):
         Sources:
             - https://geek-university.com/linux/var-log-messages-file/
         """
-
-        log_files: [TargetPath] = list(self.target.fs.path("/var/log/").glob("syslog*")) + list(
-            self.target.fs.path("/var/log/").glob("messages*")
-        )
+        syslogs = list(self.target.fs.path("/var/log/").glob("syslog*"))
+        messages = list(self.target.fs.path("/var/log/").glob("messages*"))
+        log_files: Generator[TargetPath] = chain(syslogs, messages)
 
         for log_file in log_files:
 
             file_ctime = self.target.fs.get(str(log_file)).stat().st_ctime
-            year_file_created = datetime.fromtimestamp(file_ctime).year
+            year_file_created = ts.from_unix(file_ctime).year
             last_seen_year = year_file_created
             last_seen_month = 0
 
-            for line in decompress_and_readlines(log_file):
-
-                # Line can be a byte object on debian and centos
-                if isinstance(line, bytes):
-                    line = line.decode("utf-8").strip()
-                else:
-                    line = line.strip()
+            for line in open_decompress(log_file, "rt"):
+                line = line.strip()
 
                 if not line or line == "":
                     continue
 
                 try:
-                    ts = datetime.strptime(RE_TS.search(line).groups()[0], "%b %d %H:%M:%S")
-                    if last_seen_month > ts.month:
+                    line_ts = datetime.strptime(RE_TS.search(line).groups()[0], "%b %d %H:%M:%S")
+                    if last_seen_month > line_ts.month:
                         last_seen_year += 1
-                    last_seen_month = ts.month
-                    ts = ts.replace(year=last_seen_year)
+                    last_seen_month = line_ts.month
+                    line_ts = line_ts.replace(year=last_seen_year, tzinfo=timezone.utc)
                 except Exception as e:
-                    self.target.log.warn(f"Could not convert timestamp line in {log_file}: {e}")
+                    self.target.log.warn("Could not convert timestamp line in %s: %s", log_file, e)
                     # Set ts to epoch 1970-01-01 if we could not convert
-                    ts = datetime.utcfromtimestamp(0)
+                    line_ts = ts.from_unix(0)
 
                 try:
                     daemon = RE_DAEMON.search(line).groups()[0]
@@ -96,11 +99,11 @@ class MessagesPlugin(Plugin):
                     msg = line
 
                 yield MessagesRecord(
-                    ts=ts,
+                    ts=line_ts,
                     daemon=daemon,
                     pid=pid,
                     message=msg,
                     raw=line,
-                    source=str(log_file),
+                    source=path.from_posix(log_file),
                     _target=self.target,
                 )
