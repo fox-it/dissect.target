@@ -422,7 +422,7 @@ class NetworkManager:
         for ip_value in rogue_ips:
 
             # Remove broadcast and localhost
-            if ip_value.startswith("0.0.0.0/") or ip_value == "127.0.0.1":
+            if ip_value.startswith("0.0.0.0") or ip_value.startswith("127.0.0.1"):
                 continue
 
             # Remove netmask cidr notation, eg. 1.2.3.4/24

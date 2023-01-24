@@ -2,6 +2,7 @@ import textwrap
 from io import BytesIO
 
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.helpers.network_managers import NetworkManager
 
 from ._utils import absolute_path
 
@@ -69,3 +70,24 @@ def test_dns_static_plugin(target_unix_users, fs_unix):
     results = target_unix_users.dns
 
     assert results == [{"10.13.37.1", "2001:db8::"}]
+
+
+def test_clean_ips():
+    """
+    Test the cleaning of dirty ip addresses.
+    """
+
+    ips = {
+        "0.0.0.0": set(),
+        "127.0.0.1": set(),
+        "127.0.0.1/8": set(),
+        "0.0.0.0/24": set(),
+        "10.13.37.1": {"10.13.37.1"},
+        "10.13.37.2/24": {"10.13.37.2"},
+        "  10.13.37.3  ": {"10.13.37.3"},
+        "2001:db8::": {"2001:db8::"},
+        "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff": {"2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"},
+    }
+
+    for input_ip, expected_ip in ips.items():
+        assert NetworkManager.clean_ips({input_ip}) == expected_ip
