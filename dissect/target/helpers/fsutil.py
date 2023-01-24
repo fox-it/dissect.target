@@ -965,26 +965,6 @@ def resolve_link(
     return entry
 
 
-# def decompress_and_read(path: TargetPath) -> bytes:
-#     if path.suffix == ".gz":
-#         return gzip.GzipFile(fileobj=path.open()).read()
-#     elif path.suffix == ".bz2":
-#         bytestream = path.open().read()
-#         return bz2.decompress(bytestream)
-#     else:
-#         return path.open().read()
-
-
-# def decompress_and_readlines(path: TargetPath) -> [str]:
-#     if path.suffix == ".gz":
-#         return gzip.GzipFile(fileobj=path.open()).read().decode().splitlines()
-#     elif path.suffix == ".bz2":
-#         bytestream = path.open().read()
-#         return bz2.decompress(bytestream).decode().splitlines()
-#     else:
-#         return path.open("rt").readlines()
-
-
 def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextIO]:
     """Open and decompress a file. Can handle regular files, gz and bz2 files.
 
