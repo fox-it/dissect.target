@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from io import BytesIO
+
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 from dissect.target.plugins.apps.webservers.nginx import NginxPlugin
@@ -6,6 +9,7 @@ from ._utils import absolute_path
 
 class TestNginx:
     def test_txt(self, target_unix, fs_unix):
+        fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
         data_file = absolute_path("data/webservers/nginx/access.log")
         fs_unix.map_file("var/log/nginx/access.log", data_file)
         target_unix.add_plugin(NginxPlugin)
@@ -15,6 +19,7 @@ class TestNginx:
 
         log: WebserverRecord = results[0]
 
+        assert log.ts == datetime(2022, 12, 1, 0, 3, 57, tzinfo=timezone.utc)
         assert log.statuscode == 200
         assert log.ipaddr == "1.2.3.4"
         assert log.remote_user == "admin"

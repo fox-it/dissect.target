@@ -1,4 +1,5 @@
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from datetime import datetime, timezone
 
 from dissect.target import plugin
@@ -12,6 +13,12 @@ class NginxPlugin(plugin.Plugin):
     def __init__(self, target):
         super().__init__(target)
         self.LOGS_DIR_PATH = self.get_log_paths()
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
 
     @plugin.internal
     def get_log_paths(self):
@@ -48,9 +55,9 @@ class NginxPlugin(plugin.Plugin):
             re.IGNORECASE,
         )
 
-        def parse_datetime(date_str):
+        def parse_datetime(date_str, tz):
             # Example: 10/Apr/2020:14:10:12 +0000
-            return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=timezone.utc)
+            return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
 
         for line in log_lines:
             m = regex.match(line)
@@ -60,7 +67,7 @@ class NginxPlugin(plugin.Plugin):
                 return
 
             yield WebserverRecord(
-                ts=parse_datetime(m.group("datetime")),
+                ts=parse_datetime(m.group("datetime"), self.target_timezone),
                 ipaddr=m.group("ipaddress"),
                 remote_user=m.group("remote_user"),
                 file_path=entry.resolve().__str__(),

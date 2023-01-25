@@ -1,4 +1,5 @@
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from datetime import datetime, timezone
 
 from dissect.target import plugin
@@ -13,6 +14,12 @@ class CaddyPlugin(plugin.Plugin):
         super().__init__(target)
 
         self.LOG_FILE_PATH = self.get_log_path()
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
 
     @plugin.internal
     def get_log_path(self):
@@ -52,9 +59,9 @@ class CaddyPlugin(plugin.Plugin):
             r'(?P<ipaddress>.*?) - - \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<statuscode>\d{3}) (?P<bytessent>\d+)'  # noqa: E501
         )
 
-        def parse_datetime(date_str):
+        def parse_datetime(date_str, tz):
             # Example: 10/Apr/2020:14:10:12 +0000
-            return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=timezone.utc)
+            return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
 
         for line in handle:
             line = line.rstrip()
@@ -67,7 +74,7 @@ class CaddyPlugin(plugin.Plugin):
                 continue
 
             yield WebserverRecord(
-                ts=parse_datetime(m.group("datetime")),
+                ts=parse_datetime(m.group("datetime"), self.target_timezone),
                 ipaddr=m.group("ipaddress"),
                 file_path=entry.resolve().__str__(),
                 url=m.group("url"),

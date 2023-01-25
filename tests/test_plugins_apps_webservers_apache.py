@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+from io import BytesIO
+
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 from dissect.target.plugins.apps.webservers.apache import ApachePlugin, infer_log_format
@@ -34,12 +37,12 @@ class TestHelpers:
 
 
 class TestApache:
-    def test_txt(self, target_unix, fs_unix):
+    def test_txt(self, target_unix_users, fs_unix):
         data_file = absolute_path("data/webservers/apache/access.log")
         fs_unix.map_file("var/log/apache2/access.log", data_file)
-        target_unix.add_plugin(ApachePlugin)
+        target_unix_users.add_plugin(ApachePlugin)
 
-        results = list(target_unix.apache())
+        results = list(target_unix_users.apache())
         assert len(results) == 4
 
     def test_gz(self, target_unix, fs_unix):
@@ -59,6 +62,7 @@ class TestApache:
         assert len(results) == 4
 
     def test_all_log_formats(self, target_unix, fs_unix):
+        fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
         data_file = absolute_path("data/webservers/apache/access.log")
         fs_unix.map_file("var/log/apache2/access.log", data_file)
         target_unix.add_plugin(ApachePlugin)
@@ -67,6 +71,7 @@ class TestApache:
         assert len(results) == 4
 
         combined_log: WebserverRecord = results[0]
+        assert combined_log.ts == datetime(2022, 12, 19, 17, 6, 19, tzinfo=timezone.utc)
         assert combined_log.statuscode == 200
         assert combined_log.ipaddr == "1.2.3.4"
         assert combined_log.remote_user == "-"
@@ -79,6 +84,7 @@ class TestApache:
         )
 
         vhost_combined_log: WebserverRecord = results[1]
+        assert vhost_combined_log.ts == datetime(2022, 12, 19, 17, 25, 40, tzinfo=timezone.utc)
         assert vhost_combined_log.statuscode == 200
         assert vhost_combined_log.ipaddr == "1.2.3.4"
         assert vhost_combined_log.remote_user == "-"
@@ -91,6 +97,7 @@ class TestApache:
         )
 
         common_log: WebserverRecord = results[2]
+        assert common_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=timezone.utc)
         assert common_log.statuscode == 200
         assert common_log.ipaddr == "4.3.2.1"
         assert common_log.remote_user == "-"

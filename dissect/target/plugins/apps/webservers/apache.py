@@ -1,4 +1,6 @@
 import re
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from datetime import datetime, timezone
 from typing import Iterator, Optional
 
@@ -58,6 +60,15 @@ class ApachePlugin(plugin.Plugin):
     __namespace__ = "apache"
     LOGS_DIR_PATH = "/var/log/apache2"
 
+    def __init__(self, target):
+        super().__init__(target)
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
+
     @plugin.internal
     def get_log_paths(self) -> []:
         logs_dir = self.target.fs.path(self.LOGS_DIR_PATH)
@@ -81,7 +92,7 @@ class ApachePlugin(plugin.Plugin):
 
         match = match.groupdict()
         return WebserverRecord(
-            ts=self.parse_datetime(match.get("ts")),
+            ts=self.parse_datetime(match.get("ts"), self.target_timezone),
             remote_user=match.get("remote_user"),
             ipaddr=match.get("ipaddr"),
             url=match.get("url"),
@@ -92,8 +103,8 @@ class ApachePlugin(plugin.Plugin):
         )
 
     @staticmethod
-    def parse_datetime(ts: str) -> datetime:
-        return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=timezone.utc)
+    def parse_datetime(ts: str, tz: str) -> datetime:
+        return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
 
     def parse_logs(self, log_lines: [str], path: TargetPath) -> Iterator[Optional[WebserverRecord]]:
         for line in log_lines:
