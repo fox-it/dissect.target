@@ -1,13 +1,12 @@
 import re
 from datetime import datetime, timezone
 from itertools import chain
-from typing import Generator
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.util import ts
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -40,7 +39,9 @@ class MessagesPlugin(Plugin):
             self.target_timezone = timezone.utc
 
     def check_compatible(self):
-        return self.target.fs.path("/var/log/syslog").exists() or self.target.fs.path("/var/log/messages").exists()
+        return any(self.target.fs.path("/var/log").glob("syslog*")) or any(
+            self.target.fs.path("/var/log").glob("messages*")
+        )
 
     @export(record=MessagesRecord)
     def syslog(self):
@@ -61,11 +62,8 @@ class MessagesPlugin(Plugin):
         Sources:
             - https://geek-university.com/linux/var-log-messages-file/
         """
-        syslogs = self.target.fs.path("/var/log/").glob("syslog*")
-        messages = self.target.fs.path("/var/log/").glob("messages*")
-        log_files: Iterator[TargetPath] = chain(syslogs, messages)
-
-        for log_file in log_files:
+        var_log = self.target.fs.path("/var/log")
+        for log_file in chain(var_log.glob("syslog*"), var_log.glob("messages*")):
 
             file_ctime = self.target.fs.get(str(log_file)).stat().st_ctime
             year_file_created = ts.from_unix(file_ctime).year

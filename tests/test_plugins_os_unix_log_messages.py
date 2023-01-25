@@ -5,14 +5,14 @@ from zoneinfo import ZoneInfo
 
 from flow.record.fieldtypes import path
 
-from dissect.target.plugins.os.unix.log.messages import MessagesPlugin
+from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
 
 from ._utils import absolute_path
 
 
 def test_unix_log_messages_plugin(target_unix_users, fs_unix):
 
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("Europe/Amsterdam".encode()))
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     data_file = absolute_path("data/unix/logs/messages")
     fs_unix.map_file("var/log/messages", data_file)
@@ -33,3 +33,8 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     assert results[1].message == "Stopped target Swap."
     assert results[1].pid is None
     assert results[1].source == path.from_posix("/var/log/messages")
+
+    # assure syslog() behaves the same as messages()
+    syslogs = list(target_unix_users.syslog())
+    assert len(syslogs) == len(results)
+    assert isinstance(syslogs[0], type(MessagesRecord()))
