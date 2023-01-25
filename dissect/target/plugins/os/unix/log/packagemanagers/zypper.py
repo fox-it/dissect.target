@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Iterator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
@@ -15,12 +16,18 @@ class ZypperPlugin(plugin.Plugin):
     def __init__(self, target):
         super().__init__(target)
 
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
+
     def check_compatible(self):
         if not self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB):
             raise UnsupportedPluginError("No zypper logs found")
 
     @staticmethod
-    def parse_logs(log_lines: [str]) -> Iterator[PackageManagerLogRecord]:
+    def parse_logs(log_lines: [str], tz: ZoneInfo) -> Iterator[PackageManagerLogRecord]:
         """
         Logs are formatted like this:
             2022-12-16 12:56:23|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
@@ -46,7 +53,7 @@ class ZypperPlugin(plugin.Plugin):
                 continue
 
             ts, operation, *log_arguments = line.split("|")
-            ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
             operation = OperationTypes.infer(operation)
 
             record = PackageManagerLogRecord(package_manager="zypper", ts=ts, operation=operation.value)
@@ -65,7 +72,7 @@ class ZypperPlugin(plugin.Plugin):
         for path in log_file_paths:
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
 
-            yield from self.parse_logs(log_lines)
+            yield from self.parse_logs(log_lines, self.target_timezone)
 
 
 def parse_command_line(line: [str], record: PackageManagerLogRecord) -> PackageManagerLogRecord:

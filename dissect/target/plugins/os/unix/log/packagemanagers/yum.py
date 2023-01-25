@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Iterator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
@@ -16,6 +17,12 @@ class YumPlugin(plugin.Plugin):
 
     def __init__(self, target):
         super().__init__(target)
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
 
     def check_compatible(self):
         if not self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB):
@@ -48,7 +55,7 @@ class YumPlugin(plugin.Plugin):
                 last_seen_year += 1
             last_seen_month = line_ts.month
 
-            line_ts = line_ts.replace(year=last_seen_year, tzinfo=timezone.utc)
+            line_ts = line_ts.replace(year=last_seen_year, tzinfo=self.target_timezone)
 
             message = line[16:]
             operation, package_name = message.split(": ")
