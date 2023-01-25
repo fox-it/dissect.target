@@ -3,7 +3,8 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
 from typing import Any, Callable, Match, Optional, Union
-from xml.etree.ElementTree import ElementTree
+
+from defusedxml import ElementTree
 
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target

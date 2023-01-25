@@ -1,0 +1,149 @@
+{
+    "StreamConfig": {},
+    "State": {
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "RemovalInProgress": false,
+      "Dead": false,
+      "Pid": 1234567,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2022-12-19T13:37:01.247519263Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": null
+    },
+    "ID": "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f",
+    "Created": "2022-12-19T13:37:01.247519263Z",
+    "Managed": false,
+    "Path": "/bin/sh",
+    "Args": [
+      "--",
+      "/usr/local/bin/docker-entrypoint.sh"
+    ],
+    "Config": {
+      "Hostname": "d3adb33fd3ad",
+      "Domainname": "",
+      "User": "user",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "ExposedPorts": {
+        "1234/tcp": {},
+        "5678/tcp": {}
+      },
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "EXAMPLE_ENV_VARIABLE=true"
+      ],
+      "Cmd": [
+        "my_command"
+      ],
+      "Image": "exampleimage:1.33.7",
+      "Volumes": null,
+      "WorkingDir": "/home/user",
+      "Entrypoint": [
+        "/bin/sh",
+        "--",
+        "/usr/local/bin/docker-entrypoint.sh"
+      ],
+      "OnBuild": null,
+      "Labels": null
+    },
+    "Image": "sha256:d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f",
+    "NetworkSettings": {
+      "Bridge": "",
+      "SandboxID": "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f",
+      "HairpinMode": false,
+      "LinkLocalIPv6Address": "",
+      "LinkLocalIPv6PrefixLen": 0,
+      "Networks": {
+        "bridge": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": null,
+          "NetworkID": "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f",
+          "EndpointID": "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f",
+          "Gateway": "172.17.0.1",
+          "IPAddress": "172.17.0.2",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "MacAddress": "12:34:56:78:90:0a",
+          "DriverOpts": null,
+          "IPAMOperational": false
+        }
+      },
+      "Service": null,
+      "Ports": {
+        "1234/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "1234"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "1234"
+          }
+        ],
+        "5678/tcp": [
+          {
+            "HostIp": "0.0.0.0",
+            "HostPort": "5678"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "5678"
+          }
+        ]
+      },
+      "SandboxKey": "/var/run/docker/netns/d3adb33fd3ad",
+      "SecondaryIPAddresses": null,
+      "SecondaryIPv6Addresses": null,
+      "IsAnonymousEndpoint": false,
+      "HasSwarmEndpoint": false
+    },
+    "LogPath": "/home/local/docker/containers/d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f/d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f-json.log",
+    "Name": "/example_container_name",
+    "Driver": "overlay2",
+    "OS": "linux",
+    "MountLabel": "",
+    "ProcessLabel": "",
+    "RestartCount": 0,
+    "HasBeenStartedBefore": true,
+    "HasBeenManuallyStopped": false,
+    "MountPoints": {
+      "/test": {
+        "Source": "/tmp/test",
+        "Destination": "/test",
+        "RW": true,
+        "Name": "",
+        "Driver": "",
+        "Type": "bind",
+        "Propagation": "rprivate",
+        "Spec": {
+          "Type": "bind",
+          "Source": "/tmp/test",
+          "Target": "/test"
+        },
+        "SkipMountpointCreation": false
+      }
+    },
+    "SecretReferences": null,
+    "ConfigReferences": null,
+    "AppArmorProfile": "docker-default",
+    "HostnamePath": "/home/local/docker/containers/d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f/hostname",
+    "HostsPath": "/home/local/docker/containers/d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f/hosts",
+    "ShmPath": "",
+    "ResolvConfPath": "/home/local/docker/containers/d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f/resolv.conf",
+    "SeccompProfile": "",
+    "NoNewPrivileges": false,
+    "LocalLogCacheMeta": {
+      "HaveNotifyEnabled": false
+    }
+  }
