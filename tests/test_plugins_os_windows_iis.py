@@ -2,7 +2,6 @@ from pathlib import Path
 from unittest.mock import mock_open, patch
 
 import pytest
-from flow.record import Record
 
 from dissect.target.plugins.os.windows import iis
 
