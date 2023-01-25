@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timezone
 from itertools import chain
 from typing import Generator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.util import ts
 from flow.record.fieldtypes import path
@@ -25,6 +26,15 @@ RE_TS_AND_HOSTNAME = re.compile(ts_regex + r"\s\w+\s")
 
 
 class AuthPlugin(Plugin):
+    def __init__(self, target):
+        super().__init__(target)
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
+
     def check_compatible(self):
         return self.target.fs.path("/var/log/auth.log").exists() or self.target.fs.path("/var/log/secure").exists()
 
@@ -64,7 +74,7 @@ class AuthPlugin(Plugin):
                     last_seen_year += 1
                 last_seen_month = abs_ts.month
 
-                abs_ts = abs_ts.replace(year=last_seen_year, tzinfo=timezone.utc)
+                abs_ts = abs_ts.replace(year=last_seen_year, tzinfo=self.target_timezone)
                 msg = line.replace(re.search(RE_TS_AND_HOSTNAME, line).group(0), "").strip()
 
                 yield AuthLogRecord(

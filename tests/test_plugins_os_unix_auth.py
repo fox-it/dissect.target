@@ -1,5 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from os import stat
+from io import BytesIO
+from zoneinfo import ZoneInfo
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.log.auth import AuthLogRecord, AuthPlugin
@@ -12,6 +14,8 @@ from ._utils import absolute_path
 
 
 def test_auth_plugin(target_unix, fs_unix: VirtualFilesystem):
+    fs_unix.map_file_fh("/etc/timezone", BytesIO("Europe/Amsterdam".encode()))
+
     data_path = "data/unix/logs/auth/auth.log"
     data_file = absolute_path(data_path)
     fs_unix.map_file("var/log/auth.log", data_file)
@@ -23,11 +27,13 @@ def test_auth_plugin(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=ZoneInfo("Europe/Amsterdam"))
     assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
+    fs_unix.map_file_fh("/etc/timezone", BytesIO("Pacific/Honolulu".encode()))
+
     empty_file = absolute_path("data/empty.log")
     fs_unix.map_file("var/log/auth.log", empty_file)
 
@@ -42,11 +48,13 @@ def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=ZoneInfo("Pacific/Honolulu"))
     assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
+    fs_unix.map_file_fh("/etc/timezone", BytesIO("America/Nuuk".encode()))
+
     empty_file = absolute_path("data/empty.log")
     fs_unix.map_file("var/log/auth.log", empty_file)
 
@@ -61,11 +69,13 @@ def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
 
     assert len(results) == 10
     assert isinstance(results[0], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=timezone.utc)
+    assert results[0].ts == datetime(year, 11, 14, 6, 39, 1, tzinfo=ZoneInfo("America/Nuuk"))
     assert results[0].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
 def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
+    fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
+
     data_path = "data/unix/logs/auth/secure"
     data_file = absolute_path(data_path)
     fs_unix.map_file("var/log/secure", data_file)
@@ -78,5 +88,5 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
     assert len(results) == 2
     assert isinstance(results[0], type(AuthLogRecord()))
     assert isinstance(results[1], type(AuthLogRecord()))
-    assert results[0].ts == datetime(year, 12, 31, 3, 14, 0, tzinfo=timezone.utc)
-    assert results[1].ts == datetime(year + 1, 1, 1, 13, 37, 0, tzinfo=timezone.utc)
+    assert results[0].ts == datetime(year, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    assert results[1].ts == datetime(year + 1, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("Etc/UTC"))
