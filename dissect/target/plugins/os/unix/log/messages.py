@@ -2,6 +2,7 @@ import re
 from datetime import datetime, timezone
 from itertools import chain
 from typing import Generator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.util import ts
 from flow.record.fieldtypes import path
@@ -29,6 +30,15 @@ RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 
 
 class MessagesPlugin(Plugin):
+    def __init__(self, target):
+        super().__init__(target)
+
+        try:
+            self.target_timezone = ZoneInfo(f"{target.timezone}")
+        except ZoneInfoNotFoundError:
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            self.target_timezone = timezone.utc
+
     def check_compatible(self):
         return self.target.fs.path("/var/log/syslog").exists() or self.target.fs.path("/var/log/messages").exists()
 
@@ -73,7 +83,7 @@ class MessagesPlugin(Plugin):
                     if last_seen_month > line_ts.month:
                         last_seen_year += 1
                     last_seen_month = line_ts.month
-                    line_ts = line_ts.replace(year=last_seen_year, tzinfo=timezone.utc)
+                    line_ts = line_ts.replace(year=last_seen_year, tzinfo=self.target_timezone)
                 except Exception as e:
                     self.target.log.warn("Could not convert timestamp line in %s: %s", log_file, e)
                     # Set ts to epoch 1970-01-01 if we could not convert

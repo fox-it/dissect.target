@@ -972,7 +972,7 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
 
     Example:
         bytes_buf = open_decompress(Path("/dir/file.gz")).read()
-    
+
         for line in open_decompress(Path("/dir/file.gz"), "rt"):
             print(line)
     """
