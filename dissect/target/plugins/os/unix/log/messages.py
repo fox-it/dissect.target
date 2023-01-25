@@ -75,7 +75,7 @@ class MessagesPlugin(Plugin):
             for line in open_decompress(log_file, "rt"):
                 line = line.strip()
 
-                if not line or line == "":
+                if not line:
                     continue
 
                 try:
