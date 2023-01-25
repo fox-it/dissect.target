@@ -1,5 +1,7 @@
 from datetime import datetime
+from typing import Optional
 
+from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryError
@@ -123,11 +125,7 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def ntversion(self):
         """Return the Windows NT version."""
-        key, value = ("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", "CurrentVersion")
-        try:
-            return self.target.registry.value(key, value).value
-        except RegistryError:
-            pass
+        return self.target._os._nt_version()
 
     @export(output="yield")
     def pathenvironment(self):
@@ -191,6 +189,17 @@ class GenericPlugin(Plugin):
             return datetime.fromtimestamp(last_seen)
 
         return None
+
+    @export(property=True)
+    def install_date(self) -> Optional[datetime]:
+        """Returns the install date of the system."""
+
+        key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
+
+        try:
+            return wintimestamp(self.target.registry.key(key).value("InstallDate").value)
+        except RegistryError:
+            return
 
     @export(record=AppInitRecord)
     def appinit(self):
