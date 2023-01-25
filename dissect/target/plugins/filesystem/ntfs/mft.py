@@ -109,10 +109,10 @@ class MftPlugin(Plugin):
 
     @export(
         record=[
+            FilesystemStdRecord,
+            FilesystemFilenameRecord,
             FilesystemStdCompactRecord,
             FilesystemFilenameCompactRecord,
-            FilesystemFilenameRecord,
-            FilesystemStdRecord,
         ]
     )
     @arg("--compact", action="store_true")
