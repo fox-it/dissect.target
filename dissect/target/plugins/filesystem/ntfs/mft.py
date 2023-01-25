@@ -19,8 +19,8 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
 log = logging.getLogger(__name__)
 
 
-FilesystemStdRecordCompacted = TargetRecordDescriptor(
-    "filesystem/ntfs/mft/std_compact",
+FilesystemStdCompactRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/std/compact",
     [
         ("datetime", "creation_time"),
         ("datetime", "last_modification_time"),
@@ -53,8 +53,8 @@ FilesystemStdRecord = TargetRecordDescriptor(
 )
 
 
-FilesystemFilenameRecordCompacted = TargetRecordDescriptor(
-    "filesystem/ntfs/mft/filename_compact",
+FilesystemFilenameCompactRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/filename/compact",
     [
         ("datetime", "creation_time"),
         ("datetime", "last_modification_time"),
@@ -97,8 +97,8 @@ RECORD_TYPES = {
 
 
 COMPACT_RECORD_TYPES = {
-    InformationType.STANDARD_INFORMATION: FilesystemStdRecordCompacted,
-    InformationType.FILE_INFORMATION: FilesystemFilenameRecordCompacted,
+    InformationType.STANDARD_INFORMATION: FilesystemStdCompactRecord,
+    InformationType.FILE_INFORMATION: FilesystemFilenameCompactRecord,
 }
 
 
@@ -107,9 +107,16 @@ class MftPlugin(Plugin):
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
         return len(ntfs_filesystems) > 0
 
-    @export(record=[FilesystemStdRecordCompacted, FilesystemFilenameRecordCompacted])
-    @arg("--compact", type=bool)
-    def mft(self, compact=False):
+    @export(
+        record=[
+            FilesystemStdCompactRecord,
+            FilesystemFilenameCompactRecord,
+            FilesystemFilenameRecord,
+            FilesystemStdRecord,
+        ]
+    )
+    @arg("--compact", action="store_true")
+    def mft(self, compact: bool = False):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
