@@ -8,10 +8,9 @@ from typing import BinaryIO, Optional
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target.exceptions import FileNotFoundError, FilesystemError
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import (
     Filesystem,
-    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -45,7 +44,6 @@ class ZipFilesystem(Filesystem):
 
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base or ""
-        self.alt_separator = alt_separator
 
         self._fs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
 
@@ -54,11 +52,12 @@ class ZipFilesystem(Filesystem):
             if not mname.startswith(self.base):
                 continue
 
-            rel_name = fsutil.normpath(mname[len(self.base) :])
+            rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
 
             # NOTE: Normally we would check here if the member is a symlink or not
 
-            file_entry = ZipFilesystemEntry(self, rel_name, member)
+            entry_cls = ZipFilesystemDirectoryEntry if member.is_dir() else ZipFilesystemEntry
+            file_entry = entry_cls(self, rel_name, member)
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
@@ -79,48 +78,13 @@ class ZipFilesystem(Filesystem):
         return self._fs.get(path)
 
 
-class ZipFilesystemEntry(VirtualDirectory, VirtualFile):
-    def __init__(self, fs: Filesystem, path: str, entry: zipfile.ZipInfo) -> None:
-        if entry.is_dir():
-            VirtualDirectory.__init__(self, fs, path)
-        FilesystemEntry.__init__(self, fs, path, entry)
-
-    def _resolve(self) -> ZipFilesystemEntry:
-        return self
-
-    def get(self, path: str) -> ZipFilesystemEntry:
-        if self.is_file():
-            return super(VirtualFile, self).get(path)
-        else:
-            return super(VirtualDirectory, self).get(path)
-
+class ZipFilesystemEntry(VirtualFile):
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
-        if self.is_file():
-            try:
-                return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
-            except Exception:
-                raise FileNotFoundError()
-        else:
-            return super(VirtualDirectory, self).open()
-
-    def is_dir(self) -> bool:
-        """Return whether this entry is a directory. Resolves symlinks when possible."""
         try:
-            return self._resolve().entry.is_dir()
-        except FilesystemError:
-            return False
-
-    def is_file(self) -> bool:
-        """Return whether this entry is a file. Resolves symlinks when possible."""
-        try:
-            return not self.is_dir()
-        except FilesystemError:
-            return False
-
-    def is_symlink(self) -> bool:
-        """Return whether this entry is a link."""
-        return False
+            return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
+        except Exception:
+            raise FileNotFoundError()
 
     def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
@@ -132,14 +96,42 @@ class ZipFilesystemEntry(VirtualDirectory, VirtualFile):
 
     def stat(self) -> fsutil.stat_result:
         """Return the stat information of this entry."""
-        return self._resolve().lstat()
+        return self.lstat()
 
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         return fsutil.stat_result(
             [
-                (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
+                stat.S_IFREG | 0o777,
+                self.entry.header_offset,
+                id(self.fs),
+                0,
+                0,
+                0,
+                self.entry.file_size,
+                0,
+                datetime(*self.entry.date_time, tzinfo=timezone.utc).timestamp(),
+                0,
+            ]
+        )
+
+
+class ZipFilesystemDirectoryEntry(VirtualDirectory):
+    def __init__(self, fs: ZipFilesystem, path: str, entry: zipfile.ZipInfo):
+        super().__init__(fs, path)
+        self.entry = entry
+
+    def stat(self) -> fsutil.stat_result:
+        """Return the stat information of this entry."""
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
+        """Return the stat information of the given path, without resolving links."""
+        # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
+        return fsutil.stat_result(
+            [
+                stat.S_IFDIR | 0o777,
                 self.entry.header_offset,
                 id(self.fs),
                 0,
