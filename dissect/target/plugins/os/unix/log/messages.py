@@ -1,12 +1,9 @@
 import re
-from datetime import datetime, timezone
 from itertools import chain
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from dissect.util import ts
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.fsutil import open_decompress, YearRolloverHelper
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -17,11 +14,11 @@ MessagesRecord = TargetRecordDescriptor(
         ("string", "daemon"),
         ("varint", "pid"),
         ("string", "message"),
-        ("string", "raw"),
         ("path", "source"),
     ],
 )
 
+DEFAULT_TS_LOG_FORMAT = "%b %d %H:%M:%S"
 RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
 RE_PID = re.compile(r"\w\[(\d+)\]")
@@ -29,15 +26,6 @@ RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 
 
 class MessagesPlugin(Plugin):
-    def __init__(self, target):
-        super().__init__(target)
-
-        try:
-            self.target_timezone = ZoneInfo(f"{target.timezone}")
-        except ZoneInfoNotFoundError:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
-            self.target_timezone = timezone.utc
-
     def check_compatible(self):
         return any(self.target.fs.path("/var/log").glob("syslog*")) or any(
             self.target.fs.path("/var/log").glob("messages*")
@@ -61,57 +49,31 @@ class MessagesPlugin(Plugin):
 
         Sources:
             - https://geek-university.com/linux/var-log-messages-file/
+            - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
         """
+
         var_log = self.target.fs.path("/var/log")
         for log_file in chain(var_log.glob("syslog*"), var_log.glob("messages*")):
 
-            file_ctime = self.target.fs.get(str(log_file)).stat().st_ctime
-            year_file_created = ts.from_unix(file_ctime).year
-            last_seen_year = year_file_created
-            last_seen_month = 0
+            # First iteration: we count the number of year rollovers.
+            helper = YearRolloverHelper(self.target, log_file, RE_TS, DEFAULT_TS_LOG_FORMAT)
 
+            # Second iteration: yield results with correct year ts.
             for line in open_decompress(log_file, "rt"):
                 line = line.strip()
-
                 if not line:
                     continue
 
-                try:
-                    line_ts = datetime.strptime(RE_TS.search(line).groups()[0], "%b %d %H:%M:%S")
-                    if last_seen_month > line_ts.month:
-                        last_seen_year += 1
-                    last_seen_month = line_ts.month
-                    line_ts = line_ts.replace(year=last_seen_year, tzinfo=self.target_timezone)
-                except Exception as e:
-                    self.target.log.warn("Could not convert timestamp line in %s: %s", log_file, e)
-                    # Set ts to epoch 1970-01-01 if we could not convert
-                    line_ts = ts.from_unix(0)
-
-                try:
-                    daemon = RE_DAEMON.search(line).groups()[0]
-                except Exception:
-                    daemon = None
-
-                try:
-                    pid = RE_PID.search(line)
-                    if pid is not None:
-                        pid = pid.groups()[0]
-                except Exception:
-                    pid = None
-
-                try:
-                    msg = RE_MSG.search(line).groups()[0]
-                    if msg is None:
-                        msg = line
-                except Exception:
-                    msg = line
+                absolute_ts_dt = helper.apply_year_rollovers(line)
+                daemon = dict(enumerate(RE_DAEMON.findall(line))).get(0)
+                pid = dict(enumerate(RE_PID.findall(line))).get(0)
+                message = dict(enumerate(RE_MSG.findall(line))).get(0, line)
 
                 yield MessagesRecord(
-                    ts=line_ts,
+                    ts=absolute_ts_dt,
                     daemon=daemon,
                     pid=pid,
-                    message=msg,
-                    raw=line,
+                    message=message,
                     source=path.from_posix(log_file),
                     _target=self.target,
                 )

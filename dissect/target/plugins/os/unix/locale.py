@@ -1,5 +1,8 @@
+from datetime import timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, internal
 
 UnixKeyboardRecord = TargetRecordDescriptor(
     "linux/keyboard",
@@ -34,6 +37,14 @@ class LocalePlugin(Plugin):
             zoneinfo_path = str(zoneinfo.readlink()).split("/")
             timezone = "/".join(zoneinfo_path[-2:])
             return timezone
+
+    @internal(property=True)
+    def tzinfo(self):
+        try:
+            return ZoneInfo(self.target.timezone)
+        except (TypeError, ZoneInfoNotFoundError):
+            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
+            return timezone.utc
 
     @export(property=True)
     def language(self):

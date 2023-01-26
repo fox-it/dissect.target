@@ -5,6 +5,7 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
+from datetime import datetime
 import errno
 import fnmatch
 import hashlib
@@ -15,6 +16,7 @@ import re
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
 from typing import Any, BinaryIO, List, Sequence, Set, TextIO, Tuple, Union
 
+from dissect.util.ts import from_unix
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -987,3 +989,59 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
         return bz2.open(path.open(), mode)
     else:
         return path.open(mode)
+
+
+class YearRolloverHelper:
+    """Help determine a correct timestamp for log files without year notation.
+
+    Example:
+        helper = YearRolloverHelper(self.target, log_file, RE_TS, TS_LOG_FORMAT)
+        for line in open_decompress(log_file, "rt"):
+            ...
+            line_ts = helper.apply_year_rollovers(line)
+    """
+
+    def __init__(self, target, file_path, RE_TS, LOG_FORMAT):
+        self.file_path = file_path
+        file_mtime = target.fs.get(str(file_path)).stat().st_mtime
+        self.year_file_last_modified = from_unix(file_mtime).year
+        self.timezone = target.tzinfo
+        self.RE_TS = RE_TS
+        self.LOG_FORMAT = LOG_FORMAT
+
+        self.last_seen_month = 0
+        self.year_rollover_count = 0
+        self.current_year = None
+
+        self.determine_year_rollovers()
+
+    def relative_datetime_from_raw_ts(self, line: str) -> datetime:
+        relative_ts_raw = re.search(self.RE_TS, line).group(0)
+        relative_ts_dt = datetime.strptime(relative_ts_raw, self.LOG_FORMAT)
+        return relative_ts_dt
+
+    def determine_year_rollovers(self) -> None:
+        for line in open_decompress(self.file_path, "rt"):
+            line = line.strip()
+            if not line:
+                continue
+
+            relative_ts_dt = self.relative_datetime_from_raw_ts(line)
+            if self.last_seen_month > relative_ts_dt.month:
+                self.year_rollover_count += 1
+            self.last_seen_month = relative_ts_dt.month
+
+    def apply_year_rollovers(self, line: str) -> datetime:
+        if self.current_year is None:
+            # The year of the first log line is the year the file was last modified minus
+            # the amount of year rollovers we detected.
+            self.current_year = self.year_file_last_modified - self.year_rollover_count
+            self.last_seen_month = 0
+
+        relative_ts_dt = self.relative_datetime_from_raw_ts(line)
+        if self.last_seen_month > relative_ts_dt.month:
+            self.current_year += 1
+        self.last_seen_month = relative_ts_dt.month
+
+        absolute_ts_dt = relative_ts_dt.replace(year=self.current_year, tzinfo=self.timezone)
+        return absolute_ts_dt
