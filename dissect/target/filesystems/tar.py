@@ -4,7 +4,13 @@ import tarfile
 from dissect.util.stream import BufferedStream
 
 from dissect.target.exceptions import FileNotFoundError, FilesystemError
-from dissect.target.filesystem import Filesystem, VirtualFile, VirtualFilesystem
+from dissect.target.filesystem import (
+    Filesystem,
+    FilesystemEntry,
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+)
 from dissect.target.helpers import fsutil
 
 log = logging.getLogger(__name__)
@@ -23,7 +29,7 @@ class TarFilesystem(Filesystem):
 
         for member in self.tar.getmembers():
             if member.isdir():
-                continue
+                VirtualDirectory.__init__(self, self._fs, member)
 
             mname = member.name.strip("/")
             if not mname.startswith(self.base):
@@ -59,7 +65,12 @@ class TarFilesystem(Filesystem):
         return self._fs.get(path)
 
 
-class TarFilesystemEntry(VirtualFile):
+class TarFilesystemEntry(VirtualDirectory, VirtualFile):
+    def __init__(self, fs: Filesystem, path: str, entry: tarfile.TarInfo):
+        if entry.isdir():
+            VirtualDirectory.__init__(self, fs, path)
+        FilesystemEntry.__init__(self, fs, path, entry)
+
     def _resolve(self):
         if self.is_symlink():
             return self.readlink_ext()
@@ -67,13 +78,16 @@ class TarFilesystemEntry(VirtualFile):
 
     def open(self):
         """Returns file handle (file-like object)."""
-        try:
-            f = self.fs.tar.extractfile(self.entry)
-            if hasattr(f, "raw"):
-                f.size = f.raw.size
-            return BufferedStream(f, size=f.size)
-        except Exception:
-            raise FileNotFoundError()
+        if self.is_file():
+            try:
+                f = self.fs.tar.extractfile(self.entry)
+                if hasattr(f, "raw"):
+                    f.size = f.raw.size
+                return BufferedStream(f, size=f.size)
+            except Exception:
+                raise FileNotFoundError()
+        else:
+            return super(VirtualDirectory, self).open()
 
     def is_dir(self):
         """Return whether this entry is a directory. Resolves symlinks when possible."""

@@ -25,18 +25,15 @@ class TarLoader(Loader):
 
     @staticmethod
     def detect(path: Path):
-        return path.name.lower().endswith((".tar", ".tar.gz"))
+        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
     def is_compressed(self, path: Union[Path, str]) -> bool:
-        return str(path).lower().endswith(".tar.gz")
+        return str(path).lower().endswith((".tar.gz", ".tgz"))
 
     def map(self, target: target.Target):
         volumes = {}
 
         for member in self.tar.getmembers():
-            if member.isdir():
-                continue
-
             if not member.name.startswith("fs/") and not member.name.startswith("/sysvol"):
                 if "/" not in volumes:
                     vol = filesystem.VirtualFilesystem(case_sensitive=True)
@@ -45,7 +42,7 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
-                entry = TarFilesystemEntry(volume, member.name, member)
+                entry = TarFilesystemEntry(volume, member.name.lstrip("."), member)
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
