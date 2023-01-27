@@ -1,0 +1,23 @@
+# first user session
+Jan 11 13:37:00 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/john.doe/12345/bus
+Jan 11 13:37:01 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting SHELL=/bin/bash
+Jan 11 13:37:02 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting HOME=/home/local/john.doe
+Jan 11 13:37:03 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting USER=john.doe
+
+# same user with same session
+Jan 11 13:37:04 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/john.doe/12345/bus
+Jan 11 13:37:05 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting SHELL=/bin/bash
+Jan 11 13:37:06 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting HOME=/home/local/john.doe
+Jan 11 13:37:07 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting USER=john.doe
+
+# same user with different session
+Jan 11 13:37:08 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/john.doe/12345/bus
+Jan 11 13:37:09 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting SHELL=/bin/sh
+Jan 11 13:37:10 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting HOME=/root
+Jan 11 13:37:11 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting USER=john.doe
+
+# another unrelated user
+Jan 11 13:37:12 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting DBUS_SESSION_BUS_ADDRESS=unix:path=/run/jane.doe/67890/bus
+Jan 11 13:37:13 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting SHELL=/bin/zsh
+Jan 11 13:37:14 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting HOME=/home/local/jane.doe
+Jan 11 13:37:15 hostname /usr/lib/gdm3/gdm-x-session[1234]: dbus-update-activation-environment: setting USER=jane.doe
