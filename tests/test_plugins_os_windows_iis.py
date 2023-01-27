@@ -1,3 +1,8 @@
+from pathlib import Path
+from unittest.mock import mock_open, patch
+
+import pytest
+
 from dissect.target.plugins.os.windows import iis
 
 from ._utils import absolute_path
@@ -66,3 +71,17 @@ def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
     assert {r.log_format for r in records} == {"W3C"}
     assert {r.log_file for r in records} == {"C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"}
     assert {r.hostname for r in records} == {target_win.hostname}
+
+
+@pytest.mark.parametrize(
+    "stream, method",
+    [
+        (b"-, -, 10/1/2021, 00:00:00, -, \xa7, ::1, 1, 2, 3, 200, 0, GET, /, -,", "parse_iis_format_log"),
+        (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
+    ],
+)
+def test_iis_plugin_iis_nonutf8(target_win, fs_win, tmpdir_name, stream, method):
+    server = iis.IISLogsPlugin(target_win)
+    # should not crash on invalid bytes like \xa7
+    with (patch("pathlib.Path.open", new_callable=mock_open, read_data=stream)):
+        assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"

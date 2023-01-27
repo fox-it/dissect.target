@@ -2,8 +2,8 @@ import re
 from unittest.mock import Mock
 
 import pytest
-from dissect.ntfs.exceptions import Error
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
+from dissect.ntfs.exceptions import Error
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
@@ -16,6 +16,11 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
 )
 
 from ._utils import absolute_path
+
+
+@pytest.fixture(params=[True, False])
+def compact(request) -> bool:
+    return request.param
 
 
 @pytest.fixture
@@ -140,10 +145,15 @@ def test_mft_timeline(mocked_timeline_plugin, regex_pattern, expected_nr_of_reco
     assert len(outputs) == expected_nr_of_records
 
 
-def test_mft_plugin_entries(target_win):
+def check_output_amount(number: int, compact_output: bool):
+    more_records = (0 if compact_output else 1) * 3
+    return number + number * more_records
+
+
+def test_mft_plugin_entries(target_win, compact):
     load_mft_plugin(target_win)
-    mft_data = list(target_win.mft())
-    assert len(mft_data) == 76
+    mft_data = list(target_win.mft(compact))
+    assert len(mft_data) == check_output_amount(76, compact)
 
 
 def test_mft_plugin_disk_label(target_win):
@@ -153,22 +163,22 @@ def test_mft_plugin_disk_label(target_win):
         assert mft_entries.path.startswith("c:/")
 
 
-def test_mft_plugin_ads(target_win):
+def test_mft_plugin_ads(target_win, compact):
     load_mft_plugin(target_win)
-    mft_data = [mft_entry for mft_entry in target_win.mft() if hasattr(mft_entry, "ads") and mft_entry.ads]
-    assert len(mft_data) == 6
+    mft_data = [mft_entry for mft_entry in target_win.mft(compact) if hasattr(mft_entry, "ads") and mft_entry.ads]
+    assert len(mft_data) == check_output_amount(6, compact)
 
 
-def test_mft_plugin_resident(target_win):
+def test_mft_plugin_resident(target_win, compact):
     load_mft_plugin(target_win)
-    mft_data = [mft_entry for mft_entry in target_win.mft() if mft_entry.resident]
-    assert len(mft_data) == 19
+    mft_data = [mft_entry for mft_entry in target_win.mft(compact) if mft_entry.resident]
+    assert len(mft_data) == check_output_amount(19, compact)
 
 
-def test_mft_plugin_inuse(target_win):
+def test_mft_plugin_inuse(target_win, compact):
     load_mft_plugin(target_win)
-    mft_data = [mft_entry for mft_entry in target_win.mft() if mft_entry.inuse]
-    assert len(mft_data) == 76
+    mft_data = [mft_entry for mft_entry in target_win.mft(compact) if mft_entry.inuse]
+    assert len(mft_data) == check_output_amount(76, compact)
 
 
 def test_mft_plugin_last_entries(target_win):

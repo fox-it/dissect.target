@@ -1,4 +1,3 @@
-from enum import Enum, auto
 from dataclasses import dataclass, replace
 from typing import Any, Iterator, Optional, Union
 
@@ -9,17 +8,12 @@ from dissect.ntfs.mft import MftRecord
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
+    InformationType,
     get_drive_letter,
     get_owner_and_group,
     get_record_size,
     get_volume_identifier,
 )
-
-
-class InformationType(Enum):
-    STANDARD_INFORMATION = auto()
-    FILE_INFORMATION = auto()
-    ALTERNATE_DATA_STREAM = auto()
 
 
 def format_none_value(value: Any) -> Union[str, Any]:
@@ -124,48 +118,53 @@ class MftTimelinePlugin(Plugin):
 
             for record in fs.ntfs.mft.segments():
                 segment = record.segment
-                paths = record.full_paths(ignore_dos)
 
-                _update_extras(extras, record, fs)
+                try:
+                    paths = record.full_paths(ignore_dos)
 
-                for path in paths:
-                    path = f"{drive_letter}{path}"
+                    _update_extras(extras, record, fs)
 
-                    for attr in record.attributes.STANDARD_INFORMATION:
-                        yield from format_info(
-                            segment,
-                            path,
-                            extras,
-                            attr,
-                            InformationType.STANDARD_INFORMATION,
-                        )
+                    for path in paths:
+                        path = f"{drive_letter}{path}"
 
-                    for idx, attr in enumerate(record.attributes.FILE_NAME):
-                        filepath = f"{drive_letter}{attr.full_path()}"
+                        for attr in record.attributes.STANDARD_INFORMATION:
+                            yield from format_info(
+                                segment,
+                                path,
+                                extras,
+                                attr,
+                                InformationType.STANDARD_INFORMATION,
+                            )
 
-                        yield from format_info(
-                            segment,
-                            filepath,
-                            extras,
-                            attr,
-                            InformationType.FILE_INFORMATION,
-                            idx=idx,
-                        )
-
-                    ads_extras = replace(extras)
-                    ads_info = record.attributes.FILE_NAME[0]
-
-                    for attr in record.attributes.DATA:
-                        if attr.name != "":  # ADS Data
-                            ads_extras.resident = attr.resident
-                            ads_extras.size = get_record_size(record, attr.name)
-
-                            adspath = f"{path}:{attr.name}"
+                        for idx, attr in enumerate(record.attributes.FILE_NAME):
+                            filepath = f"{drive_letter}{attr.full_path()}"
 
                             yield from format_info(
                                 segment,
-                                adspath,
-                                ads_extras,
-                                ads_info,
-                                InformationType.ALTERNATE_DATA_STREAM,
+                                filepath,
+                                extras,
+                                attr,
+                                InformationType.FILE_INFORMATION,
+                                idx=idx,
                             )
+
+                        ads_extras = replace(extras)
+                        ads_info = record.attributes.FILE_NAME[0]
+
+                        for attr in record.attributes.DATA:
+                            if attr.name != "":  # ADS Data
+                                ads_extras.resident = attr.resident
+                                ads_extras.size = get_record_size(record, attr.name)
+
+                                adspath = f"{path}:{attr.name}"
+
+                                yield from format_info(
+                                    segment,
+                                    adspath,
+                                    ads_extras,
+                                    ads_info,
+                                    InformationType.ALTERNATE_DATA_STREAM,
+                                )
+                except Exception as e:
+                    self.target.log.warning("An error occured parsing MFT segment %d: %s", segment, str(e))
+                    self.target.log.debug("", exc_info=e)
