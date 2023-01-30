@@ -8,7 +8,7 @@ address 10.13.37.6
 netmask 255.255.255.0
 gateway 10.13.37.0
 hwaddress ether 00:00:00:00:00:00
-dns-nameservers 10.13.37.1
+dns-nameservers 10.13.37.1 10.13.37.2
 
 # Padded IPv6 example
 iface eth0 inet6 static
@@ -16,4 +16,4 @@ iface eth0 inet6 static
     netmask     32
     gateway     2001:db8::
     hwaddress   00:00:00:00:00:00
-    dns-nameservers 2001:db8::
+    dns-nameservers 2001:db8:: 2001:db9::

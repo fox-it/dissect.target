@@ -1,8 +1,10 @@
+import re
+
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, Optional, Union
+from typing import Any, Callable, Match, Optional, Union, Iterable
 from xml.etree.ElementTree import ElementTree
 
 from dissect.target.helpers.fsutil import TargetPath
@@ -416,10 +418,17 @@ class NetworkManager:
         return translated_value
 
     @staticmethod
-    def clean_ips(rogue_ips: set) -> set:
-        """Clean ip values before returning them."""
-        ips = set()
-        for ip_value in rogue_ips:
+    def clean_ips(ips: Iterable) -> set:
+        """Clean ip values before returning them.
+
+        Args:
+            ips: Iterable of ip addresses to clean.
+
+        Returns:
+            Set of cleaned ip addresses.
+        """
+        cleaned_ips = set()
+        for ip_value in ips:
 
             # Remove broadcast and localhost
             if ip_value.startswith("0.0.0.0") or ip_value.startswith("127.0.0.1"):
@@ -436,9 +445,9 @@ class NetworkManager:
             # Strip values
             ip_value = ip_value.strip()
 
-            ips.add(ip_value)
+            cleaned_ips.add(ip_value)
 
-        return ips
+        return cleaned_ips
 
     def __repr__(self) -> str:
         return f"<NetworkManager {self.name}>"
@@ -479,6 +488,59 @@ class LinuxNetworkManager:
             if value:
                 values.append(value)
         return values
+
+
+def parse_unix_dhcp_log_messages(target) -> list[str]:
+    """Parse local syslog and cloud init log files for DHCP lease IPs."""
+
+    # TODO: Make use of target.messages() function as soon as that PR is merged.
+    #       https://github.com/fox-it/dissect.target/pull/131
+
+    ips = []
+    logs = ["/var/log/syslog", "/var/log/messages"]
+
+    for log in logs:
+        if target.fs.exists(log):
+            for line in target.fs.path(log).open("rt"):
+
+                # ubuntu dhcp
+                if "DHCPv4" in line or "DHCPv6" in line:
+                    ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
+                    if ip not in ips:
+                        ips.append(ip)
+
+                # ubuntu dhcp networkmanager
+                if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line):
+                    ip = line.split("=> '")[1].replace("'", "").strip()
+                    if ip not in ips:
+                        ips.append(ip)
+
+                # dhclient dhcp for debian and centos
+                if "dhclient" in line and "bound to" in line:
+                    ip = line.split("bound to")[1].split(" ")[1].strip()
+                    if ip not in ips:
+                        ips.append(ip)
+
+                # networkmanager / centos dhcp
+                if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+                    ip = line.split(" address ")[1].strip()
+                    if ip not in ips:
+                        ips.append(ip)
+
+    # A unix system might be provisioned using Ubuntu's cloud-init.
+    # (https://cloud-init.io/)
+    #
+    # We are interested in the following log entry:
+    # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
+    #
+    if (path := target.fs.path("/var/log/cloud-init.log")).exists():
+        for line in path.open("rt"):
+            if "Received dhcp lease on" in line:
+                interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+                if ip not in ips:
+                    ips.append(ip)
+
+    return ips
 
 
 MANAGERS = [

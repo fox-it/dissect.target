@@ -25,7 +25,7 @@ def test_ips_dhcp_plugin(target_unix_users, fs_unix):
     )
 
     target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips(dhcp=True)
+    results = target_unix_users.ips_dhcp
     assert results == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4"]
 
 
@@ -44,7 +44,7 @@ def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
     )
 
     target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips(dhcp=True)
+    results = target_unix_users.ips_dhcp
     assert results == ["10.13.37.5"]
 
 
@@ -55,7 +55,7 @@ def test_ips_static_plugin(target_unix_users, fs_unix):
 
     fs_unix.map_file("/etc/network/interfaces", absolute_path("data/unix/configs/ips/interfaces"))
     target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips()
+    results = target_unix_users.ips
 
     assert sorted(results) == sorted(["10.13.37.6", "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"])
 
@@ -69,7 +69,7 @@ def test_dns_static_plugin(target_unix_users, fs_unix):
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.dns
 
-    assert results == [{"10.13.37.1", "2001:db8::"}]
+    assert results == [{"10.13.37.1", "10.13.37.2", "2001:db8::", "2001:db9::"}]
 
 
 def test_clean_ips():
