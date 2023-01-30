@@ -1033,6 +1033,8 @@ def year_rollover_helper(
 ) -> Iterator[tuple[datetime, str]]:
     """Helper function for determining the correct timestamps for log files without year notation.
 
+    Supports compressed files by using :func:`open_decompress`.
+
     Yields tuples of the parsed timestamp and the lines of the file in reverse.
 
     Args:
@@ -1041,7 +1043,8 @@ def year_rollover_helper(
         ts_format: Time format specification for parsing the timestamp.
         tzinfo: The timezone to use when parsing timestamps.
     """
-    current_year = from_unix(path.stat().st_mtime).year
+    # Convert the mtime to the local timezone so that we get the correct year
+    current_year = from_unix(path.stat().st_mtime).astimezone(tzinfo).year
     last_seen_month = None
 
     with open_decompress(path, "rt") as fh:
