@@ -24,13 +24,13 @@ class TarLoader(Loader):
         self.tar = tarfile.open(path)
 
     @staticmethod
-    def detect(path: Path):
+    def detect(path: Path) -> bool:
         return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
     def is_compressed(self, path: Union[Path, str]) -> bool:
         return str(path).lower().endswith((".tar.gz", ".tgz"))
 
-    def map(self, target: target.Target):
+    def map(self, target: target.Target) -> None:
         volumes = {}
 
         for member in self.tar.getmembers():
