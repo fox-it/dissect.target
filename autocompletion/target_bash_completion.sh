@@ -60,10 +60,9 @@ __target_help() {
 
     COMPREPLY=()
     cur=${COMP_WORDS[COMP_CWORD]}
-    options=$(${COMP_WORDS[0]} --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
-
     case "${cur}" in
     -*)
+        options=$(${COMP_WORDS[0]} --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
         COMPREPLY=($( compgen -W "${options}" -- ${cur} ))
         ;;
     esac
@@ -81,9 +80,6 @@ __target_help() {
 __target_function ()
 {
     local cur prev
-    # Set compreply to command line arguments if -* is detected
-    __target_help
-
     cur=${COMP_WORDS[COMP_CWORD]}
     prev=${COMP_WORDS[COMP_CWORD-1]}
 
@@ -91,6 +87,9 @@ __target_function ()
     if [[ -z ${DISSECT_PLUGINS+x} ]]; then
         DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
     fi
+
+    # Set compreply to command line arguments if -* is detected
+    __target_help
 
     case "${prev}" in
     -f | --function )
@@ -102,10 +101,10 @@ __target_function ()
 
 
 complete -F __target_function -o filenames -o default target-query
+complete -F __target_function -o filenames -o default target-dump
 
 complete -F __target_help -o filenames -o default target-dd
 complete -F __target_help -o filenames -o default target-fs
-complete -F __target_function -o filenames -o default target-dump
 complete -F __target_help -o filenames -o default target-mount
 complete -F __target_help -o filenames -o default target-reg
 complete -F __target_help -o filenames -o default target-shell
