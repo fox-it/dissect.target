@@ -51,6 +51,7 @@ ScriptWriter.get_args = get_args_patched
 setup(
     name="dissect.target",
     packages=list(map(lambda v: "dissect." + v, find_packages("dissect"))),
+    package_data={"dissect.target": ["helpers/data/*.xml"]},
     install_requires=[
         "defusedxml",
         "dissect.cstruct>=3.0.dev,<4.0.dev",

@@ -142,7 +142,7 @@ class ActivitiesCachePlugin(Plugin):
 
 
 def mkts(ts):
-    """Timestamps inside ActivitiesCache.db are stored in a unix-like format.
+    """Timestamps inside ActivitiesCache.db are stored in a Unix-like format.
 
     Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/#timestamps
     """
