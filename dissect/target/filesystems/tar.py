@@ -41,13 +41,13 @@ class TarFilesystem(Filesystem):
         fh.seek(0)
 
         self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
-        self.base = base.strip("/") if base else ""
+        self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
         for member in self.tar.getmembers():
             mname = member.name.strip("/")
-            if not mname.startswith(self.base) or mname == self.base or mname == ".":
+            if not mname.startswith(self.base) or mname == ".":
                 continue
 
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
