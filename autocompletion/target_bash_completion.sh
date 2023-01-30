@@ -83,16 +83,16 @@ __target_function ()
     cur=${COMP_WORDS[COMP_CWORD]}
     prev=${COMP_WORDS[COMP_CWORD-1]}
 
-    # Store plugin in global variable, so it only gets executed once
-    if [[ -z ${DISSECT_PLUGINS+x} ]]; then
-        DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
-    fi
 
     # Set compreply to command line arguments if -* is detected
     __target_help
 
     case "${prev}" in
     -f | --function )
+        # Store plugin in global variable, so it only gets executed once
+        if [[ -z ${DISSECT_PLUGINS+x} ]]; then
+            DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
+        fi
         COMPREPLY=($(__comma_seperated_list_completion "${cur}" "${DISSECT_PLUGINS}"))
         ;;
     esac
