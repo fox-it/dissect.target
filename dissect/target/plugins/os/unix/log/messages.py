@@ -3,7 +3,7 @@ from itertools import chain
 
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.fsutil import open_decompress, YearRolloverHelper
+from dissect.target.helpers.fsutil import year_rollover_helper
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -43,6 +43,8 @@ class MessagesPlugin(Plugin):
     def messages(self):
         """Return contents of /var/log/messages* and /var/log/syslog*.
 
+        Note: due to year rollover detection, the contents of the files are returned in reverse.
+
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
         non-critical messages. This log should be considered the "general system activity" log.
@@ -52,25 +54,17 @@ class MessagesPlugin(Plugin):
             - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
         """
 
+        tzinfo = self.target.tzinfo
+
         var_log = self.target.fs.path("/var/log")
         for log_file in chain(var_log.glob("syslog*"), var_log.glob("messages*")):
-
-            # First iteration: we count the number of year rollovers.
-            helper = YearRolloverHelper(self.target, log_file, RE_TS, DEFAULT_TS_LOG_FORMAT)
-
-            # Second iteration: yield results with correct year ts.
-            for line in open_decompress(log_file, "rt"):
-                line = line.strip()
-                if not line:
-                    continue
-
-                absolute_ts_dt = helper.apply_year_rollovers(line)
+            for ts, line in year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo):
                 daemon = dict(enumerate(RE_DAEMON.findall(line))).get(0)
                 pid = dict(enumerate(RE_PID.findall(line))).get(0)
                 message = dict(enumerate(RE_MSG.findall(line))).get(0, line)
 
                 yield MessagesRecord(
-                    ts=absolute_ts_dt,
+                    ts=ts,
                     daemon=daemon,
                     pid=pid,
                     message=message,

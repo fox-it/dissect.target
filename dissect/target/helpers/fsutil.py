@@ -12,9 +12,9 @@ import io
 import logging
 import posixpath
 import re
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
-from typing import Any, BinaryIO, List, Sequence, Set, TextIO, Tuple, Union
+from typing import Any, BinaryIO, Iterator, List, Sequence, Set, TextIO, Tuple, Union
 
 from dissect.util.ts import from_unix
 
@@ -992,58 +992,67 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
         return path.open(mode)
 
 
-class YearRolloverHelper:
-    """Help determine a correct timestamp for log files without year notation.
+def reverse_readlines(fh: TextIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> Iterator[str]:
+    """Like iterating over a ``TextIO`` file-like object, but starting from the end of the file.
 
-    Example:
-        helper = YearRolloverHelper(self.target, log_file, RE_TS, TS_LOG_FORMAT)
-        for line in open_decompress(log_file, "rt"):
-            ...
-            line_ts = helper.apply_year_rollovers(line)
+    Args:
+        fh: The file-like object (opened in text mode) to iterate lines from.
+        chunk_size: The chunk size to use for iterating over lines.
     """
+    offset = fh.seek(0, io.SEEK_END)
+    lines = []
 
-    def __init__(self, target, file_path, RE_TS, LOG_FORMAT):
-        self.file_path = file_path
-        file_mtime = target.fs.get(str(file_path)).stat().st_mtime
-        self.tzinfo = target.tzinfo
-        self.year_file_last_modified = datetime.fromtimestamp(file_mtime, self.tzinfo).year
+    prev_offset = offset
+    while offset > 0:
+        if offset < chunk_size:
+            chunk_size = offset
+        offset -= chunk_size
+        fh.seek(offset)
 
-        self.RE_TS = RE_TS
-        self.LOG_FORMAT = LOG_FORMAT
+        lines = []
+        # tell() on TextIO returns a cookie which includes encode/decoder state
+        # Lower 64 bit are the file position
+        # https://peps.python.org/pep-3116/#text-i-o
+        # See TextIOWrapper._pack_cookie in _pyio.py for more detail
+        while (fh.tell() & ((1 << 64) - 1)) < prev_offset:
+            try:
+                lines.append(fh.readline())
+            except UnicodeDecodeError:
+                offset += 1
+                fh.seek(offset)
 
-        self.last_seen_month = 0
-        self.year_rollover_count = 0
-        self.current_year = None
+        yield from reversed(lines[1:])
+        prev_offset = offset
 
-        self.determine_year_rollovers()
+    if lines:
+        yield lines[0]
 
-    def relative_datetime_from_raw_ts(self, line: str) -> datetime:
-        relative_ts_raw = re.search(self.RE_TS, line).group(0)
-        relative_ts_dt = datetime.strptime(relative_ts_raw, self.LOG_FORMAT)
-        return relative_ts_dt
 
-    def determine_year_rollovers(self) -> None:
-        for line in open_decompress(self.file_path, "rt"):
+def year_rollover_helper(
+    path: Path, re_ts: Union[str, re.Pattern], ts_format: str, tzinfo: tzinfo = timezone.utc
+) -> Iterator[tuple[datetime, str]]:
+    """Helper function for determining the correct timestamps for log files without year notation.
+
+    Yields tuples of the parsed timestamp and the lines of the file in reverse.
+
+    Args:
+        path: A path to the log file to parse.
+        re_ts: Regex pattern for extracting the timestamp from each line.
+        ts_format: Time format specification for parsing the timestamp.
+        tzinfo: The timezone to use when parsing timestamps.
+    """
+    current_year = from_unix(path.stat().st_mtime).year
+    last_seen_month = None
+
+    with open_decompress(path, "rt") as fh:
+        for line in reverse_readlines(fh):
             line = line.strip()
             if not line:
                 continue
 
-            relative_ts_dt = self.relative_datetime_from_raw_ts(line)
-            if self.last_seen_month > relative_ts_dt.month:
-                self.year_rollover_count += 1
-            self.last_seen_month = relative_ts_dt.month
+            relative_ts = datetime.strptime(re.search(re_ts, line).group(0), ts_format)
+            if last_seen_month and relative_ts.month > last_seen_month:
+                current_year -= 1
+            last_seen_month = relative_ts.month
 
-    def apply_year_rollovers(self, line: str) -> datetime:
-        if self.current_year is None:
-            # The year of the first log line is the year the file was last modified minus
-            # the amount of year rollovers we detected.
-            self.current_year = self.year_file_last_modified - self.year_rollover_count
-            self.last_seen_month = 0
-
-        relative_ts_dt = self.relative_datetime_from_raw_ts(line)
-        if self.last_seen_month > relative_ts_dt.month:
-            self.current_year += 1
-        self.last_seen_month = relative_ts_dt.month
-
-        absolute_ts_dt = relative_ts_dt.replace(year=self.current_year, tzinfo=self.tzinfo)
-        return absolute_ts_dt
+            yield relative_ts.replace(year=current_year, tzinfo=tzinfo), line
