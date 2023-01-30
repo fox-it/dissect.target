@@ -147,7 +147,7 @@ def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = No
         try:
             if loader.detect(item):
                 return loader
-        except ImportError as exception:
+        except (ImportError, NotImplementedError) as exception:
             log.warning("Failed to import %s", loader)
             log.debug("", exc_info=exception)
 
