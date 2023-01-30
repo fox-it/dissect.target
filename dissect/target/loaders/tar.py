@@ -4,8 +4,11 @@ from pathlib import Path
 from typing import Union
 
 from dissect.target import filesystem, target
-from dissect.target.filesystems.tar import TarFilesystemEntry
-from dissect.target.helpers import loaderutil
+from dissect.target.filesystems.tar import (
+    TarFilesystemDirectoryEntry,
+    TarFilesystemEntry,
+)
+from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
 
 log = logging.getLogger(__name__)
@@ -42,7 +45,7 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
-                entry = TarFilesystemEntry(volume, member.name.lstrip("."), member)
+                mname = member.name
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
@@ -60,8 +63,10 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes[volume_name]
+                mname = "/".join(parts[1:])
 
-                entry = TarFilesystemEntry(volume, "/".join(parts[1:]), member)
+            entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
+            entry = entry_cls(volume, fsutil.normpath(mname), member)
             volume.map_file_entry(entry.path, entry)
 
         for vol_name, vol in volumes.items():
