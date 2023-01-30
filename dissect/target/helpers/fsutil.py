@@ -5,7 +5,6 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
-from datetime import datetime
 import errno
 import fnmatch
 import hashlib
@@ -13,10 +12,12 @@ import io
 import logging
 import posixpath
 import re
+from datetime import datetime
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
 from typing import Any, BinaryIO, List, Sequence, Set, TextIO, Tuple, Union
 
 from dissect.util.ts import from_unix
+
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -1004,8 +1005,9 @@ class YearRolloverHelper:
     def __init__(self, target, file_path, RE_TS, LOG_FORMAT):
         self.file_path = file_path
         file_mtime = target.fs.get(str(file_path)).stat().st_mtime
-        self.year_file_last_modified = from_unix(file_mtime).year
-        self.timezone = target.tzinfo
+        self.tzinfo = target.tzinfo
+        self.year_file_last_modified = datetime.fromtimestamp(file_mtime, self.tzinfo).year
+
         self.RE_TS = RE_TS
         self.LOG_FORMAT = LOG_FORMAT
 
@@ -1043,5 +1045,5 @@ class YearRolloverHelper:
             self.current_year += 1
         self.last_seen_month = relative_ts_dt.month
 
-        absolute_ts_dt = relative_ts_dt.replace(year=self.current_year, tzinfo=self.timezone)
+        absolute_ts_dt = relative_ts_dt.replace(year=self.current_year, tzinfo=self.tzinfo)
         return absolute_ts_dt
