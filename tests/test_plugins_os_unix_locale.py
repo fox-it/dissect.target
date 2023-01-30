@@ -15,7 +15,7 @@ def test_locale_plugin_unix(target_unix_users, fs_unix):
     target_unix_users.add_plugin(UnixLocalePlugin)
 
     assert target_unix_users.timezone == "Europe/Amsterdam"
-    assert target_unix_users.language == ["en-US"]
+    assert target_unix_users.language == ["en_US"]
     keyboard = list(target_unix_users.keyboard())
     assert len(keyboard) == 1
     assert keyboard[0].layout == "us"

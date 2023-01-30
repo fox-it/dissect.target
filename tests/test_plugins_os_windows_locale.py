@@ -34,8 +34,8 @@ def test_locale_plugin_windows(target_win_users, hive_hku, hive_hklm):
     hive_hklm.map_key(timezoneinformation_key_name, timezoneinformation_key)
 
     target_win_users.add_plugin(WindowsLocalePlugin)
-    assert target_win_users.language == ["en-US"]
-    assert target_win_users.timezone == "Pacific Standard Time"
+    assert target_win_users.language == ["en_US"]
+    assert target_win_users.timezone == "America/Los_Angeles"
 
     keyboard = list(target_win_users.keyboard())
     assert len(keyboard) == 2

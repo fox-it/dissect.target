@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from dissect.util.ts import wintimestamp
+from dissect.util.ts import from_unix, wintimestamp
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryError
@@ -186,7 +186,7 @@ class GenericPlugin(Plugin):
             pass
 
         if last_seen != 0:
-            return datetime.fromtimestamp(last_seen)
+            return from_unix(last_seen)
 
         return None
 
