@@ -1,8 +1,9 @@
-import defusedxml.ElementTree as ET
-from locale import normalize
-from pathlib import Path
 import importlib
 import importlib.resources
+from locale import normalize
+from pathlib import Path
+
+import defusedxml.ElementTree as ET
 
 
 def normalize_timezone(input: str) -> str:
@@ -10,7 +11,7 @@ def normalize_timezone(input: str) -> str:
 
     Takes a Windows registry ``TimeZoneKeyName`` string as input and translates it to IANA TZ format.
     Will return the IANA preferred territory ``001`` value of the corresponding timezone.
-    
+
     For example, ``Pacific Standard Time`` is translated to ``America/Los_Angeles``.
     """
 
