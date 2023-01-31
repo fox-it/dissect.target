@@ -58,12 +58,11 @@ __filter_list() {
 __target_help() {
     local cur options
 
-    COMPREPLY=()
     cur=${COMP_WORDS[COMP_CWORD]}
-    options=$(${COMP_WORDS[0]} --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
-
     case "${cur}" in
     -*)
+        tool=${COMP_WORDS[0]#*-}
+        options=${DISSECT_HELP["$tool"]}
         COMPREPLY=($( compgen -W "${options}" -- ${cur} ))
         ;;
     esac
@@ -81,31 +80,35 @@ __target_help() {
 __target_function ()
 {
     local cur prev
-    # Set compreply to command line arguments if -* is detected
-    __target_help
-
     cur=${COMP_WORDS[COMP_CWORD]}
     prev=${COMP_WORDS[COMP_CWORD-1]}
-
-    # Store plugin in global variable, so it only gets executed once
-    if [[ -z ${DISSECT_PLUGINS+x} ]]; then
-        DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
-    fi
 
     case "${prev}" in
     -f | --function )
         COMPREPLY=($(__comma_seperated_list_completion "${cur}" "${DISSECT_PLUGINS}"))
         ;;
+    *)
+        # Set compreply to command line arguments if -* is detected
+        __target_help
+        ;;
     esac
-
 }
 
+echo Loading Dissect plugin list
+DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
+
+echo Loading Dissect help prompts
+declare -A DISSECT_HELP
+for x in query dump dd fs mount reg shell
+do
+    DISSECT_HELP["$x"]=$(target-$x --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
+done
 
 complete -F __target_function -o filenames -o default target-query
+complete -F __target_function -o filenames -o default target-dump
 
 complete -F __target_help -o filenames -o default target-dd
 complete -F __target_help -o filenames -o default target-fs
-complete -F __target_function -o filenames -o default target-dump
 complete -F __target_help -o filenames -o default target-mount
 complete -F __target_help -o filenames -o default target-reg
 complete -F __target_help -o filenames -o default target-shell
