@@ -1,7 +1,13 @@
 import re
 import urllib.parse
+from datetime import datetime, timezone, tzinfo
 from enum import Enum
-from typing import BinaryIO
+from pathlib import Path
+from typing import BinaryIO, Iterator, Union
+
+from dissect.util.ts import from_unix
+
+from dissect.target.helpers import fsutil
 
 
 class StrEnum(str, Enum):
@@ -51,3 +57,37 @@ def readinto(buffer: bytearray, fh: BinaryIO) -> int:
     size = len(data)
     buffer[:size] = data
     return size
+
+
+def year_rollover_helper(
+    path: Path, re_ts: Union[str, re.Pattern], ts_format: str, tzinfo: tzinfo = timezone.utc
+) -> Iterator[tuple[datetime, str]]:
+    """Helper function for determining the correct timestamps for log files without year notation.
+
+    Supports compressed files by using :func:`open_decompress`.
+
+    Args:
+        path: A path to the log file to parse.
+        re_ts: Regex pattern for extracting the timestamp from each line.
+        ts_format: Time format specification for parsing the timestamp.
+        tzinfo: The timezone to use when parsing timestamps.
+
+    Returns:
+        An iterator of tuples of the parsed timestamp and the lines of the file in reverse.
+    """
+    # Convert the mtime to the local timezone so that we get the correct year
+    current_year = from_unix(path.stat().st_mtime).astimezone(tzinfo).year
+    last_seen_month = None
+
+    with fsutil.open_decompress(path, "rt") as fh:
+        for line in fsutil.reverse_readlines(fh):
+            line = line.strip()
+            if not line:
+                continue
+
+            relative_ts = datetime.strptime(re.search(re_ts, line).group(0), ts_format)
+            if last_seen_month and relative_ts.month > last_seen_month:
+                current_year -= 1
+            last_seen_month = relative_ts.month
+
+            yield relative_ts.replace(year=current_year, tzinfo=tzinfo), line

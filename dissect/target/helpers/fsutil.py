@@ -12,11 +12,8 @@ import io
 import logging
 import posixpath
 import re
-from datetime import datetime, timezone, tzinfo
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
 from typing import Any, BinaryIO, Iterator, List, Sequence, Set, TextIO, Tuple, Union
-
-from dissect.util.ts import from_unix
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
@@ -998,6 +995,9 @@ def reverse_readlines(fh: TextIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> I
     Args:
         fh: The file-like object (opened in text mode) to iterate lines from.
         chunk_size: The chunk size to use for iterating over lines.
+
+    Returns:
+        An iterator of lines from the file-like object, in reverse.
     """
     offset = fh.seek(0, io.SEEK_END) & ((1 << 64) - 1)
     lines = []
@@ -1026,36 +1026,3 @@ def reverse_readlines(fh: TextIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> I
 
     if lines:
         yield lines[0]
-
-
-def year_rollover_helper(
-    path: Path, re_ts: Union[str, re.Pattern], ts_format: str, tzinfo: tzinfo = timezone.utc
-) -> Iterator[tuple[datetime, str]]:
-    """Helper function for determining the correct timestamps for log files without year notation.
-
-    Supports compressed files by using :func:`open_decompress`.
-
-    Yields tuples of the parsed timestamp and the lines of the file in reverse.
-
-    Args:
-        path: A path to the log file to parse.
-        re_ts: Regex pattern for extracting the timestamp from each line.
-        ts_format: Time format specification for parsing the timestamp.
-        tzinfo: The timezone to use when parsing timestamps.
-    """
-    # Convert the mtime to the local timezone so that we get the correct year
-    current_year = from_unix(path.stat().st_mtime).astimezone(tzinfo).year
-    last_seen_month = None
-
-    with open_decompress(path, "rt") as fh:
-        for line in reverse_readlines(fh):
-            line = line.strip()
-            if not line:
-                continue
-
-            relative_ts = datetime.strptime(re.search(re_ts, line).group(0), ts_format)
-            if last_seen_month and relative_ts.month > last_seen_month:
-                current_year -= 1
-            last_seen_month = relative_ts.month
-
-            yield relative_ts.replace(year=current_year, tzinfo=tzinfo), line

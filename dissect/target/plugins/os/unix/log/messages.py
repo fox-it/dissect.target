@@ -3,8 +3,8 @@ from itertools import chain
 
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.fsutil import year_rollover_helper
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
 
 MessagesRecord = TargetRecordDescriptor(

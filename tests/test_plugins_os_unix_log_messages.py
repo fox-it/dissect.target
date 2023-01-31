@@ -46,7 +46,7 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     assert isinstance(syslogs[0], type(MessagesRecord()))
 
 
-def test_unix_log_messages_compressed_timezone_yearrollover():
+def test_unix_log_messages_compressed_timezone_year_rollover():
     target = Target()
     bio = BytesIO()
 
