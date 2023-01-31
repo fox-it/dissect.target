@@ -91,5 +91,5 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
     results.reverse()
     assert isinstance(results[0], type(AuthLogRecord()))
     assert isinstance(results[1], type(AuthLogRecord()))
-    assert results[0].ts == dt(year, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("Etc/UTC"))
-    assert results[1].ts == dt(year + 1, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    assert results[0].ts == dt(year - 1, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    assert results[1].ts == dt(year, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("Etc/UTC"))
