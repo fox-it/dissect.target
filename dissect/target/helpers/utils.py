@@ -76,7 +76,8 @@ def year_rollover_helper(
         An iterator of tuples of the parsed timestamp and the lines of the file in reverse.
     """
     # Convert the mtime to the local timezone so that we get the correct year
-    current_year = from_unix(path.stat().st_mtime).astimezone(tzinfo).year
+    mtime = path.stat().st_mtime
+    current_year = from_unix(mtime).astimezone(tzinfo).year
     last_seen_month = None
 
     with fsutil.open_decompress(path, "rt") as fh:
@@ -85,7 +86,8 @@ def year_rollover_helper(
             if not line:
                 continue
 
-            relative_ts = datetime.strptime(re.search(re_ts, line).group(0), ts_format)
+            timestamp = re.search(re_ts, line).group(0)
+            relative_ts = datetime.strptime(timestamp, ts_format)
             if last_seen_month and relative_ts.month > last_seen_month:
                 current_year -= 1
             last_seen_month = relative_ts.month
