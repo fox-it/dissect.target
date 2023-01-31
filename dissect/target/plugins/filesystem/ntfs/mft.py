@@ -1,12 +1,15 @@
 import logging
+from typing import Callable
 
+from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
 from flow.record.fieldtypes import uri
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
+    InformationType,
     get_drive_letter,
     get_owner_and_group,
     get_record_size,
@@ -16,8 +19,8 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
 log = logging.getLogger(__name__)
 
 
-FilesystemStdRecord = TargetRecordDescriptor(
-    "filesystem/ntfs/mft/std",
+FilesystemStdCompactRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/std/compact",
     [
         ("datetime", "creation_time"),
         ("datetime", "last_modification_time"),
@@ -34,8 +37,24 @@ FilesystemStdRecord = TargetRecordDescriptor(
 )
 
 
-FilesystemFilenameRecord = TargetRecordDescriptor(
-    "filesystem/ntfs/mft/filename",
+FilesystemStdRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/std",
+    [
+        ("datetime", "ts"),
+        ("string", "ts_type"),
+        ("uint32", "segment"),
+        ("uri", "path"),
+        ("string", "owner"),
+        ("filesize", "filesize"),
+        ("boolean", "resident"),
+        ("boolean", "inuse"),
+        ("string", "volume_uuid"),
+    ],
+)
+
+
+FilesystemFilenameCompactRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/filename/compact",
     [
         ("datetime", "creation_time"),
         ("datetime", "last_modification_time"),
@@ -53,14 +72,51 @@ FilesystemFilenameRecord = TargetRecordDescriptor(
     ],
 )
 
+FilesystemFilenameRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/filename",
+    [
+        ("datetime", "ts"),
+        ("string", "ts_type"),
+        ("uint32", "filename_index"),
+        ("uint32", "segment"),
+        ("uri", "path"),
+        ("string", "owner"),
+        ("filesize", "filesize"),
+        ("boolean", "resident"),
+        ("boolean", "inuse"),
+        ("boolean", "ads"),
+        ("string", "volume_uuid"),
+    ],
+)
+
+
+RECORD_TYPES = {
+    InformationType.STANDARD_INFORMATION: FilesystemStdRecord,
+    InformationType.FILE_INFORMATION: FilesystemFilenameRecord,
+}
+
+
+COMPACT_RECORD_TYPES = {
+    InformationType.STANDARD_INFORMATION: FilesystemStdCompactRecord,
+    InformationType.FILE_INFORMATION: FilesystemFilenameCompactRecord,
+}
+
 
 class MftPlugin(Plugin):
     def check_compatible(self):
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
         return len(ntfs_filesystems) > 0
 
-    @export(record=[FilesystemStdRecord, FilesystemFilenameRecord])
-    def mft(self):
+    @export(
+        record=[
+            FilesystemStdRecord,
+            FilesystemFilenameRecord,
+            FilesystemStdCompactRecord,
+            FilesystemFilenameCompactRecord,
+        ]
+    )
+    @arg("--compact", action="store_true")
+    def mft(self, compact: bool = False):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -68,6 +124,12 @@ class MftPlugin(Plugin):
         Sources:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
+
+        if compact:
+            record_formatter = compacted_formatter
+        else:
+            record_formatter = formatter
+
         for fs in self.target.filesystems:
             if fs.__fstype__ != "ntfs":
                 continue
@@ -77,7 +139,6 @@ class MftPlugin(Plugin):
 
             try:
                 for record in fs.ntfs.mft.segments():
-                    segment = record.segment
 
                     try:
                         inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
@@ -98,16 +159,17 @@ class MftPlugin(Plugin):
                             yield from self.mft_records(
                                 drive_letter=drive_letter,
                                 record=record,
-                                segment=segment,
+                                segment=record.segment,
                                 path=path,
                                 owner=owner,
                                 size=size,
                                 resident=resident,
                                 inuse=inuse,
                                 volume_uuid=volume_uuid,
+                                record_formatter=record_formatter,
                             )
                     except Exception as e:
-                        self.target.log.warning("An error occured parsing MFT segment %d: %s", segment, str(e))
+                        self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
                         self.target.log.debug("", exc_info=e)
 
             except Exception:
@@ -124,13 +186,13 @@ class MftPlugin(Plugin):
         resident: bool,
         inuse: bool,
         volume_uuid: str,
+        record_formatter: Callable,
     ):
+
         for attr in record.attributes.STANDARD_INFORMATION:
-            yield FilesystemStdRecord(
-                creation_time=attr.creation_time,
-                last_modification_time=attr.last_modification_time,
-                last_change_time=attr.last_change_time,
-                last_access_time=attr.last_access_time,
+            yield from record_formatter(
+                attr=attr,
+                record_type=InformationType.STANDARD_INFORMATION,
                 segment=segment,
                 path=uri.from_windows(path),
                 owner=owner,
@@ -144,11 +206,9 @@ class MftPlugin(Plugin):
         for idx, attr in enumerate(record.attributes.FILE_NAME):
             filepath = f"{drive_letter}{attr.full_path()}"
 
-            yield FilesystemFilenameRecord(
-                creation_time=attr.creation_time,
-                last_modification_time=attr.last_modification_time,
-                last_change_time=attr.last_change_time,
-                last_access_time=attr.last_access_time,
+            yield from record_formatter(
+                attr=attr,
+                record_type=InformationType.FILE_INFORMATION,
                 filename_index=idx,
                 segment=segment,
                 path=uri.from_windows(filepath),
@@ -169,11 +229,9 @@ class MftPlugin(Plugin):
             size = get_record_size(record, data_attr.name)
             ads_path = f"{path}:{data_attr.name}"
 
-            yield FilesystemFilenameRecord(
-                creation_time=ads_info.creation_time,
-                last_modification_time=ads_info.last_modification_time,
-                last_change_time=ads_info.last_change_time,
-                last_access_time=ads_info.last_access_time,
+            yield from record_formatter(
+                attr=ads_info,
+                record_type=InformationType.FILE_INFORMATION,
                 filename_index=None,
                 segment=segment,
                 path=uri.from_windows(ads_path),
@@ -185,3 +243,25 @@ class MftPlugin(Plugin):
                 volume_uuid=volume_uuid,
                 _target=self.target,
             )
+
+
+def compacted_formatter(attr: Attribute, record_type: InformationType, **kwargs):
+    record_desc = COMPACT_RECORD_TYPES.get(record_type)
+    yield record_desc(
+        creation_time=attr.creation_time,
+        last_modification_time=attr.last_modification_time,
+        last_change_time=attr.last_change_time,
+        last_access_time=attr.last_access_time,
+        **kwargs,
+    )
+
+
+def formatter(attr: Attribute, record_type: InformationType, **kwargs):
+    record_desc = RECORD_TYPES.get(record_type)
+    for type, timestamp in [
+        ("B", attr.creation_time),
+        ("C", attr.last_change_time),
+        ("M", attr.last_modification_time),
+        ("A", attr.last_access_time),
+    ]:
+        yield record_desc(ts=timestamp, ts_type=type, **kwargs)
