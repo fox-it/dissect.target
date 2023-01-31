@@ -9,7 +9,6 @@ from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, internal
 
-
 tz_def = """
 typedef struct _SYSTEMTIME {
     WORD wYear;
@@ -229,5 +228,6 @@ class DateTimePlugin(Plugin):
         """Convert any datetime.datetime object into a UTC datetime.datetime object.
 
         First replaces the current tzinfo with the system tzinfo without conversion, then converts it to an aware
-        UTC datetime object."""
+        UTC datetime object.
+        """
         return self.local(dt).astimezone(timezone.utc)

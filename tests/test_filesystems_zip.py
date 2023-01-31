@@ -36,6 +36,12 @@ def _create_zip(prefix="", zip_dir=True):
     buf = io.BytesIO()
     zf = zipfile.ZipFile(buf, "w")
 
+    if prefix and zip_dir:
+        cur = []
+        for p in prefix.strip("/").split("/"):
+            cur.append(p)
+            _mkdir(zf, "/".join(cur))
+
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_1"), "file 1 contents")
     zf.writestr(zipfile.ZipInfo(f"{prefix}file_2"), "file 2 contents")
 
@@ -62,6 +68,11 @@ def zip_base():
 
 @pytest.fixture
 def zip_relative():
+    yield _create_zip("./", False)
+
+
+@pytest.fixture
+def zip_relative_dir():
     yield _create_zip("./")
 
 
@@ -76,6 +87,7 @@ def zip_virtual_dir():
         ("zip_simple", ""),
         ("zip_base", "base/"),
         ("zip_relative", ""),
+        ("zip_relative_dir", ""),
         ("zip_virtual_dir", ""),
     ],
 )
@@ -86,6 +98,8 @@ def test_filesystems_zip(obj, base, request):
 
     fs = ZipFilesystem(fh, base)
     assert isinstance(fs, ZipFilesystem)
+
+    assert len(fs.listdir("/")) == 3
 
     assert fs.get("./file_1").open().read() == b"file 1 contents"
     assert fs.get("./file_2").open().read() == b"file 2 contents"
