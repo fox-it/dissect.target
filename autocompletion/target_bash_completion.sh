@@ -58,11 +58,11 @@ __filter_list() {
 __target_help() {
     local cur options
 
-    COMPREPLY=()
     cur=${COMP_WORDS[COMP_CWORD]}
     case "${cur}" in
     -*)
-        options=$(${COMP_WORDS[0]} --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
+        tool=${COMP_WORDS[0]#*-}
+        options=${DISSECT_HELP["$tool"]}
         COMPREPLY=($( compgen -W "${options}" -- ${cur} ))
         ;;
     esac
@@ -95,6 +95,12 @@ __target_function ()
 }
 
 DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
+
+declare -A DISSECT_HELP
+for x in query dump dd fs mount reg shell
+do
+    DISSECT_HELP["$x"]=$(target-$x --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
+done
 
 complete -F __target_function -o filenames -o default target-query
 complete -F __target_function -o filenames -o default target-dump
