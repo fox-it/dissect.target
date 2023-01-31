@@ -54,7 +54,7 @@ class MessagesPlugin(Plugin):
             - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
         """
 
-        tzinfo = self.target.tzinfo
+        tzinfo = self.target.datetime.tzinfo
 
         var_log = self.target.fs.path("/var/log")
         for log_file in chain(var_log.glob("syslog*"), var_log.glob("messages*")):
