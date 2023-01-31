@@ -33,23 +33,21 @@ class ZipFilesystem(Filesystem):
         self,
         fh: BinaryIO,
         base: Optional[str] = None,
-        alt_separator: str = "",
-        case_sensitive: bool = True,
         *args,
         **kwargs,
     ):
-        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive, *args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         fh.seek(0)
 
         self.zip = zipfile.ZipFile(fh, mode="r")
         self.base = base or ""
 
-        self._fs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
+        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
         for member in self.zip.infolist():
             mname = member.filename.strip("/")
-            if not mname.startswith(self.base):
+            if not mname.startswith(self.base) or mname == ".":
                 continue
 
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
