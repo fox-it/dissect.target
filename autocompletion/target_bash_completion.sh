@@ -83,12 +83,13 @@ __target_function ()
     cur=${COMP_WORDS[COMP_CWORD]}
     prev=${COMP_WORDS[COMP_CWORD-1]}
 
-    # Set compreply to command line arguments if -* is detected
-    __target_help
-
     case "${prev}" in
     -f | --function )
         COMPREPLY=($(__comma_seperated_list_completion "${cur}" "${DISSECT_PLUGINS}"))
+        ;;
+    *)
+        # Set compreply to command line arguments if -* is detected
+        __target_help
         ;;
     esac
 }
