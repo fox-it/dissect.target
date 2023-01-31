@@ -1,3 +1,6 @@
+import bz2
+import gzip
+import io
 import os
 from unittest.mock import Mock
 
@@ -242,3 +245,45 @@ def test_helpers_fsutil_pure_dissect_path__from_parts_flavour(alt_separator, cas
 def test_helpers_fsutil_pure_dissect_path__from_parts_no_fs_exception():
     with pytest.raises(TypeError):
         fsutil.PureDissectPath(Mock(), "/some/dir")
+
+
+def test_helpers_fsutil_open_decompress():
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("plain", io.BytesIO(b"plain\ncontent"))
+    vfs.map_file_fh("comp.gz", io.BytesIO(gzip.compress(b"gzip\ncontent")))
+    vfs.map_file_fh("comp.bz2", io.BytesIO(bz2.compress(b"bz2\ncontent")))
+
+    fsutil.open_decompress(vfs.path("plain")).read() == b"plain\ncontent"
+    fsutil.open_decompress(vfs.path("comp.gz")).read() == b"gzip\ncontent"
+    fsutil.open_decompress(vfs.path("comp.bz2")).read() == b"bz2\ncontent"
+
+
+def test_helpers_fsutil_reverse_readlines():
+    vfs = VirtualFilesystem()
+
+    expected_range_reverse = ["99"] + [f"{i}\n" for i in range(98, -1, -1)]
+
+    vfs.map_file_fh("file_n", io.BytesIO("\n".join(map(str, range(0, 100))).encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_n").open("rt"))) == expected_range_reverse
+
+    vfs.map_file_fh("file_r", io.BytesIO("\r".join(map(str, range(0, 100))).encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_r").open("rt"))) == expected_range_reverse
+
+    vfs.map_file_fh("file_rn", io.BytesIO("\r\n".join(map(str, range(0, 100))).encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_rn").open("rt"))) == expected_range_reverse
+
+    vfs.map_file_fh("file_multi", io.BytesIO("🦊\n🦊🦊\n🦊🦊🦊".encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi").open("rt"))) == ["🦊🦊🦊", "🦊🦊\n", "🦊\n"]
+
+    vfs.map_file_fh("file_multi_long", io.BytesIO((("🦊" * 8000) + ("a" * 200) + "\n🦊🦊\n🦊🦊🦊").encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long").open("rt"))) == [
+        "🦊🦊🦊",
+        "🦊🦊\n",
+        ("🦊" * 8000) + ("a" * 200) + "\n",
+    ]
+
+    vfs.map_file_fh("file_multi_long_single", io.BytesIO((("🦊" * 8000) + ("a" * 200)).encode()))
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [("🦊" * 8000) + ("a" * 200)]
+
+    vfs.map_file_fh("empty", io.BytesIO(b""))
+    assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
