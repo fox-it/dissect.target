@@ -999,7 +999,7 @@ def reverse_readlines(fh: TextIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> I
         fh: The file-like object (opened in text mode) to iterate lines from.
         chunk_size: The chunk size to use for iterating over lines.
     """
-    offset = fh.seek(0, io.SEEK_END)
+    offset = fh.seek(0, io.SEEK_END) & ((1 << 64) - 1)
     lines = []
 
     prev_offset = offset
