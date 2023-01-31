@@ -5,6 +5,7 @@ import argparse
 import logging
 import operator
 import os
+import pathlib
 import shutil
 import sys
 
@@ -79,12 +80,12 @@ def main():
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
-    parser.add_argument("target", metavar="TARGET", help="Target to load")
+    parser.add_argument("target", type=pathlib.Path, help="Target to load", metavar="TARGET")
 
     baseparser = argparse.ArgumentParser(add_help=False)
-    baseparser.add_argument("path", type=str, help="Path to perform an action on")
+    baseparser.add_argument("path", type=str, help="Path to perform an action on", metavar="PATH")
 
-    subparsers = parser.add_subparsers(help="Subcommands for performing various actions")
+    subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands for performing various actions")
     parser_ls = subparsers.add_parser("ls", help="Show a directory listing", parents=[baseparser])
     parser_ls.set_defaults(handler=ls)
 
@@ -106,16 +107,22 @@ def main():
 
     args = parser.parse_args()
 
+    if args.subcommand is None:
+        parser.error("No subcommand specified")
+
+    if not args.target.is_file():
+        parser.error(f"Specified target {args.target} is not a file or does not exist")
+
     process_generic_arguments(args)
 
-    t = Target.open(args.target)
-    path = t.fs.path(args.path)
+    target = Target.open(args.target)
+    path = target.fs.path(args.path)
 
     if not path.exists():
         print("[!] Path doesn't exist")
         sys.exit(1)
 
-    args.handler(t, path, args)
+    args.handler(target, path, args)
 
 
 if __name__ == "__main__":
