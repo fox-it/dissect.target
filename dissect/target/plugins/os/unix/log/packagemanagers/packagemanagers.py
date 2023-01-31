@@ -1,8 +1,9 @@
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.log.packagemanagers.model import PackageManagerLogRecord
+from dissect.target.plugins.os.unix.log.packagemanagers.model import (
+    PackageManagerLogRecord,
+)
 
 
 class PackageManagerPlugin(Plugin):

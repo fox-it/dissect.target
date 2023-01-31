@@ -1,13 +1,18 @@
-from datetime import datetime, timezone
+import re
+from datetime import datetime
 from typing import Iterator
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
-from dissect.target.plugins.os.unix.log.packagemanagers.model import PackageManagerLogRecord, OperationTypes
+from dissect.target.helpers.utils import year_rollover_helper
+from dissect.target.plugins.os.unix.log.packagemanagers.model import (
+    OperationTypes,
+    PackageManagerLogRecord,
+)
 
 YUM_LOG_KEYWORDS = ["Installed", "Updated", "Erased", "Obsoleted"]
+
+RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 
 
 class YumPlugin(plugin.Plugin):
@@ -18,17 +23,13 @@ class YumPlugin(plugin.Plugin):
     def __init__(self, target):
         super().__init__(target)
 
-        try:
-            self.target_timezone = ZoneInfo(f"{target.timezone}")
-        except ZoneInfoNotFoundError:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
-            self.target_timezone = timezone.utc
+        self.target_timezone = target.datetime.tzinfo
 
     def check_compatible(self):
         if not self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB):
             raise UnsupportedPluginError("No yum logs found")
 
-    def parse_logs(self, log_lines: [str], filepath: TargetPath) -> Iterator[PackageManagerLogRecord]:
+    def parse_line(self, ts: datetime, line: str) -> Iterator[PackageManagerLogRecord]:
         """
         Logs are formatted like this:
             Dec 16 04:41:22 Installed: unzip-6.0-24.el7_9.x86_64
@@ -38,38 +39,21 @@ class YumPlugin(plugin.Plugin):
             Dec 16 04:41:34 Installed: unzip-6.0-24.el7_9.x86_64
         """
 
-        file_mtime = self.target.fs.get(str(filepath)).stat().st_mtime
-        year_file_modified = datetime.fromtimestamp(file_mtime).year
-        last_seen_year = year_file_modified
-        last_seen_month = 0
+        # Only parse lines that are about installation/erasions/updates, not empty lines or debug statements.
+        if not any(keyword in line for keyword in YUM_LOG_KEYWORDS):
+            return
 
-        for line in log_lines:
-            # only parse lines that are about installation/erasions/updates, not empty lines or debug statements
-            if not any(keyword in line for keyword in YUM_LOG_KEYWORDS):
-                continue
+        operation, package_name = line.split(": ")
+        operation = OperationTypes.infer(operation.strip())
 
-            line_ts = datetime.strptime(line[0:15], "%b %d %H:%M:%S")
-
-            # because adding a year to log files is apparently hard for SuSE
-            if last_seen_month > line_ts.month:
-                last_seen_year += 1
-            last_seen_month = line_ts.month
-
-            line_ts = line_ts.replace(year=last_seen_year, tzinfo=self.target_timezone)
-
-            message = line[16:]
-            operation, package_name = message.split(": ")
-            operation = OperationTypes.infer(operation.strip())
-
-            yield PackageManagerLogRecord(
-                package_manager="yum", ts=line_ts, operation=operation.value, package_name=package_name
-            )
+        yield PackageManagerLogRecord(
+            package_manager="yum", ts=ts, operation=operation.value, package_name=package_name
+        )
 
     @plugin.export(record=PackageManagerLogRecord)
     def logs(self):
-        log_file_paths = self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB)
+        log_files = self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB)
 
-        for path in log_file_paths:
-            log_lines = [line.strip() for line in open_decompress(path, "rt")]
-
-            yield from self.parse_logs(log_lines, path)
+        for log_file in log_files:
+            for ts, line in year_rollover_helper(log_file, RE_TS, "%b %d %H:%M:%S", self.target_timezone):
+                yield from self.parse_line(ts, line)

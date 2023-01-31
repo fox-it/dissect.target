@@ -1,12 +1,15 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Iterator
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.os.unix.log.packagemanagers.model import PackageManagerLogRecord, OperationTypes
+from dissect.target.plugins.os.unix.log.packagemanagers.model import (
+    OperationTypes,
+    PackageManagerLogRecord,
+)
 
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 
@@ -25,12 +28,7 @@ class AptPlugin(plugin.Plugin):
 
     def __init__(self, target):
         super().__init__(target)
-
-        try:
-            self.target_timezone = ZoneInfo(f"{target.timezone}")
-        except ZoneInfoNotFoundError:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
-            self.target_timezone = timezone.utc
+        self.target_timezone = target.datetime.tzinfo
 
     def check_compatible(self):
         if not self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB):
