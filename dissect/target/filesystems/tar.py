@@ -14,8 +14,6 @@ class TarFilesystem(Filesystem):
     __fstype__ = "tar"
 
     def __init__(self, fh, base=None, case_sensitive=True, tarinfo=None, *args, **kwargs):
-        super().__init__(case_sensitive=case_sensitive, *args, **kwargs)
-
         fh.seek(0)
 
         self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
@@ -39,6 +37,8 @@ class TarFilesystem(Filesystem):
             else:
                 file_entry = TarFilesystemEntry(self, rel_name, member)
                 self._fs.map_file_entry(rel_name, file_entry)
+
+        super().__init__(case_sensitive=case_sensitive, *args, **kwargs)
 
     @staticmethod
     def detect(fh):
