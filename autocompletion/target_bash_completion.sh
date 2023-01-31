@@ -94,8 +94,10 @@ __target_function ()
     esac
 }
 
+echo Loading Dissect plugin list
 DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
 
+echo Loading Dissect help prompts
 declare -A DISSECT_HELP
 for x in query dump dd fs mount reg shell
 do
