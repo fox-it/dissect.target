@@ -13,12 +13,7 @@ class NginxPlugin(plugin.Plugin):
     def __init__(self, target):
         super().__init__(target)
         self.LOGS_DIR_PATH = self.get_log_paths()
-
-        try:
-            self.target_timezone = ZoneInfo(f"{target.timezone}")
-        except ZoneInfoNotFoundError:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
-            self.target_timezone = timezone.utc
+        self.target_timezone = target.datetime.tzinfo
 
     @plugin.internal
     def get_log_paths(self):

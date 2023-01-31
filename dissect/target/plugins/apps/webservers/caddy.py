@@ -14,12 +14,7 @@ class CaddyPlugin(plugin.Plugin):
         super().__init__(target)
 
         self.LOG_FILE_PATH = self.get_log_path()
-
-        try:
-            self.target_timezone = ZoneInfo(f"{target.timezone}")
-        except ZoneInfoNotFoundError:
-            self.target.log.warning("Could not determine timezone of target, falling back to UTC.")
-            self.target_timezone = timezone.utc
+        self.target_timezone = target.datetime.tzinfo
 
     @plugin.internal
     def get_log_path(self):
