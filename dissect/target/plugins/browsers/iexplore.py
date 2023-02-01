@@ -28,11 +28,11 @@ class WebCache:
     def find_containers(self, name: str) -> table.Table:
         try:
             for container_record in self.db.table("Containers").records():
-                record_name = container_record.get("Name")
-                record_name = record_name.rstrip("\00").lower()
-                if record_name == name.lower():
-                    container_id = container_record.get("ContainerId")
-                    yield self.db.table(f"Container_{container_id}")
+                if record_name := container_record.get("Name"):
+                    record_name = record_name.rstrip("\00").lower()
+                    if record_name == name.lower():
+                        container_id = container_record.get("ContainerId")
+                        yield self.db.table(f"Container_{container_id}")
         except KeyError:
             pass
 
