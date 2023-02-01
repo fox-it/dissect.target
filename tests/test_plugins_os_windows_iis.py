@@ -9,7 +9,6 @@ from ._utils import absolute_path
 
 
 def test_iis_plugin_iis_format(target_win, fs_win, tmpdir_name):
-
     config_path = absolute_path("data/iis-applicationHost-iis.config")
     data_dir = absolute_path("data/iis-logs-iis")
 
@@ -32,7 +31,6 @@ def test_iis_plugin_iis_format(target_win, fs_win, tmpdir_name):
 
 
 def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
-
     config_path = absolute_path("data/iis-applicationHost-w3c.config")
     data_dir = absolute_path("data/iis-logs-w3c")
 
@@ -83,5 +81,5 @@ def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
 def test_iis_plugin_iis_nonutf8(target_win, fs_win, tmpdir_name, stream, method):
     server = iis.IISLogsPlugin(target_win)
     # should not crash on invalid bytes like \xa7
-    with (patch("pathlib.Path.open", new_callable=mock_open, read_data=stream)):
+    with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
         assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"

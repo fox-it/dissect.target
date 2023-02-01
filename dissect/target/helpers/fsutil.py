@@ -1,4 +1,4 @@
-""" Pathlib like abstraction helpers for target filesystem.
+"""Pathlib like abstraction helpers for target filesystem.
 
 Also contains some other filesystem related utilities.
 """

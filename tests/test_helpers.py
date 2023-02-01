@@ -10,7 +10,6 @@ from ._utils import absolute_path
 
 
 def test_load_config():
-
     # FS layout:
     #
     # temp_dir1
@@ -19,7 +18,6 @@ def test_load_config():
     # temp_dir2
 
     with TemporaryDirectory() as temp_dir1, TemporaryDirectory() as temp_dir2:
-
         # create symlink in temp_dir1 pointing to temp_dir2
         symlink = Path(temp_dir1).joinpath("symlink")
         symlink.symlink_to(temp_dir2)
@@ -39,7 +37,6 @@ def guarded_keychain():
 
 
 def test_keychain_register_keychain_file(guarded_keychain):
-
     keychain_file = Path(absolute_path("data/keychain.csv"))
 
     keychain.register_keychain_file(keychain_file)
@@ -50,7 +47,6 @@ def test_keychain_register_keychain_file(guarded_keychain):
 
 
 def test_keychain_register_wildcard_value(guarded_keychain):
-
     keychain.register_wildcard_value("test-value")
 
     # number of keys registered is equal number of supported key types
@@ -62,7 +58,6 @@ def get_nonempty_lines_set(paragraph):
 
 
 def test_docs_plugin_description():
-
     plugin_desc = docs.get_plugin_description(IISLogsPlugin)
 
     assert plugin_desc
@@ -72,7 +67,6 @@ def test_docs_plugin_description():
 
 
 def test_docs_plugin_functions_desc():
-
     functions_short_desc = docs.get_plugin_functions_desc(IISLogsPlugin, with_docstrings=False)
 
     assert functions_short_desc

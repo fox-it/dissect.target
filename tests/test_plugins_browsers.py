@@ -7,11 +7,9 @@ from ._utils import absolute_path
 
 
 def test_iexplore_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-
     cache_archive = absolute_path("data/WebCacheV01.dat.gz")
 
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
-
         with gzip.GzipFile(cache_archive, "rb") as f:
             tf.write(f.read())
         tf.flush()
@@ -36,7 +34,6 @@ def test_iexplore_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-
     firefox_db = absolute_path("data/firefox-places.sqlite")
 
     user = target_win_users.user_details.find(username="John")
@@ -59,7 +56,6 @@ def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-
     firefox_db = absolute_path("data/chrome-history.sqlite")
 
     user = target_win_users.user_details.find(username="John")
@@ -82,7 +78,6 @@ def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-
     edge_db = absolute_path("data/edge-history.sqlite")
 
     user = target_win_users.user_details.find(username="John")
@@ -105,7 +100,6 @@ def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_chromium_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-
     chromium_db = absolute_path("data/chromium-history-win.sqlite")
 
     user = target_win_users.user_details.find(username="John")

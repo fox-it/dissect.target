@@ -6,7 +6,6 @@ from ._utils import absolute_path
 
 
 def test_anydesk_plugin_global_log(target_win_users, fs_win):
-
     anydesk_logfile = absolute_path("data/TestAnydesk.trace")
     target_logfile_name = "/sysvol/ProgramData/AnyDesk/TestAnydesk.trace"
 
@@ -28,7 +27,6 @@ def test_anydesk_plugin_global_log(target_win_users, fs_win):
 
 
 def test_anydesk_plugin_user_log(target_win_users, fs_win):
-
     anydesk_logfile = absolute_path("data/TestAnydesk.trace")
     user_details = target_win_users.user_details.find(username="John")
     target_logfile_name = f"{user_details.home_path}/appdata/roaming/AnyDesk/TestAnydesk.trace"

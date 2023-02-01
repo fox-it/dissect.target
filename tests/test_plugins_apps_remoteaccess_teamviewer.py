@@ -6,7 +6,6 @@ from ._utils import absolute_path
 
 
 def test_teamviewer_plugin_global_log(target_win_users, fs_win):
-
     teamviewer_logfile = absolute_path("data/TestTeamviewer.log")
     target_logfile_name = "/sysvol/Program Files/TeamViewer/TestTeamviewer.log"
 
@@ -28,7 +27,6 @@ def test_teamviewer_plugin_global_log(target_win_users, fs_win):
 
 
 def test_teamviewer_plugin_user_log(target_win_users, fs_win):
-
     teamviewer_logfile = absolute_path("data/TestTeamviewer.log")
     user_details = target_win_users.user_details.find(username="John")
     target_logfile_name = f"{user_details.home_path}/appdata/roaming/teamviewer/teamviewer_TEST_logfile.log"

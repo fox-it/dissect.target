@@ -183,7 +183,6 @@ class DumpState:
         """Return sinks that have a mismatch between recorded size and a real file size"""
         invalid_sinks = []
         for sink in self.sinks:
-
             # sink file does not exist
             if not self.get_full_sink_path(sink).exists():
                 invalid_sinks.append(sink)
