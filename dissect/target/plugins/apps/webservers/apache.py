@@ -17,22 +17,21 @@ REFERER_USER_AGENT_REGEX = r'"(?P<referer>.*?)" "(?P<useragent>.*?)"'
 LOG_FORMATS = {
     "vhost_combined": re.compile(rf"(?P<server_name>.*?):(?P<port>.*) {COMMON_REGEX} {REFERER_USER_AGENT_REGEX}"),
     "combined": re.compile(rf"{COMMON_REGEX} {REFERER_USER_AGENT_REGEX}"),
-    "common": re.compile(rf"{COMMON_REGEX}"),
+    "common": re.compile(COMMON_REGEX),
 }
 
 
 def infer_log_format(line: str) -> Optional[str]:
-    """
-    Infers - based on the format of the log - what standard LogFormat it is. If none can be inferred, returns none.
+    """Attempt to infer what standard LogFormat is used. Returns None if no known format can be inferred.
 
-    Three default log type examples from Apache (note that the ipv4 could also be ipv6):
-    combined       = '1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
-                      (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0
-                      Safari/537.36"'
-    common         = '1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
-    vhost_combined = 'example.com:80 1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 "-"
-                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko)
-                      Chrome/108.0.0.0 Safari/537.36"'
+    Three default log type examples from Apache (note that the ipv4 could also be ipv6)::
+        combined       = '1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
+                          (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0
+                          Safari/537.36"'
+        common         = '1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
+        vhost_combined = 'example.com:80 1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 "-"
+                          "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko)
+                          Chrome/108.0.0.0 Safari/537.36"'
     """
 
     first_part = line.split(" ")[0]
@@ -48,34 +47,29 @@ def infer_log_format(line: str) -> Optional[str]:
 
 
 class ApachePlugin(plugin.Plugin):
-    """
-    Apache has three default log formats, which this plugin can all parse automatically. These are:
-    LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
-    LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
-    LogFormat "%h %l %u %t \"%r\" %>s %O" common
+    """Apache log parsing plugin.
+    
+    Apache has three default log formats, which this plugin can all parse automatically. These are::
+        LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
+        LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
+        LogFormat "%h %l %u %t \"%r\" %>s %O" common
 
     For the definitions of each format string, see https://httpd.apache.org/docs/2.4/mod/mod_log_config.html#formats
     """
 
     __namespace__ = "apache"
-    LOGS_DIR_PATH = "/var/log/apache2"
+
+    LOG_DIR_PATH = "/var/log/apache2"
 
     def __init__(self, target):
-        super().__init__(target)
-
-        self.target_timezone = target.datetime.tzinfo
-
+         super().__init__(target)
+         self.log_paths = self.get_log_paths()
     @plugin.internal
     def get_log_paths(self) -> []:
-        logs_dir = self.target.fs.path(self.LOGS_DIR_PATH)
-        if logs_dir.exists():
-            self.target.log.debug(f"Log files found in {self.LOGS_DIR_PATH}")
-            return [self.target.fs.path(p) for p in logs_dir.glob("access.log*")]
-        return []
+        return self.target.fs.path(self.LOGS_DIR_PATH).glob("access.log*")
 
     def check_compatible(self):
-        log_paths = self.get_log_paths()
-        if len(log_paths) == 0:
+        if not self.log_paths:
             raise UnsupportedPluginError("No apache log files found")
 
     def parse_log(self, line: str, log_format: str) -> Optional[WebserverRecord]:
@@ -83,7 +77,7 @@ class ApachePlugin(plugin.Plugin):
         match = regex.match(line)
 
         if not match:
-            self.target.log.warning(f"No regex match found for Apache log format {log_format} for log line: {line}")
+            self.target.log.warning("No regex match found for Apache log format %s for log line: %s", log_format, line)
             return
 
         match = match.groupdict()
@@ -121,6 +115,6 @@ class ApachePlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverRecord)
     def history(self):
-        for path in self.get_log_paths():
+        for path in self.log_paths:
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
             yield from self.parse_logs(log_lines, path)
