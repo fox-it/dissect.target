@@ -1,5 +1,5 @@
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 WindowsKeyboardRecord = TargetRecordDescriptor(
@@ -53,7 +53,4 @@ class LocalePlugin(Plugin):
     @export(property=True)
     def timezone(self):
         """Get the configured timezone of the system."""
-        tzi = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
-        tzi_key_name = tzi.value("TimeZoneKeyName").value
-
-        return normalize_timezone(tzi_key_name)
+        return normalize_timezone(self.target.datetime.tzinfo.name)
