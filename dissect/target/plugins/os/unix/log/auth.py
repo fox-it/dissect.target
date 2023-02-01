@@ -18,19 +18,15 @@ AuthLogRecord = TargetRecordDescriptor(
     ],
 )
 
-ts_regex = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
-RE_TS = re.compile(ts_regex)
-RE_TS_AND_HOSTNAME = re.compile(ts_regex + r"\s\w+\s")
+_TS_REGEX = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
+RE_TS = re.compile(_TS_REGEX)
+RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\w+\s")
 
 
 class AuthPlugin(Plugin):
-    def __init__(self, target):
-        super().__init__(target)
-
-        self.target_timezone = target.datetime.tzinfo
-
     def check_compatible(self):
-        return self.target.fs.path("/var/log/auth.log").exists() or self.target.fs.path("/var/log/secure").exists()
+        var_log = self.target.fs.path("/var/log")
+        return any(var_log.glob("auth.log*")) or any(var_log.glob("secure*"))
 
     @export(record=[AuthLogRecord])
     def securelog(self):
@@ -45,13 +41,11 @@ class AuthPlugin(Plugin):
         # CentOS format: Jan 12 13:37:00 hostname daemon: message
         # Debian format: Jan 12 13:37:00 hostname daemon[pid]: pam_unix(daemon:session): message
 
-        authlogs = list(self.target.fs.path("/var/log/").glob("auth.log*"))
-        securelogs = list(self.target.fs.path("/var/log/").glob("secure*"))
-        auth_files: Generator[TargetPath] = chain(authlogs, securelogs)
+        tzinfo = self.target.datetime.tzinfo
 
-        for auth_file in auth_files:
-            for ts, line in year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", self.target_timezone):
-                line = line.rstrip()
+        var_log = self.target.fs.path("/var/log")
+        for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
+            for ts, line in year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", tzinfo):
                 message = line.replace(re.search(RE_TS_AND_HOSTNAME, line).group(0), "").strip()
                 yield AuthLogRecord(
                     ts=ts,
