@@ -39,7 +39,6 @@ def test_thumbcache_unsupported(target_win: Target, tmp_path: Path):
 
 
 def test_thumbcach_supported(target_win: Target, tmp_path: Path):
-
     explorer_dir = create_user_data_paths(target_win, tmp_path)
 
     (explorer_dir / "thumbcache_idx.db").touch()

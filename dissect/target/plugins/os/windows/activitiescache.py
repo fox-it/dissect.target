@@ -111,7 +111,6 @@ class ActivitiesCachePlugin(Plugin):
             fh = cache_file.open()
             db = sqlite3.SQLite3(fh)
             for r in db.table("Activity").rows():
-
                 yield ActivitiesCacheRecord(
                     start_time=mkts(r["[StartTime]"]),
                     end_time=mkts(r["[EndTime]"]),

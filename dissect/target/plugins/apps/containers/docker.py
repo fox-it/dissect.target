@@ -88,7 +88,6 @@ class DockerPlugin(Plugin):
 
         containers_path = f"{self.DOCKER_PATH}/containers"
         for container in self.target.fs.path(containers_path).iterdir():
-
             if (fp := self.target.fs.path(f"{container}/config.v2.json")).exists():
                 config = json.loads(fp.read_text())
 
@@ -160,7 +159,6 @@ def _convert_ports(ports: dict) -> dict:
 
     fports = {}
     for key, value in ports.items():
-
         if isinstance(value, list):
             # NOTE: We ignore IPv6 assignments here.
             fports[key] = f"{value[0]['HostIp']}:{value[0]['HostPort']}"

@@ -260,14 +260,12 @@ class Target:
 
         # Treat every path as a unique target spec
         for path in paths:
-
             path, parsed_path = extract_path_info(path)
 
             found_loader = False
 
             # Search for targets one directory deep
             for entry in _find(path):
-
                 loader_cls = loader.find_loader(entry, parsed_path=parsed_path)
 
                 if not loader_cls:
@@ -747,7 +745,6 @@ class VolumeCollection(Collection):
         start_fs = None
         start_vol = None
         for idx, vol in enumerate(self.entries):
-
             if start_fs is None and (vol.name is None):
                 start_fs = idx
 

@@ -5,7 +5,6 @@ from ._utils import absolute_path
 
 
 def test_sru_plugin(target_win, fs_win):
-
     srudb = absolute_path("data/SRUDB.dat")
 
     fs_win.map_file("Windows/System32/sru/SRUDB.dat", srudb)
