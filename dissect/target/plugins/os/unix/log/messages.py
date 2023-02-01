@@ -1,37 +1,49 @@
-import bz2
-import datetime
 import re
-import zlib
-from io import StringIO
+from itertools import chain
+from typing import Iterator
+
+from flow.record.fieldtypes import path
 
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
 
 MessagesRecord = TargetRecordDescriptor(
-    "linux/messages",
+    "linux/log/messages",
     [
         ("datetime", "ts"),
-        ("uri", "filepath"),
         ("string", "daemon"),
         ("varint", "pid"),
-        ("string", "msg"),
-        ("string", "raw"),
+        ("string", "message"),
+        ("path", "source"),
     ],
 )
 
-RE_TS = re.compile(r"(\w+\s\d+\s\d{2}:\d{2}:\d{2})")
+DEFAULT_TS_LOG_FORMAT = "%b %d %H:%M:%S"
+RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
 RE_PID = re.compile(r"\w\[(\d+)\]")
 RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 
 
 class MessagesPlugin(Plugin):
-    def check_compatible(self):
-        pass
+    def check_compatible(self) -> bool:
+        var_log = self.target.fs.path("/var/log")
+        return any(var_log.glob("syslog*")) or any(var_log.glob("messages*"))
 
     @export(record=MessagesRecord)
-    def messages(self):
-        """Return contents of /var/log/messages.
+    def syslog(self) -> Iterator[MessagesRecord]:
+        """Return contents of /var/log/messages* and /var/log/syslog*.
+
+        See ``messages`` for more information.
+        """
+        return self.messages()
+
+    @export(record=MessagesRecord)
+    def messages(self) -> Iterator[MessagesRecord]:
+        """Return contents of /var/log/messages* and /var/log/syslog*.
+
+        Note: due to year rollover detection, the contents of the files are returned in reverse.
 
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
@@ -39,61 +51,23 @@ class MessagesPlugin(Plugin):
 
         Sources:
             - https://geek-university.com/linux/var-log-messages-file/
+            - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
         """
-        for f in self.target.fs.glob_ext("/var/log/messages*"):
-            # FIXME Year is not part of syslog timestamp, take it from file. does not work yet for tar.
-            # FIXME watch for change of year in file!!!
-            # year = datetime.datetime.fromtimestamp(f.stat.mtime).year
-            year = 2018
-            fh = f.open()
-            if f.name[-2:] == "gz":
-                fh = zlib.decompress(fh.read(), 31)
-                try:
-                    fh = StringIO(fh.decode())
-                except UnicodeDecodeError:
-                    pass
-            if "bz2" in f.name:
-                fh = bz2.decompress(fh)
-                fh = StringIO(fh.decode())
 
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
+        tzinfo = self.target.datetime.tzinfo
 
-                # FIXME some messages files have long and short hostname in the file
-                try:
-                    # FIXME add timezone?
-                    ts = datetime.datetime.strptime(RE_TS.search(line).groups()[0], "%b %d %H:%M:%S")
-                    ts = ts.replace(year=year)
-                except Exception:
-                    ts = datetime.datetime.now()
-
-                try:
-                    daemon = RE_DAEMON.search(line).groups()[0]
-                except Exception:
-                    daemon = None
-
-                try:
-                    pid = RE_PID.search(line)
-                    if pid is not None:
-                        pid = pid.groups()[0]
-                except Exception:
-                    pid = None
-
-                try:
-                    msg = RE_MSG.search(line).groups()[0]
-                    if msg is None:
-                        msg = line
-                except Exception:
-                    msg = line
+        var_log = self.target.fs.path("/var/log")
+        for log_file in chain(var_log.glob("syslog*"), var_log.glob("messages*")):
+            for ts, line in year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo):
+                daemon = dict(enumerate(RE_DAEMON.findall(line))).get(0)
+                pid = dict(enumerate(RE_PID.findall(line))).get(0)
+                message = dict(enumerate(RE_MSG.findall(line))).get(0, line)
 
                 yield MessagesRecord(
                     ts=ts,
-                    filepath=f.name,
                     daemon=daemon,
                     pid=pid,
-                    msg=msg,
-                    raw=line,
+                    message=message,
+                    source=path.from_posix(log_file),
                     _target=self.target,
                 )

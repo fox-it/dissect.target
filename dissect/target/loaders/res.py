@@ -1,9 +1,10 @@
 import io
 import stat
 import struct
-import xml.etree.ElementTree as ET
 import zipfile
 import zlib
+
+import defusedxml.ElementTree as ET
 
 from dissect.target import filesystem
 from dissect.target.helpers import fsutil, record, regutil

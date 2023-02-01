@@ -135,7 +135,6 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
             log_paths = self.get_logs(filename_glob=log_file_glob)
 
         for entry in log_paths:
-
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue

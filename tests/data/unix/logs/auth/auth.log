@@ -1,0 +1,10 @@
+Nov 14 06:39:01 ubuntu CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)
+Nov 14 06:39:01 ubuntu CRON[1]: pam_unix(cron:session): session closed for user root
+Nov 14 07:09:01 ubuntu CRON[2]: pam_unix(cron:session): session opened for user root by (uid=0)
+Nov 14 07:09:01 ubuntu CRON[2]: pam_unix(cron:session): session closed for user root
+Nov 14 07:14:07 ubuntu sshd[3]: Accepted publickey for sampleuser from 1.2.3.4 port 45678 ssh2: RSA SHA256:xeKKrtx83iH/gTi5GKikBQW2ADc15+0EzAX2KjK7lqS
+Nov 14 07:14:07 ubuntu sshd[3]: pam_unix(sshd:session): session opened for user sampleuser by (uid=0)
+Nov 14 07:14:07 ubuntu systemd-logind[4]: New session 4 of user sampleuser.
+Nov 14 07:14:09 ubuntu sshd[3]: pam_unix(sshd:session): session closed for user sampleuser
+Nov 14 07:14:09 ubuntu systemd-logind[4]: Session 4 logged out. Waiting for processes to exit.
+Nov 14 07:14:09 ubuntu systemd-logind[4]: Removed session 4.

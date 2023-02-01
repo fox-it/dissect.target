@@ -648,40 +648,8 @@ def save_plugin_import_failure(module: str) -> None:
     )
 
 
-def generate() -> dict[str, Any]:
-    """Internal function to generate the list of available plugins.
-
-    Walks the plugins directory and imports any .py files in there.
-    Plugins will be automatically registered due to the decorators on them.
-
-    Returns:
-        The global ``PLUGINS`` dictionary.
-    """
-    global PLUGINS
-
-    if "_failed" not in PLUGINS:
-        PLUGINS["_failed"] = []
-
-    plugins_dir = Path(__file__).parent / "plugins"
-    for path in filter_files(plugins_dir):
-        relative_path = path.relative_to(plugins_dir)
-        module_tuple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
-        load_module_from_name(".".join(module_tuple))
-
-    return PLUGINS
-
-
-def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
-    """Iterate over the ``plugin_dirs`` and load all ``*.py`` files."""
-    for plugin_path in plugin_dirs:
-        for path in filter_files(plugin_path):
-            if path.is_file() and ".py" == path.suffix:
-                base_path = plugin_path.parent if path == plugin_path else plugin_path
-                load_module_from_file(path, base_path)
-
-
-def filter_files(plugin_path: Path) -> Iterator[Path]:
-    """Walk all the files and directories in ``plugin_path`` and excluding specific paths.
+def find_py_files(plugin_path: Path) -> Iterator[Path]:
+    """Walk all the files and directories in ``plugin_path`` and return all files ending in ``.py``.
 
     Do not walk or yield paths containing the following names:
 
@@ -697,13 +665,50 @@ def filter_files(plugin_path: Path) -> Iterator[Path]:
         log.error("Path %s does not exist.", plugin_path)
         return
 
-    path_iterator = [plugin_path] if plugin_path.is_file() else plugin_path.glob("**/*")
+    if plugin_path.is_file():
+        path_iterator = [plugin_path]
+    else:
+        path_iterator = plugin_path.glob("**/*.py")
 
     for path in path_iterator:
-        if any(skip_filter in str(path) for skip_filter in ["__pycache__", "__init__"]):
+        if not path.is_file() or str(path).endswith("__init__.py"):
             continue
 
         yield path
+
+
+def load_module_from_name(module_path: str) -> None:
+    """Load a module from ``module_path``."""
+    try:
+        # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
+        importlib.import_module(module_path)
+    except Exception as e:
+        log.error("Unable to import %s", module_path)
+        log.debug("Error while trying to import module %s", module_path, exc_info=e)
+        save_plugin_import_failure(module_path)
+
+
+def generate() -> dict[str, Any]:
+    """Internal function to generate the list of available plugins.
+
+    Walks the plugins directory and imports any .py files in there.
+    Plugins will be automatically registered due to the decorators on them.
+
+    Returns:
+        The global ``PLUGINS`` dictionary.
+    """
+    global PLUGINS
+
+    if "_failed" not in PLUGINS:
+        PLUGINS["_failed"] = []
+
+    plugins_dir = Path(__file__).parent / "plugins"
+    for path in find_py_files(plugins_dir):
+        relative_path = path.relative_to(plugins_dir)
+        module_tuple = (MODULE_PATH, *relative_path.parent.parts, relative_path.stem)
+        load_module_from_name(".".join(module_tuple))
+
+    return PLUGINS
 
 
 def load_module_from_file(path: Path, base_path: Path):
@@ -728,22 +733,19 @@ def load_module_from_file(path: Path, base_path: Path):
         save_plugin_import_failure(str(path))
 
 
-def load_module_from_name(module_path: str) -> None:
-    """Load a module from ``module_path``."""
-    try:
-        # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
-        importlib.import_module(module_path)
-    except Exception as e:
-        log.error("Unable to import %s", module_path)
-        log.debug("Error while trying to import module %s", module_path, exc_info=e)
-        save_plugin_import_failure(module_path)
+def load_modules_from_paths(plugin_dirs: list[Path]) -> None:
+    """Iterate over the ``plugin_dirs`` and load all ``.py`` files."""
+    for plugin_path in plugin_dirs:
+        for path in find_py_files(plugin_path):
+            base_path = plugin_path.parent if path == plugin_path else plugin_path
+            load_module_from_file(path, base_path)
 
 
-def load_external_module_paths(path_list: list[Path]):
+def get_external_module_paths(path_list: list[Path]) -> list[Path]:
     """Create a deduplicated list of paths."""
     output_list = environment_variable_paths() + path_list
 
-    return list(dict.fromkeys(output_list))
+    return list(set(output_list))
 
 
 def environment_variable_paths() -> list[Path]:
@@ -801,7 +803,6 @@ class InternalPlugin(Plugin):
     """
 
     def __init_subclass__(cls, **kwargs):
-
         for method in get_nonprivate_methods(cls):
             if callable(method):
                 method.__internal__ = True

@@ -33,7 +33,6 @@ def test_bde_volume_failure(target_win, encrypted_volume):
 
 @pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_recovery_key(target_win, encrypted_volume):
-
     recovery_key = "272316-265804-640728-713570-509047-503305-045837-324731"
 
     keychain.register_key(
@@ -61,7 +60,6 @@ def test_bde_volume_with_recovery_key(target_win, encrypted_volume):
 
 @pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_passphrase(target_win, encrypted_volume):
-
     identifier = "B6AD258A-2725-4A42-93C6-844478BF7A90"
     passphrase = "Password1234"
 
@@ -90,7 +88,6 @@ def test_bde_volume_with_passphrase(target_win, encrypted_volume):
 
 @pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_wildcard_key(target_win, encrypted_volume):
-
     keychain.register_wildcard_value("Password1234")
 
     enc_vol = volume.Volume(encrypted_volume, 1, 0, None, None, None, disk=encrypted_volume)
