@@ -1,0 +1,2 @@
+Dec 31 03:14:00 localhost sudo: pam_unix(sudo:session): session opened for user root by test(uid=0)
+Jan  1 13:37:00 localhost login: pam_unix(login:session): session opened for user test by LOGIN(uid=0)

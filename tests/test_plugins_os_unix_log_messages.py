@@ -1,8 +1,8 @@
 import tarfile
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
-from os import stat
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from flow.record.fieldtypes import datetime as dt
@@ -22,22 +22,25 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     data_file = absolute_path("data/unix/logs/messages")
     fs_unix.map_file("var/log/messages", data_file)
 
-    year = datetime.fromtimestamp(stat(absolute_path("data/unix/logs/messages")).st_mtime).year
+    entry = fs_unix.get("var/log/messages")
+    stat = entry.stat()
+    stat.st_mtime = datetime(2022, 6, 1, tzinfo=timezone.utc).timestamp()
 
-    target_unix_users.add_plugin(MessagesPlugin)
+    with patch.object(entry, "stat", return_value=stat):
+        target_unix_users.add_plugin(MessagesPlugin)
 
-    results = list(target_unix_users.messages())
-    assert len(results) == 2
+        results = list(target_unix_users.messages())
+        assert len(results) == 2
 
-    assert results[0].ts == datetime(year, 1, 1, 13, 21, 34, tzinfo=ZoneInfo("Europe/Amsterdam"))
-    assert results[0].message == "Stopped target Swap."
-    assert results[0].pid is None
-    assert results[0].source == path.from_posix("/var/log/messages")
+        assert results[0].ts == datetime(2022, 1, 1, 13, 21, 34, tzinfo=ZoneInfo("Europe/Amsterdam"))
+        assert results[0].message == "Stopped target Swap."
+        assert results[0].pid is None
+        assert results[0].source == path.from_posix("/var/log/messages")
 
-    assert results[1].ts == datetime(year - 1, 12, 31, 3, 14, 15, tzinfo=ZoneInfo("Europe/Amsterdam"))
-    assert results[1].message == "Starting Journal Service..."
-    assert results[1].pid == 1
-    assert results[1].source == path.from_posix("/var/log/messages")
+        assert results[1].ts == datetime(2021, 12, 31, 3, 14, 15, tzinfo=ZoneInfo("Europe/Amsterdam"))
+        assert results[1].message == "Starting Journal Service..."
+        assert results[1].pid == 1
+        assert results[1].source == path.from_posix("/var/log/messages")
 
     # assure syslog() behaves the same as messages()
     syslogs = list(target_unix_users.syslog())
