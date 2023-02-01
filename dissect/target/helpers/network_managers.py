@@ -260,7 +260,7 @@ class Parser:
         translation_table = {
             "interface": ["name", "iface", "device"],
             "dhcp": ["bootproto", "dhcp", "dhcp4", "dhcpserver", "method"],
-            "ips": ["ip", "address1", "addresses", "ipaddr", "address"],
+            "ips": ["ip", "address1", "addresses", "ipaddr", "address", "./address/local"],
             "netmask": ["netmask"],
             "gateway": ["gateway4", "gateway"],
             "dns": ["dns", "dns1", "dns-nameservers"],
@@ -622,7 +622,7 @@ TEMPLATES = {
         ["Network", "Match"],
         ["address", "dhcp", "dns", "name", "dhcpserver"],
     ),
-    "wicked": Template("wicked", ElementTree, ["ipv4:static", "name"], ["./address/local", "name"]),
+    "wicked": Template("wicked", ElementTree, ["ipv4:static", "ipv6:static", "name"], ["./address/local", "name"]),
     "ifupdown": Template(
         "ifupdown",
         ConfigParser(delimiters=("=", " "), comment_prefixes=("#"), dict_type=dict, strict=False),
