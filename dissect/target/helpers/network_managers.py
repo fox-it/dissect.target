@@ -17,6 +17,14 @@ try:
 except ImportError:
     PY_YAML = False
 
+IGNORED_IPS = [
+    "0.0.0.0",
+    "127.0.0.1",
+    "::1",
+    "0:0:0:0:0:0:0:1",
+    "0:0:0:0:0:0:0:0",
+]
+
 
 class Template:
     """Class that represents a parsing template. Linux network configuration files can be parsed according to the
@@ -407,7 +415,7 @@ class NetworkManager:
         if self.config.get("dhcp"):
             for dhcp_value in self.config.get("dhcp", ""):
                 if isinstance(dhcp_value, bool):
-                    return {translated_value.add(dhcp_value)}
+                    return translated_value.add(dhcp_value)
 
                 for key, value in translation_table.items():
                     if dhcp_value.lower() in value:
@@ -430,8 +438,8 @@ class NetworkManager:
         cleaned_ips = set()
         for ip_value in ips:
 
-            # Remove broadcast and localhost
-            if ip_value.startswith("0.0.0.0") or ip_value.startswith("127.0.0.1"):
+            # Remove broadcast and localhost ip addresses
+            if should_ignore_ip(ip_value) or ip_value == "::":
                 continue
 
             # Remove netmask cidr notation, eg. 1.2.3.4/24
@@ -541,6 +549,13 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
                     ips.append(ip)
 
     return ips
+
+
+def should_ignore_ip(ip: str) -> bool:
+    for i in IGNORED_IPS:
+        if ip.startswith(i):
+            return True
+    return False
 
 
 MANAGERS = [

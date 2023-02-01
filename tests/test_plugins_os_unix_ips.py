@@ -8,9 +8,7 @@ from ._utils import absolute_path
 
 
 def test_ips_dhcp_plugin(target_unix_users, fs_unix):
-    """
-    Test DHCP lease messages from /var/log/syslog.
-    """
+    """Test DHCP lease messages from /var/log/syslog."""
 
     messages = """
     Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'
@@ -30,9 +28,7 @@ def test_ips_dhcp_plugin(target_unix_users, fs_unix):
 
 
 def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
-    """
-    Test cloud-init dhcp.py lease messages.
-    """
+    """Test cloud-init dhcp.py lease messages."""
 
     messages = """
     2022-12-31 13:37:00,000 - dhcp.py[DEBUG]: Received dhcp lease on eth0 for 10.13.37.5/24
@@ -49,9 +45,7 @@ def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
 
 
 def test_ips_static_plugin(target_unix_users, fs_unix):
-    """
-    Test statically defined ipv4 and ipv6 addresses in /etc/network/interfaces.
-    """
+    """Test statically defined ipv4 and ipv6 addresses in /etc/network/interfaces."""
 
     fs_unix.map_file("/etc/network/interfaces", absolute_path("data/unix/configs/ips/interfaces"))
     target_unix_users.add_plugin(LinuxPlugin)
@@ -61,9 +55,7 @@ def test_ips_static_plugin(target_unix_users, fs_unix):
 
 
 def test_ips_wicked_static_plugin(target_unix_users, fs_unix):
-    """
-    Test statically defined ipv4 addresses in /etc/wicked/ifconfig/.
-    """
+    """Test statically defined ipv4 addresses in /etc/wicked/ifconfig/."""
 
     fs_unix.map_file("/etc/wicked/ifconfig/eth0.xml", absolute_path("data/unix/configs/ips/eth0.xml"))
     target_unix_users.add_plugin(LinuxPlugin)
@@ -73,9 +65,7 @@ def test_ips_wicked_static_plugin(target_unix_users, fs_unix):
 
 
 def test_dns_static_plugin(target_unix_users, fs_unix):
-    """
-    Test statically defined ipv4 and ipv6 dns-nameservers in /etc/network/interfaces.
-    """
+    """Test statically defined ipv4 and ipv6 dns-nameservers in /etc/network/interfaces."""
 
     fs_unix.map_file("/etc/network/interfaces", absolute_path("data/unix/configs/ips/interfaces"))
     target_unix_users.add_plugin(LinuxPlugin)
@@ -85,15 +75,18 @@ def test_dns_static_plugin(target_unix_users, fs_unix):
 
 
 def test_clean_ips():
-    """
-    Test the cleaning of dirty ip addresses.
-    """
+    """Test the cleaning of dirty ip addresses."""
 
     ips = {
         "0.0.0.0": set(),
         "127.0.0.1": set(),
         "127.0.0.1/8": set(),
         "0.0.0.0/24": set(),
+        "::1": set(),
+        "::": set(),
+        "0:0:0:0:0:0:0:1": set(),
+        "::ffff:192.0.2.128": {"::ffff:192.0.2.128"},
+        "2001:db8::2:1": {"2001:db8::2:1"},
         "10.13.37.1": {"10.13.37.1"},
         "10.13.37.2/24": {"10.13.37.2"},
         "  10.13.37.3  ": {"10.13.37.3"},
