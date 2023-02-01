@@ -50,7 +50,7 @@ class WebserverPlugin(Plugin):
                 self.target.log.exception(f"Failed to execute tool plugin: {p._name}{f}")
 
     @export(record=WebserverRecord)
-    def history(self):
+    def logs(self):
         """Returns history log file records from installed webservers (apache, caddy, iis and nginx)."""
-        for record in self._func("history"):
+        for record in self._func("logs"):
             yield record

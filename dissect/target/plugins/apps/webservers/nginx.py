@@ -47,7 +47,7 @@ class NginxPlugin(plugin.Plugin):
         return len(self.LOGS_DIR_PATH) > 0
 
     @plugin.export(record=WebserverRecord)
-    def history(self):
+    def logs(self):
         tzinfo = self.target.datetime.tzinfo
 
         for path in self.LOGS_DIR_PATH:

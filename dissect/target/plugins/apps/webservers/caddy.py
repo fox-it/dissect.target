@@ -3,15 +3,18 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from dissect.target import plugin
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 LOG_REGEX = re.compile(
     r'(?P<remote_ip>.*?) - - \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
 )
 
+
 def parse_datetime(date_str: str, tz: ZoneInfo):
     # Example: 10/Apr/2020:14:10:12 +0000
     return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
+
 
 class CaddyPlugin(plugin.Plugin):
 
@@ -43,7 +46,7 @@ class CaddyPlugin(plugin.Plugin):
         return self.target.fs.path(self.LOG_FILE_PATH).exists()
 
     @plugin.export(record=WebserverRecord)
-    def history(self):
+    def logs(self):
         """Parses Caddy V1 logs in CRF format.
 
         Caddy V2 uses JSON logging when enabled (not by default) and is not implemented (yet).
@@ -54,15 +57,17 @@ class CaddyPlugin(plugin.Plugin):
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
 
             for line in log_lines:
-                match = regex.match(line)
+                match = LOG_REGEX.match(line)
 
                 if not match:
-                    self.target.log.warning("Could match Caddy webserver log line with regex format for log line '%s'", line)
+                    self.target.log.warning(
+                        "Could match Caddy webserver log line with regex format for log line '%s'", line
+                    )
                     continue
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=parse_datetime(match.get("datetime"), self.target_timezone),
+                    ts=parse_datetime(match.get("datetime"), tzinfo),
                     remote_ip=match.get("remote_ip"),
                     url=match.get("url"),
                     status_code=match.get("status_code"),
