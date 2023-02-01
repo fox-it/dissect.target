@@ -51,6 +51,12 @@ class WebserverPlugin(Plugin):
 
     @export(record=WebserverRecord)
     def logs(self):
-        """Returns history log file records from installed webservers (apache, caddy, iis and nginx)."""
-        for record in self._func("logs"):
+        """Returns log file records from installed webservers."""
+        yield from self.access()
+        # TODO: In the future we should add error logs too.
+
+    @export(record=WebserverRecord)
+    def access(self):
+        """Returns access.log records from installed webservers."""
+        for record in self._func("access"):
             yield record
