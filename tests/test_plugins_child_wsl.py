@@ -1,6 +1,6 @@
 import io
 
-from dissect.target.plugins.child.wsl import WSLTargetPlugin
+from dissect.target.plugins.child.wsl import WSLChildTargetPlugin
 
 
 def test_plugins_child_wsl(target_win_users, fs_win):
@@ -9,7 +9,7 @@ def test_plugins_child_wsl(target_win_users, fs_win):
         io.BytesIO(),
     )
 
-    target_win_users.add_plugin(WSLTargetPlugin)
+    target_win_users.add_plugin(WSLChildTargetPlugin)
 
     children = list(target_win_users.list_children())
     assert len(children) == 1

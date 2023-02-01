@@ -1,10 +1,14 @@
+from pathlib import Path
+from typing import Iterator
+
 from flow.record.fieldtypes import uri
 
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
+from dissect.target.target import Target
 
 
-def find_wsl_installs(target):
+def find_wsl_installs(target) -> Iterator[Path]:
     # Officially supported distro's by Microsoft can be found under "PackageFamilyName" at
     # https://github.com/microsoft/WSL/blob/master/distributions/DistributionInfo.json
 
@@ -23,7 +27,7 @@ def find_wsl_installs(target):
                     yield vhdx
 
 
-class WSLTargetPlugin(ChildTargetPlugin):
+class WSLChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields WSL VHDX file locations.
 
     Windows WSL VHDX conatiners are stored at ``%AppData%\\Local\\Packages\\$DistFolder\\LocalState\\ext4.vhdx``,
@@ -36,14 +40,14 @@ class WSLTargetPlugin(ChildTargetPlugin):
 
     __type__ = "wsl"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.installs = list(find_wsl_installs(target))
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
         return len(self.installs) > 0
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for install_path in self.installs:
             yield ChildTargetRecord(
                 type=self.__type__,
