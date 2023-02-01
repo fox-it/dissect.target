@@ -83,7 +83,7 @@ def main():
                 os_version=target.version,
                 ips=target.ips,
                 architecture=target.architecture,
-                install_date=target.installdate,
+                install_date=target.install_date,
                 last_activity=target.activity,
                 language=target.language,
                 timezone=target.timezone,
@@ -103,12 +103,13 @@ def obj_target_info(target):
         "architecture": target.architecture,
         "domain": target.domain,
         "ips": target.ips,
-        "install_date": str(target.installdate),
+        "install_date": str(target.install_date),
         "last_activity": str(target.activity),
         "language": target.language,
         "timezone": target.timezone,
         "disks": [{"type": d.__class__.__name__, "size": d.size} for d in target.disks],
         "volumes": [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes],
+        "children": [{"type": c.type, "path": c.path} for c in target.list_children()],
     }
 
 

@@ -215,10 +215,16 @@ def print_target_info(target):
     print("Disks")
     for d in target.disks:
         print(f"- {str(d)}")
-    print()
-    print("Volumes")
+    print("\nVolumes")
     for v in target.volumes:
         print(f"- {str(v)}")
+
+    children = list(target.list_children())
+    if len(children) > 0:
+        print("\nChildren")
+        for c in children:
+            print(f"- {str(c)}")
+
     print()
     print(f"Hostname      : {target.hostname}")
     print(f"OS family     : {target.os}, {target._os_plugin.__name__}")
@@ -226,7 +232,7 @@ def print_target_info(target):
     print(f"Arch          : {target.architecture}")
     print(f"Domain        : {target.domain}")
     print(f"IPs           : {', '.join(target.ips)}")
-    print(f"Install date  : {target.installdate}")
+    print(f"Install date  : {target.install_date}")
     print(f"Last activity : {target.activity}")
     print(f"Language(s)   : {', '.join(target.language)}")
     print(f"Timezone      : {target.timezone}")
