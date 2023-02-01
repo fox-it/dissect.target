@@ -1,10 +1,9 @@
 import re
 from itertools import chain
-from typing import Generator
+from typing import Iterator
 
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -24,17 +23,17 @@ RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\w+\s")
 
 
 class AuthPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
         var_log = self.target.fs.path("/var/log")
         return any(var_log.glob("auth.log*")) or any(var_log.glob("secure*"))
 
     @export(record=[AuthLogRecord])
-    def securelog(self):
+    def securelog(self) -> Iterator[AuthLogRecord]:
         """Return contents of /var/log/auth.log* and /var/log/secure*."""
         return self.authlog()
 
     @export(record=[AuthLogRecord])
-    def authlog(self):
+    def authlog(self) -> Iterator[AuthLogRecord]:
         """Return contents of /var/log/auth.log* and /var/log/secure*."""
 
         # Assuming no custom date_format template is set in syslog-ng or systemd (M d H:M:S)

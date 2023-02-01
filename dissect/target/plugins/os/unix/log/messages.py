@@ -1,5 +1,6 @@
 import re
 from itertools import chain
+from typing import Iterator
 
 from flow.record.fieldtypes import path
 
@@ -26,13 +27,12 @@ RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 
 
 class MessagesPlugin(Plugin):
-    def check_compatible(self):
-        return any(self.target.fs.path("/var/log").glob("syslog*")) or any(
-            self.target.fs.path("/var/log").glob("messages*")
-        )
+    def check_compatible(self) -> bool:
+        var_log = self.target.fs.path("/var/log")
+        return any(var_log.glob("syslog*")) or any(var_log.glob("messages*"))
 
     @export(record=MessagesRecord)
-    def syslog(self):
+    def syslog(self) -> Iterator[MessagesRecord]:
         """Return contents of /var/log/messages* and /var/log/syslog*.
 
         See ``messages`` for more information.
@@ -40,7 +40,7 @@ class MessagesPlugin(Plugin):
         return self.messages()
 
     @export(record=MessagesRecord)
-    def messages(self):
+    def messages(self) -> Iterator[MessagesRecord]:
         """Return contents of /var/log/messages* and /var/log/syslog*.
 
         Note: due to year rollover detection, the contents of the files are returned in reverse.
