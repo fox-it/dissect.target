@@ -52,5 +52,5 @@ class LocalePlugin(Plugin):
 
     @export(property=True)
     def timezone(self):
-        """Get the configured timezone of the system."""
+        """Get the configured timezone of the system in IANA TZ standard format."""
         return normalize_timezone(self.target.datetime.tzinfo.name)
