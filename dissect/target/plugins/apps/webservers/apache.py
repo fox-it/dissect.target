@@ -1,27 +1,27 @@
+import enum
 import re
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
-from datetime import datetime, timezone
-from typing import Iterator, Optional
+from datetime import datetime
+from typing import Optional
+from zoneinfo import ZoneInfo
 
 from dissect.target import plugin
-from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 COMMON_REGEX = (
-    r'(?P<ipaddr>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<url>.*?)" '
-    r"(?P<statuscode>\d{3}) (?P<bytessent>\d+)"
+    r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<url>.*?)" '
+    r"(?P<status_code>\d{3}) (?P<bytes_sent>\d+)"
 )
 REFERER_USER_AGENT_REGEX = r'"(?P<referer>.*?)" "(?P<useragent>.*?)"'
-LOG_FORMATS = {
-    "vhost_combined": re.compile(rf"(?P<server_name>.*?):(?P<port>.*) {COMMON_REGEX} {REFERER_USER_AGENT_REGEX}"),
-    "combined": re.compile(rf"{COMMON_REGEX} {REFERER_USER_AGENT_REGEX}"),
-    "common": re.compile(COMMON_REGEX),
-}
 
 
-def infer_log_format(line: str) -> Optional[str]:
+class LogFormat(enum.Enum):
+    VHOST_COMBINED = re.compile(rf"(?P<server_name>.*?):(?P<port>.*) {COMMON_REGEX} {REFERER_USER_AGENT_REGEX}")
+    COMBINED = re.compile(rf"{COMMON_REGEX} {REFERER_USER_AGENT_REGEX}")
+    COMMON = re.compile(COMMON_REGEX)
+
+
+def infer_log_format(line: str) -> Optional[enum.Enum]:
     """Attempt to infer what standard LogFormat is used. Returns None if no known format can be inferred.
 
     Three default log type examples from Apache (note that the ipv4 could also be ipv6)::
@@ -37,18 +37,22 @@ def infer_log_format(line: str) -> Optional[str]:
     first_part = line.split(" ")[0]
     if ":" in first_part and "." in first_part:
         # does not start with IP, hence it must be a vhost typed log
-        return "vhost_combined"
+        return LogFormat.VHOST_COMBINED
     elif line[-1:] == '"':
         # ends with a quotation mark, meaning three is a user agent
-        return "combined"
+        return LogFormat.COMBINED
     elif line[-1:].isdigit():
-        return "common"
+        return LogFormat.COMMON
     return None
+
+
+def parse_datetime(ts: str, tz: ZoneInfo) -> datetime:
+    return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
 
 
 class ApachePlugin(plugin.Plugin):
     """Apache log parsing plugin.
-    
+
     Apache has three default log formats, which this plugin can all parse automatically. These are::
         LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
         LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
@@ -59,62 +63,49 @@ class ApachePlugin(plugin.Plugin):
 
     __namespace__ = "apache"
 
-    LOG_DIR_PATH = "/var/log/apache2"
-
     def __init__(self, target):
-         super().__init__(target)
-         self.log_paths = self.get_log_paths()
+        super().__init__(target)
+        self.LOGS_DIR_PATH = self.get_log_paths()
+
     @plugin.internal
     def get_log_paths(self) -> []:
-        return self.target.fs.path(self.LOGS_DIR_PATH).glob("access.log*")
+        default_logs_dir = "/var/log/apache2"
+        return list(self.target.fs.path(default_logs_dir).glob("access.log*"))
 
     def check_compatible(self):
-        if not self.log_paths:
-            raise UnsupportedPluginError("No apache log files found")
-
-    def parse_log(self, line: str, log_format: str) -> Optional[WebserverRecord]:
-        regex = LOG_FORMATS[log_format]
-        match = regex.match(line)
-
-        if not match:
-            self.target.log.warning("No regex match found for Apache log format %s for log line: %s", log_format, line)
-            return
-
-        match = match.groupdict()
-        return WebserverRecord(
-            ts=self.parse_datetime(match.get("ts"), self.target_timezone),
-            remote_user=match.get("remote_user"),
-            ipaddr=match.get("ipaddr"),
-            url=match.get("url"),
-            statuscode=match.get("statuscode"),
-            bytessent=match.get("bytessent"),
-            referer=match.get("referer"),
-            useragent=match.get("useragent"),
-        )
-
-    @staticmethod
-    def parse_datetime(ts: str, tz: str) -> datetime:
-        return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
-
-    def parse_logs(self, log_lines: [str], path: TargetPath) -> Iterator[Optional[WebserverRecord]]:
-        for line in log_lines:
-            if not line or line == "":
-                continue
-
-            log_format = infer_log_format(line)
-
-            if not log_format:
-                self.target.log.warning(f"Apache log format could not be inferred for log line '{line}'")
-
-            record = self.parse_log(line, log_format)
-            if not record:
-                yield None
-
-            record.file_path = path.resolve().__str__()
-            yield record
+        return len(self.LOGS_DIR_PATH) > 0
 
     @plugin.export(record=WebserverRecord)
     def history(self):
-        for path in self.log_paths:
+        tzinfo = self.target.datetime.tzinfo
+
+        for path in self.LOGS_DIR_PATH:
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
-            yield from self.parse_logs(log_lines, path)
+            for line in log_lines:
+                if not line:
+                    continue
+
+                regex = infer_log_format(line)
+                if not regex:
+                    self.target.log.warning("Apache log format could not be inferred for log line '%s'", line)
+                    continue
+
+                match = regex.value.match(line)
+                if not match:
+                    self.target.log.warning(
+                        "No regex match found for Apache log format %s for log line: %s", regex, line
+                    )
+                    continue
+
+                match = match.groupdict()
+                yield WebserverRecord(
+                    ts=parse_datetime(match.get("ts"), tzinfo),
+                    remote_user=match.get("remote_user"),
+                    remote_ip=match.get("remote_ip"),
+                    url=match.get("url"),
+                    status_code=match.get("status_code"),
+                    bytes_sent=match.get("bytes_sent"),
+                    referer=match.get("referer"),
+                    useragent=match.get("useragent"),
+                    source=path.resolve().__str__(),
+                )

@@ -1,10 +1,20 @@
 import re
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from dissect.target import plugin
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+
+LOG_REGEX = re.compile(
+    r'(?P<remote_ip>.*?) - (?P<remote_user>.*?) \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+) (["](?P<referer>(\-)|(.+))["]) "(?P<useragent>.*?)"',  # noqa: E501
+    re.IGNORECASE,
+)
+
+
+def parse_datetime(date_str: str, tz: ZoneInfo):
+    # Example: 10/Apr/2020:14:10:12 +0000
+    return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
 
 
 class NginxPlugin(plugin.Plugin):
@@ -17,65 +27,49 @@ class NginxPlugin(plugin.Plugin):
 
     @plugin.internal
     def get_log_paths(self):
+        log_paths = []
+        default_logs_dir = self.target.fs.path("/var/log/nginx")
+        if default_logs_dir.exists():
+            log_paths = [self.target.fs.path(p) for p in default_logs_dir.glob("access.log*")]
 
-        logs_dir = self.target.fs.path("/var/log/nginx")
-        if logs_dir.exists():
-            return [self.target.fs.path(p) for p in logs_dir.glob("access.log*")]
+        # Check for custom paths in nginx install config
+        if (config_file := self.target.fs.path("/etc/nginx/nginx.conf")).exists():
+            lines = config_file.open("rt").readlines()
+            for line in lines:
+                line = line.strip()
+                if "access_log" in line:
+                    log_paths.append(self.target.fs.path(line.split(" ")[1]).parent)
+                    break
 
-        self.target.log.debug(f"Log files for Nginx found in {self.LOGS_DIR_PATH}")
-
-        # Resolve configuration
-        configuration_file = self.target.fs.path("/etc/nginx/nginx.conf")
-        if not configuration_file.exists():
-            return []
-
-        fh = configuration_file.open("r").readlines()
-
-        for line in fh:
-            line = line.strip()
-            if "access_log" in line:
-                logs_dir = self.target.fs.path(line.split(" ")[1]).parent
-                break
-
-        if logs_dir.exists():
-            return [self.target.fs.path(p) for p in logs_dir.glob("access.log*")]
-        return []
+        return log_paths
 
     def check_compatible(self):
         return len(self.LOGS_DIR_PATH) > 0
 
-    def parse_nginx_logs(self, log_lines: [str], entry: TargetPath):
-        regex = re.compile(
-            r'(?P<ipaddress>.*?) - (?P<remote_user>.*?) \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<statuscode>\d{3}) (?P<bytessent>\d+) (["](?P<referer>(\-)|(.+))["]) "(?P<useragent>.*?)"',  # noqa: E501
-            re.IGNORECASE,
-        )
-
-        def parse_datetime(date_str, tz):
-            # Example: 10/Apr/2020:14:10:12 +0000
-            return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
-
-        for line in log_lines:
-            m = regex.match(line)
-
-            if not m:
-                self.target.log.warning(f"No regex match found for Nginx log format for log line: {line}")
-                return
-
-            yield WebserverRecord(
-                ts=parse_datetime(m.group("datetime"), self.target_timezone),
-                ipaddr=m.group("ipaddress"),
-                remote_user=m.group("remote_user"),
-                file_path=entry.resolve().__str__(),
-                url=m.group("url"),
-                statuscode=m.group("statuscode"),
-                bytessent=m.group("bytessent"),
-                referer=m.group("referer"),
-                useragent=m.group("useragent"),
-                _target=self.target,
-            )
-
     @plugin.export(record=WebserverRecord)
     def history(self):
-        for path in self.get_log_paths():
+        tzinfo = self.target.datetime.tzinfo
+
+        for path in self.LOGS_DIR_PATH:
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
-            yield from self.parse_nginx_logs(log_lines, path)
+
+            for line in log_lines:
+                match = LOG_REGEX.match(line)
+
+                if not match:
+                    self.target.log.warning("No regex match found for Nginx log format for log line '%s'", line)
+                    continue
+
+                match = match.groupdict()
+                yield WebserverRecord(
+                    ts=parse_datetime(match.get("datetime"), tzinfo),
+                    remote_ip=match.get("remote_ip"),
+                    remote_user=match.get("remote_user"),
+                    url=match.get("url"),
+                    status_code=match.get("status_code"),
+                    bytes_sent=match.get("bytes_sent"),
+                    referer=match.get("referer"),
+                    useragent=match.get("useragent"),
+                    source=path.resolve().__str__(),
+                    _target=self.target,
+                )

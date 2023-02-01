@@ -8,12 +8,12 @@ WebserverRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
-        ("path", "source"),
         ("wstring", "url"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),
         ("wstring", "referer"),
         ("string", "useragent"),
+        ("path", "source"),
     ],
 )
 
