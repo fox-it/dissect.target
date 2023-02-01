@@ -139,7 +139,6 @@ class MftPlugin(Plugin):
 
             try:
                 for record in fs.ntfs.mft.segments():
-
                     try:
                         inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
                         owner, _ = get_owner_and_group(record, fs)
@@ -188,7 +187,6 @@ class MftPlugin(Plugin):
         volume_uuid: str,
         record_formatter: Callable,
     ):
-
         for attr in record.attributes.STANDARD_INFORMATION:
             yield from record_formatter(
                 attr=attr,

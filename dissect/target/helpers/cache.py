@@ -174,7 +174,6 @@ class Cache:
                     )
 
             if os.access(temp_dir, os.W_OK | os.R_OK | os.X_OK, effective_ids=True):
-
                 if os.path.exists(temp_path):
                     try:
                         os.remove(temp_path)

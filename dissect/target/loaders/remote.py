@@ -33,7 +33,6 @@ class RemoteStream(AlignedStream):
 
 
 class RemoteStreamConnection:
-
     # Max. number of times we try to reconnect (still tweaking this)
     MAX_RECONNECTS = 30
 

@@ -113,7 +113,6 @@ class RegistryPlugin(Plugin):
             return
 
         for user_details in self.target.user_details.all_with_home():
-
             user = user_details.user
             ntuser = user_details.home_path.joinpath("ntuser.dat")
 
@@ -192,7 +191,6 @@ class RegistryPlugin(Plugin):
         key = key.strip("\\")
 
         if controlset_regex.findall(key):
-
             if not self._currentcontrolset:
                 self.target.log.warning("No known destination for CurrentControlSet link")
                 raise RegistryKeyNotFoundError(key)

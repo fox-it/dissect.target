@@ -101,7 +101,6 @@ class PluginListPlugin(Plugin):
     @export(output="none")
     @arg("--docs", dest="print_docs", action="store_true")
     def plugins(self, print_docs=False):
-
         categorized_plugins = dict(sorted(categorize_plugins().items()))
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 
