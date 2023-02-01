@@ -3,7 +3,6 @@ from dissect.target.plugins.os.windows.regf.trusteddocs import TrustedDocumentsP
 
 
 def test_trusteddocs_plugin(target_win_users, hive_hku):
-
     trusteddocs_key_name = "Software\\Microsoft\\Office\\16.0\\Word\\Security\\Trusted Documents"
     trusteddocs_key = VirtualKey(hive_hku, trusteddocs_key_name)
 

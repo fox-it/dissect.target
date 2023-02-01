@@ -7,7 +7,6 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 
 
 class ScrapePlugin(plugin.Plugin):
-
     __namespace__ = "scrape"
 
     def check_compatible(self):

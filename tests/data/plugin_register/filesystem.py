@@ -5,7 +5,6 @@ from dissect.target.volume import Volume
 
 
 class TestFilesystem(Filesystem):
-
     __fstype__: str = "Data"
 
     def __init__(

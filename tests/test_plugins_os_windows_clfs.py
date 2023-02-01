@@ -4,7 +4,6 @@ from ._utils import absolute_path
 
 
 def test_clfs_plugin(target_win, fs_win):
-
     data_dir = absolute_path("data/clfs/")
 
     fs_win.map_dir("windows/system32/config/", data_dir)
