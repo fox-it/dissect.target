@@ -9,7 +9,7 @@ from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
 
 MessagesRecord = TargetRecordDescriptor(
-    "linux/messages",
+    "linux/log/messages",
     [
         ("datetime", "ts"),
         ("string", "daemon"),
