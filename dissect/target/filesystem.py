@@ -791,46 +791,6 @@ class VirtualDirectory(FilesystemEntry):
         raise NotASymlinkError()
 
 
-class MappedFile(FilesystemEntry):
-    """Virtual file backed by a file on the host machine."""
-
-    def __init__(self, fs, path, realpath):
-        super().__init__(fs, path, realpath)
-
-    def attr(self):
-        raise NotADirectoryError(f"'{self.path}' is not a directory")
-
-    def iterdir(self):
-        raise NotADirectoryError(f"'{self.path}' is not a directory")
-
-    def scandir(self):
-        raise NotADirectoryError(f"'{self.path}' is not a directory")
-
-    def open(self):
-        return io.open(self.entry, "rb")
-
-    def stat(self):
-        return fsutil.stat_result.copy(os.stat(self.entry))
-
-    def lstat(self):
-        return fsutil.stat_result.copy(os.lstat(self.entry))
-
-    def is_dir(self):
-        return False
-
-    def is_file(self):
-        return True
-
-    def is_symlink(self):
-        return False
-
-    def readlink(self):
-        raise FilesystemError("MappedFile does not support symlinks.")
-
-    def readlink_ext(self):
-        raise FilesystemError("MappedFile does not support symlinks.")
-
-
 class VirtualFileHandle(io.RawIOBase):
     def __init__(self, fh):
         self.fh = fh
@@ -852,14 +812,11 @@ class VirtualFileHandle(io.RawIOBase):
 class VirtualFile(FilesystemEntry):
     """Virtual file backed by a file-like object."""
 
-    def __init__(self, fs, path, fileobject):
-        super().__init__(fs, path, fileobject)
-
     def attr(self):
-        raise TypeError(f"attr is not allowed on VirtualFile: {self.path}")
+        raise TypeError(f"attr is not allowed on {self.__class__.__name__}: {self.path}")
 
     def lattr(self):
-        raise TypeError(f"lattr is not allowed on VirtualFile: {self.path}")
+        raise TypeError(f"lattr is not allowed on {self.__class__.__name__}: {self.path}")
 
     def get(self, path):
         path = fsutil.normalize(path, alt_separator=self.fs.alt_separator).strip("/")
@@ -893,10 +850,23 @@ class VirtualFile(FilesystemEntry):
         return False
 
     def readlink(self):
-        raise FilesystemError("VirtualFile does not support symlinks.")
+        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
 
     def readlink_ext(self):
-        raise FilesystemError("VirtualFile does not support symlinks.")
+        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
+
+
+class MappedFile(VirtualFile):
+    """Virtual file backed by a file on the host machine."""
+
+    def open(self):
+        return io.open(self.entry, "rb")
+
+    def stat(self):
+        return fsutil.stat_result.copy(os.stat(self.entry))
+
+    def lstat(self):
+        return fsutil.stat_result.copy(os.lstat(self.entry))
 
 
 class VirtualSymlink(FilesystemEntry):
