@@ -1,6 +1,7 @@
 from dissect.hypervisor import hyperv
 from flow.record.fieldtypes import uri
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 
@@ -16,7 +17,8 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
     PATH = "sysvol/ProgramData/Microsoft/Windows/Hyper-V/data.vmcx"
 
     def check_compatible(self):
-        return self.target.fs.path(self.PATH).exists()
+        if not self.target.fs.path(self.PATH).exists():
+            raise UnsupportedPluginError("No data.vmcx file found")
 
     def list_children(self):
         fh = self.target.fs.path(self.PATH).open()
