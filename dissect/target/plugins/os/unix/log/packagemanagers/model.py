@@ -30,11 +30,11 @@ class OperationTypes(enum.Enum):
 PackageManagerLogRecord = TargetRecordDescriptor(
     "linux/log/packagemanager",
     [
-        ("string", "package_manager"),
         ("datetime", "ts"),
+        ("string", "package_manager"),
         ("string", "operation"),
         ("string", "package_name"),
         ("string", "command"),
-        ("string", "user"),
+        ("string", "requested_by_user"),
     ],
 )

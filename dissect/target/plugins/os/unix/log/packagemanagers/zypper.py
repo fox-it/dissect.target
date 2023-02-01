@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import Iterator
-from zoneinfo import ZoneInfo
 
 from dissect.target import plugin
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.os.unix.log.packagemanagers.model import (
     OperationTypes,
@@ -13,22 +11,21 @@ from dissect.target.plugins.os.unix.log.packagemanagers.model import (
 
 class ZypperPlugin(plugin.Plugin):
     __namespace__ = "zypper"
-    LOGS_DIR_PATH = "/var/log/"
-    LOGS_GLOB = "zypp/history*"
 
     def __init__(self, target):
         super().__init__(target)
-
-        self.target_timezone = target.datetime.tzinfo
+        self.LOGS_DIR_PATH = "/var/log/"
+        self.LOGS_GLOB = "zypp/history*"
 
     def check_compatible(self):
-        if not self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB):
-            raise UnsupportedPluginError("No zypper logs found")
+        return len(list(self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB))) > 0
 
-    @staticmethod
-    def parse_logs(log_lines: [str], tz: ZoneInfo) -> Iterator[PackageManagerLogRecord]:
+    @plugin.export(record=PackageManagerLogRecord)
+    def logs(self) -> Iterator[PackageManagerLogRecord]:
         """
-        Logs are formatted like this:
+        A package manager log parser for SuSE's Zypper.
+
+        Logs are formatted as:
             2022-12-16 12:56:23|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
             2022-12-16 12:56:23|install|update-alternatives|1.21.8-1.4|x86_64||repo-oss|b4d6389437e306d6104559c82d09fce15c4486fbc7fd215cc33d265ff729aaf1|  # noqa
             # 2022-12-16 12:56:23 unzip-6.00-41.1.x86_64.rpm installed ok
@@ -46,32 +43,30 @@ class ZypperPlugin(plugin.Plugin):
             2022-12-16 12:58:49|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
         """  # noqa E501
 
-        for line in log_lines:
-            # we don't parse additional output logs or empty logs
-            if line.startswith("#") or line == "":
-                continue
-
-            ts, operation, *log_arguments = line.split("|")
-            ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz)
-            operation = OperationTypes.infer(operation)
-
-            record = PackageManagerLogRecord(package_manager="zypper", ts=ts, operation=operation.value)
-
-            if operation == OperationTypes.Install:
-                yield parse_install_line(log_arguments, record)
-            elif operation == OperationTypes.Remove:
-                yield parse_remove_line(log_arguments, record)
-            elif operation == OperationTypes.Other:
-                yield parse_command_line(log_arguments, record)
-
-    @plugin.export(record=PackageManagerLogRecord)
-    def logs(self):
+        tzinfo = self.target.datetime.tzinfo
         log_file_paths = self.target.fs.path(self.LOGS_DIR_PATH).glob(self.LOGS_GLOB)
 
         for path in log_file_paths:
             log_lines = [line.strip() for line in open_decompress(path, "rt")]
 
-            yield from self.parse_logs(log_lines, self.target_timezone)
+            for line in log_lines:
+                # We don't parse additional output logs (#) or empty logs
+                if line.startswith("#") or line == "":
+                    continue
+
+                ts, operation, *log_arguments = line.split("|")
+                ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo)
+                operation = OperationTypes.infer(operation)
+                record = PackageManagerLogRecord(
+                    ts=ts, package_manager="zypper", operation=operation.value, _target=self.target
+                )
+
+                if operation == OperationTypes.Install:
+                    yield parse_install_line(log_arguments, record)
+                elif operation == OperationTypes.Remove:
+                    yield parse_remove_line(log_arguments, record)
+                elif operation == OperationTypes.Other:
+                    yield parse_command_line(log_arguments, record)
 
 
 def parse_command_line(line: [str], record: PackageManagerLogRecord) -> PackageManagerLogRecord:
@@ -81,7 +76,7 @@ def parse_command_line(line: [str], record: PackageManagerLogRecord) -> PackageM
                 ts=2022-12-16 12:57:50 package_name=None command='zypper install unzip' user='root@ec9fa6d67dda'>
     """
     user, command, *_ = line
-    record.user = user
+    record.requested_by_user = user
 
     command = command.replace("'", "")
     record.command = command
@@ -107,5 +102,5 @@ def parse_remove_line(line: [str], record: PackageManagerLogRecord) -> PackageMa
     """
     package_name, version, arch, user, *_ = line
     record.package_name = f"{package_name}-{version}:{arch}"
-    record.user = user
+    record.requested_by_user = user
     return record
