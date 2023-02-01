@@ -109,7 +109,7 @@ ChildTargetRecord = TargetRecordDescriptor(
     "target/child",
     [
         ("string", "type"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
