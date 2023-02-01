@@ -60,6 +60,18 @@ def test_ips_static_plugin(target_unix_users, fs_unix):
     assert sorted(results) == sorted(["10.13.37.6", "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"])
 
 
+def test_ips_wicked_static_plugin(target_unix_users, fs_unix):
+    """
+    Test statically defined ipv4 addresses in /etc/wicked/ifconfig/.
+    """
+
+    fs_unix.map_file("/etc/wicked/ifconfig/eth0.xml", absolute_path("data/unix/configs/ips/eth0.xml"))
+    target_unix_users.add_plugin(LinuxPlugin)
+    results = target_unix_users.ips
+
+    assert sorted(results) == sorted(["10.13.37.2", "2001:db8:ffff:ffff:ffff:ffff:ffff:fffe"])
+
+
 def test_dns_static_plugin(target_unix_users, fs_unix):
     """
     Test statically defined ipv4 and ipv6 dns-nameservers in /etc/network/interfaces.
