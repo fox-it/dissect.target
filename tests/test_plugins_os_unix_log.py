@@ -41,7 +41,7 @@ def test_btmp_plugin(target_unix, fs_unix):
 
 
 def test_atop_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix-logs/atop")
+    data_file = absolute_path("data/unix/logs/atop")
     fs_unix.map_file("var/log/atop/atop_20221111", data_file)
 
     target_unix.add_plugin(AtopPlugin)
