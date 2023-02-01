@@ -1344,7 +1344,6 @@ def register(module: str, class_name: str, internal: bool = True):
 
 
 def open(fh, *args, **kwargs):
-
     for filesystem in FILESYSTEMS:
         try:
             if filesystem.detect(fh):

@@ -17,7 +17,6 @@ from ._utils import absolute_path
 
 
 def test_unix_log_messages_plugin(target_unix_users, fs_unix):
-
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     data_file = absolute_path("data/unix/logs/messages")
@@ -51,7 +50,6 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
     bio = BytesIO()
 
     with tarfile.open(mode="w:gz", fileobj=bio) as tf:
-
         # UTC-6 tar filesystem
         timezone_contents = "America/Chicago"
         timezone_file = BytesIO(textwrap.dedent(timezone_contents).encode())

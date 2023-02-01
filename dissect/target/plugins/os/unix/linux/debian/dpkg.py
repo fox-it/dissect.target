@@ -84,7 +84,6 @@ class DpkgPlugin(Plugin):
         """Yield records for actions logged in dpkg's logs"""
 
         for log_file in self.target.fs.glob(LOG_FILES_GLOB):
-
             fh = self.target.fs.open(log_file)
             if log_file.lower().endswith(".gz"):
                 fh = gzip.open(fh)

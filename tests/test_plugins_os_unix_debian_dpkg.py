@@ -4,7 +4,6 @@ from ._utils import absolute_path
 
 
 def test_dpkg_plugin_status(target_unix, fs_unix):
-
     status_file = absolute_path("data/unix/logs/dpkg-status")
 
     fs_unix.map_file(STATUS_FILE_NAME, status_file)
@@ -19,7 +18,6 @@ def test_dpkg_plugin_status(target_unix, fs_unix):
 
 
 def test_dpkg_plugin_log_plain(target_unix, fs_unix):
-
     log_file = absolute_path("data/unix/logs/dpkg.log")
     fs_unix.map_file("/var/log/dpkg.log", log_file)
 
@@ -36,7 +34,6 @@ def test_dpkg_plugin_log_plain(target_unix, fs_unix):
 
 
 def test_dpkg_plugin_log_gz(target_unix, fs_unix):
-
     log_file_gz = absolute_path("data/unix/logs/dpkg.log.2.gz")
     fs_unix.map_file("/var/log/dpkg.log.2.gz", log_file_gz)
 
