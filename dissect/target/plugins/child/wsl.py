@@ -8,7 +8,7 @@ from dissect.target.plugin import ChildTargetPlugin
 from dissect.target.target import Target
 
 
-def find_wsl_installs(target) -> Iterator[Path]:
+def find_wsl_installs(target: Target) -> Iterator[Path]:
     # Officially supported distro's by Microsoft can be found under "PackageFamilyName" at
     # https://github.com/microsoft/WSL/blob/master/distributions/DistributionInfo.json
 
