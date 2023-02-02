@@ -15,10 +15,7 @@ def normalize_timezone(input: str) -> str:
     For example, ``Pacific Standard Time`` is translated to ``America/Los_Angeles``.
     """
 
-    if input in WINDOWS_ZONE_MAP:
-        return WINDOWS_ZONE_MAP[input]
-    else:
-        return input
+    return WINDOWS_ZONE_MAP.get(input, input)
 
 
 def normalize_language(input: str) -> str:
