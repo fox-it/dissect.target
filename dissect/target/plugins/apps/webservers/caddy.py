@@ -37,8 +37,9 @@ class CaddyPlugin(plugin.Plugin):
             for line in lines:
                 line = line.strip()
                 if "log  " in line:
-                    log_paths.append(self.target.fs.path(line.split(" ")[1]).parent)
-                    break
+                    if (path := self.target.fs.path(line.split(" ")[1]).parent).exists():
+                        log_paths.append(path)
+                        break
 
         return log_paths
 
