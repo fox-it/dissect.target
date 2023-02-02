@@ -6,7 +6,6 @@ from dissect.target.plugins.apps.webservers.apache import (
     LogFormat,
     infer_log_format,
 )
-from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
 
 from ._utils import absolute_path
 
@@ -42,12 +41,12 @@ def test_plugins_apps_webservers_apache_infer_log_ipv6():
     assert infer_log_format(log_combined) == LogFormat.COMBINED
 
 
-def test_plugins_apps_webservers_apache_txt(target_unix_users, fs_unix):
+def test_plugins_apps_webservers_apache_txt(target_unix, fs_unix):
     data_file = absolute_path("data/webservers/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
-    target_unix_users.add_plugin(ApachePlugin)
+    target_unix.add_plugin(ApachePlugin)
 
-    results = list(target_unix_users.apache())
+    results = list(target_unix.apache())
     assert len(results) == 4
 
 
@@ -78,7 +77,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     results = list(target_unix.apache())
     assert len(results) == 4
 
-    combined_log: WebserverRecord = results[0]
+    combined_log = results[0]
     assert combined_log.ts == datetime(2022, 12, 19, 17, 6, 19, tzinfo=timezone.utc)
     assert combined_log.status_code == 200
     assert combined_log.remote_ip == "1.2.3.4"
@@ -91,7 +90,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
         "Safari/537.36"
     )
 
-    vhost_combined_log: WebserverRecord = results[1]
+    vhost_combined_log = results[1]
     assert vhost_combined_log.ts == datetime(2022, 12, 19, 17, 25, 40, tzinfo=timezone.utc)
     assert vhost_combined_log.status_code == 200
     assert vhost_combined_log.remote_ip == "1.2.3.4"
@@ -104,7 +103,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
         "Safari/537.36"
     )
 
-    common_log: WebserverRecord = results[2]
+    common_log = results[2]
     assert common_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=timezone.utc)
     assert common_log.status_code == 200
     assert common_log.remote_ip == "4.3.2.1"
@@ -113,5 +112,5 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert common_log.referer is None
     assert common_log.useragent is None
 
-    ipv6_log: WebserverRecord = results[3]
+    ipv6_log = results[3]
     assert ipv6_log.remote_ip == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"

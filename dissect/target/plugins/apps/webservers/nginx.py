@@ -1,10 +1,12 @@
 import re
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from pathlib import Path
+from typing import Iterator
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.target import Target
 
 LOG_REGEX = re.compile(
     r'(?P<remote_ip>.*?) - (?P<remote_user>.*?) \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+) (["](?P<referer>(\-)|(.+))["]) "(?P<useragent>.*?)"',  # noqa: E501
@@ -49,22 +51,22 @@ class NginxPlugin(plugin.Plugin):
                 line = line.strip()
                 if not line:
                     continue
-                match = LOG_REGEX.match(line)
 
+                match = LOG_REGEX.match(line)
                 if not match:
                     self.target.log.warning("No regex match found for Nginx log format for log line '%s'", line)
                     continue
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=datetime.strptime(match.get("datetime"), "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
-                    remote_ip=match.get("remote_ip"),
-                    remote_user=match.get("remote_user"),
-                    url=match.get("url"),
-                    status_code=match.get("status_code"),
-                    bytes_sent=match.get("bytes_sent"),
-                    referer=match.get("referer"),
-                    useragent=match.get("useragent"),
+                    ts=datetime.strptime(match["datetime"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                    remote_ip=match["remote_ip"],
+                    remote_user=match["remote_user"],
+                    url=match["url"],
+                    status_code=match["status_code"],
+                    bytes_sent=match["bytes_sent"],
+                    referer=match["referer"],
+                    useragent=match["useragent"],
                     source=path.resolve(),
                     _target=self.target,
                 )

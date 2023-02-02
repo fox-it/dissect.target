@@ -1,12 +1,13 @@
 import enum
 import re
 from datetime import datetime
-from typing import Optional
-from zoneinfo import ZoneInfo
+from pathlib import Path
+from typing import Iterator, Optional
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.target import Target
 
 COMMON_REGEX = (
     r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<url>.*?)" '
@@ -21,7 +22,7 @@ class LogFormat(enum.Enum):
     COMMON = re.compile(COMMON_REGEX)
 
 
-def infer_log_format(line: str) -> Optional[enum.Enum]:
+def infer_log_format(line: str) -> Optional[LogFormat]:
     """Attempt to infer what standard LogFormat is used. Returns None if no known format can be inferred.
 
     Three default log type examples from Apache (note that the ipv4 could also be ipv6)::
@@ -81,27 +82,26 @@ class ApachePlugin(plugin.Plugin):
                 if not line:
                     continue
 
-                regex = infer_log_format(line)
-                if not regex:
+                fmt = infer_log_format(line)
+                if not fmt:
                     self.target.log.warning("Apache log format could not be inferred for log line '%s'", line)
                     continue
 
-                match = regex.value.match(line)
+                match = fmt.value.match(line)
                 if not match:
-                    self.target.log.warning(
-                        "No regex match found for Apache log format %s for log line: %s", regex, line
-                    )
+                    self.target.log.warning("No regex match found for Apache log format %s for log line: %s", fmt, line)
                     continue
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=datetime.strptime(match.get("ts"), "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
-                    remote_user=match.get("remote_user"),
-                    remote_ip=match.get("remote_ip"),
-                    url=match.get("url"),
-                    status_code=match.get("status_code"),
-                    bytes_sent=match.get("bytes_sent"),
+                    ts=datetime.strptime(match["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                    remote_user=match["remote_user"],
+                    remote_ip=match["remote_ip"],
+                    url=match["url"],
+                    status_code=match["status_code"],
+                    bytes_sent=match["bytes_sent"],
                     referer=match.get("referer"),
                     useragent=match.get("useragent"),
                     source=path.resolve(),
+                    _target=self.target,
                 )

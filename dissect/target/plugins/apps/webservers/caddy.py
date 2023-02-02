@@ -1,18 +1,19 @@
 import re
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from pathlib import Path
+from typing import Iterator
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.target import Target
 
 LOG_REGEX = re.compile(
-    r'(?P<remote_ip>.*?) - - \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
+    r'(?P<remote_ip>.*?) - - \[(?P<ts>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
 )
 
 
 class CaddyPlugin(plugin.Plugin):
-
     __namespace__ = "caddy"
 
     def __init__(self, target: Target):
@@ -53,8 +54,8 @@ class CaddyPlugin(plugin.Plugin):
                 line = line.strip()
                 if not line:
                     continue
-                match = LOG_REGEX.match(line)
 
+                match = LOG_REGEX.match(line)
                 if not match:
                     self.target.log.warning(
                         "Could match Caddy webserver log line with regex format for log line '%s'", line
@@ -63,11 +64,11 @@ class CaddyPlugin(plugin.Plugin):
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=datetime.strptime(match.get("datetime"), "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
-                    remote_ip=match.get("remote_ip"),
-                    url=match.get("url"),
-                    status_code=match.get("status_code"),
-                    bytes_sent=match.get("bytes_sent"),
+                    ts=datetime.strptime(match["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                    remote_ip=match["remote_ip"],
+                    url=match["url"],
+                    status_code=match["status_code"],
+                    bytes_sent=match["bytes_sent"],
                     source=path.resolve(),
                     _target=self.target,
                 )

@@ -78,7 +78,7 @@ def test_iis_plugin_w3c_format(target_win, fs_win, tmpdir_name):
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win, fs_win, tmpdir_name, stream, method):
+def test_iis_plugin_iis_nonutf8(target_win, stream, method):
     server = iis.IISLogsPlugin(target_win)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):

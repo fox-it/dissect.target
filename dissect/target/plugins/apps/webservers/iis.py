@@ -2,7 +2,7 @@ import re
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Generator, List, Tuple
+from typing import Iterator
 
 from defusedxml import ElementTree
 from flow.record.base import RE_VALID_FIELD_NAME
@@ -61,7 +61,7 @@ class IISLogsPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No ApplicationHost config file found")
 
     @plugin.internal
-    def get_log_dirs(self) -> List[Tuple[str, str]]:
+    def get_log_dirs(self) -> list[tuple[str, str]]:
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
         except ElementTree.ParseError as e:
@@ -79,13 +79,13 @@ class IISLogsPlugin(plugin.Plugin):
         return log_paths
 
     @plugin.internal
-    def iter_log_format_path_pairs(self) -> List[Tuple[str, str]]:
+    def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
         for log_format, log_dir_path in self.get_log_dirs():
             for log_file in self.iter_log_paths(log_dir_path):
                 yield (log_format, log_file)
 
     @plugin.internal
-    def parse_iis_format_log(self, path: Path) -> Generator[TargetRecordDescriptor, None, None]:
+    def parse_iis_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         """Parse log file in IIS format and stream log records.
 
         References:
@@ -133,11 +133,11 @@ class IISLogsPlugin(plugin.Plugin):
             yield BasicRecordDescriptor(**row)
 
     @lru_cache(maxsize=4096)
-    def _create_extended_descriptor(self, extra_fields) -> TargetRecordDescriptor:
+    def _create_extended_descriptor(self, extra_fields: tuple[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS + list(extra_fields))
 
     @plugin.internal
-    def parse_w3c_format_log(self, path: Path) -> Generator[TargetRecordDescriptor, None, None]:
+    def parse_w3c_format_log(self, path: Path) -> Iterator[TargetRecordDescriptor]:
         """Parse log file in W3C format and stream log records.
 
         References:
@@ -244,12 +244,12 @@ class IISLogsPlugin(plugin.Plugin):
             )
 
     @plugin.internal
-    def iter_log_paths(self, log_dir: str) -> Generator[Path, None, None]:
+    def iter_log_paths(self, log_dir: str) -> Iterator[Path]:
         log_dir = fsutil.normalize(log_dir, alt_separator=self.target.fs.alt_separator)
         yield from self.target.fs.path(log_dir).glob("*/*.log")
 
     @plugin.export(record=BasicRecordDescriptor)
-    def logs(self) -> Generator[TargetRecordDescriptor, None, None]:
+    def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
 
         Internet Information Services (IIS) for Windows Server is a manageable web server for hosting anything on the
@@ -268,7 +268,7 @@ class IISLogsPlugin(plugin.Plugin):
             yield from parse_func(log_file)
 
     @plugin.export(record=BasicRecordDescriptor)
-    def access(self) -> Generator[TargetRecordDescriptor, None, None]:
+    def access(self) -> Iterator[TargetRecordDescriptor]:
         return self.logs()
 
 
