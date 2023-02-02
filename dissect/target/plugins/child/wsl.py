@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Iterator
 
-from flow.record.fieldtypes import uri
-
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 from dissect.target.target import Target
@@ -51,6 +49,6 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
         for install_path in self.installs:
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=uri.from_windows(str(install_path)),
+                path=install_path,
                 _target=self.target,
             )

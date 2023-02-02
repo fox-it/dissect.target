@@ -1,4 +1,4 @@
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -40,8 +40,6 @@ class WorkstationChildTargetPlugin(ChildTargetPlugin):
 
                 yield ChildTargetRecord(
                     type=self.__type__,
-                    path=uri.from_windows(
-                        value.strip('"'),
-                    ),
+                    path=path.from_windows(value.strip('"')),
                     _target=self.target,
                 )
