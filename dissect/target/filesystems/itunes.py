@@ -1,12 +1,12 @@
 from dissect.util.stream import AlignedStream
 
-from dissect.target.filesystem import VirtualFilesystem, VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.helpers import fsutil
 
 
 class ITunesFilesystem(VirtualFilesystem):
-    def __init__(self, backup):
-        super().__init__()
+    def __init__(self, backup, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.backup = backup
 
         for file in self.backup.files():

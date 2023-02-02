@@ -15,13 +15,13 @@ log = logging.getLogger(__name__)
 class FatFilesystem(Filesystem):
     __fstype__ = "fat"
 
-    def __init__(self, fh=None, *args, **kwargs):
+    def __init__(self, fh, *args, **kwargs):
+        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
         self.fatfs = fat.FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
         # However, it should be noted that they are not actual UTC timestamps!
         # Implementers can optionally set the tzinfo attribute of this class to get correct UTC timestamps.
         self.tzinfo = datetime.timezone.utc
-        super().__init__(case_sensitive=False, alt_separator="\\", *args, **kwargs)
 
     @staticmethod
     def detect(fh):

@@ -32,9 +32,9 @@ class Filesystem:
 
     def __init__(
         self,
+        volume: Optional[Volume] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
-        volume: Optional[Volume] = None,
     ) -> None:
         """The base initializer for the class.
 
@@ -46,9 +46,9 @@ class Filesystem:
         Raises:
             NotImplementedError: When the internal ``__fstype__`` of the class is not defined.
         """
+        self.volume = volume
         self.case_sensitive = case_sensitive
         self.alt_separator = alt_separator
-        self.volume = volume
         if self.__fstype__ is None:
             raise NotImplementedError(f"{self.__class__.__name__} must define __fstype__")
 

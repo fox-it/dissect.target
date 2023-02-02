@@ -10,12 +10,12 @@ from dissect.target.helpers import fsutil
 class CbFilesystem(Filesystem):
     __fstype__ = "cb"
 
-    def __init__(self, cb, sensor, session, prefix):
+    def __init__(self, cb, sensor, session, prefix, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.cb = cb
         self.sensor = sensor
         self.session = session
         self.prefix = prefix
-        super().__init__()
 
     @staticmethod
     def detect(fh):
