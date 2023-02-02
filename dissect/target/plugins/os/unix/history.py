@@ -44,7 +44,6 @@ class CommandHistoryPlugin(Plugin):
         """
 
         for user_details in self.target.user_details.all_with_home():
-
             for ih in IGNORED_HOMES:
                 if ih in user_details.user.home:
                     continue

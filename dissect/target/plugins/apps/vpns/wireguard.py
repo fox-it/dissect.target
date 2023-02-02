@@ -91,7 +91,6 @@ class WireGuardPlugin(Plugin):
             config = _parse_config(config_path.read_text())
 
             for section in config.sections():
-
                 if "Interface" in section:
                     yield WireGuardInterfaceRecord(
                         name=basename(config_path).replace(".conf", "").replace(".netdev", ""),

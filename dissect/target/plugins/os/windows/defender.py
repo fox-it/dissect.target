@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator
+from typing import Any, BinaryIO, Generator, Iterable, Iterator, Union
 
 import dissect.util.ts as ts
 from dissect.cstruct import Structure, cstruct
@@ -392,10 +392,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         defender_evtx_records = filter_records(evtx_records, "Provider_Name", "Microsoft-Windows-Windows Defender")
 
         for evtx_record in defender_evtx_records:
-
             record_fields = {}
             for field_name in defender_evtx_field_names:
-
                 if not hasattr(evtx_record, field_name):
                     continue
 
@@ -408,8 +406,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @plugin.export(record=DefenderFileQuarantineRecord)
-    def quarantine(self) -> Iterator[DefenderFileQuarantineRecord]:
+    @plugin.export(record=[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord])
+    def quarantine(self) -> Iterator[Union[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord]]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in

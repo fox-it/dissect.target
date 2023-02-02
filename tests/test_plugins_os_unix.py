@@ -32,7 +32,6 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 
 
 def test_parse_fstab():
-
     with tempfile.NamedTemporaryFile() as tf:
         tf.write(FSTAB_CONTENT.encode("ascii"))
         tf.flush()

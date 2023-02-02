@@ -44,7 +44,6 @@ def mocked_win_volumes_fs():
     ), patch(
         "dissect.target.loaders.local._get_windows_drive_volumes", new=get_mock_drive_volumes
     ):
-
         mock_os_plugins.return_value = []
         mock_os_name.return_value = "windows"
 
@@ -76,7 +75,6 @@ def mocked_lin_volumes_fs():
     ), patch("dissect.target.plugin.os_plugins") as mock_os_plugins, patch(
         "dissect.target.target.DiskCollection.apply", new=mock_disk_apply
     ):
-
         mock_os_plugins.return_value = []
         mock_os_name.return_value = "linux"
 
@@ -84,7 +82,6 @@ def mocked_lin_volumes_fs():
 
 
 def test_target_win_force_dirfs(mocked_win_volumes_fs):
-
     mock_good_volume, mock_bad_volume, mock_good_fs = mocked_win_volumes_fs
 
     query = {"force-directory-fs": 1}
@@ -111,7 +108,6 @@ def test_target_win_force_dirfs(mocked_win_volumes_fs):
 
 
 def test_target_win_fallback_dirfs(mocked_win_volumes_fs):
-
     mock_good_volume, mock_bad_volume, mock_good_fs = mocked_win_volumes_fs
 
     query = {"fallback-to-directory-fs": 1}
@@ -138,7 +134,6 @@ def test_target_win_fallback_dirfs(mocked_win_volumes_fs):
 
 
 def test_target_force_dirfs_linux(mocked_lin_volumes_fs):
-
     mock_good_volume, mock_bad_volume, mock_good_fs = mocked_lin_volumes_fs
 
     query = {"force-directory-fs": 1}
@@ -157,7 +152,6 @@ def test_target_force_dirfs_linux(mocked_lin_volumes_fs):
 
 
 def test_target_fallback_dirfs_linux(mocked_lin_volumes_fs):
-
     mock_good_volume, mock_bad_volume, mock_good_fs = mocked_lin_volumes_fs
 
     query = {"fallback-to-directory-fs": 1}

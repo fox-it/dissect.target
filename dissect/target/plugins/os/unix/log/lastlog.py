@@ -78,7 +78,6 @@ class LastLogPlugin(Plugin):
         log = LastLogFile(lastlog)
 
         for idx, entry in enumerate(log):
-
             # if ts=0 the uid has never logged in before
             if entry.ut_host.strip(b"\x00") == b"" or entry.ll_time.tv_sec == 0:
                 continue

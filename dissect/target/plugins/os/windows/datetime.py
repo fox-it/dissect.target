@@ -229,5 +229,6 @@ class DateTimePlugin(Plugin):
         """Convert any datetime.datetime object into a UTC datetime.datetime object.
 
         First replaces the current tzinfo with the system tzinfo without conversion, then converts it to an aware
-        UTC datetime object."""
+        UTC datetime object.
+        """
         return self.local(dt).astimezone(timezone.utc)
