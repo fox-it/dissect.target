@@ -12,21 +12,15 @@ LOG_REGEX = re.compile(
 )
 
 
-def parse_datetime(date_str: str, tz: ZoneInfo):
-    # Example: 10/Apr/2020:14:10:12 +0000
-    return datetime.strptime(f"{date_str}", "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
-
-
 class NginxPlugin(plugin.Plugin):
     __namespace__ = "nginx"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
-        self.LOGS_DIR_PATH = self.get_log_paths()
-        self.target_timezone = target.datetime.tzinfo
+        self.log_paths = self.get_log_paths()
 
     @plugin.internal
-    def get_log_paths(self):
+    def get_log_paths(self) -> list[Path]:
         log_paths = []
         default_logs_dir = self.target.fs.path("/var/log/nginx")
         if default_logs_dir.exists():
@@ -34,8 +28,7 @@ class NginxPlugin(plugin.Plugin):
 
         # Check for custom paths in nginx install config
         if (config_file := self.target.fs.path("/etc/nginx/nginx.conf")).exists():
-            lines = config_file.open("rt").readlines()
-            for line in lines:
+            for line in config_file.open("rt"):
                 line = line.strip()
                 if "access_log" in line:
                     if (path := self.target.fs.path(line.split(" ")[1]).parent).exists():
@@ -44,17 +37,18 @@ class NginxPlugin(plugin.Plugin):
 
         return log_paths
 
-    def check_compatible(self):
-        return len(self.LOGS_DIR_PATH) > 0
+    def check_compatible(self) -> bool:
+        return len(self.log_paths) > 0
 
     @plugin.export(record=WebserverRecord)
-    def logs(self):
+    def access(self) -> Iterator[WebserverRecord]:
         tzinfo = self.target.datetime.tzinfo
 
-        for path in self.LOGS_DIR_PATH:
-            log_lines = [line.strip() for line in open_decompress(path, "rt")]
-
-            for line in log_lines:
+        for path in self.log_paths:
+            for line in open_decompress(path, "rt"):
+                line = line.strip()
+                if not line:
+                    continue
                 match = LOG_REGEX.match(line)
 
                 if not match:
@@ -63,7 +57,7 @@ class NginxPlugin(plugin.Plugin):
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=parse_datetime(match.get("datetime"), tzinfo),
+                    ts=datetime.strptime(match.get("datetime"), "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
                     remote_ip=match.get("remote_ip"),
                     remote_user=match.get("remote_user"),
                     url=match.get("url"),
@@ -71,6 +65,6 @@ class NginxPlugin(plugin.Plugin):
                     bytes_sent=match.get("bytes_sent"),
                     referer=match.get("referer"),
                     useragent=match.get("useragent"),
-                    source=path.resolve().__str__(),
+                    source=path.resolve(),
                     _target=self.target,
                 )

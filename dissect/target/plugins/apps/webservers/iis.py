@@ -268,7 +268,7 @@ class IISLogsPlugin(plugin.Plugin):
             yield from parse_func(log_file)
 
     @plugin.export(record=BasicRecordDescriptor)
-    def history(self) -> Generator[TargetRecordDescriptor, None, None]:
+    def access(self) -> Generator[TargetRecordDescriptor, None, None]:
         return self.logs()
 
 

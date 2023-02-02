@@ -8,10 +8,10 @@ WebserverRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
-        ("wstring", "url"),
+        ("uri", "url"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),
-        ("wstring", "referer"),
+        ("uri", "referer"),
         ("string", "useragent"),
         ("path", "source"),
     ],
@@ -28,7 +28,7 @@ class WebserverPlugin(Plugin):
         "caddy",
     ]
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._plugins = []
         for entry in self.TOOLS:

@@ -46,10 +46,6 @@ def infer_log_format(line: str) -> Optional[enum.Enum]:
     return None
 
 
-def parse_datetime(ts: str, tz: ZoneInfo) -> datetime:
-    return datetime.strptime(ts, "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tz)
-
-
 class ApachePlugin(plugin.Plugin):
     """Apache log parsing plugin.
 
@@ -63,25 +59,25 @@ class ApachePlugin(plugin.Plugin):
 
     __namespace__ = "apache"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
-        self.LOGS_DIR_PATH = self.get_log_paths()
+        self.log_paths = self.get_log_paths()
 
     @plugin.internal
-    def get_log_paths(self) -> []:
+    def get_log_paths(self) -> list[Path]:
         default_logs_dir = "/var/log/apache2"
         return list(self.target.fs.path(default_logs_dir).glob("access.log*"))
 
-    def check_compatible(self):
-        return len(self.LOGS_DIR_PATH) > 0
+    def check_compatible(self) -> bool:
+        return len(self.log_paths) > 0
 
     @plugin.export(record=WebserverRecord)
-    def logs(self):
+    def access(self) -> Iterator[WebserverRecord]:
         tzinfo = self.target.datetime.tzinfo
 
-        for path in self.LOGS_DIR_PATH:
-            log_lines = [line.strip() for line in open_decompress(path, "rt")]
-            for line in log_lines:
+        for path in self.log_paths:
+            for line in open_decompress(path, "rt"):
+                line = line.strip()
                 if not line:
                     continue
 
@@ -99,7 +95,7 @@ class ApachePlugin(plugin.Plugin):
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=parse_datetime(match.get("ts"), tzinfo),
+                    ts=datetime.strptime(match.get("ts"), "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
                     remote_user=match.get("remote_user"),
                     remote_ip=match.get("remote_ip"),
                     url=match.get("url"),
@@ -107,5 +103,5 @@ class ApachePlugin(plugin.Plugin):
                     bytes_sent=match.get("bytes_sent"),
                     referer=match.get("referer"),
                     useragent=match.get("useragent"),
-                    source=path.resolve().__str__(),
+                    source=path.resolve(),
                 )
