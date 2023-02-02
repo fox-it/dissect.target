@@ -337,15 +337,23 @@ class Target:
             try:
                 plugin_cls = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
-                if child_plugin.check_compatible() is False:
-                    continue
-                self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError:
                 self.log.exception("Failed to load child plugin: %s", plugin_desc["class"])
                 continue
             except Exception:
                 self.log.exception("Broken child plugin: %s", plugin_desc["class"])
                 continue
+
+            try:
+                if child_plugin.check_compatible() is False:
+                    continue
+                self._child_plugins[child_plugin.__type__] = child_plugin
+            except PluginError as e:
+                self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+            except Exception:
+                self.log.exception(
+                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
+                )
 
     def open_child(self, child: Union[str, Path]) -> Target:
         """Open a child target.
