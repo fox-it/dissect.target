@@ -16,7 +16,6 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
-from dissect.target.volume import Volume
 
 FILESYSTEMS: list[Type[Filesystem]] = []
 MODULE_PATH = "dissect.target.filesystems"
@@ -32,16 +31,16 @@ class Filesystem:
 
     def __init__(
         self,
-        volume: Optional[Volume] = None,
+        volume: Optional[BinaryIO],
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:
         """The base initializer for the class.
 
         Args:
+            volume: A volume or other file-like object associated with the filesystem.
             case_sensitive: Defines if the paths in the Filesystem are case sensitive or not.
             alt_separator: The alternative separator used to distingish between directories in a path.
-            volume: A volume associated with the filesystem.
 
         Raises:
             NotImplementedError: When the internal ``__fstype__`` of the class is not defined.
@@ -918,7 +917,7 @@ class VirtualFilesystem(Filesystem):
     __fstype__ = "virtual"
 
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(None, **kwargs)
         self.root = VirtualDirectory(self, "/")
 
     @staticmethod
@@ -1075,7 +1074,7 @@ class RootFilesystem(Filesystem):
         self._case_sensitive = True
         self._root_entry = RootFilesystemEntry(self, "/", [])
         self.root = self.add_layer()
-        super().__init__()
+        super().__init__(None)
 
     @staticmethod
     def detect(fh):

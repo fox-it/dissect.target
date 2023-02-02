@@ -6,7 +6,7 @@ from dissect.target.helpers import fsutil
 
 class ITunesFilesystem(VirtualFilesystem):
     def __init__(self, backup, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(None, *args, **kwargs)
         self.backup = backup
 
         for file in self.backup.files():

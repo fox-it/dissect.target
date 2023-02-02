@@ -15,7 +15,7 @@ class DirectoryFilesystem(Filesystem):
     __fstype__ = "dir"
 
     def __init__(self, path: Path, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(None, *args, **kwargs)
         self.base_path = path
 
     @staticmethod
