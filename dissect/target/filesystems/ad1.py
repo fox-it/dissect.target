@@ -16,8 +16,8 @@ class AD1Filesystem(Filesystem):
     __fstype__ = "ad1"
 
     def __init__(self, fh, *args, **kwargs):
-        self.ad1 = ad1.AD1(fh)
         super().__init__(fh, *args, **kwargs)
+        self.ad1 = ad1.AD1(fh)
 
     @staticmethod
     def detect(fh):

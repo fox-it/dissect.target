@@ -17,8 +17,8 @@ class XfsFilesystem(Filesystem):
     __fstype__ = "xfs"
 
     def __init__(self, fh, *args, **kwargs):
-        self.xfs = xfs.XFS(fh)
         super().__init__(fh, *args, **kwargs)
+        self.xfs = xfs.XFS(fh)
 
     @staticmethod
     def detect(fh):

@@ -13,9 +13,9 @@ class ExfatFilesystem(Filesystem):
     __fstype__ = "exfat"
 
     def __init__(self, fh=None, *args, **kwargs):
-        self.exfat = exfat.EXFAT(fh=fh)
+        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
+        self.exfat = exfat.ExFAT(fh)
         self.cluster_size = self.exfat.cluster_size
-        super().__init__(case_sensitive=False, alt_separator="\\", *args, **kwargs)
 
     @staticmethod
     def detect(fh):

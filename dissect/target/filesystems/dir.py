@@ -1,7 +1,12 @@
 import os
 from pathlib import Path
 
-from dissect.target.exceptions import FileNotFoundError, FilesystemError, IsADirectoryError, NotADirectoryError
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    FilesystemError,
+    IsADirectoryError,
+    NotADirectoryError,
+)
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
@@ -9,9 +14,9 @@ from dissect.target.helpers import fsutil
 class DirectoryFilesystem(Filesystem):
     __fstype__ = "dir"
 
-    def __init__(self, path: Path, alt_separator: str = "", case_sensitive: bool = True) -> None:
+    def __init__(self, path: Path, *args, **kwargs) -> None:
+        super().__init__(None, *args, **kwargs)
         self.base_path = path
-        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive)
 
     @staticmethod
     def detect(fh):

@@ -36,7 +36,7 @@ class ZipFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(fh, *args, **kwargs)
 
         fh.seek(0)
 
