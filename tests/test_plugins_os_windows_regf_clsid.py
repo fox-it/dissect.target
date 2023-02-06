@@ -1,5 +1,4 @@
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
-
 from dissect.target.plugins.os.windows.regf.clsid import CLSIDPlugin
 
 

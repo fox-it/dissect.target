@@ -6,7 +6,6 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-
 NetworkDataRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/network_data",
     [

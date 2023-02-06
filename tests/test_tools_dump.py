@@ -1,10 +1,10 @@
 import json
 import pathlib
-
-import pytest
 from unittest.mock import patch
 
-from dissect.target.plugins.os.windows import iis, amcache
+import pytest
+
+from dissect.target.plugins.os.windows import amcache, iis
 from dissect.target.tools.dump import run, state, utils
 
 from ._utils import absolute_path

@@ -1,5 +1,5 @@
-from dissect.target.plugins.filesystem.icat import ICatPlugin
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+from dissect.target.plugins.filesystem.icat import ICatPlugin
 
 from ._utils import absolute_path
 

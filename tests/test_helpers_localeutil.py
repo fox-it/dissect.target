@@ -1,4 +1,4 @@
-from dissect.target.helpers.localeutil import normalize_timezone, normalize_language
+from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 
 
 def test_helpers_localeutil_normalize_timezone():

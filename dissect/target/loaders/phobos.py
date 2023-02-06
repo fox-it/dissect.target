@@ -1,6 +1,7 @@
+from dissect.util import stream
+
 from dissect.target import filesystem
 from dissect.target.loader import Loader
-from dissect.util import stream
 
 BLOCK_SIZE = 64 * 0x100000  # 64 MiB
 

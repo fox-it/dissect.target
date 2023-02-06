@@ -2,10 +2,10 @@ from typing import Any, Optional
 
 import pytest
 
-from dissect.target.target import Target
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
+from dissect.target.target import Target
 
 
 def current_version_key() -> str:

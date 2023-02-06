@@ -2,8 +2,9 @@ import io
 from pathlib import Path
 from typing import BinaryIO, Union
 
-from dissect.target.container import Container
 from dissect.util.stream import AlignedStream, BufferedStream
+
+from dissect.target.container import Container
 
 
 class RawContainer(Container):
