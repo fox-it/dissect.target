@@ -1,7 +1,10 @@
+import json
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
+
+from dissect.util.ts import from_unix
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
@@ -73,9 +76,10 @@ class CaddyPlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverRecord)
     def access(self) -> Iterator[WebserverRecord]:
-        """Parses Caddy V1 logs in CRF format.
+        """Parses Caddy V1 CRF and Caddy V2 JSON logs.
 
-        Caddy V2 uses JSON logging when enabled (not by default) and is not implemented (yet).
+        Resources:
+            - https://caddyserver.com/docs/caddyfile/directives/log#format-modules
         """
         tzinfo = self.target.datetime.tzinfo
 
@@ -85,20 +89,40 @@ class CaddyPlugin(plugin.Plugin):
                 if not line:
                     continue
 
-                match = LOG_REGEX.match(line)
-                if not match:
-                    self.target.log.warning(
-                        "Could not match Caddy webserver log line with regex format for log line '%s'", line
-                    )
-                    continue
+                # Parse a JSON log line
+                if line.startswith('{"'):
+                    try:
+                        log = json.loads(line)
+                    except json.decoder.JSONDecodeError:
+                        self.target.log.warning("Could not decode Caddy JSON log line in file %s", path)
+                        continue
 
-                match = match.groupdict()
-                yield WebserverRecord(
-                    ts=datetime.strptime(match["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
-                    remote_ip=match["remote_ip"],
-                    url=match["url"],
-                    status_code=match["status_code"],
-                    bytes_sent=match["bytes_sent"],
-                    source=path.resolve(),
-                    _target=self.target,
-                )
+                    yield WebserverRecord(
+                        ts=from_unix(log["ts"]).replace(tzinfo=tzinfo),
+                        remote_ip=log["request"]["remote_ip"],
+                        url=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
+                        status_code=log["status"],
+                        bytes_sent=log["size"],
+                        source=path.resolve(),
+                        _target=self.target,
+                    )
+
+                # Try to parse a CLF log line
+                else:
+                    match = LOG_REGEX.match(line)
+                    if not match:
+                        self.target.log.warning(
+                            "Could not match Caddy webserver log line with regex format for log line '%s'", line
+                        )
+                        continue
+                    log = match.groupdict()
+
+                    yield WebserverRecord(
+                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                        remote_ip=log["remote_ip"],
+                        url=log["url"],
+                        status_code=log["status_code"],
+                        bytes_sent=log["bytes_sent"],
+                        source=path.resolve(),
+                        _target=self.target,
+                    )

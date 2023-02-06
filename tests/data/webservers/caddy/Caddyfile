@@ -1,4 +1,4 @@
-# Caddy V1 Caddyfile example log snippets.
+# Caddy V1 and V2 Caddyfile example log snippets.
 # Source: https://github.com/caddyserver/examples
 
 root /var/www/html
