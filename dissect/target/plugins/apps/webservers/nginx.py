@@ -32,11 +32,10 @@ class NginxPlugin(plugin.Plugin):
         if (config_file := self.target.fs.path("/etc/nginx/nginx.conf")).exists():
             for line in config_file.open("rt"):
                 line = line.strip()
-                if "access_log" in line:
-                    if (path := self.target.fs.path(line.split(" ")[1]).parent).exists():
+                if "access_log " in line:
+                    p = list(filter(None, line.strip().split(" ")))[1]
+                    if (path := self.target.fs.path(p).parent).exists():
                         log_paths.append(path)
-                        break
-
         return log_paths
 
     def check_compatible(self) -> bool:

@@ -60,3 +60,14 @@ def test_plugins_apps_webservers_nginx_bz2(target_unix, fs_unix):
     assert log.status_code == 200
     assert log.remote_ip == "1.2.3.4"
     assert log.remote_user == "admin"
+
+
+def test_plugins_apps_webservers_nginx_config(target_unix, fs_unix):
+    config_file = absolute_path("data/webservers/nginx/nginx.conf")
+    fs_unix.map_file("etc/nginx/nginx.conf", config_file)
+
+    for i, log in enumerate(["access.log", "domain1.access.log", "domain2.access.log", "big.server.access.log"]):
+        fs_unix.map_file_fh(f"opt/logs/{i}/{log}", BytesIO("Foo".encode()))
+
+    nginx = NginxPlugin(target_unix)
+    assert len(nginx.log_paths) == 4
