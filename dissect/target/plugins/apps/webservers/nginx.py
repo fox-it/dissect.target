@@ -58,7 +58,7 @@ class NginxPlugin(plugin.Plugin):
 
                 match = match.groupdict()
                 yield WebserverRecord(
-                    ts=datetime.strptime(match["datetime"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                    ts=datetime.strptime(match["datetime"], "%d/%b/%Y:%H:%M:%S %z"),
                     remote_ip=match["remote_ip"],
                     remote_user=match["remote_user"],
                     url=match["url"],

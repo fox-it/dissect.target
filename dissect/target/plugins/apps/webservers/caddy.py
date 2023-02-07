@@ -56,15 +56,12 @@ class CaddyPlugin(plugin.Plugin):
                     p = match["log_file"].replace(" {", "").split(" ")[-1]
 
                     if not p.startswith("/"):
-                        print(f"{p} is a relative path")
                         for root in found_roots:
-                            root_parent = self.target.fs.path(f"{root}").parent
-                            abs_log_path = self.target.fs.path(f"{str(root_parent)}/{p}").parent
-                            print(abs_log_path)
+                            root_parent = self.target.fs.path(root).parent
+                            abs_log_path = self.target.fs.path(root_parent).joinpath(p).parent
                             if abs_log_path.exists() and abs_log_path not in log_paths:
                                 log_paths.append(abs_log_path)
                     else:
-                        print(f"{p} is an absolute path")
                         if (path := self.target.fs.path(p).parent).exists():
                             if path not in log_paths:
                                 log_paths.append(path)
@@ -98,7 +95,7 @@ class CaddyPlugin(plugin.Plugin):
                         continue
 
                     yield WebserverRecord(
-                        ts=from_unix(log["ts"]).replace(tzinfo=tzinfo),
+                        ts=from_unix(log["ts"]),
                         remote_ip=log["request"]["remote_ip"],
                         url=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
                         status_code=log["status"],
@@ -118,7 +115,7 @@ class CaddyPlugin(plugin.Plugin):
                     log = match.groupdict()
 
                     yield WebserverRecord(
-                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
                         remote_ip=log["remote_ip"],
                         url=log["url"],
                         status_code=log["status_code"],
