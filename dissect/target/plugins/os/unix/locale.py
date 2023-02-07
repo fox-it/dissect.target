@@ -1,5 +1,5 @@
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.localeutil import normalize_language
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 UnixKeyboardRecord = TargetRecordDescriptor(

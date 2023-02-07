@@ -1,12 +1,12 @@
 from flow.record.fieldtypes import uri
 
-from dissect.target.plugin import Plugin, export
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import (
-    UserRecordDescriptorExtension,
     RegistryRecordDescriptorExtension,
+    UserRecordDescriptorExtension,
 )
+from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.plugin import Plugin, export
 
 RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/run",

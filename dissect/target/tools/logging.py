@@ -1,6 +1,6 @@
-import sys
 import logging
-from typing import Dict, Any
+import sys
+from typing import Any, Dict
 
 import structlog
 

@@ -1,5 +1,6 @@
 from dissect.target import Target
 from dissect.target.plugins.filesystem.acquire_hash import AcquireHashPlugin
+
 from ._utils import absolute_path
 
 

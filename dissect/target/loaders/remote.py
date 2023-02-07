@@ -5,7 +5,6 @@ import socket
 import ssl
 import time
 import urllib
-
 from io import DEFAULT_BUFFER_SIZE
 from pathlib import Path
 from struct import pack, unpack
@@ -17,7 +16,6 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
 from dissect.target.target import Target
-
 
 log = logging.getLogger(__name__)
 

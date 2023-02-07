@@ -7,7 +7,6 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.filesystem.ntfs.utils import get_drive_letter
 
-
 UsnjrnlRecord = TargetRecordDescriptor(
     "filesystem/ntfs/usnjrnl",
     [

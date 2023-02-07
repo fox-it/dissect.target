@@ -2,7 +2,7 @@ import io
 from pathlib import Path
 from typing import BinaryIO, Union
 
-from dissect.hypervisor.disk import qcow2, c_qcow2
+from dissect.hypervisor.disk import c_qcow2, qcow2
 
 from dissect.target.container import Container
 

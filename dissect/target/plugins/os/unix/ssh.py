@@ -1,9 +1,8 @@
 import re
 import subprocess
 
-from dissect.target.plugin import Plugin, export
 from dissect.target.helpers.record import TargetRecordDescriptor
-
+from dissect.target.plugin import Plugin, export
 
 AuthorizedKeysRecord = TargetRecordDescriptor(
     "unix/ssh/authorized_keys",

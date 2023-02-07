@@ -1,6 +1,6 @@
 import plistlib
 
-from dissect.target.plugin import export, OperatingSystem
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
 

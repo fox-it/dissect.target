@@ -2,8 +2,7 @@ import csv
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Set, NamedTuple, List
-
+from typing import List, NamedTuple, Set
 
 log = logging.getLogger(__name__)
 
