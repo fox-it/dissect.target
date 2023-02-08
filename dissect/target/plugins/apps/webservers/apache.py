@@ -6,11 +6,11 @@ from typing import Iterator, Optional
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
 
 COMMON_REGEX = (
-    r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<url>.*?)" '
+    r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<request>.*?)" '
     r"(?P<status_code>\d{3}) (?P<bytes_sent>\d+)"
 )
 REFERER_USER_AGENT_REGEX = r'"(?P<referer>.*?)" "(?P<useragent>.*?)"'
@@ -72,8 +72,8 @@ class ApachePlugin(plugin.Plugin):
     def check_compatible(self) -> bool:
         return len(self.log_paths) > 0
 
-    @plugin.export(record=WebserverRecord)
-    def access(self) -> Iterator[WebserverRecord]:
+    @plugin.export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
         tzinfo = self.target.datetime.tzinfo
 
         for path in self.log_paths:
@@ -93,11 +93,11 @@ class ApachePlugin(plugin.Plugin):
                     continue
 
                 match = match.groupdict()
-                yield WebserverRecord(
+                yield WebserverAccessLogRecord(
                     ts=datetime.strptime(match["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
                     remote_user=match["remote_user"],
                     remote_ip=match["remote_ip"],
-                    url=match["url"],
+                    request=match["request"],
                     status_code=match["status_code"],
                     bytes_sent=match["bytes_sent"],
                     referer=match.get("referer"),

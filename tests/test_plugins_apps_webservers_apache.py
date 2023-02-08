@@ -82,7 +82,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert combined_log.status_code == 200
     assert combined_log.remote_ip == "1.2.3.4"
     assert combined_log.remote_user == "-"
-    assert combined_log.url == "GET / HTTP/1.1"
+    assert combined_log.request == "GET / HTTP/1.1"
     assert combined_log.referer == "Sample referer"
     assert (
         combined_log.useragent
@@ -95,7 +95,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert vhost_combined_log.status_code == 200
     assert vhost_combined_log.remote_ip == "1.2.3.4"
     assert vhost_combined_log.remote_user == "-"
-    assert vhost_combined_log.url == "GET /index.html HTTP/1.1"
+    assert vhost_combined_log.request == "GET /index.html HTTP/1.1"
     assert vhost_combined_log.referer == "-"
     assert (
         vhost_combined_log.useragent
@@ -108,7 +108,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert common_log.status_code == 200
     assert common_log.remote_ip == "4.3.2.1"
     assert common_log.remote_user == "-"
-    assert common_log.url == "GET / HTTP/1.1"
+    assert common_log.request == "GET / HTTP/1.1"
     assert common_log.referer is None
     assert common_log.useragent is None
 

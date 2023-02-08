@@ -5,11 +5,11 @@ from typing import Iterator
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
 
 LOG_REGEX = re.compile(
-    r'(?P<remote_ip>.*?) - (?P<remote_user>.*?) \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+) (["](?P<referer>(\-)|(.+))["]) "(?P<useragent>.*?)"',  # noqa: E501
+    r'(?P<remote_ip>.*?) - (?P<remote_user>.*?) \[(?P<datetime>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<request>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+) (["](?P<referer>(\-)|(.+))["]) "(?P<useragent>.*?)"',  # noqa: E501
     re.IGNORECASE,
 )
 
@@ -41,8 +41,8 @@ class NginxPlugin(plugin.Plugin):
     def check_compatible(self) -> bool:
         return len(self.log_paths) > 0
 
-    @plugin.export(record=WebserverRecord)
-    def access(self) -> Iterator[WebserverRecord]:
+    @plugin.export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
         tzinfo = self.target.datetime.tzinfo
 
         for path in self.log_paths:
@@ -57,11 +57,11 @@ class NginxPlugin(plugin.Plugin):
                     continue
 
                 match = match.groupdict()
-                yield WebserverRecord(
+                yield WebserverAccessLogRecord(
                     ts=datetime.strptime(match["datetime"], "%d/%b/%Y:%H:%M:%S %z"),
                     remote_ip=match["remote_ip"],
                     remote_user=match["remote_user"],
-                    url=match["url"],
+                    request=match["request"],
                     status_code=match["status_code"],
                     bytes_sent=match["bytes_sent"],
                     referer=match["referer"],

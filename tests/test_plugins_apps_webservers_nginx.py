@@ -20,6 +20,8 @@ def test_plugins_apps_webservers_nginx_txt(target_unix, fs_unix):
     assert log.status_code == 200
     assert log.remote_ip == "1.2.3.4"
     assert log.remote_user == "admin"
+    assert log.request == "GET / HTTP/1.1"
+    assert log.bytes_sent == 123
 
 
 def test_plugins_apps_webservers_nginx_ipv6(target_unix, fs_unix):
@@ -32,6 +34,10 @@ def test_plugins_apps_webservers_nginx_ipv6(target_unix, fs_unix):
 
     log = results[1]
     assert log.remote_ip == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+    assert log.status_code == 200
+    assert log.remote_user == "-"
+    assert log.request == "GET / HTTP/1.1"
+    assert log.bytes_sent == 123
 
 
 def test_plugins_apps_webservers_nginx_gz(target_unix, fs_unix):
@@ -46,6 +52,8 @@ def test_plugins_apps_webservers_nginx_gz(target_unix, fs_unix):
     assert log.status_code == 200
     assert log.remote_ip == "1.2.3.4"
     assert log.remote_user == "admin"
+    assert log.request == "GET / HTTP/1.1"
+    assert log.bytes_sent == 123
 
 
 def test_plugins_apps_webservers_nginx_bz2(target_unix, fs_unix):
@@ -60,6 +68,8 @@ def test_plugins_apps_webservers_nginx_bz2(target_unix, fs_unix):
     assert log.status_code == 200
     assert log.remote_ip == "1.2.3.4"
     assert log.remote_user == "admin"
+    assert log.request == "GET / HTTP/1.1"
+    assert log.bytes_sent == 123
 
 
 def test_plugins_apps_webservers_nginx_config(target_unix, fs_unix):

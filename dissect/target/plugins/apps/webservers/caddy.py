@@ -8,12 +8,12 @@ from dissect.util.ts import from_unix
 
 from dissect.target import plugin
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.apps.webservers.webservers import WebserverRecord
+from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
 
 LOG_FILE_REGEX = re.compile(r"(log|output file) (?P<log_file>.*)( \{)?$")
 LOG_REGEX = re.compile(
-    r'(?P<remote_ip>.*?) - - \[(?P<ts>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<url>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
+    r'(?P<remote_ip>.*?) - - \[(?P<ts>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<request>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
 )
 
 
@@ -71,8 +71,8 @@ class CaddyPlugin(plugin.Plugin):
     def check_compatible(self) -> bool:
         return len(self.log_paths) > 0
 
-    @plugin.export(record=WebserverRecord)
-    def access(self) -> Iterator[WebserverRecord]:
+    @plugin.export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Parses Caddy V1 CRF and Caddy V2 JSON logs.
 
         Resources:
@@ -94,10 +94,10 @@ class CaddyPlugin(plugin.Plugin):
                         self.target.log.warning("Could not decode Caddy JSON log line in file %s", path)
                         continue
 
-                    yield WebserverRecord(
-                        ts=from_unix(log["ts"]),
+                    yield WebserverAccessLogRecord(
+                        ts=from_unix(log["ts"]).replace(tzinfo=tzinfo),
                         remote_ip=log["request"]["remote_ip"],
-                        url=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
+                        request=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
                         status_code=log["status"],
                         bytes_sent=log["size"],
                         source=path.resolve(),
@@ -114,10 +114,10 @@ class CaddyPlugin(plugin.Plugin):
                         continue
                     log = match.groupdict()
 
-                    yield WebserverRecord(
+                    yield WebserverAccessLogRecord(
                         ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
                         remote_ip=log["remote_ip"],
-                        url=log["url"],
+                        request=log["request"],
                         status_code=log["status_code"],
                         bytes_sent=log["bytes_sent"],
                         source=path.resolve(),

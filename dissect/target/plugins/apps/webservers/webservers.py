@@ -5,13 +5,13 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-WebserverRecord = TargetRecordDescriptor(
+WebserverAccessLogRecord = TargetRecordDescriptor(
     "application/log/webserver",
     [
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
-        ("uri", "url"),
+        ("string", "request"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),
         ("uri", "referer"),
@@ -43,21 +43,21 @@ class WebserverPlugin(Plugin):
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible tool plugins found")
 
-    def _func(self, f: str) -> Iterator[WebserverRecord]:
+    def _func(self, f: str) -> Iterator[WebserverAccessLogRecord]:
         for p in self._plugins:
             try:
                 yield from getattr(p, f)()
             except Exception:
                 self.target.log.exception("Failed to execute webserver plugin: %s.%s", p._name, f)
 
-    @export(record=WebserverRecord)
-    def logs(self) -> Iterator[WebserverRecord]:
+    @export(record=WebserverAccessLogRecord)
+    def logs(self) -> Iterator[WebserverAccessLogRecord]:
         """Returns log file records from installed webservers."""
         yield from self.access()
         # TODO: In the future we should add error logs too.
 
-    @export(record=WebserverRecord)
-    def access(self) -> Iterator[WebserverRecord]:
+    @export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Returns access.log records from installed webservers."""
         for record in self._func("access"):
             yield record

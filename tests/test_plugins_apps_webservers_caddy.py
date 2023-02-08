@@ -19,7 +19,7 @@ def test_plugins_apps_webservers_caddy_txt(target_unix, fs_unix):
     assert len(results) == 1
     assert results[0].remote_ip == "127.0.0.1"
     assert results[0].ts == dt(2000, 10, 10, 13, 55, 36, tzinfo=ZoneInfo("America/Phoenix"))
-    assert results[0].url == "GET /apache_pb.gif HTTP/1.1"
+    assert results[0].request == "GET /apache_pb.gif HTTP/1.1"
     assert results[0].status_code == 200
     assert results[0].bytes_sent == 2326
 
@@ -35,7 +35,7 @@ def test_plugins_apps_webservers_caddy_json(target_unix, fs_unix):
     assert len(results) == 2
     assert results[0].remote_ip == "172.17.0.1"
     assert results[0].ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=ZoneInfo("Europe/Amsterdam"))
-    assert results[0].url == "GET / HTTP/1.1"
+    assert results[0].request == "GET / HTTP/1.1"
     assert results[0].status_code == 200
     assert results[0].bytes_sent == 12
 
