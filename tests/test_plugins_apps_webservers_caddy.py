@@ -25,7 +25,6 @@ def test_plugins_apps_webservers_caddy_txt(target_unix, fs_unix):
 
 
 def test_plugins_apps_webservers_caddy_json(target_unix, fs_unix):
-    fs_unix.map_file_fh("etc/timezone", BytesIO(b"Europe/Amsterdam"))
     fs_unix.map_file(
         "var/log/caddy_access.log",
         absolute_path("data/webservers/caddy/access.log"),
@@ -34,7 +33,7 @@ def test_plugins_apps_webservers_caddy_json(target_unix, fs_unix):
     results = list(target_unix.caddy())
     assert len(results) == 2
     assert results[0].remote_ip == "172.17.0.1"
-    assert results[0].ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=ZoneInfo("Europe/Amsterdam"))
+    assert results[0].ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=ZoneInfo("Etc/UTC"))
     assert results[0].request == "GET / HTTP/1.1"
     assert results[0].status_code == 200
     assert results[0].bytes_sent == 12

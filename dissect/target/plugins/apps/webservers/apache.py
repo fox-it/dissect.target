@@ -84,7 +84,7 @@ class ApachePlugin(plugin.Plugin):
                 for path in self.target.fs.path(default_log_dir).glob(default_log_name + "*"):
                     log_paths.append(path)
 
-        # Search for enabled / configured sites and their CustomLog directive.
+        # Check default apache configs for their CustomLog directive.
         default_config_paths = [
             "/etc/apache2/apache2.conf",
             "/usr/local/etc/apache22/httpd.conf",

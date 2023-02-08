@@ -102,7 +102,7 @@ class CaddyPlugin(plugin.Plugin):
                         continue
 
                     yield WebserverAccessLogRecord(
-                        ts=from_unix(log["ts"]).replace(tzinfo=tzinfo),
+                        ts=from_unix(log["ts"]),
                         remote_ip=log["request"]["remote_ip"],
                         request=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
                         status_code=log["status"],
