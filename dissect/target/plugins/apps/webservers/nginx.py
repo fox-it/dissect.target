@@ -34,8 +34,10 @@ class NginxPlugin(plugin.Plugin):
                 line = line.strip()
                 if "access_log " in line:
                     p = list(filter(None, line.strip().split(" ")))[1]
-                    if (path := self.target.fs.path(p).parent).exists():
-                        log_paths.append(path)
+                    if (path := self.target.fs.path(p)).exists():
+                        # The configured /custom/access.log path exists, now we want all rotated versions too, such as /custom/access.log.1
+                        for log_path in path.parent.glob(path.name + "*"):
+                            log_paths.append(log_path)
         return log_paths
 
     def check_compatible(self) -> bool:

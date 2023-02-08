@@ -50,5 +50,18 @@ def test_plugins_apps_webservers_caddy_config(target_unix, fs_unix):
 
     caddy = CaddyPlugin(target_unix)
     assert len(caddy.log_paths) == 2
-    assert str(caddy.log_paths[0]) == "/var/log/caddy"
-    assert str(caddy.log_paths[1]) == "/var/www/log"
+    assert str(caddy.log_paths[0]) == "/var/log/caddy/access.log"
+    assert str(caddy.log_paths[1]) == "/var/www/log/access.log"
+
+
+def test_plugins_apps_webservers_caddy_config_logs_logrotated(target_unix, fs_unix):
+    config_file = absolute_path("data/webservers/caddy/Caddyfile")
+    fs_unix.map_file("etc/caddy/Caddyfile", config_file)
+
+    fs_unix.map_file_fh("var/www/log/access.log", BytesIO("Foo".encode()))
+    fs_unix.map_file_fh("var/www/log/access.log.1", BytesIO("Foo1".encode()))
+    fs_unix.map_file_fh("var/www/log/access.log.2", BytesIO("Foo2".encode()))
+    fs_unix.map_file_fh("var/www/log/access.log.3", BytesIO("Foo3".encode()))
+
+    caddy = CaddyPlugin(target_unix)
+    assert len(caddy.log_paths) == 4

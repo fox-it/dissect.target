@@ -114,3 +114,26 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
 
     ipv6_log = results[3]
     assert ipv6_log.remote_ip == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+
+
+def test_plugins_apps_webservers_apache_logrotate(target_unix, fs_unix):
+    data_file = absolute_path("data/webservers/apache/access.log")
+    fs_unix.map_file("var/log/apache2/access.log", data_file)
+    fs_unix.map_file("var/log/apache2/access.log.1", data_file)
+    fs_unix.map_file("var/log/apache2/access.log.2", data_file)
+    fs_unix.map_file("var/log/apache2/access.log.3", data_file)
+
+    apache = ApachePlugin(target_unix)
+    assert len(apache.log_paths) == 4
+
+
+def test_plugins_apps_webservers_apache_custom_config(target_unix, fs_unix):
+
+    fs_unix.map_file_fh("etc/apache2/apache2.conf", BytesIO(b'CustomLog "/custom/log/location/access.log" common'))
+    fs_unix.map_file_fh("custom/log/location/access.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("custom/log/location/access.log.1", BytesIO(b"Foo1"))
+    fs_unix.map_file_fh("custom/log/location/access.log.2", BytesIO(b"Foo2"))
+    fs_unix.map_file_fh("custom/log/location/access.log.3", BytesIO(b"Foo3"))
+
+    apache = ApachePlugin(target_unix)
+    assert len(apache.log_paths) == 4

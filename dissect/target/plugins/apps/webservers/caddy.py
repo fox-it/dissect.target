@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
+from os.path import basename
 
 from dissect.util.ts import from_unix
 
@@ -29,7 +30,7 @@ class CaddyPlugin(plugin.Plugin):
         log_paths = []
         default_log_file = self.target.fs.path("/var/log/caddy_access.log")
         if default_log_file.exists():
-            log_paths.append(default_log_file)
+            log_paths = [self.target.fs.path(p) for p in default_log_file.parent.glob(default_log_file.name + "*")]
 
         # Check for custom paths in Caddy config
         if (config_file := self.target.fs.path("/etc/caddy/Caddyfile")).exists():
@@ -55,16 +56,22 @@ class CaddyPlugin(plugin.Plugin):
                     match = match.groupdict()
                     p = match["log_file"].replace(" {", "").split(" ")[-1]
 
+                    # Search all root folders we found earlier with the current relative log path we found.
                     if not p.startswith("/"):
                         for root in found_roots:
+                            # Logs will be located one folder higher than the defined root.
                             root_parent = self.target.fs.path(root).parent
-                            abs_log_path = self.target.fs.path(root_parent).joinpath(p).parent
-                            if abs_log_path.exists() and abs_log_path not in log_paths:
-                                log_paths.append(abs_log_path)
+                            abs_log_folder = self.target.fs.path(root_parent).joinpath(p).parent
+
+                            # Add all /foo/bar.log* files
+                            for path in abs_log_folder.glob(basename(p) + "*"):
+                                if path.exists() and path not in log_paths:
+                                    log_paths.append(path)
                     else:
-                        if (path := self.target.fs.path(p).parent).exists():
-                            if path not in log_paths:
-                                log_paths.append(path)
+                        if (parent_folder := self.target.fs.path(p).parent).exists():
+                            for path in parent_folder.glob(basename(p) + "*"):
+                                if path not in log_paths:
+                                    log_paths.append(path)
 
         return log_paths
 

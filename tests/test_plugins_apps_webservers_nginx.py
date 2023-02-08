@@ -81,3 +81,14 @@ def test_plugins_apps_webservers_nginx_config(target_unix, fs_unix):
 
     nginx = NginxPlugin(target_unix)
     assert len(nginx.log_paths) == 4
+
+
+def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix, fs_unix):
+    config_file = absolute_path("data/webservers/nginx/nginx.conf")
+    fs_unix.map_file("etc/nginx/nginx.conf", config_file)
+    fs_unix.map_file_fh("opt/logs/0/access.log", BytesIO("Foo1".encode()))
+    fs_unix.map_file_fh("opt/logs/0/access.log.1", BytesIO("Foo2".encode()))
+    fs_unix.map_file_fh("opt/logs/0/access.log.2", BytesIO("Foo3".encode()))
+
+    nginx = NginxPlugin(target_unix)
+    assert len(nginx.log_paths) == 3

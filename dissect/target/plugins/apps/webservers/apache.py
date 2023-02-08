@@ -66,8 +66,41 @@ class ApachePlugin(plugin.Plugin):
 
     @plugin.internal
     def get_log_paths(self) -> list[Path]:
-        default_logs_dir = "/var/log/apache2"
-        return list(self.target.fs.path(default_logs_dir).glob("access.log*"))
+        """
+        Discover any present Apache log paths on the target system.
+
+        Resources:
+            - https://www.cyberciti.biz/faq/apache-logs/
+            - https://unix.stackexchange.com/a/269090
+        """
+
+        log_paths = []
+
+        # Check if any well known default apache log locations exist.
+        default_logs_dirs = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
+        default_log_names = ["access.log", "access_log", "httpd-access.log"]
+        for default_log_dir in default_logs_dirs:
+            for default_log_name in default_log_names:
+                for path in self.target.fs.path(default_log_dir).glob(default_log_name + "*"):
+                    log_paths.append(path)
+
+        # Search for enabled / configured sites and their CustomLog directive.
+        default_config_paths = [
+            "/etc/apache2/apache2.conf",
+            "/usr/local/etc/apache22/httpd.conf",
+            "/etc/httpd/conf/httpd.conf",
+        ]
+
+        for config in default_config_paths:
+            if (path := self.target.fs.path(config)).exists():
+                for line in open_decompress(path, "rt"):
+                    if "CustomLog" in line:
+                        custom_log = line.split(" ")[1].replace('"', "").strip()
+                        if (p := self.target.fs.path(custom_log)).exists():
+                            for log_path in p.parent.glob(p.name + "*"):
+                                log_paths.append(log_path)
+
+        return log_paths
 
     def check_compatible(self) -> bool:
         return len(self.log_paths) > 0
