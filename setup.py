@@ -62,7 +62,7 @@ setup(
         "dissect.regf>=3.3.dev,<4.0.dev",
         "dissect.util>=3.0.dev,<4.0.dev",
         "dissect.volume>=3.0.dev,<4.0.dev",
-        "flow.record~=3.8",
+        "flow.record~=3.9",
         "structlog",
     ],
     extras_require={
