@@ -11,6 +11,7 @@ from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
@@ -267,9 +268,32 @@ class IISLogsPlugin(plugin.Plugin):
             self.target.log.info("Parsing IIS log file %s in %s format", log_file, log_format)
             yield from parse_func(log_file)
 
-    @plugin.export(record=BasicRecordDescriptor)
-    def access(self) -> Iterator[TargetRecordDescriptor]:
-        return self.logs()
+    @plugin.export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
+        """Return contents of IIS (v7 and above) log files in unified WebserverAccessLogRecord format.
+
+        See function ``iis.logs()`` for more information and more verbose IIS records.
+        """
+
+        for iis_record in self.logs():
+
+            request = None
+            if iis_record.log_format == "W3C":
+                # W3C format may sometimes contain cs_version
+                request = f"{iis_record.request_method} {iis_record.request_path} {iis_record._asdict().get('cs_version', '')}".strip()
+
+            yield WebserverAccessLogRecord(
+                ts=iis_record.ts,
+                remote_user=iis_record.username,
+                remote_ip=iis_record.client_ip,
+                request=request,
+                status_code=iis_record._asdict().get("service_status_code", None),
+                bytes_sent=iis_record.response_size_bytes,
+                referer=iis_record._asdict().get("cs_referer", None),
+                useragent=iis_record._asdict().get("cs_user_agent", None),
+                source=iis_record.log_file,
+                _target=self.target,
+            )
 
 
 def replace_dash_with_none(data: dict) -> dict:
