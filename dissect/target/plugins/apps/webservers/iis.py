@@ -89,14 +89,20 @@ class IISLogsPlugin(plugin.Plugin):
     def parse_iis_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         """Parse log file in IIS format and stream log records.
 
+        This format is not the default IIS log format.
+
         References:
-            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
+            1. https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
+            2. https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
+            3. https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-IIS
         """
+
+        tzinfo = self.target.datetime.tzinfo
 
         def parse_datetime(date_str, time_str):
             # Example: 10/1/2021 7:19:59
-            return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %H:%M:%S")
+            # "time is recorded as local time." [^3]
+            return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %H:%M:%S").replace(tzinfo=tzinfo)
 
         for line in path.open().readlines():
             # even though the docs say that IIS log format is ASCII format,
@@ -141,9 +147,12 @@ class IISLogsPlugin(plugin.Plugin):
     def parse_w3c_format_log(self, path: Path) -> Iterator[TargetRecordDescriptor]:
         """Parse log file in W3C format and stream log records.
 
+        This is the default logging format for IIS [^3].
+
         References:
-            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
+            1. https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
+            2. https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
+            3. https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-W3C
         """  # noqa: E501
 
         basic_fields = {
@@ -219,6 +228,8 @@ class IISLogsPlugin(plugin.Plugin):
             #     "time-taken": "1"
             # }
 
+            # Make the datetime timezone aware.
+            # "the time stamp for each W3C Extended Logging log record is UTC-based." [^3]
             ts = None
             if raw.get("date") and raw.get("time"):
                 ts = datetime.strptime(f"{raw['date']} {raw['time']}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
