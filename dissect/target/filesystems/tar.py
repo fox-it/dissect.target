@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import stat
 import tarfile
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.stream import BufferedStream
 
@@ -94,12 +94,12 @@ class TarFilesystemEntry(VirtualFile):
         except Exception:
             raise FileNotFoundError()
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         if self.is_dir():
             return self._resolve().iterdir()
         return super().iterdir()
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         if self.is_dir():
             return self._resolve().scandir()
         return super().scandir()
@@ -122,7 +122,7 @@ class TarFilesystemEntry(VirtualFile):
         """Return whether this entry is a link."""
         return self.entry.issym()
 
-    def readlink(self):
+    def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
         if not self.is_symlink():
             raise NotASymlinkError()
