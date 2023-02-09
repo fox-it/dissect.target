@@ -44,6 +44,7 @@ class TarFilesystem(Filesystem):
         self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+        self._fs.tar = self.tar
 
         for member in self.tar.getmembers():
             mname = member.name.strip("/")
@@ -53,7 +54,7 @@ class TarFilesystem(Filesystem):
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
-            file_entry = entry_cls(self, rel_name, member)
+            file_entry = entry_cls(self._fs, rel_name, member)
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
@@ -156,7 +157,7 @@ class TarFilesystemEntry(VirtualFile):
 
 
 class TarFilesystemDirectoryEntry(VirtualDirectory):
-    def __init__(self, fs: TarFilesystem, path: str, entry: tarfile.TarInfo):
+    def __init__(self, fs: VirtualFilesystem, path: str, entry: tarfile.TarInfo):
         super().__init__(fs, path)
         self.entry = entry
 
