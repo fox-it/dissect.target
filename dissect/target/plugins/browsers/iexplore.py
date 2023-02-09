@@ -10,14 +10,11 @@ from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_DOWNLOAD_RECORD_FIELDS,
     try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
 from dissect.target.target import Target
-
-IEBrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
-)
 
 
 class WebCache:
@@ -47,6 +44,9 @@ class WebCache:
     def history(self) -> Iterator[record.Record]:
         yield from self._iter_records("history")
 
+    def downloads(self) -> Iterator[record.Record]:
+        yield from self._iter_records("iedownload")
+
 
 class InternetExplorerPlugin(Plugin):
     """Internet explorer browser plugin."""
@@ -56,8 +56,13 @@ class InternetExplorerPlugin(Plugin):
     DIRS = [
         "AppData/Local/Microsoft/Windows/WebCache",
     ]
-
     CACHE_FILENAME = "WebCacheV01.dat"
+    IE_BROWSER_HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+    IE_BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -74,8 +79,8 @@ class InternetExplorerPlugin(Plugin):
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Internet Explorer directories found")
 
-    @export(record=IEBrowserHistoryRecord)
-    def history(self) -> Iterator[IEBrowserHistoryRecord]:
+    @export(record=IE_BROWSER_HISTORY_RECORD)
+    def history(self) -> Iterator[IE_BROWSER_HISTORY_RECORD]:
         """Return browser history records from Internet Explorer.
 
         Yields IEBrowserHistoryRecord with the following fields:
@@ -113,7 +118,7 @@ class InternetExplorerPlugin(Plugin):
                 if accessed_time := container_record.get("AccessedTime"):
                     ts = wintimestamp(accessed_time)
 
-                yield IEBrowserHistoryRecord(
+                yield self.IE_BROWSER_HISTORY_RECORD(
                     ts=ts,
                     browser="iexplore",
                     id=container_record.get("EntryId"),
@@ -128,6 +133,36 @@ class InternetExplorerPlugin(Plugin):
                     session=None,
                     from_visit=None,
                     from_url=None,
+                    source=str(cache_file),
+                    _target=self.target,
+                    _user=user,
+                )
+
+    @export(record=IE_BROWSER_DOWNLOAD_RECORD)
+    def downloads(self):
+        for user, cdir in self.users_dirs:
+            cache_file = cdir.joinpath(self.CACHE_FILENAME)
+            if not cache_file.exists():
+                continue
+
+            cache = WebCache(self.target, cache_file.open())
+            for r in cache.downloads():
+                '''for c in r._table.column_names:
+                    recordname = r.get(c)
+                    print(c + ": ")
+                    print(recordname)'''
+                response_headers = r.ResponseHeaders.decode("utf-16-le", errors="ignore")
+                ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
+                # print(response_headers.split('\x00'))
+                yield self.IE_BROWSER_DOWNLOAD_RECORD(
+                    ts_start=None,
+                    ts_end=wintimestamp(r.AccessedTime),
+                    browser="iexplore",
+                    id=r.EntryId,
+                    path=down_path,
+                    url=down_url,
+                    size=None,
+                    state=None,
                     source=str(cache_file),
                     _target=self.target,
                     _user=user,
