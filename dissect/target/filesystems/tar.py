@@ -70,13 +70,13 @@ class TarFilesystem(Filesystem):
         finally:
             fh.seek(offset)
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> TarFilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
         return self._fs.get(path, relentry=relentry)
 
 
 class TarFilesystemEntry(VirtualFile):
-    def _resolve(self) -> TarFilesystemEntry:
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
@@ -128,7 +128,7 @@ class TarFilesystemEntry(VirtualFile):
             raise NotASymlinkError()
         return self.entry.linkname
 
-    def readlink_ext(self) -> TarFilesystemEntry:
+    def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
         return fsutil.resolve_link(fs=self.fs, entry=self)
