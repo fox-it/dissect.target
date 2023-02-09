@@ -11,6 +11,7 @@ from dissect.util.stream import BufferedStream
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import (
     Filesystem,
+    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -71,9 +72,9 @@ class ZipFilesystem(Filesystem):
         finally:
             fh.seek(offset)
 
-    def get(self, path: str, *args, **kwargs) -> ZipFilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry = None) -> ZipFilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, *args, **kwargs)
+        return self._fs.get(path, relentry)
 
 
 class ZipFilesystemEntry(VirtualFile):

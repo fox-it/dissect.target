@@ -15,6 +15,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
+    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -69,9 +70,9 @@ class TarFilesystem(Filesystem):
         finally:
             fh.seek(offset)
 
-    def get(self, path: str, *args, **kwargs) -> TarFilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry = None) -> TarFilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, *args, **kwargs)
+        return self._fs.get(path, relentry)
 
 
 class TarFilesystemEntry(VirtualFile):
@@ -156,7 +157,7 @@ class TarFilesystemEntry(VirtualFile):
 
 
 class TarFilesystemDirectoryEntry(VirtualDirectory):
-    def __init__(self, fs: VirtualFilesystem, path: str, entry: tarfile.TarInfo):
+    def __init__(self, fs: TarFilesystem, path: str, entry: tarfile.TarInfo):
         super().__init__(fs, path)
         self.entry = entry
 
