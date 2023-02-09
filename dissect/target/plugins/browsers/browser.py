@@ -20,6 +20,17 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("uri", "from_url"),
     ("path", "source"),
 ]
+GENERIC_DOWNLOAD_RECORD_FIELDS = [
+    ("datetime", "ts_start"),
+    ("datetime", "ts_end"),
+    ("string", "browser"),
+    ("varint", "id"),
+    ("path", "path"),
+    ("uri", "url"),
+    ("filesize", "size"),
+    ("varint", "state"),
+    ("path", "source"),
+]
 
 BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/history", GENERIC_HISTORY_RECORD_FIELDS
