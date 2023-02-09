@@ -167,37 +167,46 @@ class GenericPlugin(Plugin):
                 continue
 
     @export(property=True)
-    def activity(self):
+    def activity(self) -> Optional[datetime]:
         """Return last seen activity based on filesystem timestamps."""
         last_seen = 0
 
         try:
             for f in self.target.fs.scandir("sysvol/windows/system32/winevt/logs"):
-                if f.stat()._integer_mtime > last_seen:
-                    last_seen = f.stat()._integer_mtime
-        except Exception:  # noqa
+                if f.stat()._st_mtime > last_seen:
+                    last_seen = f.stat()._st_mtime
+        except Exception as e:  # noqa
+            self.target.log.debug(f"Could not determine last activity: {e}")
             pass
 
         try:
             for f in self.target.fs.scandir("sysvol/windows/system32/config"):
-                if f.stat()._integer_mtime > last_seen:  # noqa
-                    last_seen = f.stat()._integer_mtime  # noqa
-        except Exception:  # noqa
+                if f.stat()._st_mtime > last_seen:  # noqa
+                    last_seen = f.stat()._st_mtime  # noqa
+        except Exception as e:  # noqa
+            self.target.log.debug(f"Could not determine last activity: {e}")
             pass
 
-        if last_seen != 0:
-            return from_unix(last_seen)
+        if last_seen == 0:
+            return
 
-        return None
+        return from_unix(last_seen)
 
     @export(property=True)
     def install_date(self) -> Optional[datetime]:
-        """Returns the install date of the system."""
+        """Returns the install date of the system.
+
+        The value of the registry key is stored as seconds since January 1 1970 inside a 32-bit REG_DWORD.
+
+        Resources:
+            - https://winreg-kb.readthedocs.io/en/latest/_modules/winregrc/sysinfo.html?highlight=_ParseInstallDate
+            - https://www.forensics-matters.com/2018/09/15/find-out-windows-installation-date/
+        """
 
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 
         try:
-            return wintimestamp(self.target.registry.key(key).value("InstallDate").value)
+            return from_unix(self.target.registry.key(key).value("InstallDate").value)
         except RegistryError:
             return
 

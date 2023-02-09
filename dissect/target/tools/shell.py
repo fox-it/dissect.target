@@ -31,10 +31,10 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
+from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     generate_argparse_for_bound_method,
-    print_target_info,
     process_generic_arguments,
 )
 
