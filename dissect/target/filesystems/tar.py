@@ -54,11 +54,11 @@ class TarFilesystem(Filesystem):
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
-            file_entry = entry_cls(self._fs, rel_name, member)
+            file_entry = entry_cls(self, rel_name, member)
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
-    def detect(fh) -> bool:
+    def detect(fh: BinaryIO) -> bool:
         """Detect a tar file on a given file-like object."""
         offset = fh.tell()
         try:
@@ -70,9 +70,9 @@ class TarFilesystem(Filesystem):
         finally:
             fh.seek(offset)
 
-    def get(self, path) -> TarFilesystemEntry:
+    def get(self, path: str, *args, **kwargs) -> TarFilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path)
+        return self._fs.get(path, *args, **kwargs)
 
 
 class TarFilesystemEntry(VirtualFile):
