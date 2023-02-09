@@ -72,7 +72,7 @@ class TarFilesystem(Filesystem):
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> TarFilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, relentry)
+        return self._fs.get(path, relentry=relentry)
 
 
 class TarFilesystemEntry(VirtualFile):

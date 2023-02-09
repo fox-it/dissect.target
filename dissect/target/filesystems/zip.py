@@ -74,7 +74,7 @@ class ZipFilesystem(Filesystem):
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> ZipFilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, relentry)
+        return self._fs.get(path, relentry=relentry)
 
 
 class ZipFilesystemEntry(VirtualFile):
