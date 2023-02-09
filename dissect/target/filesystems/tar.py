@@ -44,7 +44,6 @@ class TarFilesystem(Filesystem):
         self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
-        self._fs.tar = self.tar
 
         for member in self.tar.getmembers():
             mname = member.name.strip("/")
