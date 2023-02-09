@@ -1,11 +1,11 @@
 import urllib.parse
-
-import pytest
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
-from dissect.target.target import Event, Target
-from dissect.target.filesystems.dir import DirectoryFilesystem
+import pytest
+
 from dissect.target.exceptions import FilesystemError
+from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.target import Event, Target
 
 
 @pytest.fixture

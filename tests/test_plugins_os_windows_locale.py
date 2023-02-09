@@ -33,9 +33,19 @@ def test_locale_plugin_windows(target_win_users, hive_hku, hive_hklm):
     timezoneinformation_key.add_value("TimeZoneKeyName", "Pacific Standard Time")
     hive_hklm.map_key(timezoneinformation_key_name, timezoneinformation_key)
 
+    # timezone info
+    tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\Pacific Standard Time"
+    tz_data = VirtualKey(hive_hklm, tz_data_path)
+    tz_data.add_value("Display", "(UTC-08:00) Pacific Time (US & Canada)")
+    tz_data.add_value("Dlt", "Pacific Summer Time")
+    tz_data.add_value("Std", "Pacific Standard Time")
+    tzi = bytes.fromhex("e001000000000000c4ffffff00000b0000000100020000000000000000000300000002000200000000000000")
+    tz_data.add_value("TZI", tzi)
+    hive_hklm.map_key(tz_data_path, tz_data)
+
     target_win_users.add_plugin(WindowsLocalePlugin)
-    assert target_win_users.language == ["en-US"]
-    assert target_win_users.timezone == "Pacific Standard Time"
+    assert target_win_users.language == ["en_US"]
+    assert target_win_users.timezone == "America/Los_Angeles"
 
     keyboard = list(target_win_users.keyboard())
     assert len(keyboard) == 2

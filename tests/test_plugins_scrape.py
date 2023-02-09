@@ -1,5 +1,5 @@
-import os
 import io
+import os
 import random
 
 from dissect.target.plugins.general import scrape

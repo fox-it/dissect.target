@@ -1,6 +1,6 @@
+from dissect import cstruct
 from flow.record.fieldtypes import uri
 
-from dissect import cstruct
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export

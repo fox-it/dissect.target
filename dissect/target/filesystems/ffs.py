@@ -17,8 +17,8 @@ class FfsFilesystem(Filesystem):
     __fstype__ = "ffs"
 
     def __init__(self, fh, *args, **kwargs):
-        self.ffs = ffs.FFS(fh)
         super().__init__(fh, *args, **kwargs)
+        self.ffs = ffs.FFS(fh)
 
     @staticmethod
     def detect(fh):

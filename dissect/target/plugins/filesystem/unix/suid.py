@@ -4,7 +4,6 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.filesystem.walkfs import FilesystemRecord
 
-
 SuidRecord = TargetRecordDescriptor(
     "filesystem/unix/suid",
     FilesystemRecord.target_fields,

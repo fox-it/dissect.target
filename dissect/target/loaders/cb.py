@@ -2,6 +2,7 @@ from urllib.parse import urlparse
 
 from cbapi.live_response_api import LiveResponseError
 from cbapi.response import CbResponseAPI, Sensor
+
 from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,

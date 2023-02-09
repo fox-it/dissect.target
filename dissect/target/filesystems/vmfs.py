@@ -21,8 +21,8 @@ class VmfsFilesystem(Filesystem):
     __fstype__ = "vmfs"
 
     def __init__(self, fh, *args, **kwargs):
-        self.vmfs = vmfs.VMFS(fh)
         super().__init__(fh, *args, **kwargs)
+        self.vmfs = vmfs.VMFS(fh)
 
     @staticmethod
     def detect(fh):

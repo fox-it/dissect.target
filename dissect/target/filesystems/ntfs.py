@@ -3,12 +3,10 @@ from __future__ import annotations
 import stat
 from typing import BinaryIO, Iterator, Optional
 
-from dissect.ntfs import NTFS, NTFS_SIGNATURE, MftRecord, IndexEntry
-from dissect.ntfs.exceptions import (
-    Error as NtfsError,
-    FileNotFoundError as NtfsFileNotFoundError,
-    NotADirectoryError as NtfsNotADirectoryError,
-)
+from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
+from dissect.ntfs.exceptions import Error as NtfsError
+from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
+from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
 from dissect.ntfs.util import AttributeMap
 
 from dissect.target.exceptions import (
@@ -33,8 +31,8 @@ class NtfsFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
+        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
         self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
-        super().__init__(case_sensitive=False, alt_separator="\\", *args, **kwargs)
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:

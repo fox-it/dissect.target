@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from dissect.target.helpers import config, keychain, docs
+from dissect.target.helpers import config, docs, keychain
 from dissect.target.plugins.os.windows.iis import IISLogsPlugin
 
 from ._utils import absolute_path

@@ -6,7 +6,7 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Iterator, Callable, TextIO, Any, Optional
+from typing import Any, Callable, Iterator, List, Optional, TextIO
 
 import structlog
 
@@ -17,7 +17,6 @@ from dissect.target.tools.dump.utils import (
     get_current_utc_time,
     parse_datetime_iso,
 )
-
 
 log = structlog.get_logger(__name__)
 

@@ -1,3 +1,4 @@
+from dissect.target.helpers.localeutil import normalize_language
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -46,9 +47,7 @@ class LocalePlugin(Plugin):
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        found_languages.append(
-                            line.replace("LANG=", "").replace('"', "").replace(".UTF-8", "").replace("_", "-").strip()
-                        )
+                        found_languages.append(normalize_language(line.replace("LANG=", "").strip()))
 
         return found_languages
 

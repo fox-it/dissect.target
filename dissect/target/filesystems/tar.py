@@ -37,7 +37,7 @@ class TarFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(fh, *args, **kwargs)
         fh.seek(0)
 
         self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)

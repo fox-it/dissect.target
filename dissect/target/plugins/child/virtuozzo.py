@@ -2,7 +2,7 @@ from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 
 
-class VirtuozzoTargetPlugin(ChildTargetPlugin):
+class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields from Virtuozzo container's root.
 
     Virtuozzo conatiners are by default registered in the folder ``vz/root/$VEID``,
@@ -31,6 +31,6 @@ class VirtuozzoTargetPlugin(ChildTargetPlugin):
         for container in self.target.fs.path(self.PATH).iterdir():
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=str(container),
+                path=container,
                 _target=self.target,
             )

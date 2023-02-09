@@ -1,14 +1,12 @@
-import textwrap
 import argparse
-
 import dataclasses
+import textwrap
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Type
 
 from dissect.target import Target
 from dissect.target.plugin import Plugin
 from dissect.target.target import Event
-
 
 BLOCK_INDENT = 4 * " "
 

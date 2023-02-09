@@ -4,6 +4,7 @@ from io import BytesIO
 from pathlib import Path
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
+
 from dissect.target.plugins.os.windows import defender
 
 from ._utils import absolute_path

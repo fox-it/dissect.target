@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers import loaderutil

@@ -1,7 +1,6 @@
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cit import CITPlugin
 
-
 CIT_TEST_DATA = bytes.fromhex(
     "9c0500004f0d000091b5000a000c004f0d000000b730bad0906ad7010000bd2d"
     "f810000000aa0a001870001818000c58041c00100100007b4e022e046268009c"

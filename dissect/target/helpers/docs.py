@@ -1,9 +1,7 @@
 import inspect
 import itertools
 import textwrap
-
-from typing import Callable, Tuple, Type, Any
-
+from typing import Any, Callable, Tuple, Type
 
 NO_DOCS = "No documentation"
 
