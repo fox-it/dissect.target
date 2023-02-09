@@ -71,9 +71,9 @@ class ZipFilesystem(Filesystem):
         finally:
             fh.seek(offset)
 
-    def get(self, path: str) -> ZipFilesystemEntry:
+    def get(self, path: str, *args, **kwargs) -> ZipFilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path)
+        return self._fs.get(path, *args, **kwargs)
 
 
 class ZipFilesystemEntry(VirtualFile):
