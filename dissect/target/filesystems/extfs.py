@@ -1,4 +1,5 @@
 import stat
+from typing import Any, BinaryIO, Iterator, Optional
 
 from dissect.extfs import extfs
 
@@ -16,26 +17,19 @@ from dissect.target.helpers import fsutil
 class ExtFilesystem(Filesystem):
     __fstype__ = "ext"
 
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.extfs = extfs.ExtFS(fh)
 
     @staticmethod
-    def detect(fh):
-        try:
-            offset = fh.tell()
-            fh.seek(1024)
-            sector = fh.read(512)
-            fh.seek(offset)
+    def _detect(fh: BinaryIO) -> bool:
+        fh.seek(1024)
+        return fh.read(512)[56:58] == b"\x53\xef"
 
-            return sector[56:58] == b"\x53\xef"
-        except Exception:  # noqa
-            return False
-
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         return ExtFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path, node=None):
+    def _get_node(self, path: str, node: Optional[extfs.INode] = None) -> extfs.INode:
         try:
             return self.extfs.get(path, node)
         except extfs.FileNotFoundError as e:
@@ -49,21 +43,21 @@ class ExtFilesystem(Filesystem):
 
 
 class ExtFilesystemEntry(FilesystemEntry):
-    def _resolve(self):
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return ExtFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
-    def open(self):
+    def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -77,7 +71,7 @@ class ExtFilesystemEntry(FilesystemEntry):
 
                 yield f
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -92,31 +86,31 @@ class ExtFilesystemEntry(FilesystemEntry):
                 path = fsutil.join(self.path, fname, alt_separator=self.fs.alt_separator)
                 yield ExtFilesystemEntry(self.fs, path, f)
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         try:
             return self._resolve().entry.filetype == stat.S_IFDIR
         except FilesystemError:
             return False
 
-    def is_file(self):
+    def is_file(self) -> bool:
         try:
             return self._resolve().entry.filetype == stat.S_IFREG
         except FilesystemError:
             return False
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return self.entry.filetype == stat.S_IFLNK
 
-    def readlink(self):
+    def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError()
 
         return self.entry.link
 
-    def stat(self):
+    def stat(self) -> fsutil.stat_result:
         return self._resolve().lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
@@ -143,8 +137,8 @@ class ExtFilesystemEntry(FilesystemEntry):
 
         return st_info
 
-    def attr(self):
+    def attr(self) -> Any:
         return self._resolve().entry.xattr
 
-    def lattr(self):
+    def lattr(self) -> Any:
         return self.entry.xattr
