@@ -37,7 +37,8 @@ class VolumeSystem:
 
     Volume systems are responsible for parsing a volume system over one or more disks and
     returning all available volumes.
-    Subclasses of ``VolumeSystem`` must implement the ``detect`` and ``_volumes`` methods.
+
+    Subclasses of ``VolumeSystem`` must implement the ``_detect`` and ``_volumes`` methods.
 
     Args:
         fh: The source file-like object(s) on which to open the volume system.
@@ -53,12 +54,34 @@ class VolumeSystem:
         self.serial = serial
         self._volumes_list: list[Volume] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} serial={self.serial}>"
 
-    @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    @classmethod
+    def detect(cls, fh: BinaryIO) -> bool:
         """Detects whether this ``VolumeSystem`` class can be opened on the given file-like object.
+
+        The position of ``fh`` will be restored before returning.
+
+        Returns:
+            ``True`` or ``False`` if the ``VolumeSystem`` can be opened from this file-like object.
+        """
+        offset = fh.tell()
+        try:
+            return cls._detect(fh)
+        except Exception as e:
+            log.warning("Failed to detect %s volume system", cls)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return False
+
+    @staticmethod
+    def _detect(fh: BinaryIO) -> bool:
+        """Detects whether this ``VolumeSystem`` class can be opened on the given file-like object.
+
+        This method should be implemented by subclasses. The position of ``fh`` is guaranteed to be ``0``.
 
         Returns:
             ``True`` or ``False`` if the ``VolumeSystem`` can be opened from this file-like object.
@@ -97,7 +120,7 @@ class EncryptedVolumeSystem(VolumeSystem):
 
     PROVIDER: str = None
 
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
 
         if not self.PROVIDER:
@@ -138,9 +161,34 @@ class LogicalVolumeSystem(VolumeSystem):
     logical volume systems.
     """
 
-    @staticmethod
-    def detect_volume(fh: BinaryIO) -> bool:
+    @classmethod
+    def detect_volume(cls, fh: BinaryIO) -> bool:
         """Determine whether the given file-like object belongs to this logical volume system.
+
+        The position of ``fh`` will be restored before returning.
+
+        Args:
+            fh: A file-like object that may be part of the logical volume system.
+
+        Returns:
+            ``True`` if the given file-like object is part of the logical volume system, ``False`` otherwise.
+        """
+        offset = fh.tell()
+        try:
+            return cls._detect_volume(fh)
+        except Exception as e:
+            log.warning("Failed to detect %s logical volume", cls)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return False
+
+    @staticmethod
+    def _detect_volume(fh: BinaryIO) -> bool:
+        """Determine whether the given file-like object belongs to this logical volume system.
+
+        This method should be implemented by subclasses. The position of ``fh`` is guaranteed to be ``0``.
 
         Args:
             fh: A file-like object that may be part of the logical volume system.
@@ -219,7 +267,7 @@ class Volume(io.IOBase):
 
         self.seek(0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
 
     def read(self, length: int) -> bytes:

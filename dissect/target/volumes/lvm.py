@@ -34,7 +34,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
                 continue
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
         for vol in vols:
             if LvmVolumeSystem.detect_volume(vol):
@@ -42,14 +42,9 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         return False
 
     @staticmethod
-    def detect_volume(fh: BinaryIO) -> bool:
-        try:
-            offset = fh.tell()
-            buf = fh.read(4096)
-            fh.seek(offset)
-            return b"LABELONE" in buf
-        except Exception:  # noqa
-            return False
+    def _detect_volume(fh: BinaryIO) -> bool:
+        buf = fh.read(4096)
+        return b"LABELONE" in buf
 
     def _volumes(self) -> Iterator[Volume]:
         for num, lv in enumerate(self.lvm.volume_group.logical_volumes):

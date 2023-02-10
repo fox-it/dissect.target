@@ -1,5 +1,4 @@
 import logging
-import struct
 from collections import defaultdict
 from typing import BinaryIO, Iterator, Union
 
@@ -34,7 +33,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
                 continue
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         vols = [fh] if not isinstance(fh, list) else fh
         for vol in vols:
             if VmfsVolumeSystem.detect_volume(vol):
@@ -42,17 +41,10 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         return False
 
     @staticmethod
-    def detect_volume(fh: BinaryIO) -> bool:
-        offset = fh.tell()
-        try:
-            fh.seek(c_vmfs.VMFS_LVM_DEVICE_META_BASE)
-            buf = fh.read(512)
-            return struct.unpack("<I", buf[:4])[0] == c_vmfs.VMFS_LVM_DEVICE_META_MAGIC
-        except Exception as e:
-            log.warning("Failed to detect VMFS LVM", exc_info=e)
-            return False
-        finally:
-            fh.seek(offset)
+    def _detect_volume(fh: BinaryIO) -> bool:
+        fh.seek(c_vmfs.VMFS_LVM_DEVICE_META_BASE)
+        sector = fh.read(512)
+        return int.from_bytes(sector[:4], "little") == c_vmfs.VMFS_LVM_DEVICE_META_MAGIC
 
     def _volumes(self) -> Iterator[Volume]:
         try:
