@@ -60,17 +60,9 @@ class ZipFilesystem(Filesystem):
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         """Detect a zip file on a given file-like object."""
-        offset = fh.tell()
-        try:
-            fh.seek(0)
-            return zipfile.is_zipfile(fh)
-        except Exception as e:
-            log.warning("Failed to detect zip filesystem", exc_info=e)
-            return False
-        finally:
-            fh.seek(offset)
+        return zipfile.is_zipfile(fh)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""

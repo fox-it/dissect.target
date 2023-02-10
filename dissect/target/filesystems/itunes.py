@@ -14,7 +14,7 @@ class ITunesFilesystem(VirtualFilesystem):
                 self.map_file_entry(file.translated_path, ITunesFile(self, file.translated_path, file))
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh):
         raise TypeError("Detect is not allowed on ITunesFilesystem class")
 
 

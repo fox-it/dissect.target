@@ -1,6 +1,6 @@
 import datetime
-import logging
 import stat
+from typing import BinaryIO, Iterator, Optional, Union
 
 from dissect.fat import exceptions as fat_exc
 from dissect.fat import fat
@@ -9,13 +9,11 @@ from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
-log = logging.getLogger(__name__)
-
 
 class FatFilesystem(Filesystem):
     __fstype__ = "fat"
 
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
         self.fatfs = fat.FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
@@ -24,27 +22,21 @@ class FatFilesystem(Filesystem):
         self.tzinfo = datetime.timezone.utc
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh: BinaryIO) -> bool:
         """Detect a FAT filesystem on a given file-like object."""
         try:
-            offset = fh.tell()
-            fh.seek(0)
-            buf = fh.read(512)
-            fh.seek(offset)
-
-            fat.validate_bpb(buf)
+            fat.validate_bpb(fh.read(512))
             return True
         except fat_exc.InvalidBPB:
             return False
-        except Exception as e:
-            log.warning("Failed to detect FAT filesystem", exc_info=e)
-            return False
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         """Returns a FatFilesystemEntry object corresponding to the given pathname"""
         return FatFilesystemEntry(self, path, self._get_entry(path))
 
-    def _get_entry(self, path, entry=None):
+    def _get_entry(
+        self, path: str, entry: Optional[Union[fat.RootDirectory, fat.DirectoryEntry]] = None
+    ) -> Union[fat.RootDirectory, fat.DirectoryEntry]:
         """Returns an internal FAT entry for a given path and optional relative entry."""
         try:
             return self.fatfs.get(path, dirent=entry)
@@ -57,18 +49,18 @@ class FatFilesystem(Filesystem):
 
 
 class FatFilesystemEntry(FilesystemEntry):
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return FatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
-    def open(self):
+    def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self.entry.open()
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         """List the directory contents of a directory. Returns a generator of strings."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
@@ -78,7 +70,7 @@ class FatFilesystemEntry(FilesystemEntry):
                 continue
             yield f.name
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(self.path)
@@ -89,23 +81,23 @@ class FatFilesystemEntry(FilesystemEntry):
             path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
             yield FatFilesystemEntry(self.fs, path, f)
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         """Return whether this entry is a link."""
         return False
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         """Return whether this entry is a directory. Resolves symlinks when possible."""
         return self.entry.is_directory()
 
-    def is_file(self):
+    def is_file(self) -> bool:
         """Return whether this entry is a file. Resolves symlinks when possible."""
         return not self.is_dir()
 
-    def stat(self):
+    def stat(self) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = [
