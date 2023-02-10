@@ -18,16 +18,8 @@ class ExfatFilesystem(Filesystem):
         self.cluster_size = self.exfat.cluster_size
 
     @staticmethod
-    def detect(fh):
-        try:
-            offset = fh.tell()
-            fh.seek(0)
-            signature = fh.read(11)  # exFAT sig should be in the first 10 bytes - 3 from jump boot
-            fh.seek(offset)
-
-            return signature[3:] == b"EXFAT   "
-        except Exception:  # noqa
-            return False
+    def _detect(fh):
+        return fh.read(11)[3:] == b"EXFAT   "
 
     def get(self, path):
         """Returns a ExfatFilesystemEntry object corresponding to the given pathname"""

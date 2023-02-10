@@ -58,19 +58,11 @@ class TarFilesystem(Filesystem):
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         """Detect a tar file on a given file-like object."""
-        offset = fh.tell()
-        try:
-            fh.seek(0)
-            return tarfile.is_tarfile(fh)
-        except Exception as e:
-            log.warning("Failed to detect tar filesystem", exc_info=e)
-            return False
-        finally:
-            fh.seek(offset)
+        return tarfile.is_tarfile(fh)
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
         return self._fs.get(path, relentry=relentry)
 
