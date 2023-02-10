@@ -34,11 +34,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        vols = [fh] if not isinstance(fh, list) else fh
-        for vol in vols:
-            if VmfsVolumeSystem.detect_volume(vol):
-                return True
-        return False
+        return VmfsVolumeSystem.detect_volume(fh)
 
     @staticmethod
     def _detect_volume(fh: BinaryIO) -> bool:
