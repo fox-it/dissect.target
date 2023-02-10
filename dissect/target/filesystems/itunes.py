@@ -1,32 +1,142 @@
+from __future__ import annotations
+
+import stat
+from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
+
 from dissect.util.stream import AlignedStream
 
-from dissect.target.filesystem import VirtualFile, VirtualFilesystem
+from dissect.target.exceptions import FilesystemError, NotASymlinkError
+from dissect.target.filesystem import (
+    Filesystem,
+    FilesystemEntry,
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+)
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from dissect.target.loaders.itunes import FileInfo, ITunesBackup
 
-class ITunesFilesystem(VirtualFilesystem):
-    def __init__(self, backup, *args, **kwargs):
+
+class ITunesFilesystem(Filesystem):
+    """Filesystem implementation for iTunes backups."""
+
+    __fstype__ = "itunes"
+
+    def __init__(self, backup: ITunesBackup, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
         self.backup = backup
 
+        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
+
         for file in self.backup.files():
-            if file.flags != 2:
-                self.map_file_entry(file.translated_path, ITunesFile(self, file.translated_path, file))
+            entry_cls = (
+                ITunesFilesystemDirectoryEntry if stat.S_IFMT(file.mode) == stat.S_IFDIR else ITunesFilesystemEntry
+            )
+
+            file_entry = entry_cls(self, file.translated_path, file)
+            self._fs.map_file_entry(file.translated_path, file_entry)
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on ITunesFilesystem class")
 
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
+        """Returns a ITunesFileEntry object corresponding to the given path."""
+        return self._fs.get(path, relentry)
 
-class ITunesFile(VirtualFile):
-    def open(self):
+
+class ITunesFilesystemEntry(VirtualFile):
+    def _resolve(self) -> FilesystemEntry:
+        if self.is_symlink():
+            return self.readlink_ext()
+        return self
+
+    def open(self) -> BinaryIO:
+        """Returns file handle (file-like object)."""
+        if self.is_dir():
+            raise IsADirectoryError(self.path)
+
         if self.entry.backup.encrypted:
             return EncryptedFileStream(self.entry)
         return self.entry.get().open("rb")
 
-    def stat(self):
+    def iterdir(self) -> Iterator[str]:
+        if self.is_dir():
+            return self._resolve().iterdir()
+        return super().iterdir()
+
+    def scandir(self) -> Iterator[FilesystemEntry]:
+        if self.is_dir():
+            return self._resolve().scandir()
+        return super().scandir()
+
+    def is_dir(self) -> bool:
+        """Return whether this entry is a directory. Resolves symlinks when possible."""
+        try:
+            return stat.S_IFMT(self._resolve().entry.mode) == stat.S_IFDIR
+        except FilesystemError:
+            return False
+
+    def is_file(self) -> bool:
+        """Return whether this entry is a file. Resolves symlinks when possible."""
+        try:
+            return stat.S_IFMT(self._resolve().entry.mode) == stat.S_IFREG
+        except FilesystemError:
+            return False
+
+    def is_symlink(self) -> bool:
+        """Return whether this entry is a link."""
+        return stat.S_IFMT(self.entry.mode) == stat.S_IFLNK
+
+    def readlink(self) -> str:
+        """Read the link if this entry is a symlink. Returns a string."""
+        if not self.is_symlink():
+            raise NotASymlinkError()
+        return self.entry.metadata["Target"]
+
+    def readlink_ext(self) -> FilesystemEntry:
+        """Read the link if this entry is a symlink. Returns a filesystem entry."""
+        # Can't use the one in VirtualFile as it overrides the FilesystemEntry
+        return fsutil.resolve_link(fs=self.fs, entry=self)
+
+    def stat(self) -> fsutil.stat_result:
+        """Return the stat information of this entry."""
+        return self._resolve().lstat()
+
+    def lstat(self) -> fsutil.stat_result:
         metadata = self.entry.metadata
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
+        return fsutil.stat_result(
+            [
+                metadata["Mode"],
+                metadata["InodeNumber"],
+                id(self.fs),
+                0,
+                metadata["UserID"],
+                metadata["GroupID"],
+                metadata["Size"],
+                0,
+                metadata["LastModified"],
+                metadata["Birth"],
+            ]
+        )
+
+
+class ITunesFilesystemDirectoryEntry(VirtualDirectory):
+    def __init__(self, fs: Filesystem, path: str, entry: FileInfo):
+        super().__init__(fs, path)
+        self.entry = entry
+
+    def stat(self) -> fsutil.stat_result:
+        """Return the stat information of this entry."""
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
+        """Return the stat information of the given path, without resolving links."""
+        metadata = self.entry.metadata
+        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         return fsutil.stat_result(
             [
                 metadata["Mode"],
@@ -46,7 +156,7 @@ class ITunesFile(VirtualFile):
 class EncryptedFileStream(AlignedStream):
     """Transparently decrypted AES-CBC decrypted stream."""
 
-    def __init__(self, file_info):
+    def __init__(self, file_info: FileInfo):
         super().__init__(file_info.size)
         self.file_info = file_info
         self.fh = file_info.get().open("rb")
@@ -56,11 +166,11 @@ class EncryptedFileStream(AlignedStream):
 
         self._reset_cipher()
 
-    def _reset_cipher(self):
+    def _reset_cipher(self) -> None:
         self.cipher = self.file_info.create_cipher()
         self.cipher_offset = 0
 
-    def _seek_cipher(self, offset):
+    def _seek_cipher(self, offset: int) -> None:
         """CBC is dependent on previous blocks so to seek the cipher, decrypt and discard to the wanted offset."""
         if offset < self.cipher_offset:
             self._reset_cipher()
@@ -71,7 +181,7 @@ class EncryptedFileStream(AlignedStream):
             self.cipher.decrypt(self.fh.read(read_size))
             self.cipher_offset += read_size
 
-    def _read(self, offset, length):
+    def _read(self, offset: int, length: int) -> bytes:
         self._seek_cipher(offset)
 
         data = self.cipher.decrypt(self.fh.read(length))
