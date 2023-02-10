@@ -68,6 +68,7 @@ class VolumeSystem:
         """
         offset = fh.tell()
         try:
+            fh.seek(0)
             return cls._detect(fh)
         except Exception as e:
             log.warning("Failed to detect %s volume system", cls)
@@ -175,6 +176,7 @@ class LogicalVolumeSystem(VolumeSystem):
         """
         offset = fh.tell()
         try:
+            fh.seek(0)
             return cls._detect_volume(fh)
         except Exception as e:
             log.warning("Failed to detect %s logical volume", cls)
