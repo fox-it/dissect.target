@@ -146,6 +146,12 @@ def test_filesystems_tar(obj, base, request):
     with pytest.raises(IsADirectoryError):
         tdir.open()
 
+    file1 = tdir.get("1")
+    assert file1.is_file()
+    assert not file1.is_dir()
+    assert not file1.is_symlink()
+    assert file1.open().read() == b"contents 1"
+
     assert tfile.stat().st_mode == 0o100777
 
     if isinstance(tdir, TarFilesystemEntry):

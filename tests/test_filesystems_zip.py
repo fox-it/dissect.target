@@ -116,6 +116,12 @@ def test_filesystems_zip(obj, base, request):
     assert not zdir.is_file()
     assert not zdir.is_symlink()
 
+    file1 = zdir.get("1")
+    assert file1.is_file()
+    assert not file1.is_dir()
+    assert not file1.is_symlink()
+    assert file1.open().read() == b"contents 1"
+
     assert zfile.stat().st_mode == 0o100777
 
     if isinstance(zdir, ZipFilesystemEntry):
