@@ -3,7 +3,6 @@ from dissect.target.tools.shell import TargetCli
 
 
 def test_target_cli_ls(target_win, capsys, monkeypatch):
-
     # disable colorful output in `target-shell`
     monkeypatch.setattr(shell, "LS_COLORS", {})
 

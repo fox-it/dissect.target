@@ -51,7 +51,6 @@ def cp(t, path, args):
 
 
 def _extract_path(path: TargetPath, output_path: str) -> None:
-
     print("%s -> %s" % (path, output_path))
 
     out_dir = ""

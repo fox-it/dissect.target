@@ -5,7 +5,6 @@ from ._utils import absolute_path
 
 
 def test_tar_loader_compressed_tar_file(target_win: Target):
-
     archive_path = absolute_path("data/test-archive.tar.gz")
 
     loader = TarLoader(archive_path)
@@ -20,7 +19,6 @@ def test_tar_loader_compressed_tar_file(target_win: Target):
 
 
 def test_tar_sensitive_drive_letter(target_win: Target):
-
     tar_file = absolute_path("data/uppercase_driveletter.tar")
 
     loader = TarLoader(tar_file)

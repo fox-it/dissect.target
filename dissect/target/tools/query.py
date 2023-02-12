@@ -154,7 +154,6 @@ def main():
     execution_report.set_event_callbacks(Target)
 
     for target in Target.open_all(args.targets, args.children):
-
         if args.child:
             try:
                 target = target.open_child(args.child)

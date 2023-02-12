@@ -114,7 +114,6 @@ def mocked_nt52_file(offset, pathname):
 
 @pytest.mark.parametrize("shimcache_error", [NotImplementedError, EOFError])
 def test_shimcache_plugin_initialize(target_win, shimcache_error):
-
     shimcache = ShimcachePlugin(target_win)
     mocked_registry_keys = Mock()
     target_win.registry.keys = Mock(return_value=[mocked_registry_keys])

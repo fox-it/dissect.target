@@ -96,7 +96,6 @@ def get_func_description(func: Callable, with_docstrings: bool = False) -> str:
 
 
 def get_plugin_functions_desc(plugin_class: Type, with_docstrings: bool = False) -> str:
-
     descriptions = []
     for func_name in plugin_class.__exports__:
         func_obj = getattr(plugin_class, func_name)
@@ -125,7 +124,6 @@ def get_plugin_description(plugin_class: Type) -> str:
 
 
 def get_plugin_overview(plugin_class: Type, with_plugin_desc: bool = False, with_func_docstrings: bool = False) -> str:
-
     paragraphs = []
 
     if with_plugin_desc:

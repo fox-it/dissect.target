@@ -75,7 +75,6 @@ class ThumbcachePlugin(Plugin):
     ) -> Iterator[Union[ThumbcacheRecord, IconcacheRecord, IndexRecord]]:
         for cache_path in self.get_cache_paths():
             try:
-
                 if output_dir:
                     dump_entry_data_through_index(cache_path, output_dir, prefix)
                 else:

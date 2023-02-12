@@ -9,7 +9,6 @@ from dissect.target.filesystems.dir import DirectoryFilesystem
 
 
 def test_target_path_checks_dirfs(tmpdir_name, target_win):
-
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         tf.write(b"dummy")
         tf.flush()
@@ -24,7 +23,6 @@ def test_target_path_checks_dirfs(tmpdir_name, target_win):
 
 
 def test_target_path_checks_mapped_dir(tmpdir_name, target_win):
-
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         tf.write(b"dummy")
         tf.flush()
@@ -47,7 +45,6 @@ def test_target_path_checks_virtual():
 
 
 def test_target_path_backslash_normalisation(target_win, fs_win, tmpdir_name):
-
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         tf.write(b"dummy")
         tf.flush()
