@@ -1,5 +1,5 @@
+from datetime import timedelta, timezone
 from io import BytesIO
-from zoneinfo import ZoneInfo
 
 from flow.record.fieldtypes import datetime as dt
 
@@ -9,6 +9,7 @@ from ._utils import absolute_path
 
 
 def test_plugins_apps_webservers_caddy_txt(target_unix, fs_unix):
+    tz = timezone(timedelta(hours=-7))
     fs_unix.map_file_fh(
         "var/log/caddy_access.log",
         BytesIO(b'127.0.0.1 - - [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.1" 200 2326'),
@@ -21,7 +22,7 @@ def test_plugins_apps_webservers_caddy_txt(target_unix, fs_unix):
 
     record = results[0]
     assert record.remote_ip == "127.0.0.1"
-    assert record.ts == dt(2000, 10, 10, 13, 55, 36, tzinfo=ZoneInfo("America/Phoenix"))
+    assert record.ts == dt(2000, 10, 10, 13, 55, 36, tzinfo=tz)
     assert record.method == "GET"
     assert record.uri == "/apache_pb.gif"
     assert record.protocol == "HTTP/1.1"
@@ -42,7 +43,7 @@ def test_plugins_apps_webservers_caddy_json(target_unix, fs_unix):
 
     record = results[0]
     assert record.remote_ip == "172.17.0.1"
-    assert record.ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=ZoneInfo("Etc/UTC"))
+    assert record.ts == dt(2023, 2, 6, 15, 5, 49, 64393, tzinfo=timezone.utc)
     assert record.method == "GET"
     assert record.uri == "/"
     assert record.protocol == "HTTP/1.1"

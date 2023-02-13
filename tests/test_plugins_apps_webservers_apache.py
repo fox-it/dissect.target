@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from dissect.target.plugins.apps.webservers.apache import (
@@ -72,7 +72,7 @@ def test_plugins_apps_webservers_apache_bz2(target_unix, fs_unix):
 
 
 def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
+    tz = timezone(timedelta(hours=1))
     data_file = absolute_path("data/webservers/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
 
@@ -82,7 +82,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert len(results) == 4
 
     combined_log = results[0]
-    assert combined_log.ts == datetime(2022, 12, 19, 17, 6, 19, tzinfo=timezone.utc)
+    assert combined_log.ts == datetime(2022, 12, 19, 17, 6, 19, tzinfo=tz)
     assert combined_log.status_code == 200
     assert combined_log.remote_ip == "1.2.3.4"
     assert combined_log.remote_user == "-"
@@ -97,7 +97,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     )
 
     vhost_combined_log = results[1]
-    assert vhost_combined_log.ts == datetime(2022, 12, 19, 17, 25, 40, tzinfo=timezone.utc)
+    assert vhost_combined_log.ts == datetime(2022, 12, 19, 17, 25, 40, tzinfo=tz)
     assert vhost_combined_log.status_code == 200
     assert vhost_combined_log.remote_ip == "1.2.3.4"
     assert vhost_combined_log.remote_user == "-"
@@ -112,7 +112,7 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     )
 
     common_log = results[2]
-    assert common_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=timezone.utc)
+    assert common_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=tz)
     assert common_log.status_code == 200
     assert common_log.remote_ip == "4.3.2.1"
     assert common_log.remote_user == "-"

@@ -1,7 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import mock_open, patch
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -88,6 +87,7 @@ def test_iis_plugin_iis_nonutf8(target_win_tzinfo, stream, method):
 
 
 def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo, fs_win):
+    tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
 
@@ -100,7 +100,7 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo, fs_win
     assert len(results) == 10
 
     record = results[0]
-    assert record.ts == datetime(2021, 10, 1, 7, 19, 8, tzinfo=ZoneInfo("Pacific/Easter"))
+    assert record.ts == datetime(2021, 10, 1, 7, 19, 8, tzinfo=tz)
     assert record.remote_ip == "127.0.0.1"
     assert record.remote_user is None
     assert record.method == "GET"
@@ -127,7 +127,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win, fs_win):
 
     # W3C format type 1: does not have HTTP version or bytes_sent.
     w3c_record_1 = results[0]
-    assert w3c_record_1.ts == datetime(2021, 10, 1, 17, 12, 0, tzinfo=ZoneInfo("Etc/UTC"))
+    assert w3c_record_1.ts == datetime(2021, 10, 1, 17, 12, 0, tzinfo=timezone.utc)
     assert w3c_record_1.remote_ip == "127.0.0.1"
     assert w3c_record_1.remote_user is None
     assert w3c_record_1.method == "GET"
@@ -144,7 +144,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win, fs_win):
 
     # W3C format type 2: contains HTTP version
     w3c_record_2 = results[6]
-    assert w3c_record_2.ts == datetime(2021, 10, 1, 17, 34, 48, tzinfo=ZoneInfo("Etc/UTC"))
+    assert w3c_record_2.ts == datetime(2021, 10, 1, 17, 34, 48, tzinfo=timezone.utc)
     assert w3c_record_2.remote_ip == "::1"
     assert w3c_record_2.remote_user is None
     assert w3c_record_2.method == "GET"
@@ -161,7 +161,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win, fs_win):
 
     # W3C format type 3
     w3c_record_3 = results[11]
-    assert w3c_record_3.ts == datetime(2021, 10, 1, 18, 2, 47, tzinfo=ZoneInfo("Etc/UTC"))
+    assert w3c_record_3.ts == datetime(2021, 10, 1, 18, 2, 47, tzinfo=timezone.utc)
     assert w3c_record_3.remote_ip == "::1"
     assert w3c_record_3.remote_user is None
     assert w3c_record_3.method == "GET"
