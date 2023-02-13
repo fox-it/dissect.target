@@ -24,6 +24,7 @@ def test_ips_dhcp_plugin(target_unix_users, fs_unix):
 
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips_dhcp
+    results.reverse()
     assert results == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4"]
 
 

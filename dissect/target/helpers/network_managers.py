@@ -4,12 +4,13 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, Optional, Union
+from typing import Any, Callable, Match, Optional, Union, Iterable
 
 from defusedxml import ElementTree
 
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
+from dissect.target.exceptions import UnsupportedPluginError
 
 try:
     import yaml
@@ -511,10 +512,10 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
     ips = []
 
     # Search through parsed syslogs for DHCP leases.
-    messages = target.messages()
-    if messages:
-        for message_record in messages:
-            line = message_record.message
+    try:
+        messages = target.messages()
+        for record in messages:
+            line = record.message
 
             # Ubuntu DHCP
             if "DHCPv4" in line or "DHCPv6" in line:
@@ -529,7 +530,7 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
                     ips.append(ip)
 
             # Debian and CentOS dhclient
-            if "dhclient" in line and "bound to" in line:
+            if record.daemon == "dhclient" and "bound to" in line:
                 ip = line.split("bound to")[1].split(" ")[1].strip()
                 if ip not in ips:
                     ips.append(ip)
@@ -539,6 +540,9 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
                 ip = line.split(" address ")[1].strip()
                 if ip not in ips:
                     ips.append(ip)
+
+    except UnsupportedPluginError:
+        target.log.debug("Can not search for DHCP leases in syslog files as they does not exist.")
 
     # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).
     if (path := target.fs.path("/var/log/cloud-init.log")).exists():
