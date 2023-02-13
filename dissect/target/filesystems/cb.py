@@ -18,7 +18,7 @@ class CbFilesystem(Filesystem):
         self.prefix = prefix
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh):
         raise TypeError("Detect is not allowed on CbFilesystem class")
 
     def get(self, path):
