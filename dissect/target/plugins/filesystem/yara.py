@@ -5,8 +5,7 @@ from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, arg
-
+from dissect.target.plugin import Plugin, arg, export
 
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",

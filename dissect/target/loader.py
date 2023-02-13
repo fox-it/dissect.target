@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import urllib
-
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, Optional, Union
 

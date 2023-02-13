@@ -1,12 +1,12 @@
 from dissect.util.stream import AlignedStream
 
-from dissect.target.filesystem import VirtualFilesystem, VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.helpers import fsutil
 
 
 class ITunesFilesystem(VirtualFilesystem):
-    def __init__(self, backup):
-        super().__init__()
+    def __init__(self, backup, *args, **kwargs):
+        super().__init__(None, *args, **kwargs)
         self.backup = backup
 
         for file in self.backup.files():
@@ -14,7 +14,7 @@ class ITunesFilesystem(VirtualFilesystem):
                 self.map_file_entry(file.translated_path, ITunesFile(self, file.translated_path, file))
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh):
         raise TypeError("Detect is not allowed on ITunesFilesystem class")
 
 

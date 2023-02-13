@@ -4,10 +4,11 @@ from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
+
 from dissect.target.container import CONTAINERS
 from dissect.target.filesystem import FILESYSTEMS
 from dissect.target.loader import LOADERS
-from dissect.target.plugin import PLUGINS, filter_files, load_modules_from_paths
+from dissect.target.plugin import PLUGINS, find_py_files, load_modules_from_paths
 
 
 @pytest.fixture
@@ -28,29 +29,29 @@ def copy_different_plugin_files(path: Path, file_name: str):
 
 
 def test_load_environment_variable_empty_string():
-    with patch("dissect.target.plugin.filter_files") as mocked_filter_files:
+    with patch("dissect.target.plugin.find_py_files") as mocked_find_py_files:
         load_modules_from_paths([])
-        mocked_filter_files.assert_not_called()
+        mocked_find_py_files.assert_not_called()
 
 
 def test_load_environment_variable_comma_seperated_string():
-    with patch("dissect.target.plugin.filter_files") as mocked_filter_files:
+    with patch("dissect.target.plugin.find_py_files") as mocked_find_py_files:
         load_modules_from_paths([Path(""), Path("")])
-        mocked_filter_files.assert_has_calls(calls=[call(Path(""))])
+        mocked_find_py_files.assert_has_calls(calls=[call(Path(""))])
 
 
 def test_filter_file(tmp_path: Path):
     file = tmp_path / "hello.py"
     file.touch()
 
-    assert list(filter_files(file)) == [file]
+    assert list(find_py_files(file)) == [file]
 
     test_file = tmp_path / "non_existent_file"
-    assert list(filter_files(test_file)) == []
+    assert list(find_py_files(test_file)) == []
 
     test_file = tmp_path / "__init__.py"
     test_file.touch()
-    assert list(filter_files(test_file)) == []
+    assert list(find_py_files(test_file)) == []
 
 
 @pytest.mark.parametrize(
@@ -67,9 +68,9 @@ def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool):
     file.touch()
 
     if empty_list:
-        assert list(filter_files(tmp_path)) == []
+        assert list(find_py_files(tmp_path)) == []
     else:
-        assert file in list(filter_files(tmp_path))
+        assert file in list(find_py_files(tmp_path))
 
 
 def test_new_plugin_registration(environment_path: Path):

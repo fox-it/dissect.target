@@ -5,12 +5,11 @@ from io import BytesIO
 
 from dissect.sql import sqlite3
 from dissect.util.plist import NSKeyedArchiver
-from dissect.target.exceptions import LoaderError
 
+from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.itunes import ITunesFilesystem
 from dissect.target.helpers import fsutil, keychain
 from dissect.target.loader import Loader
-
 
 try:
     import _pystandalone

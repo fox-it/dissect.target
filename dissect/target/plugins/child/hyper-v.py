@@ -1,5 +1,5 @@
 from dissect.hypervisor import hyperv
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
@@ -24,9 +24,9 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
         fh = self.target.fs.path(self.PATH).open()
         data = hyperv.HyperVFile(fh).as_dict()
 
-        for path in data["Configurations"]["VirtualMachines"].values():
+        for vm_path in data["Configurations"]["VirtualMachines"].values():
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=uri.from_windows(path),
+                path=path.from_windows(vm_path),
                 _target=self.target,
             )

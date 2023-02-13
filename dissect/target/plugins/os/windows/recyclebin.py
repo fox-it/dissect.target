@@ -101,7 +101,6 @@ class RecyclebinPlugin(Plugin):
                 yield from self.read_recycle_bin(new_file)
 
     def read_bin_file(self, bin_path: TargetPath) -> RecycleBinRecord:
-
         data = bin_path.read_bytes()
 
         header = self.select_header(data)

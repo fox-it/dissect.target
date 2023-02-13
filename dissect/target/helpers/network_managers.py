@@ -4,8 +4,9 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, Optional, Union, Iterable
-from xml.etree.ElementTree import ElementTree
+from typing import Any, Callable, Match, Optional, Union
+
+from defusedxml import ElementTree
 
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target

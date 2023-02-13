@@ -9,7 +9,6 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-
 ClfsRecord = TargetRecordDescriptor(
     "filesystem/windows/clfs",
     [
@@ -77,9 +76,7 @@ class ClfsPlugin(Plugin):
         for blf_path, blf_instance in self._blfs:
             # We only parse the base record client/container contexts for now
             for base_record in blf_instance.base_records():
-
                 for stream in base_record.streams:
-
                     for blf_container in base_record.containers:
                         # Check if the stream ID is matching the container ID
                         if blf_container.id != stream.lsn_base.Offset.ContainerId:

@@ -9,7 +9,6 @@ from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, internal
 
-
 tz_def = """
 typedef struct _SYSTEMTIME {
     WORD wYear;
@@ -129,7 +128,8 @@ class WindowsTimezone(tzinfo):
     Mostly inspired by the examples in the Python documentation.
     """
 
-    def __init__(self, key: RegistryKey):
+    def __init__(self, name: str, key: RegistryKey):
+        self.name = name
         self.display = key.value("Display").value
         self.dlt_name = key.value("Dlt").value
         self.std_name = key.value("Std").value
@@ -212,7 +212,7 @@ class DateTimePlugin(Plugin):
         """Return a datetime.tzinfo of the given timezone name."""
         tz_data_key = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
         tz_data = self.target.registry.key("\\".join([tz_data_key, name]))
-        return WindowsTimezone(tz_data)
+        return WindowsTimezone(name, tz_data)
 
     @internal(property=True)
     def tzinfo(self) -> tzinfo:
@@ -229,5 +229,6 @@ class DateTimePlugin(Plugin):
         """Convert any datetime.datetime object into a UTC datetime.datetime object.
 
         First replaces the current tzinfo with the system tzinfo without conversion, then converts it to an aware
-        UTC datetime object."""
+        UTC datetime object.
+        """
         return self.local(dt).astimezone(timezone.utc)

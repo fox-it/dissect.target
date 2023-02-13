@@ -109,7 +109,7 @@ ChildTargetRecord = TargetRecordDescriptor(
     "target/child",
     [
         ("string", "type"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -133,6 +133,7 @@ UnixUserRecord = TargetRecordDescriptor(
         ("string", "gecos"),
         ("uri", "home"),
         ("string", "shell"),
+        ("string", "source"),
     ],
 )
 

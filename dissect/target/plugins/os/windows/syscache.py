@@ -6,7 +6,6 @@ from dissect.target.helpers import regutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-
 SyscacheRecord = TargetRecordDescriptor(
     "windows/syscache/object",
     [

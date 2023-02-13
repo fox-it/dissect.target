@@ -1,0 +1,73 @@
+{
+    "architecture": "amd64",
+    "config": {
+      "Hostname": "",
+      "Domainname": "",
+      "User": "",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "Cmd": [
+        "bash"
+      ],
+      "Image": "sha256:070606cf58d59117ddc1c48c0af233d6761addbcd4bf9e8e39fd10eef13c1bb7",
+      "Volumes": null,
+      "WorkingDir": "",
+      "Entrypoint": null,
+      "OnBuild": null,
+      "Labels": null
+    },
+    "container": "8bf713004e88c9bc4d60fe0527a509636598e73e3ad1e71a9c9123c863c17c31",
+    "container_config": {
+      "Hostname": "8bf713004e88",
+      "Domainname": "",
+      "User": "",
+      "AttachStdin": false,
+      "AttachStdout": false,
+      "AttachStderr": false,
+      "Tty": false,
+      "OpenStdin": false,
+      "StdinOnce": false,
+      "Env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      ],
+      "Cmd": [
+        "/bin/sh",
+        "-c",
+        "#(nop) ",
+        "CMD [\"bash\"]"
+      ],
+      "Image": "sha256:070606cf58d59117ddc1c48c0af233d6761addbcd4bf9e8e39fd10eef13c1bb7",
+      "Volumes": null,
+      "WorkingDir": "",
+      "Entrypoint": null,
+      "OnBuild": null,
+      "Labels": {}
+    },
+    "created": "2022-12-09T01:20:31.321639501Z",
+    "docker_version": "20.10.12",
+    "history": [
+      {
+        "created": "2022-12-09T01:20:30.834419054Z",
+        "created_by": "/bin/sh -c #(nop) ADD file:481dd2da6de71525248eba186feeeafcc73cc956ade0a196a4e8b0c2424e74b9 in / "
+      },
+      {
+        "created": "2022-12-09T01:20:31.321639501Z",
+        "created_by": "/bin/sh -c #(nop)  CMD [\"bash\"]",
+        "empty_layer": true
+      }
+    ],
+    "os": "linux",
+    "rootfs": {
+      "type": "layers",
+      "diff_ids": [
+        "sha256:6515074984c6f8bb1b8a9962c8fb5f310fc85e70b04c88442a3939c026dbfad3"
+      ]
+    }
+}

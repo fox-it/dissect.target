@@ -1,18 +1,16 @@
 import re
+from datetime import datetime, timezone
 from functools import lru_cache
+from pathlib import Path
 from typing import Generator, List, Tuple
 
-from pathlib import Path
-from datetime import datetime, timezone
 from defusedxml import ElementTree
-
 from flow.record.base import RE_VALID_FIELD_NAME
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.exceptions import UnsupportedPluginError
-
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
@@ -102,7 +100,7 @@ class IISLogsPlugin(plugin.Plugin):
         for line in path.open().readlines():
             # even though the docs say that IIS log format is ASCII format,
             # it is possible to select UTF-8 in configuration
-            line = line.decode("utf-8")
+            line = line.decode("utf-8", errors="backslashreplace")
 
             # Example:
             # 127.0.0.1, -, 9/20/2021, 8:51:21, W3SVC1, DESKTOP-PJOQLJS, 127.0.0.1, 0, 691, 5005, 404, 2, GET, /some, -,
@@ -167,7 +165,7 @@ class IISLogsPlugin(plugin.Plugin):
         fields = []
         extra_fields = []
         for line in path.open().readlines():
-            line = line.decode("utf-8").strip()
+            line = line.decode("utf-8", errors="backslashreplace").strip()
 
             if line.startswith("#Fields"):
                 _, _, fields_str = line.partition("Fields: ")

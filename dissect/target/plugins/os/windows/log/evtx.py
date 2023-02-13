@@ -1,12 +1,11 @@
 import datetime
 import re
 from functools import lru_cache
-from typing import Generator, Any, Optional
-
-from flow.record import utils, Record
+from typing import Any, Generator, Optional
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
+from flow.record import Record, utils
 
 from dissect.target import plugin
 from dissect.target.exceptions import FilesystemError

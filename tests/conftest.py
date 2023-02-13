@@ -107,7 +107,6 @@ def target_unix(fs_unix):
 
 @pytest.fixture
 def target_win_users(hive_hklm, hive_hku, target_win):
-
     key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
 
     profile_list_key = VirtualKey(hive_hklm, key_name)

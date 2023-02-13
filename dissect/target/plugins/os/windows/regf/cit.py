@@ -9,16 +9,17 @@ from binascii import crc32
 from io import BytesIO
 
 from dissect import cstruct
-from dissect.util.ts import wintimestamp
 from dissect.util.compression import lznt1
-
+from dissect.util.ts import wintimestamp
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export
-
 
 cit_def = """
 typedef QWORD FILETIME;

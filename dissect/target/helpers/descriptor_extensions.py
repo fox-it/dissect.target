@@ -14,6 +14,7 @@ class UserRecordDescriptorExtension(RecordDescriptorExtensionBase):
     _default_fields = [
         ("string", "username"),
         ("string", "user_id"),
+        ("string", "user_group"),
         ("string", "user_home"),
     ]
 
@@ -24,15 +25,19 @@ class UserRecordDescriptorExtension(RecordDescriptorExtensionBase):
 
         username = None
         user_id = None
+        user_group = None
         user_home = None
         if user:
             username = user.name
             user_id = getattr(user, "sid", None)
             if user_id is None:
                 user_id = getattr(user, "uid", None)
+            user_group = getattr(user, "gid", None)
             user_home = user.home
 
-        record_kwargs.update({"username": username, "user_id": user_id, "user_home": user_home})
+        record_kwargs.update(
+            {"username": username, "user_id": user_id, "user_group": user_group, "user_home": user_home}
+        )
         return record_kwargs
 
 

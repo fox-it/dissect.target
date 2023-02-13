@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import struct
-from typing import Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import OSPlugin, export, OperatingSystem
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
 
 class WindowsPlugin(OSPlugin):
+    CURRENT_VERSION_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
+
     def __init__(self, target: Target):
         super().__init__(target)
 
@@ -110,24 +112,150 @@ class WindowsPlugin(OSPlugin):
 
         return list(ips)
 
+    def _get_version_reg_value(self, value_name: str) -> Any:
+        try:
+            value = self.target.registry.value(self.CURRENT_VERSION_KEY, value_name).value
+        except RegistryError:
+            value = None
+
+        return value
+
+    def _legacy_current_version(self) -> Optional[str]:
+        """Returns the NT version as used up to and including NT 6.3.
+
+        This corresponds with Windows 8 / Windows 2012 Server.
+
+        Returns:
+            The string value of the NT version number or ``None`` if the
+            CurrentVersion sub key is not present or any other registry error
+            occurred.
+        """
+        return self._get_version_reg_value("CurrentVersion")
+
+    def _major_version(self) -> Optional[int]:
+        """Return the NT major version number (starting from NT 10.0 / Windows 10).
+
+        Returns:
+            The integer value of the NT major version number or ``None`` if the
+            CurrentMajorVersionNumber sub key is not present or any other
+            registry error occurred.
+        """
+        return self._get_version_reg_value("CurrentMajorVersionNumber")
+
+    def _minor_version(self) -> Optional[int]:
+        """Return the NT minor version number (starting from NT 10.0 / Windows 10).
+
+        Returns:
+            The integer value of the NT minor version number or ``None`` if the
+            CurrentMinorVersionNumber sub key is not present or any other
+            registry error occurred.
+        """
+        return self._get_version_reg_value("CurrentMinorVersionNumber")
+
+    def _nt_version(self) -> Optional[int]:
+        """Return the Windows NT version in x.y format.
+
+        For systems up to and including NT 6.3 (Win 8 / Win 2012 Server) this
+        will be the value of the CurrentVersion sub key.
+
+        For systems starting from NT 10.0 (Win 10) this will be a value
+        constructed from the combination of the CurrentMajorVersionNumber and
+        CurrentMinorVersionNumber sub keys.
+
+        Returns:
+            The string value of the NT version or ``None`` if the any of the
+            sub keys are not present or any other registry error occurred.
+        """
+        version = None
+
+        major_version = self._major_version()
+        if major_version is not None:
+            minor_version = self._minor_version()
+            if minor_version is None:
+                minor_version = ""
+            version = f"{major_version}.{minor_version}"
+        else:
+            version = self._legacy_current_version()
+
+        return version
+
     @export(property=True)
     def version(self) -> Optional[str]:
-        key = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
-        csd_version = str()
+        """Return a string representation of the Windows version of the target.
 
-        try:
-            csd_version = self.target.registry.key(key).value("CSDVersion").value
-        except RegistryError:
-            pass
+        For Windows versions before Windows 10 this looks like::
 
-        try:
-            r = self.target.registry.key(key)
-            product_name = r.value("ProductName").value
-            current_version = r.value("CurrentVersion").value
-            current_build_number = r.value("CurrentBuildNumber").value
-            return f"{product_name} (NT {current_version}) {current_build_number} {csd_version}"
-        except RegistryError:
-            pass
+            <ProductName> (NT <CurrentVersion>) <CurrentBuildNumber>.<UBR> <CSDVersion>
+
+        For Windows versions since Windows 10 this looks like::
+
+            <ProductName> (NT <CurrentMajorVersionNumber>.<CurrentMinorVersionNumber>) <CurrentBuildNumber>.<UBR> <CSDVersion>
+
+        Where the registry values used are between ``<...>``.
+
+        Note that the ``<UBR>`` and ``<CSDVersion>`` may or may not be available,
+        depending on whether updates and service packs are installed.
+
+        Note also that we don't show the "version" (aka FeatureRelease) as
+        shown by WinVer.exe, which uses the registry values:
+
+        ``<ReleaseId>``: Windows up to Windows 10 ReleaseId <= 2004
+
+        ``<DisplayVersion>``: from Windows 10 ReleaseId >= 2009
+                              (DisplayVersion = 20H2 in this case)
+
+        Returns:
+            If any one of the registry values used in the version string can be
+            found in the registry, a string is returned as described above.
+            All values that can not be found and should be present are replaced
+            with ``<UNKNOWN value_name>``.
+            If none of the values can be found, ``None`` is returned.
+        """  # noqa: E501
+        # https://www.vcloudinfo.com/2020/12/how-to-decode-windows-version-numbers.html
+
+        def _part_str(parts: dict[str, Any], name: str) -> str:
+            value = parts.get(name)
+            if value is None:
+                value = f"<Unknown {name}>"
+            else:
+                value = str(value)
+
+            return value
+
+        version_parts = {}
+        version_parts["ProductName"] = self._get_version_reg_value("ProductName")
+        version_parts["CurrentVersion"] = self._nt_version()
+        # Note that the CurrentBuild key value also exists, often with the
+        # same value, but is apparently deprecated.
+        version_parts["CurrentBuildNumber"] = self._get_version_reg_value("CurrentBuildNumber")
+        # Update Build Revision (seems to be present from NT 6.1 onwards).
+        version_parts["UBR"] = self._get_version_reg_value("UBR")
+        # Service Pack Version, when installed using the normal method (may not be present).
+        version_parts["CSDVersion"] = self._get_version_reg_value("CSDVersion")
+
+        version_string = None
+        if any(map(lambda value: value is not None, version_parts.values())):
+            version = []
+
+            prodcut_name = _part_str(version_parts, "ProductName")
+            version.append(prodcut_name)
+
+            nt_version = _part_str(version_parts, "CurrentVersion")
+            version.append(f"(NT {nt_version})")
+
+            build_version = _part_str(version_parts, "CurrentBuildNumber")
+            ubr = version_parts["UBR"]
+            if ubr:
+                build_version = f"{build_version}.{ubr}"
+            version.append(build_version)
+
+            csd_version = version_parts["CSDVersion"]
+            if csd_version is not None:
+                version.append(f"{csd_version}")
+
+            version_string = " ".join(version)
+
+        return version_string
 
     @export(property=True)
     def architecture(self) -> Optional[str]:

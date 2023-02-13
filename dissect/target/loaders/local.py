@@ -26,7 +26,6 @@ class LocalLoader(Loader):
         return path_part == "local"
 
     def map(self, target):
-
         os_name = _get_os_name()
 
         force_dirfs = "force-directory-fs" in target.path_query

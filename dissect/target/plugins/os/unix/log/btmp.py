@@ -1,12 +1,11 @@
-import datetime
 import socket
 import struct
 
+from dissect.util.ts import from_unix
+
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-
-from dissect.target.plugins.os.unix.log.utmp import utmp, UtmpFile
-
+from dissect.target.plugins.os.unix.log.utmp import UtmpFile, utmp
 
 BtmpRecord = TargetRecordDescriptor(
     "linux/log/btmp",
@@ -14,11 +13,11 @@ BtmpRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "ut_type"),
         ("string", "ut_user"),
-        ("string", "ut_pid"),
+        ("varint", "ut_pid"),
         ("string", "ut_line"),
         ("string", "ut_id"),
         ("string", "ut_host"),
-        ("string", "ut_addr"),
+        ("net.ipaddress", "ut_addr"),
     ],
 )
 
@@ -52,7 +51,7 @@ class BtmpPlugin(Plugin):
                     r_type = utmp.Type.reverse[entry.ut_type]
 
                 yield BtmpRecord(
-                    ts=datetime.datetime.utcfromtimestamp(entry.ut_tv.tv_sec),
+                    ts=from_unix(entry.ut_tv.tv_sec),
                     ut_type=r_type,
                     ut_pid=entry.ut_pid,
                     ut_user=entry.ut_user.decode().strip("\x00"),

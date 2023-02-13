@@ -4,7 +4,6 @@ from ._utils import absolute_path
 
 
 def test_ual_plugin(target_win, fs_win, tmpdir_name):
-
     ual_dir = absolute_path("data/ual/")
 
     fs_win.map_dir("Windows/System32/LogFiles/Sum", ual_dir)
