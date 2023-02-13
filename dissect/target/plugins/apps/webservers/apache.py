@@ -108,8 +108,6 @@ class ApachePlugin(plugin.Plugin):
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of Apache access log files in unified WebserverAccessLogRecord format."""
-        tzinfo = self.target.datetime.tzinfo
-
         for path in self.log_paths:
             try:
                 path = path.resolve(strict=True)
@@ -134,7 +132,7 @@ class ApachePlugin(plugin.Plugin):
 
                     log = match.groupdict()
                     yield WebserverAccessLogRecord(
-                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
                         remote_user=log["remote_user"],
                         remote_ip=log["remote_ip"],
                         method=log["method"],

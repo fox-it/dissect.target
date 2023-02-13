@@ -1,7 +1,5 @@
 from typing import Iterator
 
-from flow.record.fieldtypes import uri
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -23,20 +21,6 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
-
-
-def parse_request(request: str) -> tuple[str, uri, str]:
-    """Parse a request string into a (method, url, protocol) tuple.
-
-    For example, "GET / HTTP/1.1" becomes ("GET", "/", "HTTP/1.1").
-
-    Args:
-        request: The request string to parse.
-    """
-    method, _, remainder = request.partition(" ")
-    url, _, protocol = remainder.partition(" ")
-
-    return method, uri(url), protocol
 
 
 class WebserverPlugin(Plugin):
