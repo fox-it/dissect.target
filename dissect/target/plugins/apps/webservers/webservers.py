@@ -1,5 +1,7 @@
 from typing import Iterator
 
+from flow.record.fieldtypes import uri
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -11,7 +13,9 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
-        ("string", "request"),
+        ("string", "method"),
+        ("uri", "uri"),
+        ("string", "protocol"),
         ("varint", "status_code"),
         ("varint", "bytes_sent"),
         ("uri", "referer"),
@@ -21,8 +25,23 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
 )
 
 
+def parse_request(request: str) -> tuple[str, uri, str]:
+    """Parse a request string into a (method, url, protocol) tuple.
+
+    For example, "GET / HTTP/1.1" becomes ("GET", "/", "HTTP/1.1").
+
+    Args:
+        request: The request string to parse.
+    """
+    method, _, remainder = request.partition(" ")
+    url, _, protocol = remainder.partition(" ")
+
+    return method, uri(url), protocol
+
+
 class WebserverPlugin(Plugin):
     __namespace__ = "webserver"
+
     WEBSERVERS = [
         "apache",
         "nginx",
@@ -41,7 +60,7 @@ class WebserverPlugin(Plugin):
 
     def check_compatible(self) -> bool:
         if not len(self._plugins):
-            raise UnsupportedPluginError("No compatible tool plugins found")
+            raise UnsupportedPluginError("No compatible webserver plugins found")
 
     def _func(self, f: str) -> Iterator[WebserverAccessLogRecord]:
         for p in self._plugins:
@@ -58,6 +77,5 @@ class WebserverPlugin(Plugin):
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Returns access.log records from installed webservers."""
-        for record in self._func("access"):
-            yield record
+        """Returns WebserverAccessLogRecord records from installed webservers."""
+        yield from self._func("access")

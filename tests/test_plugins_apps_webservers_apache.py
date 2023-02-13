@@ -44,27 +44,30 @@ def test_plugins_apps_webservers_apache_infer_log_ipv6():
 def test_plugins_apps_webservers_apache_txt(target_unix, fs_unix):
     data_file = absolute_path("data/webservers/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
-    target_unix.add_plugin(ApachePlugin)
 
-    results = list(target_unix.apache())
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
     assert len(results) == 4
 
 
 def test_plugins_apps_webservers_apache_gz(target_unix, fs_unix):
     data_file = absolute_path("data/webservers/apache/access.log.gz")
     fs_unix.map_file("var/log/apache2/access.log.1.gz", data_file)
-    target_unix.add_plugin(ApachePlugin)
 
-    results = list(target_unix.apache())
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
     assert len(results) == 4
 
 
 def test_plugins_apps_webservers_apache_bz2(target_unix, fs_unix):
     data_file = absolute_path("data/webservers/apache/access.log.bz2")
     fs_unix.map_file("var/log/apache2/access.log.1.bz2", data_file)
-    target_unix.add_plugin(ApachePlugin)
 
-    results = list(target_unix.apache())
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
     assert len(results) == 4
 
 
@@ -72,9 +75,10 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
     data_file = absolute_path("data/webservers/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
-    target_unix.add_plugin(ApachePlugin)
 
-    results = list(target_unix.apache())
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
     assert len(results) == 4
 
     combined_log = results[0]
@@ -82,7 +86,9 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert combined_log.status_code == 200
     assert combined_log.remote_ip == "1.2.3.4"
     assert combined_log.remote_user == "-"
-    assert combined_log.request == "GET / HTTP/1.1"
+    assert combined_log.method == "GET"
+    assert combined_log.uri == "/"
+    assert combined_log.protocol == "HTTP/1.1"
     assert combined_log.referer == "Sample referer"
     assert (
         combined_log.useragent
@@ -95,7 +101,9 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert vhost_combined_log.status_code == 200
     assert vhost_combined_log.remote_ip == "1.2.3.4"
     assert vhost_combined_log.remote_user == "-"
-    assert vhost_combined_log.request == "GET /index.html HTTP/1.1"
+    assert vhost_combined_log.method == "GET"
+    assert vhost_combined_log.uri == "/index.html"
+    assert vhost_combined_log.protocol == "HTTP/1.1"
     assert vhost_combined_log.referer == "-"
     assert (
         vhost_combined_log.useragent
@@ -108,12 +116,16 @@ def test_plugins_apps_webservers_apache_all_log_formats(target_unix, fs_unix):
     assert common_log.status_code == 200
     assert common_log.remote_ip == "4.3.2.1"
     assert common_log.remote_user == "-"
-    assert common_log.request == "GET / HTTP/1.1"
+    assert common_log.method == "GET"
+    assert common_log.uri == "/"
+    assert common_log.protocol == "HTTP/1.1"
     assert common_log.referer is None
     assert common_log.useragent is None
 
     ipv6_log = results[3]
     assert ipv6_log.remote_ip == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+    assert ipv6_log.protocol is None
+    assert ipv6_log.bytes_sent == 0
 
 
 def test_plugins_apps_webservers_apache_logrotate(target_unix, fs_unix):
@@ -123,17 +135,20 @@ def test_plugins_apps_webservers_apache_logrotate(target_unix, fs_unix):
     fs_unix.map_file("var/log/apache2/access.log.2", data_file)
     fs_unix.map_file("var/log/apache2/access.log.3", data_file)
 
-    apache = ApachePlugin(target_unix)
-    assert len(apache.log_paths) == 4
+    target_unix.add_plugin(ApachePlugin)
+    log_paths = target_unix.apache.get_log_paths()
+
+    assert len(log_paths) == 4
 
 
 def test_plugins_apps_webservers_apache_custom_config(target_unix, fs_unix):
-
     fs_unix.map_file_fh("etc/apache2/apache2.conf", BytesIO(b'CustomLog "/custom/log/location/access.log" common'))
     fs_unix.map_file_fh("custom/log/location/access.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("custom/log/location/access.log.1", BytesIO(b"Foo1"))
     fs_unix.map_file_fh("custom/log/location/access.log.2", BytesIO(b"Foo2"))
     fs_unix.map_file_fh("custom/log/location/access.log.3", BytesIO(b"Foo3"))
 
-    apache = ApachePlugin(target_unix)
-    assert len(apache.log_paths) == 4
+    target_unix.add_plugin(ApachePlugin)
+    log_paths = target_unix.apache.get_log_paths()
+
+    assert len(log_paths) == 4

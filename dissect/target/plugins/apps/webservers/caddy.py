@@ -3,18 +3,18 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator
-from os.path import basename
 
 from dissect.util.ts import from_unix
 
 from dissect.target import plugin
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.exceptions import FileNotFoundError
+from dissect.target.helpers.fsutil import basename, open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
 
 LOG_FILE_REGEX = re.compile(r"(log|output file) (?P<log_file>.*)( \{)?$")
 LOG_REGEX = re.compile(
-    r'(?P<remote_ip>.*?) - - \[(?P<ts>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<request>.*?)" (?P<status_code>\d{3}) (?P<bytes_sent>\d+)'  # noqa: E501
+    r'(?P<remote_ip>.*?) - - \[(?P<ts>\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} (\+|\-)\d{4})\] "(?P<method>.*?) (?P<uri>.*?) ?(?P<protocol>HTTP\/.*?)?" (?P<status_code>\d{3}) (?P<bytes_sent>-|\d+)'  # noqa: E501
 )
 
 
@@ -28,16 +28,15 @@ class CaddyPlugin(plugin.Plugin):
     @plugin.internal
     def get_log_paths(self) -> list[Path]:
         log_paths = []
-        default_log_file = self.target.fs.path("/var/log/caddy_access.log")
-        if default_log_file.exists():
-            log_paths = [self.target.fs.path(p) for p in default_log_file.parent.glob(default_log_file.name + "*")]
+
+        # Add any well known default Caddy log locations
+        log_paths.extend(self.target.fs.path("/var/log").glob("caddy_access.log*"))
 
         # Check for custom paths in Caddy config
         if (config_file := self.target.fs.path("/etc/caddy/Caddyfile")).exists():
             found_roots = []
             for line in config_file.open("rt"):
                 line = line.strip()
-
                 if not line or line.startswith("#"):
                     continue
 
@@ -50,28 +49,24 @@ class CaddyPlugin(plugin.Plugin):
 
                     match = LOG_FILE_REGEX.match(line)
                     if not match:
-                        self.target.log.warning("Could not determine log path in line %s", line)
+                        self.target.log.warning("Could not determine log path in %s: %s", config_file, line)
                         continue
 
                     match = match.groupdict()
                     p = match["log_file"].replace(" {", "").split(" ")[-1]
 
+                    parent_folders = []
                     # Search all root folders we found earlier with the current relative log path we found.
-                    if not p.startswith("/"):
+                    if p.startswith("/"):
+                        parent_folders.append(self.target.fs.path(p).parent)
+                    else:
                         for root in found_roots:
                             # Logs will be located one folder higher than the defined root.
                             root_parent = self.target.fs.path(root).parent
-                            abs_log_folder = self.target.fs.path(root_parent).joinpath(p).parent
+                            parent_folders.append(root_parent.joinpath(p).parent)
 
-                            # Add all /foo/bar.log* files
-                            for path in abs_log_folder.glob(basename(p) + "*"):
-                                if path.exists() and path not in log_paths:
-                                    log_paths.append(path)
-                    else:
-                        if (parent_folder := self.target.fs.path(p).parent).exists():
-                            for path in parent_folder.glob(basename(p) + "*"):
-                                if path not in log_paths:
-                                    log_paths.append(path)
+                    for parent_folder in parent_folders:
+                        log_paths.extend(p for p in parent_folder.glob(basename(p) + "*") if p not in log_paths)
 
         return log_paths
 
@@ -80,53 +75,62 @@ class CaddyPlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Parses Caddy V1 CRF and Caddy V2 JSON logs.
+        """Parses Caddy V1 CRF and Caddy V2 JSON access logs.
 
         Resources:
             - https://caddyserver.com/docs/caddyfile/directives/log#format-modules
         """
-        tzinfo = self.target.datetime.tzinfo
-
         for path in self.log_paths:
-            for line in open_decompress(path, "rt"):
-                line = line.strip()
-                if not line:
-                    continue
-
-                # Parse a JSON log line
-                if line.startswith('{"'):
-                    try:
-                        log = json.loads(line)
-                    except json.decoder.JSONDecodeError:
-                        self.target.log.warning("Could not decode Caddy JSON log line in file %s", path)
+            try:
+                path = path.resolve(strict=True)
+                for line in open_decompress(path, "rt"):
+                    line = line.strip()
+                    if not line:
                         continue
 
-                    yield WebserverAccessLogRecord(
-                        ts=from_unix(log["ts"]),
-                        remote_ip=log["request"]["remote_ip"],
-                        request=f"{log['request']['method']} {log['request']['uri']} {log['request']['proto']}",
-                        status_code=log["status"],
-                        bytes_sent=log["size"],
-                        source=path.resolve(),
-                        _target=self.target,
-                    )
+                    # Parse a JSON log line
+                    if line.startswith('{"'):
+                        try:
+                            log = json.loads(line)
+                        except json.decoder.JSONDecodeError:
+                            self.target.log.warning("Could not decode Caddy JSON log line: %s (%s)", line, path)
+                            continue
 
-                # Try to parse a CLF log line
-                else:
-                    match = LOG_REGEX.match(line)
-                    if not match:
-                        self.target.log.warning(
-                            "Could not match Caddy webserver log line with regex format for log line '%s'", line
+                        yield WebserverAccessLogRecord(
+                            ts=from_unix(log["ts"]),
+                            remote_ip=log["request"]["remote_ip"],
+                            method=log["request"]["method"],
+                            uri=log["request"]["uri"],
+                            protocol=log["request"]["proto"],
+                            status_code=log["status"],
+                            bytes_sent=log["size"],
+                            source=path,
+                            _target=self.target,
                         )
-                        continue
-                    log = match.groupdict()
 
-                    yield WebserverAccessLogRecord(
-                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
-                        remote_ip=log["remote_ip"],
-                        request=log["request"],
-                        status_code=log["status_code"],
-                        bytes_sent=log["bytes_sent"],
-                        source=path.resolve(),
-                        _target=self.target,
-                    )
+                    # Try to parse a CLF log line
+                    else:
+                        match = LOG_REGEX.match(line)
+                        if not match:
+                            self.target.log.warning(
+                                "Could not match Caddy regex format for log line: %s (%s)", line, path
+                            )
+                            continue
+
+                        log = match.groupdict()
+                        yield WebserverAccessLogRecord(
+                            ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
+                            remote_ip=log["remote_ip"],
+                            method=log["method"],
+                            uri=log["uri"],
+                            protocol=log["protocol"],
+                            status_code=log["status_code"],
+                            bytes_sent=log["bytes_sent"].strip("-") or 0,
+                            source=path,
+                            _target=self.target,
+                        )
+            except FileNotFoundError:
+                self.target.log.warning("Caddy log file configured but could not be found (dead symlink?): %s", path)
+            except Exception as e:
+                self.target.log.warning("An error occured parsing Caddy log file %s: %s", path, str(e))
+                self.target.log.debug("", exc_info=e)

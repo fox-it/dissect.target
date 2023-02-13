@@ -5,14 +5,12 @@ from pathlib import Path
 from typing import Iterator, Optional
 
 from dissect.target import plugin
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
 
-COMMON_REGEX = (
-    r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<request>.*?)" '
-    r"(?P<status_code>\d{3}) (?P<bytes_sent>\d+)"
-)
+COMMON_REGEX = r'(?P<remote_ip>.*?) (?P<remote_logname>.*?) (?P<remote_user>.*?) \[(?P<ts>.*)\] "(?P<method>.*?) (?P<uri>.*?) ?(?P<protocol>HTTP\/.*?)?" (?P<status_code>\d{3}) (?P<bytes_sent>-|\d+)'  # noqa: E501
 REFERER_USER_AGENT_REGEX = r'"(?P<referer>.*?)" "(?P<useragent>.*?)"'
 
 
@@ -76,15 +74,14 @@ class ApachePlugin(plugin.Plugin):
 
         log_paths = []
 
-        # Check if any well known default apache log locations exist.
+        # Check if any well known default Apache log locations exist
         default_logs_dirs = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
         default_log_names = ["access.log", "access_log", "httpd-access.log"]
         for default_log_dir in default_logs_dirs:
             for default_log_name in default_log_names:
-                for path in self.target.fs.path(default_log_dir).glob(default_log_name + "*"):
-                    log_paths.append(path)
+                log_paths.extend(self.target.fs.path(default_log_dir).glob(default_log_name + "*"))
 
-        # Check default apache configs for their CustomLog directive.
+        # Check default Apache configs for their CustomLog directive
         default_config_paths = [
             "/etc/apache2/apache2.conf",
             "/usr/local/etc/apache22/httpd.conf",
@@ -95,10 +92,13 @@ class ApachePlugin(plugin.Plugin):
             if (path := self.target.fs.path(config)).exists():
                 for line in open_decompress(path, "rt"):
                     if "CustomLog" in line:
-                        custom_log = line.split(" ")[1].replace('"', "").strip()
-                        if (p := self.target.fs.path(custom_log)).exists():
-                            for log_path in p.parent.glob(p.name + "*"):
-                                log_paths.append(log_path)
+                        try:
+                            custom_log = self.target.fs.path(line.split(" ")[1].replace('"', "").strip())
+                            log_paths.extend(
+                                p for p in custom_log.parent.glob(custom_log.name + "*") if p not in log_paths
+                            )
+                        except IndexError:
+                            self.target.log.warning("Unexpected Apache log configuration: %s (%s)", line, path)
 
         return log_paths
 
@@ -107,34 +107,48 @@ class ApachePlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
+        """Return contents of Apache access log files in unified WebserverAccessLogRecord format."""
         tzinfo = self.target.datetime.tzinfo
 
         for path in self.log_paths:
-            for line in open_decompress(path, "rt"):
-                line = line.strip()
-                if not line:
-                    continue
+            try:
+                path = path.resolve(strict=True)
+                for line in open_decompress(path, "rt"):
+                    line = line.strip()
+                    if not line:
+                        continue
 
-                fmt = infer_log_format(line)
-                if not fmt:
-                    self.target.log.warning("Apache log format could not be inferred for log line '%s'", line)
-                    continue
+                    fmt = infer_log_format(line)
+                    if not fmt:
+                        self.target.log.warning(
+                            "Apache log format could not be inferred for log line: %s (%s)", line, path
+                        )
+                        continue
 
-                match = fmt.value.match(line)
-                if not match:
-                    self.target.log.warning("No regex match found for Apache log format %s for log line: %s", fmt, line)
-                    continue
+                    match = fmt.value.match(line)
+                    if not match:
+                        self.target.log.warning(
+                            "Could not match Apache log format %s for log line: %s (%s)", fmt, line, path
+                        )
+                        continue
 
-                match = match.groupdict()
-                yield WebserverAccessLogRecord(
-                    ts=datetime.strptime(match["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
-                    remote_user=match["remote_user"],
-                    remote_ip=match["remote_ip"],
-                    request=match["request"],
-                    status_code=match["status_code"],
-                    bytes_sent=match["bytes_sent"],
-                    referer=match.get("referer"),
-                    useragent=match.get("useragent"),
-                    source=path.resolve(),
-                    _target=self.target,
-                )
+                    log = match.groupdict()
+                    yield WebserverAccessLogRecord(
+                        ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z").replace(tzinfo=tzinfo),
+                        remote_user=log["remote_user"],
+                        remote_ip=log["remote_ip"],
+                        method=log["method"],
+                        uri=log["uri"],
+                        protocol=log["protocol"],
+                        status_code=log["status_code"],
+                        bytes_sent=log["bytes_sent"].strip("-") or 0,
+                        referer=log.get("referer"),
+                        useragent=log.get("useragent"),
+                        source=path,
+                        _target=self.target,
+                    )
+            except FileNotFoundError:
+                self.target.log.warning("Apache log file configured but could not be found (dead symlink?): %s", path)
+            except Exception as e:
+                self.target.log.warning("An error occured parsing Apache log file %s: %s", path, str(e))
+                self.target.log.debug("", exc_info=e)

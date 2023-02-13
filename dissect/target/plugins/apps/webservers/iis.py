@@ -92,14 +92,14 @@ class IISLogsPlugin(plugin.Plugin):
         This format is not the default IIS log format.
 
         References:
-            1. https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
-            2. https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
-            3. https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-IIS
-        """
+            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-IIS
+        """  # noqa: E501
 
         tzinfo = self.target.datetime.tzinfo
 
-        def parse_datetime(date_str, time_str):
+        def parse_datetime(date_str: str, time_str: str) -> datetime:
             # Example: 10/1/2021 7:19:59
             # "time is recorded as local time." [^3]
             return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %H:%M:%S").replace(tzinfo=tzinfo)
@@ -150,9 +150,9 @@ class IISLogsPlugin(plugin.Plugin):
         This is the default logging format for IIS [^3].
 
         References:
-            1. https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
-            2. https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
-            3. https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-W3C
+            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-W3C
         """  # noqa: E501
 
         basic_fields = {
@@ -283,21 +283,17 @@ class IISLogsPlugin(plugin.Plugin):
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of IIS (v7 and above) log files in unified WebserverAccessLogRecord format.
 
-        See function ``iis.logs()`` for more information and more verbose IIS records.
+        See function ``iis.logs`` for more information and more verbose IIS records.
         """
 
         for iis_record in self.logs():
-
-            request = None
-            if iis_record.log_format == "W3C":
-                # W3C format may sometimes contain cs_version
-                request = f"{iis_record.request_method} {iis_record.request_path} {iis_record._asdict().get('cs_version', '')}".strip()
-
             yield WebserverAccessLogRecord(
                 ts=iis_record.ts,
                 remote_user=iis_record.username,
                 remote_ip=iis_record.client_ip,
-                request=request,
+                method=iis_record.request_method,
+                uri=iis_record.request_path,
+                protocol=getattr(iis_record, "cs_version", None),
                 status_code=iis_record._asdict().get("service_status_code", None),
                 bytes_sent=iis_record.response_size_bytes,
                 referer=iis_record._asdict().get("cs_referer", None),
