@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+from pathlib import Path
 
 from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -34,17 +35,15 @@ logging.raiseExceptions = False
 
 
 def main():
-    """target-info"""
-
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
-        description="dissect.info",
+        description="target-info",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
         add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
-    parser.add_argument("--from-file", nargs="?", help="file containing targets to load")
+    parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
@@ -52,11 +51,7 @@ def main():
     parser.add_argument("-J", "--json", action="store_true", help="output records as one-line json")
     configure_generic_arguments(parser)
 
-    args, rest = parser.parse_known_args()
-
-    if not args.targets and ("-h" in rest or "--help" in rest):
-        parser.print_help()
-        parser.exit()
+    args = parser.parse_args()
 
     process_generic_arguments(args)
 
@@ -64,11 +59,13 @@ def main():
         parser.error("too few arguments")
 
     if args.from_file:
-        with open(args.from_file, "r") as f:
-            targets = f.read().splitlines()
-            while targets[-1] == "":
-                targets = targets[:-1]
-            args.targets = targets
+        if not args.from_file.exists():
+            parser.error(f"--from-file {args.from_file} does not exist")
+
+        targets = args.from_file.read_text().splitlines()
+        while targets[-1] == "":
+            targets = targets[:-1]
+        args.targets = targets
 
     for target in Target.open_all(args.targets):
 
@@ -134,7 +131,7 @@ def print_target_info(target):
     print(f"OS version    : {target.version}")
     print(f"Arch          : {target.architecture}")
     print(f"Domain        : {target.domain}")
-    print(f"IPs           : {', '.join(list(set(target.ips + target.ips_dhcp)))}")
+    print(f"IPs           : {', '.join(set(target.ips + target.ips_dhcp))}")
     print(f"Install date  : {target.install_date}")
     print(f"Last activity : {target.activity}")
     print(f"Language(s)   : {', '.join(target.language)}")

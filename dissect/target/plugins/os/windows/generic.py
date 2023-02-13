@@ -196,7 +196,7 @@ class GenericPlugin(Plugin):
     def install_date(self) -> Optional[datetime]:
         """Returns the install date of the system.
 
-        The value of the registry key is stored as seconds since January 1 1970 inside a 32-bit REG_DWORD.
+        The value of the registry key is stored as a Unix epoch timestamp.
 
         Resources:
             - https://winreg-kb.readthedocs.io/en/latest/_modules/winregrc/sysinfo.html?highlight=_ParseInstallDate
