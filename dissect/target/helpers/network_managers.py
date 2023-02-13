@@ -499,54 +499,58 @@ class LinuxNetworkManager:
 
 
 def parse_unix_dhcp_log_messages(target) -> list[str]:
-    """Parse local syslog and cloud init log files for DHCP lease IPs."""
+    """Parse local syslog and cloud init log files for DHCP lease IPs.
 
-    # TODO: Make use of target.messages() function as soon as that PR is merged.
-    #       https://github.com/fox-it/dissect.target/pull/131
+    Args:
+        target: Target to discover and obtain network information from.
 
+    Returns:
+        List of DHCP ip addresses.
+    """
     ips = []
-    logs = ["/var/log/syslog", "/var/log/messages"]
 
-    for log in logs:
-        if target.fs.exists(log):
-            for line in target.fs.path(log).open("rt"):
+    # Search through parsed syslogs for DHCP leases.
+    messages = target.messages()
+    if messages:
+        for message_record in messages:
+            line = message_record.message
 
-                # ubuntu dhcp
-                if "DHCPv4" in line or "DHCPv6" in line:
-                    ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
-                    if ip not in ips:
-                        ips.append(ip)
+            # Ubuntu DHCP
+            if "DHCPv4" in line or "DHCPv6" in line:
+                ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
+                if ip not in ips:
+                    ips.append(ip)
 
-                # ubuntu dhcp networkmanager
-                if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line):
-                    ip = line.split("=> '")[1].replace("'", "").strip()
-                    if ip not in ips:
-                        ips.append(ip)
+            # Ubuntu DHCP NetworkManager
+            if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line):
+                ip = line.split("=> '")[1].replace("'", "").strip()
+                if ip not in ips:
+                    ips.append(ip)
 
-                # dhclient dhcp for debian and centos
-                if "dhclient" in line and "bound to" in line:
-                    ip = line.split("bound to")[1].split(" ")[1].strip()
-                    if ip not in ips:
-                        ips.append(ip)
+            # Debian and CentOS dhclient
+            if "dhclient" in line and "bound to" in line:
+                ip = line.split("bound to")[1].split(" ")[1].strip()
+                if ip not in ips:
+                    ips.append(ip)
 
-                # networkmanager / centos dhcp
-                if " address " in line and ("dhcp4" in line or "dhcp6" in line):
-                    ip = line.split(" address ")[1].strip()
-                    if ip not in ips:
-                        ips.append(ip)
+            # CentOS DHCP and general NetworkManager
+            if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+                ip = line.split(" address ")[1].strip()
+                if ip not in ips:
+                    ips.append(ip)
 
-    # A unix system might be provisioned using Ubuntu's cloud-init.
-    # (https://cloud-init.io/)
-    #
-    # We are interested in the following log entry:
-    # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
-    #
+    # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).
     if (path := target.fs.path("/var/log/cloud-init.log")).exists():
         for line in path.open("rt"):
+            # We are interested in the following log line:
+            # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
             if "Received dhcp lease on" in line:
                 interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
                 if ip not in ips:
                     ips.append(ip)
+
+    if not path and not messages:
+        target.log.warning("Can not search for DHCP leases in syslog or cloud-init.log files as they does not exist.")
 
     return ips
 
