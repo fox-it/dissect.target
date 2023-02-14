@@ -16,8 +16,6 @@ from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLog
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
 BASIC_RECORD_FIELDS = [
-    ("string", "log_file"),
-    ("string", "log_format"),
     ("datetime", "ts"),
     ("net.ipaddress", "client_ip"),
     ("net.ipaddress", "server_ip"),
@@ -34,6 +32,8 @@ BASIC_RECORD_FIELDS = [
     ("string", "service_status_code"),
     # https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes?redirectedfrom=MSDN#system-error-codes-1
     ("string", "win32_status_code"),
+    ("string", "log_format"),
+    ("string", "log_file"),
 ]
 BasicRecordDescriptor = TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS)
 
@@ -235,8 +235,6 @@ class IISLogsPlugin(plugin.Plugin):
                 ts = datetime.strptime(f"{raw['date']} {raw['time']}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
             yield record_descriptor(
-                log_file=str(path),
-                log_format="W3C",
                 ts=ts,
                 client_ip=raw.get("c-ip"),
                 server_ip=raw.get("s-ip"),
@@ -251,6 +249,8 @@ class IISLogsPlugin(plugin.Plugin):
                 process_time_ms=raw.get("time-taken"),
                 service_status_code=raw.get("sc-status"),
                 win32_status_code=raw.get("sc-win32-status"),
+                log_format="W3C",
+                log_file=str(path),
                 _target=self.target,
                 **{normalise_field_name(field): raw.get(field) for field in extra_fields},
             )
