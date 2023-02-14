@@ -18,11 +18,21 @@ from dissect.target.target import Target
 
 
 class WebCache:
+    """Class for opening and pre-processing IE WebCache file."""
+
     def __init__(self, target: Target, fh: BinaryIO):
         self.target = target
         self.db = esedb.EseDB(fh)
 
     def find_containers(self, name: str) -> table.Table:
+        """Look up ContainerId from name
+
+        Args:
+            name: A String with the container name
+
+        Yields:
+            A String with ContainerId.
+        """
         try:
             for container_record in self.db.table("Containers").records():
                 if record_name := container_record.get("Name"):
@@ -34,6 +44,14 @@ class WebCache:
             pass
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
+        """Yield records from a Webcache container.
+        
+        Args:
+            name: A String with the container name.
+
+        Yields:
+            Records from specified Webcache container.
+        """
         for container in self.find_containers(name):
             try:
                 yield from container.records()
@@ -42,9 +60,11 @@ class WebCache:
                 continue
 
     def history(self) -> Iterator[record.Record]:
+        """Yield records from the history webcache container."""
         yield from self._iter_records("history")
 
     def downloads(self) -> Iterator[record.Record]:
+        """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
 
 
@@ -76,14 +96,33 @@ class InternetExplorerPlugin(Plugin):
                 self.users_dirs.append((user_details.user, cdir))
 
     def check_compatible(self) -> bool:
+        """Perform a compatibility check with the target.
+        This function checks if any of the supported browser directories
+        exists. Otherwise it should raise an ``UnsupportedPluginError``.
+        Raises:
+            UnsupportedPluginError: If the plugin could not be loaded.
+        """
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Internet Explorer directories found")
+
+    def open_cache(self, cdir) -> WebCache:
+        """Opens the Internet Explorer esedb file containing the history and download data.
+
+        Args:
+            cidr: Path to the cache file.
+
+        Returns:
+            WebCache object
+        """
+        self.cache_file = cdir.joinpath(self.CACHE_FILENAME)
+        if self.cache_file.exists():
+            return WebCache(self.target, self.cache_file.open())
 
     @export(record=IE_BROWSER_HISTORY_RECORD)
     def history(self) -> Iterator[IE_BROWSER_HISTORY_RECORD]:
         """Return browser history records from Internet Explorer.
 
-        Yields IEBrowserHistoryRecord with the following fields:
+        Yields IE_BROWSER_HISTORY_RECORD with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -103,11 +142,10 @@ class InternetExplorerPlugin(Plugin):
             source: (path): The source file of the history record.
         """
         for user, cdir in self.users_dirs:
-            cache_file = cdir.joinpath(self.CACHE_FILENAME)
-            if not cache_file.exists():
+            cache: WebCache = self.open_cache(cdir)
+            if not cache:
                 continue
 
-            cache = WebCache(self.target, cache_file.open())
             for container_record in cache.history():
                 if not container_record.get("Url"):
                     continue
@@ -133,27 +171,37 @@ class InternetExplorerPlugin(Plugin):
                     session=None,
                     from_visit=None,
                     from_url=None,
-                    source=str(cache_file),
+                    source=str(self.cache_file),
                     _target=self.target,
                     _user=user,
                 )
 
     @export(record=IE_BROWSER_DOWNLOAD_RECORD)
     def downloads(self):
+        """Return browser downloads records from Internet Explorer.
+
+        Yields IE_BROWSER_DOWNLOAD_RECORD with the following fields:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            ts_start (datetime): Download start timestamp.
+            ts_ed (datetime): Download end timestamp.
+            browser (string): The browser from which the records are generated from.
+            id (string): Record ID.
+            path (string): Download path.
+            url (uri): Download URL.
+            size (varint): Download file size.
+            state (varint): Download state number.
+            source: (path): The source file of the history record.
+        """
         for user, cdir in self.users_dirs:
-            cache_file = cdir.joinpath(self.CACHE_FILENAME)
-            if not cache_file.exists():
+            cache: WebCache = self.open_cache(cdir)
+            if not cache:
                 continue
 
-            cache = WebCache(self.target, cache_file.open())
             for r in cache.downloads():
-                '''for c in r._table.column_names:
-                    recordname = r.get(c)
-                    print(c + ": ")
-                    print(recordname)'''
                 response_headers = r.ResponseHeaders.decode("utf-16-le", errors="ignore")
                 ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
-                # print(response_headers.split('\x00'))
+
                 yield self.IE_BROWSER_DOWNLOAD_RECORD(
                     ts_start=None,
                     ts_end=wintimestamp(r.AccessedTime),
@@ -163,7 +211,7 @@ class InternetExplorerPlugin(Plugin):
                     url=down_url,
                     size=None,
                     state=None,
-                    source=str(cache_file),
+                    source=str(self.cache_file),
                     _target=self.target,
                     _user=user,
                 )
