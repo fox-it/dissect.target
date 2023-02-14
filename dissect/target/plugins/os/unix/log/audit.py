@@ -1,60 +1,82 @@
-import datetime
 import re
+from pathlib import Path
+from typing import Iterator
 
+from dissect.util.ts import from_unix
+
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, internal
 
 AuditRecord = TargetRecordDescriptor(
     "linux/log/audit",
     [
         ("datetime", "ts"),
-        ("string", "type"),
-        ("string", "id"),
-        ("string", "msg"),
-        ("string", "auditlog"),
+        ("string", "audit_type"),
+        ("varint", "audit_id"),
+        ("string", "message"),
+        ("uri", "source"),
     ],
 )
 
+AUDIT_REGEX = re.compile(r"^type=(?P<audit_type>.*) msg=audit\((?P<ts>.*):(?P<audit_id>.*)\): (?P<message>.*)$")
+
 
 class AuditPlugin(Plugin):
-    def check_compatible(self):
-        path = self.target.fs.path("/var/log/audit/")
+    def __init__(self, target):
+        super().__init__(target)
+        self.log_paths = self.get_log_paths()
 
-        if path.exists():
-            return True
-        else:
-            return False
+    @internal
+    def get_log_paths(self) -> list[Path]:
+        default_config = "/etc/audit/auditd.conf"
+        paths = ["/var/log/audit/audit.log"]
+
+        if (path := self.target.fs.path(default_config)).exists():
+            for line in path.open("rt"):
+                line = line.strip()
+                if not line:
+                    continue
+                if "log_file" in line:
+                    log_file = line.split("=")[-1].strip()
+                    paths.append(log_file)
+
+        return paths
+
+    def check_compatible(self) -> bool:
+        return self.target.fs.path("/var/log/audit/").exists()
 
     @export(record=[AuditRecord])
-    def audit(self):
-        """Return information stored in /var/log/audit.
+    def audit(self) -> Iterator[AuditRecord]:
+        """Return CentOS and RedHat audit information stored in /var/log/audit*.
 
         The audit log file on a Linux machine stores security-relevant information.
-        Based on pre-configured rules.
+        Based on pre-configured rules. Log messages consist of space delimited key=value pairs.
 
         Sources:
             - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/security_guide/chap-system_auditing
             - https://linux-audit.com/linux-audit-log-files-in-var-log-audit/
+            - https://man7.org/linux/man-pages/man8/auditd.8.html
+            - https://man7.org/linux/man-pages/man8/ausearch.8.html
+            - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-understanding_audit_log_files
         """  # noqa: E501
-        audit_type = re.compile(r"(?<=type=).+?\W")
-        audit_msg = re.compile(r"(?<=\):\W).+")
-        audit_meta = re.compile(r"(?<=msg=audit\().+?\)")
 
-        for file in self.target.fs.listdir_ext("/var/log/audit"):
-            fh = file.open("rt")
+        for path in self.log_paths:
+            print(path)
+            for file in self.target.fs.path(path).parent.glob("*"):
+                print(file)
+                for line in open_decompress(file, "rt"):
+                    match = AUDIT_REGEX.match(line)
+                    if not match:
+                        self.target.log.warning("Audit log file contains unrecognized format in %s", path)
+                        continue
 
-            for line in fh:
-                # group returns the string representation of the match when using re.search
-                _type = audit_type.search(line).group().strip(" ")
-                msg = audit_msg.search(line).group()
-                audit = audit_meta.search(line).group()
-                ts, _id = audit.split(":")
-
-                yield AuditRecord(
-                    ts=datetime.datetime.fromtimestamp(float(ts)),
-                    type=_type,
-                    id=int(_id.strip(")")),
-                    msg=msg,
-                    auditlog=None,
-                    _target=self.target,
-                )
+                    match = match.groupdict()
+                    yield AuditRecord(
+                        ts=from_unix(float(match["ts"])),
+                        audit_type=match["audit_type"],
+                        audit_id=int(match["audit_id"]),
+                        message=match["message"].strip(),
+                        source=str(path),
+                        _target=self.target,
+                    )
