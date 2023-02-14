@@ -1,23 +1,21 @@
 from typing import Iterator
 
-from flow.record import Record
 from flow.record.fieldtypes import path
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
-from dissect.util.ts import webkittimestamp
-
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.browsers.browser import (
-    GENERIC_HISTORY_RECORD_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
+    GENERIC_HISTORY_RECORD_FIELDS,
     try_idna,
 )
+from dissect.util.ts import webkittimestamp
 
 
 class ChromiumMixin:
@@ -31,7 +29,7 @@ class ChromiumMixin:
         "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
-    def history(self, browser_name: str = None) -> Iterator[Record]:
+    def history(self, browser_name: str = None) -> Iterator[HISTORY_RECORD]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
@@ -95,7 +93,27 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    def downloads(self, browser_name: str = None) -> Iterator[Record]:
+    def downloads(self, browser_name: str = None) -> Iterator[BROWSER_DOWNLOAD_RECORD]:
+        """Return browser download records from supported Chromium-based browsers.
+
+        Args:
+            browser_name: The name of the browser as a string.
+        Yields:
+            Records with the following fields:
+                hostname (string): The target hostname.
+                domain (string): The target domain.
+                ts_start (datetime): Download start timestamp.
+                ts_ed (datetime): Download end timestamp.
+                browser (string): The browser from which the records are generated from.
+                id (string): Record ID.
+                path (string): Download path.
+                url (uri): Download URL.
+                size (varint): Download file size.
+                state (varint): Download state number.
+                source: (path): The source file of the history record.
+        Raises:
+            SQLError: If the file with the donwload records could not be processed.
+        """
         for user, db_file, db in self._iter_db("History"):
             try:
                 download_chains: dict = {}
