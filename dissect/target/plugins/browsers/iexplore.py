@@ -45,7 +45,7 @@ class WebCache:
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
         """Yield records from a Webcache container.
-        
+
         Args:
             name: A String with the container name.
 
@@ -177,14 +177,14 @@ class InternetExplorerPlugin(Plugin):
                 )
 
     @export(record=IE_BROWSER_DOWNLOAD_RECORD)
-    def downloads(self):
+    def downloads(self) -> Iterator[IE_BROWSER_DOWNLOAD_RECORD]:
         """Return browser downloads records from Internet Explorer.
 
         Yields IE_BROWSER_DOWNLOAD_RECORD with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
-            ts_ed (datetime): Download end timestamp.
+            ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
             path (string): Download path.
