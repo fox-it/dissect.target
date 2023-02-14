@@ -53,20 +53,22 @@ class CaddyPlugin(plugin.Plugin):
                         continue
 
                     match = match.groupdict()
-                    p = match["log_file"].replace(" {", "").split(" ")[-1]
+                    log_path = match["log_file"].replace(" {", "").split(" ")[-1]
 
                     parent_folders = []
                     # Search all root folders we found earlier with the current relative log path we found.
-                    if p.startswith("/"):
-                        parent_folders.append(self.target.fs.path(p).parent)
+                    if log_path.startswith("/"):
+                        parent_folders.append(self.target.fs.path(log_path).parent)
                     else:
                         for root in found_roots:
                             # Logs will be located one folder higher than the defined root.
                             root_parent = self.target.fs.path(root).parent
-                            parent_folders.append(root_parent.joinpath(p).parent)
+                            parent_folders.append(root_parent.joinpath(log_path).parent)
 
                     for parent_folder in parent_folders:
-                        log_paths.extend(p for p in parent_folder.glob(basename(p) + "*") if p not in log_paths)
+                        log_paths.extend(
+                            path for path in parent_folder.glob(f"{basename(log_path)}*") if path not in log_paths
+                        )
 
         return log_paths
 

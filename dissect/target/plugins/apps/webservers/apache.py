@@ -1,4 +1,5 @@
 import enum
+import itertools
 import re
 from datetime import datetime
 from pathlib import Path
@@ -75,11 +76,10 @@ class ApachePlugin(plugin.Plugin):
         log_paths = []
 
         # Check if any well known default Apache log locations exist
-        default_logs_dirs = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
+        default_log_dirs = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
         default_log_names = ["access.log", "access_log", "httpd-access.log"]
-        for default_log_dir in default_logs_dirs:
-            for default_log_name in default_log_names:
-                log_paths.extend(self.target.fs.path(default_log_dir).glob(default_log_name + "*"))
+        for log_dir, log_name in itertools.product(default_log_dirs, default_log_names):
+            log_paths.extend(self.target.fs.path(log_dir).glob(log_name + "*"))
 
         # Check default Apache configs for their CustomLog directive
         default_config_paths = [
@@ -91,14 +91,20 @@ class ApachePlugin(plugin.Plugin):
         for config in default_config_paths:
             if (path := self.target.fs.path(config)).exists():
                 for line in open_decompress(path, "rt"):
-                    if "CustomLog" in line:
-                        try:
-                            custom_log = self.target.fs.path(line.split(" ")[1].replace('"', "").strip())
-                            log_paths.extend(
-                                p for p in custom_log.parent.glob(custom_log.name + "*") if p not in log_paths
-                            )
-                        except IndexError:
-                            self.target.log.warning("Unexpected Apache log configuration: %s (%s)", line, path)
+                    line = line.strip()
+
+                    if not line or line.startswith("#") or "CustomLog" not in line:
+                        continue
+
+                    try:
+                        # CustomLog "/custom/log/location/access.log" common
+                        log_path = line.split(" ")[1].replace('"', "").strip()
+                        custom_log = self.target.fs.path(log_path)
+                        log_paths.extend(
+                            path for path in custom_log.parent.glob(f"{custom_log.name}*") if path not in log_paths
+                        )
+                    except IndexError:
+                        self.target.log.warning("Unexpected Apache log configuration: %s (%s)", line, path)
 
         return log_paths
 

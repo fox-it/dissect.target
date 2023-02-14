@@ -294,10 +294,10 @@ class IISLogsPlugin(plugin.Plugin):
                 method=iis_record.request_method,
                 uri=iis_record.request_path,
                 protocol=getattr(iis_record, "cs_version", None),
-                status_code=iis_record._asdict().get("service_status_code", None),
+                status_code=getattr(iis_record, "service_status_code", None),
                 bytes_sent=iis_record.response_size_bytes,
-                referer=iis_record._asdict().get("cs_referer", None),
-                useragent=iis_record._asdict().get("cs_user_agent", None),
+                referer=getattr(iis_record, "cs_referer", None),
+                useragent=getattr(iis_record, "cs_user_agent", None),
                 source=iis_record.log_file,
                 _target=self.target,
             )

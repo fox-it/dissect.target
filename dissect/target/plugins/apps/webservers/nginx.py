@@ -25,19 +25,23 @@ class NginxPlugin(plugin.Plugin):
     def get_log_paths(self) -> list[Path]:
         log_paths = []
 
-        # Add any well known default Caddy log locations
+        # Add any well known default NGINX log locations
         log_paths.extend(self.target.fs.path("/var/log/nginx").glob("access.log*"))
 
-        # Check for custom paths in nginx install config
+        # Check for custom paths in NGINX install config
         if (config_file := self.target.fs.path("/etc/nginx/nginx.conf")).exists():
             for line in config_file.open("rt"):
                 line = line.strip()
-                if "access_log " in line:
-                    try:
-                        path = self.target.fs.path(line.split()[1])
-                        log_paths.extend(p for p in path.parent.glob(path.name + "*") if p not in log_paths)
-                    except IndexError:
-                        self.target.log.warning("Unexpected NGINX log configuration: %s (%s)", line, path)
+                if not line or line.startswith("#") or "access_log " not in line:
+                    continue
+
+                try:
+                    log_path = self.target.fs.path(line.split()[1])
+                    log_paths.extend(
+                        path for path in log_path.parent.glob(f"{log_path.name}*") if path not in log_paths
+                    )
+                except IndexError:
+                    self.target.log.warning("Unexpected NGINX log configuration: %s (%s)", line, config_file)
 
         return log_paths
 
