@@ -20,15 +20,8 @@ class AD1Filesystem(Filesystem):
         self.ad1 = ad1.AD1(fh)
 
     @staticmethod
-    def detect(fh):
-        try:
-            offset = fh.tell()
-            magic = fh.read(16)
-            fh.seek(offset)
-
-            return magic == b"ADSEGMENTEDFILE\x00"
-        except Exception:
-            return False
+    def _detect(fh):
+        return fh.read(16) == b"ADSEGMENTEDFILE\x00"
 
     def get(self, path):
         return AD1FilesystemEntry(self, path, self._get_entry(path))

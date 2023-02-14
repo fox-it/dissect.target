@@ -1,4 +1,4 @@
-import struct
+from typing import BinaryIO, Iterator, Optional
 
 from dissect.ffs import c_ffs, ffs
 
@@ -16,32 +16,26 @@ from dissect.target.helpers import fsutil
 class FfsFilesystem(Filesystem):
     __fstype__ = "ffs"
 
-    def __init__(self, fh, *args, **kwargs):
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.ffs = ffs.FFS(fh)
 
     @staticmethod
-    def detect(fh):
-        try:
-            offset = fh.tell()
-            for sb_offset in ffs.SBLOCKSEARCH:
-                fh.seek(sb_offset)
-                block = fh.read(4096)
-                magic = struct.unpack("<I", block[1372:1376])[0]
+    def _detect(fh: BinaryIO) -> bool:
+        for sb_offset in ffs.SBLOCKSEARCH:
+            fh.seek(sb_offset)
+            block = fh.read(4096)
+            magic = int.from_bytes(block[1372:1376], "little")
 
-                if magic in (c_ffs.c_ffs.FS_UFS1_MAGIC, c_ffs.c_ffs.FS_UFS2_MAGIC):
-                    fh.seek(offset)
-                    return True
+            if magic in (c_ffs.c_ffs.FS_UFS1_MAGIC, c_ffs.c_ffs.FS_UFS2_MAGIC):
+                return True
 
-            fh.seek(offset)
-            return False
-        except Exception:
-            return False
+        return False
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         return FfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path, node=None):
+    def _get_node(self, path: str, node: Optional[ffs.INode] = None) -> ffs.INode:
         try:
             return self.ffs.get(path, node)
         except ffs.FileNotFoundError as e:
@@ -55,22 +49,22 @@ class FfsFilesystem(Filesystem):
 
 
 class FfsFilesystemEntry(FilesystemEntry):
-    def _resolve(self):
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
         return FfsFilesystemEntry(self.fs, entry_path, entry)
 
-    def open(self):
+    def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self):
+    def _iterdir(self) -> Iterator[ffs.INode]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -84,40 +78,40 @@ class FfsFilesystemEntry(FilesystemEntry):
 
                 yield entry
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         for entry in self._iterdir():
             yield entry.name
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         for entry in self._iterdir():
             entry_path = fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator)
             yield FfsFilesystemEntry(self.fs, entry_path, entry)
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         try:
             return self._resolve().entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self):
+    def is_file(self) -> bool:
         try:
             return self._resolve().entry.is_file()
         except FilesystemError:
             return False
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return self.entry.is_symlink()
 
-    def readlink(self):
+    def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError()
 
         return self.entry.link
 
-    def stat(self):
+    def stat(self) -> fsutil.stat_result:
         return self._resolve().lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime

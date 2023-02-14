@@ -35,21 +35,14 @@ class NtfsFilesystem(Filesystem):
         self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
-        try:
-            offset = fh.tell()
-            fh.seek(0)
-            sector = fh.read(512)
-            fh.seek(offset)
-
-            return sector[3:11] == NTFS_SIGNATURE
-        except Exception:  # noqa
-            return False
+    def _detect(fh: BinaryIO) -> bool:
+        sector = fh.read(512)
+        return sector[3:11] == NTFS_SIGNATURE
 
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(self, path, self._get_record(path))
 
-    def _get_record(self, path: str, root: MftRecord = None) -> MftRecord:
+    def _get_record(self, path: str, root: Optional[MftRecord] = None) -> MftRecord:
         try:
             path = path.rsplit(":", maxsplit=1)[0]
             return self.ntfs.mft.get(path, root=root)
@@ -96,7 +89,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         stream = name or self.ads
         return self.dereference().open(stream)
 
-    def _iterdir(self, ignore_dos=True) -> Iterator[IndexEntry]:
+    def _iterdir(self, ignore_dos: bool = True) -> Iterator[IndexEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
