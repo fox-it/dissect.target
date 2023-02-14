@@ -1,10 +1,7 @@
-from dissect.target.exceptions import LoaderError
-
 try:
     import yaml
 except ImportError:
-    raise LoaderError("Missing PyYAML dependency")
-
+    raise ImportError("Missing PyYAML dependency")
 
 from dissect.target import container
 from dissect.target.loader import Loader
