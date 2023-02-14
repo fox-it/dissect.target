@@ -45,6 +45,7 @@ class WebCache:
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
         """Yield records from a Webcache container.
+
         Args:
             name: A String with the container name.
 
