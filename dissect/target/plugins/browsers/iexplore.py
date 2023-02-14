@@ -2,19 +2,18 @@ from pathlib import Path
 from typing import BinaryIO, Iterator, Tuple
 
 from dissect.esedb import esedb, record, table
-from dissect.util.ts import wintimestamp
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.browsers.browser import (
+    GENERIC_DOWNLOAD_RECORD_FIELDS, 
     GENERIC_HISTORY_RECORD_FIELDS,
-    GENERIC_DOWNLOAD_RECORD_FIELDS,
     try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
 from dissect.target.target import Target
+from dissect.util.ts import wintimestamp
 
 
 class WebCache:
