@@ -4,7 +4,7 @@ from typing import Iterator
 
 from dissect.util.ts import from_unix
 
-from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.fsutil import basename, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
@@ -15,7 +15,7 @@ AuditRecord = TargetRecordDescriptor(
         ("string", "audit_type"),
         ("varint", "audit_id"),
         ("string", "message"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -35,16 +35,17 @@ class AuditPlugin(Plugin):
         if (path := self.target.fs.path(default_config)).exists():
             for line in path.open("rt"):
                 line = line.strip()
-                if not line:
+                if not line or "log_file" not in line:
                     continue
-                if "log_file" in line:
-                    log_file = line.split("=")[-1].strip()
+
+                log_file = line.split("=")[-1].strip()
+                if log_file not in paths:
                     paths.append(log_file)
 
         return paths
 
     def check_compatible(self) -> bool:
-        return self.target.fs.path("/var/log/audit/").exists()
+        return len(self.log_paths) > 0
 
     @export(record=[AuditRecord])
     def audit(self) -> Iterator[AuditRecord]:
@@ -62,9 +63,7 @@ class AuditPlugin(Plugin):
         """  # noqa: E501
 
         for path in self.log_paths:
-            print(path)
-            for file in self.target.fs.path(path).parent.glob("*"):
-                print(file)
+            for file in self.target.fs.path(path).parent.glob(basename(path) + "*"):
                 for line in open_decompress(file, "rt"):
                     match = AUDIT_REGEX.match(line)
                     if not match:
