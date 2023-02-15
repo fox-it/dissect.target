@@ -37,15 +37,18 @@ class CaddyPlugin(plugin.Plugin):
             found_roots = []
             for line in config_file.open("rt"):
                 line = line.strip()
-                if not line or line.startswith("#"):
+                if not line:
                     continue
 
                 if "root " in line:
                     found_roots.append(line.split("root ")[1].strip())
 
                 if "log " in line or "output file " in line:
-                    if line.strip() == "log {":
+                    if line.strip() == "log {" or (line.strip().startswith("#") and "log {" in line.strip()):
                         continue
+
+                    if line.strip().startswith("#"):
+                        line = line.strip()[1:].strip()
 
                     match = LOG_FILE_REGEX.match(line)
                     if not match:
@@ -60,6 +63,12 @@ class CaddyPlugin(plugin.Plugin):
                     if log_path.startswith("/"):
                         parent_folders.append(self.target.fs.path(log_path).parent)
                     else:
+                        if len(found_roots) == 0:
+                            self.target.log.warning(
+                                "Can not infer absolute log path from relative path: Caddyfile root is not configured."
+                            )
+                            continue
+
                         for root in found_roots:
                             # Logs will be located one folder higher than the defined root.
                             root_parent = self.target.fs.path(root).parent

@@ -1,3 +1,4 @@
+import textwrap
 from datetime import timedelta, timezone
 from io import BytesIO
 
@@ -56,8 +57,8 @@ def test_plugins_apps_webservers_caddy_config(target_unix, fs_unix):
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
 
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
-    fs_unix.map_file_fh("var/www/log/access.log", BytesIO("Foo".encode()))
-    fs_unix.map_file_fh("var/log/caddy/access.log", BytesIO("Foo".encode()))
+    fs_unix.map_file_fh("var/www/log/access.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("var/log/caddy/access.log", BytesIO(b"Foo"))
 
     target_unix.add_plugin(CaddyPlugin)
     log_paths = target_unix.caddy.get_log_paths()
@@ -71,12 +72,41 @@ def test_plugins_apps_webservers_caddy_config_logs_logrotated(target_unix, fs_un
     config_file = absolute_path("data/webservers/caddy/Caddyfile")
     fs_unix.map_file("etc/caddy/Caddyfile", config_file)
 
-    fs_unix.map_file_fh("var/www/log/access.log", BytesIO("Foo".encode()))
-    fs_unix.map_file_fh("var/www/log/access.log.1", BytesIO("Foo1".encode()))
-    fs_unix.map_file_fh("var/www/log/access.log.2", BytesIO("Foo2".encode()))
-    fs_unix.map_file_fh("var/www/log/access.log.3", BytesIO("Foo3".encode()))
+    fs_unix.map_file_fh("var/www/log/access.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("var/www/log/access.log.1", BytesIO(b"Foo1"))
+    fs_unix.map_file_fh("var/www/log/access.log.2", BytesIO(b"Foo2"))
+    fs_unix.map_file_fh("var/www/log/access.log.3", BytesIO(b"Foo3"))
 
     target_unix.add_plugin(CaddyPlugin)
     log_paths = target_unix.caddy.get_log_paths()
 
     assert len(log_paths) == 4
+
+
+def test_plugins_apps_webservers_caddy_config_commented(target_unix, fs_unix):
+    config = """
+    root /var/www/html
+    1.example.com {
+        log {
+            # output file log/old.log
+            output file log/new.log
+        }
+    }
+    # 2.example.com {
+    #     log {
+    #         output file /completely/disabled/access.log
+    #     }
+    # }
+    """
+    fs_unix.map_file_fh("etc/caddy/Caddyfile", BytesIO(textwrap.dedent(config).encode()))
+    fs_unix.map_file_fh("var/www/log/old.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("var/www/log/new.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("completely/disabled/access.log", BytesIO(b"Foo"))
+
+    target_unix.add_plugin(CaddyPlugin)
+    log_paths = target_unix.caddy.get_log_paths()
+
+    assert len(log_paths) == 3
+    assert str(log_paths[0]) == "/var/www/log/old.log"
+    assert str(log_paths[1]) == "/var/www/log/new.log"
+    assert str(log_paths[2]) == "/completely/disabled/access.log"
