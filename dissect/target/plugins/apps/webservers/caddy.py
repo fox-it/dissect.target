@@ -40,15 +40,15 @@ class CaddyPlugin(plugin.Plugin):
                 if not line:
                     continue
 
+                if line.startswith("#"):
+                    line = line[1:].strip()
+
                 if "root " in line:
                     found_roots.append(line.split("root ")[1].strip())
 
                 if "log " in line or "output file " in line:
-                    if line.strip() == "log {" or (line.strip().startswith("#") and "log {" in line.strip()):
+                    if line == "log {":
                         continue
-
-                    if line.strip().startswith("#"):
-                        line = line.strip()[1:].strip()
 
                     match = LOG_FILE_REGEX.match(line)
                     if not match:
