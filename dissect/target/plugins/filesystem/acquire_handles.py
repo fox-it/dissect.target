@@ -1,5 +1,6 @@
 import csv
 import gzip
+from typing import Iterator
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -7,7 +8,7 @@ from dissect.target.plugin import Plugin, export
 AcquireOpenHandlesRecord = TargetRecordDescriptor(
     "filesystem/acquire_open_handles",
     [
-        ("path", "file_name"),
+        ("path", "name"),
         ("string", "handle_type"),
         ("string", "object"),
         ("varint", "unique_process_id"),
@@ -28,11 +29,11 @@ class OpenHandlesPlugin(Plugin):
         super().__init__(target)
         self.open_handles_file = target.fs.path("$metadata$/open_handles.csv.gz")
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
         return self.open_handles_file.exists()
 
     @export(record=AcquireOpenHandlesRecord)
-    def acquire_handles(self):
+    def acquire_handles(self) -> Iterator[AcquireOpenHandlesRecord]:
         """Return open handles collected by Acquire.
 
         An Acquire file container contains an open handles csv when the handles module was used. The content of this csv
