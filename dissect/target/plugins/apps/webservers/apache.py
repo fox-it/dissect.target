@@ -63,6 +63,9 @@ class ApachePlugin(plugin.Plugin):
         super().__init__(target)
         self.log_paths = self.get_log_paths()
 
+    def check_compatible(self) -> bool:
+        return len(self.log_paths) > 0
+
     @plugin.internal
     def get_log_paths(self) -> list[Path]:
         """
@@ -107,9 +110,6 @@ class ApachePlugin(plugin.Plugin):
                         self.target.log.warning("Unexpected Apache log configuration: %s (%s)", line, path)
 
         return log_paths
-
-    def check_compatible(self) -> bool:
-        return len(self.log_paths) > 0
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:

@@ -25,6 +25,9 @@ class CaddyPlugin(plugin.Plugin):
         super().__init__(target)
         self.log_paths = self.get_log_paths()
 
+    def check_compatible(self) -> bool:
+        return len(self.log_paths) > 0
+
     @plugin.internal
     def get_log_paths(self) -> list[Path]:
         log_paths = []
@@ -80,9 +83,6 @@ class CaddyPlugin(plugin.Plugin):
                         )
 
         return log_paths
-
-    def check_compatible(self) -> bool:
-        return len(self.log_paths) > 0
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
