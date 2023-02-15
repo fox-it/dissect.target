@@ -32,11 +32,12 @@ class NginxPlugin(plugin.Plugin):
         if (config_file := self.target.fs.path("/etc/nginx/nginx.conf")).exists():
             for line in config_file.open("rt"):
                 line = line.strip()
-                if not line or line.startswith("#") or "access_log " not in line:
+                if not line or "access_log " not in line:
                     continue
 
                 try:
-                    log_path = self.target.fs.path(line.split()[1])
+                    line = line.split("access_log")[1].strip()
+                    log_path = self.target.fs.path(line.split()[0])
                     log_paths.extend(
                         path for path in log_path.parent.glob(f"{log_path.name}*") if path not in log_paths
                     )

@@ -93,12 +93,12 @@ class ApachePlugin(plugin.Plugin):
                 for line in open_decompress(path, "rt"):
                     line = line.strip()
 
-                    if not line or line.startswith("#") or "CustomLog" not in line:
+                    if not line or "CustomLog" not in line:
                         continue
 
                     try:
                         # CustomLog "/custom/log/location/access.log" common
-                        log_path = line.split(" ")[1].replace('"', "").strip()
+                        log_path = line.split("CustomLog")[1].strip().split(" ")[0].replace('"', "")
                         custom_log = self.target.fs.path(log_path)
                         log_paths.extend(
                             path for path in custom_log.parent.glob(f"{custom_log.name}*") if path not in log_paths

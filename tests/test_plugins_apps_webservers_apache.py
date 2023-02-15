@@ -1,3 +1,4 @@
+import textwrap
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
@@ -152,3 +153,18 @@ def test_plugins_apps_webservers_apache_custom_config(target_unix, fs_unix):
     log_paths = target_unix.apache.get_log_paths()
 
     assert len(log_paths) == 4
+
+
+def test_plugins_apps_webservers_apache_config_commented_logs(target_unix, fs_unix):
+    config = """
+    # CustomLog "/custom/log/location/old.log" common
+    CustomLog "/custom/log/location/new.log" common
+    """
+    fs_unix.map_file_fh("etc/httpd/conf/httpd.conf", BytesIO(textwrap.dedent(config).encode()))
+    fs_unix.map_file_fh("custom/log/location/new.log", BytesIO(b"New"))
+    fs_unix.map_file_fh("custom/log/location/old.log", BytesIO(b"Old"))
+    target_unix.add_plugin(ApachePlugin)
+
+    log_paths = target_unix.apache.get_log_paths()
+    assert str(log_paths[0]) == "/custom/log/location/old.log"
+    assert str(log_paths[1]) == "/custom/log/location/new.log"
