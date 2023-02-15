@@ -1,3 +1,6 @@
+import textwrap
+from io import BytesIO
+
 from dissect.util.ts import from_unix
 
 from dissect.target.plugins.os.unix.log.audit import AuditPlugin
@@ -28,3 +31,19 @@ def test_audit_plugin(target_unix, fs_unix):
     assert result.ts == from_unix(1364481363.243)
     assert result.audit_id == 24287
     assert result.message == 'cwd="/home/shadowman"'
+
+
+def test_audit_plugin_config(target_unix, fs_unix):
+    config = """
+    log_file = /foo/bar/audit/audit.log
+    # log_file=/tmp/disabled/audit/audit.log
+    """
+    fs_unix.map_file_fh("etc/audit/auditd.conf", BytesIO(textwrap.dedent(config).encode()))
+    fs_unix.map_file_fh("tmp/disabled/audit/audit.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("foo/bar/audit/audit.log", BytesIO(b"Foo"))
+
+    audit = AuditPlugin(target_unix)
+    log_paths = audit.get_log_paths()
+    assert len(log_paths) == 2
+    assert str(log_paths[0]) == "/foo/bar/audit/audit.log"
+    assert str(log_paths[1]) == "/tmp/disabled/audit/audit.log"
