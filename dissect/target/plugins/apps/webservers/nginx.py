@@ -50,7 +50,12 @@ class NginxPlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Return contents of NGINX access log files in unified WebserverAccessLogRecord format."""
+        """Return contents of NGINX access log files in unified WebserverAccessLogRecord format.
+
+        Resources:
+            - https://docs.nginx.com/nginx/admin-guide/monitoring/logging/#access_log
+            - http://nginx.org/en/docs/http/ngx_http_log_module.html#log_format
+        """
         for path in self.log_paths:
             try:
                 path = path.resolve(strict=True)
