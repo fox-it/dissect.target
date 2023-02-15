@@ -93,7 +93,7 @@ class Template:
         replace_match: Callable[[Match]] = lambda match: match.group(1).replace(":", "___")
         text = sub(pattern, replace_match, fh.open("rt").read())
 
-        xml = self.parser(file=StringIO(text))
+        xml = self.parser.parse(StringIO(text))
         return self._parse_xml_config(xml, self.sections, self.options)
 
     def _parse_configparser_config(self, fh: TargetPath) -> dict:
