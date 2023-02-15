@@ -93,7 +93,7 @@ class ApachePlugin(plugin.Plugin):
 
         for config in default_config_paths:
             if (path := self.target.fs.path(config)).exists():
-                for line in open_decompress(path, "rt"):
+                for line in path.open("rt"):
                     line = line.strip()
 
                     if not line or "CustomLog" not in line:
