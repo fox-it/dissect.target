@@ -1,16 +1,15 @@
 import re
-
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, Optional, Union, Iterable
+from typing import Any, Callable, Iterable, Match, Optional, Union
 
 from defusedxml import ElementTree
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
-from dissect.target.exceptions import UnsupportedPluginError
 
 try:
     import yaml
@@ -439,7 +438,6 @@ class NetworkManager:
         """
         cleaned_ips = set()
         for ip_value in ips:
-
             # Remove broadcast and localhost ip addresses
             if should_ignore_ip(ip_value) or ip_value == "::":
                 continue

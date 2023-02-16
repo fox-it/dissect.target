@@ -1,8 +1,8 @@
 import textwrap
 from io import BytesIO
 
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.helpers.network_managers import NetworkManager
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 
 from ._utils import absolute_path
 
@@ -23,7 +23,7 @@ def test_ips_dhcp_plugin(target_unix_users, fs_unix):
     )
 
     target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips_dhcp
+    results = target_unix_users.ips
     results.reverse()
     assert results == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4"]
 
@@ -41,7 +41,7 @@ def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
     )
 
     target_unix_users.add_plugin(LinuxPlugin)
-    results = target_unix_users.ips_dhcp
+    results = target_unix_users.ips
     assert results == ["10.13.37.5"]
 
 
