@@ -1,0 +1,30 @@
+# Caddy V1 and V2 Caddyfile example log snippets.
+# Source: https://github.com/caddyserver/examples
+
+root /var/www/html
+
+example.com {
+    log {
+        output file /var/log/caddy/access.log {
+            ...
+        }
+    }
+}
+
+example.com {
+    log {
+        output file log/access.log
+    }
+}
+
+example.com {
+    log / /var/log/caddy/access.log {
+        ...
+    }
+}
+
+example.com {
+    log /var/log/caddy/access.log {
+        ...
+    }
+}
