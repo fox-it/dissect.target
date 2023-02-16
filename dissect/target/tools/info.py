@@ -79,7 +79,7 @@ def main():
                 InfoRecord(
                     os_family=target.os,
                     os_version=target.version,
-                    ips=list(set(target.ips + target.ips_dhcp)),
+                    ips=target.ips,
                     architecture=target.architecture,
                     install_date=target.install_date,
                     last_activity=target.activity,
@@ -99,7 +99,7 @@ def obj_target_info(target):
         "os_version": target.version,
         "architecture": target.architecture,
         "domain": target.domain,
-        "ips": list(set(target.ips + target.ips_dhcp)),
+        "ips": target.ips,
         "install_date": str(target.install_date),
         "last_activity": str(target.activity),
         "language": target.language,
@@ -131,7 +131,7 @@ def print_target_info(target):
     print(f"OS version    : {target.version}")
     print(f"Arch          : {target.architecture}")
     print(f"Domain        : {target.domain}")
-    print(f"IPs           : {', '.join(set(target.ips + target.ips_dhcp))}")
+    print(f"IPs           : {', '.join(target.ips)}")
     print(f"Install date  : {target.install_date}")
     print(f"Last activity : {target.activity}")
     print(f"Language(s)   : {', '.join(target.language)}")
