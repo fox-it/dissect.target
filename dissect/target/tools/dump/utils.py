@@ -7,7 +7,7 @@ import json
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, BinaryIO, Union, Iterator, Callable, Optional
+from typing import Any, BinaryIO, Callable, Iterator, Optional, Union
 
 import structlog
 
@@ -27,12 +27,11 @@ except ImportError:
     HAS_ZSTD = False
 
 
-from flow.record import RecordStreamWriter, RecordDescriptor
-from flow.record.jsonpacker import JsonRecordPacker
+from flow.record import RecordDescriptor, RecordStreamWriter
 from flow.record.adapter.jsonfile import JsonfileWriter
+from flow.record.jsonpacker import JsonRecordPacker
 
 from dissect.target import Target
-
 
 log = structlog.get_logger(__name__)
 
@@ -201,7 +200,6 @@ def get_sink_writer(
 
 @contextmanager
 def cached_sink_writers(state) -> Iterator[Callable]:
-
     # Poor man's cache that cleans up when it hits the limit of `OPEN_WRITERS_LIMIT`.
     # The cache is needed to reduce file handler open/close flickering for unsorted records stream.
     writers_cache = {}
@@ -213,7 +211,6 @@ def cached_sink_writers(state) -> Iterator[Callable]:
         writers_cache.clear()
 
     def write_element(element) -> int:
-
         sink_path = get_relative_sink_path(
             element,
             state.serialization,

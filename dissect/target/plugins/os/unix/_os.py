@@ -9,7 +9,7 @@ from typing import Iterator, Optional, Tuple, Union
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OSPlugin, OperatingSystem, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -37,27 +37,77 @@ class UnixPlugin(OSPlugin):
         return cls(target)
 
     @export(record=UnixUserRecord)
-    def users(self) -> Iterator[UnixUserRecord]:
-        passwd = self.target.fs.path("/etc/passwd")
-        if not passwd.exists():
-            return
+    @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")
+    def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
+        """Recover users from /etc/passwd, /etc/master.passwd or /var/log/syslog session logins."""
 
-        for line in passwd.open("rt"):
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+        seen_users = set()
 
-            pwent = line.split(":")
-            yield UnixUserRecord(
-                name=pwent[0],
-                passwd=pwent[1],
-                uid=pwent[2],
-                gid=pwent[3],
-                gecos=pwent[4],
-                home=pwent[5],
-                shell=pwent[6],
-                _target=self.target,
-            )
+        # Yield users found in passwd files.
+        for passwd_file in ["/etc/passwd", "/etc/master.passwd"]:
+            if (path := self.target.fs.path(passwd_file)).exists():
+                for line in path.open("rt"):
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+
+                    pwent = dict(enumerate(line.split(":")))
+                    seen_users.add((pwent.get(0), pwent.get(5), pwent.get(6)))
+                    yield UnixUserRecord(
+                        name=pwent.get(0),
+                        passwd=pwent.get(1),
+                        uid=pwent.get(2),
+                        gid=pwent.get(3),
+                        gecos=pwent.get(4),
+                        home=pwent.get(5),
+                        shell=pwent.get(6),
+                        source=passwd_file,
+                        _target=self.target,
+                    )
+
+        # Find users not in passwd files by parsing recent
+        # syslog ldap, kerberos and x-session logins.
+        # Must be enabled using the --sessions flag
+        if sessions and (path := self.target.fs.path("/var/log/syslog")).exists():
+            sessions = []
+            cur_session = -1
+            needles = {
+                ("setting HOME=", "home"),
+                ("setting SHELL=", "shell"),
+                ("setting USER=", "name"),
+            }
+
+            for line in path.open("rt"):
+                # Detect the beginning of a new session activation in the syslog
+                #
+                # dbus-update-activation-environment starts a new session with
+                # DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR and/or DISPLAY
+                # Using DBUS_SESSION_BUS_ADDRESS seems to work fine for now.
+                if "setting DBUS_SESSION_BUS_ADDRESS=" in line:
+                    bus = line.split("DBUS_SESSION_BUS_ADDRESS=")[1].strip()
+                    cur_session += 1
+                    sessions.append({"bus": bus, "name": None, "home": None, "shell": None, "uid": None})
+
+                # Search the following lines for more information on the previousley detected session.
+                for n, k in needles:
+                    if n in line and "dbus-update-activation-environment" in line:
+                        sessions[cur_session][k] = line.split(n)[1].strip()
+
+            for user in sessions:
+                # Only return users we didn't already find in previously parsed passwd files and past sessions.
+                current_user = (user["name"], user["home"], user["shell"])
+                if current_user in seen_users:
+                    continue
+
+                seen_users.add(current_user)
+
+                yield UnixUserRecord(
+                    name=user["name"],
+                    home=user["home"],
+                    shell=user["shell"],
+                    source="/var/log/syslog",
+                    _target=self.target,
+                )
 
     @export(property=True)
     def architecture(self) -> str:
@@ -128,7 +178,6 @@ class UnixPlugin(OSPlugin):
         volumes_to_mount = [v for v in self.target.volumes if v.fs]
 
         for dev_id, volume_name, _, mount_point in parse_fstab(fstab, self.target.log):
-
             for volume in volumes_to_mount:
                 fs_id = None
                 last_mount = None
@@ -157,7 +206,6 @@ class UnixPlugin(OSPlugin):
 
         for path in self.target.fs.glob(glob):
             if self.target.fs.path(path).exists():
-
                 with self.target.fs.path(path).open("rt") as release_file:
                     for line in release_file:
                         if line.startswith("#"):
@@ -223,7 +271,6 @@ def parse_fstab(
         return
 
     for entry in fstab.open("rt"):
-
         entry = entry.strip()
         if entry.startswith("#"):
             continue

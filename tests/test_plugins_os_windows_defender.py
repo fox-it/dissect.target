@@ -4,13 +4,13 @@ from io import BytesIO
 from pathlib import Path
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
+
 from dissect.target.plugins.os.windows import defender
 
 from ._utils import absolute_path
 
 
 def test_defender_evtx_logs(target_win, fs_win, tmpdir_name):
-
     # map default log location to pass EvtxPlugin's compatibility check
     fs_win.map_dir("windows/system32/winevt/logs", tmpdir_name)
 

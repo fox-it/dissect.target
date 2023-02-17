@@ -1,12 +1,10 @@
-import datetime
-
 from dissect.sql import sqlite3
+from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-
+from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.plugin import Plugin, export
 
 ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/activitiescache",
@@ -111,7 +109,6 @@ class ActivitiesCachePlugin(Plugin):
             fh = cache_file.open()
             db = sqlite3.SQLite3(fh)
             for r in db.table("Activity").rows():
-
                 yield ActivitiesCacheRecord(
                     start_time=mkts(r["[StartTime]"]),
                     end_time=mkts(r["[EndTime]"]),
@@ -144,4 +141,8 @@ class ActivitiesCachePlugin(Plugin):
 
 
 def mkts(ts):
-    return datetime.datetime.utcfromtimestamp(ts) if ts else None
+    """Timestamps inside ActivitiesCache.db are stored in a Unix-like format.
+
+    Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/#timestamps
+    """
+    return from_unix(ts) if ts else None

@@ -3,8 +3,8 @@ from typing import Generator
 from flow.record.fieldtypes import path
 
 from dissect.target.helpers.descriptor_extensions import (
-    UserRecordDescriptorExtension,
     RegistryRecordDescriptorExtension,
+    UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey

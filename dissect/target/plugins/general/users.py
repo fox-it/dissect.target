@@ -5,7 +5,6 @@ from flow.record import RecordDescriptor
 
 from dissect.target.plugin import InternalPlugin
 
-
 UserDetails = namedtuple("UserDetails", "user home_path")
 
 

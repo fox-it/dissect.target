@@ -17,7 +17,6 @@ class BitlockerVolumeSystemError(VolumeSystemError):
 
 
 class BitlockerVolumeSystem(EncryptedVolumeSystem):
-
     PROVIDER = "bitlocker"
 
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
@@ -25,11 +24,8 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
         self.bde = bde.BDE(fh)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
-        try:
-            return bde.is_bde_volume(fh)
-        except Exception:
-            return False
+    def _detect(fh: BinaryIO) -> bool:
+        return bde.is_bde_volume(fh)
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):

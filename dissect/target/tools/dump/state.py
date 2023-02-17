@@ -6,7 +6,7 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Iterator, Callable, TextIO, Any, Optional
+from typing import Any, Callable, Iterator, List, Optional, TextIO
 
 import structlog
 
@@ -17,7 +17,6 @@ from dissect.target.tools.dump.utils import (
     get_current_utc_time,
     parse_datetime_iso,
 )
-
 
 log = structlog.get_logger(__name__)
 
@@ -183,7 +182,6 @@ class DumpState:
         """Return sinks that have a mismatch between recorded size and a real file size"""
         invalid_sinks = []
         for sink in self.sinks:
-
             # sink file does not exist
             if not self.get_full_sink_path(sink).exists():
                 invalid_sinks.append(sink)

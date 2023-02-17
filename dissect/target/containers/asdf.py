@@ -4,6 +4,7 @@ from typing import BinaryIO, Union
 
 from dissect.evidence import AsdfSnapshot, AsdfStream
 from dissect.evidence.asdf import FILE_MAGIC
+
 from dissect.target.container import Container
 
 

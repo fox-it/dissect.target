@@ -1,10 +1,8 @@
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
-
 from dissect.target.plugins.os.windows.regf.clsid import CLSIDPlugin
 
 
 def test_clsid_plugin(target_win_users, hive_hklm):
-
     clsid_key_name = "SOFTWARE\\Classes\\CLSID"
     clsid_key = VirtualKey(hive_hklm, clsid_key_name)
 

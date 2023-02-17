@@ -1,12 +1,11 @@
 import fnmatch
 import re
-
-from typing import Generator, BinaryIO, Any, List, Optional
 from pathlib import Path
-
-from flow.record import Record
+from typing import Any, BinaryIO, Generator, List, Optional
 
 from dissect.eventlog import evt
+from flow.record import Record
+
 from dissect.target import plugin
 from dissect.target.exceptions import (
     FilesystemError,
@@ -135,7 +134,6 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
             log_paths = self.get_logs(filename_glob=log_file_glob)
 
         for entry in log_paths:
-
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue

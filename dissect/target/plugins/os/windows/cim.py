@@ -1,6 +1,7 @@
 from typing import Iterator
 
 from dissect.cim import cim
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal

@@ -1,3 +1,4 @@
+from enum import Enum, auto
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -6,6 +7,12 @@ from dissect.ntfs.mft import MftRecord
 
 from dissect.target import Target
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+
+
+class InformationType(Enum):
+    STANDARD_INFORMATION = auto()
+    FILE_INFORMATION = auto()
+    ALTERNATE_DATA_STREAM = auto()
 
 
 def get_drive_letter(target: Target, filesystem: NtfsFilesystem):

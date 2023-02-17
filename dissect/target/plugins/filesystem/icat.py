@@ -1,10 +1,11 @@
-import sys
 import shutil
+import sys
 
 import dissect.extfs.exceptions
 import dissect.ntfs.exceptions
 import dissect.xfs.exceptions
-from dissect.target.plugin import Plugin, export, arg
+
+from dissect.target.plugin import Plugin, arg, export
 
 
 class ICatPlugin(Plugin):

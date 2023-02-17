@@ -4,8 +4,11 @@ from pathlib import Path
 from typing import Union
 
 from dissect.target import filesystem, target
-from dissect.target.filesystems.tar import TarFilesystemEntry
-from dissect.target.helpers import loaderutil
+from dissect.target.filesystems.tar import (
+    TarFilesystemDirectoryEntry,
+    TarFilesystemEntry,
+)
+from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
 
 log = logging.getLogger(__name__)
@@ -26,19 +29,16 @@ class TarLoader(Loader):
         self.tar = tarfile.open(path)
 
     @staticmethod
-    def detect(path: Path):
-        return path.name.lower().endswith((".tar", ".tar.gz"))
+    def detect(path: Path) -> bool:
+        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
     def is_compressed(self, path: Union[Path, str]) -> bool:
-        return str(path).lower().endswith(".tar.gz")
+        return str(path).lower().endswith((".tar.gz", ".tgz"))
 
-    def map(self, target: target.Target):
+    def map(self, target: target.Target) -> None:
         volumes = {}
 
         for member in self.tar.getmembers():
-            if member.isdir():
-                continue
-
             if not member.name.startswith("fs/") and not member.name.startswith("/sysvol"):
                 if "/" not in volumes:
                     vol = filesystem.VirtualFilesystem(case_sensitive=True)
@@ -47,7 +47,7 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes["/"]
-                entry = TarFilesystemEntry(volume, member.name, member)
+                mname = member.name
             else:
                 if not member.name.startswith("/sysvol"):
                     parts = member.name.replace("fs/", "").split("/")
@@ -65,8 +65,10 @@ class TarLoader(Loader):
                     target.filesystems.add(vol)
 
                 volume = volumes[volume_name]
+                mname = "/".join(parts[1:])
 
-                entry = TarFilesystemEntry(volume, "/".join(parts[1:]), member)
+            entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
+            entry = entry_cls(volume, fsutil.normpath(mname), member)
             volume.map_file_entry(entry.path, entry)
 
         for vol_name, vol in volumes.items():

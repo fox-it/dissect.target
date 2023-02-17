@@ -1,9 +1,9 @@
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.plugin import Plugin, export
 
 ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "filesystem/windows/powershell/history",

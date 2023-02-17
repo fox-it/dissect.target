@@ -65,7 +65,6 @@ def test_build_pipe_broken_pipe():
 
 
 def test_targethubcli_autocomplete_enter(make_mock_targets):
-
     target1, target2 = make_mock_targets(2)
 
     target1.hostname = "dev-null-1.localhost"
@@ -109,7 +108,6 @@ def test_targetcli_autocomplete(mock_target):
 
 
 def test_pipe_symbol_parsing(capfd, mock_target):
-
     cli = TargetCli(mock_target)
 
     def mock_func(func_args, func_stdout):

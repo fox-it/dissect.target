@@ -4,16 +4,16 @@ from collections import defaultdict
 from functools import lru_cache
 
 from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
-from dissect.target.plugin import Plugin, internal
-from dissect.target.plugins.general.users import UserDetails
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
     HiveCollection,
     KeyCollection,
-    RegistryKey,
     RegfHive,
+    RegistryKey,
     VirtualHive,
 )
+from dissect.target.plugin import Plugin, internal
+from dissect.target.plugins.general.users import UserDetails
 
 controlset_regex = re.compile("CurrentControlSet", flags=re.IGNORECASE)
 
@@ -113,7 +113,6 @@ class RegistryPlugin(Plugin):
             return
 
         for user_details in self.target.user_details.all_with_home():
-
             user = user_details.user
             ntuser = user_details.home_path.joinpath("ntuser.dat")
 
@@ -192,7 +191,6 @@ class RegistryPlugin(Plugin):
         key = key.strip("\\")
 
         if controlset_regex.findall(key):
-
             if not self._currentcontrolset:
                 self.target.log.warning("No known destination for CurrentControlSet link")
                 raise RegistryKeyNotFoundError(key)

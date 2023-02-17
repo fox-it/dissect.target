@@ -1,9 +1,8 @@
 import re
 import urllib
-
-from typing import Optional, Tuple, Union
-from pathlib import Path
 from os import PathLike
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
@@ -50,7 +49,6 @@ def _try_open(fs, path):
 
 
 def extract_path_info(path: Union[str, Path]) -> Tuple[Path, Optional[urllib.parse.ParseResult]]:
-
     """
     Extracts a ParseResult from a path if it has
     a scheme and adjusts the path if necessary.

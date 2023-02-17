@@ -1,13 +1,15 @@
 import re
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 from typing import Iterator, List, Optional, Set
 
 from dissect.target import Target
 from dissect.target.exceptions import RegistryError
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export, internal
-
 
 EnvironmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/environment",

@@ -1,5 +1,4 @@
-import datetime
-
+from dissect.util.ts import from_unix
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import FileNotFoundError
@@ -50,9 +49,9 @@ class WalkFSPlugin(Plugin):
 def generate_record(target, entry, idx):
     stat = entry.lstat()
     return FilesystemRecord(
-        atime=datetime.datetime.utcfromtimestamp(stat.st_atime),
-        mtime=datetime.datetime.utcfromtimestamp(stat.st_mtime),
-        ctime=datetime.datetime.utcfromtimestamp(stat.st_ctime),
+        atime=from_unix(stat.st_atime),
+        mtime=from_unix(stat.st_mtime),
+        ctime=from_unix(stat.st_ctime),
         ino=stat.st_ino,
         path=uri(str(entry)),
         size=stat.st_size,

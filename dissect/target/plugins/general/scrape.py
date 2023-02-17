@@ -1,13 +1,11 @@
 import io
-
-from typing import Generator, List, Tuple, Dict, Callable, BinaryIO
+from typing import BinaryIO, Callable, Dict, Generator, List, Tuple
 
 from dissect.target import plugin
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 
 class ScrapePlugin(plugin.Plugin):
-
     __namespace__ = "scrape"
 
     def check_compatible(self):

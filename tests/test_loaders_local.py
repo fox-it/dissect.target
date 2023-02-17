@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import call, mock_open, patch, MagicMock
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
@@ -42,7 +42,7 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
 def test_local_loader_drive_skipping(mock_target):
     mock = mock_open()
     # Does it attempt to open the file and pass a raw container?
-    with (patch("builtins.open", mock), patch.object(mock_target.disks, "add") as mock_method):
+    with patch("builtins.open", mock), patch.object(mock_target.disks, "add") as mock_method:
         drive = Path("/xdev/fake")
         _add_disk_as_raw_container_to_target(drive, mock_target)
         assert isinstance(mock_method.call_args[0][0], RawContainer) is True
@@ -50,7 +50,7 @@ def test_local_loader_drive_skipping(mock_target):
 
     # Does it emit a warning instead of raising an exception?
     mock.side_effect = IOError
-    with (patch.object(TargetLogAdapter, "warning") as mock_method, patch("builtins.open", mock)):
+    with patch.object(TargetLogAdapter, "warning") as mock_method, patch("builtins.open", mock):
         drive = Path("/xdev/fake")
         _add_disk_as_raw_container_to_target(drive, mock_target)
         assert mock_method.call_args[0][0] == "Unable to open drive: /xdev/fake, skipped"

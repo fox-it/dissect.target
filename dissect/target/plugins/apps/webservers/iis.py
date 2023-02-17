@@ -1,24 +1,21 @@
 import re
-from functools import lru_cache
-from typing import Generator, List, Tuple
-
-from pathlib import Path
 from datetime import datetime, timezone
-from defusedxml import ElementTree
+from functools import lru_cache
+from pathlib import Path
+from typing import Iterator
 
+from defusedxml import ElementTree
 from flow.record.base import RE_VALID_FIELD_NAME
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.exceptions import UnsupportedPluginError
-
+from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
 BASIC_RECORD_FIELDS = [
-    ("string", "log_file"),
-    ("string", "log_format"),
     ("datetime", "ts"),
     ("net.ipaddress", "client_ip"),
     ("net.ipaddress", "server_ip"),
@@ -35,6 +32,8 @@ BASIC_RECORD_FIELDS = [
     ("string", "service_status_code"),
     # https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes?redirectedfrom=MSDN#system-error-codes-1
     ("string", "win32_status_code"),
+    ("string", "log_format"),
+    ("string", "log_file"),
 ]
 BasicRecordDescriptor = TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS)
 
@@ -63,7 +62,7 @@ class IISLogsPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No ApplicationHost config file found")
 
     @plugin.internal
-    def get_log_dirs(self) -> List[Tuple[str, str]]:
+    def get_log_dirs(self) -> list[tuple[str, str]]:
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
         except ElementTree.ParseError as e:
@@ -81,28 +80,34 @@ class IISLogsPlugin(plugin.Plugin):
         return log_paths
 
     @plugin.internal
-    def iter_log_format_path_pairs(self) -> List[Tuple[str, str]]:
+    def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
         for log_format, log_dir_path in self.get_log_dirs():
             for log_file in self.iter_log_paths(log_dir_path):
                 yield (log_format, log_file)
 
     @plugin.internal
-    def parse_iis_format_log(self, path: Path) -> Generator[TargetRecordDescriptor, None, None]:
+    def parse_iis_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         """Parse log file in IIS format and stream log records.
+
+        This format is not the default IIS log format.
 
         References:
             - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
-        """
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-IIS
+        """  # noqa: E501
 
-        def parse_datetime(date_str, time_str):
+        tzinfo = self.target.datetime.tzinfo
+
+        def parse_datetime(date_str: str, time_str: str) -> datetime:
             # Example: 10/1/2021 7:19:59
-            return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %H:%M:%S")
+            # "time is recorded as local time." [^3]
+            return datetime.strptime(f"{date_str} {time_str}", "%m/%d/%Y %H:%M:%S").replace(tzinfo=tzinfo)
 
         for line in path.open().readlines():
             # even though the docs say that IIS log format is ASCII format,
             # it is possible to select UTF-8 in configuration
-            line = line.decode("utf-8")
+            line = line.decode("utf-8", errors="backslashreplace")
 
             # Example:
             # 127.0.0.1, -, 9/20/2021, 8:51:21, W3SVC1, DESKTOP-PJOQLJS, 127.0.0.1, 0, 691, 5005, 404, 2, GET, /some, -,
@@ -135,16 +140,19 @@ class IISLogsPlugin(plugin.Plugin):
             yield BasicRecordDescriptor(**row)
 
     @lru_cache(maxsize=4096)
-    def _create_extended_descriptor(self, extra_fields) -> TargetRecordDescriptor:
+    def _create_extended_descriptor(self, extra_fields: tuple[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS + list(extra_fields))
 
     @plugin.internal
-    def parse_w3c_format_log(self, path: Path) -> Generator[TargetRecordDescriptor, None, None]:
+    def parse_w3c_format_log(self, path: Path) -> Iterator[TargetRecordDescriptor]:
         """Parse log file in W3C format and stream log records.
+
+        This is the default logging format for IIS [^3].
 
         References:
             - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-W3C
         """  # noqa: E501
 
         basic_fields = {
@@ -167,7 +175,7 @@ class IISLogsPlugin(plugin.Plugin):
         fields = []
         extra_fields = []
         for line in path.open().readlines():
-            line = line.decode("utf-8").strip()
+            line = line.decode("utf-8", errors="backslashreplace").strip()
 
             if line.startswith("#Fields"):
                 _, _, fields_str = line.partition("Fields: ")
@@ -220,13 +228,13 @@ class IISLogsPlugin(plugin.Plugin):
             #     "time-taken": "1"
             # }
 
+            # Make the datetime timezone aware.
+            # "the time stamp for each W3C Extended Logging log record is UTC-based." [^3]
             ts = None
             if raw.get("date") and raw.get("time"):
                 ts = datetime.strptime(f"{raw['date']} {raw['time']}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
 
             yield record_descriptor(
-                log_file=str(path),
-                log_format="W3C",
                 ts=ts,
                 client_ip=raw.get("c-ip"),
                 server_ip=raw.get("s-ip"),
@@ -241,17 +249,19 @@ class IISLogsPlugin(plugin.Plugin):
                 process_time_ms=raw.get("time-taken"),
                 service_status_code=raw.get("sc-status"),
                 win32_status_code=raw.get("sc-win32-status"),
+                log_format="W3C",
+                log_file=str(path),
                 _target=self.target,
                 **{normalise_field_name(field): raw.get(field) for field in extra_fields},
             )
 
     @plugin.internal
-    def iter_log_paths(self, log_dir: str) -> Generator[Path, None, None]:
+    def iter_log_paths(self, log_dir: str) -> Iterator[Path]:
         log_dir = fsutil.normalize(log_dir, alt_separator=self.target.fs.alt_separator)
         yield from self.target.fs.path(log_dir).glob("*/*.log")
 
     @plugin.export(record=BasicRecordDescriptor)
-    def logs(self) -> Generator[TargetRecordDescriptor, None, None]:
+    def logs(self) -> Iterator[TargetRecordDescriptor]:
         """Return contents of IIS (v7 and above) log files.
 
         Internet Information Services (IIS) for Windows Server is a manageable web server for hosting anything on the
@@ -268,6 +278,29 @@ class IISLogsPlugin(plugin.Plugin):
 
             self.target.log.info("Parsing IIS log file %s in %s format", log_file, log_format)
             yield from parse_func(log_file)
+
+    @plugin.export(record=WebserverAccessLogRecord)
+    def access(self) -> Iterator[WebserverAccessLogRecord]:
+        """Return contents of IIS (v7 and above) log files in unified WebserverAccessLogRecord format.
+
+        See function ``iis.logs`` for more information and more verbose IIS records.
+        """
+
+        for iis_record in self.logs():
+            yield WebserverAccessLogRecord(
+                ts=iis_record.ts,
+                remote_user=iis_record.username,
+                remote_ip=iis_record.client_ip,
+                method=iis_record.request_method,
+                uri=iis_record.request_path,
+                protocol=getattr(iis_record, "cs_version", None),
+                status_code=getattr(iis_record, "service_status_code", None),
+                bytes_sent=iis_record.response_size_bytes,
+                referer=getattr(iis_record, "cs_referer", None),
+                useragent=getattr(iis_record, "cs_user_agent", None),
+                source=iis_record.log_file,
+                _target=self.target,
+            )
 
 
 def replace_dash_with_none(data: dict) -> dict:

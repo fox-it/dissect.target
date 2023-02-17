@@ -1,16 +1,17 @@
 import io
 import stat
 import struct
-import xml.etree.ElementTree as ET
 import zipfile
 import zlib
+
+import defusedxml.ElementTree as ET
+from dissect.util import ts
 
 from dissect.target import filesystem
 from dissect.target.helpers import fsutil, record, regutil
 from dissect.target.loader import Loader
 from dissect.target.plugin import OSPlugin, export
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
-from dissect.util import ts
 
 EXTENSIONS = ("upr", "upf", "upr.zip", "upf.zip")
 

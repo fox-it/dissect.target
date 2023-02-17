@@ -6,7 +6,6 @@ from dissect.target.helpers.descriptor_extensions import (
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
-
 CLSIDRecordDescriptor = create_extended_descriptor(
     [
         RegistryRecordDescriptorExtension,
