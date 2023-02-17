@@ -23,7 +23,7 @@ class TarLoader(Loader):
         # Some issues exist with some tar entries, causing all entries afterwards to become invisible.
         # Using `ignore_zeros=True` resolves this issue, but is a workaround.
         # A propper solution should be implemented in the future
-        self.tar = tarfile.open(path, ignore_zeros=True)
+        self.tar = tarfile.open(path)
 
     @staticmethod
     def detect(path: Path):
