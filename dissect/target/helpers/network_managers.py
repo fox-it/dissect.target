@@ -1,11 +1,13 @@
+import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Match, Optional, Union
+from typing import Any, Callable, Iterable, Match, Optional, Union
 
 from defusedxml import ElementTree
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
 
@@ -15,6 +17,14 @@ try:
     PY_YAML = True
 except ImportError:
     PY_YAML = False
+
+IGNORED_IPS = [
+    "0.0.0.0",
+    "127.0.0.1",
+    "::1",
+    "0:0:0:0:0:0:0:1",
+    "0:0:0:0:0:0:0:0",
+]
 
 
 class Template:
@@ -129,12 +139,25 @@ class Template:
         fh = fh.open("rt")
 
         for line in fh.readlines():
-            if line.startswith(comments):
+            line = line.strip()
+
+            if not line or line.startswith(comments):
                 continue
+
+            key, value = line.split(delim, maxsplit=1)
+            key = key.strip()
+            value = value.strip()
+
             for option in self.options:
-                if option in line:
-                    entry = line.split(delim, maxsplit=1)[1].rstrip()
-                    option_dict[option] = entry
+                if option == key:
+                    # This key may have multiple values
+                    if key == "dns-nameservers":
+                        value = value.split(delim)
+
+                    if option_dict.get(key):
+                        option_dict[key].append(value) if isinstance(value, str) else option_dict[key].extend(value)
+                    else:
+                        option_dict[key] = [value] if isinstance(value, str) else value
 
         for section in self.sections:
             config[section] = option_dict
@@ -201,7 +224,10 @@ class Parser:
             config = self.template.create_config(path)
 
             for key, value in self.translate_network_config(config):
-                template[key].add(value)
+                if isinstance(value, list):
+                    template[key].update(value)
+                else:
+                    template[key].add(value)
         return template
 
     def translate_network_config(self, config_dict: dict) -> list[tuple[str, Any]]:
@@ -243,13 +269,14 @@ class Parser:
         translation_table = {
             "interface": ["name", "iface", "device"],
             "dhcp": ["bootproto", "dhcp", "dhcp4", "dhcpserver", "method"],
-            "ips": ["ip", "address1", "addresses", "ipaddr", "address"],
+            "ips": ["ip", "address1", "addresses", "ipaddr", "address", "./address/local"],
+            "netmask": ["netmask"],
             "gateway": ["gateway4", "gateway"],
-            "dns": ["dns", "dns1"],
+            "dns": ["dns", "dns1", "dns-nameservers"],
         }
 
         for translation_key, translation_values in translation_table.items():
-            if any([translation_value in option for translation_value in translation_values]) and value:
+            if option in translation_values and value:
                 return translation_key
 
     def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
@@ -330,7 +357,7 @@ class NetworkManager:
             return True
         else:
             self.target, self.parser = None, None
-            target.log.error("Failed to register network manager %s as active.", self.name)
+            target.log.debug("Failed to register network manager %s as active.", self.name)
             return False
 
     def parse(self) -> None:
@@ -346,11 +373,11 @@ class NetworkManager:
 
     @property
     def ips(self) -> set:
-        return self.config.get("ips")
+        return NetworkManager.clean_ips(self.config.get("ips", set()))
 
     @property
     def dns(self) -> set:
-        return self.config.get("dns")
+        return NetworkManager.clean_ips(self.config.get("dns", set()))
 
     @property
     def dhcp(self) -> bool:
@@ -359,11 +386,11 @@ class NetworkManager:
 
     @property
     def gateway(self) -> set:
-        return self.config.get("gateway")
+        return NetworkManager.clean_ips(self.config.get("gateway", set()))
 
     @property
     def netmask(self) -> set:
-        return self.config.get("netmask")
+        return NetworkManager.clean_ips(self.config.get("netmask", set()))
 
     @property
     def registered(self) -> bool:
@@ -398,6 +425,37 @@ class NetworkManager:
             translated_value.add(False)
 
         return translated_value
+
+    @staticmethod
+    def clean_ips(ips: Iterable) -> set:
+        """Clean ip values before returning them.
+
+        Args:
+            ips: Iterable of ip addresses to clean.
+
+        Returns:
+            Set of cleaned ip addresses.
+        """
+        cleaned_ips = set()
+        for ip_value in ips:
+            # Remove broadcast and localhost ip addresses
+            if should_ignore_ip(ip_value) or ip_value == "::":
+                continue
+
+            # Remove netmask cidr notation, eg. 1.2.3.4/24
+            if "/" in ip_value:
+                ip_value = ip_value.split("/")[0]
+
+            # Remove encapsulated "'s
+            if '"' in ip_value:
+                ip_value = ip_value.replace('"', "")
+
+            # Strip values
+            ip_value = ip_value.strip()
+
+            cleaned_ips.add(ip_value)
+
+        return cleaned_ips
 
     def __repr__(self) -> str:
         return f"<NetworkManager {self.name}>"
@@ -440,50 +498,129 @@ class LinuxNetworkManager:
         return values
 
 
+def parse_unix_dhcp_log_messages(target) -> list[str]:
+    """Parse local syslog and cloud init log files for DHCP lease IPs.
+
+    Args:
+        target: Target to discover and obtain network information from.
+
+    Returns:
+        List of DHCP ip addresses.
+    """
+    ips = []
+
+    # Search through parsed syslogs for DHCP leases.
+    try:
+        messages = target.messages()
+        for record in messages:
+            line = record.message
+
+            # Ubuntu DHCP
+            if "DHCPv4" in line or "DHCPv6" in line:
+                ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
+                if ip not in ips:
+                    ips.append(ip)
+
+            # Ubuntu DHCP NetworkManager
+            if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line):
+                ip = line.split("=> '")[1].replace("'", "").strip()
+                if ip not in ips:
+                    ips.append(ip)
+
+            # Debian and CentOS dhclient
+            if record.daemon == "dhclient" and "bound to" in line:
+                ip = line.split("bound to")[1].split(" ")[1].strip()
+                if ip not in ips:
+                    ips.append(ip)
+
+            # CentOS DHCP and general NetworkManager
+            if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+                ip = line.split(" address ")[1].strip()
+                if ip not in ips:
+                    ips.append(ip)
+
+    except UnsupportedPluginError:
+        target.log.debug("Can not search for DHCP leases in syslog files as they does not exist.")
+
+    # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).
+    if (path := target.fs.path("/var/log/cloud-init.log")).exists():
+        for line in path.open("rt"):
+            # We are interested in the following log line:
+            # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
+            if "Received dhcp lease on" in line:
+                interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+                if ip not in ips:
+                    ips.append(ip)
+
+    if not path and not messages:
+        target.log.warning("Can not search for DHCP leases in syslog or cloud-init.log files as they does not exist.")
+
+    return ips
+
+
+def should_ignore_ip(ip: str) -> bool:
+    for i in IGNORED_IPS:
+        if ip.startswith(i):
+            return True
+    return False
+
+
 MANAGERS = [
+    # Arch Linux netctl
     NetworkManager(
         "netctl",
         ("/etc/netctl/examples/*", "/usr/lib/systemd/system/netctl*.service"),
         ("/etc/netctl/*"),
     ),
+    # NetworkManager is a python configuration tool for networking, for various Linux distro's
     NetworkManager(
         "NetworkManager",
         ("/usr/bin/nmcli", "/usr/bin/nmtui", "/etc/NetworkManager/NetworkManager.conf", "/usr/lib/NetworkManager/*"),
         ("/etc/NetworkManager/system-connections/*"),
     ),
+    # Photon/Systemd Debian/Ubuntu network manager
     NetworkManager(
         "systemd-networkd",
-        ("/lib/systemd/system/systemd-networkd.servic*"),
+        ("/etc/systemd/network/*.network", "/lib/systemd/system/systemd-networkd.servic*"),
         (
             "/etc/systemd/network/*.network",
             "/run/systemd/network/*.network",
             "/usr/lib/systemd/network/*.network",
         ),
     ),
+    # Debian/Ubuntu WICD/Wicked network manager
     NetworkManager(
         "wicd",
-        ("/usr/sbin/wicd", "/etc/dbus-1/system.d/wicd.*", "/etc/wicd/*.conf"),
+        ("/etc/wicd/wire*-*.conf", "/usr/sbin/wicd", "/etc/dbus-1/system.d/wicd.*", "/etc/wicd/*.conf"),
         ("/etc/wicd/wire*-*.conf"),
     ),
     NetworkManager(
         "wicked",
-        ("/usr/sbin/wicked*", "/usr/lib/systemd/system/wicked.*", "/etc/dbus-1/system.d/org.opensuse.Network.*"),
+        (
+            "/etc/wicked/ifconfig/*.xml",
+            "/usr/sbin/wicked*",
+            "/usr/lib/systemd/system/wicked.*",
+            "/etc/dbus-1/system.d/org.opensuse.Network.*",
+        ),
         ("/etc/wicked/ifconfig/*.xml"),
     ),
+    # Ubuntu netplan
     NetworkManager(
         "netplan",
-        ("/usr/sbin/netplan", "/usr/share/dbus-1/system.d/io.netplan.Netplan.conf"),
+        ("/etc/netplan/*.yaml", "/usr/sbin/netplan", "/usr/share/dbus-1/system.d/io.netplan.Netplan.conf"),
         ("/etc/netplan/*.yaml"),
     ),
+    # CentOS/Red Hat/Fedora/SuSe sysconfig folder/files
     NetworkManager(
         "ifupdown",
-        ("/usr/sbin/ifup", "/usr/sbin/ifdown"),
+        ("/etc/sysconfig/network-scripts/ifcfg-*", "/usr/sbin/ifup", "/usr/sbin/ifdown"),
         ("/etc/sysconfig/network-scripts/ifcfg-*", "/etc/sysconfig/network/ifcfg-*"),
     ),
+    # Interfaces folder/files
     NetworkManager(
         "interfaces",
-        ("/usr/sbin/ifup", "/usr/sbin/ifdown", "/usr/sbin/ifquery"),
-        ("/etc/network/interfaces"),
+        ("/etc/network/interfaces", "/usr/sbin/ifup", "/usr/sbin/ifdown", "/usr/sbin/ifquery"),
+        ("/etc/network/interfaces", "/etc/network/interfaces.d/*"),
     ),
 ]
 
@@ -507,12 +644,14 @@ TEMPLATES = {
         ["Network", "Match"],
         ["address", "dhcp", "dns", "name", "dhcpserver"],
     ),
-    "wicked": Template("wicked", ElementTree, ["ipv4:static", "name"], ["./address/local", "name"]),
+    "wicked": Template("wicked", ElementTree, ["ipv4:static", "ipv6:static", "name"], ["./address/local", "name"]),
     "ifupdown": Template(
         "ifupdown",
         ConfigParser(delimiters=("=", " "), comment_prefixes=("#"), dict_type=dict, strict=False),
         ["ifupdown"],
         ["ipaddr", "bootproto", "dns", "gateway", "name", "device", "dns1"],
     ),
-    "interfaces": Template("interfaces", None, ["interfaces"], ["iface", "address", "gateway"]),
+    "interfaces": Template(
+        "interfaces", None, ["interfaces"], ["iface", "address", "gateway", "netmask", "dns-nameservers"]
+    ),
 }

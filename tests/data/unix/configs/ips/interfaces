@@ -1,0 +1,19 @@
+auto lo
+iface lo inet loopback
+
+# Simple IPv4 example
+auth eth0
+iface eth0 inet static
+address 10.13.37.6
+netmask 255.255.255.0
+gateway 10.13.37.0
+hwaddress ether 00:00:00:00:00:00
+dns-nameservers 10.13.37.1 10.13.37.2
+
+# Padded IPv6 example
+iface eth0 inet6 static
+    address     2001:db8:ffff:ffff:ffff:ffff:ffff:ffff
+    netmask     32
+    gateway     2001:db8::
+    hwaddress   00:00:00:00:00:00
+    dns-nameservers 2001:db8:: 2001:db9::
