@@ -23,9 +23,7 @@ class TarLoader(Loader):
                 f"Tar file {path!r} is compressed, which will affect performance. "
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
-        # Some issues exist with some tar entries, causing all entries afterwards to become invisible.
-        # Using `ignore_zeros=True` resolves this issue, but is a workaround.
-        # A propper solution should be implemented in the future
+
         self.tar = tarfile.open(path)
 
     @staticmethod

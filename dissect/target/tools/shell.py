@@ -511,7 +511,6 @@ class TargetCli(TargetCmd):
     def print_extensive_file_stat(self, stdout, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
         entry = target_path.get()
-        symlink = ""
 
         # Entry is an NTFSEntry and has alternative datastream
         if hasattr(entry, "deref") and ":" in name:
@@ -521,8 +520,7 @@ class TargetCli(TargetCmd):
 
         stat = entry.lstat()
 
-        if entry.is_symlink():
-            symlink = f"-> {entry.readlink()}"
+        symlink = f"-> {entry.readlink()}" if entry.is_symlink() else ""
 
         utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
 
