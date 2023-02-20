@@ -16,7 +16,12 @@ if TYPE_CHECKING:
 class HyperVChildTargetPlugin(ChildTargetPlugin):
     """Child target plugin that yields from Hyper-V VM inventory.
 
-    Hyper-V VMs are registered in a data.vmcx file in the Hyper-V ProgramData directory.
+    Since Windows Server 2016, Hyper-V VMs are registered in a data.vmcx file in the Hyper-V ProgramData directory.
+    Before that, VMs were registered by having a .xml file in the Hyper-V ProgramData "Virtual Machines" directory.
+
+    It is possible to put your "VM descriptor" files elsewhere. In the .vmcx format, the full path to the alternative
+    location is stored. In the .xml format, a NTFS symlink reparse point is created that points to the full
+    alternative path.
     """
 
     __type__ = "hyper-v"
