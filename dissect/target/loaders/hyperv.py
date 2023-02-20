@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 from xml.etree.ElementTree import Element
@@ -14,6 +15,8 @@ from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
+
+log = logging.getLogger(__name__)
 
 DRIVE_CONTROLLER_GUIDS = [
     # Microsoft Emulated IDE Controller
@@ -66,6 +69,7 @@ def xml_as_dict(element: Element, root: Optional[dict] = None) -> dict:
         root[element.tag] = True if element.text.lower() == "true" else False
     else:
         # We don't necessarily want to error out, so add as string instead
+        log.warning("Unknown Hyper-V XML value type, adding as string instead: %s (%s)", ftype, element.tag)
         root[element.tag] = element.text
 
     return root
@@ -123,6 +127,7 @@ class HyperVLoader(Loader):
             raise ValueError("Unable to find drive controllers")
 
         for guid in instance_guids:
+            # The GUID can be stored in lower or upper case
             device = configuration.get(guid, configuration.get(guid.lower(), {}))
 
             for key, value in device.items():
