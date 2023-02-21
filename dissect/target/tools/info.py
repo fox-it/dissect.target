@@ -93,6 +93,7 @@ def main():
         except Exception as e:
             target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
 
+
 def obj_target_info(target):
     return {
         "hostname": target.hostname,
