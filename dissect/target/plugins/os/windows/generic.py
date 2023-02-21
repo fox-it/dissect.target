@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from dissect.util.ts import from_unix, wintimestamp
+from dissect.util.ts import from_unix
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryError

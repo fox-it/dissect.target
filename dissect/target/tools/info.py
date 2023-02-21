@@ -68,7 +68,6 @@ def main():
         args.targets = targets
 
     for target in Target.open_all(args.targets):
-
         if args.json:
             print(json.dumps(obj_target_info(target)))
         elif args.json_pretty:
@@ -77,12 +76,12 @@ def main():
             rs = record_output(args.strings, args.json)
             rs.write(
                 InfoRecord(
+                    last_activity=target.activity,
+                    install_date=target.install_date,
+                    ips=target.ips,
                     os_family=target.os,
                     os_version=target.version,
-                    ips=target.ips,
                     architecture=target.architecture,
-                    install_date=target.install_date,
-                    last_activity=target.activity,
                     language=target.language,
                     timezone=target.timezone,
                     _target=target,
@@ -95,15 +94,15 @@ def main():
 def obj_target_info(target):
     return {
         "hostname": target.hostname,
+        "domain": target.domain,
+        "ips": target.ips,
         "os_family": target.os,
         "os_version": target.version,
         "architecture": target.architecture,
-        "domain": target.domain,
-        "ips": target.ips,
-        "install_date": str(target.install_date),
-        "last_activity": str(target.activity),
         "language": target.language,
         "timezone": target.timezone,
+        "install_date": str(target.install_date),
+        "last_activity": str(target.activity),
         "disks": [{"type": d.__class__.__name__, "size": d.size} for d in target.disks],
         "volumes": [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes],
         "children": [{"type": c.type, "path": str(c.path)} for c in target.list_children()],
@@ -126,15 +125,15 @@ def print_target_info(target: Target) -> None:
 
     print()
     print(f"Hostname      : {target.hostname}")
-    print(f"OS family     : {target.os}, {target._os_plugin.__name__}")
-    print(f"OS version    : {target.version}")
-    print(f"Arch          : {target.architecture}")
     print(f"Domain        : {target.domain}")
     print(f"IPs           : {', '.join(target.ips)}")
-    print(f"Install date  : {target.install_date}")
-    print(f"Last activity : {target.activity}")
+    print(f"OS family     : {target.os}, {target._os_plugin.__name__}")
+    print(f"OS version    : {target.version}")
+    print(f"Architecture  : {target.architecture}")
     print(f"Language(s)   : {', '.join(target.language)}")
     print(f"Timezone      : {target.timezone}")
+    print(f"Install date  : {target.install_date}")
+    print(f"Last activity : {target.activity}")
 
 
 if __name__ == "__main__":
