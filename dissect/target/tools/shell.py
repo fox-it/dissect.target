@@ -28,6 +28,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+from dissect.target.filesystem import RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
@@ -406,38 +407,35 @@ class TargetCli(TargetCmd):
     def scandir(self, path, color=False):
         """List a directory for the given path"""
         path = self.resolvepath(path)
-        if not path.exists() or not path.is_dir():
-            return []
+        result = []
 
-        r = []
-        for f in path.iterdir():
-            ft = None
-            if color:
-                if f.is_symlink():
-                    ft = "ln"
-                elif f.is_dir():
-                    ft = "di"
-                elif f.is_file():
-                    ft = "fi"
+        if path.exists() and path.is_dir():
+            for file_ in path.iterdir():
+                file_type = None
+                if color:
+                    if file_.is_symlink():
+                        file_type = "ln"
+                    elif file_.is_dir():
+                        file_type = "di"
+                    elif file_.is_file():
+                        file_type = "fi"
 
-            entry = f.get()
-            if hasattr(entry, "deref"):
-                m = entry.deref()
+                result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
 
-                if m.attr.Data:
-                    for data in m.attr.Data:
-                        if data.name == "":
-                            name = f.name
-                        else:
-                            ft = "fi"
-                            name = f"{f.name}:{data.name}"
-                        r.append((f, fmt_ls_colors(ft, name) if color else name))
-                    continue
+                # If we happen to scan an NTFS filesystem see if any of the
+                # entries has an alternative data stream and also list them.
+                entry = file_.get()
+                if isinstance(entry, RootFilesystemEntry):
+                    if entry.entries.fs.__fstype__ == "ntfs":
+                        attrs = entry.lattr()
+                        for data_stream in attrs.DATA:
+                            if data_stream.name != "":
+                                name = f"{file_.name}:{data_stream.name}"
+                                result.append((file_, fmt_ls_colors(file_type, name) if color else name))
 
-            r.append((f, fmt_ls_colors(ft, f.name) if color else f.name))
+            result.sort(key=lambda e: e[0].name)
 
-        r.sort(key=lambda e: e[0].name)
-        return r
+        return result
 
     def do_cd(self, line):
         """change directory"""

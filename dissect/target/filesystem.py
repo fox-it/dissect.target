@@ -1222,22 +1222,15 @@ class EntryList(list):
     there's a virtual filesystem entry as well as a real one.
     """
 
-    def __init__(self, value: Any, subattribute: Optional[str] = None):
+    def __init__(self, value: Any):
         if not isinstance(value, list):
             value = [value]
-        self._sub = subattribute
         super().__init__(value)
 
     def __getattr__(self, attr: str) -> Any:
-        for e in self:
-            if self._sub:
-                try:
-                    e = getattr(e, self._sub)
-                except AttributeError:
-                    continue
-
+        for entry in self:
             try:
-                return getattr(e, attr)
+                return getattr(entry, attr)
             except AttributeError:
                 continue
         else:
@@ -1246,7 +1239,7 @@ class EntryList(list):
 
 class RootFilesystemEntry(FilesystemEntry):
     def __init__(self, fs: Filesystem, path: str, entry: FilesystemEntry):
-        super().__init__(fs, path, EntryList(entry, "entry"))
+        super().__init__(fs, path, EntryList(entry))
         self.entries = self.entry
         self._link = None
 
@@ -1256,7 +1249,6 @@ class RootFilesystemEntry(FilesystemEntry):
                 return getattr(entry, attr)
             except AttributeError:
                 continue
-
         return object.__getattribute__(self, attr)
 
     def _exec(self, func: str, *args, **kwargs) -> Any:
