@@ -68,28 +68,30 @@ def main():
         args.targets = targets
 
     for target in Target.open_all(args.targets):
-        if args.json:
-            print(json.dumps(obj_target_info(target)))
-        elif args.json_pretty:
-            print(json.dumps(obj_target_info(target), indent=4))
-        elif args.record:
-            rs = record_output(args.strings, args.json)
-            rs.write(
-                InfoRecord(
-                    last_activity=target.activity,
-                    install_date=target.install_date,
-                    ips=target.ips,
-                    os_family=target.os,
-                    os_version=target.version,
-                    architecture=target.architecture,
-                    language=target.language,
-                    timezone=target.timezone,
-                    _target=target,
+        try:
+            if args.json:
+                print(json.dumps(obj_target_info(target)))
+            elif args.json_pretty:
+                print(json.dumps(obj_target_info(target), indent=4))
+            elif args.record:
+                rs = record_output(args.strings, args.json)
+                rs.write(
+                    InfoRecord(
+                        last_activity=target.activity,
+                        install_date=target.install_date,
+                        ips=target.ips,
+                        os_family=target.os,
+                        os_version=target.version,
+                        architecture=target.architecture,
+                        language=target.language,
+                        timezone=target.timezone,
+                        _target=target,
+                    )
                 )
-            )
-        else:
-            print_target_info(target)
-
+            else:
+                print_target_info(target)
+        except Exception as e:
+            target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
 
 def obj_target_info(target):
     return {
