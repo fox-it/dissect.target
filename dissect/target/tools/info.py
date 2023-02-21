@@ -110,8 +110,7 @@ def obj_target_info(target):
     }
 
 
-def print_target_info(target):
-    """print target information"""
+def print_target_info(target: Target) -> None:
     print("Disks")
     for d in target.disks:
         print(f"- {str(d)}")

@@ -173,18 +173,18 @@ class GenericPlugin(Plugin):
 
         try:
             for f in self.target.fs.scandir("sysvol/windows/system32/winevt/logs"):
-                if f.stat()._st_mtime > last_seen:
-                    last_seen = f.stat()._st_mtime
+                if f.stat().st_mtime > last_seen:
+                    last_seen = f.stat().st_mtime
         except Exception as e:  # noqa
-            self.target.log.debug(f"Could not determine last activity: {e}")
+            self.target.log.debug("Could not determine last activity", exc_info=e)
             pass
 
         try:
             for f in self.target.fs.scandir("sysvol/windows/system32/config"):
-                if f.stat()._st_mtime > last_seen:  # noqa
-                    last_seen = f.stat()._st_mtime  # noqa
-        except Exception as e:  # noqa
-            self.target.log.debug(f"Could not determine last activity: {e}")
+                if f.stat().st_mtime > last_seen:
+                    last_seen = f.stat().st_mtime
+        except Exception as e:
+            self.target.log.debug("Could not determine last activity", exc_info=e)
             pass
 
         if last_seen == 0:
