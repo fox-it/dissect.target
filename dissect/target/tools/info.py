@@ -25,6 +25,9 @@ InfoRecord = TargetRecordDescriptor(
         ("string", "architecture"),
         ("string", "language"),
         ("string", "timezone"),
+        ("string", "disks"),
+        ("string", "volumes"),
+        ("string", "children"),
     ],
 )
 
@@ -85,6 +88,9 @@ def main():
                         architecture=target.architecture,
                         language=target.language,
                         timezone=target.timezone,
+                        disks=get_disks(target),
+                        volumes=get_volumes(target),
+                        children=get_children(target),
                         _target=target,
                     )
                 )
@@ -106,9 +112,9 @@ def obj_target_info(target):
         "timezone": target.timezone,
         "install_date": str(target.install_date),
         "last_activity": str(target.activity),
-        "disks": [{"type": d.__class__.__name__, "size": d.size} for d in target.disks],
-        "volumes": [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes],
-        "children": [{"type": c.type, "path": str(c.path)} for c in target.list_children()],
+        "disks": get_disks(target),
+        "volumes": get_volumes(target),
+        "children": get_children(target),
     }
 
 
@@ -137,6 +143,18 @@ def print_target_info(target: Target) -> None:
     print(f"Timezone      : {target.timezone}")
     print(f"Install date  : {target.install_date}")
     print(f"Last activity : {target.activity}")
+
+
+def get_disks(target: Target) -> list:
+    return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
+
+
+def get_volumes(target: Target) -> list:
+    return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
+
+
+def get_children(target: Target) -> list:
+    return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
 
 
 if __name__ == "__main__":
