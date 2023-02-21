@@ -5,6 +5,7 @@ import argparse
 import json
 import logging
 from pathlib import Path
+from typing import Union
 
 from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -23,11 +24,11 @@ InfoRecord = TargetRecordDescriptor(
         ("string", "os_family"),
         ("string", "os_version"),
         ("string", "architecture"),
-        ("string", "language"),
+        ("string[]", "language"),
         ("string", "timezone"),
-        ("string", "disks"),
-        ("string", "volumes"),
-        ("string", "children"),
+        ("string[]", "disks"),
+        ("string[]", "volumes"),
+        ("string[]", "children"),
     ],
 )
 
@@ -43,7 +44,6 @@ def main():
         description="target-info",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
-        add_help=False,
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
@@ -73,34 +73,19 @@ def main():
     for target in Target.open_all(args.targets):
         try:
             if args.json:
-                print(json.dumps(obj_target_info(target)))
+                print(json.dumps(get_target_info(target), default=str))
             elif args.json_pretty:
-                print(json.dumps(obj_target_info(target), indent=4))
+                print(json.dumps(get_target_info(target), indent=4, default=str))
             elif args.record:
                 rs = record_output(args.strings, args.json)
-                rs.write(
-                    InfoRecord(
-                        last_activity=target.activity,
-                        install_date=target.install_date,
-                        ips=target.ips,
-                        os_family=target.os,
-                        os_version=target.version,
-                        architecture=target.architecture,
-                        language=target.language,
-                        timezone=target.timezone,
-                        disks=get_disks(target),
-                        volumes=get_volumes(target),
-                        children=get_children(target),
-                        _target=target,
-                    )
-                )
+                rs.write(InfoRecord(**get_target_info(target), _target=target))
             else:
                 print_target_info(target)
         except Exception as e:
             target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
 
 
-def obj_target_info(target):
+def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
     return {
         "hostname": target.hostname,
         "domain": target.domain,
@@ -110,8 +95,8 @@ def obj_target_info(target):
         "architecture": target.architecture,
         "language": target.language,
         "timezone": target.timezone,
-        "install_date": str(target.install_date),
-        "last_activity": str(target.activity),
+        "install_date": target.install_date,
+        "last_activity": target.activity,
         "disks": get_disks(target),
         "volumes": get_volumes(target),
         "children": get_children(target),
@@ -127,16 +112,16 @@ def print_target_info(target: Target) -> None:
         print(f"- {str(v)}")
 
     children = list(target.list_children())
-    if len(children) > 0:
+    if children:
         print("\nChildren")
-        for c in children:
-            print(f"- <Child type='{c.type}' path='{str(c.path)}'>")
+        for child in children:
+            print(f"- <Child type='{child.type}' path='{child.path}'>")
 
     print()
     print(f"Hostname      : {target.hostname}")
     print(f"Domain        : {target.domain}")
     print(f"IPs           : {', '.join(target.ips)}")
-    print(f"OS family     : {target.os}, {target._os_plugin.__name__}")
+    print(f"OS family     : {target.os} ({target._os_plugin.__name__})")
     print(f"OS version    : {target.version}")
     print(f"Architecture  : {target.architecture}")
     print(f"Language(s)   : {', '.join(target.language)}")
@@ -145,15 +130,15 @@ def print_target_info(target: Target) -> None:
     print(f"Last activity : {target.activity}")
 
 
-def get_disks(target: Target) -> list:
+def get_disks(target: Target) -> list[dict[str, Union[str, int]]]:
     return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
 
 
-def get_volumes(target: Target) -> list:
+def get_volumes(target: Target) -> list[dict[str, Union[str, int]]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 
-def get_children(target: Target) -> list:
+def get_children(target: Target) -> list[dict[str, str]]:
     return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
 
 
