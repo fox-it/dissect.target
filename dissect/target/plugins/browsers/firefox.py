@@ -1,8 +1,6 @@
 import json
 from typing import Iterator
 
-from flow.record.fieldtypes import datetime, path
-
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import Row, SQLite3
@@ -16,6 +14,7 @@ from dissect.target.plugins.browsers.browser import (
     try_idna,
 )
 from dissect.util.ts import from_unix_ms, from_unix_us
+from flow.record.fieldtypes import datetime, path
 
 
 class FirefoxPlugin(Plugin):
