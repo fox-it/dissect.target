@@ -501,31 +501,26 @@ class TargetCli(TargetCmd):
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
-                try:
-                    self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
-                except FileNotFoundError:
-                    log.error("Could not list any data for %s", name)
+                self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
 
     def print_extensive_file_stat(self, stdout, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
-        entry = target_path.get()
+        try:
+            entry = target_path.get()
+            stat = entry.lstat()
+            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
+            utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
 
-        # Entry is an NTFSEntry and has alternative datastream
-        if hasattr(entry, "deref") and ":" in name:
-            # retrieve the ads from the NTFS entry
-            ads_path = fsutil.join(fsutil.dirname(entry.path, separator=entry.fs.alt_separator), name)
-            entry = entry.fs.get(ads_path)
+            print(
+                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
+                file=stdout,
+            )
 
-        stat = entry.lstat()
-
-        symlink = f"-> {entry.readlink()}" if entry.is_symlink() else ""
-
-        utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
-
-        print(
-            f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name} {symlink}",
-            file=stdout,
-        )
+        except FileNotFoundError:
+            print(
+                f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}",
+                file=stdout,
+            )
 
     @arg("path", nargs="?")
     @arg("-name", default="*")
@@ -1081,6 +1076,11 @@ def main():
     args = parser.parse_args()
 
     process_generic_arguments(args)
+
+    # For the shell tool we want -q to log slightly more then just CRITICAL
+    # messages.
+    if args.quiet:
+        logging.getLogger("dissect").setLevel(level=logging.ERROR)
 
     targets = list(Target.open_all(args.targets))
 
