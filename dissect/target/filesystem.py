@@ -1362,7 +1362,7 @@ class RootFilesystemEntry(FilesystemEntry):
 
     def lattr(self) -> Any:
         self.fs.target.log.debug("%r::lattr()", self)
-        return self._exec("attr")
+        return self._exec("lattr")
 
 
 def register(module: str, class_name: str, internal: bool = True) -> None:
