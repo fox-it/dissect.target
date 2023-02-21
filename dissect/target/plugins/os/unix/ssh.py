@@ -1,7 +1,9 @@
 import re
-import subprocess
+from pathlib import Path
+from typing import Iterator
 
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.ssh import SSHPrivateKey
 from dissect.target.plugin import Plugin, export
 
 AuthorizedKeysRecord = TargetRecordDescriptor(
@@ -34,12 +36,26 @@ KnownHostRecord = TargetRecordDescriptor(
 PrivateKeyRecord = TargetRecordDescriptor(
     "unix/ssh/private_key",
     [
+        ("datetime", "ts"),
         ("string", "user"),
-        ("string", "keytype"),
+        ("string", "key_format"),
+        ("string", "key_type"),
         ("string", "public_key"),
         ("string", "comment"),
         ("boolean", "encrypted"),
-        ("uri", "path"),
+        ("path", "source"),
+    ],
+)
+
+PublicKeyRecord = TargetRecordDescriptor(
+    "unix/ssh/public_key",
+    [
+        ("datetime", "ts"),
+        ("string", "user"),
+        ("string", "key_type"),
+        ("string", "public_key"),
+        ("string", "comment"),
+        ("path", "source"),
     ],
 )
 
@@ -116,41 +132,82 @@ class SSHPlugin(Plugin):
 
     @export(record=PrivateKeyRecord)
     def private_keys(self):
+        """Yields OpenSSH private keys on a Unix target per user."""
+        private_key_files = []
+
         for user_details in self.target.user_details.all_with_home():
             for file_path in user_details.home_path.glob(".ssh/*"):
-                file_buf = file_path.read_bytes()
+                private_key_files.append((user_details.user.name, file_path))
 
-                if b"PRIVATE KEY-----" not in file_buf:
-                    continue
+        for file_path in self.target.fs.path("/etc/ssh/").glob("*.pub"):
+            private_key_files.append((None, file_path))
 
-                encrypted = b"ENCRYPTED" in file_buf
+        for user, file_path in private_key_files:
+            if not file_path.is_file():
+                continue
 
-                public_key_data = None
-                public_key_path = file_path.with_suffix(".pub")
-                if public_key_path.exists():
-                    public_key_data = public_key_path.read_text()
-                elif not encrypted:
-                    try:
-                        output = subprocess.run(
-                            ["ssh-keygen", "-y", "-f", "/dev/stdin"], input=file_buf, stdout=subprocess.PIPE
-                        )
-                        public_key_data = output.stdout.decode("utf-8").strip()
-                    except Exception:
-                        self.target.log.exception("Failed to generate public key from private key %s", file_path)
+            buffer: bytes = file_path.read_bytes().strip()
+            if b"PRIVATE KEY-----" not in buffer:
+                continue
 
-                _, keytype, public_key, comment = None, None, None, None
-                if public_key_data:
-                    _, keytype, public_key, comment = parse_ssh_key(public_key_data)
+            try:
+                private_key = SSHPrivateKey(buffer)
+            except ValueError:
+                continue
+
+            yield PrivateKeyRecord(
+                ts=file_path.stat().st_mtime,
+                source=file_path,
+                user=user,
+                key_format=private_key.format,
+                key_type=private_key.key_type,
+                public_key=private_key.public_key,
+                encrypted=private_key.is_encrypted,
+                comment=private_key.comment,
+                _target=self.target,
+            )
+
+    @export(record=PublicKeyRecord)
+    def public_keys(self) -> Iterator[PublicKeyRecord]:
+        """Yields all SSH public keys from /home/*/.ssh and /etc/ssh/."""
+
+        for user_details in self.target.user_details.all_with_home():
+            for file_path in user_details.home_path.glob(".ssh/*.pub"):
+                if file_path.is_file():
+                    key_type, public_key, comment = parse_ssh_public_key_file(file_path)
+
+                    yield PrivateKeyRecord(
+                        ts=file_path.stat().st_mtime,
+                        source=file_path,
+                        user=user_details.user.name,
+                        key_type=key_type,
+                        public_key=public_key,
+                        comment=comment,
+                        _target=self.target,
+                    )
+
+        for file_path in self.target.fs.path("/etc/ssh/").glob("*.pub"):
+            if file_path.is_file():
+                key_type, public_key, comment = parse_ssh_public_key_file(file_path)
 
                 yield PrivateKeyRecord(
-                    user=user_details.user.name,
-                    keytype=keytype,
+                    ts=file_path.stat().st_mtime,
+                    source=file_path,
+                    user=None,
+                    key_type=key_type,
                     public_key=public_key,
                     comment=comment,
-                    encrypted=encrypted,
-                    path=str(file_path),
                     _target=self.target,
                 )
+
+
+def parse_ssh_public_key_file(path: Path) -> tuple[str, str, str]:
+    with path.open("rt") as h_public_key:
+        public_key_data = h_public_key.read().strip()
+
+    _, key_type, public_key, comment = parse_ssh_key(public_key_data)
+
+    return key_type, public_key, comment
 
 
 def parse_ssh_key(key_string):
