@@ -1,7 +1,5 @@
 from typing import Iterator
 
-from flow.record.fieldtypes import path
-
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
@@ -16,6 +14,7 @@ from dissect.target.plugins.browsers.browser import (
     try_idna,
 )
 from dissect.util.ts import webkittimestamp
+from flow.record.fieldtypes import path
 
 
 class ChromiumMixin:
