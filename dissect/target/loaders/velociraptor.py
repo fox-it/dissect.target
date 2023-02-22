@@ -23,8 +23,8 @@ def find_os_directory(path: Path) -> Optional[Path]:
     # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
     mft_root = fs_root.joinpath("mft")
     if not os_type and mft_root.exists():
-        # Filter out files that start with '.'
-        windows_path = [p for p in mft_root.iterdir() if not p.name.startswith(".")][0]
+        # Find the C folder and skip Volume Shadow Copies
+        windows_path = [p for p in mft_root.iterdir() if "C." in p.name][0]
         os_type, dirs = find_dirs(windows_path)
         if os_type == "windows":
             return dirs[0]
