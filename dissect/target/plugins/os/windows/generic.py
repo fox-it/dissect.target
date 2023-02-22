@@ -175,7 +175,7 @@ class GenericPlugin(Plugin):
             for f in self.target.fs.scandir("sysvol/windows/system32/winevt/logs"):
                 if f.stat().st_mtime > last_seen:
                     last_seen = f.stat().st_mtime
-        except Exception as e:  # noqa
+        except Exception as e:
             self.target.log.debug("Could not determine last activity", exc_info=e)
             pass
 

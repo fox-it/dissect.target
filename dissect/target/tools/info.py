@@ -50,8 +50,8 @@ def main():
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
-    parser.add_argument("-j", "--json-pretty", action="store_true", help="output records as pretty json")
-    parser.add_argument("-J", "--json", action="store_true", help="output records as one-line json")
+    parser.add_argument("-j", "--json", action="store_true", help="output records as pretty json")
+    parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
     configure_generic_arguments(parser)
 
     args = parser.parse_args()
@@ -99,9 +99,9 @@ def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
         "timezone": target.timezone,
         "install_date": target.install_date,
         "last_activity": target.activity,
-        "disks": get_disks(target),
-        "volumes": get_volumes(target),
-        "children": get_children(target),
+        "disks": get_disks_info(target),
+        "volumes": get_volumes_info(target),
+        "children": get_children_info(target),
     }
 
 
@@ -133,15 +133,15 @@ def print_target_info(target: Target) -> None:
     print(f"Last activity : {target.activity}")
 
 
-def get_disks(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:
     return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
 
 
-def get_volumes(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_volumes_info(target: Target) -> list[dict[str, Union[str, int]]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 
-def get_children(target: Target) -> list[dict[str, str]]:
+def get_children_info(target: Target) -> list[dict[str, str]]:
     return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
 
 
