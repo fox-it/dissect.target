@@ -32,8 +32,12 @@ GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
-BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/history", GENERIC_HISTORY_RECORD_FIELDS
+)
+
+BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
 )
 
 
@@ -63,11 +67,25 @@ class BrowserPlugin(Plugin):
             except Exception:  # noqa
                 target.log.exception("Failed to load browser plugin: %s", entry)
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
+        """Perform a compatibility check with the target.
+        This function checks if any of the supported browser plugins
+        can be used. Otherwise it should raise an ``UnsupportedPluginError``.
+        Raises:
+            UnsupportedPluginError: If the plugin could not be loaded.
+        """
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible browser plugins found")
 
     def _func(self, f):
+        """Return the supported browser plugin records.
+
+        Args:
+            f: Exported function of the browser plugin to find.
+
+        Yields:
+            Record from the browser function.
+        """
         for p in self._plugins:
             try:
                 for entry in getattr(p, f)():
@@ -75,13 +93,13 @@ class BrowserPlugin(Plugin):
             except Exception:
                 self.target.log.exception("Failed to execute browser plugin: %s.%s", p._name, f)
 
-    @export(record=BrowserHistoryRecord)
+    @export(record=HISTORY_RECORD)
     def history(self):
-        """Return browser history records from all browsers installed.
+        """Return browser history records from all browsers installed and supported.
 
         Historical browser records for Chrome, Chromium, Edge (Chromium), Firefox, and Internet Explorer are returned.
 
-        Yields BrowserHistoryRecords with the following fields:
+        Yields HISTORY_RECORD with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -101,6 +119,28 @@ class BrowserPlugin(Plugin):
             source: (path): The source file of the history record.
         """
         for e in self._func("history"):
+            yield e
+
+    @export(record=BROWSER_DOWNLOAD_RECORD)
+    def downloads(self):
+        """Return browser download records from all browsers installed and supported.
+
+        Yields:
+            BROWSER_DOWNLOAD_RECORD with the following fieds:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            ts_start (datetime): Download start timestamp.
+            ts_end (datetime): Download end timestamp.
+            browser (string): The browser from which the records are generated from.
+            id (string): Record ID.
+            path (string): Download path.
+            url (uri): Download URL.
+            size (varint): Download file size.
+            state (varint): Download state number.
+            source: (path): The source file of the history record.
+
+        """
+        for e in self._func("downloads"):
             yield e
 
 
