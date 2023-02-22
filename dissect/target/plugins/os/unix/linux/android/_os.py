@@ -4,7 +4,7 @@ from typing import Iterator, Optional, TextIO
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OSPlugin, OperatingSystem, export
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
 

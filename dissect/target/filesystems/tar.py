@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import stat
 import tarfile
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.stream import BufferedStream
 
@@ -15,6 +15,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     Filesystem,
+    FilesystemEntry,
     VirtualDirectory,
     VirtualFile,
     VirtualFilesystem,
@@ -37,7 +38,7 @@ class TarFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(fh, *args, **kwargs)
         fh.seek(0)
 
         self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
@@ -57,25 +58,17 @@ class TarFilesystem(Filesystem):
             self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
-    def detect(fh) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         """Detect a tar file on a given file-like object."""
-        offset = fh.tell()
-        try:
-            fh.seek(0)
-            return tarfile.is_tarfile(fh)
-        except Exception as e:
-            log.warning("Failed to detect tar filesystem", exc_info=e)
-            return False
-        finally:
-            fh.seek(offset)
+        return tarfile.is_tarfile(fh)
 
-    def get(self, path) -> TarFilesystemEntry:
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path)
+        return self._fs.get(path, relentry=relentry)
 
 
 class TarFilesystemEntry(VirtualFile):
-    def _resolve(self) -> TarFilesystemEntry:
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
@@ -93,12 +86,12 @@ class TarFilesystemEntry(VirtualFile):
         except Exception:
             raise FileNotFoundError()
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         if self.is_dir():
             return self._resolve().iterdir()
         return super().iterdir()
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         if self.is_dir():
             return self._resolve().scandir()
         return super().scandir()
@@ -121,13 +114,13 @@ class TarFilesystemEntry(VirtualFile):
         """Return whether this entry is a link."""
         return self.entry.issym()
 
-    def readlink(self):
+    def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
         if not self.is_symlink():
             raise NotASymlinkError()
         return self.entry.linkname
 
-    def readlink_ext(self) -> TarFilesystemEntry:
+    def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
         return fsutil.resolve_link(fs=self.fs, entry=self)

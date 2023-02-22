@@ -392,10 +392,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         defender_evtx_records = filter_records(evtx_records, "Provider_Name", "Microsoft-Windows-Windows Defender")
 
         for evtx_record in defender_evtx_records:
-
             record_fields = {}
             for field_name in defender_evtx_field_names:
-
                 if not hasattr(evtx_record, field_name):
                     continue
 

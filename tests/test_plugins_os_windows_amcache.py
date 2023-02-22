@@ -11,7 +11,6 @@ from ._utils import absolute_path
 
 
 def test_amcache_new_format(target_win, fs_win):
-
     amcache_file = absolute_path("data/amcache-new.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 
@@ -36,7 +35,6 @@ def test_amcache_new_format(target_win, fs_win):
 
 
 def test_amcache_old_format(target_win, fs_win):
-
     amcache_file = absolute_path("data/amcache-old.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 

@@ -1,0 +1,4 @@
+1.2.3.4 - - [19/Dec/2022:17:06:19 +0100] "GET / HTTP/1.1" 200 3460 "Sample referer" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+example.com:80 1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET /index.html HTTP/1.1" 200 312 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36"
+4.3.2.1 - - [19/Dec/2022:17:25:48 +0100] "GET / HTTP/1.1" 200 312
+2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [20/Dec/2022:15:18:01 +0100] "GET /" 200 - "-" "curl/7.81.0"

@@ -78,7 +78,6 @@ class UnixPlugin(OSPlugin):
             }
 
             for line in path.open("rt"):
-
                 # Detect the beginning of a new session activation in the syslog
                 #
                 # dbus-update-activation-environment starts a new session with
@@ -179,7 +178,6 @@ class UnixPlugin(OSPlugin):
         volumes_to_mount = [v for v in self.target.volumes if v.fs]
 
         for dev_id, volume_name, _, mount_point in parse_fstab(fstab, self.target.log):
-
             for volume in volumes_to_mount:
                 fs_id = None
                 last_mount = None
@@ -208,7 +206,6 @@ class UnixPlugin(OSPlugin):
 
         for path in self.target.fs.glob(glob):
             if self.target.fs.path(path).exists():
-
                 with self.target.fs.path(path).open("rt") as release_file:
                     for line in release_file:
                         if line.startswith("#"):
@@ -274,7 +271,6 @@ def parse_fstab(
         return
 
     for entry in fstab.open("rt"):
-
         entry = entry.strip()
         if entry.startswith("#"):
             continue

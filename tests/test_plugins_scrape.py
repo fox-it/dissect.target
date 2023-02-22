@@ -1,5 +1,5 @@
-import os
 import io
+import os
 import random
 
 from dissect.target.plugins.general import scrape
@@ -100,7 +100,6 @@ def test_scrape_plugin_one_needle(target_win):
 
 
 def test_scrape_plugin_multiple_needles(target_win):
-
     target_win.add_plugin(scrape.ScrapePlugin)
 
     needle1 = b"ABCD"
@@ -201,7 +200,6 @@ def test_scrape_plugin_multiple_needles(target_win):
 
 
 def test_scrape_plugin_multiple_overlapping_needles(target_win):
-
     target_win.add_plugin(scrape.ScrapePlugin)
 
     needle1 = b"AAA"

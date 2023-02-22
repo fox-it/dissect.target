@@ -1,10 +1,9 @@
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import ual
 
-from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.exceptions import UnsupportedPluginError
-
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 ClientAccessRecord = TargetRecordDescriptor(
     "filesystem/windows/ual/client_access",

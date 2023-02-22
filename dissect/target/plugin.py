@@ -803,7 +803,6 @@ class InternalPlugin(Plugin):
     """
 
     def __init_subclass__(cls, **kwargs):
-
         for method in get_nonprivate_methods(cls):
             if callable(method):
                 method.__internal__ = True

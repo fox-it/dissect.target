@@ -1,8 +1,8 @@
-import logging
-import struct
+from typing import BinaryIO, Iterator, Optional
 
 import dissect.vmfs as vmfs
 from dissect.vmfs.c_vmfs import c_vmfs
+from dissect.vmfs.vmfs import FileDescriptor
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -14,38 +14,29 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
-log = logging.getLogger(__name__)
-
 
 class VmfsFilesystem(Filesystem):
     __fstype__ = "vmfs"
 
-    def __init__(self, fh, *args, **kwargs):
-        self.vmfs = vmfs.VMFS(fh)
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
+        self.vmfs = vmfs.VMFS(fh)
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh: BinaryIO) -> bool:
         """Detect a VMFS filesystem on a given file-like object."""
-        offset = fh.tell()
-        try:
-            fh.seek(c_vmfs.VMFS_FS3_BASE)
-            sector = fh.read(512)
-            return struct.unpack("<I", sector[:4])[0] in (
-                c_vmfs.VMFS_FS3_MAGIC,
-                c_vmfs.VMFSL_FS3_MAGIC,
-            )
-        except Exception as e:
-            log.warning("Failed to detect VMFS filesystem", exc_info=e)
-            return False
-        finally:
-            fh.seek(offset)
+        fh.seek(c_vmfs.VMFS_FS3_BASE)
+        sector = fh.read(512)
+        return int.from_bytes(sector[:4], "little") in (
+            c_vmfs.VMFS_FS3_MAGIC,
+            c_vmfs.VMFSL_FS3_MAGIC,
+        )
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         """Returns a VmfsFilesystemEntry object corresponding to the given pathname"""
         return VmfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path, node=None):
+    def _get_node(self, path: str, node: Optional[FileDescriptor] = None) -> FileDescriptor:
         """Returns an internal VMFS entry for a given path and optional relative entry."""
         try:
             return self.vmfs.get(path, node)
@@ -60,23 +51,23 @@ class VmfsFilesystem(Filesystem):
 
 
 class VmfsFilesystemEntry(FilesystemEntry):
-    def _resolve(self):
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return VmfsFilesystemEntry(self.fs, full_path, self.fs._get_node(path, self.entry))
 
-    def open(self):
+    def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def _iterdir(self):
+    def _iterdir(self) -> Iterator[FileDescriptor]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -90,25 +81,25 @@ class VmfsFilesystemEntry(FilesystemEntry):
 
                 yield f
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         """List the directory contents of a directory. Returns a generator of strings."""
         for f in self._iterdir():
             yield f.name
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         for f in self._iterdir():
             path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
             yield VmfsFilesystemEntry(self.fs, path, f)
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         """Return whether this entry is a directory. Resolves symlinks when possible."""
         try:
             return self._resolve().entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self):
+    def is_file(self) -> bool:
         """Return whether this entry is a file. Resolves symlinks when possible."""
         try:
             resolved = self._resolve()
@@ -116,22 +107,22 @@ class VmfsFilesystemEntry(FilesystemEntry):
         except FilesystemError:
             return False
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         """Return whether this entry is a link."""
         return self.entry.is_symlink()
 
-    def readlink(self):
+    def readlink(self) -> str:
         """Read the link of the given path if it is a symlink. Returns a string."""
         if not self.is_symlink():
             raise NotASymlinkError()
 
         return self.entry.link
 
-    def stat(self):
+    def stat(self) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self._resolve().lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         node = self.entry.descriptor
 

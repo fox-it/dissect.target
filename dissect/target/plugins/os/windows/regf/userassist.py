@@ -2,18 +2,16 @@ import codecs
 
 from dissect import cstruct
 from dissect.util.ts import wintimestamp
-
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
+from dissect.target.helpers.descriptor_extensions import (
+    RegistryRecordDescriptorExtension,
+    UserRecordDescriptorExtension,
+)
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.shell_folder_ids import DESCRIPTIONS
 from dissect.target.plugin import Plugin, export
-from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.descriptor_extensions import (
-    UserRecordDescriptorExtension,
-    RegistryRecordDescriptorExtension,
-)
-
 
 userassist_def = """
 struct VERSION5_ENTRY {

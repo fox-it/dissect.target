@@ -4,9 +4,11 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, arg, export, internal
-
 
 ExampleRecordRecord = TargetRecordDescriptor(
     "example/descriptor",

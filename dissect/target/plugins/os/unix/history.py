@@ -1,9 +1,8 @@
-import datetime
 import re
 
-from dissect.target.helpers.descriptor_extensions import (
-    UserRecordDescriptorExtension,
-)
+from dissect.util.ts import from_unix
+
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
@@ -45,7 +44,6 @@ class CommandHistoryPlugin(Plugin):
         """
 
         for user_details in self.target.user_details.all_with_home():
-
             for ih in IGNORED_HOMES:
                 if ih in user_details.user.home:
                     continue
@@ -70,7 +68,7 @@ class CommandHistoryPlugin(Plugin):
                             if matches:
                                 ts = matches.group(1)
                                 try:
-                                    next_cmd_ts = datetime.datetime.utcfromtimestamp(float(ts))
+                                    next_cmd_ts = from_unix(float(ts))
                                 except (ValueError, TypeError):
                                     continue
                             continue

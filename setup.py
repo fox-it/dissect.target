@@ -51,17 +51,18 @@ ScriptWriter.get_args = get_args_patched
 setup(
     name="dissect.target",
     packages=list(map(lambda v: "dissect." + v, find_packages("dissect"))),
+    package_data={"dissect.target": ["helpers/data/*.xml"]},
     install_requires=[
         "defusedxml",
         "dissect.cstruct>=3.0.dev,<4.0.dev",
         "dissect.eventlog>=3.0.dev,<4.0.dev",
         "dissect.evidence>=3.0.dev,<4.0.dev",
         "dissect.hypervisor>=3.0.dev,<4.0.dev",
-        "dissect.ntfs>=3.0.dev,<4.0.dev",
+        "dissect.ntfs>=3.4.dev,<4.0.dev",
         "dissect.regf>=3.3.dev,<4.0.dev",
         "dissect.util>=3.0.dev,<4.0.dev",
         "dissect.volume>=3.0.dev,<4.0.dev",
-        "flow.record~=3.8",
+        "flow.record~=3.9",
         "structlog",
     ],
     extras_require={
@@ -100,6 +101,7 @@ setup(
             "target-dump=dissect.target.tools.dump.run:main",
             "target-dd=dissect.target.tools.dd:main",
             "target-fs=dissect.target.tools.fs:main",
+            "target-info=dissect.target.tools.info:main",
             "target-mount=dissect.target.tools.mount:main",
             "target-query=dissect.target.tools.query:main",
             "target-reg=dissect.target.tools.reg:main",

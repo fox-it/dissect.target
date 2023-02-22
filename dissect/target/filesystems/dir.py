@@ -1,7 +1,13 @@
 import os
 from pathlib import Path
+from typing import Any, BinaryIO, Iterator
 
-from dissect.target.exceptions import FileNotFoundError, FilesystemError, IsADirectoryError, NotADirectoryError
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    FilesystemError,
+    IsADirectoryError,
+    NotADirectoryError,
+)
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
@@ -9,15 +15,18 @@ from dissect.target.helpers import fsutil
 class DirectoryFilesystem(Filesystem):
     __fstype__ = "dir"
 
-    def __init__(self, path: Path, alt_separator: str = "", case_sensitive: bool = True) -> None:
+    def __init__(self, path: Path, *args, **kwargs):
+        super().__init__(None, *args, **kwargs)
         self.base_path = path
-        super().__init__(alt_separator=alt_separator, case_sensitive=case_sensitive)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.base_path}>"
 
     @staticmethod
-    def detect(fh):
+    def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on DirectoryFilesystem class")
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         path = path.strip("/")
 
         if not path:
@@ -44,26 +53,23 @@ class DirectoryFilesystem(Filesystem):
         except Exception:
             raise FileNotFoundError(path)
 
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.base_path}>"
-
 
 class DirectoryFilesystemEntry(FilesystemEntry):
-    def _resolve(self):
+    def _resolve(self) -> FilesystemEntry:
         if self.is_symlink():
             return self.readlink_ext()
         return self
 
-    def get(self, path):
+    def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return self.fs.get(path)
 
-    def open(self):
+    def open(self) -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open("rb")
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -73,7 +79,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             for item in self.entry.iterdir():
                 yield item.name
 
-    def scandir(self):
+    def scandir(self) -> Iterator[FilesystemEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -84,38 +90,38 @@ class DirectoryFilesystemEntry(FilesystemEntry):
                 path = fsutil.join(self.path, item.name, alt_separator=self.fs.alt_separator)
                 yield DirectoryFilesystemEntry(self.fs, path, item)
 
-    def exists(self):
+    def exists(self) -> bool:
         try:
             return self._resolve().entry.exists()
         except FilesystemError:
             return False
 
-    def is_dir(self):
+    def is_dir(self) -> bool:
         try:
             return self._resolve().entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self):
+    def is_file(self) -> bool:
         try:
             return self._resolve().entry.is_file()
         except FilesystemError:
             return False
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return self.entry.is_symlink()
 
-    def readlink(self):
+    def readlink(self) -> str:
         return os.readlink(self.entry)  # Python 3.7 compatibility
 
-    def stat(self):
+    def stat(self) -> fsutil.stat_result:
         return self._resolve().entry.lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(self.entry.lstat())
 
-    def attr(self):
+    def attr(self) -> Any:
         raise TypeError()
 
-    def lattr(self):
+    def lattr(self) -> Any:
         raise TypeError()

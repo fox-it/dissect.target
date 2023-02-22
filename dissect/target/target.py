@@ -260,14 +260,12 @@ class Target:
 
         # Treat every path as a unique target spec
         for path in paths:
-
             path, parsed_path = extract_path_info(path)
 
             found_loader = False
 
             # Search for targets one directory deep
             for entry in _find(path):
-
                 loader_cls = loader.find_loader(entry, parsed_path=parsed_path)
 
                 if not loader_cls:
@@ -339,15 +337,23 @@ class Target:
             try:
                 plugin_cls = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
-                if child_plugin.check_compatible() is False:
-                    continue
-                self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError:
                 self.log.exception("Failed to load child plugin: %s", plugin_desc["class"])
                 continue
             except Exception:
                 self.log.exception("Broken child plugin: %s", plugin_desc["class"])
                 continue
+
+            try:
+                if child_plugin.check_compatible() is False:
+                    continue
+                self._child_plugins[child_plugin.__type__] = child_plugin
+            except PluginError as e:
+                self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+            except Exception:
+                self.log.exception(
+                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
+                )
 
     def open_child(self, child: Union[str, Path]) -> Target:
         """Open a child target.
@@ -747,7 +753,6 @@ class VolumeCollection(Collection):
         start_fs = None
         start_vol = None
         for idx, vol in enumerate(self.entries):
-
             if start_fs is None and (vol.name is None):
                 start_fs = idx
 
