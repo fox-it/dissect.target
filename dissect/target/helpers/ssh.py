@@ -56,8 +56,8 @@ class SSHPrivateKey:
     """
 
     def __init__(self, data: bytes):
-        self.key_type = ""
-        self.public_key = ""
+        self.key_type = None
+        self.public_key = None
         self.comment = ""
 
         if is_rfc4716(data):
