@@ -2,8 +2,8 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.browsers.browser import (
-    GENERIC_HISTORY_RECORD_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
+    GENERIC_HISTORY_RECORD_FIELDS,
 )
 from dissect.target.plugins.browsers.chromium import ChromiumMixin
 
