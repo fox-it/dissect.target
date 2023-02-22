@@ -32,7 +32,7 @@ class AptPlugin(plugin.Plugin):
         Apt creates logs that are multiline and therefore requires somewhat complex parsing logic.
         We create one ``PackageManagerLogRecord`` per package and type; the example below hence generates *three* records.
 
-        Example::
+        Example log format::
 
             Start-Date: 2022-09-21  06:48:56
             Commandline: /usr/bin/unattended-upgrade

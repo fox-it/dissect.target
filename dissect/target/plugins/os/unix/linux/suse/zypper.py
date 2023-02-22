@@ -23,7 +23,7 @@ class ZypperPlugin(plugin.Plugin):
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Package manager log parser for SuSE's Zypper.
 
-        Logs are formatted as::
+        Example log format::
 
             2022-12-16 12:56:23|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
             2022-12-16 12:56:23|install|update-alternatives|1.21.8-1.4|x86_64||repo-oss|b4d6389437e306d6104559c82d09fce15c4486fbc7fd215cc33d265ff729aaf1|  # noqa

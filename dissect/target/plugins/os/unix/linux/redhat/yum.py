@@ -26,7 +26,7 @@ class YumPlugin(plugin.Plugin):
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Package manager log parser for CentOS' Yellowdog Updater (Yum).
 
-        Logs are formatted like this::
+        Example log format::
 
             Dec 16 04:41:22 Installed: unzip-6.0-24.el7_9.x86_64
             Dec 16 04:41:25 Installed: unzip-6.0-22.el7_9.x86_64
