@@ -47,7 +47,7 @@ class LocalePlugin(Plugin):
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        found_languages.append(normalize_language(line.replace("LANG=", "").strip()))
+                        found_languages.append(normalize_language(line.replace("LANG=", "").strip().strip('"')))
 
         return found_languages
 
@@ -64,9 +64,7 @@ class LocalePlugin(Plugin):
                 k = {}
                 for line in path.open("rt"):
                     if len(key_value := line.split("=")) == 2:
-                        k[key_value[0].replace("XKB", "").replace("KEYMAP", "LAYOUT")] = (
-                            key_value[1].replace('"', "").strip()
-                        )
+                        k[key_value[0].replace("XKB", "").replace("KEYMAP", "LAYOUT")] = key_value[1].strip().strip('"')
 
                 yield UnixKeyboardRecord(
                     layout=k.get("LAYOUT"),
