@@ -13,7 +13,7 @@ import logging
 import posixpath
 import re
 from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
-from typing import Any, BinaryIO, Iterator, List, Sequence, Set, TextIO, Tuple, Union
+from typing import Any, BinaryIO, Iterator, Sequence, TextIO, Union
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
@@ -191,35 +191,35 @@ class stat_result:  # noqa
             self._st_ctime,
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, stat_result):
             other = other._s
 
         return self._s == other
 
-    def __ne__(self, other):
+    def __ne__(self, other) -> bool:
         return not self == other
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> int:
         return self._s[item]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[int]:
         return iter(self._s)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         values = ", ".join(
             f"{k}={getattr(self, k)}" for k in self.__slots__ if k.startswith("st_") and getattr(self, k) is not None
         )
         return f"dissect.target.stat_result({values})"
 
-    def _parse_time(self, ts: Union[int, float]) -> Tuple[int, float, int]:
+    def _parse_time(self, ts: Union[int, float]) -> tuple[int, float, int]:
         ts_int = int(ts)
         ts_ns = int(ts * 1e9)
 
         return ts_int, ts_ns * 1e-9, ts_ns
 
     @classmethod
-    def copy(cls, other):
+    def copy(cls, other) -> stat_result:
         # First copy the basic 10 fields
         st = cls(list(other))
         # Then iterate and copy any other
@@ -910,7 +910,7 @@ def glob_ext1(direntry: filesystem.FilesystemEntry, pattern: str) -> filesystem.
             yield e
 
 
-def glob_ext0(direntry: filesystem.FilesystemEntry, base_name: str) -> List[filesystem.FilesystemEntry]:
+def glob_ext0(direntry: filesystem.FilesystemEntry, base_name: str) -> list[filesystem.FilesystemEntry]:
     if base_name == "":
         # `os.path.split()` returns an empty base_name for paths ending with a
         # directory separator.  'q*x/' should match only directories.
@@ -924,12 +924,12 @@ def glob_ext0(direntry: filesystem.FilesystemEntry, base_name: str) -> List[file
     return []
 
 
-def has_glob_magic(s):
+def has_glob_magic(s) -> bool:
     return re_glob_magic.search(s) is not None
 
 
 def resolve_link(
-    fs: filesystem.Filesystem, entry: filesystem.FilesystemEntry, previous_links: Set[str] = None
+    fs: filesystem.Filesystem, entry: filesystem.FilesystemEntry, previous_links: set[str] = None
 ) -> filesystem.FilesystemEntry:
     """Resolves a symlink to its actual path.
 
