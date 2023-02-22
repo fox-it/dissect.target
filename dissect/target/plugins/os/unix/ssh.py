@@ -36,7 +36,7 @@ KnownHostRecord = TargetRecordDescriptor(
 PrivateKeyRecord = TargetRecordDescriptor(
     "unix/ssh/private_key",
     [
-        ("datetime", "ts"),
+        ("datetime", "mtime_ts"),
         ("string", "user"),
         ("string", "key_format"),
         ("string", "key_type"),
@@ -50,7 +50,7 @@ PrivateKeyRecord = TargetRecordDescriptor(
 PublicKeyRecord = TargetRecordDescriptor(
     "unix/ssh/public_key",
     [
-        ("datetime", "ts"),
+        ("datetime", "mtime_ts"),
         ("string", "user"),
         ("string", "key_type"),
         ("string", "public_key"),
@@ -67,7 +67,7 @@ class SSHPlugin(Plugin):
         return len(list(self.target.users())) > 0 and self.target.os != "windows"
 
     @export(record=AuthorizedKeysRecord)
-    def authorized_keys(self):
+    def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
         """Yields the content of the authorized_keys files on a Unix target per user."""
         for user_details in self.target.user_details.all_with_home():
             for authorized_keys_file in user_details.home_path.glob(".ssh/authorized_keys*"):
@@ -92,7 +92,7 @@ class SSHPlugin(Plugin):
                     )
 
     @export(record=KnownHostRecord)
-    def known_hosts(self):
+    def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Yields the content of the known_hosts files on a Unix target per user."""
         known_hosts_files = []
         for user_details in self.target.user_details.all_with_home():
@@ -131,7 +131,7 @@ class SSHPlugin(Plugin):
                     )
 
     @export(record=PrivateKeyRecord)
-    def private_keys(self):
+    def private_keys(self) -> Iterator[PrivateKeyRecord]:
         """Yields OpenSSH private keys on a Unix target per user."""
         private_key_files = []
 
@@ -156,33 +156,33 @@ class SSHPlugin(Plugin):
                 continue
 
             yield PrivateKeyRecord(
-                ts=file_path.stat().st_mtime,
-                source=file_path,
+                mtime_ts=file_path.stat().st_mtime,
                 user=user,
                 key_format=private_key.format,
                 key_type=private_key.key_type,
                 public_key=private_key.public_key,
-                encrypted=private_key.is_encrypted,
                 comment=private_key.comment,
+                encrypted=private_key.is_encrypted,
+                source=file_path,
                 _target=self.target,
             )
 
     @export(record=PublicKeyRecord)
     def public_keys(self) -> Iterator[PublicKeyRecord]:
-        """Yields all SSH public keys from /home/*/.ssh and /etc/ssh/."""
+        """Yields all SSH public keys from all user home directories and /etc/ssh/."""
 
         for user_details in self.target.user_details.all_with_home():
             for file_path in user_details.home_path.glob(".ssh/*.pub"):
                 if file_path.is_file():
                     key_type, public_key, comment = parse_ssh_public_key_file(file_path)
 
-                    yield PrivateKeyRecord(
-                        ts=file_path.stat().st_mtime,
-                        source=file_path,
+                    yield PublicKeyRecord(
+                        mtime_ts=file_path.stat().st_mtime,
                         user=user_details.user.name,
                         key_type=key_type,
                         public_key=public_key,
                         comment=comment,
+                        source=file_path,
                         _target=self.target,
                     )
 
@@ -190,13 +190,13 @@ class SSHPlugin(Plugin):
             if file_path.is_file():
                 key_type, public_key, comment = parse_ssh_public_key_file(file_path)
 
-                yield PrivateKeyRecord(
-                    ts=file_path.stat().st_mtime,
-                    source=file_path,
+                yield PublicKeyRecord(
+                    mtime_ts=file_path.stat().st_mtime,
                     user=None,
                     key_type=key_type,
                     public_key=public_key,
                     comment=comment,
+                    source=file_path,
                     _target=self.target,
                 )
 
@@ -210,7 +210,7 @@ def parse_ssh_public_key_file(path: Path) -> tuple[str, str, str]:
     return key_type, public_key, comment
 
 
-def parse_ssh_key(key_string):
+def parse_ssh_key(key_string: str) -> tuple[str, str, str, str]:
     parts = re.findall(r'(?:[^\s,"]|"(?:\\.|[^"])*")+', key_string)
 
     options = None
@@ -226,7 +226,7 @@ def parse_ssh_key(key_string):
     return options, keytype, public_key, comment
 
 
-def parse_known_host(known_host_string):
+def parse_known_host(known_host_string: str) -> tuple[str, list, str, str, str]:
     parts = known_host_string.split()
 
     marker = None
