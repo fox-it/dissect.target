@@ -3,6 +3,9 @@ from typing import Iterator
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
+from dissect.util.ts import webkittimestamp
+from flow.record.fieldtypes import path
+
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
@@ -13,8 +16,6 @@ from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     try_idna,
 )
-from dissect.util.ts import webkittimestamp
-from flow.record.fieldtypes import path
 
 
 class ChromiumMixin:

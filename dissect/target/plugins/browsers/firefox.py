@@ -4,6 +4,9 @@ from typing import Iterator
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import Row, SQLite3
+from dissect.util.ts import from_unix_ms, from_unix_us
+from flow.record.fieldtypes import datetime, path
+
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -13,8 +16,6 @@ from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     try_idna,
 )
-from dissect.util.ts import from_unix_ms, from_unix_us
-from flow.record.fieldtypes import datetime, path
 
 
 class FirefoxPlugin(Plugin):
