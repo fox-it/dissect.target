@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import hashlib
 import plistlib
 import struct
 from io import BytesIO
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
 from dissect.sql import sqlite3
 from dissect.util.plist import NSKeyedArchiver
-from dissect.target.exceptions import LoaderError
 
+from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.itunes import ITunesFilesystem
 from dissect.target.helpers import fsutil, keychain
 from dissect.target.loader import Loader
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 try:
     import _pystandalone
@@ -53,7 +59,7 @@ DOMAIN_TRANSLATION = {
 
 
 class ITunesLoader(Loader):
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path)
 
         self.backup = ITunesBackup(self.path)
@@ -76,17 +82,17 @@ class ITunesLoader(Loader):
             self.backup.open()
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         return path.is_dir() and path.joinpath("Manifest.plist").exists()
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         target.filesystems.add(ITunesFilesystem(self.backup))
 
 
 class ITunesBackup:
     """Parse a directory as an iTunes backup directory."""
 
-    def __init__(self, root):
+    def __init__(self, root: Path):
         self.root = root
         self.manifest = plistlib.load(self.root.joinpath("Manifest.plist").open("rb"))
         self.info = plistlib.load(self.root.joinpath("Info.plist").open("rb"))
@@ -103,13 +109,17 @@ class ITunesBackup:
         self.manifest_db = None
 
     @property
-    def identifier(self):
+    def identifier(self) -> str:
         return self.info["Unique Identifier"]
 
-    def open(self, password=None, kek=None):
+    def open(self, password: Optional[str] = None, kek: Optional[bytes] = None) -> None:
         """Open the backup.
 
         Opens the Manifest.db file. Requires a password if the backup is encrypted.
+
+        Args:
+            password: Optional backup password if the backup is encrypted.
+            kek: Optional kek if the password is unknown, but the derived key is known.
         """
         if self.encrypted:
             if not password and not kek:
@@ -123,7 +133,7 @@ class ITunesBackup:
 
         self.manifest_db = self._open_manifest_db()
 
-    def _open_manifest_db(self):
+    def _open_manifest_db(self) -> sqlite3.SQLite3:
         path = self.root.joinpath("Manifest.db")
         if not self.encrypted or self.manifest["Lockdown"]["ProductVersion"] < "10.2":
             fh = path.open("rb")
@@ -133,7 +143,7 @@ class ITunesBackup:
 
         return sqlite3.SQLite3(fh)
 
-    def derive_key(self, password):
+    def derive_key(self, password: str) -> bytes:
         """Derive the key bag encryption key from a given password."""
         password = password.encode()
         if self.manifest["Lockdown"]["ProductVersion"] < "10.2":
@@ -145,7 +155,7 @@ class ITunesBackup:
 
         return hashlib.pbkdf2_hmac("sha1", first_round, self.key_bag.attr["SALT"], self.key_bag.attr["ITER"], 32)
 
-    def files(self):
+    def files(self) -> Iterator[FileInfo]:
         """Iterate all the files in this backup."""
         for row in self.manifest_db.table("Files").rows():
             yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
@@ -154,7 +164,9 @@ class ITunesBackup:
 class FileInfo:
     """Utility class that represents a file in a iTunes backup."""
 
-    def __init__(self, backup, file_id, domain, relative_path, flags, metadata):
+    def __init__(
+        self, backup: ITunesBackup, file_id: str, domain: str, relative_path: str, flags: int, metadata: bytes
+    ):
         self.backup = backup
         self.file_id = file_id
         self.domain = domain
@@ -164,22 +176,22 @@ class FileInfo:
 
         self.translated_path = translate_file_path(self.domain, self.relative_path)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<FileInfo {self.translated_path}>"
 
     @property
-    def mode(self):
+    def mode(self) -> int:
         return self.metadata["Mode"]
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.metadata["Size"]
 
     @property
-    def encryption_key(self):
-        return self.metadata["EncryptionKey"] if self.backup.encrypted else None
+    def encryption_key(self) -> Optional[str]:
+        return self.metadata.get("EncryptionKey")
 
-    def get(self):
+    def get(self) -> Path:
         """Return a Path object to the underlying file."""
         return self.backup.root / self.file_id[:2] / self.file_id
 
@@ -188,6 +200,9 @@ class FileInfo:
         if not self.backup.encrypted:
             raise TypeError("File is not encrypted")
 
+        if not self.encryption_key:
+            raise ValueError("File has no encryption key")
+
         key = self.backup.key_bag.unwrap(self.encryption_key)
         return _create_cipher(key)
 
@@ -195,10 +210,10 @@ class FileInfo:
 class KeyBag:
     """Parse and implements a simple key bag."""
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         self.attr, self.keys = parse_key_bag(buf)
 
-    def unlock_with_passcode_key(self, key: bytes):
+    def unlock_with_passcode_key(self, key: bytes) -> None:
         """Attempt to unlock the passcode protected keys in this key bag with the given decryption key."""
         for class_key in self.keys.values():
             if class_key.wrap_type != ClassKey.WRAP_PASSCODE:
@@ -206,7 +221,7 @@ class KeyBag:
 
             class_key.unwrap(key)
 
-    def unwrap(self, key):
+    def unwrap(self, key: bytes) -> bytes:
         """Unwrap a given key.
 
         Wrapped keys are prefixed with a 32bit protection class.
@@ -220,7 +235,15 @@ class ClassKey:
 
     WRAP_PASSCODE = 2
 
-    def __init__(self, uuid, protection_class, wrap_type, key_type, wrapped_key, public_key=None):
+    def __init__(
+        self,
+        uuid: bytes,
+        protection_class: int,
+        wrap_type: int,
+        key_type: int,
+        wrapped_key: bytes,
+        public_key: Optional[bytes] = None,
+    ):
         self.uuid = uuid
         self.protection_class = protection_class
         self.wrap_type = wrap_type
@@ -231,7 +254,7 @@ class ClassKey:
         self.key = None
 
     @classmethod
-    def from_bag_dict(cls, data):
+    def from_bag_dict(cls, data: dict[str, Union[bytes, int]]) -> ClassKey:
         return cls(
             data.get("UUID"),
             data.get("CLAS"),
@@ -242,16 +265,16 @@ class ClassKey:
         )
 
     @property
-    def unwrapped(self):
+    def unwrapped(self) -> bool:
         """Return whether this key is already unwrapped."""
         return self.key is not None
 
-    def unwrap(self, kek):
+    def unwrap(self, kek: bytes) -> None:
         """Attempt to unwrap this key."""
         self.key = aes_unwrap_key(kek, self.wrapped_key)
 
 
-def translate_file_path(domain, relative_path):
+def translate_file_path(domain: str, relative_path: str) -> str:
     """Translate a domain and relative path (as stored in iTunes backups) to an absolute path on an iOS device."""
     try:
         domain, _, package_name = domain.partition("-")
@@ -262,7 +285,7 @@ def translate_file_path(domain, relative_path):
     return fsutil.join(domain_path, relative_path)
 
 
-def parse_key_bag(buf: bytes):
+def parse_key_bag(buf: bytes) -> tuple[dict[str, bytes, int], dict[str, ClassKey]]:
     """Parse the BackupKeyBag buffer. Simple TLV format."""
     attr = {}
     class_keys = {}
@@ -307,12 +330,12 @@ def parse_key_bag(buf: bytes):
     return attr, class_keys
 
 
-def aes_decrypt(data, key, iv=b"\x00" * 16):
+def aes_decrypt(data: bytes, key: bytes, iv: bytes = b"\x00" * 16) -> bytes:
     """Helper function to easily decrypt some data with a default IV."""
     return _create_cipher(key, iv).decrypt(data)
 
 
-def aes_unwrap_key(kek, wrapped, iv=0xA6A6A6A6A6A6A6A6):
+def aes_unwrap_key(kek: bytes, wrapped: bytes, iv: int = 0xA6A6A6A6A6A6A6A6) -> bytes:
     """AES key unwrapping algorithm.
 
     Derived from https://github.com/kurtbrose/aes_keywrap/blob/master/aes_keywrap.py
@@ -342,7 +365,7 @@ def aes_unwrap_key(kek, wrapped, iv=0xA6A6A6A6A6A6A6A6):
     return key
 
 
-def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc"):
+def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc") -> Any:
     """Create a cipher object.
 
     Dynamic based on the available crypto module.

@@ -1,12 +1,11 @@
 import fnmatch
 import re
-
-from typing import Generator, BinaryIO, Any, List, Optional
 from pathlib import Path
-
-from flow.record import Record
+from typing import Any, BinaryIO, Generator, List, Optional
 
 from dissect.eventlog import evt
+from flow.record import Record
+
 from dissect.target import plugin
 from dissect.target.exceptions import (
     FilesystemError,

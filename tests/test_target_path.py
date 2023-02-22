@@ -2,8 +2,6 @@ import os
 import pathlib
 import tempfile
 
-import pytest
-
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
@@ -33,9 +31,7 @@ def test_target_path_checks_mapped_dir(tmpdir_name, target_win):
         assert not target_win.fs.path("C:\\test-dir\\").is_file()
 
         assert target_win.fs.path(f"C:\\test-dir\\{tmpfile_name}").is_file()
-
-        with pytest.raises(NotImplementedError):
-            target_win.fs.path(f"C:\\test-dir\\{tmpfile_name}\\some").is_file()
+        assert not target_win.fs.path(f"C:\\test-dir\\{tmpfile_name}\\some").is_file()
 
 
 def test_target_path_checks_virtual():

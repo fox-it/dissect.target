@@ -1,4 +1,7 @@
-from dissect.target.plugins.os.unix.linux.debian.dpkg import DpkgPlugin, STATUS_FILE_NAME
+from dissect.target.plugins.os.unix.linux.debian.dpkg import (
+    STATUS_FILE_NAME,
+    DpkgPlugin,
+)
 
 from ._utils import absolute_path
 

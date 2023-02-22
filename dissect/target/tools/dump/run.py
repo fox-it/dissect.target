@@ -4,33 +4,32 @@
 import argparse
 import itertools
 import sys
-from dataclasses import dataclass
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, List, Tuple, Any, Iterable, Optional
+from typing import Any, Generator, Iterable, List, Optional, Tuple
 
 import structlog
-
 from flow.record import Record
 
 from dissect.target import Target
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.tools.utils import (
-    configure_generic_arguments,
-    process_generic_arguments,
+from dissect.target.tools.dump.state import (
+    DumpState,
+    create_state,
+    load_state,
+    persisted_state,
 )
 from dissect.target.tools.dump.utils import (
-    get_nested_attr,
     Compression,
     Serialization,
     cached_sink_writers,
+    get_nested_attr,
 )
-from dissect.target.tools.dump.state import (
-    persisted_state,
-    create_state,
-    load_state,
-    DumpState,
+from dissect.target.tools.utils import (
+    configure_generic_arguments,
+    process_generic_arguments,
 )
 
 log = structlog.get_logger("dissect.target.tools.dump.run")

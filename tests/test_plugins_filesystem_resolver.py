@@ -2,6 +2,7 @@ from collections import OrderedDict
 from unittest.mock import patch
 
 import pytest
+
 from dissect.target.filesystem import VirtualFile
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
 

@@ -1,4 +1,5 @@
 from dissect.target.plugins.apps.vpns.wireguard import WireGuardPlugin
+
 from ._utils import absolute_path
 
 

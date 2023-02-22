@@ -1,10 +1,12 @@
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict, namedtuple
 from unittest import mock
 
 import pytest
 
-from dissect.target.plugins.os.windows.env import EnvironmentVariablePlugin, EnvVarDetails
-
+from dissect.target.plugins.os.windows.env import (
+    EnvironmentVariablePlugin,
+    EnvVarDetails,
+)
 
 PATHEXTS = [".ext_1", ".ext_2"]
 

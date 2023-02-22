@@ -11,13 +11,11 @@ class DissectVolumeSystem(VolumeSystem):
         super().__init__(fh, serial=self._disk.serial, *args, **kwargs)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
+    def _detect(fh: BinaryIO) -> bool:
         try:
-            offset = fh.tell()
             disk.Disk(fh)
-            fh.seek(offset)
             return True
-        except Exception:  # noqa
+        except Exception:
             return False
 
     def _volumes(self) -> Iterator[Volume]:

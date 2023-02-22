@@ -1,9 +1,8 @@
 import re
 import urllib
-
-from typing import Optional, Tuple, Union
-from pathlib import Path
 from os import PathLike
+from pathlib import Path
+from typing import Optional, Tuple, Union
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystems.ntfs import NtfsFilesystem

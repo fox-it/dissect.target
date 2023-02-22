@@ -25,7 +25,7 @@ exit
     results = list(target_unix_users.commandhistory())
     assert len(results) == 3
 
-    assert results[0].ts == dt("2022-03-29T23:58:59")
+    assert results[0].ts == dt("2022-03-29T23:58:59Z")
     assert results[0].command == 'echo "this is a test"'
     assert results[0].source == "/root/.bash_history"
 
@@ -33,7 +33,7 @@ exit
     assert results[1].command == 'echo "O no. A line without timestamp"'
     assert results[1].source == "/root/.bash_history"
 
-    assert results[2].ts == dt("2022-07-23T12:14:28")
+    assert results[2].ts == dt("2022-07-23T12:14:28Z")
     assert results[2].command == "exit"
     assert results[2].source == "/root/.bash_history"
 

@@ -28,9 +28,11 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+from dissect.target.filesystem import RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
+from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     generate_argparse_for_bound_method,
@@ -52,7 +54,7 @@ except ImportError:
     log.warning("Readline module is not available")
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
-STAT_TEMPLATE = """  File: {path}
+STAT_TEMPLATE = """  File: {path} {symlink}
   Size: {size}          {filetype}
  Inode: {inode}   Links: {nlink}
 Access: ({modeord}/{modestr})  Uid: ( {uid} )   Gid: ( {gid} )
@@ -406,38 +408,35 @@ class TargetCli(TargetCmd):
     def scandir(self, path, color=False):
         """List a directory for the given path"""
         path = self.resolvepath(path)
-        if not path.exists() or not path.is_dir():
-            return []
+        result = []
 
-        r = []
-        for f in path.iterdir():
-            ft = None
-            if color:
-                if f.is_symlink():
-                    ft = "ln"
-                elif f.is_dir():
-                    ft = "di"
-                elif f.is_file():
-                    ft = "fi"
+        if path.exists() and path.is_dir():
+            for file_ in path.iterdir():
+                file_type = None
+                if color:
+                    if file_.is_symlink():
+                        file_type = "ln"
+                    elif file_.is_dir():
+                        file_type = "di"
+                    elif file_.is_file():
+                        file_type = "fi"
 
-            entry = f.get()
-            if hasattr(entry, "deref"):
-                m = entry.deref()
+                result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
 
-                if m.attr.Data:
-                    for data in m.attr.Data:
-                        if data.name == "":
-                            name = f.name
-                        else:
-                            ft = "fi"
-                            name = f"{f.name}:{data.name}"
-                        r.append((f, fmt_ls_colors(ft, name) if color else name))
-                    continue
+                # If we happen to scan an NTFS filesystem see if any of the
+                # entries has an alternative data stream and also list them.
+                entry = file_.get()
+                if isinstance(entry, RootFilesystemEntry):
+                    if entry.entries.fs.__fstype__ == "ntfs":
+                        attrs = entry.lattr()
+                        for data_stream in attrs.DATA:
+                            if data_stream.name != "":
+                                name = f"{file_.name}:{data_stream.name}"
+                                result.append((file_, fmt_ls_colors(file_type, name) if color else name))
 
-            r.append((f, fmt_ls_colors(ft, f.name) if color else f.name))
+            result.sort(key=lambda e: e[0].name)
 
-        r.sort(key=lambda e: e[0].name)
-        return r
+        return result
 
     def do_cd(self, line):
         """change directory"""
@@ -464,21 +463,7 @@ class TargetCli(TargetCmd):
 
     def do_info(self, line):
         """print target information"""
-        print("OS Plugin :", self.target._os_plugin.__name__)
-        print()
-        print("Disks     :")
-        for d in self.target.disks:
-            print("-", str(d))
-        print()
-        print("Volumes   :")
-        for v in self.target.volumes:
-            print("-", str(v))
-        print()
-        print("Hostname  :", self.target.hostname)
-        print("OS        :", self.target.version)
-        print("Domain    :", self.target.domain)
-        print("IPs       :", self.target.ips)
-        print()
+        return print_target_info(self.target)
 
     @arg("path", nargs="?")
     @arg("-l", action="store_true")
@@ -486,37 +471,43 @@ class TargetCli(TargetCmd):
     @arg("-h", "--human-readable", action="store_true")
     def cmd_ls(self, args, stdout):
         """list directory contents"""
-        path = self.checkdir(args.path)
-        if not path:
+
+        path = self.resolvepath(args.path)
+
+        if not path or not path.exists():
             return
 
-        directory_contents = self.scandir(path, color=True)
+        if path.is_dir():
+            contents = self.scandir(path, color=True)
+        elif path.is_file():
+            contents = [(path, path.name)]
+
         if not args.l:
-            print("\n".join([name for _, name in directory_contents]), file=stdout)
+            print("\n".join([name for _, name in contents]), file=stdout)
         else:
-            print(f"total {len(directory_contents)}", file=stdout)
-            for target_path, name in directory_contents:
-                try:
-                    self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
-                except FileNotFoundError:
-                    log.error("Could not list any data for %s", name)
+            if len(contents) > 1:
+                print(f"total {len(contents)}", file=stdout)
+            for target_path, name in contents:
+                self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
 
     def print_extensive_file_stat(self, stdout, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
-        entry = target_path.get()
+        try:
+            entry = target_path.get()
+            stat = entry.lstat()
+            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
+            utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
 
-        # Entry is an NTFSEntry and has alternative datastream
-        if hasattr(entry, "deref") and ":" in name:
-            # retrieve the ads from the NTFS entry
-            ads_path = fsutil.join(fsutil.dirname(entry.path, separator=entry.fs.alt_separator), name)
-            entry = entry.fs.get(ads_path)
+            print(
+                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
+                file=stdout,
+            )
 
-        stat = entry.lstat()
-        utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
-        print(
-            f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}",
-            file=stdout,
-        )
+        except FileNotFoundError:
+            print(
+                f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}",
+                file=stdout,
+            )
 
     @arg("path", nargs="?")
     @arg("-name", default="*")
@@ -545,9 +536,13 @@ class TargetCli(TargetCmd):
         if not path:
             return
 
+        symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
+
         s = path.stat() if args.dereference else path.lstat()
+
         res = STAT_TEMPLATE.format(
             path=path,
+            symlink=symlink,
             size=s.st_size,
             filetype="",
             inode=s.st_ino,
@@ -1068,6 +1063,11 @@ def main():
     args = parser.parse_args()
 
     process_generic_arguments(args)
+
+    # For the shell tool we want -q to log slightly more then just CRITICAL
+    # messages.
+    if args.quiet:
+        logging.getLogger("dissect").setLevel(level=logging.ERROR)
 
     targets = list(Target.open_all(args.targets))
 

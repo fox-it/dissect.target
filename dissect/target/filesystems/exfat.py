@@ -13,21 +13,13 @@ class ExfatFilesystem(Filesystem):
     __fstype__ = "exfat"
 
     def __init__(self, fh=None, *args, **kwargs):
-        self.exfat = exfat.EXFAT(fh=fh)
+        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
+        self.exfat = exfat.ExFAT(fh)
         self.cluster_size = self.exfat.cluster_size
-        super().__init__(case_sensitive=False, alt_separator="\\", *args, **kwargs)
 
     @staticmethod
-    def detect(fh):
-        try:
-            offset = fh.tell()
-            fh.seek(0)
-            signature = fh.read(11)  # exFAT sig should be in the first 10 bytes - 3 from jump boot
-            fh.seek(offset)
-
-            return signature[3:] == b"EXFAT   "
-        except Exception:  # noqa
-            return False
+    def _detect(fh):
+        return fh.read(11)[3:] == b"EXFAT   "
 
     def get(self, path):
         """Returns a ExfatFilesystemEntry object corresponding to the given pathname"""

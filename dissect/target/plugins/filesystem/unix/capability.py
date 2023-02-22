@@ -5,7 +5,6 @@ from io import BytesIO
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-
 CapabilityRecord = TargetRecordDescriptor(
     "filesystem/unix/capability",
     [

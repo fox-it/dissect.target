@@ -1,6 +1,7 @@
 import argparse
-import pytest
 from unittest.mock import MagicMock, call, patch
+
+import pytest
 
 from dissect.target import Target
 from dissect.target.report import (

@@ -4,16 +4,16 @@ from collections import defaultdict
 from functools import lru_cache
 
 from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
-from dissect.target.plugin import Plugin, internal
-from dissect.target.plugins.general.users import UserDetails
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
     HiveCollection,
     KeyCollection,
-    RegistryKey,
     RegfHive,
+    RegistryKey,
     VirtualHive,
 )
+from dissect.target.plugin import Plugin, internal
+from dissect.target.plugins.general.users import UserDetails
 
 controlset_regex = re.compile("CurrentControlSet", flags=re.IGNORECASE)
 
