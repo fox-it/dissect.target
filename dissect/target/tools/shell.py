@@ -32,6 +32,7 @@ from dissect.target.filesystem import RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
+from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     configure_generic_arguments,
     generate_argparse_for_bound_method,
@@ -462,21 +463,7 @@ class TargetCli(TargetCmd):
 
     def do_info(self, line):
         """print target information"""
-        print("OS Plugin :", self.target._os_plugin.__name__)
-        print()
-        print("Disks     :")
-        for d in self.target.disks:
-            print("-", str(d))
-        print()
-        print("Volumes   :")
-        for v in self.target.volumes:
-            print("-", str(v))
-        print()
-        print("Hostname  :", self.target.hostname)
-        print("OS        :", self.target.version)
-        print("Domain    :", self.target.domain)
-        print("IPs       :", self.target.ips)
-        print()
+        return print_target_info(self.target)
 
     @arg("path", nargs="?")
     @arg("-l", action="store_true")
