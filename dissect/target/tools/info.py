@@ -70,7 +70,7 @@ def main():
             targets = targets[:-1]
         args.targets = targets
 
-    for target in Target.open_all(args.targets):
+    for i, target in enumerate(Target.open_all(args.targets)):
         try:
             if args.json:
                 print(json.dumps(get_target_info(target), default=str))
@@ -80,6 +80,8 @@ def main():
                 rs = record_output(args.strings, args.json)
                 rs.write(InfoRecord(**get_target_info(target), _target=target))
             else:
+                if i > 0:
+                    print("-" * 70)
                 print_target_info(target)
         except Exception as e:
             target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
@@ -104,7 +106,8 @@ def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
 
 
 def print_target_info(target: Target) -> None:
-    print("Disks")
+    print(target)
+    print("\nDisks")
     for d in target.disks:
         print(f"- {str(d)}")
     print("\nVolumes")
