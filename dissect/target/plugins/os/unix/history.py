@@ -57,7 +57,7 @@ class CommandHistoryPlugin(Plugin):
                 if file.name not in COMMAND_HISTORY_FILES:
                     continue
 
-                # TODO: Starting with Python 3.10 we can use pattern matching (PEP 634)
+                # NOTE: Starting with Python 3.10 we can use pattern matching (PEP 634)
                 if file.name == ".zsh_history":
                     return self.parse_zsh_history(file, user_details.user)
 
