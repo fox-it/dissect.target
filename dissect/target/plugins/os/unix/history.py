@@ -1,22 +1,27 @@
 import re
+from typing import Iterator
 
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, internal
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "linux/history",
     [
         ("datetime", "ts"),
         ("wstring", "command"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
-COMMAND_HISTORY_FILES = [".bash_history", ".zsh_history", ".fish_history", "fish_history", ".python_history"]
+COMMAND_HISTORY_FILES = [".bash_history", ".zsh_history", ".python_history"]
+# TODO: Add support for fish_history YAML-based files.
 IGNORED_HOMES = ["/bin", "/usr/sbin", "/sbin"]
+
+RE_EXTENDED_BASH = re.compile(r"^#(?P<ts>\d{10})$")
+RE_EXTENDED_ZSH = re.compile(r"^: (?P<ts>\d{10}):\d+;(?P<command>.*)$")
 
 
 class CommandHistoryPlugin(Plugin):
@@ -48,41 +53,80 @@ class CommandHistoryPlugin(Plugin):
                 if ih in user_details.user.home:
                     continue
 
-            for file_ in user_details.home_path.iterdir():
-                if file_.name not in COMMAND_HISTORY_FILES:
+            for file in user_details.home_path.iterdir():
+                if file.name not in COMMAND_HISTORY_FILES:
                     continue
 
-                try:
-                    next_cmd_ts = None
+                # NOTE: Starting with Python 3.10 we can use pattern matching (PEP 634)
+                if file.name == ".zsh_history":
+                    return self.parse_zsh_history(file, user_details.user)
 
-                    for line in file_.open("rt", errors="replace"):  # Ignore Non-UTF-8 characters in bash_history
-                        cmd_ts = None
-                        line = line.strip()
+                return self.parse_bash_history(file, user_details.user)
 
-                        # Skip empty lines
-                        if not line:
-                            continue
+    @internal
+    def parse_bash_history(self, file, user: str) -> Iterator[CommandHistoryRecord]:
+        """Parse bash_history contents.
 
-                        if line.startswith("#"):  # Parse timestamp if possible
-                            matches = re.search(r"^#([0-9]{10})$", line)
-                            if matches:
-                                ts = matches.group(1)
-                                try:
-                                    next_cmd_ts = from_unix(float(ts))
-                                except (ValueError, TypeError):
-                                    continue
-                            continue
+        Regular .bash_history files contain one plain command per line.
+        An extended .bash_history file may look like this:
+        ```
+        #1648598339
+        echo "this is a test"
+        ```
+        """
+        next_cmd_ts = None
 
-                        if next_cmd_ts:
-                            cmd_ts = next_cmd_ts
-                            next_cmd_ts = None
+        for line in file.open("rt", errors="replace"):
+            ts = None
+            line = line.strip()
 
-                        yield CommandHistoryRecord(
-                            ts=cmd_ts,
-                            command=line,
-                            source=str(file_),
-                            _target=self.target,
-                            _user=user_details.user,
-                        )
-                except Exception:
-                    self.target.log.exception("Failed to parse command history: %s", file_)
+            if not line:
+                continue
+
+            if line.startswith("#") and (extended_bash_match := RE_EXTENDED_BASH.match(line)):
+                next_cmd_ts = from_unix(int(extended_bash_match["ts"]))
+                continue
+
+            if next_cmd_ts:
+                ts = next_cmd_ts
+                next_cmd_ts = None
+
+            yield CommandHistoryRecord(
+                ts=ts,
+                command=line,
+                source=file,
+                _target=self.target,
+                _user=user,
+            )
+
+    @internal
+    def parse_zsh_history(self, file, user: str) -> Iterator[CommandHistoryRecord]:
+        """Parse zsh_history contents.
+
+        Regular .zsh_history lines are just the plain commands.
+        Extended .zsh_history files may look like this:
+        ```
+        : 1673860722:0;sudo apt install sl
+        : :;
+        ```
+        """
+        for line in file.open("rt", errors="replace"):
+            line = line.strip()
+
+            if not line or line == ": :;":
+                continue
+
+            if line.startswith(":") and (extended_zsh_match := RE_EXTENDED_ZSH.match(line)):
+                ts = from_unix(int(extended_zsh_match["ts"]))
+                command = extended_zsh_match["command"]
+            else:
+                ts = None
+                command = line
+
+            yield CommandHistoryRecord(
+                ts=ts,
+                command=command,
+                source=str(file),
+                _target=self.target,
+                _user=user,
+            )
