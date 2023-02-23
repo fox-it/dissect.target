@@ -72,12 +72,12 @@ def main():
 
     for i, target in enumerate(Target.open_all(args.targets)):
         try:
-            if args.json:
+            if args.jsonlines:
                 print(json.dumps(get_target_info(target), default=str))
-            elif args.json_pretty:
+            elif args.json:
                 print(json.dumps(get_target_info(target), indent=4, default=str))
             elif args.record:
-                rs = record_output(args.strings, args.json)
+                rs = record_output(args.strings)
                 rs.write(InfoRecord(**get_target_info(target), _target=target))
             else:
                 if i > 0:
