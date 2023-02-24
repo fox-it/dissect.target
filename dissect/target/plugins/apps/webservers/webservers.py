@@ -25,6 +25,7 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
 
 class WebserverPlugin(Plugin):
     __namespace__ = "webserver"
+    __findable__ = False
 
     WEBSERVERS = [
         "apache",

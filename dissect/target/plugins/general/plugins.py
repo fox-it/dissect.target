@@ -6,11 +6,14 @@ from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview
 from dissect.target.plugin import Plugin, arg, export
 
 
-def categorize_plugins() -> dict:
+def categorize_plugins(plugins_selection: list[dict] = None) -> dict:
     """Categorize plugins based on the module it's from."""
 
     output_dict = dict()
-    for plugin_dict in get_exported_plugins():
+
+    plugins_selection = plugins_selection or get_exported_plugins()
+
+    for plugin_dict in plugins_selection:
         tmp_dict = dictify_module_recursive(
             list_of_items=plugin_dict["module"].split("."),
             last_value=plugin.load(plugin_dict),
@@ -98,10 +101,10 @@ class PluginListPlugin(Plugin):
     def check_compatible(self):
         return True
 
-    @export(output="none")
+    @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true")
-    def plugins(self, print_docs=False):
-        categorized_plugins = dict(sorted(categorize_plugins().items()))
+    def plugins(self, plugins: list[dict] = None, print_docs: bool = False) -> None:
+        categorized_plugins = dict(sorted(categorize_plugins(plugins).items()))
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 
         plugins_list = textwrap.indent(
