@@ -568,3 +568,14 @@ class GenericPlugin(Plugin):
                         _user=user,
                         _key=s,
                     )
+
+    @export(property=True)
+    def codepage(self) -> Optional[str]:
+        """Returns the current active codepage on the system."""
+
+        key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"
+
+        try:
+            return self.target.registry.key(key).value("ACP").value
+        except RegistryError:
+            pass
