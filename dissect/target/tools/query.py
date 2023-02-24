@@ -246,7 +246,7 @@ def main():
     timestamp = datetime.utcnow()
 
     execution_report.set_plugin_stats(PLUGINS)
-    log.info("%s", execution_report.get_formatted_report())
+    log.debug("%s", execution_report.get_formatted_report())
     if args.report_dir:
         persist_execution_report(
             args.report_dir,

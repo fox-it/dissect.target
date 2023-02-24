@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator
+from typing import Any, BinaryIO, Generator, Iterable, Iterator, Union
 
 import dissect.util.ts as ts
 from dissect.cstruct import Structure, cstruct
@@ -406,8 +406,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @plugin.export(record=DefenderFileQuarantineRecord)
-    def quarantine(self) -> Iterator[DefenderFileQuarantineRecord]:
+    @plugin.export(record=[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord])
+    def quarantine(self) -> Iterator[Union[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord]]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in

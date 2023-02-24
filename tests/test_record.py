@@ -8,10 +8,10 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import (
-    create_extended_descriptor,
     TargetRecordDescriptor,
     UnixUserRecord,
     WindowsUserRecord,
+    create_extended_descriptor,
 )
 
 RECORD_NAME = "test/record"

@@ -5,8 +5,8 @@ import pytest
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.log import evt, evtx
 from dissect.target.plugins.general import scrape
+from dissect.target.plugins.os.windows.log import evt, evtx
 
 from ._utils import absolute_path
 

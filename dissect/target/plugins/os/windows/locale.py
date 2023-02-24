@@ -1,3 +1,4 @@
+from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -44,13 +45,12 @@ class LocalePlugin(Plugin):
         found_languages = []
         for up in self.target.registry.keys("HKCU\\Control Panel\\International\\User Profile"):
             for subkey in up.subkeys():
-                language = subkey.name
+                language = normalize_language(subkey.name.replace("-", "_"))
                 if language not in found_languages:
                     found_languages.append(language)
         return found_languages
 
     @export(property=True)
     def timezone(self):
-        """Get the configured timezone of the system."""
-        tzi = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
-        return tzi.value("TimeZoneKeyName").value
+        """Get the configured timezone of the system in IANA TZ standard format."""
+        return normalize_timezone(self.target.datetime.tzinfo.name)

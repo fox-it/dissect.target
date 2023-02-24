@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import call, patch
 
 import pytest
+
 from dissect.target.container import CONTAINERS
 from dissect.target.filesystem import FILESYSTEMS
 from dissect.target.loader import LOADERS

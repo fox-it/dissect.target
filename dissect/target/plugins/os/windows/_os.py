@@ -6,7 +6,7 @@ from typing import Any, Iterator, Optional
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.plugin import export, OperatingSystem, OSPlugin
+from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import urllib
-
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, Optional, Union
 
@@ -177,7 +176,7 @@ register("remote", "RemoteLoader")
 register("asdf", "AsdfLoader")
 register("tar", "TarLoader")
 register("vmx", "VmxLoader")
-register("vmcx", "VmcxLoader")
+register("hyperv", "HyperVLoader")
 register("ovf", "OvfLoader")
 register("vbox", "VBoxLoader")
 register("ewf", "EwfLoader")

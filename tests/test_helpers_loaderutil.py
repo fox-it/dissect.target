@@ -1,10 +1,11 @@
-import pytest
 import urllib
 from pathlib import Path
 
-from dissect.target.helpers.loaderutil import extract_path_info
-from dissect.target.helpers.fsutil import TargetPath
+import pytest
+
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.loaderutil import extract_path_info
 
 
 @pytest.mark.parametrize(

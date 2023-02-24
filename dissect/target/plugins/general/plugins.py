@@ -1,5 +1,5 @@
 import textwrap
-from typing import Dict, List, Union, Type
+from typing import Dict, List, Type, Union
 
 from dissect.target import plugin
 from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview

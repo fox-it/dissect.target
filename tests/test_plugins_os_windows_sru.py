@@ -1,6 +1,7 @@
 import pytest
 
 from dissect.target.plugins.os.windows import sru
+
 from ._utils import absolute_path
 
 

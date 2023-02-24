@@ -3,18 +3,17 @@ from __future__ import annotations
 import stat
 from typing import BinaryIO, Iterator, Optional
 
-from dissect.ntfs import NTFS, NTFS_SIGNATURE, MftRecord, IndexEntry
-from dissect.ntfs.exceptions import (
-    Error as NtfsError,
-    FileNotFoundError as NtfsFileNotFoundError,
-    NotADirectoryError as NtfsNotADirectoryError,
-)
+from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
+from dissect.ntfs.exceptions import Error as NtfsError
+from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
+from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
 from dissect.ntfs.util import AttributeMap
 
 from dissect.target.exceptions import (
     FileNotFoundError,
     IsADirectoryError,
     NotADirectoryError,
+    NotASymlinkError,
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
@@ -33,25 +32,18 @@ class NtfsFilesystem(Filesystem):
         *args,
         **kwargs,
     ):
+        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
         self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
-        super().__init__(case_sensitive=False, alt_separator="\\", *args, **kwargs)
 
     @staticmethod
-    def detect(fh: BinaryIO) -> bool:
-        try:
-            offset = fh.tell()
-            fh.seek(0)
-            sector = fh.read(512)
-            fh.seek(offset)
-
-            return sector[3:11] == NTFS_SIGNATURE
-        except Exception:  # noqa
-            return False
+    def _detect(fh: BinaryIO) -> bool:
+        sector = fh.read(512)
+        return sector[3:11] == NTFS_SIGNATURE
 
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(self, path, self._get_record(path))
 
-    def _get_record(self, path: str, root: MftRecord = None) -> MftRecord:
+    def _get_record(self, path: str, root: Optional[MftRecord] = None) -> MftRecord:
         try:
             path = path.rsplit(":", maxsplit=1)[0]
             return self.ntfs.mft.get(path, root=root)
@@ -74,12 +66,6 @@ class NtfsFilesystemEntry(FilesystemEntry):
         if ":" in self.path:
             self.path, self.ads = path.rsplit(":", maxsplit=1)
 
-    def readlink(self) -> str:
-        raise NotImplementedError()
-
-    def readlink_ext(self) -> NtfsFilesystemEntry:
-        raise NotImplementedError()
-
     def dereference(self) -> MftRecord:
         if not self.entry:
             self.entry = self.index_entry.dereference()
@@ -95,12 +81,20 @@ class NtfsFilesystemEntry(FilesystemEntry):
     def open(self, name: str = "") -> BinaryIO:
         if self.is_dir():
             raise IsADirectoryError(self.path)
+
+        if self.is_symlink():
+            return self.readlink_ext().open(name)
+
         stream = name or self.ads
         return self.dereference().open(stream)
 
-    def _iterdir(self, ignore_dos=True) -> Iterator[IndexEntry]:
+    def _iterdir(self, ignore_dos: bool = True) -> Iterator[IndexEntry]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
+
+        if self.is_symlink():
+            yield from self.readlink_ext()._iterdir(ignore_dos=ignore_dos)
+            return
 
         for entry in self.dereference().iterdir(ignore_dos=ignore_dos):
             if entry.attribute.file_name == ".":
@@ -124,12 +118,37 @@ class NtfsFilesystemEntry(FilesystemEntry):
         return not self.is_dir()
 
     def is_symlink(self) -> bool:
-        return False
+        return self.dereference().is_reparse_point()
+
+    def readlink(self) -> str:
+        # Note: we only need to check and resolve symlinks when actually interacting with the target, such as
+        # opening a file or iterating a directory. This is because the reparse point itself will have the appropriate
+        # flags set to indicate if the target is a file or directory
+        if not self.is_symlink():
+            raise NotASymlinkError()
+
+        reparse_point = self.dereference().attributes.REPARSE_POINT
+        print_name = reparse_point.print_name
+        if reparse_point.absolute:
+            # Prefix with \\ to make the path play ball with all the filesystem utilities
+            # Note: absolute links (such as directory junctions) will _always_ fail within the filesystem
+            # This is because absolute links include the drive letter, of which we have no knowledge here
+            # These will only work in the RootFilesystem
+            print_name = "\\" + print_name
+        return fsutil.normalize(print_name, self.fs.alt_separator)
 
     def stat(self) -> fsutil.stat_result:
+        if self.is_symlink():
+            return self.readlink_ext().lstat()
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
         record = self.dereference()
 
-        if self.is_file():
+        size = 0
+        if self.is_symlink():
+            mode = stat.S_IFLNK
+        elif self.is_file():
             mode = stat.S_IFREG
             try:
                 size = record.size(self.ads)
@@ -138,7 +157,6 @@ class NtfsFilesystemEntry(FilesystemEntry):
                 raise FileNotFoundError from e
         else:
             mode = stat.S_IFDIR
-            size = 0
 
         stdinfo = record.attributes.STANDARD_INFORMATION
 
@@ -165,11 +183,10 @@ class NtfsFilesystemEntry(FilesystemEntry):
 
         return st_info
 
-    def lstat(self) -> fsutil.stat_result:
-        return self.stat()
-
     def attr(self) -> AttributeMap:
-        return self.dereference().attributes
+        if self.is_symlink():
+            return self.readlink_ext().lattr()
+        return self.lattr()
 
     def lattr(self) -> AttributeMap:
-        return self.attr()
+        return self.dereference().attributes

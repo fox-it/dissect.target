@@ -3,8 +3,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from dissect.target.helpers import config, keychain, docs
-from dissect.target.plugins.os.windows.iis import IISLogsPlugin
+from dissect.target.helpers import config, docs, keychain
+from dissect.target.plugins.apps.webservers.iis import IISLogsPlugin
 
 from ._utils import absolute_path
 
@@ -72,7 +72,7 @@ def test_docs_plugin_functions_desc():
     assert functions_short_desc
     desc_lines = functions_short_desc.splitlines()
 
-    assert len(desc_lines) == 1
+    assert len(desc_lines) == 2
     assert "iis.logs" in functions_short_desc
     assert "Return contents of IIS (v7 and above) log files." in functions_short_desc
     assert "output: records" in functions_short_desc
