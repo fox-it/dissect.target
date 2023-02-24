@@ -27,10 +27,16 @@ def test_iexplore_plugin(target_win, fs_win, tmpdir_name, target_win_users):
         target_win.add_plugin(iexplore.InternetExplorerPlugin)
 
         records = list(target_win.iexplore.history())
-        assert len(records) == 33
+        assert len(records) == 41
 
         records = list(target_win.browser.history())
-        assert len(records) == 33
+        assert len(records) == 41
+
+        records = list(target_win.iexplore.downloads())
+        assert len(records) == 1
+
+        records = list(target_win.browser.downloads())
+        assert len(records) == 1
 
 
 def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
@@ -54,9 +60,15 @@ def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     records = list(target_win.browser.history())
     assert len(records) == 24
 
+    records = list(target_win.firefox.downloads())
+    assert len(records) == 3
+
+    records = list(target_win.browser.downloads())
+    assert len(records) == 3
+
 
 def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    firefox_db = absolute_path("data/chrome-history.sqlite")
+    chrome_db = absolute_path("data/chrome-history.sqlite")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Google/Chrome/continuousUpdates/User Data/Default")
@@ -66,15 +78,21 @@ def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     webcache_file = str(webcache_file)[3:]  # drop C:/
 
     fs_win.map_dir("Users\\John", tmpdir_name)
-    fs_win.map_file(webcache_file, firefox_db)
+    fs_win.map_file(webcache_file, chrome_db)
 
     target_win.add_plugin(chrome.ChromePlugin)
 
     records = list(target_win.chrome.history())
-    assert len(records) == 10
+    assert len(records) == 5
 
     records = list(target_win.browser.history())
-    assert len(records) == 10
+    assert len(records) == 5
+
+    records = list(target_win.chrome.downloads())
+    assert len(records) == 1
+
+    records = list(target_win.browser.downloads())
+    assert len(records) == 1
 
 
 def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
@@ -93,10 +111,16 @@ def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     target_win.add_plugin(edge.EdgePlugin)
 
     records = list(target_win.edge.history())
-    assert len(records) == 9
+    assert len(records) == 45
 
     records = list(target_win.browser.history())
-    assert len(records) == 9
+    assert len(records) == 45
+
+    records = list(target_win.edge.downloads())
+    assert len(records) == 2
+
+    records = list(target_win.browser.downloads())
+    assert len(records) == 2
 
 
 def test_chromium_plugin(target_win, fs_win, tmpdir_name, target_win_users):
@@ -119,3 +143,9 @@ def test_chromium_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
     records = list(target_win.browser.history())
     assert len(records) == 5
+
+    records = list(target_win.chromium.downloads())
+    assert len(records) == 1
+
+    records = list(target_win.browser.downloads())
+    assert len(records) == 1
