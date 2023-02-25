@@ -5,10 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-from dissect.target import Target, plugin
+from dissect.target import Target
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
 from dissect.target.plugin import (
+    OSPlugin,
     Plugin,
+    PluginFunction,
     get_external_module_paths,
     load_modules_from_paths,
 )
@@ -121,48 +124,9 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
-def get_attr_for_attr_path(attr_path: str) -> Any:
-    """
-    Return an attribute of any registered plugin that matches provided `attr_path` value.
-    """
-    parts = attr_path.split(".")
-
-    parts_head = parts[0]
-    parts_tail = parts[1:]
-
-    plugins_with_namespace = plugin.get_plugin_classes_by_namespace(parts_head)
-    for plugin_class in plugins_with_namespace:
-        attr = plugin_class
-        # Starting with `parts_tail` since we got a namespace plugin
-        # that matches `parts_head` value.
-        for part in parts_tail:
-            if hasattr(attr, part):
-                attr = getattr(attr, part)
-            else:
-                break
-        else:
-            # we walked all `attr_path` parts without any issues
-            return attr
-
-    plugins_with_method = plugin.get_plugin_classes_with_method(parts_head)
-    for plugin_class in plugins_with_method:
-        attr = plugin_class
-        # Starting with the full `parts` value since we got the plugins
-        # that have the method that matches `parts_head` value, so it needs
-        # to be resolved first.
-        for part in parts:
-            if hasattr(attr, part):
-                attr = getattr(attr, part)
-            else:
-                break
-        else:
-            # we walked all `attr_path` parts without any issues
-            return attr
-
-
 def execute_function_on_target(
     target: Target,
-    func: str,
+    func: PluginFunction,
     cli_params: Optional[List[str]] = None,
 ) -> Tuple[str, Any, List[str]]:
     """
@@ -171,10 +135,21 @@ def execute_function_on_target(
 
     cli_params = cli_params or []
 
-    target_attr = target
-    for part in func.split("."):
-        target_attr = getattr(target_attr, part)
+    plugin_class = func.class_object
 
+    if issubclass(plugin_class, OSPlugin):
+        # OS plugin does not need to be added
+        plugin_class = target._os_plugin
+    else:
+        try:
+            target.add_plugin(plugin_class)
+        except UnsupportedPluginError as e:
+            raise UnsupportedPluginError(
+                f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
+            )
+
+    plugin_obj = plugin_class(target)
+    target_attr = getattr(plugin_obj, func.method_name)
     plugin_method = None
     parser = None
 
