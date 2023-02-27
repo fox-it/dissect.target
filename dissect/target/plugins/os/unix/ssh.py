@@ -170,43 +170,34 @@ class SSHPlugin(Plugin):
     @export(record=PublicKeyRecord)
     def public_keys(self) -> Iterator[PublicKeyRecord]:
         """Yields all SSH public keys from all user home directories and /etc/ssh/."""
+        public_key_files = []
 
         for user_details in self.target.user_details.all_with_home():
             for file_path in user_details.home_path.glob(".ssh/*.pub"):
-                if file_path.is_file():
-                    key_type, public_key, comment = parse_ssh_public_key_file(file_path)
-
-                    yield PublicKeyRecord(
-                        mtime_ts=file_path.stat().st_mtime,
-                        user=user_details.user.name,
-                        key_type=key_type,
-                        public_key=public_key,
-                        comment=comment,
-                        source=file_path,
-                        _target=self.target,
-                    )
+                public_key_files.append((user_details.user.name, file_path))
 
         for file_path in self.target.fs.path("/etc/ssh/").glob("*.pub"):
-            if file_path.is_file():
-                key_type, public_key, comment = parse_ssh_public_key_file(file_path)
+            public_key_files.append((None, file_path))
 
-                yield PublicKeyRecord(
-                    mtime_ts=file_path.stat().st_mtime,
-                    user=None,
-                    key_type=key_type,
-                    public_key=public_key,
-                    comment=comment,
-                    source=file_path,
-                    _target=self.target,
-                )
+        for user, file_path in public_key_files:
+            if not file_path.is_file():
+                continue
+
+            key_type, public_key, comment = parse_ssh_public_key_file(file_path)
+
+            yield PublicKeyRecord(
+                mtime_ts=file_path.stat().st_mtime,
+                user=user,
+                key_type=key_type,
+                public_key=public_key,
+                comment=comment,
+                source=file_path,
+                _target=self.target,
+            )
 
 
 def parse_ssh_public_key_file(path: Path) -> tuple[str, str, str]:
-    with path.open("rt") as h_public_key:
-        public_key_data = h_public_key.read().strip()
-
-    _, key_type, public_key, comment = parse_ssh_key(public_key_data)
-
+    _, key_type, public_key, comment = parse_ssh_key(path.read_text().strip())
     return key_type, public_key, comment
 
 
