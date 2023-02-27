@@ -20,7 +20,7 @@ UsbRegistryRecord = TargetRecordDescriptor(
         ("string", "version"),
         ("string", "friendlyname"),
         ("datetime", "first_insert_date"),
-        ("datetime", "first_instal_date"),
+        ("datetime", "first_install_date"),
         ("datetime", "last_insert_date"),
         ("datetime", "last_removal_date"),
         ("string", "info_origin"),
