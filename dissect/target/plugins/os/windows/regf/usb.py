@@ -19,19 +19,19 @@ UsbRegistryRecord = TargetRecordDescriptor(
         ("string", "product"),
         ("string", "version"),
         ("string", "friendlyname"),
-        ("datetime", "first_insert_date"),
-        ("datetime", "first_install_date"),
-        ("datetime", "last_insert_date"),
-        ("datetime", "last_removal_date"),
+        ("datetime", "first_insert"),
+        ("datetime", "first_install"),
+        ("datetime", "last_insert"),
+        ("datetime", "last_removal"),
         ("string", "info_origin"),
     ],
 )
 
 USB_DEVICE_PROPERTY_KEYS = {
-    "first_instal_date": ("0064", "00000064"),  # Windows 7 and higher. USB device first install date
-    "first_insert_date": ("0065", "00000065"),  # Windows 7 and higher. USB device first insert date.
-    "last_insert_date": ("0066", "00000066"),  # Windows 8 and higher. USB device last insert date.
-    "last_removal_date": ("0067", "00000067"),  # Windows 8 and higer. USB device last removal date.
+    "first_install": ("0064", "00000064"),  # Windows 7 and higher. USB device first install date
+    "first_insert": ("0065", "00000065"),  # Windows 7 and higher. USB device first insert date.
+    "last_insert": ("0066", "00000066"),  # Windows 8 and higher. USB device last insert date.
+    "last_removal": ("0067", "00000067"),  # Windows 8 and higer. USB device last removal date.
 }
 
 
@@ -102,10 +102,10 @@ class UsbPlugin(Plugin):
             rev (string): Version of the USB storage device
             containerid (string):
             friendlyname (string): Display name of the USB storage device
-            first_insert_date (datetime): First insertion date of USB storage device
-            first_instal_date (datetime): First instalation date of USB storage device
-            last_insert_date (datetime): Most recent insertion (arrival) date of USB storage device
-            last_removal_date (datetime): Most recent removal (unplug) date of USB storage device
+            first_insert (datetime): First insertion date of USB storage device
+            first_install (datetime): First instalation date of USB storage device
+            last_insert (datetime): Most recent insertion (arrival) date of USB storage device
+            last_removal (datetime): Most recent removal (unplug) date of USB storage device
             info_origin (string): Location of info present in output
         """
 
@@ -132,10 +132,10 @@ class UsbPlugin(Plugin):
                     except RegistryValueNotFoundError:
                         friendlyname = None
                         timestamps = {
-                            "first_instal_date": None,
-                            "first_insert_date": None,
-                            "last_insert_date": None,
-                            "last_removal_date": None,
+                            "first_install": None,
+                            "first_insert": None,
+                            "last_insert": None,
+                            "last_removal": None,
                         }
                         containerid = None
 
@@ -149,10 +149,10 @@ class UsbPlugin(Plugin):
                         product=device_info["product"],
                         version=device_info["version"],
                         containerid=containerid,
-                        first_instal_date=timestamps["first_instal_date"],
-                        first_insert_date=timestamps["first_insert_date"],
-                        last_insert_date=timestamps["last_insert_date"],  # AKA first arrival
-                        last_removal_date=timestamps["last_removal_date"],
+                        first_install=timestamps["first_install"],
+                        first_insert=timestamps["first_insert"],
+                        last_insert=timestamps["last_insert"],  # AKA first arrival
+                        last_removal=timestamps["last_removal"],
                         info_origin=info_origin,
                         _target=self.target,
                     )
