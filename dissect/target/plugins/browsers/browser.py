@@ -35,6 +35,8 @@ class BrowserPlugin(Plugin):
     """
 
     __namespace__ = "browser"
+    __findable__ = False
+
     BROWSERS = [
         "chrome",
         "chromium",
