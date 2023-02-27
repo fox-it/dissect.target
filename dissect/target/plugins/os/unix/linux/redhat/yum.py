@@ -42,7 +42,7 @@ class YumPlugin(plugin.Plugin):
                 if not any(keyword in line for keyword in YUM_LOG_KEYWORDS):
                     return
 
-                operation, package_name = line.split(": ")
+                operation, package_name = line[16:].split(": ")
                 yield PackageManagerLogRecord(
                     ts=ts,
                     package_manager="yum",

@@ -53,11 +53,12 @@ class ZypperPlugin(plugin.Plugin):
 
                 ts, operation, *remainder = line.split("|")
                 ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo)
+                operation = OperationTypes.infer(operation)
 
                 record = PackageManagerLogRecord(
                     ts=ts,
                     package_manager="zypper",
-                    operation=OperationTypes.infer(operation).value,
+                    operation=operation.value,
                     _target=self.target,
                 )
 
@@ -69,11 +70,11 @@ class ZypperPlugin(plugin.Plugin):
                     # 2022-12-16 12:57:50|remove |unzip|6.00-41.1|x86_64|root@ec9fa6d67dda|
                     package_name, version, arch, user, *_ = remainder
                     record.package_name = f"{package_name}-{version}:{arch}"
-                    record.requested_by_user = user
+                    record.requested_by_user = user.split("@")[0]
                 elif operation == OperationTypes.Other:
                     # 2022-12-16 12:56:23|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
                     user, command, *_ = remainder
-                    record.requested_by_user = user
+                    record.requested_by_user = user.split("@")[0]
                     record.command = command.replace("'", "")
 
                 yield record

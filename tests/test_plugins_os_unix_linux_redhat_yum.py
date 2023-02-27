@@ -1,4 +1,7 @@
+from datetime import timedelta, timezone
+
 import pytest
+from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.os.unix.linux.redhat.yum import YumPlugin
 
@@ -14,6 +17,7 @@ from ._utils import absolute_path
     ],
 )
 def test_yum_logs(test_file, target_unix, fs_unix):
+    tz = timezone(timedelta(hours=0))
     data_file = absolute_path(f"data/plugins/os/unix/linux/redhat/yum/{test_file}")
     fs_unix.map_file(f"/var/log/{test_file}", data_file)
     target_unix.add_plugin(YumPlugin)
@@ -23,3 +27,15 @@ def test_yum_logs(test_file, target_unix, fs_unix):
 
     for record in results:
         assert record.package_manager == "yum"
+
+    assert results[0].ts == dt(2023, 12, 16, 4, 41, 34, tzinfo=tz)
+    assert results[0].operation == "install"
+    assert results[0].package_name == "unzip-6.0-24.el7_9.x86_64"
+    assert results[0].command is None
+    assert results[0].requested_by_user is None
+
+    assert results[-1].ts == dt(2023, 12, 16, 4, 41, 22, tzinfo=tz)
+    assert results[-1].operation == "install"
+    assert results[-1].package_name == "unzip-6.0-24.el7_9.x86_64"
+    assert results[-1].command is None
+    assert results[-1].requested_by_user is None
