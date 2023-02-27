@@ -4,7 +4,7 @@ from ._utils import absolute_path
 
 
 def test_tasks(target_win, fs_win):
-    task_file = absolute_path("data/windows-task")
+    task_file = absolute_path("data/plugins/os/windows/tasks/MapsToastTask")
     fs_win.map_file("windows/system32/tasks/Microsoft/Windows/Maps/MapsToastTask", task_file)
 
     target_win.add_plugin(TasksPlugin)
