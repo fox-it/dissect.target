@@ -146,13 +146,15 @@ class SSHPlugin(Plugin):
             if not file_path.is_file():
                 continue
 
-            buffer: bytes = file_path.read_bytes().strip()
+            buffer = file_path.read_bytes().strip()
             if b"PRIVATE KEY-----" not in buffer:
                 continue
 
             try:
                 private_key = SSHPrivateKey(buffer)
-            except ValueError:
+            except ValueError as e:
+                self.target.log.warning("Failed to parse SSH private key: %s", file_path)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             yield PrivateKeyRecord(
