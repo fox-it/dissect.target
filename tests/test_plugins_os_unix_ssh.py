@@ -115,7 +115,7 @@ def test_private_keys_plugin_rfc4716_ed25519(target_unix_users, fs_unix):
     public_key_data = "AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw"
 
     fs_unix.map_file_fh(
-        "/root/.ssh/id_ed25519",
+        "/etc/ssh/ssh_host_ed25519_key",
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
@@ -127,15 +127,15 @@ def test_private_keys_plugin_rfc4716_ed25519(target_unix_users, fs_unix):
     target_unix_users.add_plugin(SSHPlugin)
 
     results = list(target_unix_users.ssh.private_keys())
-    private_key = results[0]
-
     assert len(results) == 1
+
+    private_key = results[0]
     assert private_key.key_format == "RFC4716"
     assert private_key.key_type == "ssh-ed25519"
     assert private_key.comment == "long comment here"
     assert private_key.public_key == public_key_data
     assert not private_key.encrypted
-    assert private_key.source == path.from_posix("/root/.ssh/id_ed25519")
+    assert private_key.source == path.from_posix("/etc/ssh/ssh_host_ed25519_key")
 
 
 def test_private_keys_plugin_rfc4716_rsa_encrypted(target_unix_users, fs_unix):

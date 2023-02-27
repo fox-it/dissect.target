@@ -139,7 +139,7 @@ class SSHPlugin(Plugin):
             for file_path in user_details.home_path.glob(".ssh/*"):
                 private_key_files.append((user_details.user.name, file_path))
 
-        for file_path in self.target.fs.path("/etc/ssh/").glob("*.pub"):
+        for file_path in self.target.fs.path("/etc/ssh/").glob("*"):
             private_key_files.append((None, file_path))
 
         for user, file_path in private_key_files:
