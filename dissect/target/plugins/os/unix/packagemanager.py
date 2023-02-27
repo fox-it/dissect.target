@@ -47,6 +47,7 @@ class OperationTypes(Enum):
 
 class PackageManagerPlugin(Plugin):
     __namespace__ = "packagemanager"
+    __findable__ = False
 
     TOOLS = [
         "apt",

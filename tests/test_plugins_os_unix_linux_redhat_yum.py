@@ -16,7 +16,7 @@ from ._utils import absolute_path
         "yum.log.1.bz2",
     ],
 )
-def test_yum_logs(test_file, target_unix, fs_unix):
+def test_yum_logs(test_file, target_unix, fs_unix) -> None:
     tz = timezone(timedelta(hours=0))
     data_file = absolute_path(f"data/plugins/os/unix/linux/redhat/yum/{test_file}")
     fs_unix.map_file(f"/var/log/{test_file}", data_file)
