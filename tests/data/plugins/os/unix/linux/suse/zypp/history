@@ -1,0 +1,123 @@
+2022-12-16 12:56:23|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
+2022-12-16 12:56:23|install|update-alternatives|1.21.8-1.4|x86_64||repo-oss|b4d6389437e306d6104559c82d09fce15c4486fbc7fd215cc33d265ff729aaf1|
+# 2022-12-16 12:56:23 unzip-6.00-41.1.x86_64.rpm installed ok
+# Additional rpm output:
+# update-alternatives: using /usr/bin/unzip-plain to provide /usr/bin/unzip (unzip) in auto mode
+# update-alternatives: using /usr/bin/funzip-plain to provide /usr/bin/funzip (funzip) in auto mode
+# update-alternatives: using /usr/bin/unzipsfx-plain to provide /usr/bin/unzipsfx (unzipsfx) in auto mode
+# update-alternatives: using /usr/bin/zipgrep-plain to provide /usr/bin/zipgrep (zipgrep) in auto mode
+# 
+2022-12-16 12:56:23|install|unzip|6.00-41.1|x86_64|root@ec9fa6d67dda|repo-oss|d7e42c9d83f97cf3b7eceb4d3fa64e445a33a7a33f387366734c444d5571cb3a|
+2022-12-16 12:57:50|command|root@ec9fa6d67dda|'zypper' 'remove' 'unzip'|
+# 2022-12-16 12:57:50 unzip-6.00-41.1.x86_64 removed ok
+# Additional rpm output:
+# update-alternatives: warning: alternative /usr/bin/unzip-plain (part of link group unzip) doesn't exist; removing from list of alternatives
+# update-alternatives: warning: alternative /usr/bin/funzip-plain (part of link group funzip) doesn't exist; removing from list of alternatives
+# update-alternatives: warning: alternative /usr/bin/unzipsfx-plain (part of link group unzipsfx) doesn't exist; removing from list of alternatives
+# update-alternatives: warning: alternative /usr/bin/zipgrep-plain (part of link group zipgrep) doesn't exist; removing from list of alternatives
+# 
+2022-12-16 12:57:50|remove |unzip|6.00-41.1|x86_64|root@ec9fa6d67dda|
+2022-12-16 12:58:49|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
+# 2022-12-16 12:58:49 unzip-6.00-41.1.x86_64.rpm installed ok
+# Additional rpm output:
+# update-alternatives: using /usr/bin/unzip-plain to provide /usr/bin/unzip (unzip) in auto mode
+# update-alternatives: using /usr/bin/funzip-plain to provide /usr/bin/funzip (funzip) in auto mode
+# update-alternatives: using /usr/bin/unzipsfx-plain to provide /usr/bin/unzipsfx (unzipsfx) in auto mode
+# update-alternatives: using /usr/bin/zipgrep-plain to provide /usr/bin/zipgrep (zipgrep) in auto mode
+# 
+2022-12-16 12:58:49|install|unzip|6.00-41.1|x86_64|root@ec9fa6d67dda|repo-oss|d7e42c9d83f97cf3b7eceb4d3fa64e445a33a7a33f387366734c444d5571cb3a|
+2022-12-16 13:02:40|command|root@ec9fa6d67dda|'zypper' 'install' 'yast2'|
+2022-12-16 13:02:40|install|augeas|1.13.0-1.1|x86_64||repo-oss|faf04c2e36ac8268191d5129836931d3a4b08543967931e6643ab00548ef8bfc|
+2022-12-16 13:02:40|install|augeas-lenses|1.13.0-1.1|x86_64||repo-oss|56ef5215e43c8bdce345278933d1f2852fed6755b0ff2fbbf04fb63944726156|
+2022-12-16 13:02:40|install|cpio|2.13-4.11|x86_64||repo-oss|739dad1e375458fc00725b4eacf9aae7c7af53068284df27c020df82b49430e2|
+2022-12-16 13:02:40|install|fdupes|2.2.1-1.1|x86_64||repo-oss|80f3909d1d7d56efac5671ca57e40f19e23b951635d57337b4dbc3e0175b5259|
+2022-12-16 13:02:40|install|hostname|3.23-2.13|x86_64||repo-oss|01a494a57ab64aca606cfd9260cb60c5a44c528003d7eb49d592be5349e62bc5|
+2022-12-16 13:02:40|install|libcrypt1|4.4.33-1.1|x86_64||repo-oss|7e9818bce84b6776d96c96542fae9396fab6a629c294d339b27e7f2fe6ec3cfe|
+2022-12-16 13:02:40|install|libdb-4_8|4.8.30-39.7|x86_64||repo-oss|57429160c30c6fab84b6bddf06d5bf4a4fb25a77ef4bd860446851b9c68267eb|
+2022-12-16 13:02:41|install|libelf1|0.188-2.1|x86_64||repo-oss|b10558cd0752439c5bab65bea89eca10592abf1a678420c1aac25ea5f281825d|
+2022-12-16 13:02:41|install|libgdbm6|1.23-1.10|x86_64||repo-oss|209760afa94140354c721915d9e4966c22ee088469c3bc6c9ac559a5ab1cd26a|
+2022-12-16 13:02:41|install|libmnl0|1.0.5-1.4|x86_64||repo-oss|13825036c8e82bcc04b5213921669951750debfdc786ccb253517a8f8dceaa6e|
+2022-12-16 13:02:41|install|libsepol2|3.4-1.3|x86_64||repo-oss|ec842fe6c9e15a870c95d08b3e72058091327ee39a93d1e1fe32bf9e92940352|
+2022-12-16 13:02:41|install|libuuid1|2.37.4-4.3|x86_64||repo-oss|ed58ded9e8476ecdde53ce888455fe2cfd3737e146848bbe7e238f07aaf9df71|
+2022-12-16 13:02:41|install|libx86emu3|3.5-1.5|x86_64||repo-oss|e1d812ea5e3f6ca58e536ebd40a605252574d0eaa1264157c1552d32fd2eec51|
+2022-12-16 13:02:41|install|libxslt1|1.1.37-1.1|x86_64||repo-oss|b290c078bcaa6d0f7586ff01852c13fb2fd0c6de1c57bce4827f4277851f1fa2|
+2022-12-16 13:02:41|install|libxtables12|1.8.8-2.2|x86_64||repo-oss|bdf79fb8cc7c872eda4b411bc0541192eca910a4f4a54b84456f45832e3976d2|
+2022-12-16 13:02:41|install|libyaml-0-2|0.2.5-2.1|x86_64||repo-oss|e1e11fb6a13d0930eb79b50c699644015e46ab20c93d6a3ebe6c4dc223337772|
+2022-12-16 13:02:41|install|libyui-ncurses16|4.4.7-1.1|x86_64||repo-oss|252bc07f9f78d433f8632dfe77d6b286703becd4af216a86cfd3bf6cebbae384|
+2022-12-16 13:02:41|install|libyui16|4.4.7-1.1|x86_64||repo-oss|5e77d095a7f83297e14e0aded5a679a715eb6498fd99d122d500e81997278ddc|
+# 2022-12-16 13:02:41 sysconfig-0.90.0-2.1.x86_64.rpm installed ok
+# Additional rpm output:
+# Updating /etc/sysconfig/network/dhcp ...
+# Updating /etc/sysconfig/network/config ...
+# 
+2022-12-16 13:02:41|install|sysconfig|0.90.0-2.1|x86_64||repo-oss|5cebc4ff22c1acec6c10f626fc122c0c7e5036fe7b35c93496171e57a7e0484e|
+2022-12-16 13:02:41|install|tar|1.34-8.1|x86_64||repo-oss|2bfb83e8804578d289b52d2082d3a863fc2289d3589e50409ad72d86b115c104|
+2022-12-16 13:02:41|install|perl-base|5.36.0-3.3|x86_64||repo-oss|10f07d07b12f1fde68e380959d75950285951e257b349660e5214c047336ef14|
+2022-12-16 13:02:41|install|libruby3_1-3_1|3.1.3-2.1|x86_64||repo-oss|aa08481dbffaec22e67f3c6e20d9e5dd6ae78776c9c0d50f5ed9adde416c85ef|
+2022-12-16 13:02:41|install|libbpf1|1.0.1-2.1|x86_64||repo-oss|c79248a63e7126af0d9cae0c690b66388f45e721b3bff0b559c48a4bb0a447f5|
+2022-12-16 13:02:41|install|libgdbm_compat4|1.23-1.10|x86_64||repo-oss|0e417b994124d1a417a0bd89ec003f1366449e23c9cc47c9df945fd2aebbf4f1|
+2022-12-16 13:02:41|install|busybox|1.35.0-9.1|x86_64||repo-oss|6614667d5bd8bc232b54d1ad33b51a56fd8efdaf6b2859e02220f190f8448095|
+2022-12-16 13:02:41|install|libhd22|22.1-2.1|x86_64||repo-oss|ef7311bdede9f14b79b96b4cb6e3f9328377cfa20066bae669ddbfb9e1027ab6|
+2022-12-16 13:02:41|install|libexslt0|1.1.37-1.1|x86_64||repo-oss|33405015058407beb4c63570653e4d6b164d4c2ef303ad5f256266bb021ca075|
+2022-12-16 13:02:41|install|yast2-logs|4.5.20-1.1|x86_64||repo-oss|9cf4fa3fb1f9af465d716929d4f6085d2c8ab4070d7aa5eb4ea1d0eb558216f6|
+2022-12-16 13:02:42|install|iproute2|6.0-2.1|x86_64||repo-oss|a5f72ac2e0353a49f571cc3781dde548df6677ab4fa0d84171267947ba713fb1|
+2022-12-16 13:02:42|install|perl|5.36.0-3.3|x86_64||repo-oss|6ad54e172fe473bcb583ce017708b98c618020d82305f676042a74805af87c18|
+2022-12-16 13:02:42|install|busybox-util-linux|1.35.0-25.1|noarch||repo-oss|b34394378340d54d4362a3d88d84e86d650aeca41593343ee3f13b5762b96eb3|
+2022-12-16 13:02:42|install|hwinfo|22.1-2.1|x86_64||repo-oss|264d68c177a69fa1e367854828f639cc477769a7082da47708e1b2121333edd4|
+2022-12-16 13:02:43|install|yast2-core|4.5.4-1.1|x86_64||repo-oss|bdde1fdfba965619a76839fb780262130b1b4410190e5daf9e3a0558bcdf023c|
+2022-12-16 13:02:43|install|perl-gettext|1.07-1.62|x86_64||repo-oss|808f824ccd93b85c64a4ce21ef3cccbecb2de749fbbed21c0a0d0a40dba31d41|
+# 2022-12-16 13:02:43 ruby3.1-3.1.3-2.1.x86_64.rpm installed ok
+# Additional rpm output:
+# update-alternatives: using /usr/bin/bundle.ruby.ruby3.1 to provide /usr/bin/bundle (bundle) in auto mode
+# update-alternatives: using /usr/bin/bundle.ruby.ruby3.1 to provide /usr/bin/bundle.ruby3.1 (bundle.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/bundler.ruby.ruby3.1 to provide /usr/bin/bundler (bundler) in auto mode
+# update-alternatives: using /usr/bin/bundler.ruby.ruby3.1 to provide /usr/bin/bundler.ruby3.1 (bundler.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/racc.ruby.ruby3.1 to provide /usr/bin/racc (racc) in auto mode
+# update-alternatives: using /usr/bin/racc.ruby.ruby3.1 to provide /usr/bin/racc.ruby3.1 (racc.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/rake.ruby.ruby3.1 to provide /usr/bin/rake (rake) in auto mode
+# update-alternatives: using /usr/bin/rake.ruby.ruby3.1 to provide /usr/bin/rake.ruby3.1 (rake.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/rbs.ruby.ruby3.1 to provide /usr/bin/rbs (rbs) in auto mode
+# update-alternatives: using /usr/bin/rbs.ruby.ruby3.1 to provide /usr/bin/rbs.ruby3.1 (rbs.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/rdoc.ruby.ruby3.1 to provide /usr/bin/rdoc (rdoc) in auto mode
+# update-alternatives: using /usr/bin/rdoc.ruby.ruby3.1 to provide /usr/bin/rdoc.ruby3.1 (rdoc.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/ri.ruby.ruby3.1 to provide /usr/bin/ri (ri) in auto mode
+# update-alternatives: using /usr/bin/ri.ruby.ruby3.1 to provide /usr/bin/ri.ruby3.1 (ri.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/typeprof.ruby.ruby3.1 to provide /usr/bin/typeprof (typeprof) in auto mode
+# update-alternatives: using /usr/bin/typeprof.ruby.ruby3.1 to provide /usr/bin/typeprof.ruby3.1 (typeprof.ruby3.1) in auto mode
+# update-alternatives: using /usr/bin/rdbg.ruby.ruby3.1 to provide /usr/bin/rdbg (rdbg) in auto mode
+# update-alternatives: using /usr/bin/rdbg.ruby.ruby3.1 to provide /usr/bin/rdbg.ruby3.1 (rdbg.ruby3.1) in auto mode
+# 
+2022-12-16 13:02:43|install|ruby3.1|3.1.3-2.1|x86_64||repo-oss|cc8d6f254d2cb5298552a3fed0c0172811f41803bfda489fb81ddccaf7b4b830|
+# 2022-12-16 13:02:43 ruby3.1-rubygem-gem2rpm-0.10.1-19.2.x86_64.rpm installed ok
+# Additional rpm output:
+# update-alternatives: using /usr/bin/gem2rpm.ruby3.1-0.10.1 to provide /usr/bin/gem2rpm (gem2rpm) in auto mode
+# update-alternatives: using /usr/bin/gem2rpm.ruby3.1-0.10.1 to provide /usr/bin/gem2rpm-0.10.1 (gem2rpm-0.10.1) in auto mode
+# update-alternatives: using /usr/bin/gem2rpm.ruby3.1-0.10.1 to provide /usr/bin/gem2rpm.ruby3.1 (gem2rpm.ruby3.1) in auto mode
+# 
+2022-12-16 13:02:43|install|ruby3.1-rubygem-gem2rpm|0.10.1-19.2|x86_64||repo-oss|5a4b5954745905cae6b7533c6c7e6cc32d88819f7d4ef40e272b8d4e1770cd1f|
+2022-12-16 13:02:43|install|ruby-common|3.2-1.1|noarch||repo-oss|40850d60fb893c8d44ce2b4f4051162d4ae86527965932d7cfa554e7fff065c3|
+2022-12-16 13:02:43|install|yast2-ycp-ui-bindings|4.5.0-1.5|x86_64||repo-oss|0ebf2505d7cbf555404a9373a36782a28774f611b86824c873cf0035df335b6b|
+2022-12-16 13:02:43|install|yast2-pkg-bindings|4.5.1-1.1|x86_64||repo-oss|dac26252678de228d646b55b41292c01c5ed7618dac6a36536aaec02b421f8ca|
+2022-12-16 13:02:43|install|ruby3.1-rubygem-unf_ext|0.0.8.2-1.3|x86_64||repo-oss|80db7ea46544402ce98384d7131b764cc1460ce13df055179873c6eefed25ba2|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-ruby-augeas|0.5.0-3.31|x86_64||repo-oss|8ba1480a8aeadb59f3b81f54752943ee7a89e71eb413efee395f4e0516981140|
+# 2022-12-16 13:02:44 ruby3.1-rubygem-nokogiri-1.13.9-1.2.x86_64.rpm installed ok
+# Additional rpm output:
+# update-alternatives: using /usr/bin/nokogiri.ruby3.1-1.13.9 to provide /usr/bin/nokogiri (nokogiri) in auto mode
+# update-alternatives: using /usr/bin/nokogiri.ruby3.1-1.13.9 to provide /usr/bin/nokogiri-1.13.9 (nokogiri-1.13.9) in auto mode
+# update-alternatives: using /usr/bin/nokogiri.ruby3.1-1.13.9 to provide /usr/bin/nokogiri.ruby3.1 (nokogiri.ruby3.1) in auto mode
+# 
+2022-12-16 13:02:44|install|ruby3.1-rubygem-nokogiri|1.13.9-1.2|x86_64||repo-oss|de8c30edceb3a35c80adc233a1379e12d73bc33626b08ccf8899e1d50e9219c7|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-fast_gettext|2.2.0-1.6|x86_64||repo-oss|0c565da671771db83e3a084d818ba36c545ffbe4331479c9c79deb178281f2e9|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-abstract_method|1.2.1-2.29|x86_64||repo-oss|c7791e48c993e168c479501e7cf0751982a60de941a7a45c2f690650119fc4b8|
+2022-12-16 13:02:44|install|ruby|3.1-1.6|x86_64||repo-oss|0fb7022668cb8bfe002136f616b4e40cf7280d2b02ffd50555fcf877d64a7f72|
+2022-12-16 13:02:44|install|yast2-perl-bindings|4.5.1-1.3|x86_64||repo-oss|a65a564bacf295189e87677219830b6c128e5302461f45843b1e64a3839dff2f|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-unf|0.1.4-1.28|x86_64||repo-oss|4c7cd51184894bc96dcb1c24fba594f18537ce3cdc02caedcbc89dc0ef893e5d|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-cfa|1.0.2-1.16|x86_64||repo-oss|34385c919ff0206c1c6f9eeb73725587dd51cdb06704ec8ec8b2aab3658c3810|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-cheetah|1.0.0-1.8|x86_64||repo-oss|a31a43c7aa713229752c43d00c27040ac35ab5fceb986b7056e4c06c77298c9f|
+2022-12-16 13:02:44|install|yast2-ruby-bindings|4.5.4-1.1|x86_64||repo-oss|9dd658338d43a6a54434f5e80ad9d43d563a8fcb6f150fc28f1284d477a64854|
+2022-12-16 13:02:44|install|ruby3.1-rubygem-simpleidn|0.2.1-1.11|x86_64||repo-oss|1dcf67631c6898ff3b195c0a9234deadefa618bd56698536c61e6f12cd8db659|
+2022-12-16 13:02:44|install|yast2-hardware-detection|4.5.1-1.1|x86_64||repo-oss|612d47526418c72895d5ccac565ea52f30af308de7d0ac195d0edcc69feae6c2|
+# 2022-12-16 13:02:44 yast2-4.5.20-1.1.x86_64.rpm installed ok
+# Additional rpm output:
+# Updating /etc/sysconfig/yast2 ...
+2022-12-16 13:02:44|install|yast2|4.5.20-1.1|x86_64|root@ec9fa6d67dda|repo-oss|413807559aab566ae873cab207aca15f04de930004f0bb8d4592b3f1869a5503|
