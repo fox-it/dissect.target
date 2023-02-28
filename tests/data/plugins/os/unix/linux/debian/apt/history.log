@@ -1,0 +1,22 @@
+Start-Date: 2022-09-02  06:36:31
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: libcurl4:amd64 (7.68.0-1ubuntu2.12, 7.68.0-1ubuntu2.13), curl:amd64 (7.68.0-1ubuntu2.12, 7.68.0-1ubuntu2.13)
+End-Date: 2022-09-02  06:36:32
+
+Start-Date: 2022-09-02  06:36:35
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: libcurl3-gnutls:amd64 (7.68.0-1ubuntu2.12, 7.68.0-1ubuntu2.13)
+End-Date: 2022-09-02  06:36:35
+
+Start-Date: 2022-09-07  06:49:28
+Commandline: apt-get install python3.9-dev
+Requested-By: root (0)
+Install: libpython3.9-minimal:amd64 (3.9.5-3ubuntu0~20.04.1, automatic), libpython3.9-stdlib:amd64 (3.9.5-3ubuntu0~20.04.1, automatic), libpython3.9:amd64 (3.9.5-3ubuntu0~20.04.1, automatic), python3.9:amd64 (3.9.5-3ubuntu0~20.04.1, automatic), python3.9-dev:amd64 (3.9.5-3ubuntu0~20.04.1), python3.9-minimal:amd64 (3.9.5-3ubuntu0~20.04.1, automatic), libpython3.9-dev:amd64 (3.9.5-3ubuntu0~20.04.1, automatic)
+End-Date: 2022-09-07  06:49:30
+
+Start-Date: 2022-09-07  07:48:28
+Commandline: /usr/bin/unattended-upgrade
+Requested-By: user (1000)
+Install: linux-headers-5.4.0-126:amd64 (5.4.0-126.142, automatic), linux-headers-5.4.0-126-generic:amd64 (5.4.0-126.142, automatic), linux-modules-extra-5.4.0-126-generic:amd64 (5.4.0-126.142, automatic), linux-modules-5.4.0-126-generic:amd64 (5.4.0-126.142, automatic), linux-image-5.4.0-126-generic:amd64 (5.4.0-126.142, automatic)
+Upgrade: linux-headers-generic:amd64 (5.4.0.125.126, 5.4.0.126.127), linux-image-generic:amd64 (5.4.0.125.126, 5.4.0.126.127), linux-generic:amd64 (5.4.0.125.126, 5.4.0.126.127)
+End-Date: 2022-09-21  06:48:57
