@@ -5,12 +5,15 @@ See dissect/target/plugins/general/example.py for an example plugin.
 from __future__ import annotations
 
 import enum
+import fnmatch
 import importlib
 import importlib.util
+import inspect
 import logging
 import os
 import sys
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
@@ -198,6 +201,15 @@ class Plugin:
     """Defines the plugin namespace."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
+    __findable__: bool = True
+    """Determines whether this plugin will be revealed when using search patterns.
+
+    Some (meta)-plugins are not very suitable for wild cards on CLI or
+    plugin searches, because they will produce duplicate records or results.
+    For instance a plugin that offers the same functions as subplugins will
+    produce redundant results when used with a wild card
+    (browser.* -> browser.history + browser.*.history).
+    """
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -218,6 +230,15 @@ class Plugin:
 
     def __init__(self, target: Target):
         self.target = target
+
+    def is_compatible(self) -> bool:
+        """Perform a compatibility check with the target."""
+        try:
+            self.check_compatible()
+        except Exception:
+            return False
+
+        return True
 
     def check_compatible(self) -> None:
         """Perform a compatibility check with the target.
@@ -591,7 +612,7 @@ def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[P
     """Get a plugin descriptor by namespace.
 
     Args:
-        func_name: Function name to lookup.
+        namespace: Plugin namespace to match.
         osfilter: The OS module path the plugin should be from.
     """
     for plugin_desc in plugins(osfilter):
@@ -772,27 +793,6 @@ def _modulepath(cls) -> str:
     return cls.__module__.replace(MODULE_PATH, "").lstrip(".")
 
 
-def get_plugin_classes_with_method(method_name: str) -> Iterator[Type[Plugin]]:
-    """Retrieve plugin classess that have a method that matches ``method_name``."""
-    for desc in get_plugins_by_func_name(method_name):
-        try:
-            yield load(desc)
-        except PluginError:
-            pass
-
-    if method_name in get_nonprivate_attribute_names(OSPlugin):
-        yield OSPlugin
-
-
-def get_plugin_classes_by_namespace(namespace: str) -> Iterator[Type[Plugin]]:
-    """Retrieve plugin classess that have ``__namespace__`` defined that matches ``namespace``."""
-    for desc in get_plugins_by_namespace(namespace):
-        try:
-            yield load(desc)
-        except PluginError:
-            pass
-
-
 # Needs to be at the bottom of the module because __init_subclass__ requires everything
 # in the parent class Plugin to be defined and resolved.
 class InternalPlugin(Plugin):
@@ -809,3 +809,133 @@ class InternalPlugin(Plugin):
 
         super().__init_subclass__(**kwargs)
         return cls
+
+
+@dataclass
+class PluginFunction:
+    name: str
+    output_type: str
+    class_object: str
+    method_name: str
+    plugin_desc: dict
+
+
+def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
+    """Returns an index-list for plugins.
+
+    This list is used to match CLI expressions against to find the desired plugin.
+    Also returns the roots to determine whether a CLI expression has to be compared
+    to the plugin tree or parsed using legacy rules.
+    """
+    index = {}
+    rootset = set()
+
+    def all_plugins():
+        yield from plugins()
+        yield from os_plugins()
+        yield from child_plugins()  # Doesn't export anything but added for completeness.
+
+    for available in all_plugins():
+        if "get_all_records" in available["exports"]:
+            available["exports"].remove("get_all_records")
+        modulepath = available["module"]
+        if modulepath.endswith("._os"):
+            if not target._os:
+                # if no target available mention general OS instead of specific one
+                available["module"] = "OS"
+            elif target._os.__class__.__name__ != available["class"]:
+                continue
+            rootset.add(modulepath.split(".")[0])
+            for exported in available["exports"]:
+                index[f"{modulepath}.{exported}"] = available
+                index[exported] = available
+        else:
+            rootset.add(modulepath.split(".")[0])
+            for exported in available["exports"]:
+                index[f"{modulepath}.{exported}"] = available
+
+    return index, rootset
+
+
+def find_plugin_functions(target: Target, patterns: str, compatibility: bool = False) -> list[PluginFunction]:
+    """Finds plugins that match the target and the patterns.
+
+    Given a target, a comma separated list of patterns and an optional compatibility flag,
+    this function finds matching plugins, optionally checking compatibility and returns
+    a list of plugin function descriptors (including output types).
+    """
+    result = []
+    functions, rootset = plugin_function_index(target)
+
+    for pattern in patterns.split(","):
+        wildcard = any(char in pattern for char in ["*", "!", "?", "[", "]"])
+        treematch = pattern.split(".")[0] in rootset and pattern != "os"
+
+        if treematch and not wildcard:
+            # Examples:
+            #     -f browsers -> browsers* (the whole package)
+            #     -f apps.webservers.iis -> apps.webservers.iis* (logs etc)
+            # We do not include  a dot because that does not work if the full path is given:
+            #     -f apps.webservers.iis.logs != apps.webservers.iis.logs.* (does not work)
+            pattern += "*"
+
+        if wildcard or treematch:
+            for index_name, func in functions.items():
+                if fnmatch.fnmatch(index_name, pattern):
+                    method_name = index_name.split(".")[-1]
+                    loaded_plugin_object = load(func)
+
+                    # Skip plugins that don't want to be found by wildcards
+                    if not loaded_plugin_object.__findable__:
+                        continue
+
+                    fobject = inspect.getattr_static(loaded_plugin_object, method_name)
+
+                    if compatibility:
+                        try:
+                            if not loaded_plugin_object(target).is_compatible():
+                                continue
+                        except Exception:
+                            continue
+
+                    result.append(
+                        PluginFunction(
+                            name=index_name,
+                            class_object=loaded_plugin_object,
+                            method_name=method_name,
+                            output_type=getattr(fobject, "__output__", "text"),
+                            plugin_desc=func,
+                        )
+                    )
+        else:
+            # otherwise match using ~ classic style
+            if pattern.find(".") > -1:
+                namespace, funcname = pattern.split(".", 1)
+            else:
+                funcname = pattern
+                namespace = None
+
+            plugindesc = None
+            for index_name, func in functions.items():
+                nsmatch = namespace and func["namespace"] == namespace and funcname in func["exports"]
+                fmatch = not namespace and not func["namespace"] and funcname in func["exports"]
+                if nsmatch or fmatch:
+                    plugindesc = func
+
+            if plugindesc:
+                loaded_plugin_object = load(plugindesc)
+                fobject = inspect.getattr_static(loaded_plugin_object, funcname)
+
+                if compatibility and not loaded_plugin_object(target).is_compatible():
+                    continue
+
+                result.append(
+                    PluginFunction(
+                        name=f"{plugindesc['module']}.{pattern}",
+                        class_object=loaded_plugin_object,
+                        method_name=funcname,
+                        output_type=getattr(fobject, "__output__", "text"),
+                        plugin_desc=plugindesc,
+                    )
+                )
+    return result

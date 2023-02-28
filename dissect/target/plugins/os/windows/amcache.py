@@ -196,6 +196,8 @@ AppLaunchAppcompatRecord = TargetRecordDescriptor(
 
 
 class AmcachePluginOldMixin:
+    __namespace__ = "amcache"
+
     def _replace_indices_with_fields(self, mapping, record):
         record_data = {v.name: v.value for v in record.values()}
         result = {}
