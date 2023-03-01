@@ -16,7 +16,7 @@ TaskRecord = TargetRecordDescriptor(
         ("uri", "uri"),
         ("string", "security_descriptor"),
         ("string", "source"),
-        ("string", "date"),
+        ("datetime", "date"),
         ("string", "author"),
         ("string", "version"),
         ("string", "description"),
@@ -378,7 +378,7 @@ class TasksPlugin(Plugin):
 
     @export(record=DynamicDescriptor(["uri", "datetime"]))
     def tasks(self):
-        """Return all scheduled tasks on a Widows system.
+        """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
         intervals. An adversary may leverage such scheduled tasks to gain persistence on a system.
