@@ -868,6 +868,11 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
     functions, rootset = plugin_function_index(target)
 
     for pattern in patterns.split(","):
+        # backward compatibility fix for namespace-level plugins (i.e. chrome)
+        for index_name, func in functions.items():
+            if func["namespace"] == pattern:
+                pattern = func["module"] + "*"
+
         wildcard = any(char in pattern for char in ["*", "!", "?", "[", "]"])
         treematch = pattern.split(".")[0] in rootset and pattern != "os"
 
