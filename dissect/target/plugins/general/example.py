@@ -52,6 +52,8 @@ class ExamplePlugin(Plugin):
         def __init__(self, target):
             super().__init__(target)
     """
+    
+     __findable__ = False
 
     def check_compatible(self) -> bool:
         """Perform a compatibility check with the target.
