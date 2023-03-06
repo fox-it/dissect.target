@@ -12,7 +12,7 @@ import io
 import logging
 import posixpath
 import re
-from pathlib import Path, PurePath, _Accessor, _PathParents, _PosixFlavour
+from pathlib import Path, PurePath, _PathParents, _PosixFlavour
 from typing import Any, BinaryIO, Iterator, Sequence, TextIO, Union
 
 import dissect.target.filesystem as filesystem
@@ -243,7 +243,10 @@ and code style is kept exactly the same as the original pathlib.py.
 
 Yes, we know, this is playing with fire and it can break on new CPython releases.
 
-Commit hash of CPython we're currently in sync with: b382bf50c53e6eab09f3e3bf0802ab052cb0289d
+Commit hash of CPython we're currently in sync with: 9f101c23a41e739f5f80cf38419df1281835d452
+
+Notes:
+- CPython 3.11 ditched the _Accessor class, so we override the methods that should use it
 """
 
 
@@ -380,7 +383,7 @@ class _DissectScandirIterator:
         pass
 
 
-class _DissectAccessor(_Accessor):
+class _DissectAccessor:
     # CPython >= 3.10
     @staticmethod
     def stat(path, follow_symlinks=True):
@@ -593,7 +596,7 @@ class PureDissectPath(PurePath):
         return self
 
     def _make_child(self, args):
-        child = super()._make_child(args)  # noqa
+        child = super()._make_child(args)
         child._fs = self._fs
         child._flavour = self._flavour
         return child
@@ -646,11 +649,11 @@ class TargetPath(Path, PureDissectPath):
     __slots__ = '_entry'
 
     # CPython <= 3.9
-    def _init(self, template=None):  # noqa
+    def _init(self, template=None):
         self._accessor = _dissect_accessor
 
     def _make_child_relpath(self, part):
-        child = super()._make_child_relpath(part)  # noqa
+        child = super()._make_child_relpath(part)
         child._fs = self._fs
         child._flavour = self._flavour
         return child
@@ -659,7 +662,7 @@ class TargetPath(Path, PureDissectPath):
         try:
             return self._entry
         except AttributeError:
-            self._entry = self._fs.get(str(self))  # noqa
+            self._entry = self._fs.get(str(self))
             return self._entry
 
     @classmethod
@@ -679,6 +682,9 @@ class TargetPath(Path, PureDissectPath):
             child_path._entry = entry
             yield child_path
 
+    def _scandir(self):
+        return self._accessor.scandir(self)
+
     def absolute(self):
         raise NotImplementedError()
 
@@ -693,6 +699,14 @@ class TargetPath(Path, PureDissectPath):
         normed = self._flavour.pathmod.normpath(s)
         obj = self._from_parts((self._fs, normed,))
         return obj
+
+    # CPython >= 3.11
+    def stat(self, *, follow_symlinks=True):
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+        return self._accessor.stat(self, follow_symlinks=follow_symlinks)
 
     def owner(self):
         raise NotImplementedError()
@@ -752,6 +766,9 @@ class TargetPath(Path, PureDissectPath):
     def symlink_to(self, *args, **kwargs):
         raise NotImplementedError()
 
+    def hardlink_to(self, target):
+        raise NotImplementedError()
+
     def link_to(self, *args, **kwargs):
         raise NotImplementedError()
 
@@ -780,18 +797,6 @@ class TargetPath(Path, PureDissectPath):
             return self.get().is_symlink()
         except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
             return False
-
-    def is_block_device(self):
-        raise NotImplementedError()
-
-    def is_char_device(self):
-        raise NotImplementedError()
-
-    def is_fifo(self):
-        raise NotImplementedError()
-
-    def is_socket(self):
-        raise NotImplementedError()
 
     def expanduser(self):
         raise NotImplementedError()
