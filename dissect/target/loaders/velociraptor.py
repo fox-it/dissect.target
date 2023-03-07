@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
+from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
     from dissect.target import Target
@@ -11,24 +12,23 @@ if TYPE_CHECKING:
 FILESYSTEMS_ROOT = "uploads"
 
 
-def find_os_directory(path: Path) -> Optional[Path]:
+def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional[list[Path]]]:
     # As of Velociraptor version 0.6.7 the structure of the Velociraptor Offline Collector varies by operating system
     # Generic.Collectors.File (Unix, OS-X) root filesystem is 'uploads/'
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) root filesystem is
     # 'uploads/<file-accessor>/<drive-name>/'
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
     os_type, dirs = find_dirs(fs_root)
-    if os_type in ["linux", "osx"]:
-        return dirs[0]
+    if os_type in [OperatingSystem.LINUX, OperatingSystem.OSX]:
+        return os_type, [dirs[0]]
+
     # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
     mft_root = fs_root.joinpath("mft")
     if not os_type and mft_root.exists():
-        # Find the C folder and skip Volume Shadow Copies
-        windows_path = [p for p in mft_root.iterdir() if "C." in p.name][0]
-        os_type, dirs = find_dirs(windows_path)
-        if os_type == "windows":
-            return dirs[0]
-    return None
+        # If the `mft` directory exists, assume all the subdirectories are volumes
+        return OperatingSystem.WINDOWS, list(mft_root.iterdir())
+
+    return None, None
 
 
 class VelociraptorLoader(DirLoader):
@@ -43,11 +43,10 @@ class VelociraptorLoader(DirLoader):
         #   uploads.json
         #   [...] other files related to the collection
         if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
-            return bool(find_os_directory(path))
+            _, dirs = find_fs_directories(path)
+            return bool(dirs)
         return False
 
     def map(self, target: Target) -> None:
-        map_dirs(
-            target,
-            find_os_directory(self.path),
-        )
+        os_type, dirs = find_fs_directories(self.path)
+        map_dirs(target, dirs, os_type)

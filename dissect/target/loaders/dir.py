@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Tuple
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
+from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
     from dissect.target import Target
@@ -17,11 +18,36 @@ class DirLoader(Loader):
         return find_dirs(path)[0] is not None
 
     def map(self, target: Target) -> None:
-        map_dirs(target, self.path)
+        find_and_map_dirs(target, self.path)
 
 
-def map_dirs(target: Target, path: Path, **kwargs) -> None:
-    """Try to map all found directories as filesystems into the given target.
+def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
+    """Map directories as filesystems into the given target.
+
+    Args:
+        target: The target to map into.
+        dirs: The directories to map as filesystems.
+        os_type: The operating system type, used to determine how the filesystem should be mounted.
+    """
+    alt_separator = ""
+    case_sensitive = True
+    if os_type == OperatingSystem.WINDOWS:
+        alt_separator = "\\"
+        case_sensitive = False
+
+    for path in dirs:
+        dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
+        target.filesystems.add(dfs)
+
+        if os_type == OperatingSystem.WINDOWS:
+            loaderutil.add_virtual_ntfs_filesystem(target, dfs, **kwargs)
+
+            if is_drive_letter_path(path):
+                target.fs.mount(path.name[0] + ":", dfs)
+
+
+def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
+    """Try to find and map directories as filesystems into the given target.
 
     Args:
         target: The target to map into.
@@ -31,24 +57,10 @@ def map_dirs(target: Target, path: Path, **kwargs) -> None:
     """
     os_type, dirs = find_dirs(path)
 
-    alt_separator = ""
-    case_sensitive = True
-    if os_type == "windows":
-        alt_separator = "\\"
-        case_sensitive = False
-
-    for path in dirs:
-        dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
-        target.filesystems.add(dfs)
-
-        if os_type == "windows":
-            loaderutil.add_virtual_ntfs_filesystem(target, dfs, **kwargs)
-
-            if is_drive_letter_path(path):
-                target.fs.mount(path.name[0] + ":", dfs)
+    map_dirs(target, dirs, os_type, **kwargs)
 
 
-def find_dirs(path: Path) -> Tuple[str, List[Path]]:
+def find_dirs(path: Path) -> Tuple[str, list[Path]]:
     """Try to find if ``path`` contains an operating system directory layout and return the OS type and detected
     directories.
 
@@ -80,7 +92,7 @@ def find_dirs(path: Path) -> Tuple[str, List[Path]]:
     return os_type, dirs
 
 
-def os_type_from_path(path: Path) -> str:
+def os_type_from_path(path: Path) -> OperatingSystem:
     """Try to detect what kind of operating system directory structure ``path`` contains.
 
     The operating system type is returned as a string.
@@ -89,7 +101,7 @@ def os_type_from_path(path: Path) -> str:
         path: The path to check.
 
     Returns:
-        The detected operating system type, one of ``windows``, ``linux`` or ``osx``.
+        The detected operating system type.
     """
     if path.is_dir():
         dirlist = [p.name for p in path.iterdir()]
@@ -105,17 +117,17 @@ def os_type_from_path(path: Path) -> str:
         winnt_exists = "winnt" in dirlist_l
 
         if system32_exists or winnt_exists:  # Windows
-            return "windows"
+            return OperatingSystem.WINDOWS
 
         etc_exists = "etc" in dirlist
         var_exists = "var" in dirlist
         library_exists = "Library" in dirlist
 
         if etc_exists and var_exists and not library_exists:  # Linux
-            return "linux"
+            return OperatingSystem.LINUX
 
         if library_exists:  # OSX
-            return "osx"
+            return OperatingSystem.OSX
 
     return None
 

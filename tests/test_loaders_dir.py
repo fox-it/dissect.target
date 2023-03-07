@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from dissect.target.loaders.dir import DirLoader, find_dirs
+from dissect.target.plugin import OperatingSystem
 
 from ._utils import mkdirs
 
@@ -10,7 +11,7 @@ def test_dir_loader_windows(mock_target, tmpdir_name):
     mkdirs(root, ["windows/system32"])
 
     os_type, dirs = find_dirs(root)
-    assert os_type == "windows"
+    assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 1
 
     assert DirLoader.detect(root)
@@ -26,7 +27,7 @@ def test_dir_loader_winnt(mock_target, tmpdir_name):
     mkdirs(root, ["winnt"])
 
     os_type, dirs = find_dirs(root)
-    assert os_type == "windows"
+    assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 1
 
     assert DirLoader.detect(root)
@@ -42,7 +43,7 @@ def test_dir_loader_linux(mock_target, tmpdir_name):
     mkdirs(root, ["etc", "var"])
 
     os_type, dirs = find_dirs(root)
-    assert os_type == "linux"
+    assert os_type == OperatingSystem.LINUX
     assert len(dirs) == 1
 
     assert DirLoader.detect(root)
@@ -58,7 +59,7 @@ def test_dir_loader_macos(mock_target, tmpdir_name):
     mkdirs(root, ["Library"])
 
     os_type, dirs = find_dirs(root)
-    assert os_type == "osx"
+    assert os_type == OperatingSystem.OSX
     assert len(dirs) == 1
 
     assert DirLoader.detect(root)
@@ -74,7 +75,7 @@ def test_dir_loader_windows_drive_letters(mock_target, tmpdir_name):
     mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
 
     os_type, dirs = find_dirs(root)
-    assert os_type == "windows"
+    assert os_type == OperatingSystem.WINDOWS
     assert len(dirs) == 3
 
     assert DirLoader.detect(root)
