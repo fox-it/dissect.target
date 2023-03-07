@@ -67,7 +67,7 @@ class TarLoader(Loader):
 
             entry_cls = TarFilesystemDirectoryEntry if member.isdir() else TarFilesystemEntry
             entry = entry_cls(volume, fsutil.normpath(mname), member)
-            volume.map_file_entry(entry.path, entry)
+            volume.map_file_entry(entry.path.lstrip("."), entry)
 
         for vol_name, vol in volumes.items():
             loaderutil.add_virtual_ntfs_filesystem(
