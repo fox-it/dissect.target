@@ -716,7 +716,7 @@ class TargetCli(TargetCmd):
             if not path:
                 continue
 
-            fh = path.open()
+            fh = fsutil.open_decompress(path)
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
 
@@ -746,7 +746,7 @@ class TargetCli(TargetCmd):
         if not path:
             return
 
-        pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
+        pydoc.pager(fsutil.open_decompress(path, "rt").read(10 * 1024 * 1024))
 
     @arg("path", nargs="+")
     def cmd_readlink(self, args, stdout):
