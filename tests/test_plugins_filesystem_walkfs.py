@@ -1,5 +1,8 @@
 from dissect.target.filesystem import VirtualFile
+from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin
+
+from ._utils import absolute_path
 
 
 def test_walkfs_plugin(target_unix, fs_unix):
@@ -71,3 +74,15 @@ def test_walkfs_ext_internal(target_unix, fs_unix):
     assert sorted([r.path for _, r in results]) == [
         "/path/to/some/other/file.ext",
     ]
+
+
+def test_walkfs_dot_folder(target_unix):
+    archive_path = absolute_path("data/loaders/tar/test-archive-dot-folder.tgz")
+    loader = TarLoader(archive_path)
+    loader.map(target_unix)
+    target_unix.add_plugin(WalkFSPlugin)
+    results = list(target_unix.walkfs())
+
+    assert len(target_unix.filesystems) == 2
+    assert len(results) == 3
+    assert target_unix.fs.path("/test.txt").exists()
