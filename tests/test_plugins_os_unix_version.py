@@ -19,6 +19,7 @@ from ._utils import absolute_path
         ("data/plugins/os/unix/linux/redhat/centos-os-release", "/etc/os-release", "CentOS Linux 8"),
         ("data/plugins/os/unix/linux/redhat/fedora-os-release", "/etc/os-release", "Fedora Linux 37 (Container Image)"),
         ("data/plugins/os/unix/linux/suse/opensuse-os-release", "/etc/os-release", "openSUSE Leap 15.4"),
+        ("data/plugins/os/unix/linux/debian/ubuntu-lsb-release", "/etc/lsb-release", "Ubuntu 22.04.2 LTS"),
     ],
 )
 def test_unix_version_detection(fs_unix, target_unix, data_path, target_path, expected_version):
