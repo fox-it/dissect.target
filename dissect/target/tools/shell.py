@@ -143,6 +143,15 @@ class TargetCmd(cmd.Cmd):
 
         return cmd.Cmd.default(self, line)
 
+    def emptyline(self):
+        """This function forces Python's cmd.Cmd module to behave like a regular shell.
+
+        When entering an empty command, the cmd module will by default repeat the previous command.
+        By defining an empty ``emptyline`` function we make sure no command is executed instead.
+        See https://stackoverflow.com/a/16479030
+        """
+        pass
+
     def _exec(self, func, command_args_str):
         """
         Command execution helper that chains initial command and piped
