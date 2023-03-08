@@ -200,6 +200,22 @@ class UnixPlugin(OSPlugin):
                     self.target.fs.mount(mount_point, volume.fs)
 
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
+        """Parse Unix /etc/*-release files.
+
+        Not all release files are equal. Generally speaking release files are
+        either key=value files or contain just one line.
+
+        Examples of key=value pair structured release files are:
+        - /etc/os-release
+        - /usr/lib/os-release
+        - /etc/lsb-release
+
+        Examples of sparse release files:
+        - /etc/fedora-release
+        - /etc/centos-release
+        - /etc/redhat-release
+        - /etc/SuSE-release
+        """
         glob = glob or "/etc/*-release"
 
         os_release = {}
@@ -210,11 +226,17 @@ class UnixPlugin(OSPlugin):
                     for line in release_file:
                         if line.startswith("#"):
                             continue
-                        try:
-                            name, value = line.split("=", maxsplit=1)
-                            os_release[name] = value.replace('"', "").replace("\n", "")
-                        except ValueError:
-                            continue
+
+                        elif "=" not in line:
+                            os_release["DISTRIB_DESCRIPTION"] = line.strip()
+                            break
+
+                        else:
+                            try:
+                                name, value = line.split("=", maxsplit=1)
+                                os_release[name] = value.replace('"', "").replace("\n", "")
+                            except ValueError:
+                                continue
         return os_release
 
     def _get_architecture(self, os: str = "unix") -> Optional[str]:
