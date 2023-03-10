@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers import loaderutil
@@ -60,7 +60,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     map_dirs(target, dirs, os_type, **kwargs)
 
 
-def find_dirs(path: Path) -> Tuple[str, list[Path]]:
+def find_dirs(path: Path) -> tuple[str, list[Path]]:
     """Try to find if ``path`` contains an operating system directory layout and return the OS type and detected
     directories.
 
