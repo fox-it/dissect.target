@@ -25,13 +25,13 @@ class WebCache:
         self.db = esedb.EseDB(fh)
 
     def find_containers(self, name: str) -> table.Table:
-        """Look up ContainerId from name
+        """Look up all ``ContainerId`` values for a given container name.
 
         Args:
-            name: A String with the container name
+            name: The container name to look up all container IDs of.
 
         Yields:
-            A String with ContainerId.
+            All ``ContainerId`` values for the requested container name.
         """
         try:
             for container_record in self.db.table("Containers").records():
@@ -47,7 +47,7 @@ class WebCache:
         """Yield records from a Webcache container.
 
         Args:
-            name: A String with the container name.
+            name: The container name.
 
         Yields:
             Records from specified Webcache container.
@@ -77,11 +77,11 @@ class InternetExplorerPlugin(Plugin):
         "AppData/Local/Microsoft/Windows/WebCache",
     ]
     CACHE_FILENAME = "WebCacheV01.dat"
-    IE_BROWSER_HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
-    )
-    IE_BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+    )
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):
@@ -96,30 +96,30 @@ class InternetExplorerPlugin(Plugin):
                 self.users_dirs.append((user_details.user, cdir))
 
     def check_compatible(self) -> bool:
-        """Perform a compatibility check with the target.
-        This function checks if any of the supported browser directories
-        exists. Otherwise it should raise an ``UnsupportedPluginError``.
-        Raises:
-            UnsupportedPluginError: If the plugin could not be loaded.
-        """
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Internet Explorer directories found")
 
-    def open_cache(self, cdir) -> WebCache:
-        """Opens the Internet Explorer esedb file containing the history and download data.
+    def _iter_cache(self) -> Iterator[WebCache]:
+        """Yield open IE Webcache files.
 
         Args:
-            cidr: Path to the cache file.
+            filename: Name of the Webcache file.
 
-        Returns:
-            WebCache object
+        Yields:
+            Open Webcache file.
+
+        Raises:
+            FileNoteFoundError: If the webcache file could not be found.
         """
-        self.cache_file = cdir.joinpath(self.CACHE_FILENAME)
-        if self.cache_file.exists():
-            return WebCache(self.target, self.cache_file.open())
+        for user, cdir in self.users_dirs:
+            cache_file = cdir.joinpath(self.CACHE_FILENAME)
+            try:
+                yield user, cache_file, WebCache(self.target, cache_file.open())
+            except FileNotFoundError:
+                self.target.log.warning("Could not find %s file: %s", self.CACHE_FILENAME, cache_file)
 
-    @export(record=IE_BROWSER_HISTORY_RECORD)
-    def history(self) -> Iterator[IE_BROWSER_HISTORY_RECORD]:
+    @export(record=BrowserHistoryRecord)
+    def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from Internet Explorer.
 
         Yields IE_BROWSER_HISTORY_RECORD with the following fields:
@@ -141,11 +141,7 @@ class InternetExplorerPlugin(Plugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
-        for user, cdir in self.users_dirs:
-            cache: WebCache = self.open_cache(cdir)
-            if not cache:
-                continue
-
+        for user, cache_file, cache in self._iter_cache():
             for container_record in cache.history():
                 if not container_record.get("Url"):
                     continue
@@ -156,7 +152,7 @@ class InternetExplorerPlugin(Plugin):
                 if accessed_time := container_record.get("AccessedTime"):
                     ts = wintimestamp(accessed_time)
 
-                yield self.IE_BROWSER_HISTORY_RECORD(
+                yield self.BrowserHistoryRecord(
                     ts=ts,
                     browser="iexplore",
                     id=container_record.get("EntryId"),
@@ -171,13 +167,13 @@ class InternetExplorerPlugin(Plugin):
                     session=None,
                     from_visit=None,
                     from_url=None,
-                    source=str(self.cache_file),
+                    source=str(cache_file),
                     _target=self.target,
                     _user=user,
                 )
 
-    @export(record=IE_BROWSER_DOWNLOAD_RECORD)
-    def downloads(self) -> Iterator[IE_BROWSER_DOWNLOAD_RECORD]:
+    @export(record=BrowserDownloadRecord)
+    def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser downloads records from Internet Explorer.
 
         Yields IE_BROWSER_DOWNLOAD_RECORD with the following fields:
@@ -191,18 +187,14 @@ class InternetExplorerPlugin(Plugin):
             url (uri): Download URL.
             size (varint): Download file size.
             state (varint): Download state number.
-            source: (path): The source file of the history record.
+            source: (path): The source file of the download record.
         """
-        for user, cdir in self.users_dirs:
-            cache: WebCache = self.open_cache(cdir)
-            if not cache:
-                continue
-
+        for user, cache_file, cache in self._iter_cache():
             for r in cache.downloads():
                 response_headers = r.ResponseHeaders.decode("utf-16-le", errors="ignore")
                 ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
 
-                yield self.IE_BROWSER_DOWNLOAD_RECORD(
+                yield self.BrowserDownloadRecord(
                     ts_start=None,
                     ts_end=wintimestamp(r.AccessedTime),
                     browser="iexplore",
@@ -211,7 +203,7 @@ class InternetExplorerPlugin(Plugin):
                     url=down_url,
                     size=None,
                     state=None,
-                    source=str(self.cache_file),
+                    source=str(cache_file),
                     _target=self.target,
                     _user=user,
                 )

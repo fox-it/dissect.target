@@ -32,11 +32,11 @@ GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
-HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 
-BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
 )
 
@@ -79,23 +79,23 @@ class BrowserPlugin(Plugin):
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible browser plugins found")
 
-    def _func(self, f):
+    def _func(self, func_name: str):
         """Return the supported browser plugin records.
 
         Args:
-            f: Exported function of the browser plugin to find.
+            func_name: Exported function of the browser plugin to find.
 
         Yields:
             Record from the browser function.
         """
-        for p in self._plugins:
+        for plugin_name in self._plugins:
             try:
-                for entry in getattr(p, f)():
+                for entry in getattr(plugin_name, func_name)():
                     yield entry
             except Exception:
-                self.target.log.exception("Failed to execute browser plugin: %s.%s", p._name, f)
+                self.target.log.exception("Failed to execute browser plugin: %s.%s", plugin_name._name, func_name)
 
-    @export(record=HISTORY_RECORD)
+    @export(record=BrowserHistoryRecord)
     def history(self):
         """Return browser history records from all browsers installed and supported.
 
@@ -120,10 +120,9 @@ class BrowserPlugin(Plugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
-        for e in self._func("history"):
-            yield e
+        yield from self._func("history")
 
-    @export(record=BROWSER_DOWNLOAD_RECORD)
+    @export(record=BrowserDownloadRecord)
     def downloads(self):
         """Return browser download records from all browsers installed and supported.
 
@@ -139,15 +138,20 @@ class BrowserPlugin(Plugin):
             url (uri): Download URL.
             size (varint): Download file size.
             state (varint): Download state number.
-            source: (path): The source file of the history record.
-
+            source: (path): The source file of the download record.
         """
-        for e in self._func("downloads"):
-            yield e
+        yield from self._func("downloads")
 
 
-def try_idna(s):
+def try_idna(url: str) -> bytes:
+    """Attempts to convert a possible Unicode url to ASCII using the IDNA standard.
+
+    Args:
+        url: A String containing the url to be converted.
+
+    Returns: Bytes object with the ASCII version of the url.
+    """
     try:
-        return s.encode("idna")
+        return url.encode("idna")
     except Exception:  # noqa
-        return s
+        return url

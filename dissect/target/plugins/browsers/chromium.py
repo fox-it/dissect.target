@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Iterator
 
 from dissect.sql import sqlite3
@@ -22,14 +23,14 @@ class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
-    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
-    BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
-    def history(self, browser_name: str = None) -> Iterator[HISTORY_RECORD]:
+    def history(self, browser_name: str = None) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
@@ -59,7 +60,7 @@ class ChromiumMixin:
         for user, db_file, db in self._iter_db("History"):
             try:
                 urls = {row.id: row for row in db.table("urls").rows()}
-                visits: dict = {}
+                visits = {}
 
                 for row in db.table("visits").rows():
                     visits[row.id] = row
@@ -71,7 +72,7 @@ class ChromiumMixin:
                     else:
                         from_visit, from_url = None, None
 
-                    yield self.HISTORY_RECORD(
+                    yield self.BrowserHistoryRecord(
                         ts=webkittimestamp(row.visit_time),
                         browser=browser_name,
                         id=row.id,
@@ -93,7 +94,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    def downloads(self, browser_name: str = None) -> Iterator[BROWSER_DOWNLOAD_RECORD]:
+    def downloads(self, browser_name: str = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
 
         Args:
@@ -110,16 +111,14 @@ class ChromiumMixin:
                 url (uri): Download URL.
                 size (varint): Download file size.
                 state (varint): Download state number.
-                source: (path): The source file of the history record.
+                source: (path): The source file of the download record.
         Raises:
-            SQLError: If the file with the donwload records could not be processed.
+            SQLError: If the history file could not be processed.
         """
         for user, db_file, db in self._iter_db("History"):
             try:
-                download_chains: dict = {}
+                download_chains = defaultdict(list)
                 for row in db.table("downloads_url_chains"):
-                    if row.id not in download_chains:
-                        download_chains[row.id] = []
                     download_chains[row.id].append(row)
 
                 for chain in download_chains.values():
@@ -130,17 +129,24 @@ class ChromiumMixin:
                     if download_path and self.target.os == "windows":
                         download_path = path.from_windows(download_path)
                     elif download_path:
-                        download_path = path(download_path)
+                        download_path = path.from_posix()(download_path)
 
-                    yield self.BROWSER_DOWNLOAD_RECORD(
+                    url = None
+                    download_chain = download_chains.get(row.id)
+
+                    if download_chain:
+                        url = download_chain[-1].url
+                        url = try_idna(url)
+
+                    yield self.BrowserDownloadRecord(
                         ts_start=webkittimestamp(row.start_time),
                         ts_end=webkittimestamp(row.end_time) if row.end_time else None,
                         browser=browser_name,
-                        id=row.id,
+                        id=row.get("id"),
                         path=download_path,
-                        url=try_idna(download_chains[row.id][-1].url),
-                        size=row.total_bytes,
-                        state=row.state,
+                        url=url,
+                        size=row.get("total_bytes"),
+                        state=row.get("state"),
                         source=str(db_file),
                         _target=self.target,
                         _user=user,
@@ -210,12 +216,12 @@ class ChromiumPlugin(ChromiumMixin, Plugin):
         "AppData/Local/Chromium/User Data/Default",
     ]
 
-    @export(record=ChromiumMixin.HISTORY_RECORD)
+    @export(record=ChromiumMixin.BrowserHistoryRecord)
     def history(self):
         """Return browser history records for Chromium browser."""
-        yield from ChromiumMixin.history(self, "chromium")
+        yield from super().history("chromium")
 
-    @export(record=ChromiumMixin.BROWSER_DOWNLOAD_RECORD)
+    @export(record=ChromiumMixin.BrowserDownloadRecord)
     def downloads(self):
         """Return browser download records for Chromium browser."""
-        yield from ChromiumMixin.downloads(self, "chromium")
+        yield from super().downloads("chromium")

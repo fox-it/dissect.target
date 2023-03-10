@@ -19,19 +19,19 @@ class EdgePlugin(ChromiumMixin, Plugin):
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
     ]
-    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/history", GENERIC_HISTORY_RECORD_FIELDS
     )
-    BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
-    @export(record=HISTORY_RECORD)
+    @export(record=BrowserHistoryRecord)
     def history(self):
         """Return browser history records for Microsoft Edge."""
-        yield from ChromiumMixin.history(self, "edge")
+        yield from super().history("edge")
 
-    @export(record=BROWSER_DOWNLOAD_RECORD)
+    @export(record=BrowserDownloadRecord)
     def downloads(self):
         """Return browser download records for Microsoft Edge."""
-        yield from ChromiumMixin.downloads(self, "edge")
+        yield from super().downloads("edge")

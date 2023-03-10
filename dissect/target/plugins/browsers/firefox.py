@@ -3,9 +3,9 @@ from typing import Iterator
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
-from dissect.sql.sqlite3 import Row, SQLite3
+from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
-from flow.record.fieldtypes import datetime, path
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -29,10 +29,10 @@ class FirefoxPlugin(Plugin):
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
     ]
-    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
-    BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
@@ -48,26 +48,16 @@ class FirefoxPlugin(Plugin):
                 self.users_dirs.append((user_details.user, cur_dir))
 
     def check_compatible(self):
-        """Perform a compatibility check with the target.
-        This function checks if any of the supported browser directories
-        exists. Otherwise it should raise an ``UnsupportedPluginError``.
-
-        Raises:
-            UnsupportedPluginError: If the plugin could not be loaded.
-        """
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 
     def _iter_db(self, filename: str) -> Iterator[SQLite3]:
-        """Generate a connection to a sqlite history database files.
+        """Yield opened history database files of all users.
 
         Args:
-            filename: The filename as string of the database where the history is stored.
+            filename: The filename of the database.
         Yields:
-            connection to db_file (SQLite3)
-        Raises:
-            FileNotFoundError: If the history file could not be found.
-            SQLError: If the history file could not be opened.
+            Opened SQLite3 databases.
         """
         for user, cur_dir in self.users_dirs:
             for profile_dir in cur_dir.iterdir():
@@ -80,11 +70,11 @@ class FirefoxPlugin(Plugin):
                     except SQLError as e:
                         self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
-    @export(record=HISTORY_RECORD)
-    def history(self) -> Iterator[HISTORY_RECORD]:
+    @export(record=BrowserHistoryRecord)
+    def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from Firefox.
 
-        Yields FirefoxBrowserHistoryRecord with the following fields:
+        Yields BrowserHistoryRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -110,7 +100,7 @@ class FirefoxPlugin(Plugin):
 
                 for row in db.table("moz_historyvisits").rows():
                     visits[row.id] = row
-                    place: Row = places[row.place_id]
+                    place = places[row.place_id]
 
                     if row.from_visit and row.from_visit in visits:
                         from_visit = visits[row.from_visit]
@@ -118,7 +108,7 @@ class FirefoxPlugin(Plugin):
                     else:
                         from_visit, from_place = None, None
 
-                    yield self.HISTORY_RECORD(
+                    yield self.BrowserHistoryRecord(
                         ts=from_unix_us(row.visit_date),
                         browser="firefox",
                         id=row.id,
@@ -140,26 +130,25 @@ class FirefoxPlugin(Plugin):
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    @export(record=BROWSER_DOWNLOAD_RECORD)
-    def downloads(self) -> Iterator[BROWSER_DOWNLOAD_RECORD]:
+    @export(record=BrowserDownloadRecord)
+    def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from Firefox.
 
-        Yields FirefoxBrowserHistoryRecord with the following fields:
+        Yields BrowserDownloadRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            ts_start (datetime): .
-            ts_end (datetime): .
+            ts_start (datetime): Download start timestamp.
+            ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
-            path (string): .
-            url (uri): History URL.
-            size (string): .
-            state (string): .
-            source: (path): The source file of the history record.
+            path (string): Download path.
+            url (uri): Download URL.
+            size (varint): Download file size.
+            state (varint): Download state number.
+            source: (path): The source file of the download record.
         """
         for user, db_file, db in self._iter_db("places.sqlite"):
             try:
-                # TODO: should implement proper indexing in SQLite at some point
                 places = {row.id: row for row in db.table("moz_places").rows()}
                 attributes = {row.id: row.name for row in db.table("moz_anno_attributes").rows()}
                 annotations = {}
@@ -188,29 +177,38 @@ class FirefoxPlugin(Plugin):
                     if "downloads/metaData" not in annotation:
                         continue
 
-                    place: Row = places[place_id]
-                    dest_file_info: dict = annotation["downloads/destinationFileURI"]
-                    metadata: dict = annotation["downloads/metaData"]
+                    dest_file_info = annotation.get("downloads/destinationFileURI")
+                    metadata = annotation.get("downloads/metaData")
 
-                    ended: int = metadata["content"]["endTime"]
-                    ended: datetime = from_unix_ms(ended) if ended else None
+                    ts_end = metadata.get("content").get("endTime")
+                    ts_end = from_unix_ms(ts_end) if ts_end else None
 
-                    download_path: str = dest_file_info["content"]
+                    download_path = dest_file_info.get("content")
 
                     if download_path and self.target.os == "windows":
                         download_path = path.from_windows(download_path)
                     elif download_path:
                         download_path = path(download_path)
 
-                    yield self.BROWSER_DOWNLOAD_RECORD(
-                        ts_start=dest_file_info["date_added"],
-                        ts_end=ended,
+                    place = places.get(place_id)
+                    url = place.get("url")
+                    url = try_idna(url) if url else None
+
+                    size = metadata.get("content")
+                    size = size.get("fileSize") if size else None
+
+                    state = metadata.get("content")
+                    state = state.get("state") if state else None
+
+                    yield self.BrowserDownloadRecord(
+                        ts_start=dest_file_info.get("date_added"),
+                        ts_end=ts_end,
                         browser="firefox",
-                        id=annotation["id"],
+                        id=annotation.get("id"),
                         path=download_path,
-                        url=try_idna(place.url),
-                        size=metadata["content"]["fileSize"],
-                        state=metadata["content"]["state"],
+                        url=url,
+                        size=size,
+                        state=state,
                         source=str(db_file),
                         _target=self.target,
                     )

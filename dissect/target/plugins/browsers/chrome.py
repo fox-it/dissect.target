@@ -23,19 +23,19 @@ class ChromePlugin(ChromiumMixin, Plugin):
         # Macos
         "Library/Application Support/Google/Chrome/Default",
     ]
-    HISTORY_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
     )
-    BROWSER_DOWNLOAD_RECORD = create_extended_descriptor([UserRecordDescriptorExtension])(
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
-    @export(record=HISTORY_RECORD)
+    @export(record=BrowserHistoryRecord)
     def history(self):
         """Return browser history records for Google Chrome."""
-        yield from ChromiumMixin.history(self, "chrome")
+        yield from super().history("chrome")
 
-    @export(record=BROWSER_DOWNLOAD_RECORD)
+    @export(record=BrowserDownloadRecord)
     def downloads(self):
         """Return browser download records for Google Chrome."""
-        yield from ChromiumMixin.downloads(self, "chrome")
+        yield from super().downloads("chrome")
