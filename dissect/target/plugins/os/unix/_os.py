@@ -200,9 +200,9 @@ class UnixPlugin(OSPlugin):
                     self.target.fs.mount(mount_point, volume.fs)
 
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
-        """Parse Unix /etc/*-release files.
+        """Parse files containing Unix version information.
 
-        Not all release files are equal. Generally speaking release files are
+        Not all these files are equal. Generally speaking these files are
         either key=value files or contain just one line.
 
         Examples of key=value pair structured release files are:
@@ -215,6 +215,9 @@ class UnixPlugin(OSPlugin):
         - /etc/centos-release
         - /etc/redhat-release
         - /etc/SuSE-release
+
+        Examples of bsd version files:
+        - /bin/freebsd-version
         """
         glob = glob or "/etc/*-release"
 
@@ -229,7 +232,6 @@ class UnixPlugin(OSPlugin):
 
                         elif "=" not in line:
                             os_release["DISTRIB_DESCRIPTION"] = line.strip()
-                            break
 
                         else:
                             try:
