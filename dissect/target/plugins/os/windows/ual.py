@@ -142,7 +142,7 @@ class UalPlugin(Plugin):
     a local server.
 
     Sources:
-        - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-R2-and-2012/hh849634(v=ws.11)
+        - `<https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-R2-and-2012/hh849634(v=ws.11)>`_
     """  # noqa: E501
 
     __namespace__ = "ual"

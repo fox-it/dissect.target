@@ -135,7 +135,7 @@ class GenericPlugin(Plugin):
         programs are located. Adversaries may add the directories in which they have stored their (malicious) binaries.
 
         Sources:
-            - https://en.wikipedia.org/wiki/PATH_(variable)
+            - `<https://en.wikipedia.org/wiki/PATH_(variable)>`_
         """
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
         for r in self.target.registry.keys(key):
@@ -413,8 +413,8 @@ class GenericPlugin(Plugin):
         exploited by an adversary to hide malicious commands or leverage as a persistence mechanism
 
         Sources:
-            - https://devblogs.microsoft.com/oldnewthing/20071121-00/?p=24433
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc779439(v=ws.10)?redirectedfrom=MSDN
+            - `<https://devblogs.microsoft.com/oldnewthing/20071121-00/?p=24433>`_
+            - `<https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc779439(v=ws.10)?redirectedfrom=MSDN>`_
         """  # noqa: E501
         keys = [
             ("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Command Processor", "AutoRun"),
@@ -497,9 +497,9 @@ class GenericPlugin(Plugin):
         reboot. Can be used to hunt for malicious binaries.
 
         Sources:
-            - https://forensicatorj.wordpress.com/2014/06/25/interpreting-the-pendingfilerenameoperations-registry-key-for-forensics/
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc960241(v=technet.10)?redirectedfrom=MSDN
-            - https://qtechbabble.wordpress.com/2020/06/26/use-pendingfilerenameoperations-registry-key-to-automatically-delete-a-file-on-reboot/
+            - `<https://forensicatorj.wordpress.com/2014/06/25/interpreting-the-pendingfilerenameoperations-registry-key-for-forensics/>`_
+            - `<https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc960241(v=technet.10)?redirectedfrom=MSDN>`_
+            - `<https://qtechbabble.wordpress.com/2020/06/26/use-pendingfilerenameoperations-registry-key-to-automatically-delete-a-file-on-reboot/>`_
         """  # noqa: E501
         key = "HKLM\\System\\CurrentControlSet\\Control\\Session Manager"
         for r in self.target.registry.keys(key):

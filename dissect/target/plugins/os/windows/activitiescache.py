@@ -42,7 +42,7 @@ class ActivitiesCachePlugin(Plugin):
     """Plugin that parses the ActivitiesCache.db on newer Windows 10 machines.
 
     Resources:
-        https://cclgroupltd.com/windows-10-timeline-forensic-artefacts/
+        https://www.cclsolutionsgroup.com/resources/technical-papers
         https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
     """
 
@@ -143,6 +143,6 @@ class ActivitiesCachePlugin(Plugin):
 def mkts(ts):
     """Timestamps inside ActivitiesCache.db are stored in a Unix-like format.
 
-    Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/#timestamps
+    Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
     """
     return from_unix(ts) if ts else None

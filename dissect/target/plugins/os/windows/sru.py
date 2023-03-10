@@ -347,7 +347,6 @@ class SRUPlugin(Plugin):
     Sources:
         - https://docs.microsoft.com/en-us/sql/relational-databases/performance-monitor/monitor-resource-usage-system-monitor?view=sql-server-ver15
         - https://blog.1234n6.com/2019/01/
-        - http://dfir.pro/index.php?link_id=92259
     """  # noqa: E501
 
     __namespace__ = "sru"
