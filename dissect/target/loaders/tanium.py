@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
+from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
+from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
     from dissect.target import Target
@@ -29,7 +30,7 @@ class TaniumLoader(DirLoader):
         #       D/
         file_path = path.joinpath("file")
         os_type, dirs = find_dirs(file_path)
-        if file_path and os_type == "windows":
+        if file_path and os_type == OperatingSystem.WINDOWS:
             for path in dirs:
                 # Tanium doesn't have the correct filenames for several files, like $J
                 if path.joinpath("$Extend/$UsnJrnl_$J").exists():
@@ -38,7 +39,7 @@ class TaniumLoader(DirLoader):
         return False
 
     def map(self, target: Target) -> None:
-        map_dirs(
+        find_and_map_dirs(
             target,
             self.path.joinpath("file"),
             sds_path="$Secure_$SDS",
