@@ -37,6 +37,9 @@ class TarLoader(Loader):
         volumes = {}
 
         for member in self.tar.getmembers():
+            if member.name == ".":
+                continue
+
             if not member.name.startswith("fs/") and not member.name.startswith("/sysvol"):
                 if "/" not in volumes:
                     vol = filesystem.VirtualFilesystem(case_sensitive=True)
