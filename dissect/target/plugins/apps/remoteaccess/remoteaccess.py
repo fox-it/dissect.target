@@ -23,6 +23,8 @@ class RemoteAccessPlugin(Plugin):
     """
 
     __namespace__ = "remoteaccess"
+    __findable__ = False
+
     TOOLS = [
         "teamviewer",
         "anydesk",
