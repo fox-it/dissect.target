@@ -94,21 +94,24 @@ __target_function ()
     esac
 }
 
-echo Loading Dissect plugin list
-DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
+if command -v target-query &> /dev/null
+then
+    echo Loading Dissect plugin list
+    DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
 
-echo Loading Dissect help prompts
-declare -A DISSECT_HELP
-for x in query dump dd fs mount reg shell
-do
-    DISSECT_HELP["$x"]=$(target-$x --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
-done
+    echo Loading Dissect help prompts
+    declare -A DISSECT_HELP
+    for x in query dump dd fs mount reg shell
+    do
+        DISSECT_HELP["$x"]=$(target-$x --quiet --help | grep -Eo ' --?([a-zA-Z]|-)+' | awk '{print $1}' | sort -u)
+    done
 
-complete -F __target_function -o filenames -o default target-query
-complete -F __target_function -o filenames -o default target-dump
+    complete -F __target_function -o filenames -o default target-query
+    complete -F __target_function -o filenames -o default target-dump
 
-complete -F __target_help -o filenames -o default target-dd
-complete -F __target_help -o filenames -o default target-fs
-complete -F __target_help -o filenames -o default target-mount
-complete -F __target_help -o filenames -o default target-reg
-complete -F __target_help -o filenames -o default target-shell
+    complete -F __target_help -o filenames -o default target-dd
+    complete -F __target_help -o filenames -o default target-fs
+    complete -F __target_help -o filenames -o default target-mount
+    complete -F __target_help -o filenames -o default target-reg
+    complete -F __target_help -o filenames -o default target-shell
+fi
