@@ -122,7 +122,7 @@ class InternetExplorerPlugin(Plugin):
     def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from Internet Explorer.
 
-        Yields IE_BROWSER_HISTORY_RECORD with the following fields:
+        Yields BrowserHistoryRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -176,7 +176,7 @@ class InternetExplorerPlugin(Plugin):
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser downloads records from Internet Explorer.
 
-        Yields IE_BROWSER_DOWNLOAD_RECORD with the following fields:
+        Yields BrowserDownloadRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
@@ -190,15 +190,15 @@ class InternetExplorerPlugin(Plugin):
             source: (path): The source file of the download record.
         """
         for user, cache_file, cache in self._iter_cache():
-            for r in cache.downloads():
-                response_headers = r.ResponseHeaders.decode("utf-16-le", errors="ignore")
+            for container_record in cache.downloads():
+                response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
                 ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
 
                 yield self.BrowserDownloadRecord(
                     ts_start=None,
-                    ts_end=wintimestamp(r.AccessedTime),
+                    ts_end=wintimestamp(container_record.AccessedTime),
                     browser="iexplore",
-                    id=r.EntryId,
+                    id=container_record.EntryId,
                     path=down_path,
                     url=down_url,
                     size=None,

@@ -177,28 +177,31 @@ class FirefoxPlugin(Plugin):
                     if "downloads/metaData" not in annotation:
                         continue
 
-                    dest_file_info = annotation.get("downloads/destinationFileURI")
-                    metadata = annotation.get("downloads/metaData")
+                    metadata = annotation.get("downloads/metaData", {})
 
-                    ts_end = metadata.get("content").get("endTime")
-                    ts_end = from_unix_ms(ts_end) if ts_end else None
+                    ts_end = None
+                    size = None
+                    state = None
 
+                    content = metadata.get("content")
+                    if content:
+                        ts_end = metadata.get("content").get("endTime")
+                        ts_end = from_unix_ms(ts_end) if ts_end else None
+
+                        size = content.get("fileSize")
+                        state = content.get("state")
+
+                    dest_file_info = annotation.get("downloads/destinationFileURI", {})
                     download_path = dest_file_info.get("content")
 
                     if download_path and self.target.os == "windows":
                         download_path = path.from_windows(download_path)
                     elif download_path:
-                        download_path = path(download_path)
+                        download_path = path.from_posix(download_path)
 
                     place = places.get(place_id)
                     url = place.get("url")
                     url = try_idna(url) if url else None
-
-                    size = metadata.get("content")
-                    size = size.get("fileSize") if size else None
-
-                    state = metadata.get("content")
-                    state = state.get("state") if state else None
 
                     yield self.BrowserDownloadRecord(
                         ts_start=dest_file_info.get("date_added"),

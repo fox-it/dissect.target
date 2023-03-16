@@ -66,7 +66,7 @@ class BrowserPlugin(Plugin):
         for entry in self.BROWSERS:
             try:
                 self._plugins.append(getattr(self.target, entry))
-            except Exception:  # noqa
+            except Exception:
                 target.log.exception("Failed to load browser plugin: %s", entry)
 
     def check_compatible(self) -> bool:
@@ -101,7 +101,7 @@ class BrowserPlugin(Plugin):
 
         Historical browser records for Chrome, Chromium, Edge (Chromium), Firefox, and Internet Explorer are returned.
 
-        Yields HISTORY_RECORD with the following fields:
+        Yields BrowserHistoryRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -127,7 +127,7 @@ class BrowserPlugin(Plugin):
         """Return browser download records from all browsers installed and supported.
 
         Yields:
-            BROWSER_DOWNLOAD_RECORD with the following fieds:
+            BrowserDownloadRecord with the following fieds:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
@@ -153,5 +153,5 @@ def try_idna(url: str) -> bytes:
     """
     try:
         return url.encode("idna")
-    except Exception:  # noqa
+    except Exception:
         return url
