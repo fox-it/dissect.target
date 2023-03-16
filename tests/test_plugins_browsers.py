@@ -7,7 +7,7 @@ from ._utils import absolute_path
 
 
 def test_iexplore_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    cache_archive = absolute_path("data/WebCacheV01.dat.gz")
+    cache_archive = absolute_path("data/plugins/browsers/iexplore/WebCacheV01.dat.gz")
 
     with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
         with gzip.GzipFile(cache_archive, "rb") as f:
@@ -40,7 +40,7 @@ def test_iexplore_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    firefox_db = absolute_path("data/firefox-places.sqlite")
+    firefox_db = absolute_path("data/plugins/browsers/firefox/places.sqlite")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/local/Mozilla/Firefox/Profiles/g1rbw8y7.default-release/")
@@ -68,7 +68,7 @@ def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    chrome_db = absolute_path("data/chrome-history.sqlite")
+    chrome_db = absolute_path("data/plugins/browsers/chrome/History.sqlite")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Google/Chrome/continuousUpdates/User Data/Default")
@@ -96,7 +96,7 @@ def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    edge_db = absolute_path("data/edge-history.sqlite")
+    edge_db = absolute_path("data/plugins/browsers/edge/History.sqlite")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Microsoft/Edge/User Data/Default")
@@ -124,7 +124,7 @@ def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 
 def test_chromium_plugin(target_win, fs_win, tmpdir_name, target_win_users):
-    chromium_db = absolute_path("data/chromium-history-win.sqlite")
+    chromium_db = absolute_path("data/plugins/browsers/chromium/History.sqlite")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Chromium/User Data/Default")
