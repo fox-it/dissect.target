@@ -1,4 +1,3 @@
+exclude .gitattributes
 exclude .gitignore
-exclude .github
-
-graft autocompletion/
+recursive-exclude .github/ *
