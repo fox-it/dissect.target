@@ -1,3 +1,4 @@
+import logging
 import re
 import urllib.parse
 from datetime import datetime, timezone, tzinfo
@@ -8,6 +9,8 @@ from typing import BinaryIO, Iterator, Union
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers import fsutil
+
+log = logging.getLogger(__name__)
 
 
 class StrEnum(str, Enum):
@@ -81,13 +84,19 @@ def year_rollover_helper(
     last_seen_month = None
 
     with fsutil.open_decompress(path, "rt") as fh:
-        for line in fsutil.reverse_readlines(fh):
-            line = line.strip()
+        for line in fsutil.reverse_readlines(fh, chunk_size=1024 * 1024 * 8):
+            line = line.strip().strip("\x00\n")
             if not line:
                 continue
 
-            timestamp = re.search(re_ts, line).group(0)
-            relative_ts = datetime.strptime(timestamp, ts_format)
+            timestamp = re.search(re_ts, line)
+
+            if not timestamp:
+                log.warning(f"No timestamp found in one of the lines in {path}!")
+                log.debug(f"Skipping this line: {line}")
+                continue
+
+            relative_ts = datetime.strptime(timestamp.group(0), ts_format)
             if last_seen_month and relative_ts.month > last_seen_month:
                 current_year -= 1
             last_seen_month = relative_ts.month
