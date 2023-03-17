@@ -14,16 +14,16 @@ FILESYSTEMS_ROOT = "uploads"
 
 def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional[list[Path]]]:
     # As of Velociraptor version 0.6.7 the structure of the Velociraptor Offline Collector varies by operating system
-    # Generic.Collectors.File (Linux, Unix and OS-X) root filesystem is 'uploads/file/'
+    # Generic.Collectors.File (Linux and OS-X) root filesystem is 'uploads/file/'
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) root filesystem is
     # 'uploads/<file-accessor>/<drive-name>/'
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
 
-    # Linux, Unix and OS-X
+    # Linux and OS-X
     file_root = fs_root.joinpath("file")
     if file_root.exist():
         os_type, dirs = find_dirs(file_root)
-        if os_type in [OperatingSystem.LINUX, OperatingSystem.UNIX ,OperatingSystem.OSX]:
+        if os_type in [OperatingSystem.LINUX, OperatingSystem.OSX]:
             return os_type, [dirs[0]]
 
     # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
