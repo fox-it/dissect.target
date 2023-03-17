@@ -32,7 +32,7 @@ def test_velociraptor_loader_windows_ntfs(mock_target, tmpdir_name):
 
 def test_dir_loader_linux(mock_target, tmpdir_name):
     root = Path(tmpdir_name)
-    mkdirs(root, ["uploads.json", "uploads/etc", "uploads/var"])
+    mkdirs(root, ["uploads.json", "uploads/file/etc", "uploads/file/var"])
 
     assert VelociraptorLoader.detect(root) is True
 
@@ -44,7 +44,7 @@ def test_dir_loader_linux(mock_target, tmpdir_name):
 
 def test_dir_loader_macos(mock_target, tmpdir_name):
     root = Path(tmpdir_name)
-    mkdirs(root, ["uploads.json", "uploads/Library"])
+    mkdirs(root, ["uploads.json", "uploads/file/Library"])
 
     assert VelociraptorLoader.detect(root) is True
 
