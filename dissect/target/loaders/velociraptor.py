@@ -21,7 +21,7 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
 
     # Linux and OS-X
     file_root = fs_root.joinpath("file")
-    if file_root.exist():
+    if file_root.exists():
         os_type, dirs = find_dirs(file_root)
         if os_type in [OperatingSystem.LINUX, OperatingSystem.OSX]:
             return os_type, [dirs[0]]
