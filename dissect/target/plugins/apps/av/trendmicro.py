@@ -1,7 +1,7 @@
-import datetime
 from typing import Iterator
 
 from dissect import cstruct
+from dissect.util.ts import from_unix
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -34,7 +34,7 @@ TrendMicroWFFirewallRecord = TargetRecordDescriptor(
 )
 
 
-c_pfwlog_i = """
+pfwlog_def = """
 struct firewall_entry {
     char      _[1];
     char      direction;
@@ -48,19 +48,19 @@ struct firewall_entry {
     char      _[10];
 };
 """
+c_pfwlog = cstruct.cstruct()
+c_pfwlog.load(pfwlog_def)
 
 
 class TrendMicroPlugin(Plugin):
     __namespace__ = "trendmicro"
 
-    LOG_FOLDER = "sysvol/Program Files (x86)/Trend Micro/Security Agent/"
+    LOG_FOLDER = "sysvol/Program Files (x86)/Trend Micro/Security Agent"
     LOG_FILE_FIREWALL = f"{LOG_FOLDER}/PFW/PfwLog_*.dat"  # Windows intrusions
     LOG_FILE_INFECTIONS = f"{LOG_FOLDER}/Misc/pccnt35.log"  # Windows infections
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        self.pfwlog_parser = cstruct.cstruct()
-        self.pfwlog_parser.load(c_pfwlog_i)
 
     def check_compatible(self) -> bool:
         if not self.target.fs.path(self.LOG_FOLDER).exists():
@@ -80,17 +80,15 @@ class TrendMicroPlugin(Plugin):
             fkey (string): Foreign key for reference for further investigation.
         """
         with self.target.fs.path(self.LOG_FILE_INFECTIONS).open("rt") as f:
-            linenum = 0
-            while line := f.readline():
+            for lineno, line in enumerate(f.readlines()):
                 cells = line.split("<;>")
                 yield TrendMicroWFLogRecord(
-                    ts=datetime.datetime.fromtimestamp(int(cells[9])),
+                    ts=from_unix(int(cells[9])),
                     message=",".join(cells),
                     threat=cells[2],
                     keywords=",".join([cells[0], cells[2], cells[6], cells[7], cells[8]]),
-                    fkey=linenum,
+                    fkey=lineno,
                 )
-                linenum += 1
 
     @export(record=TrendMicroWFFirewallRecord)
     def wffirewall(self) -> Iterator[TrendMicroWFFirewallRecord]:
@@ -108,12 +106,11 @@ class TrendMicroPlugin(Plugin):
             description (string): Description of the detected threat
         """
         for firewall_log in self.target.fs.glob_ext(self.LOG_FILE_FIREWALL):
-            print(firewall_log)
             with firewall_log.open() as log:
                 try:
-                    while entry := self.pfwlog_parser.read("firewall_entry", log):
+                    while entry := c_pfwlog.firewall_entry(log):
                         yield TrendMicroWFFirewallRecord(
-                            ts=datetime.datetime.fromtimestamp(entry.timestamp),
+                            ts=from_unix(entry.timestamp),
                             local_ip=entry.local_ip.strip(b"\x00").decode("utf-8"),
                             remote_ip=entry.remote_ip.strip(b"\x00").decode("utf-8"),
                             port=entry.port,
