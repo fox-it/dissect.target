@@ -62,7 +62,7 @@ class StartupInfoPlugin(Plugin):
         On a Windows system, the StartupInfo log files contain information about process execution for the first 90
         seconds of user logon activity, such as process name and CPU usage.
 
-        Sources:
+        References:
             - https://www.trustedsec.com/blog/who-left-the-backdoor-open-using-startupinfo-for-the-win/
         """
         for path in self._files:

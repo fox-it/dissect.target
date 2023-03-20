@@ -31,7 +31,7 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
     Windows WSL VHDX conatiners are stored at ``%AppData%\\Local\\Packages\\$DistFolder\\LocalState\\ext4.vhdx``,
     where ``$DistFolder`` will be substituted with a unix distribution folder.
 
-    Sources:
+    References:
         - https://www.osdfcon.org/presentations/2020/Asif-Matadar_Investigating-WSL-Endpoints.pdf
         - https://www.sans.org/white-papers/39330/
     """  # noqa: E501

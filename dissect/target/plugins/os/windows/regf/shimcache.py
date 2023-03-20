@@ -316,7 +316,7 @@ class ShimcachePlugin(Plugin):
         compatibility purposes. Since it contains information about files such as the last
         modified date and the file size, it can be useful in forensic investigations.
 
-        Sources:
+        References:
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
 
         Yields ShimcacheRecords with the following fields:

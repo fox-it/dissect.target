@@ -37,7 +37,7 @@ class NethistPlugin(Plugin):
         HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Profiles registry keys contain information
         about the networks to which the system has been connected, both wireless and wired.
 
-        Sources:
+        References:
             - https://www.weaklink.org/2016/11/windows-network-profile-registry-keys/
         """
         for key in self.target.registry.keys(self.KEY):

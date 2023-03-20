@@ -52,7 +52,7 @@ class CatrootPlugin(Plugin):
         A catalog file contains a collection of cryptographic hashes, or thumbprints. These files are generally used to
         verify the integrity of Windows operating system files, instead of per-file authenticode signatures.
 
-        Sources:
+        References:
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 

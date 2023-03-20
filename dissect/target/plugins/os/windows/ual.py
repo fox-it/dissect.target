@@ -141,8 +141,8 @@ class UalPlugin(Plugin):
     server. It helps Windows server administrators to quantify requests from client computers for roles and services on
     a local server.
 
-    Sources:
-        - `<https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-R2-and-2012/hh849634(v=ws.11)>`_
+    References:
+        - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-R2-and-2012/hh849634%28v=ws.11%29
     """  # noqa: E501
 
     __namespace__ = "ual"

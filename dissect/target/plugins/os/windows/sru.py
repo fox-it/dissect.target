@@ -344,7 +344,7 @@ class SRUPlugin(Plugin):
     The System Resource Usage Monitor (SRUM) stores its information in a SRUDB.dat file. As the names suggests, it
     contains data about resource usage, such as network and memory usage by applications.
 
-    Sources:
+    References:
         - https://docs.microsoft.com/en-us/sql/relational-databases/performance-monitor/monitor-resource-usage-system-monitor?view=sql-server-ver15
         - https://blog.1234n6.com/2019/01/
     """  # noqa: E501

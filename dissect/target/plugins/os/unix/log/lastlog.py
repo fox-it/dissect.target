@@ -63,7 +63,7 @@ class LastLogPlugin(Plugin):
 
         The lastlog file contains the most recent logins of all users on a Unix based operating system.
 
-        Sources:
+        References:
             - https://www.tutorialspoint.com/unix_commands/lastlog.htm
         """
         try:

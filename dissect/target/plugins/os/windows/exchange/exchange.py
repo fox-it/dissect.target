@@ -31,7 +31,7 @@ class ExchangePlugin(Plugin):
         A Transport Agent is additional software on a Microsoft Exchange server that allows for custom processing of
         email messages that go through the transport pipeline.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/exchange/mail-flow/transport-agents/transport-agents?view=exchserver-2019
         """
         for path in self.install_paths():

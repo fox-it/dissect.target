@@ -41,7 +41,7 @@ ActivitiesCacheRecord = create_extended_descriptor([UserRecordDescriptorExtensio
 class ActivitiesCachePlugin(Plugin):
     """Plugin that parses the ActivitiesCache.db on newer Windows 10 machines.
 
-    Resources:
+    References:
         https://www.cclsolutionsgroup.com/resources/technical-papers
         https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
     """
@@ -72,7 +72,7 @@ class ActivitiesCachePlugin(Plugin):
         Currently only puts the database records straight into Flow Records. Ideally
         we do some additional parsing on this later.
 
-        Sources:
+        References:
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ActivitiesCacheDatabase.html
             - https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
 

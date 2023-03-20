@@ -281,7 +281,7 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
 class SamPlugin(Plugin):
     """SAM plugin.
 
-    Resources:
+    References:
         MS-SAMR Specification
         Reversing samsrv.dll
         https://github.com/gentilkiwi/mimikatz
@@ -354,7 +354,7 @@ class SamPlugin(Plugin):
         The Security Account Manager (SAM) registry hive contains registry keys that store usernames, full names and
         passwords in a hashed format, either an LM or NT hash.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Security_Account_Manager
 
         Yields SamRecords with fields:

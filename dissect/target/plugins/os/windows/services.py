@@ -70,7 +70,7 @@ class ServicesPlugin(Plugin):
         The HKLM\\SYSTEM\\CurrentControlSet\\Services registry key contains information about the installed services and
         drivers on the system.
 
-        Sources:
+        References:
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ServicesAndDrivers.html
 
         Yields ServiceRecords with fields:

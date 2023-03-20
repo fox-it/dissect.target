@@ -71,7 +71,7 @@ class ApachePlugin(plugin.Plugin):
         """
         Discover any present Apache log paths on the target system.
 
-        Resources:
+        References:
             - https://www.cyberciti.biz/faq/apache-logs/
             - https://unix.stackexchange.com/a/269090
         """

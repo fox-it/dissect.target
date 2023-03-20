@@ -40,7 +40,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         diagnose a system or find future issues. Up until Windows XP the extension .evt was used, hereafter .evtx
         became the new standard.
 
-        Sources:
+        References:
             - https://www.techtarget.com/searchwindowsserver/definition/Windows-event-log
             - https://serverfault.com/questions/441050/what-are-the-differences-between-windows-evt-and-evtx-log-files
 
