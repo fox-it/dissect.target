@@ -725,6 +725,20 @@ class TargetCli(TargetCmd):
             if not path:
                 continue
 
+            fh = path.open()
+            shutil.copyfileobj(fh, stdout)
+            stdout.flush()
+
+    @arg("path")
+    def cmd_zcat(self, args, stdout):
+        """print file content from compressed files"""
+        paths = self.resolveglobpath(args.path)
+        stdout = stdout.buffer
+        for path in paths:
+            path = self.checkfile(path)
+            if not path:
+                continue
+
             fh = fsutil.open_decompress(path)
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
@@ -751,6 +765,15 @@ class TargetCli(TargetCmd):
     @arg("path")
     def cmd_less(self, args, stdout):
         """open the first 10 MB of a file with less"""
+        path = self.checkfile(args.path)
+        if not path:
+            return
+
+        pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
+
+    @arg("path")
+    def cmd_zless(self, args, stdout):
+        """open the first 10 MB of a compressed file with zless"""
         path = self.checkfile(args.path)
         if not path:
             return
