@@ -264,7 +264,7 @@ class ShellBagsPlugin(Plugin):
     """Windows Shellbags plugin.
 
     References:
-        https://github.com/libyal/libfwsi
+        - https://github.com/libyal/libfwsi
     """
 
     KEYS = [

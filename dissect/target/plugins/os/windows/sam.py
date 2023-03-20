@@ -282,11 +282,11 @@ class SamPlugin(Plugin):
     """SAM plugin.
 
     References:
-        MS-SAMR Specification
-        Reversing samsrv.dll
-        https://github.com/gentilkiwi/mimikatz
-        https://github.com/skelsec/pypykatz
-        https://web.archive.org/web/20190717124313/http://www.beginningtoseethelight.org/ntsecurity/index.htm
+        - MS-SAMR Specification
+        - Reversing samsrv.dll
+        - https://github.com/gentilkiwi/mimikatz
+        - https://github.com/skelsec/pypykatz
+        - https://web.archive.org/web/20190717124313/http://www.beginningtoseethelight.org/ntsecurity/index.htm
     """
 
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
