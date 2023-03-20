@@ -62,6 +62,9 @@ def readinto(buffer: bytearray, fh: BinaryIO) -> int:
     return size
 
 
+STRIP_RE = re.compile(r"^[\s\x00]*|[\s\x00]*$")
+
+
 def year_rollover_helper(
     path: Path, re_ts: Union[str, re.Pattern], ts_format: str, tzinfo: tzinfo = timezone.utc
 ) -> Iterator[tuple[datetime, str]]:
@@ -84,8 +87,8 @@ def year_rollover_helper(
     last_seen_month = None
 
     with fsutil.open_decompress(path, "rt") as fh:
-        for line in fsutil.reverse_readlines(fh, chunk_size=1024 * 1024 * 8):
-            line = line.strip().strip("\x00\n")
+        for line in fsutil.reverse_readlines(fh):
+            line = STRIP_RE.sub(r"", line)
             if not line:
                 continue
 
