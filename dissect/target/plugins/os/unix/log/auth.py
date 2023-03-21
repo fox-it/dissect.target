@@ -19,7 +19,7 @@ AuthLogRecord = TargetRecordDescriptor(
 
 _TS_REGEX = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
 RE_TS = re.compile(_TS_REGEX)
-RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\w+\s")
+RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\S+\s")
 
 
 class AuthPlugin(Plugin):
@@ -45,7 +45,13 @@ class AuthPlugin(Plugin):
         var_log = self.target.fs.path("/var/log")
         for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
             for ts, line in year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", tzinfo):
-                message = line.replace(re.search(RE_TS_AND_HOSTNAME, line).group(0), "").strip()
+                ts_and_hostname = re.search(RE_TS_AND_HOSTNAME, line)
+                if not ts_and_hostname:
+                    self.target.log.warning(f"No timstamp and hostname found on one of the lines in {auth_file}.")
+                    self.target.log.debug(f"Skipping this line: {line}")
+                    continue
+
+                message = line.replace(ts_and_hostname.group(0), "").strip()
                 yield AuthLogRecord(
                     ts=ts,
                     message=message,
