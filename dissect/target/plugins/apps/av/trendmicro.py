@@ -45,7 +45,7 @@ struct firewall_entry {
     char      remote_ip[65];
     char      path[520];
     wchar     description[128];
-    char      _[10];
+    char      _padding[10];
 };
 """
 c_pfwlog = cstruct.cstruct()
