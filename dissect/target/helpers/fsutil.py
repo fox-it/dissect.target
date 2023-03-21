@@ -5,8 +5,10 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
+import bz2
 import errno
 import fnmatch
+import gzip
 import hashlib
 import io
 import logging
@@ -973,7 +975,12 @@ def resolve_link(
 def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextIO]:
     """Open and decompress a file. Handles gz and bz2 files. Uncompressed files are opened as-is.
 
-    Assumes that the ``path`` exists.
+    Args:
+        path: The path to the file to open and decompress. It is assumed this path exists.
+        mode: The mode in which to open the file.
+
+    Returns:
+        An binary or text IO stream, depending on the mode with which the file was opened.
 
     Example:
         bytes_buf = open_decompress(Path("/dir/file.gz")).read()
@@ -981,16 +988,17 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
         for line in open_decompress(Path("/dir/file.gz"), "rt"):
             print(line)
     """
+    file = path.open()
+    magic = file.read(4)
+    file.seek(0)
 
-    if path.suffix == ".gz":
-        import gzip
-
-        return gzip.open(path.open(), mode)
-    elif path.suffix == ".bz2":
-        import bz2
-
-        return bz2.open(path.open(), mode)
+    if magic[:2] == b"\x1f\x8b":
+        return gzip.open(file, mode)
+    # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
+    elif magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+        return bz2.open(file, mode)
     else:
+        file.close()
         return path.open(mode)
 
 
