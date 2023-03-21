@@ -2,6 +2,7 @@ from typing import Iterator
 
 from dissect import cstruct
 from dissect.util.ts import from_unix
+from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -13,9 +14,8 @@ TrendMicroWFLogRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("string", "threat"),
-        ("string", "message"),
-        ("string", "keywords"),
-        ("string", "fkey"),
+        ("path", "path"),
+        ("varint", "lineno"),
     ],
 )
 
@@ -36,16 +36,16 @@ TrendMicroWFFirewallRecord = TargetRecordDescriptor(
 
 pfwlog_def = """
 struct firewall_entry {
-    char      _[1];
+    char      _pad1[1];
     char      direction;
     uint16    port;
     uint32    timestamp;
-    char      _pad[8];
+    char      _pad2[8];
     char      local_ip[65];
     char      remote_ip[65];
     char      path[520];
     wchar     description[128];
-    char      _padding[10];
+    char      _pad3[10];
 };
 """
 c_pfwlog = cstruct.cstruct()
@@ -61,6 +61,7 @@ class TrendMicroPlugin(Plugin):
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
+        self.codepage = self.target.codepage or "ascii"
 
     def check_compatible(self) -> bool:
         if not self.target.fs.path(self.LOG_FOLDER).exists():
@@ -74,20 +75,19 @@ class TrendMicroPlugin(Plugin):
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.
-            threat (string): Description of the detected threat (if available).
-            message (string): Message as reported in the user interface
-            keywords (string): Unparsed fields that might be visible in user interface.
-            fkey (string): Foreign key for reference for further investigation.
+            threat (string): Description of the detected threat.
+            path (string): Path to file that is associated with the threat.
+            filename (string): Name to file that is associated with the threat.
+            lineno (uint16): Line number for reference for further investigation.
         """
-        with self.target.fs.path(self.LOG_FILE_INFECTIONS).open("rt") as f:
+        with self.target.fs.path(self.LOG_FILE_INFECTIONS).open("rt", 0, self.codepage) as f:
             for lineno, line in enumerate(f.readlines()):
                 cells = line.split("<;>")
                 yield TrendMicroWFLogRecord(
                     ts=from_unix(int(cells[9])),
-                    message=",".join(cells),
                     threat=cells[2],
-                    keywords=",".join([cells[0], cells[2], cells[6], cells[7], cells[8]]),
-                    fkey=lineno,
+                    path=path.from_windows(cells[6] + cells[7]),
+                    lineno=lineno,
                 )
 
     @export(record=TrendMicroWFFirewallRecord)
@@ -111,12 +111,12 @@ class TrendMicroPlugin(Plugin):
                     while entry := c_pfwlog.firewall_entry(log):
                         yield TrendMicroWFFirewallRecord(
                             ts=from_unix(entry.timestamp),
-                            local_ip=entry.local_ip.strip(b"\x00").decode("utf-8"),
-                            remote_ip=entry.remote_ip.strip(b"\x00").decode("utf-8"),
+                            local_ip=entry.local_ip.strip(b"\x00").decode(self.codepage),
+                            remote_ip=entry.remote_ip.strip(b"\x00").decode(self.codepage),
                             port=entry.port,
                             direction=("out" if entry.direction == b"\x01" else "in"),
-                            path=entry.path.strip(b"\x00").decode(),
-                            description=entry.description.encode().strip(b"\x00").decode(),
+                            path=path.from_windows(entry.path.strip(b"\x00").decode(self.codepage)),
+                            description=entry.description.strip("\x00"),
                         )
                 except EOFError:
                     pass

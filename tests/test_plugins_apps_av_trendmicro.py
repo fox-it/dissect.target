@@ -28,3 +28,5 @@ def test_trendmicro_plugin_worryfree_log(target_win, fs_win):
     assert len(records) == 1
     assert records[0].ts == dt("2023-03-10T15:06:19Z")
     assert records[0].threat == "Eicar_test_file"
+    assert str(records[0].path) == "C:\\Users\\admin\\Desktop\\test\\eicarcom2.zip"
+    assert records[0].lineno == 0
