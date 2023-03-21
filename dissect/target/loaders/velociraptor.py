@@ -53,4 +53,13 @@ class VelociraptorLoader(DirLoader):
 
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.path)
-        map_dirs(target, dirs, os_type)
+        if os_type == OperatingSystem.WINDOWS:
+            # Velociraptor doesn't have the correct filenames for several files, like $J
+            map_dirs(
+                target,
+                dirs,
+                os_type,
+                usnjrnl_path="$Extend/$UsnJrnl%3A$J",
+            )
+        else:
+            map_dirs(target, dirs, os_type)
