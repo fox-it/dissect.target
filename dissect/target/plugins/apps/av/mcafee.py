@@ -117,6 +117,7 @@ class McAfeePlugin(Plugin):
                             port = int(log_field[len_marker:])
                             protocol = log_field[:3]
                             continue
+
                         if key == self.TEMPLATE_ID_INFECTION and entry.details_info.find(self.MARKER_INFECTION) > -1:
                             threat = log_field
 
