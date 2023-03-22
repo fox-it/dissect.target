@@ -109,6 +109,7 @@ class McAfeePlugin(Plugin):
                             continue
                         except ValueError:
                             pass
+
                         if log_field.startswith(
                             (self.MARKER_SUSPICIOUS_TCP_CONNECTION, self.MARKER_SUSPICIOUS_UDP_CONNECTION)
                         ):
