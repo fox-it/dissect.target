@@ -21,7 +21,7 @@ TrendMicroWFLogRecord = TargetRecordDescriptor(
 
 
 TrendMicroWFFirewallRecord = TargetRecordDescriptor(
-    "application/av/trendmicro/wffirewall",
+    "application/av/trendmicro/wf/firewall",
     [
         ("datetime", "ts"),
         ("net.ipaddress", "local_ip"),
