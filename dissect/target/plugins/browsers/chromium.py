@@ -129,7 +129,7 @@ class ChromiumMixin:
                     if download_path and self.target.os == "windows":
                         download_path = path.from_windows(download_path)
                     elif download_path:
-                        download_path = path.from_posix()(download_path)
+                        download_path = path.from_posix(download_path)
 
                     url = None
                     download_chain = download_chains.get(row.id)
