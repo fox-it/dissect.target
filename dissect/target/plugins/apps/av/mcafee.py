@@ -100,13 +100,9 @@ class McAfeePlugin(Plugin):
                             continue
                         except ValueError:
                             pass
-                        if log_field.startswith(self.MARKER_SUSPICIOUS_TCP_CONNECTION):
-                            port = int(log_field[len_tcpstr:])
-                            protocol = "TCP"
-                            continue
-                        if log_field.startswith(self.MARKER_SUSPICIOUS_UDP_CONNECTION):
+                        if log_field.startswith((self.MARKER_SUSPICIOUS_UDP_CONNECTION, self.MARKER_SUSPICIOUS_UDP_CONNECTION)):
                             port = int(log_field[len_udpstr:])
-                            protocol = "UDP"
+                            protocol = log_field[:3]
                             continue
                         if key == self.TEMPLATE_ID_INFECTION and entry.details_info.find(self.MARKER_INFECTION) > -1:
                             threat = log_field
