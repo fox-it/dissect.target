@@ -87,7 +87,7 @@ class McAfeePlugin(Plugin):
 
                 for entry in log_table.rows():
                     fkey = entry.fkey
-                    log_fields = fields.get(fkey, {})
+                    log_fields = fields[fkey]
                     ip = None
                     protocol = None
                     port = None
