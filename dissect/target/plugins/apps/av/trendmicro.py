@@ -10,7 +10,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 TrendMicroWFLogRecord = TargetRecordDescriptor(
-    "application/av/trendmicro/wflog",
+    "application/av/trendmicro/wf/log",
     [
         ("datetime", "ts"),
         ("string", "threat"),
