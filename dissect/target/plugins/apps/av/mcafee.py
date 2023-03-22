@@ -109,6 +109,7 @@ class McAfeePlugin(Plugin):
                             continue
                         if key == self.TEMPLATE_ID_INFECTION and entry.details_info.find(self.MARKER_INFECTION) > -1:
                             threat = log_field
+
                     yield McAfeeMscLogRecord(
                         ts=from_unix(entry.date),
                         ip=ip,
