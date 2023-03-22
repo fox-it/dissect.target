@@ -47,8 +47,8 @@ class AuthPlugin(Plugin):
             for ts, line in year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", tzinfo):
                 ts_and_hostname = re.search(RE_TS_AND_HOSTNAME, line)
                 if not ts_and_hostname:
-                    self.target.log.warning(f"No timstamp and hostname found on one of the lines in {auth_file}.")
-                    self.target.log.debug(f"Skipping this line: {line}")
+                    self.target.log.warning(f"No timstamp and hostname found on one of the lines in %s.", auth_file)
+                    self.target.log.debug(f"Skipping this line: %s", line)
                     continue
 
                 message = line.replace(ts_and_hostname.group(0), "").strip()
