@@ -82,8 +82,6 @@ class McAfeePlugin(Plugin):
                 fields_table = database.table(self.TABLE_FIELD)
 
                 for field in fields_table.rows():
-                    if not fields.get(field.fkey):
-                        fields[field.fkey] = {}
                     fields[field.fkey][field.field_id] = field.data
                 log_table = database.table(self.TABLE_LOG)
 
