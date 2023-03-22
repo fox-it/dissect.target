@@ -86,6 +86,7 @@ class McAfeePlugin(Plugin):
                         fields[field.fkey] = {}
                     fields[field.fkey][field.field_id] = field.data
                 log_table = database.table(self.TABLE_LOG)
+
                 for entry in log_table.rows():
                     fkey = entry.fkey
                     log_fields = fields.get(fkey, {})
