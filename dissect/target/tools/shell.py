@@ -143,6 +143,15 @@ class TargetCmd(cmd.Cmd):
 
         return cmd.Cmd.default(self, line)
 
+    def emptyline(self):
+        """This function forces Python's cmd.Cmd module to behave like a regular shell.
+
+        When entering an empty command, the cmd module will by default repeat the previous command.
+        By defining an empty ``emptyline`` function we make sure no command is executed instead.
+        See https://stackoverflow.com/a/16479030
+        """
+        pass
+
     def _exec(self, func, command_args_str):
         """
         Command execution helper that chains initial command and piped
@@ -721,6 +730,20 @@ class TargetCli(TargetCmd):
             stdout.flush()
 
     @arg("path")
+    def cmd_zcat(self, args, stdout):
+        """print file content from compressed files"""
+        paths = self.resolveglobpath(args.path)
+        stdout = stdout.buffer
+        for path in paths:
+            path = self.checkfile(path)
+            if not path:
+                continue
+
+            fh = fsutil.open_decompress(path)
+            shutil.copyfileobj(fh, stdout)
+            stdout.flush()
+
+    @arg("path")
     def cmd_hexdump(self, args, stdout):
         """print a hexdump of the first X bytes"""
         path = self.checkfile(args.path)
@@ -747,6 +770,15 @@ class TargetCli(TargetCmd):
             return
 
         pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
+
+    @arg("path")
+    def cmd_zless(self, args, stdout):
+        """open the first 10 MB of a compressed file with zless"""
+        path = self.checkfile(args.path)
+        if not path:
+            return
+
+        pydoc.pager(fsutil.open_decompress(path, "rt").read(10 * 1024 * 1024))
 
     @arg("path", nargs="+")
     def cmd_readlink(self, args, stdout):
