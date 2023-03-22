@@ -92,6 +92,7 @@ class McAfeePlugin(Plugin):
                     protocol = None
                     port = None
                     threat = None
+
                     for key, log_field in log_fields.items():
                         try:
                             ipaddress.ip_address(log_field)
