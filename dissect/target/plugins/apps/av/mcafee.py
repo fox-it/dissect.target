@@ -78,7 +78,7 @@ class McAfeePlugin(Plugin):
         for log_file in self.get_log_files():
             with log_file.open() as open_log:
                 database = SQLite3(open_log)
-                fields = {}
+                fields = defaultdict(dict)
                 fields_table = database.table(self.TABLE_FIELD)
 
                 for field in fields_table.rows():
