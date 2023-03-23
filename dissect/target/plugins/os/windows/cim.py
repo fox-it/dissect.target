@@ -55,7 +55,7 @@ class CimPlugin(Plugin):
         action to be performed, including executing a command, running a script, adding an entry to a log, or sending
         an email. WMI Filters define conditions that will trigger a Consumer.
 
-        Sources:
+        References:
             - https://learn-powershell.net/2013/08/14/powershell-and-events-permanent-wmi-event-subscriptions/
             - https://www.mandiant.com/resources/dissecting-one-ofap
             - https://support.sophos.com/support/s/article/KB-000038535?language=en_US&c__displayLanguage=en_US

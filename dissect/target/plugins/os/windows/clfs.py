@@ -69,7 +69,7 @@ class ClfsPlugin(Plugin):
 
         Containers are used to store the transactional logs in the form of records.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/introduction-to-the-common-log-file-system
         """  # noqa: E501
 

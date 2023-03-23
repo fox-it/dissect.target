@@ -117,7 +117,7 @@ class WindowsErrorReportingPlugin(Plugin):
         information within may be useful for analysis. For example, it may contain the file hash of the crashed
         application within the target_app_id field.
 
-        Sources:
+        References:
             - https://learn.microsoft.com/en-us/windows/win32/wer/windows-error-reporting
             - https://medium.com/dfir-dudes/amcache-is-not-alone-using-wer-files-to-hunt-evil-86bdfdb216d7
 

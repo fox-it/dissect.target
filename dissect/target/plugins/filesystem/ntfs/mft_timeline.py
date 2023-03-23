@@ -103,7 +103,7 @@ class MftTimelinePlugin(Plugin):
 
         The Master File Table (MFT) contains metadata about every file and folder on a NFTS filesystem.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
         for fs in self.target.filesystems:

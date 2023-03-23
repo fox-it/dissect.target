@@ -255,7 +255,7 @@ class PrefetchPlugin(Plugin):
         Prefetch is a memory management feature in Windows. It contains information (for example run count and
         timestamp) about executable applications that have been executed recently or are frequently executed.
 
-        Sources:
+        References:
             - https://www.geeksforgeeks.org/prefetch-files-in-windows/
 
         Yields PrefetchRecords with fields:

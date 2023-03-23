@@ -105,7 +105,7 @@ class EtlPlugin(Plugin):
         application or kernel-mode driver that uses Event Tracing for Windows (ETW) technology to generate trace
         messages or trace events) is generating trace messages.
 
-        Sources:
+        References:
             - https://www.hecfblog.com/2018/06/etw-event-tracing-for-windows-and-etl.html
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/devtest/trace-log
 

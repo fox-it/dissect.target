@@ -49,7 +49,7 @@ class MessagesPlugin(Plugin):
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
         non-critical messages. This log should be considered the "general system activity" log.
 
-        Sources:
+        References:
             - https://geek-university.com/linux/var-log-messages-file/
             - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
         """

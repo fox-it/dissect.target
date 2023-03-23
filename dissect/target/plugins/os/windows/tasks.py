@@ -383,7 +383,7 @@ class TasksPlugin(Plugin):
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
         intervals. An adversary may leverage such scheduled tasks to gain persistence on a system.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Windows_Task_Scheduler
         """
         for f in self.files:

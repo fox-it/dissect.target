@@ -134,8 +134,8 @@ class GenericPlugin(Plugin):
         PATH is an environment variable on an operating system that specifies a set of directories where executable
         programs are located. Adversaries may add the directories in which they have stored their (malicious) binaries.
 
-        Sources:
-            - https://en.wikipedia.org/wiki/PATH_(variable)
+        References:
+            - https://en.wikipedia.org/wiki/PATH_%28variable%29
         """
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
         for r in self.target.registry.keys(key):
@@ -147,7 +147,7 @@ class GenericPlugin(Plugin):
 
         Corporate Windows systems are usually connected to a domain (active directory).
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Active_Directory
         """
         keys = [
@@ -198,7 +198,7 @@ class GenericPlugin(Plugin):
 
         The value of the registry key is stored as a Unix epoch timestamp.
 
-        Resources:
+        References:
             - https://winreg-kb.readthedocs.io/en/latest/_modules/winregrc/sysinfo.html?highlight=_ParseInstallDate
             - https://www.forensics-matters.com/2018/09/15/find-out-windows-installation-date/
         """
@@ -221,7 +221,7 @@ class GenericPlugin(Plugin):
         HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows are loaded by
         user32.dll into every process that loads user32.dll.
 
-        Sources:
+        References:
             - https://attack.mitre.org/techniques/T1546/010/
             - https://docs.microsoft.com/en-us/windows/win32/win7appqual/appinit-dlls-in-windows-7-and-windows-server-2008-r2?redirectedfrom=MSDN
             - https://docs.microsoft.com/en-US/windows/win32/dlls/secure-boot-and-appinit-dlls
@@ -268,7 +268,7 @@ class GenericPlugin(Plugin):
         the version from the application folder will be ignored). However, these registry keys can still be leveraged
         to perform DLL injection.
 
-        Sources:
+        References:
             - https://www.apriorit.com/dev-blog/257-dll-injection
         """
         key = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\KnownDlls"
@@ -297,7 +297,7 @@ class GenericPlugin(Plugin):
         registry key holds the Windows tasks that cannot be performed when Windows is running, the Execute registry key
         should never be populated when Windows is installed. Can be leveraged as persistence mechanisms.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Session_Manager_Subsystem
             - https://www.microsoftpressstore.com/articles/article.aspx?p=2762082&seqNum=2
         """
@@ -352,7 +352,7 @@ class GenericPlugin(Plugin):
         guest access. These can thus be accessed without authentication and can be leveraged for latteral movement
         and/or privilege escalation.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/network-access-restrict-anonymous-access-to-named-pipes-and-shares
         """  # noqa: E501
         key = "HKLM\\System\\CurrentControlSet\\Services\\LanManServer\\Parameters"
@@ -412,9 +412,9 @@ class GenericPlugin(Plugin):
         (cmd.exe) is started. Since these commands are not shown to the user in the Command Processor, it can be
         exploited by an adversary to hide malicious commands or leverage as a persistence mechanism
 
-        Sources:
+        References:
             - https://devblogs.microsoft.com/oldnewthing/20071121-00/?p=24433
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc779439(v=ws.10)?redirectedfrom=MSDN
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc779439%28v=ws.10%29?redirectedfrom=MSDN
         """  # noqa: E501
         keys = [
             ("HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Command Processor", "AutoRun"),
@@ -447,7 +447,7 @@ class GenericPlugin(Plugin):
         shell that is used when a Windows system is started in "Safe Mode with Command Prompt". Can be leveraged as a
         persistence mechanism.
 
-        Sources:
+        References:
             - https://technet.microsoft.com/en-us/library/cc976124.aspx
         """
         key = "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Safeboot"
@@ -496,9 +496,9 @@ class GenericPlugin(Plugin):
         The PendingFileRenameOperations registry key value contains information about files that will be renamed on
         reboot. Can be used to hunt for malicious binaries.
 
-        Sources:
+        References:
             - https://forensicatorj.wordpress.com/2014/06/25/interpreting-the-pendingfilerenameoperations-registry-key-for-forensics/
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc960241(v=technet.10)?redirectedfrom=MSDN
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-2000-server/cc960241%28v=technet.10%29?redirectedfrom=MSDN
             - https://qtechbabble.wordpress.com/2020/06/26/use-pendingfilerenameoperations-registry-key-to-automatically-delete-a-file-on-reboot/
         """  # noqa: E501
         key = "HKLM\\System\\CurrentControlSet\\Control\\Session Manager"
@@ -545,7 +545,7 @@ class GenericPlugin(Plugin):
     def winsocknamespaceprovider(self):
         """Return available protocols stored in the Winsock catalog database.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/win32/winsock/name-space-service-providers-2?redirectedfrom=MSDN
         """
         keys = [

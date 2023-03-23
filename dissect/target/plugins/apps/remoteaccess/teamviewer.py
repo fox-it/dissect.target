@@ -45,7 +45,7 @@ class TeamviewerPlugin(Plugin):
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a
         system.
 
-        Sources:
+        References:
             - https://www.teamviewer.com/nl/
         """
         for logfile, user in self.logfiles:

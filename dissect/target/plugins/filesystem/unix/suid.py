@@ -22,7 +22,7 @@ class SuidPlugin(Plugin):
         SUID binary owned by the root user can be run with root privileges by any user. Such binaries can be leveraged
         by an adversary to perform privilege escalation.
 
-        Sources:
+        References:
             - https://steflan-security.com/linux-privilege-escalation-suid-binaries/
         """
         for record in self.target.walkfs():

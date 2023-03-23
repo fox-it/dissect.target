@@ -42,9 +42,9 @@ WireGuardPeerRecord = TargetRecordDescriptor(
 class WireGuardPlugin(Plugin):
     """WireGuard configuration parser.
 
-    Resources:
-    - https://manpages.debian.org/testing/wireguard-tools/wg.8.en.html#CONFIGURATION_FILE_FORMAT
-    - https://github.com/pirate/wireguard-docs
+    References:
+        - https://manpages.debian.org/testing/wireguard-tools/wg.8.en.html#CONFIGURATION_FILE_FORMAT
+        - https://github.com/pirate/wireguard-docs
     """
 
     __namespace__ = "wireguard"

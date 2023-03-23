@@ -53,7 +53,7 @@ class NginxPlugin(plugin.Plugin):
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of NGINX access log files in unified WebserverAccessLogRecord format.
 
-        Resources:
+        References:
             - https://docs.nginx.com/nginx/admin-guide/monitoring/logging/#access_log
             - http://nginx.org/en/docs/http/ngx_http_log_module.html#log_format
         """

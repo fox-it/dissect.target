@@ -57,7 +57,7 @@ class RunKeysPlugin(Plugin):
         time the user logs on and the RunOnce key makes the program run once and deletes the key after. Often leveraged
         as a persistence mechanism.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
 
         Yields RunKeyRecords with fields:

@@ -46,7 +46,7 @@ class IISLogsPlugin(plugin.Plugin):
 
     References:
         - https://docs.microsoft.com/en-us/iis/get-started/planning-your-iis-architecture/introduction-to-applicationhostconfig
-        - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)
+        - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29
     """  # noqa: E501
 
     APPLICATION_HOST_CONFIG = "sysvol/windows/system32/inetsrv/config/applicationHost.config"
@@ -92,9 +92,9 @@ class IISLogsPlugin(plugin.Plugin):
         This format is not the default IIS log format.
 
         References:
-            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#iis-log-file-format
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311(v=ws.10)
-            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-IIS
+            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29#iis-log-file-format
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311%28v=ws.10%29
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
         """  # noqa: E501
 
         tzinfo = self.target.datetime.tzinfo
@@ -150,9 +150,9 @@ class IISLogsPlugin(plugin.Plugin):
         This is the default logging format for IIS [^3].
 
         References:
-            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807(v=vs.90)#w3c-extended-log-file-format
-            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596(v=ws.10)
-            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile/#attributes-logFormat-W3C
+            - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29#w3c-extended-log-file-format
+            - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596%28v=ws.10%29
+            - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
         """  # noqa: E501
 
         basic_fields = {

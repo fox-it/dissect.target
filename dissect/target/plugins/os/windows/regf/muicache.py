@@ -43,7 +43,7 @@ class MuiCachePlugin(Plugin):
         the Multilingual User Interface service in Windows. MUIcache references the file description contained within
         the executable's resource section and populates that value.
 
-        Sources:
+        References:
             - https://www.magnetforensics.com/blog/forensic-analysis-of-muicache-files-in-windows/
             - https://forensafe.com/blogs/muicache.html
 

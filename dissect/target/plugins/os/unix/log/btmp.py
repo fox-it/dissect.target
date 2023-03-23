@@ -35,7 +35,7 @@ class BtmpPlugin(Plugin):
 
         On a Linux system, failed login attempts are stored in the btmp file located in the var/log/ folder.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Utmp
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
