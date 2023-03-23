@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import time
 from pathlib import Path
 from typing import Union
@@ -9,7 +10,7 @@ from dissect.util.stream import AlignedStream
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
-from dissect.target.plugin import arg, export
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.target import Target
 
 TARGETD_AVAILABLE = False
@@ -85,7 +86,7 @@ class TargetdLoader(Loader):
     )
     @arg("--help-targetd", action="help", help="Show help message for special targetd loader and exit")
     @arg("-h", "--help", action="help", help="Show help message for plugin and exit")
-    def plugin_bridge(self, peers: int, host: str, local_link: str, port: int, adapter: str):
+    def plugin_bridge(self, plugin_func: str, peers: int, host: str, local_link: str, port: int, adapter: str):
         """Command Execution Bridge Plugin for Targetd.
 
         This is a generic plugin interceptor that becomes active only if using
@@ -103,7 +104,7 @@ class TargetdLoader(Loader):
             self.client = Client(host, port, [self.uri], local_link, "targetd")
             self.client.module_fullname = "dissect.target.loaders"
             self.client.module_fromlist = ["command_runner"]
-            self.client.command = self._plugin_func
+            self.client.command = plugin_func
             self.peers = peers
             self.client.start()
 
@@ -111,14 +112,20 @@ class TargetdLoader(Loader):
             time.sleep(1)
         return self.output
 
-    def get_command(self, func):
+    def _get_command(self, func: str) -> tuple[Loader, functools.partial]:
         """For target API"""
-        self._plugin_func = func
-        return (self, self.plugin_bridge)
+        curried_plugin_bridge = functools.update_wrapper(
+            functools.partial(self.plugin_bridge, plugin_func=func), self.plugin_bridge
+        )
+        return (self, curried_plugin_bridge)
+
+    def _add_plugin(self, plugin: Plugin):
+        plugin.check_compatibe = lambda: True
 
     def map(self, target: Target) -> None:
         target.disks.add(RawContainer(TargetdStream()))
-        target.get_function = self.get_command
+        target.get_function = self._get_command
+        target.add_plugin = self._add_plugin
 
     @staticmethod
     def detect(path: Path) -> bool:

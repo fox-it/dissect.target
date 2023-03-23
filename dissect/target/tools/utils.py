@@ -52,6 +52,10 @@ def generate_argparse_for_bound_method(
 ) -> argparse.ArgumentParser:
     """Generate an `argparse.ArgumentParser` for a bound `Plugin` class method"""
 
+    # allow functools.partial wrapped method
+    while hasattr(method, "func"):
+        method = method.func
+
     if not inspect.ismethod(method):
         raise ValueError(f"Value `{method}` is not a bound plugin instance method")
 
@@ -127,9 +131,7 @@ def generate_argparse_for_plugin(
 
 def plugin_factory(target: Target, plugin_class: type, funcname: str) -> tuple[Plugin, str]:
     if TargetdLoader.instance:
-        plugin_obj = TargetdLoader.instance
-        plugin_obj._plugin_func = funcname
-        funcname = "plugin_bridge"
+        return target.get_function(funcname)
     else:
         plugin_obj = plugin_class(target)
     target_attr = getattr(plugin_obj, funcname)
