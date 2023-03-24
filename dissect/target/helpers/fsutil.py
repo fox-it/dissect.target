@@ -5,7 +5,6 @@ Also contains some other filesystem related utilities.
 
 from __future__ import annotations
 
-import bz2
 import errno
 import fnmatch
 import gzip
@@ -16,6 +15,13 @@ import posixpath
 import re
 from pathlib import Path, PurePath, _PathParents, _PosixFlavour
 from typing import Any, BinaryIO, Iterator, Sequence, TextIO, Union
+
+try:
+    import bz2
+
+    HAVE_BZ2 = True
+except ImportError:
+    HAVE_BZ2 = False
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import (
@@ -995,7 +1001,7 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode)
     # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
-    elif magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+    elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
         return bz2.open(file, mode)
     else:
         file.close()
