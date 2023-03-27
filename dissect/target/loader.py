@@ -173,6 +173,7 @@ def open(item: Union[str, Path], *args, **kwargs):
 
 register("local", "LocalLoader")
 register("remote", "RemoteLoader")
+register("targetd", "TargetdLoader")
 register("asdf", "AsdfLoader")
 register("tar", "TarLoader")
 register("vmx", "VmxLoader")
