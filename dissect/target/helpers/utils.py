@@ -87,6 +87,7 @@ def year_rollover_helper(
     last_seen_month = None
 
     with fsutil.open_decompress(path, "rt") as fh:
+        warned = False
         for line in fsutil.reverse_readlines(fh):
             line = STRIP_RE.sub(r"", line)
             if not line:
@@ -95,8 +96,10 @@ def year_rollover_helper(
             timestamp = re.search(re_ts, line)
 
             if not timestamp:
-                log.warning(f"No timestamp found in one of the lines in {path}!")
-                log.debug(f"Skipping this line: {line}")
+                if not warned:
+                    log.warning("No timestamp found in one of the lines in %s!", path)
+                    warned = True
+                log.debug("Skipping line: %s", line)
                 continue
 
             relative_ts = datetime.strptime(timestamp.group(0), ts_format)
