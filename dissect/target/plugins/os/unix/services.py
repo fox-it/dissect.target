@@ -34,7 +34,7 @@ class ServicesPlugin(Plugin):
     def services(self) -> Iterator[LinuxServiceRecord]:
         """Return information about all installed systemd and init.d services.
 
-        Resources:
+        References:
         - https://geeksforgeeks.org/what-is-init-d-in-linux-service-management
         - http://0pointer.de/blog/projects/systemd-for-admins-3.html
         - https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
