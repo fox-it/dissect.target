@@ -1,0 +1,15 @@
+[Unit]
+Description=an example systemd service
+After=foobar.service
+Requires=foo.service bar.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; \
+                        exit 0'
+SyslogIdentifier=example-service
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
+Alias=example.service

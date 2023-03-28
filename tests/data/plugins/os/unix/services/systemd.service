@@ -1,0 +1,14 @@
+[Unit]
+Description=an example systemd service
+After=foobar.service
+Requires=foo.service bar.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/simple-command --key value
+SyslogIdentifier=
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
+Alias=example.service
