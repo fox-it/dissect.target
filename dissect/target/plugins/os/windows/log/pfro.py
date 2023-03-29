@@ -38,7 +38,7 @@ class PfroPlugin(Plugin):
         files that are locked or being used and that will be renamed on reboot. This is related to the filerenameop
         plugin.
 
-        Sources:
+        References:
             - https://social.technet.microsoft.com/Forums/en-US/9b66a7b0-16d5-4d22-be4e-51df12db9f80/issue-understanding-pfro-log
             - https://community.ccleaner.com/topic/49106-pending-file-rename-operations-log/
 

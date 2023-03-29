@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
+from dissect.target.loaders.targetd import TargetdLoader
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -50,6 +51,10 @@ def generate_argparse_for_bound_method(
     usage_tmpl: Optional[str] = None,
 ) -> argparse.ArgumentParser:
     """Generate an `argparse.ArgumentParser` for a bound `Plugin` class method"""
+
+    # allow functools.partial wrapped method
+    while hasattr(method, "func"):
+        method = method.func
 
     if not inspect.ismethod(method):
         raise ValueError(f"Value `{method}` is not a bound plugin instance method")
@@ -124,6 +129,15 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
+def plugin_factory(target: Target, plugin_class: type, funcname: str) -> tuple[Plugin, str]:
+    if TargetdLoader.instance:
+        return target.get_function(funcname)
+    else:
+        plugin_obj = plugin_class(target)
+    target_attr = getattr(plugin_obj, funcname)
+    return plugin_obj, target_attr
+
+
 def execute_function_on_target(
     target: Target,
     func: PluginFunction,
@@ -148,8 +162,7 @@ def execute_function_on_target(
                 f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
             )
 
-    plugin_obj = plugin_class(target)
-    target_attr = getattr(plugin_obj, func.method_name)
+    plugin_obj, target_attr = plugin_factory(target, plugin_class, func.method_name)
     plugin_method = None
     parser = None
 

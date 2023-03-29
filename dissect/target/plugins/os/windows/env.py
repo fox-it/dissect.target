@@ -329,7 +329,7 @@ class EnvironmentVariablePlugin(Plugin):
         Examples variables are PATH, HOME and TEMP. Adversaries may alter or create environment variables to exploit
         a system.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Environment_variable
             - https://www.elttam.com/blog/env/
         """

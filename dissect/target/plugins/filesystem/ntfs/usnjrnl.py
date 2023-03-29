@@ -35,7 +35,7 @@ class UsnjrnlPlugin(Plugin):
         The Update Sequence Number Journal (UsnJrnl) is a feature of an NTFS file system and contains information about
         filesystem activities. Each volume has its own UsnJrnl.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/USN_Journal
             - https://velociraptor.velocidex.com/the-windows-usn-journal-f0c55c9010e
         """

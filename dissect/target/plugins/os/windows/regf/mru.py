@@ -110,7 +110,7 @@ class MRUPlugin(Plugin):
 
     The Windows registry contains various keys about Most Recently Used (MRU) files.
 
-    Sources:
+    References:
         - https://winreg-kb.readthedocs.io/en/latest/sources/explorer-keys/Most-recently-used.html
     """
 
@@ -126,7 +126,7 @@ class MRUPlugin(Plugin):
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU`` registry key contains information
         about the most recent commands that have been performed by the Run application
 
-        Sources:
+        References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU"
@@ -142,7 +142,7 @@ class MRUPlugin(Plugin):
         information about the last 10 documents that the currently logged on user accessed or executed via Windows
         Explorer.
 
-        Sources:
+        References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
 
@@ -158,7 +158,7 @@ class MRUPlugin(Plugin):
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU`` registry key
         contains information about the most recently opened or saved files.
 
-        Sources:
+        References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
 
@@ -176,7 +176,7 @@ class MRUPlugin(Plugin):
         OpenSaveMRU registry key. Also each value tracks the directory location for the last file that was accessed by
         that application.
 
-        Sources:
+        References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
         """
 
@@ -218,7 +218,7 @@ class MRUPlugin(Plugin):
           - ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery``:
             This registry key contains the most recent search history from Windows Explorer. (Windows >=7)
 
-        Sources:
+        References:
             - https://digitalf0rensics.wordpress.com/2014/01/17/windows-registry-and-forensics-part2/
 
         Known categories:
@@ -257,7 +257,7 @@ class MRUPlugin(Plugin):
         The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Map Network Drive MRU registry key contains
         information about the most recently used mapped network drives.
 
-        Sources:
+        References:
             - https://winreg-kb.readthedocs.io/en/latest/sources/explorer-keys/Most-recently-used.html#keys-with-a-mrulist-value
         """  # noqa: E501
 

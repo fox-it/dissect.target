@@ -145,7 +145,7 @@ class AuditpolPlugin(Plugin):
         For Windows, the audit policy settings are stored in the HKEY_LOCAL_MACHINE\\Security\\Policy\\PolAdtEv registry
         key. It shows for each possible audit event if it is logged.
 
-        Sources:
+        References:
             - https://countuponsecurity.com/tag/poladtev/
         """
         for regf in self.target.registry.keys(self.KEY):

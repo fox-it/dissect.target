@@ -44,7 +44,7 @@ class AnydeskPlugin(Plugin):
         AnyDesk is a remote desktop application and can be used by adversaries to get (persistent) access to a machine.
         Log files (.trace files) are retrieved from /ProgramData/AnyDesk/ and AppData/roaming/AnyDesk/
 
-        Sources:
+        References:
             - https://www.inversecos.com/2021/02/forensic-analysis-of-anydesk-logs.html
         """
         for logfile, user in self.logfiles:

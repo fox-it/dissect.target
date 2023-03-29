@@ -88,7 +88,7 @@ class CaddyPlugin(plugin.Plugin):
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Parses Caddy V1 CRF and Caddy V2 JSON access logs.
 
-        Resources:
+        References:
             - https://caddyserver.com/docs/caddyfile/directives/log#format-modules
         """
         for path in self.log_paths:

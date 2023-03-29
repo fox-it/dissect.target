@@ -37,7 +37,7 @@ class PowerShellHistoryPlugin(Plugin):
         The PowerShell ConsoleHost_history.txt file contains information about the commands executed with PowerShell in
         a terminal. No data is recorded from terminal-less PowerShell sessions.
 
-        Sources:
+        References:
             - https://0xdf.gitlab.io/2018/11/08/powershell-history-file.html
         """
         for user, path in self._history:

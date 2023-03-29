@@ -281,12 +281,12 @@ def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -
 class SamPlugin(Plugin):
     """SAM plugin.
 
-    Resources:
-        MS-SAMR Specification
-        Reversing samsrv.dll
-        https://github.com/gentilkiwi/mimikatz
-        https://github.com/skelsec/pypykatz
-        https://web.archive.org/web/20190717124313/http://www.beginningtoseethelight.org/ntsecurity/index.htm
+    References:
+        - MS-SAMR Specification
+        - Reversing samsrv.dll
+        - https://github.com/gentilkiwi/mimikatz
+        - https://github.com/skelsec/pypykatz
+        - https://web.archive.org/web/20190717124313/http://www.beginningtoseethelight.org/ntsecurity/index.htm
     """
 
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
@@ -354,7 +354,7 @@ class SamPlugin(Plugin):
         The Security Account Manager (SAM) registry hive contains registry keys that store usernames, full names and
         passwords in a hashed format, either an LM or NT hash.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Security_Account_Manager
 
         Yields SamRecords with fields:

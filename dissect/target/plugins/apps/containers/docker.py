@@ -39,10 +39,10 @@ DOCKER_NS_REGEX = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d
 
 class DockerPlugin(Plugin):
     """
-    Resources:
-    - https://didactic-security.com/resources/docker-forensics.pdf
-    - https://didactic-security.com/resources/docker-forensics-cheatsheet.pdf
-    - https://github.com/google/docker-explorer
+    References:
+        - https://didactic-security.com/resources/docker-forensics.pdf
+        - https://didactic-security.com/resources/docker-forensics-cheatsheet.pdf
+        - https://github.com/google/docker-explorer
     """
 
     __namespace__ = "docker"

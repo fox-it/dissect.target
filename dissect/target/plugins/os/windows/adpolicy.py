@@ -45,7 +45,7 @@ ADPolicyRecord = TargetRecordDescriptor(
 class ADPolicyPlugin(Plugin):
     """Plugin that parses AD policies present on Windows Server and Desktop systems
 
-    Sources:
+    References:
         - https://docs.microsoft.com/en-us/previous-versions/windows/desktop/policy/registry-policy-file-format
     """
 
@@ -69,7 +69,7 @@ class ADPolicyPlugin(Plugin):
         An Active Directory (AD) maintains global policies that should be adhered by all systems in the domain.
         Example policies are password policies, account lockout policies and group policies.
 
-        Sources:
+        References:
             - https://www.windows-active-directory.com/windows-active-directory-policies.html
         """
         for policy_dir in self.dirs:

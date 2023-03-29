@@ -263,8 +263,8 @@ ShellBagRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, 
 class ShellBagsPlugin(Plugin):
     """Windows Shellbags plugin.
 
-    Resources:
-        https://github.com/libyal/libfwsi
+    References:
+        - https://github.com/libyal/libfwsi
     """
 
     KEYS = [
@@ -292,7 +292,7 @@ class ShellBagsPlugin(Plugin):
         Shellbags are registry keys to improve user experience when using Windows Explorer. It stores information about
         for example file/folder creation time and access time.
 
-        Sources:
+        References:
             - https://www.hackingarticles.in/forensic-investigation-shellbags/
         """
         for regkey in self.bagkeys:

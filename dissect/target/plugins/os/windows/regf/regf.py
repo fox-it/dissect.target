@@ -43,7 +43,7 @@ class RegfPlugin(Plugin):
         The Windows Registry is a hierarchical database that stores low-level settings for the Windows operating system
         and for applications that opt to use it.
 
-        Sources:
+        References:
             - https://en.wikipedia.org/wiki/Windows_Registry
 
         Yields RegistryKeyRecords and RegistryValueRecords

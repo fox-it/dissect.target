@@ -321,7 +321,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         • InventoryApplicationFile
         * InventoryApplicationShortcut
 
-    Resources:
+    References:
         https://binaryforay.blogspot.com/2015/04/appcompatcache-changes-in-windows-10.html
         https://www.ssi.gouv.fr/uploads/2019/01/anssi-coriin_2019-analysis_amcache.pdf
         https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
@@ -356,7 +356,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
     def parse_inventory_application(self):
         """Parse Root\\InventoryApplication registry key subkeys.
 
-        Resources:
+        References:
             - https://docs.microsoft.com/en-us/windows/privacy/required-windows-diagnostic-data-events-and-fields-2004#microsoftwindowsinventorycoreinventoryapplicationadd
 
         """  # noqa
@@ -426,7 +426,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
     def parse_inventory_application_file(self):
         """Parse Root\\InventoryApplicationFile registry key subkeys.
 
-        Resources:
+        References:
             - https://docs.microsoft.com/en-us/windows/privacy/required-windows-diagnostic-data-events-and-fields-2004#microsoftwindowsinventorycoreinventoryapplicationadd
 
         """  # noqa
@@ -552,7 +552,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         Amcache is a registry hive that stores information about executed programs. The InventoryApplication key holds
         all application objects that are in cache.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/privacy/basic-level-windows-diagnostic-events-and-fields-1803
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
         """
@@ -566,7 +566,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         Amcache is a registry hive that stores information about executed programs. The InventoryApplicationFile key
         holds the application files that are in cache.
 
-        Sources:
+        References:
             - https://docs.microsoft.com/en-us/windows/privacy/basic-level-windows-diagnostic-events-and-fields-1803
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
         """
@@ -580,7 +580,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         Amcache is a registry hive that stores information about executed programs. The InventoryDriverBinary key holds
         the driver binaries that are in cache.
 
-        Sources:
+        References:
             - https://binaryforay.blogspot.com/2017/10/amcache-still-rules-everything-around.html
             - https://docs.microsoft.com/en-us/windows/privacy/basic-level-windows-diagnostic-events-and-fields-1803
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
@@ -596,7 +596,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         field holds the shortcuts that are in cache. The key values contain information about the target of the lnk
         file.
 
-        Sources:
+        References:
             - https://binaryforay.blogspot.com/2017/10/amcache-still-rules-everything-around.html
             - https://docs.microsoft.com/en-us/windows/privacy/basic-level-windows-diagnostic-events-and-fields-1803
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
@@ -611,7 +611,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         Amcache is a registry hive that stores information about executed programs. The InventoryDeviceContainer key
         holds the device containers that are in cache. Example devices are bluetooth, printers, audio, etc.
 
-        Sources:
+        References:
             - https://binaryforay.blogspot.com/2017/10/amcache-still-rules-everything-around.html
             - https://docs.microsoft.com/en-us/windows/privacy/basic-level-windows-diagnostic-events-and-fields-1803
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
@@ -626,7 +626,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         TODO: Research C:\\Windows\\appcompat\\pca\\PcaGeneralDb0.txt and
               C:\\Windows\\appcompat\\pca\\PcaGeneralDb1.txt files.
 
-        Sources:
+        References:
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
 

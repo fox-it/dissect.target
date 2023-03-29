@@ -35,7 +35,7 @@ class WtmpPlugin(Plugin):
         logins at which terminals, logouts, system events and current status of the system, system boot time
         (used by uptime) etc.
 
-        Sources:
+        References:
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
         wtmp_paths = self.target.fs.glob("/var/log/wtmp*")

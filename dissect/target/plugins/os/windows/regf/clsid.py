@@ -31,7 +31,7 @@ class CLSIDPlugin(Plugin):
     HKEY_CURRENT_USER\\Software\\Classes\\CLSID and HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID. Malware may make use
     of the CLSID system to launch themselves automatically or when certain conditions are triggered.
 
-    Sources:
+    References:
         - https://docs.microsoft.com/en-us/windows/win32/com/clsid-key-hklm
         - https://www.enigmasoftware.com/what-is-clsid-registry-key/
     """

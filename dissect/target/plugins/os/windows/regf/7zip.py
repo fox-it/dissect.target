@@ -80,7 +80,7 @@ class SevenZipPlugin(Plugin):
         additional registry keys, such as ArcHistory and FolderHistory. This might provide insight in which files have
         been archived by 7-Zip.
 
-        Sources:
+        References:
             - https://www.7-zip.org/
         """
         target = self.target

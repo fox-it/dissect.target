@@ -247,15 +247,20 @@ def test_helpers_fsutil_pure_dissect_path__from_parts_no_fs_exception():
         fsutil.PureDissectPath(Mock(), "/some/dir")
 
 
-def test_helpers_fsutil_open_decompress():
+@pytest.mark.parametrize(
+    ("file_name, compressor, content"),
+    [
+        ("plain", lambda x: x, b"plain\ncontent"),
+        ("comp.gz", gzip.compress, b"gzip\ncontent"),
+        ("comp_gz", gzip.compress, b"gzip\ncontent"),
+        ("comp.bz2", bz2.compress, b"bz2\ncontent"),
+        ("comp_bz2", bz2.compress, b"bz2\ncontent"),
+    ],
+)
+def test_helpers_fsutil_open_decompress(file_name, compressor, content):
     vfs = VirtualFilesystem()
-    vfs.map_file_fh("plain", io.BytesIO(b"plain\ncontent"))
-    vfs.map_file_fh("comp.gz", io.BytesIO(gzip.compress(b"gzip\ncontent")))
-    vfs.map_file_fh("comp.bz2", io.BytesIO(bz2.compress(b"bz2\ncontent")))
-
-    fsutil.open_decompress(vfs.path("plain")).read() == b"plain\ncontent"
-    fsutil.open_decompress(vfs.path("comp.gz")).read() == b"gzip\ncontent"
-    fsutil.open_decompress(vfs.path("comp.bz2")).read() == b"bz2\ncontent"
+    vfs.map_file_fh(file_name, io.BytesIO(compressor(content)))
+    assert fsutil.open_decompress(vfs.path(file_name)).read() == content
 
 
 def test_helpers_fsutil_reverse_readlines():

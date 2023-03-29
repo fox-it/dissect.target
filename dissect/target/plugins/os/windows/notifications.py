@@ -73,7 +73,7 @@ class NotificationsPlugin(Plugin):
     def wpndatabase(self):
         """Returns Windows Notifications from wpndatabase.db (post Windows 10 Anniversary).
 
-        Resources:
+        References:
             - https://inc0x0.com/2018/10/windows-10-notification-database/
         """
         for user, wpndatabase in self.wpndb_files:

@@ -56,7 +56,7 @@ class AuditPlugin(Plugin):
         The audit log file on a Linux machine stores security-relevant information.
         Based on pre-configured rules. Log messages consist of space delimited key=value pairs.
 
-        Sources:
+        References:
             - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/security_guide/chap-system_auditing
             - https://linux-audit.com/linux-audit-log-files-in-var-log-audit/
             - https://man7.org/linux/man-pages/man8/auditd.8.html

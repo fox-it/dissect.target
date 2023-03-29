@@ -265,7 +265,7 @@ class AtopPlugin(Plugin):
         and for every process (and thread) it shows e.g. the CPU utilization, memory growth, disk utilization,
         priority, username, state, and exit code.
 
-        Sources:
+        References:
             - https://diablohorn.com/2022/11/17/parsing-atop-files-with-python-dissect-cstruct/
 
         Yields AtopRecord with fields:

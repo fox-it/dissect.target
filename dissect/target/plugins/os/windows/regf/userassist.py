@@ -68,7 +68,7 @@ class UserAssistPlugin(Plugin):
         The UserAssist registry keys contain information about programs that were recently executed on the system.
         Programs launch via the commandline are not registered within these registry keys.
 
-        Sources:
+        References:
             - https://www.magnetforensics.com/blog/artifact-profile-userassist/
             - https://www.aldeid.com/wiki/Windows-userassist-keys
 

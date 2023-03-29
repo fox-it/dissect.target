@@ -20,9 +20,24 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("uri", "from_url"),
     ("path", "source"),
 ]
+GENERIC_DOWNLOAD_RECORD_FIELDS = [
+    ("datetime", "ts_start"),
+    ("datetime", "ts_end"),
+    ("string", "browser"),
+    ("varint", "id"),
+    ("path", "path"),
+    ("uri", "url"),
+    ("filesize", "size"),
+    ("varint", "state"),
+    ("path", "source"),
+]
 
 BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/history", GENERIC_HISTORY_RECORD_FIELDS
+)
+
+BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
 )
 
 
@@ -51,28 +66,42 @@ class BrowserPlugin(Plugin):
         for entry in self.BROWSERS:
             try:
                 self._plugins.append(getattr(self.target, entry))
-            except Exception:  # noqa
+            except Exception:
                 target.log.exception("Failed to load browser plugin: %s", entry)
 
-    def check_compatible(self):
+    def check_compatible(self) -> bool:
+        """Perform a compatibility check with the target.
+        This function checks if any of the supported browser plugins
+        can be used. Otherwise it should raise an ``UnsupportedPluginError``.
+        Raises:
+            UnsupportedPluginError: If the plugin could not be loaded.
+        """
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible browser plugins found")
 
-    def _func(self, f):
-        for p in self._plugins:
+    def _func(self, func_name: str):
+        """Return the supported browser plugin records.
+
+        Args:
+            func_name: Exported function of the browser plugin to find.
+
+        Yields:
+            Record from the browser function.
+        """
+        for plugin_name in self._plugins:
             try:
-                for entry in getattr(p, f)():
+                for entry in getattr(plugin_name, func_name)():
                     yield entry
             except Exception:
-                self.target.log.exception("Failed to execute browser plugin: %s.%s", p._name, f)
+                self.target.log.exception("Failed to execute browser plugin: %s.%s", plugin_name._name, func_name)
 
     @export(record=BrowserHistoryRecord)
     def history(self):
-        """Return browser history records from all browsers installed.
+        """Return browser history records from all browsers installed and supported.
 
         Historical browser records for Chrome, Chromium, Edge (Chromium), Firefox, and Internet Explorer are returned.
 
-        Yields BrowserHistoryRecords with the following fields:
+        Yields BrowserHistoryRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Visit timestamp.
@@ -91,12 +120,38 @@ class BrowserPlugin(Plugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
-        for e in self._func("history"):
-            yield e
+        yield from self._func("history")
+
+    @export(record=BrowserDownloadRecord)
+    def downloads(self):
+        """Return browser download records from all browsers installed and supported.
+
+        Yields:
+            BrowserDownloadRecord with the following fieds:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            ts_start (datetime): Download start timestamp.
+            ts_end (datetime): Download end timestamp.
+            browser (string): The browser from which the records are generated from.
+            id (string): Record ID.
+            path (string): Download path.
+            url (uri): Download URL.
+            size (varint): Download file size.
+            state (varint): Download state number.
+            source: (path): The source file of the download record.
+        """
+        yield from self._func("downloads")
 
 
-def try_idna(s):
+def try_idna(url: str) -> bytes:
+    """Attempts to convert a possible Unicode url to ASCII using the IDNA standard.
+
+    Args:
+        url: A String containing the url to be converted.
+
+    Returns: Bytes object with the ASCII version of the url.
+    """
     try:
-        return s.encode("idna")
-    except Exception:  # noqa
-        return s
+        return url.encode("idna")
+    except Exception:
+        return url
