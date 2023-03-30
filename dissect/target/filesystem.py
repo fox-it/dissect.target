@@ -770,7 +770,7 @@ class VirtualDirectory(FilesystemEntry):
 
         self.entries[name] = entry
 
-    def get(self, path) -> FilesystemEntry:
+    def get(self, path: str) -> FilesystemEntry:
         return self.fs.get(path, relentry=self)
 
     def iterdir(self) -> Iterator[str]:

@@ -375,6 +375,30 @@ def test_filesystem_virtual_filesystem_get_erroring_vfs_paths(vfs, vfs_path, exc
         vfs.get(vfs_path)
 
 
+def test_filesystem_vritual_filesystem_get_case_sensitive():
+    vfs = VirtualFilesystem()
+    vfs.map_file_entry("/path/to/some/file_lower_case", VirtualFile(vfs, "file_lower_case", None))
+    vfs.map_file_entry("/path/TO/some/FILE_UPPER_CASE", VirtualFile(vfs, "FILE_UPPER_CASE", None))
+
+    assert vfs.get("/path/to/some/file_lower_case").name == "file_lower_case"
+    assert vfs.get("/path/TO/some/FILE_UPPER_CASE").name == "FILE_UPPER_CASE"
+    with pytest.raises(FileNotFoundError):
+        vfs.get("/path/to/some/FILE_LOWER_CASE")
+    with pytest.raises(FileNotFoundError):
+        assert vfs.get("/path/TO/some/file_upper_case")
+
+
+def test_filesystem_vritual_filesystem_get_case_insensitive():
+    vfs = VirtualFilesystem(case_sensitive=False)
+    vfs.map_file_entry("/path/to/some/file_lower_case", VirtualFile(vfs, "file_lower_case", None))
+    vfs.map_file_entry("/path/TO/some/FILE_UPPER_CASE", VirtualFile(vfs, "FILE_UPPER_CASE", None))
+
+    assert vfs.get("/path/to/some/file_lower_case").name == "file_lower_case"
+    assert vfs.get("/path/TO/some/FILE_UPPER_CASE").name == "FILE_UPPER_CASE"
+    assert vfs.get("/path/to/some/FILE_LOWER_CASE").name == "file_lower_case"
+    assert vfs.get("/path/TO/some/file_upper_case").name == "FILE_UPPER_CASE"
+
+
 @pytest.mark.parametrize(
     "paths",
     [
