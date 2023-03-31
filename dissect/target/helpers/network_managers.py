@@ -516,25 +516,25 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
             line = record.message
 
             # Ubuntu DHCP
-            if "DHCPv4" in line or "DHCPv6" in line:
+            if ("DHCPv4" in line or "DHCPv6" in line) and " address " in line and " via " in line:
                 ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
                 if ip not in ips:
                     ips.append(ip)
 
             # Ubuntu DHCP NetworkManager
-            if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line):
+            elif "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line) and "=> '" in line:
                 ip = line.split("=> '")[1].replace("'", "").strip()
                 if ip not in ips:
                     ips.append(ip)
 
             # Debian and CentOS dhclient
-            if record.daemon == "dhclient" and "bound to" in line:
+            elif record.daemon == "dhclient" and "bound to" in line:
                 ip = line.split("bound to")[1].split(" ")[1].strip()
                 if ip not in ips:
                     ips.append(ip)
 
             # CentOS DHCP and general NetworkManager
-            if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+            elif " address " in line and ("dhcp4" in line or "dhcp6" in line):
                 ip = line.split(" address ")[1].strip()
                 if ip not in ips:
                     ips.append(ip)
