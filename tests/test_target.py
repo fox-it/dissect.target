@@ -1,11 +1,121 @@
+import io
 import urllib.parse
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import FilesystemError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.target import Event, Target
+from dissect.target.loader import LOADERS
+from dissect.target.loaders.raw import RawLoader
+from dissect.target.target import Event, Target, TargetLogAdapter, log
+
+
+class ErrorCounter(TargetLogAdapter):
+    errors = 0
+
+    def error(*args, **kwargs):
+        ErrorCounter.errors += 1
+
+
+@pytest.mark.parametrize(
+    "topo, entry_point, expected_result, expected_errors",
+    [
+        # Base cases:
+        # Scenario 0:  Can we still load a single target that's not a dir?
+        (["/raw.tst"], "/raw.tst", "[TestLoader('/raw.tst')]", 0),
+        # Scenario 0b: Make sure we still get so see errors if a target fails to load
+        # (1 error + 1 exception no load)
+        (["/raw.vbox"], "/raw.vbox", "[]", 2),
+        # Scenario 0c: Attempting to load a dir with nothing of interest yield an error
+        # (1 exception no load)
+        (["/dir/garbage"], "/dir", "[]", 1),
+        # Dir cases:
+        # Scenario 1:  Dir is loadable target (simple)
+        (["/dir/etc", "/dir/var"], "/dir", "[DirLoader('/dir')]", 0),
+        # Scenario 2: dir contains multiple loadable targets
+        (["/dir/raw.img", "/dir/raw2.tst"], "/dir", "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]", 0),
+        # Scenario 2b: dir contains multiple loadable targets and some garbage
+        # (it will wrap the garbage in a RawLoader to try)
+        (
+            ["/dir/raw.img", "/dir/raw2.tst", "/dir/info.txt"],
+            "/dir",
+            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')," " RawLoader('/dir/info.txt')]",
+            0,
+        ),
+        # Scenario 3: dir contains 1 loadable dir as well as 2 loadable targets
+        (
+            ["/dir/unix/etc", "/dir/unix/var", "/dir/raw.img", "/dir/raw2.tst"],
+            "/dir",
+            "[DirLoader('/dir/unix'), " "RawLoader('/dir/raw.img'), " "TestLoader('/dir/raw2.tst')]",
+            0,
+        ),
+        # Scenario 3b: dir contains 2 loadable dirs as well as 2 loadable targets
+        (
+            [
+                "/dir/unix1/etc",
+                "/dir/unix1/var",
+                "/dir/unix2/etc",
+                "/dir/unix2/var",
+                "/dir/raw.img",
+                "/dir/raw2.tst",
+            ],
+            "/dir",
+            "[DirLoader('/dir/unix1'), DirLoader('/dir/unix2'),"
+            " RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
+            0,
+        ),
+        # Scenario 4: dir is a loadable dir but contains other files including loadable targets
+        (
+            [
+                "/dir/etc",
+                "/dir/var",
+                "/dir/raw.img",
+                "/dir/info.txt",
+            ],
+            "/dir",
+            "[DirLoader('/dir')]",
+            0,
+        ),
+    ],
+)
+@patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
+def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
+    # TestLoader to mix Raw Targets with Test Targets without depending on
+    # specific implementations.
+    class TestLoader(RawLoader):
+        @staticmethod
+        def detect(path):
+            return str(path).endswith(".tst")
+
+        def map(self, target):
+            target.disks.add(RawContainer(io.BytesIO(b"\x00")))
+
+    if TestLoader not in LOADERS:
+        LOADERS.append(TestLoader)
+
+    def make_vfs(topo):
+        vfs = VirtualFilesystem()
+        for entry in topo:
+            if entry.find(".") > -1:
+                vfs.map_file_fh(entry, io.BytesIO(b"\x00"))
+            else:
+                vfs.makedirs(entry)
+        return vfs
+
+    def dirtest(vfs, selector):
+        ErrorCounter.errors = 0
+        try:
+            return [x._loader for x in Target.open_all([vfs.path(selector)])]
+        except Exception:
+            ErrorCounter.errors += 1
+            return []
+
+    assert str(dirtest(make_vfs(topo), entry_point)) == expected_result
+
+    assert ErrorCounter.errors == expected_errors
 
 
 @pytest.fixture
