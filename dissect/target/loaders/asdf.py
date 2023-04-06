@@ -1,9 +1,9 @@
 from dissect.evidence import AsdfSnapshot
+from dissect.evidence.asdf.asdf import IDX_METADATA
 
 from dissect.target.containers.asdf import AsdfContainer
-from dissect.target.helpers import fsutil
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loader import Loader
-from dissect.target.loaders.tar import TarFile
 
 
 class AsdfLoader(Loader):
@@ -23,11 +23,4 @@ class AsdfLoader(Loader):
         for disk in self.asdf.disks():
             target.disks.add(AsdfContainer(disk))
 
-        overlay = target.fs.add_layer()
-        for member in self.asdf.metadata.members():
-            if member.isdir():
-                continue
-
-            path = fsutil.join(self.METADATA_PREFIX, member.name)
-            entry = TarFile(overlay, path, member.name, self.asdf.metadata.tar)
-            overlay.map_file_entry(entry.path, entry)
+        target.fs.mount(self.METADATA_PREFIX, TarFilesystem(self.asdf.open(IDX_METADATA)))
