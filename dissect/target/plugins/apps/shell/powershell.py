@@ -51,15 +51,17 @@ class PowerShellHistoryPlugin(Plugin):
         """  # noqa E501
 
         for user, _path in self._history:
+            file_mtime = _path.stat().st_mtime
+
             for line in _path.open("r"):
                 line = line.strip()
                 if not line:
                     continue
 
                 yield ConsoleHostHistoryRecord(
-                    mtime=_path.stat().st_mtime,
+                    mtime=file_mtime,
                     command=line,
-                    source=path.from_windows(str(_path)),
+                    source=_path,
                     _target=self.target,
                     _user=user,
                 )

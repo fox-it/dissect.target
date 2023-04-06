@@ -1,7 +1,7 @@
 import pytest
 from flow.record.fieldtypes import path
 
-from dissect.target.plugins.os.windows.powershell import PowerShellHistoryPlugin
+from dissect.target.plugins.apps.shell.powershell import PowerShellHistoryPlugin
 
 from ._utils import absolute_path
 
@@ -33,4 +33,4 @@ def test_plugins_os_windows_powershell(target, fs, target_file, request):
 
     assert len(records) == 4
     assert records[0].command == "Write-Host \"Hello World!\""
-    assert records[0].source == path.from_windows(target_file)
+    assert str(records[0].source) == target_file
