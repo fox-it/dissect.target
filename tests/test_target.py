@@ -55,15 +55,15 @@ class ErrorCounter(TargetLogAdapter):
         # Scenario 3b: dir contains 2 loadable dirs as well as 2 loadable targets
         (
             [
-                "/dir/unix1/etc",
-                "/dir/unix1/var",
-                "/dir/unix2/etc",
-                "/dir/unix2/var",
+                "/dir/unix/etc",
+                "/dir/unix/var",
+                "/dir/win/c:",
+                "/dir/win/c:/windows/system32",
                 "/dir/raw.img",
                 "/dir/raw2.tst",
             ],
             "/dir",
-            "[DirLoader('/dir/unix1'), DirLoader('/dir/unix2'),"
+            "[DirLoader('/dir/unix'), DirLoader('/dir/win'),"
             " RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
         ),
@@ -79,6 +79,18 @@ class ErrorCounter(TargetLogAdapter):
             "[DirLoader('/dir')]",
             0,
         ),
+        # Scenario 4b: Windows variant
+        (
+            [
+                "/dir/c:",
+                "/dir/c:/windows/system32",
+                "/dir/raw.img",
+                "/dir/info.txt",
+            ],
+            "/dir",
+            "[DirLoader('/dir')]",
+            0,
+        ),
     ],
 )
 @patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
@@ -87,16 +99,16 @@ def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
     # specific implementations.
     class TestLoader(RawLoader):
         @staticmethod
-        def detect(path):
+        def detect(path: str) -> bool:
             return str(path).endswith(".tst")
 
-        def map(self, target):
+        def map(self, target: Target):
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
 
     if TestLoader not in LOADERS:
         LOADERS.append(TestLoader)
 
-    def make_vfs(topo):
+    def make_vfs(topo: dict) -> dict:
         vfs = VirtualFilesystem()
         for entry in topo:
             if entry.find(".") > -1:
@@ -105,7 +117,7 @@ def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
                 vfs.makedirs(entry)
         return vfs
 
-    def dirtest(vfs, selector):
+    def dirtest(vfs: dict, selector: str) -> list:
         ErrorCounter.errors = 0
         try:
             return [x._loader for x in Target.open_all([vfs.path(selector)])]
