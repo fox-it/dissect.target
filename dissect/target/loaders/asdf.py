@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from dissect.evidence import AsdfSnapshot
 from dissect.evidence.asdf.asdf import IDX_METADATA
 
@@ -5,21 +8,24 @@ from dissect.target.containers.asdf import AsdfContainer
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loader import Loader
 
+if TYPE_CHECKING:
+    from dissect.target import Target
+
 
 class AsdfLoader(Loader):
     METADATA_PREFIX = "$asdf$"
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)
         self.asdf = AsdfSnapshot(open(path, "rb"))
 
     @staticmethod
-    def detect(path):
+    def detect(path) -> bool:
         return path.suffix.lower() == ".asdf"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         for disk in self.asdf.disks():
             target.disks.add(AsdfContainer(disk))
 
