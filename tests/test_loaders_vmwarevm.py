@@ -1,14 +1,18 @@
 from pathlib import Path
 from unittest.mock import call, patch
 
+from dissect.hypervisor.descriptor.vmx import VMX
+
+from dissect.target.containers.vmdk import VmdkContainer
 from dissect.target.loaders.vmwarevm import VmwarevmLoader
+from dissect.target.target import Target
 
 from ._utils import mkdirs
 
 
 @patch("dissect.target.loaders.vmx.VmdkContainer")
 @patch("dissect.target.loaders.vmx.vmx.VMX")
-def test_pvm_loader(VMX, VmdkContainer, mock_target, tmpdir_name):
+def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, mock_target: Target, tmpdir_name: str):
     root = Path(tmpdir_name)
     mkdirs(root, ["Test.vmwarevm"])
     (root / "Test.vmwarevm" / "Test.vmx").touch()
