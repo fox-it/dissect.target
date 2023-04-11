@@ -16,15 +16,24 @@ def test_commandhistory_with_timestamps(target_unix_users, fs_unix):
     exit
     """
 
+    commandhistory2_data = """\
+    echo "this for user 2"
+    """
+
     fs_unix.map_file_fh(
         "/root/.bash_history",
         BytesIO(textwrap.dedent(commandhistory_data).encode()),
     )
 
+    fs_unix.map_file_fh(
+        "/home/user/.bash_history",
+        BytesIO(textwrap.dedent(commandhistory2_data).encode()),
+    )
+
     target_unix_users.add_plugin(CommandHistoryPlugin)
 
     results = list(target_unix_users.commandhistory())
-    assert len(results) == 3
+    assert len(results) == 4
 
     assert results[0].ts == dt("2022-03-29T23:58:59Z")
     assert results[0].command == 'echo "this is a test"'
@@ -37,6 +46,8 @@ def test_commandhistory_with_timestamps(target_unix_users, fs_unix):
     assert results[2].ts == dt("2022-07-23T12:14:28Z")
     assert results[2].command == "exit"
     assert results[2].source.as_posix() == "/root/.bash_history"
+
+    assert results[3].source.as_posix() == "/home/user/.bash_history"
 
 
 def test_commandhistory_without_timestamps(target_unix_users, fs_unix):
