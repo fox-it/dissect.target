@@ -89,4 +89,7 @@ license-files = ["LICENSE", "COPYRIGHT"]
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
 
+[tool.setuptools.package-data]
+"dissect.target" = ["helpers/data/*.xml"]
+
 [tool.setuptools_scm]
