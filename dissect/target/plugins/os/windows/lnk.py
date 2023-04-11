@@ -75,7 +75,7 @@ class LnkPlugin(Plugin):
         codepage = self.target.codepage
 
         for entry in self.lnk_entries(path):
-            lnk_file = Lnk(entry)
+            lnk_file = Lnk(entry.open())
             lnk_net_name = lnk_device_name = None
 
             if lnk_file.link_header:
