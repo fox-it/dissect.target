@@ -1,5 +1,4 @@
 import pytest
-from flow.record.fieldtypes import path
 
 from dissect.target.plugins.apps.shell.powershell import PowerShellHistoryPlugin
 
