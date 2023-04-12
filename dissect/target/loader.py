@@ -122,7 +122,9 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
     LOADERS_BY_SCHEME[module_name] = loader
 
 
-def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None) -> Optional[Loader]:
+def find_loader(
+    item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None, fallbacks: list = [DirLoader]
+) -> Optional[Loader]:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -134,6 +136,7 @@ def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = No
 
     Args:
         item: The target path to load.
+        fallbacks: Fallback loaders to try
 
     Returns:
         A :class:`Loader` class for the specific target if one exists.
@@ -142,7 +145,7 @@ def find_loader(item: Path, parsed_path: Optional[urllib.parse.ParseResult] = No
         if loader := LOADERS_BY_SCHEME.get(parsed_path.scheme):
             return loader
 
-    for loader in LOADERS + [DirLoader]:
+    for loader in LOADERS + fallbacks:
         try:
             if loader.detect(item):
                 return loader

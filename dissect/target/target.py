@@ -266,12 +266,9 @@ class Target:
 
             # Search for targets one directory deep
             for entry in _find(path):
-                loader_cls = loader.find_loader(entry, parsed_path=parsed_path)
+                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=[DirLoader, RawLoader])
                 if not loader_cls:
-                    if not entry.is_dir():
-                        loader_cls = RawLoader
-                    else:
-                        continue
+                    continue
 
                 getlogger(entry).debug("Attempting to use loader: %s for: %s", loader_cls, entry)
                 for sub_entry in loader_cls.find_all(entry):
