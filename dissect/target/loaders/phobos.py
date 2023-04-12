@@ -32,6 +32,12 @@ def scrape_pos(fp, needles, block_size=BLOCK_SIZE):
 
 
 class PhobosLoader(Loader):
+    """Load Phobos Ransomware files.
+
+    References:
+        - https://www.hhs.gov/sites/default/files/overview-phobos-ransomware.pdf
+    """
+
     @staticmethod
     def detect(path):
         return path.suffix.lower() == ".eight"

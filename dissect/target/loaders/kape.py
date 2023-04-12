@@ -16,6 +16,12 @@ USNJRNL_PATHS = ["$Extend/$J", "$Extend/$UsnJrnl$J"]
 
 
 class KapeLoader(DirLoader):
+    """Load KAPE forensic image format files.
+
+    References:
+        - https://www.kroll.com/en/insights/publications/cyber/kroll-artifact-parser-extractor-kape
+    """
+
     @staticmethod
     def detect(path: Path) -> bool:
         os_type, dirs = find_dirs(path)
