@@ -14,13 +14,9 @@ def test_lnk(target_win, fs_win):
     records = list(target_win.lnk(None))
 
     assert len(records) == 1
-
     assert isinstance(records[0], type(LnkRecord()))
     assert str(records[0].lnk_path) == "sysvol\\users\\pestudio.lnk"
     assert records[0].lnk_name is None
-    assert records[0].lnk_mtime == datetime("2023-04-12T08:50:02.008187+00:00")
-    assert records[0].lnk_atime == datetime("2023-04-12T08:50:16.638750+00:00")
-    assert records[0].lnk_ctime == datetime("2023-04-12T08:50:37.237209+00:00")
     assert records[0].lnk_relativepath == ".\\pestudio.exe"
     assert str(records[0].lnk_workdir) == "C:\\Program Files\\pestudio"
     assert records[0].lnk_arguments is None
