@@ -6,7 +6,7 @@ from dissect.target.loader import Loader
 
 class RawLoader(Loader):
     @staticmethod
-    def detect(path: Path):
+    def detect(path: Path) -> bool:
         return not path.is_dir()
 
     def map(self, target):
