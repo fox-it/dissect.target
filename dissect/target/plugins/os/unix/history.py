@@ -59,9 +59,9 @@ class CommandHistoryPlugin(Plugin):
 
                 # NOTE: Starting with Python 3.10 we can use pattern matching (PEP 634)
                 if file.name == ".zsh_history":
-                    return self.parse_zsh_history(file, user_details.user)
-
-                return self.parse_bash_history(file, user_details.user)
+                    yield from self.parse_zsh_history(file, user_details.user)
+                else:
+                    yield from self.parse_bash_history(file, user_details.user)
 
     @internal
     def parse_bash_history(self, file, user: str) -> Iterator[CommandHistoryRecord]:

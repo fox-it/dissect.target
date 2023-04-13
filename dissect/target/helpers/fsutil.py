@@ -1008,7 +1008,7 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
         return path.open(mode)
 
 
-def reverse_readlines(fh: TextIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE) -> Iterator[str]:
+def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:
     """Like iterating over a ``TextIO`` file-like object, but starting from the end of the file.
 
     Args:
