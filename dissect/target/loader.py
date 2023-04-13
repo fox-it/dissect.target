@@ -136,7 +136,7 @@ def find_loader(
 
     Args:
         item: The target path to load.
-        fallbacks: Fallback loaders to try
+        fallbacks: Fallback loaders to try.
 
     Returns:
         A :class:`Loader` class for the specific target if one exists.
