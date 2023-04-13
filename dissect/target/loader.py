@@ -123,7 +123,7 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None, fallbacks: list = [DirLoader]
+    item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None, fallbacks: list[Loader] = [DirLoader]
 ) -> Optional[Loader]:
     """Finds a :class:`Loader` class for the specific ``item``.
 
