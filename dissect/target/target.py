@@ -270,7 +270,7 @@ class Target:
                 if not loader_cls:
                     continue
 
-                getlogger(entry).debug("Attempting to use loader: %s for: %s", loader_cls, entry)
+                getlogger(entry).debug("Attempting to use loader: %s", loader_cls)
                 for sub_entry in loader_cls.find_all(entry):
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
