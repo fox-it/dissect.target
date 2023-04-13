@@ -15,7 +15,7 @@ def test_lnk(target_win, fs_win):
 
     assert len(records) == 1
     assert isinstance(records[0], type(LnkRecord()))
-    assert str(records[0].lnk_path) == "sysvol\\users\\pestudio.lnk"
+    assert str(records[0].lnk_path) == "sysvol/users/pestudio.lnk"
     assert records[0].lnk_name is None
     assert records[0].lnk_relativepath == ".\\pestudio.exe"
     assert str(records[0].lnk_workdir) == "C:\\Program Files\\pestudio"

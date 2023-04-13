@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterator, Optional
 
 from dissect.shellitem.lnk import Lnk
@@ -5,7 +6,6 @@ from dissect.util import ts
 from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.target import Target
@@ -80,7 +80,7 @@ class LnkPlugin(Plugin):
             lnk_net_name = lnk_device_name = None
 
             if lnk_file.link_header:
-                lnk_path = path.from_windows(entry)
+                lnk_path = entry
                 lnk_name = lnk_file.stringdata.name_string.string if lnk_file.flag("has_name") else None
 
                 lnk_mtime = ts.from_unix(entry.stat().st_mtime)
@@ -161,7 +161,7 @@ class LnkPlugin(Plugin):
                     target_ctime=target_ctime,
                 )
 
-    def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
+    def lnk_entries(self, path: Optional[str] = None) -> Iterator[Path]:
         if path:
             yield self.target.fs.path(path)
         else:
