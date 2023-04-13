@@ -140,3 +140,4 @@ if TARGETD_AVAILABLE:
         targetd.easy_connect_remoting(remoting, link, caller.peers)
         func = getattr(targetd.rpcs, targetd.command)
         caller.output = list(func())
+        targetd.close()
