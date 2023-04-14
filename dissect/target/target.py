@@ -285,11 +285,12 @@ class Target:
                         at_least_one_loaded = True
                         yield target
 
-                        # If DirLoader, ignore further entries. Otherwise search children/nested
-                        if isinstance(ldr, DirLoader):
-                            break
                     except Exception as error:
                         getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=error)
+
+                    # If DirLoader, ignore further entries. Otherwise search children.
+                    if isinstance(ldr, DirLoader):
+                        continue
 
                     if include_children:
                         try:
