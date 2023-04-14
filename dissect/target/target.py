@@ -19,8 +19,6 @@ from dissect.target.helpers import config
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
-from dissect.target.loaders.dir import DirLoader
-from dissect.target.loaders.raw import RawLoader
 from dissect.target.plugins.general import default
 
 log = logging.getLogger(__name__)
@@ -258,6 +256,7 @@ class Target:
                 yield from find_path.iterdir()
 
         at_least_one_loaded = False
+        fallback_loaders = [loader.DirLoader, loader.RawLoader]
 
         # Treat every path as a unique target spec
         for path in paths:
@@ -266,7 +265,7 @@ class Target:
 
             # Search for targets one directory deep
             for entry in _find(path):
-                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=[DirLoader, RawLoader])
+                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=fallback_loaders)
                 if not loader_cls:
                     continue
 
@@ -287,10 +286,6 @@ class Target:
 
                     except Exception as error:
                         getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=error)
-
-                    # If DirLoader, ignore further entries. Otherwise search children.
-                    if isinstance(ldr, DirLoader):
-                        continue
 
                     if include_children:
                         try:

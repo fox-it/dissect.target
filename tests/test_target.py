@@ -1,5 +1,7 @@
 import io
 import urllib.parse
+from pathlib import Path
+from typing import Iterator
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
@@ -9,6 +11,7 @@ from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loader import LOADERS
+from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.target import Event, Target, TargetLogAdapter, log
 
@@ -91,6 +94,18 @@ class ErrorCounter(TargetLogAdapter):
             "[DirLoader('/dir')]",
             0,
         ),
+        # Scenario 5: Hypothetical Dirloader with selection
+        (
+            [
+                "/dir/select.txt",  # selects 1 and 3
+                "/dir/raw1.img",
+                "/dir/raw2.img",
+                "/dir/raw3.img",
+            ],
+            "/dir",
+            "[SelectLdr('/dir/raw1.img'), SelectLdr('/dir/raw3.img')]",
+            0,
+        ),
     ],
 )
 @patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
@@ -105,8 +120,21 @@ def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
         def map(self, target: Target):
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
 
+    class SelectLdr(DirLoader):
+        @staticmethod
+        def detect(path: Path) -> bool:
+            return path.is_dir() and path.joinpath("select.txt").exists()
+
+        @staticmethod
+        def find_all(path: Path) -> Iterator[Path]:
+            return [Path("/dir/raw1.img"), Path("/dir/raw3.img")]
+
+        def map(self, target: Target):
+            target.disks.add(RawContainer(io.BytesIO(b"\x00")))
+
     if TestLoader not in LOADERS:
         LOADERS.append(TestLoader)
+        LOADERS.append(SelectLdr)
 
     def make_vfs(topo: dict) -> dict:
         vfs = VirtualFilesystem()
