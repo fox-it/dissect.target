@@ -252,28 +252,24 @@ class Target:
 
         def _find(find_path: Path):
             yield find_path
-
             if find_path.is_dir():
                 yield from find_path.iterdir()
 
-        loaded = False
+        at_least_one_loaded = False
+        fallback_loaders = [loader.DirLoader, loader.RawLoader]
 
         # Treat every path as a unique target spec
         for path in paths:
+            loaded = False
             path, parsed_path = extract_path_info(path)
-
-            found_loader = False
 
             # Search for targets one directory deep
             for entry in _find(path):
-                loader_cls = loader.find_loader(entry, parsed_path=parsed_path)
-
+                loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=fallback_loaders)
                 if not loader_cls:
                     continue
 
-                getlogger(entry).debug("Found compatible loader: %s", loader_cls)
-                found_loader = True
-
+                getlogger(entry).debug("Attempting to use loader: %s", loader_cls)
                 for sub_entry in loader_cls.find_all(entry):
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
@@ -285,10 +281,11 @@ class Target:
                         # Attempt to load the target using this loader
                         target = cls._load(sub_entry, ldr)
                         loaded = True
+                        at_least_one_loaded = True
                         yield target
+
                     except Exception as e:
                         getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
-                        continue
 
                     if include_children:
                         try:
@@ -301,24 +298,7 @@ class Target:
                 if loaded and entry is path:
                     break
 
-            # If we didn't find a loader at all, attempt to load it raw
-            # If a loader failed at some point, we still skip this
-            if not found_loader:
-                getlogger(entry).debug("Couldn't find compatible loader, falling back to RawLoader: %s", loader_cls)
-                try:
-                    target = cls.open_raw(path)
-                    loaded = True
-                    yield target
-                except Exception as e:
-                    getlogger(entry).error("Failed to find loader for target", exc_info=e)
-
-                if include_children:
-                    try:
-                        yield from target.open_children()
-                    except Exception as e:
-                        getlogger(sub_entry).error("Failed to load child target from %s", target, exc_info=e)
-
-        if not loaded:
+        if not at_least_one_loaded:
             raise TargetError(f"Failed to find any loader for targets: {paths}")
 
     def _load_child_plugins(self) -> None:
