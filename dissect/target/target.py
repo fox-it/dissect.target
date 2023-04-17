@@ -284,8 +284,8 @@ class Target:
                         at_least_one_loaded = True
                         yield target
 
-                    except Exception as error:
-                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=error)
+                    except Exception as e:
+                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
 
                     if include_children:
                         try:
