@@ -69,83 +69,116 @@ def test_firefox_plugin(target_win, fs_win, tmpdir_name, target_win_users):
 
 def test_chrome_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     chrome_db = absolute_path("data/plugins/browsers/chrome/History.sqlite")
+    chrome_prefs = absolute_path("data/plugins/browsers/chrome/windows/Preferences")
+    chrome_sec_prefs = absolute_path("data/plugins/browsers/chrome/windows/Secure Preferences")
 
     user = target_win_users.user_details.find(username="John")
-    webcache_dir = user.home_path.joinpath("AppData/Local/Google/Chrome/continuousUpdates/User Data/Default")
+    webcache_dir = user.home_path.joinpath("AppData/Local/Google/Chrome/User Data/Default")
     webcache_file = webcache_dir.joinpath("History")
+    extensions_pref_file = webcache_dir.joinpath("Preferences")
+    extensions_sec_pref_file = webcache_dir.joinpath("Secure Preferences")
 
-    webcache_dir = str(webcache_dir)[3:]  # drop C:/
-    webcache_file = str(webcache_file)[3:]  # drop C:/
+    # drop C:/
+    webcache_dir = str(webcache_dir)[3:]
+    webcache_file = str(webcache_file)[3:]
+    extensions_pref_file = str(extensions_pref_file)[3:]
+    extensions_sec_pref_file = str(extensions_sec_pref_file)[3:]
 
     fs_win.map_dir("Users\\John", tmpdir_name)
     fs_win.map_file(webcache_file, chrome_db)
+    fs_win.map_file(extensions_pref_file, chrome_prefs)
+    fs_win.map_file(extensions_sec_pref_file, chrome_sec_prefs)
 
     target_win.add_plugin(chrome.ChromePlugin)
 
+    records = list(target_win.chrome.downloads())
+    assert len(records) == 1
+    records = list(target_win.chrome.extensions())
+    assert len(records) == 8
     records = list(target_win.chrome.history())
     assert len(records) == 5
 
-    records = list(target_win.browser.history())
-    assert len(records) == 5
-
-    records = list(target_win.chrome.downloads())
-    assert len(records) == 1
-
     records = list(target_win.browser.downloads())
     assert len(records) == 1
+    records = list(target_win.browser.extensions())
+    assert len(records) == 8
+    records = list(target_win.browser.history())
+    assert len(records) == 5
 
 
 def test_edge_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     edge_db = absolute_path("data/plugins/browsers/edge/History.sqlite")
+    edge_prefs = absolute_path("data/plugins/browsers/edge/windows/Preferences")
+    edge_sec_prefs = absolute_path("data/plugins/browsers/edge/windows/Secure Preferences")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Microsoft/Edge/User Data/Default")
     webcache_file = webcache_dir.joinpath("History")
+    extensions_pref_file = webcache_dir.joinpath("Preferences")
+    extensions_sec_pref_file = webcache_dir.joinpath("Secure Preferences")
 
-    webcache_dir = str(webcache_dir)[3:]  # drop C:/
-    webcache_file = str(webcache_file)[3:]  # drop C:/
+    # drop C:/
+    webcache_dir = str(webcache_dir)[3:]
+    webcache_file = str(webcache_file)[3:]
+    extensions_pref_file = str(extensions_pref_file)[3:]
+    extensions_sec_pref_file = str(extensions_sec_pref_file)[3:]
 
     fs_win.map_dir("Users\\John", tmpdir_name)
     fs_win.map_file(webcache_file, edge_db)
+    fs_win.map_file(extensions_pref_file, edge_prefs)
+    fs_win.map_file(extensions_sec_pref_file, edge_sec_prefs)
 
     target_win.add_plugin(edge.EdgePlugin)
 
+    records = list(target_win.edge.downloads())
+    assert len(records) == 2
+    records = list(target_win.edge.extensions())
+    assert len(records) == 39
     records = list(target_win.edge.history())
     assert len(records) == 45
 
-    records = list(target_win.browser.history())
-    assert len(records) == 45
-
-    records = list(target_win.edge.downloads())
-    assert len(records) == 2
-
     records = list(target_win.browser.downloads())
     assert len(records) == 2
+    records = list(target_win.browser.extensions())
+    assert len(records) == 39
+    records = list(target_win.browser.history())
+    assert len(records) == 45
 
 
 def test_chromium_plugin(target_win, fs_win, tmpdir_name, target_win_users):
     chromium_db = absolute_path("data/plugins/browsers/chromium/History.sqlite")
+    chromium_prefs = absolute_path("data/plugins/browsers/chromium/windows/Preferences")
+    chromium_sec_prefs = absolute_path("data/plugins/browsers/chromium/windows/Secure Preferences")
 
     user = target_win_users.user_details.find(username="John")
     webcache_dir = user.home_path.joinpath("AppData/Local/Chromium/User Data/Default")
     webcache_file = webcache_dir.joinpath("History")
+    extensions_pref_file = webcache_dir.joinpath("Preferences")
+    extensions_sec_pref_file = webcache_dir.joinpath("Secure Preferences")
 
-    webcache_dir = str(webcache_dir)[3:]  # drop C:/
-    webcache_file = str(webcache_file)[3:]  # drop C:/
+    # drop C:/
+    webcache_dir = str(webcache_dir)[3:]
+    webcache_file = str(webcache_file)[3:]
+    extensions_pref_file = str(extensions_pref_file)[3:]
+    extensions_sec_pref_file = str(extensions_sec_pref_file)[3:]
 
     fs_win.map_dir("Users\\John", tmpdir_name)
     fs_win.map_file(webcache_file, chromium_db)
+    fs_win.map_file(extensions_pref_file, chromium_prefs)
+    fs_win.map_file(extensions_sec_pref_file, chromium_sec_prefs)
 
     target_win.add_plugin(chromium.ChromiumPlugin)
 
+    records = list(target_win.chromium.downloads())
+    assert len(records) == 1
+    records = list(target_win.chromium.extensions())
+    assert len(records) == 4
     records = list(target_win.chromium.history())
     assert len(records) == 5
 
-    records = list(target_win.browser.history())
-    assert len(records) == 5
-
-    records = list(target_win.chromium.downloads())
-    assert len(records) == 1
-
     records = list(target_win.browser.downloads())
     assert len(records) == 1
+    records = list(target_win.browser.extensions())
+    assert len(records) == 4
+    records = list(target_win.browser.history())
+    assert len(records) == 5
