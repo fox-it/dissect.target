@@ -13,6 +13,7 @@ pip install dissect.target
 ```
 
 This module is also automatically installed if you install the `dissect` package.
+To enable `yara` with `dissect` install `dissect.target[yara]`.
 
 ## Tools inside this project
 
