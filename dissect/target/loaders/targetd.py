@@ -16,7 +16,7 @@ from dissect.target.target import Target
 TARGETD_AVAILABLE = False
 try:
     from flow import remoting
-    from targetd.winclient import WinClient
+    from targetd.client import Client
 
     TARGETD_AVAILABLE = True
 except Exception:
@@ -101,7 +101,7 @@ class TargetdLoader(Loader):
         self.output = None
 
         if self.client is None:
-            self.client = WinClient(host, port, [self.uri], local_link, "targetd")
+            self.client = Client(host, port, [self.uri], local_link, "targetd")
             self.client.module_fullname = "dissect.target.loaders"
             self.client.module_fromlist = ["command_runner"]
             self.client.command = plugin_func
