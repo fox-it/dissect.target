@@ -12,8 +12,10 @@ please see [the documentation](https://docs.dissect.tools/en/latest/projects/dis
 pip install dissect.target
 ```
 
+If you wish to use the YARA plugin (`target-query -f yara`), you can install `dissect.target[yara]` to automatically 
+install the `yara-python` dependency.
+
 This module is also automatically installed if you install the `dissect` package.
-To enable `yara` with `dissect` install `dissect.target[yara]`.
 
 ## Tools inside this project
 
