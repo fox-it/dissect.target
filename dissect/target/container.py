@@ -196,7 +196,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
                 ):
                     return container(item, *args, **kwargs)
             except ImportError as e:
-                log.warning("Failed to import %s", container)
+                log.info("Failed to import %s", container)
                 log.debug("", exc_info=e)
             except Exception as e:
                 raise ContainerError(f"Failed to open container {item}", cause=e)

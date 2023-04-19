@@ -150,7 +150,7 @@ def find_loader(
             if loader.detect(item):
                 return loader
         except ImportError as exception:
-            log.warning("Failed to import %s", loader)
+            log.info("Failed to import %s", loader)
             log.debug("", exc_info=exception)
 
 
