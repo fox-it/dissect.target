@@ -1,13 +1,11 @@
-from pathlib import Path
-
 from dissect.target.loaders.dir import DirLoader, find_dirs
 from dissect.target.plugin import OperatingSystem
 
 from ._utils import mkdirs
 
 
-def test_dir_loader_windows(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_windows(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["windows/system32"])
 
     os_type, dirs = find_dirs(root)
@@ -22,9 +20,9 @@ def test_dir_loader_windows(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 1
 
 
-def test_dir_loader_winnt(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
-    mkdirs(root, ["winnt"])
+def test_dir_loader_winnt(mock_target, tmp_path):
+    root = tmp_path
+    mkdirs(tmp_path, ["winnt"])
 
     os_type, dirs = find_dirs(root)
     assert os_type == OperatingSystem.WINDOWS
@@ -38,8 +36,8 @@ def test_dir_loader_winnt(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 1
 
 
-def test_dir_loader_linux(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_linux(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["etc", "var"])
 
     os_type, dirs = find_dirs(root)
@@ -54,8 +52,8 @@ def test_dir_loader_linux(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 1
 
 
-def test_dir_loader_macos(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_macos(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["Library"])
 
     os_type, dirs = find_dirs(root)
@@ -70,8 +68,8 @@ def test_dir_loader_macos(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 1
 
 
-def test_dir_loader_windows_drive_letters(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_windows_drive_letters(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
 
     os_type, dirs = find_dirs(root)

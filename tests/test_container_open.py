@@ -31,7 +31,7 @@ def test_open_inputs(mocked_ewf_detect: Mock, path, expected_output):
     mocked_ewf_detect.assert_called_with(expected_output)
 
 
-def test_open_fallback_fh(tmpdir_name):
+def test_open_fallback_fh(tmp_path):
     # Create a valid VHD file
     fake_vhd = (
         (bytes(range(256)) * 2)
@@ -43,10 +43,9 @@ def test_open_fallback_fh(tmpdir_name):
         + (b"\x00" * 455)
     )
 
-    tmp_root = Path(tmpdir_name)
-    tmp_with_ext = tmp_root.joinpath("testfile.vhd")
-    tmp_without_ext = tmp_root.joinpath("testfile")
-    tmp_with_wrong_ext = tmp_root.joinpath("testfile.qcow2")
+    tmp_with_ext = tmp_path.joinpath("testfile.vhd")
+    tmp_without_ext = tmp_path.joinpath("testfile")
+    tmp_with_wrong_ext = tmp_path.joinpath("testfile.qcow2")
 
     for path in [tmp_with_ext, tmp_without_ext, tmp_with_wrong_ext]:
         path.write_bytes(fake_vhd)
@@ -60,13 +59,13 @@ def test_open_fallback_fh(tmpdir_name):
         with path.open("rb") as fh:
             assert vhd.VhdContainer.detect(fh)
 
-    tmp_nonexistent = tmp_root.joinpath("doesntexist")
+    tmp_nonexistent = tmp_path.joinpath("doesntexist")
     with pytest.raises(ContainerError):
         container.open(tmp_nonexistent)
 
     assert not vhd.VhdContainer.detect(tmp_nonexistent)
 
-    tmp_dummy = tmp_root.joinpath("testdummy")
+    tmp_dummy = tmp_path.joinpath("testdummy")
     tmp_dummy.write_bytes(b"\x00" * 1024)
     assert isinstance(container.open(tmp_dummy), raw.RawContainer)
     assert not vhd.VhdContainer.detect(tmp_dummy)

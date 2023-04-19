@@ -1,4 +1,3 @@
-from pathlib import Path
 from unittest.mock import patch
 
 from dissect.target.loaders.tanium import TaniumLoader
@@ -7,8 +6,8 @@ from ._utils import absolute_path, mkdirs
 
 
 @patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
-def test_tanium_loader(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_tanium_loader(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["file/C/windows/system32", "file/C/$Extend", "file/D/test", "file/E/test"])
 
     # Only need this to exist up until the root directory record to make dissect.ntfs happy

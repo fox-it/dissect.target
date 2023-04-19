@@ -40,16 +40,10 @@ def make_mock_targets(request):
 
 
 @pytest.fixture
-def tmpdir_name():
-    with tempfile.TemporaryDirectory() as tmpdir_name:
-        yield tmpdir_name
-
-
-@pytest.fixture
-def fs_win(tmpdir_name):
+def fs_win(tmp_path):
     fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
-    fs.map_dir("windows/system32", tmpdir_name)
-    fs.map_dir("windows/system32/config/", tmpdir_name)
+    fs.map_dir("windows/system32", tmp_path)
+    fs.map_dir("windows/system32/config/", tmp_path)
     yield fs
 
 

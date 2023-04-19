@@ -4,18 +4,16 @@ import tempfile
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
 
-def test_filesystem_dir_symlink_to_file(tmpdir_name):
-    tmpdir_path = pathlib.Path(tmpdir_name)
-
-    with tempfile.NamedTemporaryFile(dir=tmpdir_name) as tf:
+def test_filesystem_dir_symlink_to_file(tmp_path):
+    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
         tf.write(b"dummy")
         tf.flush()
 
         tmpfile_path = pathlib.Path(tf.name)
-        symlink_path = tmpdir_path.joinpath("symlink")
+        symlink_path = tmp_path.joinpath("symlink")
         symlink_path.symlink_to(f"/{tmpfile_path.name}")
 
-        fs = DirectoryFilesystem(path=tmpdir_path)
+        fs = DirectoryFilesystem(path=tmp_path)
         symlink_entry = fs.get("symlink")
 
         assert symlink_entry.is_symlink()
@@ -32,18 +30,16 @@ def test_filesystem_dir_symlink_to_file(tmpdir_name):
         assert list(symlink_entry.stat()) == list(tmpfile_path.lstat())
 
 
-def test_filesystem_dir_symlink_to_dir(tmpdir_name):
-    tmpdir_path = pathlib.Path(tmpdir_name)
-
-    nested_path = tmpdir_path.joinpath("nested")
+def test_filesystem_dir_symlink_to_dir(tmp_path):
+    nested_path = tmp_path.joinpath("nested")
     nested_path.mkdir()
     nested_path.joinpath("file1").touch()
     nested_path.joinpath("file2").touch()
 
-    symlink_path = tmpdir_path.joinpath("symlink")
+    symlink_path = tmp_path.joinpath("symlink")
     symlink_path.symlink_to("/nested")
 
-    fs = DirectoryFilesystem(path=tmpdir_path)
+    fs = DirectoryFilesystem(path=tmp_path)
     symlink_entry = fs.get("symlink")
 
     assert symlink_entry.is_symlink()
