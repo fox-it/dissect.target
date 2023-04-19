@@ -57,7 +57,7 @@ class LnkPlugin(Plugin):
             lnk_mtime (datetime): Modification time of the link (.lnk) file.
             lnk_atime (datetime): Access time of the link (.lnk) file.
             lnk_ctime (datetime): Creation time of the link (.lnk) file.
-            lnk_relativepath (string): Relative path of target file to the link (.lnk) file.
+            lnk_relativepath (path): Relative path of target file to the link (.lnk) file.
             lnk_workdir (path): Path of the working directory the link (.lnk) file will execute from.
             lnk_iconlocation (path): Path of the display icon used for the link (.lnk) file.
             lnk_arguments (string): Command-line arguments passed to the target (linked) file.
