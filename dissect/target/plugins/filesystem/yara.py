@@ -1,6 +1,10 @@
 from pathlib import Path
 
-import yara
+try:
+    import yara
+except ImportError:
+    raise ImportError("Please install 'yara-python' to use 'target-query -f yara'.")
+
 from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import FileNotFoundError
