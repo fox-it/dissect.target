@@ -88,7 +88,9 @@ class LnkPlugin(Plugin):
                 lnk_ctime = ts.from_unix(entry.stat().st_ctime)
 
                 lnk_relativepath = (
-                    path.from_windows(lnk_file.stringdata.relative_path.string) if lnk_file.flag("has_relative_path") else None
+                    path.from_windows(lnk_file.stringdata.relative_path.string)
+                    if lnk_file.flag("has_relative_path")
+                    else None
                 )
                 lnk_workdir = (
                     path.from_windows(lnk_file.stringdata.working_dir.string)
