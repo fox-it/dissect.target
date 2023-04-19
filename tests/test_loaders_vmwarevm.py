@@ -12,8 +12,8 @@ from ._utils import mkdirs
 
 @patch("dissect.target.loaders.vmx.VmdkContainer")
 @patch("dissect.target.loaders.vmx.vmx.VMX")
-def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, mock_target: Target, tmpdir_name: str):
-    root = Path(tmpdir_name)
+def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, mock_target: Target, tmp_path: Path):
+    root = tmp_path
     mkdirs(root, ["Test.vmwarevm"])
     (root / "Test.vmwarevm" / "Test.vmx").touch()
 

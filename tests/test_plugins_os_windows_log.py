@@ -1,5 +1,4 @@
 import shutil
-from pathlib import Path
 
 import pytest
 
@@ -19,21 +18,21 @@ from ._utils import absolute_path
         (True, True),
     ],
 )
-def test_evt_plugin(target_win, fs_win, tmpdir_name, is_in_directory, is_in_registry):
+def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registry):
     target_win.add_plugin(evt.EvtPlugin)
 
     evt_log_file = absolute_path("data/TestLog.evt")
     expected_records = 0
 
     if is_in_directory:
-        evt_dir_file = Path(tmpdir_name) / "TestLogDir.evt"
+        evt_dir_file = tmp_path / "TestLogDir.evt"
         shutil.copyfile(evt_log_file, evt_dir_file)
 
         fs_win.map_file("windows/system32/config/TestLog.evt", evt_dir_file)
         expected_records += 5
 
     if is_in_registry:
-        evt_reg_file = Path(tmpdir_name) / "TestLogReg.evt"
+        evt_reg_file = tmp_path / "TestLogReg.evt"
         shutil.copyfile(evt_log_file, evt_reg_file)
 
         # Set a log path in the registry key and map that path
@@ -66,19 +65,19 @@ def test_evt_plugin(target_win, fs_win, tmpdir_name, is_in_directory, is_in_regi
         (True, True, True),
     ],
 )
-def test_evtx_plugin(target_win, fs_win, tmpdir_name, is_in_directory, is_in_registry, duplicate):
+def test_evtx_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registry, duplicate):
     with pytest.raises(UnsupportedPluginError):
         target_win.add_plugin(evtx.EvtxPlugin)
 
     # Map default log location to pass EvtxPlugin's compatibility check
-    fs_win.map_dir("windows/system32/winevt/logs", tmpdir_name)
+    fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
     target_win.add_plugin(evtx.EvtxPlugin)
 
     evtx_log_file = absolute_path("data/TestLogX.evtx")
     expected_records = 0
 
     if is_in_directory:
-        evtx_dir_file = Path(tmpdir_name) / "TestLogXDir.evtx"
+        evtx_dir_file = tmp_path / "TestLogXDir.evtx"
         shutil.copyfile(evtx_log_file, evtx_dir_file)
 
         # Mock log file in a default directory
@@ -86,7 +85,7 @@ def test_evtx_plugin(target_win, fs_win, tmpdir_name, is_in_directory, is_in_reg
         expected_records += 5
 
     if is_in_registry:
-        evtx_reg_file = Path(tmpdir_name) / "TestLogXReg.evtx"
+        evtx_reg_file = tmp_path / "TestLogXReg.evtx"
         shutil.copyfile(evtx_log_file, evtx_reg_file)
 
         # Set a log path in the registry key and map that path
