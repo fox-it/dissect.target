@@ -18,7 +18,7 @@ LnkRecord = TargetRecordDescriptor(
         ("datetime", "lnk_mtime"),
         ("datetime", "lnk_atime"),
         ("datetime", "lnk_ctime"),
-        ("string", "lnk_relativepath"),
+        ("path", "lnk_relativepath"),
         ("path", "lnk_workdir"),
         ("string", "lnk_arguments"),
         ("path", "lnk_iconlocation"),
