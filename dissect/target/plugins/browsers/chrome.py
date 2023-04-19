@@ -18,6 +18,7 @@ class ChromePlugin(ChromiumMixin, Plugin):
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
         "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
+        "Local Settings/Application Data/Google/Chrome/User Data/Default",
         # Linux
         ".config/google-chrome/Default",
         ".var/app/com.google.Chrome/config/google-chrome/Default",

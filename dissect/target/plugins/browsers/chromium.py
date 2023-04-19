@@ -48,7 +48,8 @@ class ChromiumMixin:
         for user_details in self.target.user_details.all_with_home():
             for d in hist_paths:
                 cur_dir: TargetPath = user_details.home_path.joinpath(d)
-                if not cur_dir.exists():
+                cur_dir = cur_dir.resolve()
+                if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
                     continue
                 users_dirs.append((user_details.user, cur_dir))
         return users_dirs
@@ -59,7 +60,7 @@ class ChromiumMixin:
         Args:
             filename: The filename as string of the database where the history is stored.
         Yields:
-            connection to db_file (SQLite3)
+            opened db_file (SQLite3)
         Raises:
             FileNotFoundError: If the history file could not be found.
             SQLError: If the history file could not be opened.
@@ -97,12 +98,6 @@ class ChromiumMixin:
                 self.target.log.warning("Could not find %s file: %s", filename, json_file)
 
     def check_compatible(self) -> None:
-        """Perform a compatibility check with the target.
-        This function checks if any of the supported browser directories
-        exists. Otherwise it should raise an ``UnsupportedPluginError``.
-        Raises:
-            UnsupportedPluginError: If the plugin could not be loaded.
-        """
         if not len(self._build_userdirs(self.DIRS)):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
@@ -159,7 +154,7 @@ class ChromiumMixin:
                         url=url,
                         size=row.get("total_bytes"),
                         state=row.get("state"),
-                        source=str(db_file),
+                        source=db_file.as_posix(),
                         _target=self.target,
                         _user=user,
                     )
@@ -180,7 +175,7 @@ class ChromiumMixin:
                     ts_install (datetime): Extension install timestamp.
                     ts_update (datetime): Extension update timestamp.
                     browser (string): The browser from which the records are generated.
-                    id (string) = Extension unique identifier.
+                    id (string): Extension unique identifier.
                     name (string): Name of the extension.
                     short_name (string): Short name of the extension.
                     default_title (string): Default title of the extension.
@@ -245,7 +240,7 @@ class ChromiumMixin:
                             from_webstore=extensions.get(extension_id).get("from_webstore"),
                             permissions=ext_permissions,
                             manifest_version=manifest_version,
-                            source=str(json_file),
+                            source=json_file.as_posix(),
                             _target=self.target,
                             _user=user,
                         )
@@ -309,7 +304,7 @@ class ChromiumMixin:
                         session=None,
                         from_visit=row.from_visit or None,
                         from_url=try_idna(from_url.url) if from_url else None,
-                        source=str(db_file),
+                        source=db_file.as_posix(),
                         _target=self.target,
                         _user=user,
                     )

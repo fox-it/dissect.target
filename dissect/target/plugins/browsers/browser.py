@@ -105,12 +105,6 @@ class BrowserPlugin(Plugin):
                 self.target.log.exception("Failed to execute browser plugin: %s.%s", plugin_name._name, func_name)
 
     def check_compatible(self) -> bool:
-        """Perform a compatibility check with the target.
-        This function checks if any of the supported browser plugins
-        can be used. Otherwise it should raise an ``UnsupportedPluginError``.
-        Raises:
-            UnsupportedPluginError: If the plugin could not be loaded.
-        """
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible browser plugins found")
 
@@ -118,8 +112,7 @@ class BrowserPlugin(Plugin):
     def downloads(self):
         """Return browser download records from all browsers installed and supported.
 
-        Yields:
-            BrowserDownloadRecord with the following fieds:
+        Yields BrowserDownloadRecord with the following fieds:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
@@ -146,7 +139,7 @@ class BrowserPlugin(Plugin):
             ts_install (datetime): Extension install timestamp.
             ts_update (datetime): Extension update timestamp.
             browser (string): The browser from which the records are generated.
-            id (string) = Extension unique identifier.
+            id (string): Extension unique identifier.
             name (string): Name of the extension.
             short_name (string): Short name of the extension.
             default_title (string): Default title of the extension.
