@@ -183,7 +183,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         first_fh = first
     else:
         first_path = first
-        if first_path.exists() and first_path.is_file():
+        if first_path.is_file():
             first_fh = first.open("rb")
             first_fh_opened = True
 
