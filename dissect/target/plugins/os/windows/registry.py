@@ -120,11 +120,11 @@ class RegistryPlugin(Plugin):
             user = user_details.user
             ntuser = user_details.home_path.joinpath("ntuser.dat")
 
-            if ntuser.exists():
-                if ntuser.stat().st_size == 0:
-                    self.target.log.warning("Empty NTUSER.DAT hive: %s", ntuser)
-                    continue
-
+            if not ntuser.exists():
+                self.target.log.debug("Could not find ntuser.dat: %s", ntuser)
+            elif ntuser.stat().st_size == 0:
+                self.target.log.warning("Empty NTUSER.DAT hive: %s", ntuser)
+            else:
                 try:
                     ntuserhive = RegfHive(ntuser)
                     self.add_hive(user.sid, ntuserhive, ntuser)
@@ -134,15 +134,14 @@ class RegistryPlugin(Plugin):
                     self._hives_to_users[ntuserhive] = user_details
                 except Exception as e:
                     self.target.log.warning("Could not open ntuser.dat: %s", ntuser, exc_info=e)
-            else:
-                self.target.log.debug("Could not find ntuser.dat: %s", ntuser)
 
             usrclass = user_details.home_path.joinpath("AppData/Local/Microsoft/Windows/usrclass.dat")
-            if usrclass.exists():
-                if usrclass.stat().st_size == 0:
-                    self.target.log.warning("Empty UsrClass.DAT hive: %s", usrclass)
-                    continue
 
+            if not usrclass.exists():
+                self.target.log.debug("Could not find usrclass.dat: %s", usrclass)
+            elif usrclass.stat().st_size == 0:
+                self.target.log.warning("Empty UsrClass.DAT hive: %s", usrclass)
+            else:
                 try:
                     usr_class_hive = RegfHive(usrclass)
                     self.add_hive(f"{user.sid}_Classes", usr_class_hive, usrclass)
@@ -152,8 +151,6 @@ class RegistryPlugin(Plugin):
                     self._hives_to_users[usr_class_hive] = user_details
                 except Exception as e:
                     self.target.log.warning("Could not open usrclass.dat: %s", usrclass, exc_info=e)
-            else:
-                self.target.log.debug("Could not find usrclass.dat: %s", usrclass)
 
         self._users_loaded = True
 
