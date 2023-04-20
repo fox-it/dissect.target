@@ -26,6 +26,18 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
     assert [record.message for record in caplog.records if record.filename == "registry.py"] == expected
 
 
+def test_missing_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture):
+    fs_win.makedirs("Users/John")
+
+    caplog.set_level(logging.DEBUG)
+    target_win_users.registry.load_user_hives()
+
+    assert [record.message for record in caplog.records if record.filename == "registry.py"] == [
+        f"{target_win_users}: Could not find ntuser.dat: C:/Users/John/ntuser.dat",
+        f"{target_win_users}: Could not find usrclass.dat: C:/Users/John/AppData/Local/Microsoft/Windows/usrclass.dat",
+    ]
+
+
 def test_empty_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
     fs_win.map_file_fh("windows/system32/config/SYSTEM", BytesIO())
     fs_win.map_file_fh("boot/BCD", BytesIO())
