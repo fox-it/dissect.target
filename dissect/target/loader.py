@@ -194,6 +194,7 @@ register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
 register("target", "TargetLoader")
+register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
 register("phobos", "PhobosLoader")
