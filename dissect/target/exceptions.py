@@ -110,3 +110,11 @@ class HiveUnavailableError(RegistryError):
 
 class RegistryCorruptError(RegistryError):
     """The registry is corrupt."""
+
+
+class CBCCredentialError(Error):
+    """The Carbon Black Cloud API key was not found or has the wrong set of permissions set."""
+
+
+class CBCDeviceError(Error):
+    """The device was not found within the specified instance."""

@@ -1,27 +1,45 @@
-import stat
+from __future__ import annotations
 
-from cbapi.live_response_api import LiveResponseError
+import stat
+from datetime import datetime
+from typing import TYPE_CHECKING, BinaryIO, Iterator
+
+from cbc_sdk.live_response_api import LiveResponseError
 
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from cbc_sdk.live_response_api import LiveResponseSession
+    from cbc_sdk.platform import Device
+    from cbc_sdk.rest_api import CBCloudAPI
+
+    from dissect.target.helpers.fsutil import stat_result
+
+
+EPOCH = datetime(1970, 1, 1)
+CB_TIMEFORMAT = "%Y-%m-%dT%H:%M:%S%fZ"
+
 
 class CbFilesystem(Filesystem):
     __fstype__ = "cb"
 
-    def __init__(self, cb, sensor, session, prefix, *args, **kwargs):
-        super().__init__(None, *args, **kwargs)
+    def __init__(self, cb: CBCloudAPI, sensor: Device, session: LiveResponseSession, prefix: str):
         self.cb = cb
         self.sensor = sensor
         self.session = session
         self.prefix = prefix
+        super().__init__(volume=prefix)
 
     @staticmethod
-    def _detect(fh):
+    def detect(fh: BinaryIO):
         raise TypeError("Detect is not allowed on CbFilesystem class")
 
-    def get(self, path):
+    def get(self, path: Path) -> CbFilesystemEntry:
+        """Returns a CbFilesystemEntry object corresponding to the given pathname."""
         path = path.strip("/")
 
         if self.session.os_type == 1:
@@ -52,18 +70,22 @@ class CbFilesystem(Filesystem):
 
 
 class CbFilesystemEntry(FilesystemEntry):
-    def get(self, path):
-        fullpath = self.fs.session.path_join(self.path, path)
-        return self.fs.get(fullpath)
+    def get(self, path: str) -> CbFilesystemEntry:
+        """Get a filesystem entry relative from the current one."""
+        full_path = fsutil.join(self.path, path)
+        return self.fs.get(full_path)
 
-    def open(self):
+    def open(self) -> bytes:
+        """Open the file on the location that is currently set as path."""
         return self.fs.session.get_raw_file(self.path)
 
-    def iterdir(self):
+    def iterdir(self) -> Iterator[str]:
+        """Iterate over the entries of a directory and return the name."""
         for f in self.scandir():
             yield f.name
 
-    def scandir(self):
+    def scandir(self) -> Iterator[CbFilesystemEntry]:
+        """Iterate over the entries within a given directory."""
         if not self.is_dir():
             raise NotADirectoryError(f"'{self.path}' is not a directory")
 
@@ -77,7 +99,7 @@ class CbFilesystemEntry(FilesystemEntry):
             if f["filename"] in (".", ".."):
                 continue
 
-            yield CbFilesystemEntry(self.fs, self.fs.session.path_join(path, f["filename"]), f)
+            yield CbFilesystemEntry(self.fs, fsutil.join(path, f["filename"]), f)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return "DIRECTORY" in self.entry["attributes"]
@@ -93,19 +115,21 @@ class CbFilesystemEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
+        last_access = int((datetime.strptime(self.entry["last_access_time"], CB_TIMEFORMAT) - EPOCH).total_seconds())
+        last_write = int((datetime.strptime(self.entry["last_write_time"], CB_TIMEFORMAT) - EPOCH).total_seconds())
 
-        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
+        # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         st_info = [
             mode | 0o755,
-            fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
-            id(self.fs),
+            0,
+            0,
             0,
             0,
             0,
             self.entry["size"],
-            self.entry["last_access_time"],
-            self.entry["last_write_time"],
-            self.entry["last_write_time"],
+            last_access,
+            last_write,
+            last_write,
         ]
         return fsutil.stat_result(st_info)
 
