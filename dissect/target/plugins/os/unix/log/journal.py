@@ -1,0 +1,388 @@
+import lzma
+from typing import BinaryIO, Iterator
+
+import zstandard
+from dissect.cstruct import Instance, cstruct
+from dissect.util import ts
+from dissect.util.compression import lz4
+from flow.record.fieldtypes import path
+
+from dissect.target import Target
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
+
+# The fields: Fields to log on behalf of a different program and Address Fields are not part of the record
+# The events have undocumented fields that are not part of the record
+JournalRecord = TargetRecordDescriptor(
+    "linux/log/journal",
+    [
+        ("datetime", "ts"),
+        # User Journal fields
+        ("string", "message"),
+        ("string", "message_id"),
+        ("varint", "priority"),
+        ("path", "code_file"),
+        ("varint", "code_line"),
+        ("string", "code_func"),
+        ("varint", "errno"),
+        ("string", "invocation_id"),
+        ("string", "user_invocation_id"),
+        ("string", "syslog_facility"),
+        ("string", "syslog_identifier"),
+        ("varint", "syslog_pid"),
+        ("string", "syslog_raw"),
+        ("string", "documentation"),
+        ("varint", "tid"),
+        ("string", "unit"),
+        ("string", "user_unit"),
+        # Trusted Journal fields
+        ("varint", "pid"),
+        ("varint", "uid"),
+        ("varint", "gid"),
+        ("string", "comm"),
+        ("string", "exe"),
+        ("string", "cmdline"),
+        ("string", "cap_effective"),
+        ("varint", "audit_session"),
+        ("varint", "audit_loginuid"),
+        ("path", "systemd_cgroup"),
+        ("string", "systemd_slice"),
+        ("string", "systemd_unit"),
+        ("string", "systemd_user_unit"),
+        ("string", "systemd_user_slice"),
+        ("string", "systemd_session"),
+        ("string", "systemd_owner_uid"),
+        ("string", "selinux_context"),
+        ("string", "boot_id"),
+        ("string", "machine_id"),
+        ("string", "systemd_invocation_id"),
+        ("string", "transport"),
+        ("string", "stream_id"),
+        ("string", "line_break"),
+        ("string", "namespace"),
+        ("string", "runtime_scope"),
+        # Kernel Journal fields
+        ("string", "kernel_device"),
+        ("string", "kernel_subsystem"),
+        ("string", "udev_sysname"),
+        ("path", "udev_devnode"),
+        ("path", "udev_devlink"),
+        # Other fields
+        ("string", "journal_hostname"),
+        ("path", "filepath"),
+    ],
+)
+
+journal_def = """
+typedef uint8 uint8_t;
+typedef uint32 le32_t;
+typedef uint64 le64_t;
+
+enum State : uint8_t {
+    OFFLINE   =  0,
+    ONLINE    =  1,
+    ARCHIVED  =  2,
+    UNKNOWN
+};
+
+union sd_id128_t {
+    uint8_t   bytes[16];
+    uint64_t  qwords[2];
+};
+
+struct Header {
+    uint8_t     signature[8];
+    le32_t      compatible_flags;
+    le32_t      incompatible_flags;
+    State       state;
+    uint8_t     reserved[7];
+    sd_id128_t  file_id;
+    sd_id128_t  machine_id;
+    sd_id128_t  tail_entry_boot_id;
+    sd_id128_t  seqnum_id;
+    le64_t      header_size;
+    le64_t      arena_size;
+    le64_t      data_hash_table_offset;
+    le64_t      data_hash_table_size;
+    le64_t      field_hash_table_offset;
+    le64_t      field_hash_table_size;
+    le64_t      tail_object_offset;
+    le64_t      n_objects;
+    le64_t      n_entries;
+    le64_t      tail_entry_seqnum;
+    le64_t      head_entry_seqnum;
+    le64_t      entry_array_offset;
+    le64_t      head_entry_realtime;
+    le64_t      tail_entry_realtime;
+    le64_t      tail_entry_monotonic;
+    le64_t      n_data;
+    le64_t      n_fields;
+    le64_t      n_tags;
+    le64_t      n_entry_arrays;
+    le64_t      data_hash_chain_depth;
+    le64_t      field_hash_chain_depth;
+    le32_t      tail_entry_array_offset;
+    le32_t      tail_entry_array_n_entries;
+    le64_t      tail_entry_offset;
+};
+
+enum ObjectType : uint8 {
+    OBJECT_UNUSED,
+    OBJECT_DATA,
+    OBJECT_FIELD,
+    OBJECT_ENTRY,
+    OBJECT_DATA_HASH_TABLE,
+    OBJECT_FIELD_HASH_TABLE,
+    OBJECT_ENTRY_ARRAY,
+    OBJECT_TAG,
+    _OBJECT_TYPE_MAX
+};
+
+enum ObjectFlag : uint8 {
+    OBJECT_UNCOMPRESSED      =  0,
+    OBJECT_COMPRESSED_XZ     =  1,
+    OBJECT_COMPRESSED_LZ4    =  2,
+    OBJECT_COMPRESSED_ZSTD   =  4,
+    _OBJECT_COMPRESSED_MASK  =  7
+};
+
+struct ObjectHeader {
+    ObjectType  type;               // The type field is one of the object types listed above
+    uint8_t     flags;              // If DATA object the value is ObjectFlag
+    uint8_t     reserved[6];
+    le64_t      size;               // The size field encodes the size of the object including all its headers and payload
+};
+
+
+// The first four members are copied from ObjectHeader, so that the size can be used as the length of payload
+struct DataObject {
+    ObjectType  type;
+    ObjectFlag  flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      hash;
+    le64_t      next_hash_offset;
+    le64_t      next_field_offset;
+    le64_t      entry_offset;
+    le64_t      entry_array_offset;
+    le64_t      n_entries;
+    char        payload[size - 64];  // Data objects carry actual field data in the payload[] array.
+};
+
+struct EntryItem {
+    uint64_t object_offset;
+    uint64_t hash;
+};
+
+// The first four members are copied from ObjectHeader, so that the size can be used as the length of items
+struct EntryObject {
+    ObjectType  type;
+    uint8_t     flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      seqnum;
+    le64_t      realtime;
+    le64_t      monotonic;
+    sd_id128_t  boot_id;
+    le64_t      xor_hash;
+    EntryItem   items[size - 64];
+};
+
+// The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
+struct EntryArrayObject {
+    ObjectType  type;
+    uint8_t     flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      next_entry_array_offset;
+    le64_t      entry_object_offsets[size - 24 / 8];
+};
+"""  # noqa: E501
+
+c_journal = cstruct()
+c_journal.load(journal_def)
+
+
+class JournalFile:
+    """Parse Systemd Journal file format.
+
+    References:
+        - https://github.com/systemd/systemd/blob/206f0f397edf1144c63a158fb30f496c3e89f256/docs/JOURNAL_FILE_FORMAT.md
+        - https://github.com/libyal/dtformats/blob/c4fc2b8102702c64b58f145971821986bf74e6c0/documentation/Systemd%20journal%20file%20format.asciidoc
+    """  # noqa: E501
+
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
+        self.header = c_journal.Header(self.fh)
+        self.signature = "".join(chr(c) for c in self.header.signature)
+        self.entry_array_offset = self.header.entry_array_offset
+
+    def entry_object_offsets(self) -> Iterator[int]:
+        """Read object entry arrays."""
+
+        offset = self.entry_array_offset
+
+        # Entry Array with next_entry_array_offset set to 0 is the last in the list
+        while offset != 0:
+            self.fh.seek(offset)
+
+            object = c_journal.ObjectHeader(self.fh)
+
+            if object.type == c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
+                # After the object is checked, read again but with EntryArrayObject instead of ObjectHeader
+                self.fh.seek(offset)
+                entry_array_object = c_journal.EntryArrayObject(self.fh)
+
+                for entry_object_offset in entry_array_object.entry_object_offsets:
+                    # Check if the offset is not zero
+                    if entry_object_offset:
+                        yield entry_object_offset
+
+                offset = entry_array_object.next_entry_array_offset
+
+    def decode_value(self, value: bytes) -> tuple[str, str]:
+        value = value.decode().strip()
+
+        # Remove underscores _, __
+        if value[0:1] == "__":
+            value = value[2:]
+        elif value[0] == "_":
+            value = value[1:]
+
+        key, value = value.split("=", 1)
+        key = key.lower()
+
+        return key, value
+
+    def __iter__(self) -> Iterator[Instance]:
+        "Iterate over the entry objects to read payloads."
+
+        for offset in self.entry_object_offsets():
+            self.fh.seek(offset)
+            entry = c_journal.EntryObject(self.fh)
+
+            event = {}
+            event["ts"] = ts.from_unix_us(entry.realtime)
+
+            for item in entry.items:
+                try:
+                    self.fh.seek(item.object_offset)
+
+                    object = c_journal.ObjectHeader(self.fh)
+
+                    if object.type == c_journal.ObjectType.OBJECT_DATA:
+                        self.fh.seek(item.object_offset)
+
+                        data_object = c_journal.DataObject(self.fh)
+
+                        data = data_object.payload
+
+                        if not data:
+                            # If the data field is empty
+                            continue
+                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
+                            data = lzma.decompress(data)
+                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
+                            data = lz4.decompress(data[8:])
+                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
+                            data = zstandard.decompress(data)
+
+                        key, value = self.decode_value(data)
+                        event[key] = value
+
+                except Exception:
+                    continue
+
+            yield event
+
+
+class JournalPlugin(Plugin):
+    JOURNAL_GLOBS = ["/var/log/journal/*", "/run/systemd/journal/*"]
+    JOURNAL_SIGNATURE = "LPKSHHRH"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.journal_paths = []
+
+        for glob in self.JOURNAL_GLOBS:
+            for journal_path in self.target.fs.glob(glob):
+                self.journal_paths.append(journal_path)
+
+    def check_compatible(self) -> bool:
+        return bool(len(self.journal_paths))
+
+    @export(record=JournalRecord)
+    def journal(self) -> Iterator[JournalRecord]:
+        """Return the content of Systemd Journal log files.
+
+        References:
+            - https://wiki.archlinux.org/title/Systemd/Journal
+            - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
+        """  # noqa: E501
+
+        for _path in self.journal_paths:
+            for f in self.target.fs.listdir_ext(_path):
+                fh = f.open()
+
+                journal = JournalFile(fh)
+
+                if not journal.signature == self.JOURNAL_SIGNATURE:
+                    self.target.log.warning("The Journal log file %s has an invalid magic header", f.name)
+                    continue
+
+                for entry in journal:
+                    yield JournalRecord(
+                        ts=entry.get("ts"),
+                        message=entry.get("message"),
+                        message_id=entry.get("message_id"),
+                        priority=int(entry.get("priority", 0)),
+                        code_file=path.from_posix(entry.get("code_file")) if entry.get("code_file") else None,
+                        code_line=int(entry.get("code_line", 0)),
+                        code_func=entry.get("code_func"),
+                        errno=int(entry.get("errno", 0)),
+                        invocation_id=entry.get("invocation_id"),
+                        user_invocation_id=entry.get("user_invocation_id"),
+                        syslog_facility=entry.get("syslog_facility"),
+                        syslog_identifier=entry.get("syslog_identifier"),
+                        syslog_pid=int(entry.get("syslog_pid", 0)),
+                        syslog_raw=entry.get("syslog_raw"),
+                        documentation=entry.get("documentation"),
+                        tid=int(entry.get("tid", 0)),
+                        unit=entry.get("unit"),
+                        user_unit=entry.get("user_unit"),
+                        pid=int(entry.get("pid", 0)),
+                        uid=int(entry.get("uid", 0)),
+                        gid=int(entry.get("gid", 0)),
+                        comm=entry.get("comm"),
+                        exe=path.from_posix(entry.get("exe")) if entry.get("exe") else None,
+                        cmdline=entry.get("cmdline"),
+                        cap_effective=entry.get("cap_effective"),
+                        audit_session=int(entry.get("audit_session", 0)),
+                        audit_loginuid=int(entry.get("audit_loginuid", 0)),
+                        systemd_cgroup=path.from_posix(entry.get("systemd_cgroup"))
+                        if entry.get("systemd_cgroup")
+                        else None,
+                        systemd_slice=entry.get("systemd_slice"),
+                        systemd_unit=entry.get("systemd_unit"),
+                        systemd_user_unit=entry.get("systemd_user_unit"),
+                        systemd_user_slice=entry.get("systemd_user_slice"),
+                        systemd_session=entry.get("systemd_session", 0),
+                        systemd_owner_uid=entry.get("systemd_owner_uid"),
+                        selinux_context=entry.get("selinux_context"),
+                        boot_id=entry.get("boot_id"),
+                        machine_id=entry.get("machine_id"),
+                        systemd_invocation_id=entry.get("systemd_invocation_id"),
+                        transport=entry.get("transport"),
+                        stream_id=entry.get("stream_id"),
+                        line_break=entry.get("line_break"),
+                        namespace=entry.get("namespace"),
+                        runtime_scope=entry.get("runtime_scope"),
+                        kernel_device=entry.get("kernel_device"),
+                        kernel_subsystem=entry.get("kernel_subsystem"),
+                        udev_sysname=entry.get("udev_sysname"),
+                        udev_devnode=path.from_posix(entry.get("udev_devnode")) if entry.get("udev_devnode") else None,
+                        udev_devlink=path.from_posix(entry.get("udev_devlink")) if entry.get("udev_devlink") else None,
+                        journal_hostname=entry.get("hostname"),
+                        filepath=path.from_posix(f.path),
+                        _target=self.target,
+                    )
