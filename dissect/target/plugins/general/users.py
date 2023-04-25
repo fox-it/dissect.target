@@ -17,7 +17,7 @@ class UsersPlugin(InternalPlugin):
     def check_compatible(self) -> bool:
         return hasattr(self.target, "users")
 
-    def find(self, sid: str = None, uid: str = None, username: str = None, force_case_sensitive=False) -> UserDetails:
+    def find(self, sid: str = None, uid: int = None, username: str = None, force_case_sensitive=False) -> UserDetails:
         """Find User record matching provided sid, uid or username and return UserDetails object"""
         if sum(bool(i) for i in [sid, uid, username]) != 1:
             raise ValueError("Either sid or uid or username is expected")
