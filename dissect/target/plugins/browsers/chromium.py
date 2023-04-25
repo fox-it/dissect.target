@@ -154,7 +154,7 @@ class ChromiumMixin:
                         url=url,
                         size=row.get("total_bytes"),
                         state=row.get("state"),
-                        source=db_file.as_posix(),
+                        source=db_file,
                         _target=self.target,
                         _user=user,
                     )
@@ -202,10 +202,12 @@ class ChromiumMixin:
                             short_name = manifest.get("short_name")
                             description = manifest.get("description")
                             ext_path = extensions.get(extension_id).get("path")
+
                             if ext_path and self.target.os == "windows":
                                 ext_path = path.from_windows(ext_path)
                             elif ext_path:
                                 ext_path = path.from_posix(ext_path)
+
                             ext_version = manifest.get("version")
                             ext_permissions = manifest.get("permissions")
                             manifest_version = manifest.get("manifest_version")
@@ -214,6 +216,7 @@ class ChromiumMixin:
                                 default_title = manifest.get("browser_action").get("default_title")
                             else:
                                 default_title = None
+
                         else:
                             ts_install = None
                             ts_update = None
@@ -240,7 +243,7 @@ class ChromiumMixin:
                             from_webstore=extensions.get(extension_id).get("from_webstore"),
                             permissions=ext_permissions,
                             manifest_version=manifest_version,
-                            source=json_file.as_posix(),
+                            source=json_file,
                             _target=self.target,
                             _user=user,
                         )
@@ -304,7 +307,7 @@ class ChromiumMixin:
                         session=None,
                         from_visit=row.from_visit or None,
                         from_url=try_idna(from_url.url) if from_url else None,
-                        source=db_file.as_posix(),
+                        source=db_file,
                         _target=self.target,
                         _user=user,
                     )
