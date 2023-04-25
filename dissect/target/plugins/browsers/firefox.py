@@ -123,7 +123,7 @@ class FirefoxPlugin(Plugin):
                         session=row.session,
                         from_visit=row.from_visit or None,
                         from_url=try_idna(from_place.url) if from_place else None,
-                        source=str(db_file),
+                        source=db_file,
                         _target=self.target,
                         _user=user,
                     )
@@ -212,8 +212,9 @@ class FirefoxPlugin(Plugin):
                         url=url,
                         size=size,
                         state=state,
-                        source=str(db_file),
+                        source=db_file,
                         _target=self.target,
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
