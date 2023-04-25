@@ -49,8 +49,8 @@ def main():
         fname = f"disks/disk_{i}"
         vfs.map_file_fh(fname, d)
 
-    for v in t.volumes:
-        fname = f"volumes/{v.name}"
+    for i, v in enumerate(t.volumes):
+        fname = f"volumes/{v.name or f'volume_{i}'}"
         vfs.map_file_fh(fname, v)
 
     for i, fs in enumerate(t.filesystems):
