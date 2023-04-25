@@ -327,7 +327,7 @@ class JournalPlugin(Plugin):
                 journal = JournalFile(fh)
 
                 if not journal.signature == self.JOURNAL_SIGNATURE:
-                    self.target.log.warning("The Journal log file %s has an invalid magic header", f.name)
+                    self.target.log.warning("The Journal log file %s has an invalid magic header", f.path)
                     continue
 
                 for entry in journal:
