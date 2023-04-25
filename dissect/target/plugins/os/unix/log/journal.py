@@ -234,7 +234,7 @@ class JournalFile:
                 entry_array_object = c_journal.EntryArrayObject(self.fh)
 
                 for entry_object_offset in entry_array_object.entry_object_offsets:
-                    # Check if the offset is not zero
+                    # Check if the offset is not zero and points to nothing
                     if entry_object_offset:
                         yield entry_object_offset
 
@@ -278,7 +278,7 @@ class JournalFile:
                         data = data_object.payload
 
                         if not data:
-                            # If the data field is empty
+                            # If the payload is empty
                             continue
                         elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
                             data = lzma.decompress(data)
@@ -335,30 +335,30 @@ class JournalPlugin(Plugin):
                         ts=entry.get("ts"),
                         message=entry.get("message"),
                         message_id=entry.get("message_id"),
-                        priority=int(entry.get("priority", 0)),
+                        priority=int(entry.get("priority")) if entry.get("priority") else None,
                         code_file=path.from_posix(entry.get("code_file")) if entry.get("code_file") else None,
-                        code_line=int(entry.get("code_line", 0)),
+                        code_line=int(entry.get("code_line")) if entry.get("code_line") else None,
                         code_func=entry.get("code_func"),
-                        errno=int(entry.get("errno", 0)),
+                        errno=int(entry.get("errno")) if entry.get("errno") else None,
                         invocation_id=entry.get("invocation_id"),
                         user_invocation_id=entry.get("user_invocation_id"),
-                        syslog_facility=entry.get("syslog_facility"),
+                        syslog_facility=entry.get("syslog_facility", 0),
                         syslog_identifier=entry.get("syslog_identifier"),
-                        syslog_pid=int(entry.get("syslog_pid", 0)),
+                        syslog_pid=int(entry.get("syslog_pid")) if entry.get("syslog_pid") else None,
                         syslog_raw=entry.get("syslog_raw"),
                         documentation=entry.get("documentation"),
-                        tid=int(entry.get("tid", 0)),
+                        tid=int(entry.get("tid")) if entry.get("tid") else None,
                         unit=entry.get("unit"),
                         user_unit=entry.get("user_unit"),
-                        pid=int(entry.get("pid", 0)),
-                        uid=int(entry.get("uid", 0)),
-                        gid=int(entry.get("gid", 0)),
+                        pid=int(entry.get("pid")) if entry.get("pid") else None,
+                        uid=int(entry.get("uid")) if entry.get("uid") else None,
+                        gid=int(entry.get("gid")) if entry.get("gid") else None,
                         comm=entry.get("comm"),
                         exe=path.from_posix(entry.get("exe")) if entry.get("exe") else None,
                         cmdline=entry.get("cmdline"),
                         cap_effective=entry.get("cap_effective"),
-                        audit_session=int(entry.get("audit_session", 0)),
-                        audit_loginuid=int(entry.get("audit_loginuid", 0)),
+                        audit_session=int(entry.get("audit_session")) if entry.get("audit_session") else None,
+                        audit_loginuid=int(entry.get("audit_loginuid")) if entry.get("audit_loginuid") else None,
                         systemd_cgroup=path.from_posix(entry.get("systemd_cgroup"))
                         if entry.get("systemd_cgroup")
                         else None,
@@ -366,7 +366,7 @@ class JournalPlugin(Plugin):
                         systemd_unit=entry.get("systemd_unit"),
                         systemd_user_unit=entry.get("systemd_user_unit"),
                         systemd_user_slice=entry.get("systemd_user_slice"),
-                        systemd_session=entry.get("systemd_session", 0),
+                        systemd_session=entry.get("systemd_session"),
                         systemd_owner_uid=entry.get("systemd_owner_uid"),
                         selinux_context=entry.get("selinux_context"),
                         boot_id=entry.get("boot_id"),
