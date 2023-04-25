@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Callable
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
@@ -15,9 +14,6 @@ class LogLoader(Loader):
     @staticmethod
     def detect(path: Path) -> bool:
         return False
-
-    def appendix(self, plugin_method: Callable) -> dict[str, str]:
-        return {"logs_dir": self.LOGS_DIRS[str(plugin_method.__self__.__class__.__name__)]}
 
     def _map_entry(self, entry: Path) -> str:
         logs_dir_key = entry.suffix[1:].capitalize()

@@ -182,7 +182,6 @@ def execute_function_on_target(
     if parser:
         parsed_params, cli_params = parser.parse_known_args(cli_params)
         method_kwargs = vars(parsed_params)
-        method_kwargs.update(target._loader.appendix(plugin_method))
         value = plugin_method(**method_kwargs)
     else:
         value = target_attr
