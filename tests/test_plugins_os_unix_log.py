@@ -110,7 +110,8 @@ def test_journal_plugin(target_unix, fs_unix):
 
     results = list(target_unix.journal())
     record = results[0]
-
+    
+    # The tool Journalctl has the same amount of events as result: journalctl -D log/ | wc -l
     assert len(results) == 2400
 
     assert record.ts == dt("2023-04-25T16:16:58.252792+00:00")
