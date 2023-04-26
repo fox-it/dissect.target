@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable
+from enum import IntEnum
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterator, Optional
+from urllib.parse import ParseResult
 
 from cbc_sdk.errors import CredentialError
+from cbc_sdk.live_response_api import LiveResponseSession
 from cbc_sdk.platform import Device
 from cbc_sdk.rest_api import CBCloudAPI
 
 from dissect.target.exceptions import (
-    CBCCredentialError,
-    CBCDeviceError,
+    LoaderError,
     RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
@@ -28,9 +31,15 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
+class OS(IntEnum):
+    WINDOWS = 1
+    LINUX = 2
+    MAX = 4
+
+
 class CbLoader(Loader):
-    def __init__(self, path: str, **kwargs):
-        self.host, instance = kwargs["parsed_path"].netloc.split("@")
+    def __init__(self, path: str, parsed_path: ParseResult = None, **kwargs):
+        self.host, _, instance = parsed_path.netloc.partition("@")
         super(CbLoader, self).__init__(path)
 
         # A profile will need to be given as argument to CBCloudAPI
@@ -38,50 +47,54 @@ class CbLoader(Loader):
         try:
             self.cbc_api = CBCloudAPI(profile=instance)
         except CredentialError:
-            raise CBCCredentialError
+            raise LoaderError("The Carbon Black Cloud API key was not found or has the wrong set of permissions set")
 
         self.sensor = self.get_device()
         if not self.sensor:
-            raise CBCDeviceError
+            raise LoaderError("The device was not found within the specified instance")
 
         self.session = self.sensor.lr_session()
 
-    def get_device(self) -> Device:
+    def get_device(self) -> Optional[Device]:
+        host_is_ip = self.host.count(".") == 3 and all([part.isdigit() for part in self.host.split(".")])
+
         for cbc_sensor in self.cbc_api.select(Device).all():
-            if all([part.isdigit() for part in self.host.split(".")]):
+            if host_is_ip:
                 if cbc_sensor.last_internal_ip_address == self.host:
-                    device_id = cbc_sensor.id
-                    break
+                    return cbc_sensor
             else:
                 try:
                     device_name = cbc_sensor.name.lower()
                 except AttributeError:
                     continue
 
+                # Sometimes the domain name is included in the device name
+                # E.g. DOMAIN\\Hostname
                 if "\\" in device_name:
                     device_name = device_name.split("\\")[1]
 
                 if device_name == self.host.lower():
-                    device_id = cbc_sensor.id
-                    break
-        else:
-            return None
+                    return cbc_sensor
 
-        return self.cbc_api.select(Device, device_id)
+        return None
 
     @staticmethod
     def detect(path: Path) -> bool:
         path_part, _, _ = parse_path_uri(path)
         return path_part == "cb"
 
-    @staticmethod
-    def find_all(path: Path) -> str:
-        # TODO: Hostname wildcards
-        yield path
-
     def map(self, target: Target) -> None:
+        alt_separator = "\\" if self.session.os_type == OS.WINDOWS else "/"
+        case_sensitive = False if self.session.os_type == OS.WINDOWS else True
         for drive in self.session.session_data["drives"]:
-            cbfs = CbFilesystem(self.cbc_api, self.sensor, self.session, drive)
+            cbfs = CbFilesystem(
+                self.cbc_api,
+                self.sensor,
+                self.session,
+                drive,
+                alt_separator=alt_separator,
+                case_sensitive=case_sensitive,
+            )
             target.filesystems.add(cbfs)
             target.fs.mount(drive.lower(), cbfs)
 
@@ -89,7 +102,7 @@ class CbLoader(Loader):
 class CbRegistry(RegistryPlugin):
     def __init__(self, target: Target, session: LiveResponseSession):
         self.session = session
-        super(CbRegistry, self).__init__(target)
+        super().__init__(target)
 
     def _init_registry(self) -> None:
         for hive_name, rootkey in self.MAPPINGS.items():
@@ -144,7 +157,7 @@ class CbRegistryKey(RegistryKey):
         else:
             raise RegistryKeyNotFoundError(subkey)
 
-    def subkeys(self) -> map:
+    def subkeys(self) -> Iterator[CbRegistryKey]:
         return map(self.subkey, self.data["sub_keys"])
 
     def value(self, value: str) -> str:
@@ -155,7 +168,7 @@ class CbRegistryKey(RegistryKey):
         else:
             raise RegistryValueNotFoundError(value)
 
-    def values(self) -> Iterable[CbRegistryValue]:
+    def values(self) -> Iterator[CbRegistryValue]:
         return (
             CbRegistryValue(self.hive, val["registry_name"], val["registry_data"], val["registry_type"])
             for val in self.data["values"]

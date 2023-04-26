@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import hashlib
 import stat
 from datetime import datetime
+from enum import IntEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO, Iterator
 
-from cbc_sdk.live_response_api import LiveResponseError
+from cbc_sdk.live_response_api import LiveResponseError, LiveResponseSession
+from cbc_sdk.platform import Device
+from cbc_sdk.rest_api import CBCloudAPI
+
 from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from cbc_sdk.live_response_api import LiveResponseSession
     from cbc_sdk.platform import Device
     from cbc_sdk.rest_api import CBCloudAPI
@@ -23,15 +27,21 @@ EPOCH = datetime(1970, 1, 1)
 CB_TIMEFORMAT = "%Y-%m-%dT%H:%M:%S%fZ"
 
 
+class OS(IntEnum):
+    WINDOWS = 1
+    LINUX = 2
+    MAX = 4
+
+
 class CbFilesystem(Filesystem):
     __fstype__ = "cb"
 
-    def __init__(self, cb: CBCloudAPI, sensor: Device, session: LiveResponseSession, prefix: str):
+    def __init__(self, cb: CBCloudAPI, sensor: Device, session: LiveResponseSession, prefix: str, *args, **kwargs):
         self.cb = cb
         self.sensor = sensor
         self.session = session
-        self.prefix = prefix
-        super().__init__(prefix)
+        self.prefix = prefix.lower()
+        super().__init__(*args, **kwargs)
 
     @staticmethod
     def detect(fh: BinaryIO):
@@ -41,12 +51,8 @@ class CbFilesystem(Filesystem):
         """Returns a CbFilesystemEntry object corresponding to the given pathname."""
         path = path.strip("/")
 
-        if self.session.os_type == 1:
-            cbpath = path.replace("/", "\\")
-        else:
-            cbpath = path
-
-        if self.prefix and not cbpath.lower().startswith(self.prefix.lower()):
+        cbpath = path.replace("/", "\\") if self.session.os_type == OS.WINDOWS else path
+        if self.prefix and not cbpath.lower().startswith(self.prefix):
             cbpath = self.prefix + cbpath
 
         try:
@@ -55,8 +61,9 @@ class CbFilesystem(Filesystem):
                 entry = res[0]
             else:
                 # Root entries return the full dirlisting, make up our own entry
+                root_filename = "\\" if self.session.os_type == OS.WINDOWS else "/"
                 entry = {
-                    "filename": "\\",
+                    "filename": root_filename,
                     "attributes": ["DIRECTORY"],
                     "last_access_time": 0,
                     "last_write_time": 0,
@@ -88,17 +95,11 @@ class CbFilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-        if self.fs.session.os_type == 1:
-            stripped_path = self.path.rstrip("\\")
-            path = f"{stripped_path}\\"
-        else:
-            path = f"{self.path.rstrip('/')}/"
-
-        for f in self.fs.session.list_directory(path):
+        for f in self.fs.session.list_directory(self.path):
             if f["filename"] in (".", ".."):
                 continue
 
-            yield CbFilesystemEntry(self.fs, fsutil.join(path, f["filename"]), f)
+            yield CbFilesystemEntry(self.fs, fsutil.join(self.path, f["filename"]), f)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return "DIRECTORY" in self.entry["attributes"]
@@ -114,14 +115,19 @@ class CbFilesystemEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
+
+        # Generate an unique ID for the file to be used as stat addr
+        filename = self.entry["filename"].encode()
+        stat_addr = hashlib.md5(filename).hexdigest()
+
         last_access = int((datetime.strptime(self.entry["last_access_time"], CB_TIMEFORMAT) - EPOCH).total_seconds())
         last_write = int((datetime.strptime(self.entry["last_write_time"], CB_TIMEFORMAT) - EPOCH).total_seconds())
 
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         st_info = [
             mode | 0o755,
-            0,
-            0,
+            stat_addr,
+            id(self.fs),
             0,
             0,
             0,
