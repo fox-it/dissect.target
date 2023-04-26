@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from struct import unpack
-from typing import Iterator, Optional, Tuple, Union
+from typing import Iterator, Optional, Union
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -277,7 +277,7 @@ class UnixPlugin(OSPlugin):
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
-) -> Iterator[Tuple[Union[uuid.UUID, str], str, str, str]]:
+) -> Iterator[tuple[Union[uuid.UUID, str], str, str, str]]:
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
@@ -315,6 +315,8 @@ def parse_fstab(
         if dev.startswith(("/dev/mapper", "/dev/gpt")):
             volume_name = dev.rsplit("/")[-1]
         elif dev.startswith("/dev/") and dev.count("/") == 3:
+            # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
+            # Emulate that here when combining the vg and lv names
             volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
             dev_id = dev.split("=")[1]
