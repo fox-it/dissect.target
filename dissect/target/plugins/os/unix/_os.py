@@ -315,7 +315,7 @@ def parse_fstab(
         if dev.startswith(("/dev/mapper", "/dev/gpt")):
             volume_name = dev.rsplit("/")[-1]
         elif dev.startswith("/dev/") and dev.count("/") == 3:
-            volume_name = "-".join(dev.rsplit("/")[-2:])
+            volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
             dev_id = dev.split("=")[1]
             try:
