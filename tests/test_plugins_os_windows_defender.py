@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from io import BytesIO
-from pathlib import Path
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 
@@ -10,9 +9,9 @@ from dissect.target.plugins.os.windows import defender
 from ._utils import absolute_path
 
 
-def test_defender_evtx_logs(target_win, fs_win, tmpdir_name):
+def test_defender_evtx_logs(target_win, fs_win, tmp_path):
     # map default log location to pass EvtxPlugin's compatibility check
-    fs_win.map_dir("windows/system32/winevt/logs", tmpdir_name)
+    fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
 
     log_file = absolute_path("data/defender-operational.evtx")
     fs_win.map_file("windows/system32/winevt/logs/Microsoft-Windows-Windows Defender%4Operational.evtx", log_file)
@@ -31,7 +30,7 @@ def test_defender_evtx_logs(target_win, fs_win, tmpdir_name):
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
 
 
-def test_defender_quarantine_entries(target_win, fs_win, tmpdir_name):
+def test_defender_quarantine_entries(target_win, fs_win):
     quarantine_dir = absolute_path("data/defender-quarantine")
 
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
@@ -56,14 +55,14 @@ def test_defender_quarantine_entries(target_win, fs_win, tmpdir_name):
     assert mimikatz_record.last_accessed_time.date() == detection_date
 
 
-def test_defender_quarantine_recovery(target_win, fs_win, tmpdir_name):
+def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("data/defender-quarantine")
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
 
     # Create a directory to recover to
-    recovery_dst = Path(tmpdir_name).joinpath("recovery")
-    os.mkdir(recovery_dst)
+    recovery_dst = tmp_path.joinpath("recovery")
+    recovery_dst.mkdir()
 
     # Recover
     target_win.add_plugin(defender.MicrosoftDefenderPlugin)

@@ -64,7 +64,7 @@ class ADPolicyPlugin(Plugin):
 
     @export(record=ADPolicyRecord)
     def adpolicy(self):
-        """Return all AD policies.
+        """Return all AD policies (also known as GPOs or Group Policy Objects).
 
         An Active Directory (AD) maintains global policies that should be adhered by all systems in the domain.
         Example policies are password policies, account lockout policies and group policies.

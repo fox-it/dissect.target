@@ -43,10 +43,6 @@ class CbLoader(Loader):
     def detect(path):
         return urlparse(str(path)).scheme == "cb"
 
-    @staticmethod
-    def find_all(path):
-        yield path
-
     def map(self, target):
         for drive in self.session.session_data["drives"]:
             cbfs = CbFilesystem(self.cb, self.sensor, self.session, drive)

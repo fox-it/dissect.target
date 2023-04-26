@@ -43,7 +43,7 @@ def test_execute_pipeline(
     compression_name,
     serialization_name,
     target_win_iis_amcache,
-    tmpdir_name,
+    tmp_path,
 ):
     def mock_get_targets(_):
         yield target_win_iis_amcache
@@ -58,7 +58,7 @@ def test_execute_pipeline(
     with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
         "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
     ):
-        output_dir = pathlib.Path(tmpdir_name)
+        output_dir = tmp_path
 
         serialization = utils.Serialization(serialization_name)
         compression = utils.Compression(compression_name)
@@ -131,7 +131,7 @@ def test_execute_pipeline(
 
 
 @pytest.mark.parametrize("limit", [5, 15, None])
-def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmpdir_name):
+def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
     def mock_get_targets(_):
         yield target_win_iis_amcache
 
@@ -149,7 +149,7 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmpdir_name):
     with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
         "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
     ):
-        output_dir = pathlib.Path(tmpdir_name)
+        output_dir = tmp_path
 
         functions = ["iis.logs", "amcache.applications"]
 

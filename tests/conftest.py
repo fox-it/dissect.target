@@ -1,5 +1,6 @@
 import pathlib
 import tempfile
+import textwrap
 from io import BytesIO
 
 import pytest
@@ -39,16 +40,10 @@ def make_mock_targets(request):
 
 
 @pytest.fixture
-def tmpdir_name():
-    with tempfile.TemporaryDirectory() as tmpdir_name:
-        yield tmpdir_name
-
-
-@pytest.fixture
-def fs_win(tmpdir_name):
+def fs_win(tmp_path):
     fs = VirtualFilesystem(case_sensitive=False, alt_separator="\\")
-    fs.map_dir("windows/system32", tmpdir_name)
-    fs.map_dir("windows/system32/config/", tmpdir_name)
+    fs.map_dir("windows/system32", tmp_path)
+    fs.map_dir("windows/system32/config/", tmp_path)
     yield fs
 
 
@@ -167,6 +162,9 @@ def target_win_tzinfo(hive_hklm, target_win):
 
 @pytest.fixture
 def target_unix_users(target_unix, fs_unix):
-    fs_unix.map_file_fh("/etc/passwd", BytesIO("root:x:0:0:root:/root:/bin/bash".encode()))
-
+    passwd = """
+    root:x:0:0:root:/root:/bin/bash
+    user:x:1000:1000:user:/home/user:/bin/bash
+    """
+    fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix

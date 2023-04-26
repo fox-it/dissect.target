@@ -1,4 +1,4 @@
-def test_users_plugin(target_win_users, fs_win, tmpdir_name):
+def test_users_plugin(target_win_users, fs_win, tmp_path):
     users = list(target_win_users.users())
     assert len(users) == 2
 
@@ -18,6 +18,6 @@ def test_users_plugin(target_win_users, fs_win, tmpdir_name):
     users_with_home = list(target_win_users.user_details.all_with_home())
     assert len(users_with_home) == 0  # no users have home dirs
 
-    fs_win.map_dir("Users\\John", tmpdir_name)
+    fs_win.map_dir("Users\\John", tmp_path)
     users_with_home = list(target_win_users.user_details.all_with_home())
     assert len(users_with_home) == 1  # only John has a home dir
