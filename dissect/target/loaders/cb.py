@@ -9,7 +9,13 @@ from cbc_sdk.errors import CredentialError
 from cbc_sdk.live_response_api import LiveResponseSession
 from cbc_sdk.platform import Device
 from cbc_sdk.rest_api import CBCloudAPI
-from dissect.target.exceptions import LoaderError, RegistryError, RegistryKeyNotFoundError, RegistryValueNotFoundError
+
+from dissect.target.exceptions import (
+    LoaderError,
+    RegistryError,
+    RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
+)
 from dissect.target.filesystems.cb import CbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
