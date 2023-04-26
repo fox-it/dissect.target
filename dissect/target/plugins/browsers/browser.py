@@ -112,7 +112,7 @@ class BrowserPlugin(Plugin):
     def downloads(self):
         """Return browser download records from all browsers installed and supported.
 
-        Yields BrowserDownloadRecord with the following fieds:
+        Yields BrowserDownloadRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts_start (datetime): Download start timestamp.

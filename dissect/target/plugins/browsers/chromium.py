@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Iterator
 
 from dissect.sql import sqlite3
@@ -19,6 +20,7 @@ from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     try_idna,
 )
+from dissect.target.plugins.general.users import UserDetails
 
 
 class ChromiumMixin:
@@ -35,14 +37,14 @@ class ChromiumMixin:
         "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
-    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple]:
+    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, Path]]:
         """Join the selected browser dirs with the user home path.
 
         Args:
             hist_paths: A list with browser paths as strings.
 
         Returns:
-            list with tuples containing user and TargetPath object.
+            List of tuples containing user and history file path objects.
         """
         users_dirs: list[tuple] = []
         for user_details in self.target.user_details.all_with_home():
@@ -75,7 +77,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
-    def _iter_json(self, filename: str) -> Iterator[tuple[str, TargetPath, dict]]:
+    def _iter_json(self, filename: str) -> Iterator[tuple[str, Path, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
         of user name, JSON file path, and the parsed JSON data.
 
@@ -84,8 +86,7 @@ class ChromiumMixin:
             user directory.
 
         Yields:
-            Tuple[str, TargetPath, dict]: A tuple containing the name of the
-            user, the path to the JSON file, and the parsed JSON data.
+            A tuple containing the name of the user, the path to the JSON file, and the parsed JSON data.
 
         Raises:
             FileNotFoundError: If the json file could not be found.
@@ -194,20 +195,26 @@ class ChromiumMixin:
                     extensions = content.get("extensions").get("settings")
 
                     for extension_id in extensions.keys():
-                        manifest = extensions.get(extension_id).get("manifest")
+                        extension_data = extensions.get(extension_id)
+
+                        ts_install = extension_data.get("first_install_time") or extension_data.get("install_time")
+                        ts_update = extension_data.get("last_update_time")
+                        if ts_install:
+                            ts_install = webkittimestamp(ts_install)
+                        if ts_update:
+                            ts_update = webkittimestamp(ts_update)
+
+                        ext_path = extension_data.get("path")
+                        if ext_path and self.target.os == "windows":
+                            ext_path = path.from_windows(ext_path)
+                        elif ext_path:
+                            ext_path = path.from_posix(ext_path)
+
+                        manifest = extension_data.get("manifest")
                         if manifest:
-                            ts_install = webkittimestamp(extensions.get(extension_id).get("first_install_time"))
-                            ts_update = webkittimestamp(extensions.get(extension_id).get("last_update_time"))
                             name = manifest.get("name")
                             short_name = manifest.get("short_name")
                             description = manifest.get("description")
-                            ext_path = extensions.get(extension_id).get("path")
-
-                            if ext_path and self.target.os == "windows":
-                                ext_path = path.from_windows(ext_path)
-                            elif ext_path:
-                                ext_path = path.from_posix(ext_path)
-
                             ext_version = manifest.get("version")
                             ext_permissions = manifest.get("permissions")
                             manifest_version = manifest.get("manifest_version")
@@ -218,14 +225,11 @@ class ChromiumMixin:
                                 default_title = None
 
                         else:
-                            ts_install = None
-                            ts_update = None
                             name = None
                             short_name = None
                             default_title = None
                             description = None
                             ext_version = None
-                            ext_path = None
                             ext_permissions = None
                             manifest_version = None
 
