@@ -18,14 +18,15 @@ class DissectMount(Operations):
         self.file_handles: dict[int, BinaryIO] = {}
         self.dir_handles: dict[int, FilesystemEntry] = {}
 
-    @lru_cache(CACHE_SIZE)
+        self._get = lru_cache(CACHE_SIZE)(self._get)
+        self.getattr = lru_cache(CACHE_SIZE)(self.getattr)
+
     def _get(self, path: str) -> FilesystemEntry:
         try:
             return self.fs.get(path)
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    @lru_cache(CACHE_SIZE)
     def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
