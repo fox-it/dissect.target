@@ -16,7 +16,7 @@ from dissect.target.target import Target
 TARGETD_AVAILABLE = False
 try:
     from flow import remoting
-    from targetd.client import Client
+    from targetd.clients import Client
 
     TARGETD_AVAILABLE = True
 except Exception:

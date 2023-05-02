@@ -3,6 +3,35 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
+GENERIC_DOWNLOAD_RECORD_FIELDS = [
+    ("datetime", "ts_start"),
+    ("datetime", "ts_end"),
+    ("string", "browser"),
+    ("varint", "id"),
+    ("path", "path"),
+    ("uri", "url"),
+    ("filesize", "size"),
+    ("varint", "state"),
+    ("path", "source"),
+]
+
+GENERIC_EXTENSION_RECORD_FIELDS = [
+    ("datetime", "ts_install"),
+    ("datetime", "ts_update"),
+    ("string", "browser"),
+    ("string", "id"),
+    ("string", "name"),
+    ("string", "short_name"),
+    ("string", "default_title"),
+    ("string", "description"),
+    ("string", "version"),
+    ("path", "ext_path"),
+    ("boolean", "from_webstore"),
+    ("string[]", "permissions"),
+    ("varint", "manifest_version"),
+    ("path", "source"),
+]
+
 GENERIC_HISTORY_RECORD_FIELDS = [
     ("datetime", "ts"),
     ("string", "browser"),
@@ -20,24 +49,14 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("uri", "from_url"),
     ("path", "source"),
 ]
-GENERIC_DOWNLOAD_RECORD_FIELDS = [
-    ("datetime", "ts_start"),
-    ("datetime", "ts_end"),
-    ("string", "browser"),
-    ("varint", "id"),
-    ("path", "path"),
-    ("uri", "url"),
-    ("filesize", "size"),
-    ("varint", "state"),
-    ("path", "source"),
-]
-
-BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
-)
-
 BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+)
+BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/extension", GENERIC_EXTENSION_RECORD_FIELDS
+)
+BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
 )
 
 
@@ -69,16 +88,6 @@ class BrowserPlugin(Plugin):
             except Exception:
                 target.log.exception("Failed to load browser plugin: %s", entry)
 
-    def check_compatible(self) -> bool:
-        """Perform a compatibility check with the target.
-        This function checks if any of the supported browser plugins
-        can be used. Otherwise it should raise an ``UnsupportedPluginError``.
-        Raises:
-            UnsupportedPluginError: If the plugin could not be loaded.
-        """
-        if not len(self._plugins):
-            raise UnsupportedPluginError("No compatible browser plugins found")
-
     def _func(self, func_name: str):
         """Return the supported browser plugin records.
 
@@ -94,6 +103,55 @@ class BrowserPlugin(Plugin):
                     yield entry
             except Exception:
                 self.target.log.exception("Failed to execute browser plugin: %s.%s", plugin_name._name, func_name)
+
+    def check_compatible(self) -> bool:
+        if not len(self._plugins):
+            raise UnsupportedPluginError("No compatible browser plugins found")
+
+    @export(record=BrowserDownloadRecord)
+    def downloads(self):
+        """Return browser download records from all browsers installed and supported.
+
+        Yields BrowserDownloadRecord with the following fields:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            ts_start (datetime): Download start timestamp.
+            ts_end (datetime): Download end timestamp.
+            browser (string): The browser from which the records are generated from.
+            id (string): Record ID.
+            path (string): Download path.
+            url (uri): Download URL.
+            size (varint): Download file size.
+            state (varint): Download state number.
+            source: (path): The source file of the download record.
+        """
+        yield from self._func("downloads")
+
+    @export(record=BrowserExtensionRecord)
+    def extensions(self):
+        """Return browser extensions from all browsers installed and supported.
+
+        Browser extensions for Chrome, Chromium, and Edge (Chromium).
+
+        Yields BrowserExtensionRecord with the following fields:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            ts_install (datetime): Extension install timestamp.
+            ts_update (datetime): Extension update timestamp.
+            browser (string): The browser from which the records are generated.
+            id (string): Extension unique identifier.
+            name (string): Name of the extension.
+            short_name (string): Short name of the extension.
+            default_title (string): Default title of the extension.
+            description (string): Description of the extension.
+            version (string): Version of the extension.
+            ext_path (path): Relative path of the extension.
+            from_webstore (boolean): Extension from webstore.
+            permissions (string[]): Permissions of the extension.
+            manifest (varint): Version of the extensions' manifest.
+            source: (path): The source file of the download record.
+        """
+        yield from self._func("extensions")
 
     @export(record=BrowserHistoryRecord)
     def history(self):
@@ -121,26 +179,6 @@ class BrowserPlugin(Plugin):
             source: (path): The source file of the history record.
         """
         yield from self._func("history")
-
-    @export(record=BrowserDownloadRecord)
-    def downloads(self):
-        """Return browser download records from all browsers installed and supported.
-
-        Yields:
-            BrowserDownloadRecord with the following fieds:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
-            ts_start (datetime): Download start timestamp.
-            ts_end (datetime): Download end timestamp.
-            browser (string): The browser from which the records are generated from.
-            id (string): Record ID.
-            path (string): Download path.
-            url (uri): Download URL.
-            size (varint): Download file size.
-            state (varint): Download state number.
-            source: (path): The source file of the download record.
-        """
-        yield from self._func("downloads")
 
 
 def try_idna(url: str) -> bytes:
