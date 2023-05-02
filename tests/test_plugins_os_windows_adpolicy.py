@@ -11,4 +11,4 @@ def test_adpolicy_plugin(target_win, fs_win):
     target_win.add_plugin(adpolicy.ADPolicyPlugin)
 
     records = list(target_win.adpolicy())
-    assert len(records) == 9
+    assert len(records) == 10
