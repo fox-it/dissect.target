@@ -7,21 +7,22 @@ from dissect.target.loader import Loader
 
 class LogLoader(Loader):
     LOGS_DIRS = {
-        "EvtxPlugin": "sysvol/windows/system32/winevt/logs",
-        "EvtPlugin": "sysvol/windows/system32/config",
+        ".evtx": "sysvol/windows/system32/winevt/logs",
+        ".evt": "sysvol/windows/system32/config",
     }
 
     @staticmethod
     def detect(path: Path) -> bool:
         return False
 
-    def _map_entry(self, entry: Path) -> str:
-        logs_dir_key = entry.suffix[1:].capitalize()
-        return str(Path(self.LOGS_DIRS[f"{logs_dir_key}Plugin"]).joinpath(entry.name)).lower()
-
     def map(self, target: Target) -> None:
         self.target = target
         vfs = VirtualFilesystem()
-        for entry in self.path.parent.rglob(self.path.name):
-            vfs.map_file(str(self._map_entry(entry)), str(entry))
+        for entry in self.path.parent.glob(self.path.name):
+            ext = entry.suffix.lower()
+            mapping = self.LOGS_DIRS.get(ext, None)
+            if mapping is None:
+                continue
+            mapping = str(Path(mapping).joinpath(entry.name)).lower()
+            vfs.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
