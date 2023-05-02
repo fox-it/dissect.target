@@ -20,8 +20,7 @@ class LogLoader(Loader):
         vfs = VirtualFilesystem()
         for entry in self.path.parent.glob(self.path.name):
             ext = entry.suffix.lower()
-            mapping = self.LOGS_DIRS.get(ext, None)
-            if mapping is None:
+            if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
             mapping = str(Path(mapping).joinpath(entry.name)).lower()
             vfs.map_file(mapping, str(entry))
