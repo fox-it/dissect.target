@@ -28,6 +28,10 @@ UUID=28a25297-9825-4f87-ac41-f9c20cd5db4f /boot        ext4    defaults         
 UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,umask=0077   0    0
 
 /dev/disk/cloud/azure_resource-part1      /mnt         auto    defaults,nofail,x-systemd.requires=cloud-init.service,comment=cloudconfig   0   2
+
+/dev/mapper/vg--main-lv--var              /var         auto    default             0    2
+
+/dev/vg-main/lv-data                      /data        auto    default             0    2
 """  # noqa
 
 
@@ -41,14 +45,16 @@ def test_parse_fstab():
 
         records = list(parse_fstab(fs.path("/etc/fstab")))
 
-    # 8 input records minus
+    # 10 input records minus
     #   2 unsupported mount devices (proc, /dev/disk/cloud/azure_resource-part1)
     #   2 swap partitions
     #   1 root partition
-    # = 3 expected results
+    # = 5 expected results
 
     assert set(records) == {
         (UUID("5d1f1508-069b-4274-9bfa-ae2bf7ffb5e0"), None, "ext4", "/home"),
         (UUID("28a25297-9825-4f87-ac41-f9c20cd5db4f"), None, "ext4", "/boot"),
         ("F631-BECA", None, "vfat", "/boot/efi"),
+        (None, "vg--main-lv--var", "auto", "/var"),
+        (None, "vg--main-lv--data", "auto", "/data"),
     }
