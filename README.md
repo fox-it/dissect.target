@@ -14,6 +14,9 @@ pip install dissect.target
 
 This module is also automatically installed if you install the `dissect` package.
 
+If you wish to use the YARA plugin (`target-query -f yara`), you can install `dissect.target[yara]` to automatically 
+install the `yara-python` dependency.
+
 ## Tools inside this project
 
 ### target-query
