@@ -1,6 +1,5 @@
 import json
 from collections import defaultdict
-from pathlib import Path
 from typing import Iterator
 
 from dissect.sql import sqlite3
@@ -37,7 +36,7 @@ class ChromiumMixin:
         "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
-    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, Path]]:
+    def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
         """Join the selected browser dirs with the user home path.
 
         Args:
@@ -77,7 +76,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
-    def _iter_json(self, filename: str) -> Iterator[tuple[str, Path, dict]]:
+    def _iter_json(self, filename: str) -> Iterator[tuple[str, TargetPath, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
         of user name, JSON file path, and the parsed JSON data.
 
