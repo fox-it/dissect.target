@@ -79,8 +79,8 @@ class ADPolicyPlugin(Plugin):
                         key="XML",
                         value=properties.attrib.get("appName"),
                         size=len(xml),
-                        data=xml,
-                        path=task_file,
+                        data=ElementTree.tostring(task),
+                        path=str(task_file),
                         _target=self.target,
                     )
             except Exception as error:

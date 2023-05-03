@@ -4,7 +4,7 @@ from ._utils import absolute_path
 
 
 def test_adpolicy_plugin(target_win, fs_win):
-    policy_dir = absolute_path("data/adpolicy/")
+    policy_dir = absolute_path("data/plugins/os/windows/adpolicy/")
 
     fs_win.map_dir("Windows/sysvol/domain/policies", policy_dir)
 
