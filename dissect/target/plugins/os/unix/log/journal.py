@@ -243,11 +243,8 @@ class JournalFile:
     def decode_value(self, value: bytes) -> tuple[str, str]:
         value = value.decode().strip()
 
-        # Remove underscores _, __
-        if value[0:1] == "__":
-            value = value[2:]
-        elif value[0] == "_":
-            value = value[1:]
+        # Strip leading underscores part of the field name
+        value = value.lstrip("_")
 
         key, value = value.split("=", 1)
         key = key.lower()
