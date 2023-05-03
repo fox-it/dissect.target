@@ -78,7 +78,7 @@ class ADPolicyPlugin(Plugin):
                         guid=task.attrib.get("uid"),
                         key="XML",
                         value=properties.attrib.get("appName"),
-                        size=len(xml),
+                        size=len(task),
                         data=ElementTree.tostring(task),
                         path=str(task_file),
                         _target=self.target,
