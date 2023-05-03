@@ -17,11 +17,12 @@ class LogLoader(Loader):
 
     def map(self, target: Target) -> None:
         self.target = target
-        vfs = VirtualFilesystem()
+        vfs = VirtualFilesystem(case_sensitive=False)
         for entry in self.path.parent.glob(self.path.name):
             ext = entry.suffix.lower()
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
-            mapping = str(Path(mapping).joinpath(entry.name)).lower()
+            mapping = str(Path(mapping).joinpath(entry.name))
             vfs.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
+        target.fs = vfs
