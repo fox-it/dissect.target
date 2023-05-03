@@ -67,7 +67,7 @@ class ADPolicyPlugin(Plugin):
         for task_file in policy_dir.rglob("ScheduledTasks.xml"):
             try:
                 task_file_stat = task_file.stat()
-                xml = task_file.open("rt").read()
+                xml = task_file.read_text()
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall("Task"):
                     properties = task.find("Properties")
