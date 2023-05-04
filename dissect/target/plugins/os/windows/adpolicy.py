@@ -38,7 +38,7 @@ ADPolicyRecord = TargetRecordDescriptor(
         ("string", "value"),
         ("uint32", "size"),
         ("dynamic", "data"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -81,7 +81,7 @@ class ADPolicyPlugin(Plugin):
                         value=properties.attrib.get("appName"),
                         size=len(task_data),
                         data=task_data,
-                        path=str(task_file),
+                        path=task_file,
                         _target=self.target,
                     )
             except Exception as error:
@@ -151,7 +151,7 @@ class ADPolicyPlugin(Plugin):
                         value=policy_reg_value.decode("utf-16-le").rstrip("\x00"),
                         size=policy_reg_data_size,
                         data=policy_reg_data,
-                        path=str(policy_file),
+                        path=policy_file,
                         _target=self.target,
                     )
 
