@@ -71,6 +71,7 @@ class ADPolicyPlugin(Plugin):
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall("Task"):
                     properties = task.find("Properties")
+                    task_data = ElementTree.tostring(task)
                     yield ADPolicyRecord(
                         last_modification_time=task_file_stat.st_mtime,
                         last_access_time=task_file_stat.st_atime,
@@ -78,8 +79,8 @@ class ADPolicyPlugin(Plugin):
                         guid=task.attrib.get("uid"),
                         key="XML",
                         value=properties.attrib.get("appName"),
-                        size=len(task),
-                        data=ElementTree.tostring(task),
+                        size=len(task_data),
+                        data=task_data,
                         path=str(task_file),
                         _target=self.target,
                     )
