@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
@@ -811,13 +811,13 @@ class InternalPlugin(Plugin):
         return cls
 
 
-@dataclass
+@dataclass(frozen=True, eq=True)
 class PluginFunction:
     name: str
     output_type: str
     class_object: str
     method_name: str
-    plugin_desc: dict
+    plugin_desc: dict = field(hash=False)
 
 
 def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
@@ -920,15 +920,15 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                 funcname = pattern
                 namespace = None
 
-            plugindesc = None
+            plugindesc = []
             for index_name, func in functions.items():
                 nsmatch = namespace and func["namespace"] == namespace and funcname in func["exports"]
                 fmatch = not namespace and not func["namespace"] and funcname in func["exports"]
                 if nsmatch or fmatch:
-                    plugindesc = func
+                    plugindesc.append(func)
 
-            if plugindesc:
-                loaded_plugin_object = load(plugindesc)
+            for description in plugindesc:
+                loaded_plugin_object = load(description)
                 fobject = inspect.getattr_static(loaded_plugin_object, funcname)
 
                 if compatibility and not loaded_plugin_object(target).is_compatible():
@@ -936,11 +936,12 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
 
                 result.append(
                     PluginFunction(
-                        name=f"{plugindesc['module']}.{pattern}",
+                        name=f"{description['module']}.{pattern}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),
-                        plugin_desc=plugindesc,
+                        plugin_desc=description,
                     )
                 )
-    return result
+
+    return list(set(result))
