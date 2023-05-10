@@ -213,17 +213,17 @@ def main():
             except UnsupportedPluginError as e:
                 target.log.error(
                     "Unsupported plugin for `%s`: %s",
-                    func,
+                    func_def,
                     e.root_cause_str(),
                 )
 
                 target.log.debug("", exc_info=e)
                 continue
             except PluginNotFoundError:
-                target.log.error("Cannot find plugin `%s`", func)
+                target.log.error("Cannot find plugin `%s`", func_def)
                 continue
             except Exception:
-                target.log.error("Exception while executing function `%s`", func, exc_info=True)
+                target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
                 continue
 
             if first_seen_output_type and output_type != first_seen_output_type:
@@ -236,7 +236,7 @@ def main():
                         "does not match first seen output `%s`."
                     ),
                     output_type,
-                    func,
+                    func_def,
                     first_seen_output_type,
                 )
                 parser.exit()
@@ -249,7 +249,7 @@ def main():
             elif output_type == "yield":
                 yield_entries.append(result)
             elif output_type == "none":
-                target.log.info("No result for function `%s` (output type is set to 'none')", func)
+                target.log.info("No result for function `%s` (output type is set to 'none')", func_def)
                 continue
             else:
                 basic_entries.append(result)
