@@ -202,10 +202,16 @@ def main():
         basic_entries = []
         yield_entries = []
 
+        # Keep a set of plugins that were already executed on the target.
+        executed_plugins = set()
+
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in funcs:
+        for func_def in find_plugin_functions(target, args.function, False):
+            if func_def.method_name in executed_plugins:
+                continue
+
             try:
                 output_type, result, cli_params_unparsed = execute_function_on_target(
                     target, func_def, cli_params_unparsed
@@ -243,6 +249,8 @@ def main():
 
             if not first_seen_output_type:
                 first_seen_output_type = output_type
+
+            executed_plugins.add(func_def.method_name)
 
             if output_type == "record":
                 record_entries.append(result)
