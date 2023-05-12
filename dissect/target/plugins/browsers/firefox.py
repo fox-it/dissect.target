@@ -32,7 +32,7 @@ class FirefoxPlugin(Plugin):
         "snap/firefox/common/.mozilla/firefox",
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
         # macOS
-        "/Users/*/Library/Application Support/Firefox",
+        "Library/Application Support/Firefox",
     ]
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
