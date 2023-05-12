@@ -5,7 +5,6 @@ from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
 from dissect import cstruct
-from dissect.cstruct.types.instance import Instance
 from flow.record import GroupedRecord, RecordDescriptor
 from flow.record.fieldtypes import path
 
@@ -20,7 +19,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
     [
-        ("path", "uri"),
+        ("path", "path"),
         ("string", "security_descriptor"),
         ("string", "source"),
         ("datetime", "date"),
@@ -65,7 +64,7 @@ TaskRecord = TargetRecordDescriptor(
     ],
 )
 
-ExecRecord = RecordDescriptor(
+ExecRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/Exec",
     [
         ("string", "action_type"),
@@ -75,7 +74,7 @@ ExecRecord = RecordDescriptor(
     ],
 )
 
-ComHandlerRecord = RecordDescriptor(
+ComHandlerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/ComHandler",
     [
         ("string", "action_type"),
@@ -84,7 +83,7 @@ ComHandlerRecord = RecordDescriptor(
     ],
 )
 
-SendEmailRecord = RecordDescriptor(
+SendEmailRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/SendEmail",
     [
         ("string", "action_type"),
@@ -102,7 +101,7 @@ SendEmailRecord = RecordDescriptor(
     ],
 )
 
-ShowMessageRecord = RecordDescriptor(
+ShowMessageRecord = TargetRecordDescriptor(
     "filesystem/windows/task/action/ShowMessage",
     [
         ("string", "tile"),
@@ -110,7 +109,7 @@ ShowMessageRecord = RecordDescriptor(
     ],
 )
 
-LogonTriggerRecord = RecordDescriptor(
+LogonTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/LogonTrigger",
     [
         ("string", "user_id"),
@@ -118,26 +117,26 @@ LogonTriggerRecord = RecordDescriptor(
     ],
 )
 
-BootTriggerRecord = RecordDescriptor(
+BootTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/BootTrigger",
     [
         ("string", "delay"),
     ],
 )
 
-IdleTriggerRecord = RecordDescriptor(
+IdleTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/IdleTrigger",
     [],
 )
 
-TimeTriggerRecord = RecordDescriptor(
+TimeTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/TimeTrigger",
     [
         ("string", "random_delay"),
     ],
 )
 
-TriggerRecord = RecordDescriptor(
+TriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/Trigger",
     [
         ("string", "enabled"),
@@ -150,7 +149,7 @@ TriggerRecord = RecordDescriptor(
     ],
 )
 
-EventTriggerRecord = RecordDescriptor(
+EventTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/EventTrigger",
     [
         ("string", "subscription"),
@@ -162,7 +161,7 @@ EventTriggerRecord = RecordDescriptor(
     ],
 )
 
-SessionStateChangeTriggerRecord = RecordDescriptor(
+SessionStateChangeTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/SessionStateChangeTrigger",
     [
         ("string", "user_id"),
@@ -171,7 +170,7 @@ SessionStateChangeTriggerRecord = RecordDescriptor(
     ],
 )
 
-CalendarTriggerRecord = RecordDescriptor(
+CalendarTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/CalendarTrigger",
     [
         ("string", "random_delay"),
@@ -182,8 +181,8 @@ CalendarTriggerRecord = RecordDescriptor(
     ],
 )
 
-DailyTriggerRecord = RecordDescriptor(
-    "filesystem/windows/task/trigger/DailyTrigger",
+DailyTriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger/daily",
     [
         ("uint16", "days_between_triggers"),
         ("uint16[]", "unused"),
@@ -193,8 +192,8 @@ DailyTriggerRecord = RecordDescriptor(
     ],
 )
 
-WeeklyTriggerRecord = RecordDescriptor(
-    "filesystem/windows/task/trigger/WeeklyTrigger",
+WeeklyTriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger/weekly",
     [
         ("uint16", "weeks_between_triggers"),
         ("string[]", "days_of_week"),
@@ -205,8 +204,8 @@ WeeklyTriggerRecord = RecordDescriptor(
     ],
 )
 
-MonthlyDateTriggerRecord = RecordDescriptor(
-    "filesystem/windows/task/trigger/MonthlyDateTrigger",
+MonthlyDateTriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger/monthly_date",
     [
         ("string", "day_of_month"),
         ("string[]", "months_of_year"),
@@ -216,8 +215,8 @@ MonthlyDateTriggerRecord = RecordDescriptor(
     ],
 )
 
-MonthlyDowTriggerRecord = RecordDescriptor(
-    "filesystem/windows/task/trigger/MonthlyDowTrigger",
+MonthlyDowTriggerRecord = TargetRecordDescriptor(
+    "filesystem/windows/task/trigger/monthly_dow",
     [
         ("string", "which_week"),
         ("string[]", "day_of_week"),
@@ -229,121 +228,121 @@ MonthlyDowTriggerRecord = RecordDescriptor(
 )
 
 
-c_atjob = """
-    struct PRIORITY {
-        uint32  undefined1: 5;          /* bit 31..27 */
-        uint32  normal : 1;             /* bit 26 - NORMAL_PRIORITY_CLASS */
-        uint32  idle : 1;               /* bit 25 - IDLE_PRIORITY_CLASS */
-        uint32  high : 1;               /* bit 24 - HIGH_PRIORITY_CLASS */
-        uint32  realtime : 1;           /* bit 23 - REALTIME_PRIORITY_CLASS */
-        uint32  undefined2 : 23;        /* bit 22..0 */
-    };
+atjob_def = """
+struct PRIORITY {
+    uint32  undefined1: 5;          /* bit 31..27 */
+    uint32  normal : 1;             /* bit 26 - NORMAL_PRIORITY_CLASS */
+    uint32  idle : 1;               /* bit 25 - IDLE_PRIORITY_CLASS */
+    uint32  high : 1;               /* bit 24 - HIGH_PRIORITY_CLASS */
+    uint32  realtime : 1;           /* bit 23 - REALTIME_PRIORITY_CLASS */
+    uint32  undefined2 : 23;        /* bit 22..0 */
+};
 
-    struct FLAGS {
-        uint32  interactive : 1;        /* bit 31 - can interact with user. */
-        uint32  delete_when_done : 1;   /* bit 30 - delete task when done. */
-        uint32  disabled : 1;           /* bit 29 - task is disabled. */
-        uint32  undefined3 : 1;         /* bit 28 */
-        uint32  only_idle : 1;          /* bit 27 - only start when idle. */
-        uint32  stop_on_idle_end : 1;   /* bit 26 - stop when no longer idle. */
-        uint32  disallow_battery : 1;   /* bit 25 - don't start when on batteries. */
-        uint32  stop_battery : 1;       /* bit 24 - stop when going to batteries. */
-        uint32  docked : 1;             /* bit 23 - should be 0, unused. */
-        uint32  hidden : 1;             /* bit 22 - hidden task. */
-        uint32  internet_connected : 1; /* bit 21 - should be 0, unused. */
-        uint32  restart_on_idle: 1;     /* bit 20 - restart task when returning to idle state. */
-        uint32  wake_to_run : 1;        /* bit 19 - can resume or wake the system to run. */
-        uint32  logged_on_only : 1;     /* bit 18 - only runs when specified user is logged on. */
-        uint32  undefined2 : 10;        /* bit 8..17 */
-        uint32  task_app_name_set : 1;  /* bit 7 - has app name. */
-        uint32  undefined1 : 7;         /* bit 0..6 */
-    };
+struct FLAGS {
+    uint32  interactive : 1;        /* bit 31 - can interact with user. */
+    uint32  delete_when_done : 1;   /* bit 30 - delete task when done. */
+    uint32  disabled : 1;           /* bit 29 - task is disabled. */
+    uint32  undefined3 : 1;         /* bit 28 */
+    uint32  only_idle : 1;          /* bit 27 - only start when idle. */
+    uint32  stop_on_idle_end : 1;   /* bit 26 - stop when no longer idle. */
+    uint32  disallow_battery : 1;   /* bit 25 - don't start when on batteries. */
+    uint32  stop_battery : 1;       /* bit 24 - stop when going to batteries. */
+    uint32  docked : 1;             /* bit 23 - should be 0, unused. */
+    uint32  hidden : 1;             /* bit 22 - hidden task. */
+    uint32  internet_connected : 1; /* bit 21 - should be 0, unused. */
+    uint32  restart_on_idle: 1;     /* bit 20 - restart task when returning to idle state. */
+    uint32  wake_to_run : 1;        /* bit 19 - can resume or wake the system to run. */
+    uint32  logged_on_only : 1;     /* bit 18 - only runs when specified user is logged on. */
+    uint32  undefined2 : 10;        /* bit 8..17 */
+    uint32  task_app_name_set : 1;  /* bit 7 - has app name. */
+    uint32  undefined1 : 7;         /* bit 0..6 */
+};
 
-    struct HRESULT {
-        uint32  severity : 1;           /* 0 = success, 1 = failure. */
-        uint32  reserved_value : 4;     /* reserved value */
-        uint32  facility_code : 11;     /* responsibility for the error or warning. */
-        uint32  return_code : 16;       /* error code that describes the error or warning. */
-    };
+struct HRESULT {
+    uint32  severity : 1;           /* 0 = success, 1 = failure. */
+    uint32  reserved_value : 4;     /* reserved value */
+    uint32  facility_code : 11;     /* responsibility for the error or warning. */
+    uint32  return_code : 16;       /* error code that describes the error or warning. */
+};
 
-    struct TFLAGS {
-        uint32  has_end_date : 1;       /* bit 31 - stop at some point in time. */
-        uint32  kill_at_end : 1;        /* bit 30 - stop at end of repetition period. */
-        uint32  trigger_disabled : 1;   /* bit 29 - trigger is disabled. */
-        uint32  unused : 29;            /* bit 28..0 - should be 0. */
-    };
+struct TFLAGS {
+    uint32  has_end_date : 1;       /* bit 31 - stop at some point in time. */
+    uint32  kill_at_end : 1;        /* bit 30 - stop at end of repetition period. */
+    uint32  trigger_disabled : 1;   /* bit 29 - trigger is disabled. */
+    uint32  unused : 29;            /* bit 28..0 - should be 0. */
+};
 
-    struct TRIGGER {
-        uint16  trigger_size;           /* trigger size, should be 0x0030. */
-        uint16  reserved1;              /* reserved. */
-        uint16  begin_year;             /* first trigger fire date, year. */
-        uint16  begin_month;            /* first trigger fire date, month. */
-        uint16  begin_day;              /* first trigger fire date, day. */
-        uint16  end_year;               /* last trigger fire date, year. */
-        uint16  end_month;              /* last trigger fire date, month. */
-        uint16  end_day;                /* last trigger fire date, day. */
-        uint16  start_hour;             /* hour of trigger fire. */
-        uint16  start_minute;           /* minute of trigger fire. */
-        uint32  minutes_duration;       /* task runs for duration in minutes. */
-        uint32  minutes_interval;       /* task runs every interval in minutes. */
-        TFLAGS  trigger_flags;          /* task trigger bit flags. */
-        uint32  trigger_type;           /* trigger type. */
-        uint16  trigger_specific0;      /* value specific to trigger type. */
-        uint16  trigger_specific1;      /* value specific to trigger type. */
-        uint16  trigger_specific2;      /* value specific to trigger type. */
-        uint16  padding;                /* should be 0. */
-        uint16  reserved2;              /* should be 0. */
-        uint16  reserved3;              /* should be 0. */
-    };
+struct TRIGGER {
+    uint16  trigger_size;           /* trigger size, should be 0x0030. */
+    uint16  reserved1;              /* reserved. */
+    uint16  begin_year;             /* first trigger fire date, year. */
+    uint16  begin_month;            /* first trigger fire date, month. */
+    uint16  begin_day;              /* first trigger fire date, day. */
+    uint16  end_year;               /* last trigger fire date, year. */
+    uint16  end_month;              /* last trigger fire date, month. */
+    uint16  end_day;                /* last trigger fire date, day. */
+    uint16  start_hour;             /* hour of trigger fire. */
+    uint16  start_minute;           /* minute of trigger fire. */
+    uint32  minutes_duration;       /* task runs for duration in minutes. */
+    uint32  minutes_interval;       /* task runs every interval in minutes. */
+    TFLAGS  trigger_flags;          /* task trigger bit flags. */
+    uint32  trigger_type;           /* trigger type. */
+    uint16  trigger_specific0;      /* value specific to trigger type. */
+    uint16  trigger_specific1;      /* value specific to trigger type. */
+    uint16  trigger_specific2;      /* value specific to trigger type. */
+    uint16  padding;                /* should be 0. */
+    uint16  reserved2;              /* should be 0. */
+    uint16  reserved3;              /* should be 0. */
+};
 
-    struct ATJOB_DATA {
-        uint16      windows_version;                    /* 0x00 - windows version that generated this task. */
-        uint16      file_version;                       /* 0x02 - should be set to 1. */
-        char        uuid[16];                           /* 0x04 - randomly generated UUID. */
-        uint16      app_name_len_offset;                /* 0x14 - offset in bytes to app_name_len. */
-        uint16      triggers_offset;                    /* 0x16 - offset in bytes to triggers. */
-        uint16      retry_count;                        /* 0x18 - number of attempts to retry when failing. */
-        uint16      retry_interval;                     /* 0x1a - minutes between retries. */
-        uint16      idle_deadline;                      /* 0x1c - minutes to wait for idle machine. */
-        uint16      idle_wait;                          /* 0x1e - minutes of idle before run task. */
-        PRIORITY    task_prio;                          /* 0x20 - bit flags with max. one bit set. */
-        uint32      max_run_time;                       /* 0x24 - milliseconds to wait for task complete. */
-        uint32      exit_code;                          /* 0x28 - should be set to 0x00000000. */
-        uint32      status;                             /* 0x2C - status value of the task. */
-        FLAGS       task_flags;                         /* 0x30 - task flag bits. */
-        uint16      last_year;                          /* 0x34 - last run year. */
-        uint16      last_month;                         /* 0x36 - last run month. */
-        uint16      last_weekday;                       /* 0x38 - last run weekday. */
-        uint16      last_day;                           /* 0x3a - last run day of the month. */
-        uint16      last_hour;                          /* 0x3c - last run hour (24h). */
-        uint16      last_minute;                        /* 0x3e - last run minute. */
-        uint16      last_second;                        /* 0x40 - last run second. */
-        uint16      last_millisecond;                   /* 0x42 - last run millisecond. */
-        uint16      running_instances;                  /* 0x44 - number of currently running instances. */
-        uint16      app_name_len;                       /* 0x46 - app name character count. */
-        char        app_name[app_name_len * 2];         /* 0x48 - app name - null-terminated Unicode string. */
-        uint16      par_char_count;                     /*      - parameters character count. */
-        char        parameters[par_char_count * 2];     /*      - parameters - null-terminated Unicode string. */
-        uint16      dir_char_count;                     /*      - working dir character count. */
-        char        working_dir[dir_char_count * 2];    /*      - working dir - null-terminated Unicode string. */
-        uint16      author_char_count;                  /*      - author character count. */
-        char        author[author_char_count * 2];      /*      - author - null-terminated Unicode string. */
-        uint16      comment_char_count;                 /*      - comment character count. */
-        char        comment[comment_char_count * 2];    /*      - comment - null-terminated Unicode string. */
-        uint16      user_data_size;                     /*      - user data size in bytes. */
-        uint8       user_data[user_data_size];          /*      - arbitrary bits, implementation specific. */
-        uint16      reserved_data_size;                 /*      - should be 0 or 8. */
-        HRESULT     reserved_hresult;                   /*      - used to describe an error. */
-        uint32      reserved_task_flags;                /*      - not used, should be zero. */
-        uint16      trigger_count;                      /*      - size in bytes of array of triggers. */
-        TRIGGER     task_triggers[trigger_count];       /*      - an arry of zero or more triggers. */
+struct ATJOB_DATA {
+    uint16      windows_version;                    /* 0x00 - windows version that generated this task. */
+    uint16      file_version;                       /* 0x02 - should be set to 1. */
+    char        uuid[16];                           /* 0x04 - randomly generated UUID. */
+    uint16      app_name_len_offset;                /* 0x14 - offset in bytes to app_name_len. */
+    uint16      triggers_offset;                    /* 0x16 - offset in bytes to triggers. */
+    uint16      retry_count;                        /* 0x18 - number of attempts to retry when failing. */
+    uint16      retry_interval;                     /* 0x1a - minutes between retries. */
+    uint16      idle_deadline;                      /* 0x1c - minutes to wait for idle machine. */
+    uint16      idle_wait;                          /* 0x1e - minutes of idle before run task. */
+    PRIORITY    task_prio;                          /* 0x20 - bit flags with max. one bit set. */
+    uint32      max_run_time;                       /* 0x24 - milliseconds to wait for task complete. */
+    uint32      exit_code;                          /* 0x28 - should be set to 0x00000000. */
+    uint32      status;                             /* 0x2C - status value of the task. */
+    FLAGS       task_flags;                         /* 0x30 - task flag bits. */
+    uint16      last_year;                          /* 0x34 - last run year. */
+    uint16      last_month;                         /* 0x36 - last run month. */
+    uint16      last_weekday;                       /* 0x38 - last run weekday. */
+    uint16      last_day;                           /* 0x3a - last run day of the month. */
+    uint16      last_hour;                          /* 0x3c - last run hour (24h). */
+    uint16      last_minute;                        /* 0x3e - last run minute. */
+    uint16      last_second;                        /* 0x40 - last run second. */
+    uint16      last_millisecond;                   /* 0x42 - last run millisecond. */
+    uint16      running_instances;                  /* 0x44 - number of currently running instances. */
+    uint16      app_name_len;                       /* 0x46 - app name character count. */
+    wchar       app_name[app_name_len];             /* 0x48 - app name - null-terminated Unicode string. */
+    uint16      par_char_count;                     /*      - parameters character count. */
+    wchar       parameters[par_char_count];         /*      - parameters - null-terminated Unicode string. */
+    uint16      dir_char_count;                     /*      - working dir character count. */
+    wchar       working_dir[dir_char_count];        /*      - working dir - null-terminated Unicode string. */
+    uint16      author_char_count;                  /*      - author character count. */
+    wchar       author[author_char_count];          /*      - author - null-terminated Unicode string. */
+    uint16      comment_char_count;                 /*      - comment character count. */
+    wchar       comment[comment_char_count];        /*      - comment - null-terminated Unicode string. */
+    uint16      user_data_size;                     /*      - user data size in bytes. */
+    uint8       user_data[user_data_size];          /*      - arbitrary bits, implementation specific. */
+    uint16      reserved_data_size;                 /*      - should be 0 or 8. */
+    HRESULT     reserved_hresult;                   /*      - used to describe an error. */
+    uint32      reserved_task_flags;                /*      - not used, should be zero. */
+    uint16      trigger_count;                      /*      - size in bytes of array of triggers. */
+    TRIGGER     task_triggers[trigger_count];       /*      - an arry of zero or more triggers. */
 //      uint16      s_ver;                              /*      - SignatureVersion, should be 1. */
 //      uint16      c_ver;                              /*      - MinClientVersion, should be 1. */
 //      uint8       job_signature[64 * s_ver * c_ver];  /*      - calculated job signature. */
-    };
-    """
+};
+"""
 atjob = cstruct.cstruct()
-atjob.load(c_atjob)
+atjob.load(atjob_def)
 
 
 def strip_namespace(data):
@@ -357,8 +356,7 @@ def strip_namespace(data):
 
 
 def minutes_duration_to_iso(minutes: int) -> Optional[str]:
-    """
-    Convert the given number of minutes to an ISO 8601 duration format string, like those found in the xml tasks.
+    """Convert the given number of minutes to an ISO 8601 duration format string, like those found in the xml tasks.
     The most significant unit is days (D), the least significant is minutes (M).
 
     Args:
@@ -391,8 +389,7 @@ def minutes_duration_to_iso(minutes: int) -> Optional[str]:
 
 
 def get_flags_data(flags: int, items: List[str]) -> List[str]:
-    """
-    Create a generator of items corresponding to the flags.
+    """Create a generator of items corresponding to the flags.
 
     Args:
         flags: An integer representing the trigger specific flags.
@@ -408,8 +405,7 @@ def get_flags_data(flags: int, items: List[str]) -> List[str]:
 
 
 def get_months_of_year(flags: int) -> List[str]:
-    """
-    Convert 16-bit flags to a list of months of the year.
+    """Convert 16-bit flags to a list of months of the year.
 
     Args:
         flags: An integer representing the trigger specific flags. See also:
@@ -436,8 +432,7 @@ def get_months_of_year(flags: int) -> List[str]:
 
 
 def get_days_of_week(flags: int) -> List[str]:
-    """
-    Get the list of weekdays corresponding to the given trigger specific 16-bit flags.
+    """Get the list of weekdays corresponding to the given trigger specific 16-bit flags.
 
     Args:
         flags: An integer representing the trigger specific flags. See also:
@@ -459,26 +454,25 @@ def get_days_of_week(flags: int) -> List[str]:
 
 
 class AtTask:
-    def __init__(self, at_data: Instance) -> None:
-        """
-        Initialize the class for opening .job task files created by at.exe.
+    """Initialize the class for opening .job task files created by at.exe.
 
-        Args:
-            at_data: cstruct instance of an .job file.
-        """
+    Args:
+        at_data: cstruct instance of an .job file.
+    """
+
+    def __init__(self, at_data):
         self.at_data = at_data
 
     def get_at_actions(self) -> Iterator[TargetRecordDescriptor]:
-        """
-        Get the at job task actions.
+        """Get the at job task actions.
 
         Yields:
             An iterator of at job task actions.
         """
         action_type = "Exec"
-        command = self.at_data.app_name.decode("utf-16-le").rstrip("\x00")
-        args = self.at_data.parameters.decode("utf-16-le").rstrip("\x00")
-        wrkdir = self.at_data.working_dir.decode("utf-16-le").rstrip("\x00")
+        command = self.at_data.app_name.rstrip("\x00")
+        args = self.at_data.parameters.rstrip("\x00")
+        wrkdir = self.at_data.working_dir.rstrip("\x00")
 
         yield ExecRecord(
             action_type=action_type,
@@ -488,8 +482,7 @@ class AtTask:
         )
 
     def get_at_triggers(self) -> Iterator[GroupedRecord]:
-        """
-        Get the job task triggers.
+        """Get the job task triggers.
 
         Yields:
             An iterator of at job task triggers.
@@ -634,18 +627,17 @@ class AtTask:
 
 
 class XmlTask:
-    def __init__(self, xml_data) -> None:
-        """
-        Initialize the XmlTask class for open XML-based task files.
+    """Initialize the XmlTask class for open XML-based task files.
 
-        Args:
-            xml_data (ElementTree.Element): The XML data representing the task.
-        """
+    Args:
+        xml_data (ElementTree.Element): The XML data representing the task.
+    """
+
+    def __init__(self, xml_data):
         self.xml_data = xml_data
 
     def get_element(self, xml_path: str, xml_data: Element = None) -> str:
-        """
-        Get the value of the specified XML element.
+        """Get the value of the specified XML element.
 
         Args:
             path (str): The string used to locate the element.
@@ -661,8 +653,7 @@ class XmlTask:
             return
 
     def get_raw(self, xml_path: str) -> str:
-        """
-        Get the raw XML data of the specified element.
+        """Get the raw XML data of the specified element.
 
         Args:
             path (str): The string used to locate the element.
@@ -675,8 +666,7 @@ class XmlTask:
             return ElementTree.tostring(data, encoding="utf-8")
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
-        """
-        Get the triggers from the XML task data.
+        """Get the triggers from the XML task data.
 
         Yields:
             GroupedRecord: The grouped record representing a trigger.
@@ -760,8 +750,7 @@ class XmlTask:
                 pass
 
     def get_actions(self) -> Iterator[RecordDescriptor]:
-        """
-        Get the actions from the XML task data.
+        """Get the actions from the XML task data.
 
         Yields:
             ActionRecord: The action record representing an action.
@@ -826,8 +815,10 @@ class XmlTask:
 
 
 class TasksPlugin(Plugin):
-    """
-    Plugin for retrieving scheduled tasks on a Windows system.
+    """Plugin for retrieving scheduled tasks on a Windows system.
+
+    Args:
+        target: The target system.
     """
 
     PATHS = [
@@ -838,12 +829,6 @@ class TasksPlugin(Plugin):
     ]
 
     def __init__(self, target: Target):
-        """
-        Initialize the TasksPlugin and build a list with files to parse.
-
-        Args:
-            target: The target system.
-        """
         super().__init__(target)
         self.task_files = []
 
@@ -862,8 +847,7 @@ class TasksPlugin(Plugin):
 
     @export(record=DynamicDescriptor(["path", "datetime"]))
     def tasks(self) -> Iterator:
-        """
-        Return all scheduled tasks on a Windows system.
+        """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
         intervals. An adversary may leverage such scheduled tasks to gain persistence on a system.
@@ -872,7 +856,7 @@ class TasksPlugin(Plugin):
             https://en.wikipedia.org/wiki/Windows_Task_Scheduler
 
         Yields:
-            TaskRecord or GroupedRecord: The scheduled tasks found on the target.
+            The scheduled tasks found on the target.
         """
         for task_file in self.task_files:
             try:
@@ -890,14 +874,13 @@ class TasksPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
 
     def parse_xml_task(self, entry: TargetPath) -> Iterator:
-        """
-        Parse a scheduled task from an XML file.
+        """Parse a scheduled task from an XML file.
 
         Args:
             entry: The path to the XML task file.
 
         Yields:
-            TaskRecord or GroupedRecord: The parsed scheduled task.
+            The parsed scheduled task.
         """
         try:
             task_xml = strip_namespace(ElementTree.fromstring(entry.open().read(), forbid_dtd=True))
@@ -956,7 +939,7 @@ class TasksPlugin(Plugin):
         task.data = task.get_raw("Data")
 
         record = TaskRecord(
-            uri=path.from_windows(task.uri) if task.uri else None,
+            path=path.from_windows(task.uri) if task.uri else None,
             security_descriptor=task.security_descriptor,
             source=task.source,
             date=task.date,
@@ -1012,14 +995,13 @@ class TasksPlugin(Plugin):
             yield grouped
 
     def parse_atjob(self, entry: TargetPath) -> Iterator[TargetRecordDescriptor]:
-        """
-        Parse a scheduled task from an at.exe job file.
+        """Parse a scheduled task from an at.exe job file.
 
         Args:
             entry: The path to the job file.
 
         Yields:
-            TaskRecord or GroupedRecord: The parsed at.exe job file.
+            The parsed at.exe job file.
         """
         try:
             at_task_data = atjob.ATJOB_DATA(entry.open())
@@ -1027,8 +1009,8 @@ class TasksPlugin(Plugin):
         except Exception as e:
             raise InvalidTaskError(e)
 
-        at_task_data.author = at_task_data.author.decode("utf-16-le").rstrip("\x00")
-        at_task_data.comment = at_task_data.comment.decode("utf-16-le").rstrip("\x00")
+        at_task_data.author = at_task_data.author.rstrip("\x00")
+        at_task_data.comment = at_task_data.comment.rstrip("\x00")
         at_task_data.retry_interval = minutes_duration_to_iso(at_task_data.retry_interval)
         at_task_data.task_flags.disallow_battery = True if at_task_data.task_flags.disallow_battery else False
         at_task_data.task_flags.stop_battery = True if at_task_data.task_flags.stop_battery else False
@@ -1050,7 +1032,7 @@ class TasksPlugin(Plugin):
                 task_priority = key
 
         record = TaskRecord(
-            uri=None,
+            path=None,
             security_descriptor=None,
             source=entry,
             date=None,
