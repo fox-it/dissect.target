@@ -308,7 +308,8 @@ class JournalPlugin(Plugin):
 
         for glob in self.JOURNAL_GLOBS:
             for journal_path in self.target.fs.glob(glob):
-                self.journal_paths.append(journal_path)
+                if self.target.fs.is_dir(journal_path):
+                    self.journal_paths.append(journal_path)
 
     def check_compatible(self) -> bool:
         return bool(len(self.journal_paths))
