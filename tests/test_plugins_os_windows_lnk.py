@@ -14,19 +14,22 @@ def test_lnk(target_win, fs_win):
     records = list(target_win.lnk(None))
 
     assert len(records) == 1
-    assert isinstance(records[0], type(LnkRecord()))
-    assert str(records[0].lnk_path) == "sysvol/users/pestudio.lnk"
-    assert records[0].lnk_name is None
-    assert str(records[0].lnk_relativepath) == "pestudio.exe"
-    assert str(records[0].lnk_workdir) == "C:\\Program Files\\pestudio"
-    assert records[0].lnk_arguments is None
-    assert records[0].lnk_iconlocation is None
-    assert records[0].local_base_path == "C:\\Program Files\\pestudio\\pestudio.exe"
-    assert records[0].common_path_suffix == ""
-    assert records[0].lnk_net_name is None
-    assert records[0].lnk_device_name is None
-    assert str(records[0].lnk_full_path) == "C:\\Program Files\\pestudio\\pestudio.exe"
-    assert records[0].machine_id == "desktop-i2purd1"
-    assert records[0].target_mtime == datetime("2021-10-09T07:24:42+00:00")
-    assert records[0].target_atime == datetime("2021-10-16T15:26:55.033125+00:00")
-    assert records[0].target_ctime == datetime("2021-10-16T15:26:20.406921+00:00")
+
+    record = records[0]
+
+    assert isinstance(record, type(LnkRecord()))
+    assert str(record.lnk_path) == "sysvol/users/pestudio.lnk"
+    assert record.lnk_name is None
+    assert str(record.lnk_relativepath) == "pestudio.exe"
+    assert str(record.lnk_workdir) == "C:\\Program Files\\pestudio"
+    assert record.lnk_arguments is None
+    assert record.lnk_iconlocation is None
+    assert record.local_base_path == "C:\\Program Files\\pestudio\\pestudio.exe"
+    assert record.common_path_suffix == ""
+    assert record.lnk_net_name is None
+    assert record.lnk_device_name is None
+    assert str(record.lnk_full_path) == "C:\\Program Files\\pestudio\\pestudio.exe"
+    assert record.machine_id == "desktop-i2purd1"
+    assert record.target_mtime == datetime("2021-10-09T07:24:42+00:00")
+    assert record.target_atime == datetime("2021-10-16T15:26:55.033125+00:00")
+    assert record.target_ctime == datetime("2021-10-16T15:26:20.406921+00:00")
