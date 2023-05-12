@@ -28,7 +28,7 @@ def test_single_record_properties(target_win, setup_tasks_test):
 
 
 def assert_xml_task_properties(xml_task):
-    assert str(xml_task.uri) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
+    assert str(xml_task.path) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
     assert (
         xml_task.security_descriptor
         == "D:(A;;0x111FFFFF;;;SY)(A;;0x111FFFFF;;;BA)(A;;0x111FFFFF;;;S-1-5-80-3028837079-3186095147-955107200-3701964851-1150726376)(A;;FRFX;;;AU)"  # noqa: E501
@@ -75,7 +75,7 @@ def assert_xml_task_properties(xml_task):
 
 
 def assert_at_task_properties(at_task):
-    assert at_task.uri is None
+    assert at_task.path is None
     assert at_task.security_descriptor is None
     assert at_task.source == "sysvol/windows/tasks/AtTask.job"
     assert at_task.date is None
