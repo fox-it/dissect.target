@@ -1,5 +1,5 @@
 import lzma
-from typing import BinaryIO, Iterator
+from typing import BinaryIO, Callable, Iterator
 
 import zstandard
 from dissect.cstruct import Instance, cstruct
@@ -203,6 +203,11 @@ c_journal = cstruct()
 c_journal.load(journal_def)
 
 
+def get_optional(value: str, to_type: Callable):
+    """Return the value if True, otherwise return None."""
+    return to_type(value) if value else None
+
+
 class JournalFile:
     """Parse Systemd Journal file format.
 
@@ -332,33 +337,31 @@ class JournalPlugin(Plugin):
                         ts=entry.get("ts"),
                         message=entry.get("message"),
                         message_id=entry.get("message_id"),
-                        priority=int(entry.get("priority")) if entry.get("priority") else None,
-                        code_file=path.from_posix(entry.get("code_file")) if entry.get("code_file") else None,
-                        code_line=int(entry.get("code_line")) if entry.get("code_line") else None,
+                        priority=get_optional(entry.get("priority"), int),
+                        code_file=get_optional(entry.get("code_file"), path.from_posix),
+                        code_line=get_optional(entry.get("code_line"), int),
                         code_func=entry.get("code_func"),
-                        errno=int(entry.get("errno")) if entry.get("errno") else None,
+                        errno=get_optional(entry.get("errno"), int),
                         invocation_id=entry.get("invocation_id"),
                         user_invocation_id=entry.get("user_invocation_id"),
-                        syslog_facility=entry.get("syslog_facility", 0),
+                        syslog_facility=get_optional(entry.get("syslog_facility"), int),
                         syslog_identifier=entry.get("syslog_identifier"),
-                        syslog_pid=int(entry.get("syslog_pid")) if entry.get("syslog_pid") else None,
+                        syslog_pid=get_optional(entry.get("syslog_pid"), int),
                         syslog_raw=entry.get("syslog_raw"),
                         documentation=entry.get("documentation"),
-                        tid=int(entry.get("tid")) if entry.get("tid") else None,
+                        tid=get_optional(entry.get("tid"), int),
                         unit=entry.get("unit"),
                         user_unit=entry.get("user_unit"),
-                        pid=int(entry.get("pid")) if entry.get("pid") else None,
-                        uid=int(entry.get("uid")) if entry.get("uid") else None,
-                        gid=int(entry.get("gid")) if entry.get("gid") else None,
+                        pid=get_optional(entry.get("pid"), int),
+                        uid=get_optional(entry.get("uid"), int),
+                        gid=get_optional(entry.get("gid"), int),
                         comm=entry.get("comm"),
-                        exe=path.from_posix(entry.get("exe")) if entry.get("exe") else None,
+                        exe=get_optional(entry.get("exe"), path.from_posix),
                         cmdline=entry.get("cmdline"),
                         cap_effective=entry.get("cap_effective"),
-                        audit_session=int(entry.get("audit_session")) if entry.get("audit_session") else None,
-                        audit_loginuid=int(entry.get("audit_loginuid")) if entry.get("audit_loginuid") else None,
-                        systemd_cgroup=path.from_posix(entry.get("systemd_cgroup"))
-                        if entry.get("systemd_cgroup")
-                        else None,
+                        audit_session=get_optional(entry.get("audit_session"), int),
+                        audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
+                        systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path.from_posix),
                         systemd_slice=entry.get("systemd_slice"),
                         systemd_unit=entry.get("systemd_unit"),
                         systemd_user_unit=entry.get("systemd_user_unit"),
@@ -377,8 +380,8 @@ class JournalPlugin(Plugin):
                         kernel_device=entry.get("kernel_device"),
                         kernel_subsystem=entry.get("kernel_subsystem"),
                         udev_sysname=entry.get("udev_sysname"),
-                        udev_devnode=path.from_posix(entry.get("udev_devnode")) if entry.get("udev_devnode") else None,
-                        udev_devlink=path.from_posix(entry.get("udev_devlink")) if entry.get("udev_devlink") else None,
+                        udev_devnode=get_optional(entry.get("udev_devnode"), path.from_posix),
+                        udev_devlink=get_optional(entry.get("udev_devlink"), path.from_posix),
                         journal_hostname=entry.get("hostname"),
                         filepath=path.from_posix(f.path),
                         _target=self.target,
