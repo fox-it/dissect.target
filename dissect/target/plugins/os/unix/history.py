@@ -126,7 +126,7 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,
-                source=str(file),
+                source=file,
                 _target=self.target,
                 _user=user,
             )
