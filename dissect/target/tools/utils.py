@@ -129,13 +129,16 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
-def plugin_factory(target: Target, plugin_class: type, funcname: str) -> tuple[Plugin, str]:
+def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
     if TargetdLoader.instance:
         return target.get_function(funcname)
-    else:
-        plugin_obj = plugin_class(target)
-    target_attr = getattr(plugin_obj, funcname)
-    return plugin_obj, target_attr
+
+    if isinstance(plugin, type):
+        plugin_obj = plugin(target)
+        target_attr = getattr(plugin_obj, funcname)
+        return plugin_obj, target_attr
+    elif isinstance(plugin, object):
+        return plugin, getattr(plugin, funcname)
 
 
 def execute_function_on_target(
@@ -178,13 +181,11 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
     Raises:
         UnsupportedPluginError: When the function was incompatible with the target.
     """
+    plugin_class = func.class_object
     if target.has_function(func.method_name):
         # If the function is already attached, use the one inside the target.
-        _, target_attr = target.get_function(func.method_name)
-        return target_attr
-
-    plugin_class = func.class_object
-    if issubclass(plugin_class, OSPlugin):
+        plugin_class, _ = target.get_function(func.method_name)
+    elif issubclass(plugin_class, OSPlugin):
         # OS plugin does not need to be added
         plugin_class = target._os_plugin
     else:

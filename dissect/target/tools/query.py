@@ -208,7 +208,7 @@ def main():
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in find_plugin_functions(target, args.function, False):
+        for func_def in funcs:
             if func_def.method_name in executed_plugins:
                 continue
 

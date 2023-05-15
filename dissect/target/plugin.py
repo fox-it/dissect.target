@@ -920,14 +920,14 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                 funcname = pattern
                 namespace = None
 
-            plugindesc = []
-            for index_name, func in functions.items():
+            plugin_descriptions = []
+            for _, func in functions.items():
                 nsmatch = namespace and func["namespace"] == namespace and funcname in func["exports"]
                 fmatch = not namespace and not func["namespace"] and funcname in func["exports"]
                 if nsmatch or fmatch:
-                    plugindesc.append(func)
+                    plugin_descriptions.append(func)
 
-            for description in plugindesc:
+            for description in plugin_descriptions:
                 loaded_plugin_object = load(description)
                 fobject = inspect.getattr_static(loaded_plugin_object, funcname)
 
