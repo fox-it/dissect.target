@@ -3,7 +3,7 @@ import inspect
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, Iterator
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
