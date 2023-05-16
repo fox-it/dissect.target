@@ -163,7 +163,7 @@ class LnkPlugin(Plugin):
                     target_ctime=target_ctime,
                 )
 
-    def lnk_entries(self, path: Optional[str] = None) -> Iterator[Path]:
+    def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
         if path:
             yield self.target.fs.path(path)
         else:
