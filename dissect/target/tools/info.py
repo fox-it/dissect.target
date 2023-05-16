@@ -11,6 +11,7 @@ from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -38,6 +39,7 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
