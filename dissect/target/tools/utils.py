@@ -137,7 +137,7 @@ def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -
         plugin_obj = plugin(target)
         target_attr = getattr(plugin_obj, funcname)
         return plugin_obj, target_attr
-    elif isinstance(plugin, object):
+    else:
         return plugin, getattr(plugin, funcname)
 
 
@@ -172,7 +172,7 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
     If the function does not exist yet, it will attempt to load it into the target.
 
     Args:
-        target: The platform we wish to run the function on.
+        target: The target we wish to run the function on.
         func: The function to run on the target.
 
     Returns:
