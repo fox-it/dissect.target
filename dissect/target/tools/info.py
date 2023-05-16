@@ -123,7 +123,7 @@ def print_target_info(target: Target) -> None:
     print()
     print(f"Hostname      : {target.hostname}")
     print(f"Domain        : {target.domain}")
-    print(f"IPs           : {', '.join(target.ips)}")
+    print(f"IPs           : {', '.join(target.ips or ['None'])}")
     print(f"OS family     : {target.os} ({target._os_plugin.__name__})")
     print(f"OS version    : {target.version}")
     print(f"Architecture  : {target.architecture}")
