@@ -135,7 +135,7 @@ class EtlPlugin(Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventType (string): The type of the event defined by the manifest file.
         """
-        yield from self.read_etl_files(self.PATHS["boot"])
+        yield from self.read_etl_files(self.PATHS["shutdown"])
 
     @export(record=DynamicDescriptor(["datetime"]))
     def boot(self):
