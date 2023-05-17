@@ -18,23 +18,24 @@ def setup_tasks_test(target_win, fs_win):
 
 def test_single_record_properties(target_win, setup_tasks_test):
     records = list(target_win.tasks())
-    assert len(records) == 6
+    assert len(records) == 8
 
     xml_task = records[0]
     assert_xml_task_properties(xml_task)
 
-    at_task = records[2]
+    at_task = records[7]
     assert_at_task_properties(at_task)
 
 
 def assert_xml_task_properties(xml_task):
-    assert str(xml_task.path) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
+    assert str(xml_task.uri) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
     assert (
         xml_task.security_descriptor
         == "D:(A;;0x111FFFFF;;;SY)(A;;0x111FFFFF;;;BA)(A;;0x111FFFFF;;;S-1-5-80-3028837079-3186095147-955107200-3701964851-1150726376)(A;;FRFX;;;AU)"  # noqa: E501
     )
     assert xml_task.source is None
     assert str(xml_task.date) == "2014-11-05 00:00:00"
+    assert xml_task.last_run_date is None
     assert xml_task.author == "$(@%SystemRoot%\\system32\\mapstoasttask.dll,-600)"
     assert xml_task.version is None
     assert xml_task.description == "$(@%SystemRoot%\\system32\\mapstoasttask.dll,-602)"
@@ -75,10 +76,11 @@ def assert_xml_task_properties(xml_task):
 
 
 def assert_at_task_properties(at_task):
-    assert at_task.path is None
+    assert at_task.uri is None
     assert at_task.security_descriptor is None
     assert at_task.source == "sysvol/windows/tasks/AtTask.job"
     assert at_task.date is None
+    assert at_task.last_run_date is None
     assert at_task.author == "user1"
     assert at_task.version == "1"
     assert at_task.description == "At job task for testing purposes"
@@ -119,12 +121,12 @@ def assert_at_task_properties(at_task):
 
 def test_grouped_record_properties(target_win, setup_tasks_test):
     records = list(target_win.tasks())
-    assert len(records) == 6
+    assert len(records) == 8
 
     xml_task_grouped = records[1]
     assert_xml_task_grouped_properties(xml_task_grouped)
 
-    at_task_grouped = records[5]
+    at_task_grouped = records[6]
     assert_at_task_grouped_properties(at_task_grouped)
 
 
@@ -145,6 +147,3 @@ def assert_at_task_grouped_properties(at_task_grouped):
     assert at_task_grouped.which_week == "SECOND_WEEK"
     assert at_task_grouped.day_of_week == ["Wednesday"]
     assert at_task_grouped.months_of_year == "['June', 'September']"
-    assert at_task_grouped.padding == 0
-    assert at_task_grouped.reserved2 == 0
-    assert at_task_grouped.reserved3 == 0
