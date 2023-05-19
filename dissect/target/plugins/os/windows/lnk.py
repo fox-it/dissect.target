@@ -2,6 +2,7 @@ from typing import Iterator, Optional
 
 from dissect.shellitem.lnk import Lnk
 from dissect.util import ts
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
@@ -12,20 +13,20 @@ from dissect.target.target import Target
 LnkRecord = TargetRecordDescriptor(
     "windows/filesystem/lnk",
     [
-        ("uri", "lnk_path"),
+        ("path", "lnk_path"),
         ("string", "lnk_name"),
         ("datetime", "lnk_mtime"),
         ("datetime", "lnk_atime"),
         ("datetime", "lnk_ctime"),
-        ("string", "lnk_relativepath"),
-        ("string", "lnk_workdir"),
+        ("path", "lnk_relativepath"),
+        ("path", "lnk_workdir"),
         ("string", "lnk_arguments"),
-        ("string", "lnk_iconlocation"),
+        ("path", "lnk_iconlocation"),
         ("string", "local_base_path"),
         ("string", "common_path_suffix"),
         ("string", "lnk_net_name"),
         ("string", "lnk_device_name"),
-        ("string", "lnk_full_path"),
+        ("path", "lnk_full_path"),
         ("string", "machine_id"),
         ("datetime", "target_mtime"),
         ("datetime", "target_atime"),
@@ -45,20 +46,20 @@ class LnkPlugin(Plugin):
                 return None
         raise UnsupportedPluginError("No folders containing link files found")
 
-    @arg("--path", "-p", dest="path", default=None, help="Path to .lnk file in target")
+    @arg("--directory", "-d", dest="directory", default=None, help="Path to .lnk file in target")
     @export(record=LnkRecord)
-    def lnk(self, path: Optional[str]) -> Iterator[LnkRecord]:
+    def lnk(self, directory: Optional[str] = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
-            lnk_path (uri): Path of the link (.lnk) file.
+            lnk_path (path): Path of the link (.lnk) file.
             lnk_name (string): Name of the link (.lnk) file.
             lnk_mtime (datetime): Modification time of the link (.lnk) file.
             lnk_atime (datetime): Access time of the link (.lnk) file.
             lnk_ctime (datetime): Creation time of the link (.lnk) file.
-            lnk_relpath (string): Relative path of target file to the link (.lnk) file.
-            lnk_workdir (string): Path of the working directory the link (.lnk) file will execute from.
-            lnk_iconlocation (string): Path of the display icon used for the link (.lnk) file.
+            lnk_relativepath (path): Relative path of target file to the link (.lnk) file.
+            lnk_workdir (path): Path of the working directory the link (.lnk) file will execute from.
+            lnk_iconlocation (path): Path of the display icon used for the link (.lnk) file.
             lnk_arguments (string): Command-line arguments passed to the target (linked) file.
             local_base_path (string): Absolute path of the target (linked) file.
             common_path_suffix (string): Suffix of the local_base_path.
@@ -72,14 +73,14 @@ class LnkPlugin(Plugin):
         """
 
         # we need to get the active codepage from the system to properly decode some values
-        codepage = self.target.codepage
+        codepage = self.target.codepage or "ascii"
 
-        for entry in self.lnk_entries(path):
+        for entry in self.lnk_entries(directory):
             lnk_file = Lnk(entry.open())
             lnk_net_name = lnk_device_name = None
 
             if lnk_file.link_header:
-                lnk_path = str(entry)
+                lnk_path = entry
                 lnk_name = lnk_file.stringdata.name_string.string if lnk_file.flag("has_name") else None
 
                 lnk_mtime = ts.from_unix(entry.stat().st_mtime)
@@ -87,11 +88,19 @@ class LnkPlugin(Plugin):
                 lnk_ctime = ts.from_unix(entry.stat().st_ctime)
 
                 lnk_relativepath = (
-                    lnk_file.stringdata.relative_path.string if lnk_file.flag("has_relative_path") else None
+                    path.from_windows(lnk_file.stringdata.relative_path.string)
+                    if lnk_file.flag("has_relative_path")
+                    else None
                 )
-                lnk_workdir = lnk_file.stringdata.working_dir.string if lnk_file.flag("has_working_dir") else None
+                lnk_workdir = (
+                    path.from_windows(lnk_file.stringdata.working_dir.string)
+                    if lnk_file.flag("has_working_dir")
+                    else None
+                )
                 lnk_iconlocation = (
-                    lnk_file.stringdata.icon_location.string if lnk_file.flag("has_icon_location") else None
+                    path.from_windows(lnk_file.stringdata.icon_location.string)
+                    if lnk_file.flag("has_icon_location")
+                    else None
                 )
                 lnk_arguments = (
                     lnk_file.stringdata.command_line_arguments.string if lnk_file.flag("has_arguments") else None
@@ -106,9 +115,9 @@ class LnkPlugin(Plugin):
                 )
 
                 if local_base_path and common_path_suffix:
-                    lnk_full_path = local_base_path + common_path_suffix
+                    lnk_full_path = path.from_windows(local_base_path + common_path_suffix)
                 elif local_base_path and not common_path_suffix:
-                    lnk_full_path = local_base_path
+                    lnk_full_path = path.from_windows(local_base_path)
                 else:
                     lnk_full_path = None
 
@@ -125,7 +134,7 @@ class LnkPlugin(Plugin):
                             else None
                         )
                 try:
-                    machine_id = lnk_file.extradata.TRACKER_PROPS.machine_id.decode(codepage)
+                    machine_id = lnk_file.extradata.TRACKER_PROPS.machine_id.decode(codepage).strip("\x00")
                 except AttributeError:
                     machine_id = None
 

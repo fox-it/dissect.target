@@ -1,5 +1,6 @@
 from struct import unpack
 
+from defusedxml import ElementTree
 from dissect import cstruct
 from dissect.regf.c_regf import (
     REG_BINARY,
@@ -37,7 +38,7 @@ ADPolicyRecord = TargetRecordDescriptor(
         ("string", "value"),
         ("uint32", "size"),
         ("dynamic", "data"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -62,6 +63,30 @@ class ADPolicyPlugin(Plugin):
         if len([d for d in self.dirs if d.exists()]) <= 0:
             raise UnsupportedPluginError("No AD policy directories found")
 
+    def _xmltasks(self, policy_dir):
+        for task_file in policy_dir.rglob("ScheduledTasks.xml"):
+            try:
+                task_file_stat = task_file.stat()
+                xml = task_file.read_text()
+                tree = ElementTree.fromstring(xml)
+                for task in tree.findall("Task"):
+                    properties = task.find("Properties")
+                    task_data = ElementTree.tostring(task)
+                    yield ADPolicyRecord(
+                        last_modification_time=task_file_stat.st_mtime,
+                        last_access_time=task_file_stat.st_atime,
+                        creation_time=task_file_stat.st_ctime,
+                        guid=task.attrib.get("uid"),
+                        key="XML",
+                        value=properties.attrib.get("appName"),
+                        size=len(task_data),
+                        data=task_data,
+                        path=task_file,
+                        _target=self.target,
+                    )
+            except Exception as error:
+                self.target.log.warning("Unable to read XML policy file: %s", error)
+
     @export(record=ADPolicyRecord)
     def adpolicy(self):
         """Return all AD policies (also known as GPOs or Group Policy Objects).
@@ -75,6 +100,8 @@ class ADPolicyPlugin(Plugin):
         for policy_dir in self.dirs:
             if not policy_dir.exists():
                 continue
+
+            yield from self._xmltasks(policy_dir)
 
             # The body consists of registry values in the following format.
             # [key;value;type;size;data]
@@ -124,7 +151,7 @@ class ADPolicyPlugin(Plugin):
                         value=policy_reg_value.decode("utf-16-le").rstrip("\x00"),
                         size=policy_reg_data_size,
                         data=policy_reg_data,
-                        path=str(policy_file),
+                        path=policy_file,
                         _target=self.target,
                     )
 

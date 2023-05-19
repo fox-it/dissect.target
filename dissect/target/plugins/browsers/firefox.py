@@ -24,10 +24,15 @@ class FirefoxPlugin(Plugin):
     __namespace__ = "firefox"
 
     DIRS = [
+        # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
+        # Linux
         ".mozilla/firefox",
         "snap/firefox/common/.mozilla/firefox",
+        ".var/app/org.mozilla.firefox/.mozilla/firefox",
+        # macOS
+        "Library/Application Support/Firefox",
     ]
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
