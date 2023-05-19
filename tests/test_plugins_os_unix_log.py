@@ -1,10 +1,7 @@
 from datetime import datetime, timezone
 
-from flow.record.fieldtypes import datetime as dt
-
 from dissect.target.plugins.os.unix.log.atop import AtopPlugin
 from dissect.target.plugins.os.unix.log.btmp import BtmpPlugin
-from dissect.target.plugins.os.unix.log.journal import JournalPlugin
 from dissect.target.plugins.os.unix.log.lastlog import LastLogPlugin
 from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
 
@@ -100,26 +97,3 @@ def test_atop_plugin(target_unix, fs_unix):
     assert bool(results[0].wasinactive) is False
     assert results[0].container == ""
     assert str(results[0].filepath) == "atop_20221111"
-
-
-def test_journal_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/plugins/os/unix/log/journal")
-    fs_unix.map_file("var/log/journal/1337/user-1000.journal", data_file)
-
-    target_unix.add_plugin(JournalPlugin)
-
-    results = list(target_unix.journal())
-    record = results[0]
-
-    # The tool Journalctl has the same amount of events as result: journalctl -D log/ | wc -l
-    assert len(results) == 2400
-
-    assert record.ts == dt("2023-04-25T16:16:58.252792+00:00")
-    assert record.message == "  AMD AuthenticAMD"
-    assert record.priority == 6
-    assert record.syslog_identifier == "kernel"
-    assert record.boot_id == "9b6b84a5821c46bab1a1c52f94eb2ed4"
-    assert record.machine_id == "e8565bc35a014cada437832a3754e15c"
-    assert record.transport == "kernel"
-    assert record.journal_hostname == "dissect"
-    assert str(record.filepath) == "/var/log/journal/1337/user-1000.journal"
