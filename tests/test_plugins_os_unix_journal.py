@@ -27,7 +27,7 @@ def test_journal_plugin(target_unix, fs_unix):
     assert record.uid == 1000
     assert record.gid == 1000
     assert record.comm == "gnome-shell"
-    assert record.exe == "/usr/bin/gnome-shell"
+    assert str(record.exe) == "/usr/bin/gnome-shell"
     assert record.cmdline == "/usr/bin/gnome-shell"
     assert record.transport == "stdout"
     assert record.journal_hostname == "dissect"
