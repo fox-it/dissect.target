@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 
 from dissect.target.plugins.os.windows.tasks import TasksPlugin
@@ -23,7 +25,7 @@ def test_single_record_properties(target_win, setup_tasks_test):
     xml_task = records[0]
     assert_xml_task_properties(xml_task)
 
-    at_task = records[7]
+    at_task = records[2]
     assert_at_task_properties(at_task)
 
 
@@ -80,7 +82,7 @@ def assert_at_task_properties(at_task):
     assert at_task.security_descriptor is None
     assert at_task.source == "sysvol/windows/tasks/AtTask.job"
     assert at_task.date is None
-    assert at_task.last_run_date is None
+    assert at_task.last_run_date == datetime.strptime("2023-05-21 10:44:25.794000", "%Y-%m-%d %H:%M:%S.%f")
     assert at_task.author == "user1"
     assert at_task.version == "1"
     assert at_task.description == "At job task for testing purposes"
@@ -88,6 +90,7 @@ def assert_at_task_properties(at_task):
     assert at_task.principal_id is None
     assert at_task.user_id is None
     assert at_task.logon_type is None
+    assert at_task.group_id is None
     assert at_task.display_name is None
     assert at_task.run_level is None
     assert at_task.process_token_sid_type is None
@@ -126,8 +129,20 @@ def test_grouped_record_properties(target_win, setup_tasks_test):
     xml_task_grouped = records[1]
     assert_xml_task_grouped_properties(xml_task_grouped)
 
+    at_task_grouped = records[3]
+    assert_at_task_grouped_exec(at_task_grouped)
+
+    at_task_grouped = records[4]
+    assert_at_task_grouped_daily(at_task_grouped)
+
+    at_task_grouped = records[5]
+    assert_at_task_grouped_padding(at_task_grouped)
+
     at_task_grouped = records[6]
-    assert_at_task_grouped_properties(at_task_grouped)
+    assert_at_task_grouped_monthlydow(at_task_grouped)
+
+    at_task_grouped = records[7]
+    assert_at_task_grouped_padding(at_task_grouped)
 
 
 def assert_xml_task_grouped_properties(xml_task_grouped):
@@ -136,7 +151,30 @@ def assert_xml_task_grouped_properties(xml_task_grouped):
     assert xml_task_grouped.data is None
 
 
-def assert_at_task_grouped_properties(at_task_grouped):
+def assert_at_task_grouped_exec(at_task_grouped):
+    assert at_task_grouped.action_type == "Exec"
+    assert at_task_grouped.arguments == ""
+    assert at_task_grouped.command == "C:\\WINDOWS\\NOTEPAD.EXE"
+    assert at_task_grouped.working_directory == "C:\\Documents and Settings\\John"
+
+
+def assert_at_task_grouped_daily(at_task_grouped):
+    assert at_task_grouped.days_between_triggers == 3
+    assert at_task_grouped.end_boundary == "2023-05-12"
+    assert at_task_grouped.execution_time_limit == "P3D"
+    assert at_task_grouped.repetition_duration == "PT13H15M"
+    assert at_task_grouped.repetition_interval == "PT12M"
+    assert at_task_grouped.repetition_stop_duration_end == "True"
+    assert at_task_grouped.start_boundary == "2023-05-11"
+
+
+def assert_at_task_grouped_padding(at_task_grouped):
+    assert at_task_grouped.padding == 0
+    assert at_task_grouped.reserved2 == 0
+    assert at_task_grouped.reserved3 == 0
+
+
+def assert_at_task_grouped_monthlydow(at_task_grouped):
     assert at_task_grouped.records[1].enabled == "True"
     assert at_task_grouped.start_boundary == "2023-05-11"
     assert at_task_grouped.end_boundary == "2023-05-20"
