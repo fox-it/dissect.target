@@ -18,17 +18,6 @@ def setup_tasks_test(target_win, fs_win):
     target_win.add_plugin(TasksPlugin)
 
 
-def test_single_record_properties(target_win, setup_tasks_test):
-    records = list(target_win.tasks())
-    assert len(records) == 8
-
-    xml_task = records[0]
-    assert_xml_task_properties(xml_task)
-
-    at_task = records[2]
-    assert_at_task_properties(at_task)
-
-
 def assert_xml_task_properties(xml_task):
     assert str(xml_task.uri) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
     assert (
@@ -122,29 +111,6 @@ def assert_at_task_properties(at_task):
     assert at_task.data == "[]"
 
 
-def test_grouped_record_properties(target_win, setup_tasks_test):
-    records = list(target_win.tasks())
-    assert len(records) == 8
-
-    xml_task_grouped = records[1]
-    assert_xml_task_grouped_properties(xml_task_grouped)
-
-    at_task_grouped = records[3]
-    assert_at_task_grouped_exec(at_task_grouped)
-
-    at_task_grouped = records[4]
-    assert_at_task_grouped_daily(at_task_grouped)
-
-    at_task_grouped = records[5]
-    assert_at_task_grouped_padding(at_task_grouped)
-
-    at_task_grouped = records[6]
-    assert_at_task_grouped_monthlydow(at_task_grouped)
-
-    at_task_grouped = records[7]
-    assert_at_task_grouped_padding(at_task_grouped)
-
-
 def assert_xml_task_grouped_properties(xml_task_grouped):
     assert xml_task_grouped.action_type == "ComHandler"
     assert xml_task_grouped.class_id == "{9885AEF2-BD9F-41E0-B15E-B3141395E803}"
@@ -166,6 +132,7 @@ def assert_at_task_grouped_daily(at_task_grouped):
     assert at_task_grouped.repetition_interval == "PT12M"
     assert at_task_grouped.repetition_stop_duration_end == "True"
     assert at_task_grouped.start_boundary == "2023-05-11"
+    assert_at_task_grouped_padding(at_task_grouped)
 
 
 def assert_at_task_grouped_padding(at_task_grouped):
@@ -185,3 +152,36 @@ def assert_at_task_grouped_monthlydow(at_task_grouped):
     assert at_task_grouped.which_week == "SECOND_WEEK"
     assert at_task_grouped.day_of_week == ["Wednesday"]
     assert at_task_grouped.months_of_year == "['June', 'September']"
+    assert_at_task_grouped_padding(at_task_grouped)
+
+
+@pytest.mark.parametrize(
+    "record_index,assert_func",
+    [
+        (0, assert_xml_task_properties),
+        (2, assert_at_task_properties),
+    ],
+)
+def test_single_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+    records = list(target_win.tasks())
+    assert len(records) == 6
+
+    record = records[record_index]
+    assert_func(record)
+
+
+@pytest.mark.parametrize(
+    "record_index,assert_func",
+    [
+        (1, assert_xml_task_grouped_properties),
+        (3, assert_at_task_grouped_exec),
+        (4, assert_at_task_grouped_daily),
+        (5, assert_at_task_grouped_monthlydow),
+    ],
+)
+def test_grouped_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+    records = list(target_win.tasks())
+    assert len(records) == 6
+
+    grouped_record = records[record_index]
+    assert_func(grouped_record)

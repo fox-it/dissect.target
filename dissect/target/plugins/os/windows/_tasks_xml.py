@@ -13,7 +13,7 @@ from dissect.target.target import Target
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 ExecRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/Exec",
+    "filesystem/windows/task/action/exec",
     [
         ("string", "action_type"),
         ("string", "command"),
@@ -23,7 +23,7 @@ ExecRecord = TargetRecordDescriptor(
 )
 
 ComHandlerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/ComHandler",
+    "filesystem/windows/task/action/comhandler",
     [
         ("string", "action_type"),
         ("string", "class_id"),
@@ -32,7 +32,7 @@ ComHandlerRecord = TargetRecordDescriptor(
 )
 
 SendEmailRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/SendEmail",
+    "filesystem/windows/task/action/sendemail",
     [
         ("string", "action_type"),
         ("string", "server"),
@@ -50,7 +50,7 @@ SendEmailRecord = TargetRecordDescriptor(
 )
 
 ShowMessageRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/ShowMessage",
+    "filesystem/windows/task/action/showmessage",
     [
         ("string", "tile"),
         ("string", "body"),
@@ -58,7 +58,7 @@ ShowMessageRecord = TargetRecordDescriptor(
 )
 
 LogonTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/LogonTrigger",
+    "filesystem/windows/task/trigger/logontrigger",
     [
         ("string", "user_id"),
         ("string", "delay"),
@@ -66,26 +66,26 @@ LogonTriggerRecord = TargetRecordDescriptor(
 )
 
 BootTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/BootTrigger",
+    "filesystem/windows/task/trigger/boottrigger",
     [
         ("string", "delay"),
     ],
 )
 
 IdleTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/IdleTrigger",
+    "filesystem/windows/task/trigger/idletrigger",
     [],
 )
 
 TimeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/TimeTrigger",
+    "filesystem/windows/task/trigger/timetrigger",
     [
         ("string", "random_delay"),
     ],
 )
 
 TriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/Trigger",
+    "filesystem/windows/task/trigger",
     [
         ("string", "enabled"),
         ("string", "start_boundary"),
@@ -98,7 +98,7 @@ TriggerRecord = TargetRecordDescriptor(
 )
 
 EventTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/EventTrigger",
+    "filesystem/windows/task/trigger/eventtrigger",
     [
         ("string", "subscription"),
         ("string", "delay"),
@@ -110,7 +110,7 @@ EventTriggerRecord = TargetRecordDescriptor(
 )
 
 SessionStateChangeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/SessionStateChangeTrigger",
+    "filesystem/windows/task/trigger/sessionstatechangetrigger",
     [
         ("string", "user_id"),
         ("string", "delay"),
@@ -119,7 +119,7 @@ SessionStateChangeTriggerRecord = TargetRecordDescriptor(
 )
 
 CalendarTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/CalendarTrigger",
+    "filesystem/windows/task/trigger/calendartrigger",
     [
         ("string", "random_delay"),
         ("string", "schedule_by_day"),
@@ -313,17 +313,17 @@ class XmlTask:
 
             if trigger_type == "LogonTrigger":
                 user_id = self.get_element("UserId", trigger)
-                delay = self.get_element("UserId", trigger)
+                delay = self.get_element("Delay", trigger)
                 record = LogonTriggerRecord(
                     user_id=user_id,
                     delay=delay,
                 )
-                yield GroupedRecord("filesystem/windows/task/LogonTrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/logontrigger", [base, record])
 
             if trigger_type == "BootTrigger":
                 delay = self.get_element("Delay", trigger)
                 record = BootTriggerRecord(delay=delay)
-                yield GroupedRecord("filesystem/windows/task/BootTrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/boottrigger", [base, record])
 
             if trigger_type == "IdleTrigger":
                 pass  # No extra fields
@@ -332,7 +332,7 @@ class XmlTask:
                 random_delay = self.get_element("RandomDelay", trigger)
 
                 record = TimeTriggerRecord(random_delay=random_delay)
-                yield GroupedRecord("filesystem/windows/task/TimeTrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/timetrigger", [base, record])
 
             if trigger_type == "EventTrigger":
                 subscription = self.get_element("Subscription", trigger)
@@ -351,7 +351,7 @@ class XmlTask:
                     value_queries=value_queries,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/EventTrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/eventtrigger", [base, record])
 
             if trigger_type == "SessionStateChangeTrigger":
                 user_id = self.get_element("UserId", trigger)
@@ -364,7 +364,7 @@ class XmlTask:
                     state_change=state_change,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/SessionStateTrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/sessionstatetrigger", [base, record])
 
             if trigger_type == "CalendarTrigger":
                 pass

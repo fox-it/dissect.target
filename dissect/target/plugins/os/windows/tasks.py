@@ -154,12 +154,7 @@ class TasksPlugin(Plugin):
             The scheduled tasks found on the target.
         """
         for task_object in self.task_objects:
-            try:
-                for entry in self.get_task_fields(task_object):
-                    yield entry
-            except Exception as e:
-                self.target.log.warning("An error occured parsing task %s: %s", task_object, str(e))
-                self.target.log.debug("", exc_info=e)
+            yield from self.get_task_fields(task_object)
 
     def get_task_fields(self, task_object) -> Iterator:
         """Get all the parsed task fields from a task.
@@ -173,10 +168,7 @@ class TasksPlugin(Plugin):
         """
         record_kwargs = {}
         for attr in self.ATTRIBUTES:
-            try:
-                record_kwargs[attr] = getattr(task_object, attr)
-            except AttributeError:
-                record_kwargs[attr] = None
+            record_kwargs[attr] = getattr(task_object, attr, None)
 
         record = TaskRecord(**record_kwargs)
         yield record

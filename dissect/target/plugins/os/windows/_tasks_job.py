@@ -13,7 +13,7 @@ from dissect.target.target import Target
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 ExecRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/Exec",
+    "filesystem/windows/task/action/exec",
     [
         ("string", "action_type"),
         ("string", "command"),
@@ -23,7 +23,7 @@ ExecRecord = TargetRecordDescriptor(
 )
 
 TriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/Trigger",
+    "filesystem/windows/task/trigger",
     [
         ("string", "enabled"),
         ("string", "start_boundary"),
@@ -326,6 +326,11 @@ class AtTask:
                 repetition_stop_duration_end=repetition_stop_duration_end,
                 execution_time_limit=execution_time_limit,
             )
+            padding_record = PaddingTriggerRecord(
+                padding=trigger.padding,
+                reserved2=trigger.reserved2,
+                reserved3=trigger.reserved3,
+            )
 
             if trigger_type == "EVENT_AT_LOGON":
                 # No trigger specific flags in job files for this trigger type
@@ -352,7 +357,7 @@ class AtTask:
                     unused=unused,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/daily", [base, record])
+                yield GroupedRecord("filesystem/windows/task/daily", [base, record, padding_record])
 
             if trigger_type == "WEEKLY":
                 interval = trigger.trigger_specific0
@@ -367,7 +372,7 @@ class AtTask:
                     unused=unused,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/weekly", [base, record])
+                yield GroupedRecord("filesystem/windows/task/weekly", [base, record, padding_record])
 
             if trigger_type == "MONTHLYDATE":
                 # Convert trigger_specific fields to binary, remove the "0b" prefix, and pad with zeroes to 16 digits
@@ -386,7 +391,7 @@ class AtTask:
                     months_of_year=months_of_year,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/monthly_date", [base, record])
+                yield GroupedRecord("filesystem/windows/task/monthly_date", [base, record, padding_record])
 
             if trigger_type == "MONTHLYDOW":
                 week = trigger.trigger_specific0
@@ -406,15 +411,7 @@ class AtTask:
                     months_of_year=months,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record])
-
-            record = PaddingTriggerRecord(
-                padding=trigger.padding,
-                reserved2=trigger.reserved2,
-                reserved3=trigger.reserved3,
-            )
-
-            yield GroupedRecord("filesystem/windows/task/padding", [base, record])
+                yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record, padding_record])
 
     def minutes_duration_to_iso(self, minutes: int) -> Optional[str]:
         """Convert the given number of minutes to an ISO 8601 duration format string, like those found in the xml tasks.
