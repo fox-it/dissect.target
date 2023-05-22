@@ -44,29 +44,26 @@ class LazyAttr:
         self.module = module
         self._realattr = None
 
-    def _set_realattr(self):
+    @property
+    def realattr(self):
         if not self._realattr:
             self.module._import()
             self._realattr = getattr(self.module._module, self.attr)
 
-    def __call__(self, *args, **kwargs):
-        self._set_realattr()
-
-        return self._realattr(*args, **kwargs)
-
-    def __getattr__(self, attr):
-        self._set_realattr()
-
-        return getattr(self._realattr, attr)
+        return self._realattr
 
     @property
     def __doc__(self):
-        self._set_realattr()
+        return self.realattr.__doc__
 
-        return self._realattr.__doc__
+    def __call__(self, *args, **kwargs):
+        return self.realattr(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        return getattr(self.realattr, attr)
 
     def __repr__(self):
-        return f"<lazyattr {self.module._module_name}.{self.attr} loaded={self._realattr is not None}>"
+        return f"<lazyattr {self.module._module_name}.{self.attr} loaded={self.realattr is not None}>"
 
 
 def import_lazy(module_name):
