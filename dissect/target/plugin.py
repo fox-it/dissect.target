@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
@@ -811,13 +811,13 @@ class InternalPlugin(Plugin):
         return cls
 
 
-@dataclass
+@dataclass(frozen=True, eq=True)
 class PluginFunction:
     name: str
     output_type: str
     class_object: str
     method_name: str
-    plugin_desc: dict
+    plugin_desc: dict = field(hash=False)
 
 
 def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
@@ -831,7 +831,9 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
     rootset = set()
 
     def all_plugins():
-        yield from plugins()
+        # Filter out plugins based on the target os
+        os_type = type(target._os) if target._os else None
+        yield from plugins(os_type)
         yield from os_plugins()
         yield from child_plugins()  # Doesn't export anything but added for completeness.
 
@@ -885,33 +887,34 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
             pattern += "*"
 
         if wildcard or treematch:
-            for index_name, func in functions.items():
-                if fnmatch.fnmatch(index_name, pattern):
-                    method_name = index_name.split(".")[-1]
-                    loaded_plugin_object = load(func)
+            for index_name in fnmatch.filter(functions.keys(), pattern):
+                func = functions[index_name]
 
-                    # Skip plugins that don't want to be found by wildcards
-                    if not loaded_plugin_object.__findable__:
+                method_name = index_name.split(".")[-1]
+                loaded_plugin_object = load(func)
+
+                # Skip plugins that don't want to be found by wildcards
+                if not loaded_plugin_object.__findable__:
+                    continue
+
+                fobject = inspect.getattr_static(loaded_plugin_object, method_name)
+
+                if compatibility:
+                    try:
+                        if not loaded_plugin_object(target).is_compatible():
+                            continue
+                    except Exception:
                         continue
 
-                    fobject = inspect.getattr_static(loaded_plugin_object, method_name)
-
-                    if compatibility:
-                        try:
-                            if not loaded_plugin_object(target).is_compatible():
-                                continue
-                        except Exception:
-                            continue
-
-                    result.append(
-                        PluginFunction(
-                            name=index_name,
-                            class_object=loaded_plugin_object,
-                            method_name=method_name,
-                            output_type=getattr(fobject, "__output__", "text"),
-                            plugin_desc=func,
-                        )
+                result.append(
+                    PluginFunction(
+                        name=index_name,
+                        class_object=loaded_plugin_object,
+                        method_name=method_name,
+                        output_type=getattr(fobject, "__output__", "text"),
+                        plugin_desc=func,
                     )
+                )
         else:
             # otherwise match using ~ classic style
             if pattern.find(".") > -1:
@@ -920,15 +923,15 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                 funcname = pattern
                 namespace = None
 
-            plugindesc = None
-            for index_name, func in functions.items():
+            plugin_descriptions = []
+            for _, func in functions.items():
                 nsmatch = namespace and func["namespace"] == namespace and funcname in func["exports"]
                 fmatch = not namespace and not func["namespace"] and funcname in func["exports"]
                 if nsmatch or fmatch:
-                    plugindesc = func
+                    plugin_descriptions.append(func)
 
-            if plugindesc:
-                loaded_plugin_object = load(plugindesc)
+            for description in plugin_descriptions:
+                loaded_plugin_object = load(description)
                 fobject = inspect.getattr_static(loaded_plugin_object, funcname)
 
                 if compatibility and not loaded_plugin_object(target).is_compatible():
@@ -936,11 +939,12 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
 
                 result.append(
                     PluginFunction(
-                        name=f"{plugindesc['module']}.{pattern}",
+                        name=f"{description['module']}.{pattern}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),
-                        plugin_desc=plugindesc,
+                        plugin_desc=description,
                     )
                 )
-    return result
+
+    return list(set(result))
