@@ -9,6 +9,7 @@ from flow.record import Record
 from dissect.target import plugin
 from dissect.target.exceptions import (
     FilesystemError,
+    PluginNotFoundError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     UnsupportedPluginError,
@@ -85,6 +86,9 @@ class WindowsEventlogsMixin:
             subkeys = self.target.registry.key(self.EVENTLOG_REGISTRY_KEY).subkeys()
         except RegistryKeyNotFoundError:
             self.target.log.warning("No eventlog registry key %s found", self.EVENTLOG_REGISTRY_KEY)
+            return []
+        except PluginNotFoundError:
+            self.target.log.warning("Cannot access registry in target")
             return []
 
         for subkey in subkeys:

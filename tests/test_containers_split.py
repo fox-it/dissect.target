@@ -1,5 +1,4 @@
 from io import BytesIO
-from pathlib import Path
 
 import pytest
 
@@ -22,9 +21,8 @@ def split_fhs():
 
 
 @pytest.fixture
-def split_paths(tmpdir_name, split_fhs):
-    root = Path(tmpdir_name)
-    paths = [(root / f"split.{i:>03}") for i in range(4)]
+def split_paths(tmp_path, split_fhs):
+    paths = [(tmp_path / f"split.{i:>03}") for i in range(4)]
 
     for fh, path in zip(split_fhs, paths):
         fh.seek(0)
@@ -34,8 +32,8 @@ def split_paths(tmpdir_name, split_fhs):
 
 
 @pytest.fixture
-def split_symlink(tmpdir_name, split_paths):
-    dir_path = Path(tmpdir_name) / "dir"
+def split_symlink(tmp_path, split_paths):
+    dir_path = tmp_path / "dir"
     symlink_path = dir_path / split_paths[0].name
     dir_path.mkdir()
     symlink_path.symlink_to(split_paths[0])
