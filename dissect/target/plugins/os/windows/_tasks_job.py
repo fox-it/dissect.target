@@ -8,75 +8,18 @@ from flow.record import GroupedRecord
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.os.windows._tasks_records import (
+    DailyTriggerRecord,
+    ExecRecord,
+    MonthlyDateTriggerRecord,
+    MonthlyDowTriggerRecord,
+    PaddingTriggerRecord,
+    TriggerRecord,
+    WeeklyTriggerRecord,
+)
 from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
-ExecRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/exec",
-    [
-        ("string", "action_type"),
-        ("string", "command"),
-        ("string", "arguments"),
-        ("string", "working_directory"),
-    ],
-)
-
-TriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger",
-    [
-        ("string", "enabled"),
-        ("string", "start_boundary"),
-        ("string", "end_boundary"),
-        ("string", "repetition_interval"),
-        ("string", "repetition_duration"),
-        ("string", "repetition_stop_duration_end"),
-        ("string", "execution_time_limit"),
-    ],
-)
-
-DailyTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/daily",
-    [
-        ("uint16", "days_between_triggers"),
-        ("uint16[]", "unused"),
-    ],
-)
-
-WeeklyTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/weekly",
-    [
-        ("uint16", "weeks_between_triggers"),
-        ("string[]", "days_of_week"),
-        ("uint16[]", "unused"),
-    ],
-)
-
-MonthlyDateTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/monthly_date",
-    [
-        ("string", "day_of_month"),
-        ("string[]", "months_of_year"),
-    ],
-)
-
-MonthlyDowTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/monthly_dow",
-    [
-        ("string", "which_week"),
-        ("string[]", "day_of_week"),
-        ("string", "months_of_year"),
-    ],
-)
-
-PaddingTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/padding",
-    [
-        ("uint16", "padding"),
-        ("uint16", "reserved2"),
-        ("uint16", "reserved3"),
-    ],
-)
 
 atjob_def = """
 struct PRIORITY {
@@ -255,7 +198,6 @@ class AtTask:
         self.execution_time_limit = self.minutes_duration_to_iso(self.execution_time_limit)
         self.run_only_idle = True if self.at_data.task_flags.only_idle else False
         self.data = self.at_data.user_data
-        self._target = target
 
         # check which prio bit is set
         for key, value in self.at_data.task_prio._values.items():
@@ -403,11 +345,11 @@ class AtTask:
                     "LAST_WEEK",
                 ]
                 week = week_strings[week - 1]
-                day = self.get_days_of_week(trigger.trigger_specific1)
+                days = self.get_days_of_week(trigger.trigger_specific1)
                 months = self.get_months_of_year(trigger.trigger_specific2)
                 record = MonthlyDowTriggerRecord(
                     which_week=week,
-                    day_of_week=day,
+                    days_of_week=days,
                     months_of_year=months,
                 )
 

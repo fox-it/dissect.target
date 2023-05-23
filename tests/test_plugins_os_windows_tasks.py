@@ -150,9 +150,35 @@ def assert_at_task_grouped_monthlydow(at_task_grouped):
     assert at_task_grouped.repetition_stop_duration_end == "True"
     assert at_task_grouped.execution_time_limit == "P3D"
     assert at_task_grouped.which_week == "SECOND_WEEK"
-    assert at_task_grouped.day_of_week == ["Wednesday"]
-    assert at_task_grouped.months_of_year == "['June', 'September']"
+    assert at_task_grouped.days_of_week == ["Wednesday"]
+    assert at_task_grouped.months_of_year == ["June", "September"]
     assert_at_task_grouped_padding(at_task_grouped)
+
+
+def assert_at_task_grouped_weekly(at_task_grouped):
+    assert at_task_grouped.records[1].enabled == "True"
+    assert at_task_grouped.end_boundary == "2023-05-27"
+    assert at_task_grouped.execution_time_limit == "P3D"
+    assert at_task_grouped.repetition_duration == "PT1H"
+    assert at_task_grouped.repetition_interval == "PT10M"
+    assert at_task_grouped.repetition_stop_duration_end == "True"
+    assert at_task_grouped.start_boundary == "2023-05-23"
+    assert at_task_grouped.days_of_week == ["Monday", "Wednesday", "Friday"]
+    assert at_task_grouped.unused == [0]
+    assert at_task_grouped.weeks_between_triggers == 1
+    assert_at_task_grouped_padding(at_task_grouped)
+
+
+def assert_at_task_grouped_monthly_date(at_task_grouped):
+    assert at_task_grouped.day_of_month == "15"
+    assert at_task_grouped.months_of_year == ["March", "May", "June", "July", "August", "October"]
+    assert at_task_grouped.records[1].enabled == "True"
+    assert at_task_grouped.end_boundary == "2023-05-29"
+    assert at_task_grouped.execution_time_limit == "P3D"
+    assert at_task_grouped.repetition_duration == "PT4H44M"
+    assert at_task_grouped.repetition_interval == "PT17M"
+    assert at_task_grouped.repetition_stop_duration_end == "True"
+    assert at_task_grouped.start_boundary == "2023-05-23"
 
 
 @pytest.mark.parametrize(
@@ -164,7 +190,7 @@ def assert_at_task_grouped_monthlydow(at_task_grouped):
 )
 def test_single_record_properties(target_win, setup_tasks_test, record_index, assert_func):
     records = list(target_win.tasks())
-    assert len(records) == 6
+    assert len(records) == 8
 
     record = records[record_index]
     assert_func(record)
@@ -177,11 +203,13 @@ def test_single_record_properties(target_win, setup_tasks_test, record_index, as
         (3, assert_at_task_grouped_exec),
         (4, assert_at_task_grouped_daily),
         (5, assert_at_task_grouped_monthlydow),
+        (6, assert_at_task_grouped_weekly),
+        (7, assert_at_task_grouped_monthly_date),
     ],
 )
 def test_grouped_record_properties(target_win, setup_tasks_test, record_index, assert_func):
     records = list(target_win.tasks())
-    assert len(records) == 6
+    assert len(records) == 8
 
     grouped_record = records[record_index]
     assert_func(grouped_record)

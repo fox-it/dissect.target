@@ -7,170 +7,21 @@ from flow.record import GroupedRecord, RecordDescriptor
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.os.windows._tasks_records import (
+    BootTriggerRecord,
+    ComHandlerRecord,
+    EventTriggerRecord,
+    ExecRecord,
+    LogonTriggerRecord,
+    SendEmailRecord,
+    SessionStateChangeTriggerRecord,
+    ShowMessageRecord,
+    TimeTriggerRecord,
+    TriggerRecord,
+)
 from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
-ExecRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/exec",
-    [
-        ("string", "action_type"),
-        ("string", "command"),
-        ("string", "arguments"),
-        ("string", "working_directory"),
-    ],
-)
-
-ComHandlerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/comhandler",
-    [
-        ("string", "action_type"),
-        ("string", "class_id"),
-        ("string", "data"),
-    ],
-)
-
-SendEmailRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/sendemail",
-    [
-        ("string", "action_type"),
-        ("string", "server"),
-        ("string", "subject"),
-        ("string", "to"),
-        ("string", "cc"),
-        ("string", "bcc"),
-        ("string", "replyto"),
-        ("string", "email_from"),
-        ("string", "header_name"),
-        ("string", "header_value"),
-        ("string", "body"),
-        ("string", "attachment"),
-    ],
-)
-
-ShowMessageRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/showmessage",
-    [
-        ("string", "tile"),
-        ("string", "body"),
-    ],
-)
-
-LogonTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/logontrigger",
-    [
-        ("string", "user_id"),
-        ("string", "delay"),
-    ],
-)
-
-BootTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/boottrigger",
-    [
-        ("string", "delay"),
-    ],
-)
-
-IdleTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/idletrigger",
-    [],
-)
-
-TimeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/timetrigger",
-    [
-        ("string", "random_delay"),
-    ],
-)
-
-TriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger",
-    [
-        ("string", "enabled"),
-        ("string", "start_boundary"),
-        ("string", "end_boundary"),
-        ("string", "repetition_interval"),
-        ("string", "repetition_duration"),
-        ("string", "repetition_stop_duration_end"),
-        ("string", "execution_time_limit"),
-    ],
-)
-
-EventTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/eventtrigger",
-    [
-        ("string", "subscription"),
-        ("string", "delay"),
-        ("string", "period_of_occurence"),
-        ("string", "number_of_occurences"),
-        ("string", "matching_elements"),
-        ("string", "value_queries"),
-    ],
-)
-
-SessionStateChangeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/sessionstatechangetrigger",
-    [
-        ("string", "user_id"),
-        ("string", "delay"),
-        ("string", "state_change"),
-    ],
-)
-
-CalendarTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/calendartrigger",
-    [
-        ("string", "random_delay"),
-        ("string", "schedule_by_day"),
-        ("string", "schedule_by_week"),
-        ("string", "schedule_by_month"),
-        ("string", "schedule_by_day_of_week"),
-    ],
-)
-
-DailyTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/daily",
-    [
-        ("uint16", "days_between_triggers"),
-        ("uint16[]", "unused"),
-    ],
-)
-
-WeeklyTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/weekly",
-    [
-        ("uint16", "weeks_between_triggers"),
-        ("string[]", "days_of_week"),
-        ("uint16[]", "unused"),
-    ],
-)
-
-MonthlyDateTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/monthly_date",
-    [
-        ("string", "day_of_month"),
-        ("string[]", "months_of_year"),
-    ],
-)
-
-MonthlyDowTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/monthly_dow",
-    [
-        ("string", "which_week"),
-        ("string[]", "day_of_week"),
-        ("string", "months_of_year"),
-    ],
-)
-
-PaddingTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/padding",
-    [
-        ("uint16", "padding"),
-        ("uint16", "reserved2"),
-        ("uint16", "reserved3"),
-    ],
-)
 
 
 class XmlTask:
@@ -235,7 +86,6 @@ class XmlTask:
 
         # Data
         self.data = self.get_raw("Data")
-        self._target = target
 
     def strip_namespace(self, data: Element) -> Element:
         """Strip namespace from XML data.

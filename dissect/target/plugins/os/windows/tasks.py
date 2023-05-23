@@ -1,5 +1,5 @@
 import warnings
-from typing import Iterator
+from typing import Iterator, Union
 
 from flow.record import GroupedRecord
 
@@ -111,7 +111,6 @@ class TasksPlugin(Plugin):
         "unified_scheduling_engine",
         "disallow_start_on_remote_app_session",
         "data",
-        "_target",
     ]
 
     PATHS = [
@@ -123,7 +122,7 @@ class TasksPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.task_objects = []
+        self.task_files = []
 
         for file_path in self.PATHS:
             fpath = self.target.fs.path(file_path)
@@ -131,17 +130,15 @@ class TasksPlugin(Plugin):
                 continue
 
             for entry in fpath.rglob("*"):
-                if entry.is_file() and entry.suffix.lower() == ".job":
-                    self.task_objects.append(AtTask(entry, target))
-                elif entry.is_file() and not entry.suffix:
-                    self.task_objects.append(XmlTask(entry, target))
+                if entry.is_file() and (entry.suffix.lower() == ".job" or not entry.suffix):
+                    self.task_files.append(entry)
 
     def check_compatible(self):
-        if len(self.task_objects) == 0:
+        if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 
     @export(record=DynamicDescriptor(["path", "datetime"]))
-    def tasks(self) -> Iterator:
+    def tasks(self) -> Iterator[Union[TaskRecord, GroupedRecord]]:
         """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
@@ -153,32 +150,25 @@ class TasksPlugin(Plugin):
         Yields:
             The scheduled tasks found on the target.
         """
-        for task_object in self.task_objects:
-            yield from self.get_task_fields(task_object)
+        for task_file in self.task_files:
+            if not task_file.suffix:
+                task_object = XmlTask(task_file, self.target)
+            else:
+                task_object = AtTask(task_file, self.target)
 
-    def get_task_fields(self, task_object) -> Iterator:
-        """Get all the parsed task fields from a task.
-        The generic fields are defined in ATTRIBUTES. XmlTasks and AtTasks have also unique fields defined.
+            record_kwargs = {}
+            for attr in self.ATTRIBUTES:
+                record_kwargs[attr] = getattr(task_object, attr, None)
 
-        Args:
-            task_object: The task object to extract fields from.
+            record = TaskRecord(**record_kwargs, _target=self.target)
+            yield record
 
-        Yields:
-            The extracted task fields as TaskRecords and GroupedRecords.
-        """
-        record_kwargs = {}
-        for attr in self.ATTRIBUTES:
-            record_kwargs[attr] = getattr(task_object, attr, None)
+            # Actions
+            for action in task_object.get_actions():
+                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
+                yield grouped
 
-        record = TaskRecord(**record_kwargs)
-        yield record
-
-        # Actions
-        for action in task_object.get_actions():
-            grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
-            yield grouped
-
-        # Triggers
-        for trigger in task_object.get_triggers():
-            grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
-            yield grouped
+            # Triggers
+            for trigger in task_object.get_triggers():
+                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
+                yield grouped
