@@ -3,7 +3,7 @@ import inspect
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -129,13 +129,16 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
-def plugin_factory(target: Target, plugin_class: type, funcname: str) -> tuple[Plugin, str]:
+def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
     if TargetdLoader.instance:
         return target.get_function(funcname)
+
+    if isinstance(plugin, type):
+        plugin_obj = plugin(target)
+        target_attr = getattr(plugin_obj, funcname)
+        return plugin_obj, target_attr
     else:
-        plugin_obj = plugin_class(target)
-    target_attr = getattr(plugin_obj, funcname)
-    return plugin_obj, target_attr
+        return plugin, getattr(plugin, funcname)
 
 
 def execute_function_on_target(
@@ -149,9 +152,40 @@ def execute_function_on_target(
 
     cli_params = cli_params or []
 
-    plugin_class = func.class_object
+    target_attr = get_target_attribute(target, func)
+    plugin_method, parser = plugin_function_with_argparser(target_attr)
 
-    if issubclass(plugin_class, OSPlugin):
+    if parser:
+        parsed_params, cli_params = parser.parse_known_args(cli_params)
+        method_kwargs = vars(parsed_params)
+        value = plugin_method(**method_kwargs)
+    else:
+        value = target_attr
+
+    output_type = getattr(plugin_method, "__output__", "default") if plugin_method else "default"
+    return (output_type, value, cli_params)
+
+
+def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, Callable]:
+    """Retrieves the function attribute from the target.
+
+    If the function does not exist yet, it will attempt to load it into the target.
+
+    Args:
+        target: The target we wish to run the function on.
+        func: The function to run on the target.
+
+    Returns:
+        The function, either plugin or a callable to execute.
+
+    Raises:
+        UnsupportedPluginError: When the function was incompatible with the target.
+    """
+    plugin_class = func.class_object
+    if target.has_function(func.method_name):
+        # If the function is already attached, use the one inside the target.
+        plugin_class, _ = target.get_function(func.method_name)
+    elif issubclass(plugin_class, OSPlugin):
         # OS plugin does not need to be added
         plugin_class = target._os_plugin
     else:
@@ -162,7 +196,14 @@ def execute_function_on_target(
                 f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
             )
 
-    plugin_obj, target_attr = plugin_factory(target, plugin_class, func.method_name)
+    _, target_attr = plugin_factory(target, plugin_class, func.method_name)
+    return target_attr
+
+
+def plugin_function_with_argparser(
+    target_attr: Union[Plugin, Callable]
+) -> tuple[Optional[Iterator], Optional[argparse.ArgumentParser]]:
+    """Resolves which plugin function to execute, and creates the argument parser for said plugin."""
     plugin_method = None
     parser = None
 
@@ -178,16 +219,7 @@ def execute_function_on_target(
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)
-
-    if parser:
-        parsed_params, cli_params = parser.parse_known_args(cli_params)
-        method_kwargs = vars(parsed_params)
-        value = plugin_method(**method_kwargs)
-    else:
-        value = target_attr
-
-    output_type = getattr(plugin_method, "__output__", "default") if plugin_method else "default"
-    return (output_type, value, cli_params)
+    return plugin_method, parser
 
 
 def persist_execution_report(output_dir: Path, report_data: Dict, timestamp: datetime) -> Path:
