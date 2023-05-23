@@ -3,6 +3,7 @@ import inspect
 import json
 import sys
 from datetime import datetime
+from errno import EINVAL
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
@@ -245,7 +246,8 @@ def catch_sigpipe(func: Callable) -> Callable:
         except OSError as e:
             exc_type = type(e)
             # Only catch BrokenPipeError or OSError 22
-            if (exc_type is BrokenPipeError) or (exc_type is OSError and e.errno == 22):
+            if (exc_type is BrokenPipeError) or (exc_type is OSError and e.errno == EINVAL):
+                sys.stderr.close()
                 return 1
             # Raise other exceptions
             raise
