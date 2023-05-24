@@ -60,7 +60,9 @@ def main():
 
         shutil.copyfileobj(fhin, fhout)
     finally:
-        fhout.close()
+        # We should not close the stdout buffer
+        if fhout is not sys.stdout.buffer:
+            fhout.close()
 
 
 if __name__ == "__main__":

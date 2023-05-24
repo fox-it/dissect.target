@@ -1,9 +1,10 @@
 import argparse
+import errno
 import inspect
 import json
+import os
 import sys
 from datetime import datetime
-from errno import EINVAL
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
@@ -244,10 +245,10 @@ def catch_sigpipe(func: Callable) -> Callable:
             print("Aborted!", file=sys.stderr)
             return 1
         except OSError as e:
-            exc_type = type(e)
             # Only catch BrokenPipeError or OSError 22
-            if (exc_type is BrokenPipeError) or (exc_type is OSError and e.errno == EINVAL):
-                sys.stderr.close()
+            if e.errno in (errno.EPIPE, errno.EINVAL):
+                devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull, sys.stdout.fileno())
                 return 1
             # Raise other exceptions
             raise
