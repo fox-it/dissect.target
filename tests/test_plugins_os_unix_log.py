@@ -96,4 +96,4 @@ def test_atop_plugin(target_unix, fs_unix):
     assert results[0].vpid == 0
     assert bool(results[0].wasinactive) is False
     assert results[0].container == ""
-    assert str(results[0].filepath) == "atop_20221111"
+    assert str(results[0].filepath) == "/var/log/atop/atop_20221111"
