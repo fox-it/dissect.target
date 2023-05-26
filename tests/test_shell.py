@@ -1,3 +1,4 @@
+import platform
 import sys
 
 import pytest
@@ -20,6 +21,7 @@ INPUT_STREAM = f"""
 """
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_build_pipe():
     pipeparts = [
         "grep",
@@ -36,6 +38,7 @@ def test_build_pipe():
     assert output == GREP_MATCH
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_build_pipe_nonexisting_command():
     dummy_command = "non-existing-command"
     pipeparts = ["grep", "test1", "|", dummy_command]
@@ -50,6 +53,7 @@ def test_build_pipe_nonexisting_command():
             print(input_stream, file=pipe_stdin)
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_build_pipe_broken_pipe():
     # `ls` command does not accept stdin, so pipe closes prematurely
     pipeparts = ["grep", "test1", "|", "ls"]
@@ -107,6 +111,7 @@ def test_targetcli_autocomplete(mock_target):
     assert suggestions == [subpath_match]
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_pipe_symbol_parsing(capfd, mock_target):
     cli = TargetCli(mock_target)
 
@@ -130,6 +135,7 @@ def test_pipe_symbol_parsing(capfd, mock_target):
     assert GREP_MISSING not in captured.out
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_exec_target_command(capfd, mock_target):
     cli = TargetCli(mock_target)
     command = "users"

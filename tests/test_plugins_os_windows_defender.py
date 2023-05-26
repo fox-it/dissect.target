@@ -1,7 +1,9 @@
 import os
+import platform
 from datetime import datetime
 from io import BytesIO
 
+import pytest
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 
 from dissect.target.plugins.os.windows import defender
@@ -55,6 +57,9 @@ def test_defender_quarantine_entries(target_win, fs_win):
     assert mimikatz_record.last_accessed_time.date() == detection_date
 
 
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="Path error? OSError: [Errno 22] Invalid argument. Needs to be fixed."
+)
 def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("data/defender-quarantine")

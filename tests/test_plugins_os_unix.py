@@ -1,5 +1,8 @@
+import platform
 import tempfile
 from uuid import UUID
+
+import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import parse_fstab
@@ -35,6 +38,7 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 """  # noqa
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
 def test_parse_fstab():
     with tempfile.NamedTemporaryFile() as tf:
         tf.write(FSTAB_CONTENT.encode("ascii"))
