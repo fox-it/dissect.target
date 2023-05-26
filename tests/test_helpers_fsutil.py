@@ -3,7 +3,8 @@ import gzip
 import io
 import os
 import platform
-from unittest.mock import Mock
+from contextlib import contextmanager
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -294,3 +295,36 @@ def test_helpers_fsutil_reverse_readlines():
 
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
+
+
+@pytest.mark.parametrize(
+    "follow_symlinks",
+    [
+        True,
+        False,
+    ],
+)
+def test_fs_attrs(xattrs, listxattr_spec, getxattr_spec, follow_symlinks):
+    with patch("os.listxattr", **listxattr_spec) as listxattr:
+        with patch("os.getxattr", **getxattr_spec) as getxattr:
+            path = "/some/path"
+            attr_name = list(xattrs.keys())[0]
+
+            assert fsutil.fs_attrs(path, follow_symlinks=follow_symlinks) == xattrs
+            listxattr.assert_called_with(path, follow_symlinks=follow_symlinks)
+            getxattr.assert_called_with(path, attr_name, follow_symlinks=follow_symlinks)
+
+
+@contextmanager
+def no_listxattr():
+    listxattr = os.listxattr
+    try:
+        del os.listxattr
+        yield
+    finally:
+        os.listxattr = listxattr
+
+
+def test_fs_attrs_no_os_listxattr():
+    with no_listxattr():
+        assert fsutil.fs_attrs("/some/path") == {}

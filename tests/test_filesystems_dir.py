@@ -1,10 +1,11 @@
 import pathlib
 import platform
 import tempfile
+from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.dir import DirectoryFilesystem, DirectoryFilesystemEntry
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
@@ -59,3 +60,20 @@ def test_filesystem_dir_symlink_to_dir(tmp_path):
         fs.get("/nested/file1").entry,
         fs.get("/nested/file2").entry,
     ]
+
+
+@pytest.fixture
+def dirfs_entry():
+    return DirectoryFilesystemEntry(Mock(), "/some/path", Mock())
+
+
+def test_directory_filesystem_entry_attr(dirfs_entry):
+    with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
+        dirfs_entry.attr()
+        fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=True)
+
+
+def test_directory_filesystem_entry_lattr(dirfs_entry):
+    with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
+        dirfs_entry.lattr()
+        fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=False)
