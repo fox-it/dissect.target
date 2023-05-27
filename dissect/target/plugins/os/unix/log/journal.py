@@ -11,7 +11,6 @@ from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-# The fields: Fields to log on behalf of a different program and Address Fields are not part of the record
 # The events have undocumented fields that are not part of the record
 JournalRecord = TargetRecordDescriptor(
     "linux/log/journal",
@@ -170,8 +169,9 @@ struct DataObject {
 };
 
 struct EntryItem {
-    uint64_t object_offset;
-    uint64_t hash;
+    le32_t object_offset;
+    le32_t unknown1;
+    le64_t unknown2;
 };
 
 // The first four members are copied from ObjectHeader, so that the size can be used as the length of items
@@ -185,7 +185,7 @@ struct EntryObject {
     le64_t      monotonic;
     sd_id128_t  boot_id;
     le64_t      xor_hash;
-    EntryItem   items[size - 64];
+    EntryItem   items[size / 64];
 };
 
 // The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
