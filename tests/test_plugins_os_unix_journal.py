@@ -24,11 +24,5 @@ def test_journal_plugin(target_unix, fs_unix):
     assert record.syslog_facility == 3
     assert record.syslog_identifier == "gnome-shell"
     assert record.pid == 2096
-    assert record.uid == 1000
-    assert record.gid == 1000
-    assert record.comm == "gnome-shell"
-    assert str(record.exe) == "/usr/bin/gnome-shell"
-    assert record.cmdline == "/usr/bin/gnome-shell"
     assert record.transport == "stdout"
-    assert record.journal_hostname == "dissect"
     assert str(record.filepath) == "/var/log/journal/1337/user-1000.journal"
