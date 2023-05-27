@@ -2,8 +2,6 @@ import re
 from itertools import chain
 from typing import Iterator
 
-from flow.record.fieldtypes import path
-
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -13,7 +11,7 @@ AuthLogRecord = TargetRecordDescriptor(
     [
         ("datetime", "ts"),
         ("string", "message"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -55,6 +53,6 @@ class AuthPlugin(Plugin):
                 yield AuthLogRecord(
                     ts=ts,
                     message=message,
-                    source=path.from_posix(auth_file),
+                    source=auth_file,
                     _target=self.target,
                 )
