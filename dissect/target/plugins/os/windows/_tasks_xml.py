@@ -168,12 +168,12 @@ class XmlTask:
                     user_id=user_id,
                     delay=delay,
                 )
-                yield GroupedRecord("filesystem/windows/task/logontrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/logon_trigger", [base, record])
 
             if trigger_type == "BootTrigger":
                 delay = self.get_element("Delay", trigger)
                 record = BootTriggerRecord(delay=delay)
-                yield GroupedRecord("filesystem/windows/task/boottrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/boot_trigger", [base, record])
 
             if trigger_type == "IdleTrigger":
                 pass  # No extra fields
@@ -182,7 +182,7 @@ class XmlTask:
                 random_delay = self.get_element("RandomDelay", trigger)
 
                 record = TimeTriggerRecord(random_delay=random_delay)
-                yield GroupedRecord("filesystem/windows/task/timetrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/time_trigger", [base, record])
 
             if trigger_type == "EventTrigger":
                 subscription = self.get_element("Subscription", trigger)
@@ -201,7 +201,7 @@ class XmlTask:
                     value_queries=value_queries,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/eventtrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/event_trigger", [base, record])
 
             if trigger_type == "SessionStateChangeTrigger":
                 user_id = self.get_element("UserId", trigger)
@@ -214,7 +214,7 @@ class XmlTask:
                     state_change=state_change,
                 )
 
-                yield GroupedRecord("filesystem/windows/task/sessionstatetrigger", [base, record])
+                yield GroupedRecord("filesystem/windows/task/sessionstate_trigger", [base, record])
 
             if trigger_type == "CalendarTrigger":
                 pass

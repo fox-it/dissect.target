@@ -1,14 +1,14 @@
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 BootTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/boottrigger",
+    "filesystem/windows/task/trigger/boot_trigger",
     [
         ("string", "delay"),
     ],
 )
 
 CalendarTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/calendartrigger",
+    "filesystem/windows/task/trigger/calendar_trigger",
     [
         ("string", "random_delay"),
         ("string", "schedule_by_day"),
@@ -36,7 +36,7 @@ ComHandlerRecord = TargetRecordDescriptor(
 )
 
 EventTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/eventtrigger",
+    "filesystem/windows/task/trigger/event_trigger",
     [
         ("string", "subscription"),
         ("string", "delay"),
@@ -66,12 +66,12 @@ DailyTriggerRecord = TargetRecordDescriptor(
 )
 
 IdleTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/idletrigger",
+    "filesystem/windows/task/trigger/idle_trigger",
     [],
 )
 
 LogonTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/logontrigger",
+    "filesystem/windows/task/trigger/logon_trigger",
     [
         ("string", "user_id"),
         ("string", "delay"),
@@ -79,7 +79,7 @@ LogonTriggerRecord = TargetRecordDescriptor(
 )
 
 TimeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/timetrigger",
+    "filesystem/windows/task/trigger/time_trigger",
     [
         ("string", "random_delay"),
     ],
@@ -125,7 +125,7 @@ PaddingTriggerRecord = TargetRecordDescriptor(
 )
 
 SendEmailRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/sendemail",
+    "filesystem/windows/task/action/send_email",
     [
         ("string", "action_type"),
         ("string", "server"),
@@ -143,7 +143,7 @@ SendEmailRecord = TargetRecordDescriptor(
 )
 
 SessionStateChangeTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/sessionstatechangetrigger",
+    "filesystem/windows/task/trigger/session_state_change_trigger",
     [
         ("string", "user_id"),
         ("string", "delay"),
@@ -152,7 +152,7 @@ SessionStateChangeTriggerRecord = TargetRecordDescriptor(
 )
 
 ShowMessageRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/action/showmessage",
+    "filesystem/windows/task/action/show_message",
     [
         ("string", "tile"),
         ("string", "body"),
