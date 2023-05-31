@@ -179,6 +179,30 @@ def main():
     for func in funcs:
         output_types.add(func.output_type)
 
+    # Verify if all provided plugins exist. Exits if a
+    # given function was not found in `find_plugin_functions`.
+    # TODO: Are there any other ways to call a function using target-query?
+    invalid_funcs = [func.strip(" *!?[]") for func in args.function.split(",")]
+    for func in funcs:
+        # e.g. users
+        if func.method_name in invalid_funcs:
+            invalid_funcs.remove(func.method_name)
+
+        # e.g. browsers.chrome
+        if (f := f"{func.plugin_desc['namespace']}.{func.method_name}") in invalid_funcs:
+            invalid_funcs.remove(f)
+
+        # e.g. apps.webservers.iis*
+        if (f := f"{func.plugin_desc['module']}") in invalid_funcs:
+            invalid_funcs.remove(f)
+
+        # e.g. apps.webservers.iis.logs
+        if (f := f"{func.plugin_desc['module']}.{func.method_name}") in invalid_funcs:
+            invalid_funcs.remove(f)
+
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
+
     default_output_type = None
     if len(output_types) > 1:
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
