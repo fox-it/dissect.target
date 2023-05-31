@@ -40,8 +40,17 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
             raise UnsupportedPluginError("No registered VMs and no data.vmcx file found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
+        for xml_path in self.vm_xml:
+            yield ChildTargetRecord(
+                type=self.__type__,
+                path=xml_path.resolve(),
+                _target=self.target,
+            )
+
         if self.data_vmcx.exists():
             data = hyperv.HyperVFile(self.data_vmcx.open()).as_dict()
+            if "VirtualMachines" not in data["Configurations"]:
+                return
 
             for vm_path in data["Configurations"]["VirtualMachines"].values():
                 yield ChildTargetRecord(
@@ -49,10 +58,3 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                     path=path.from_windows(vm_path),
                     _target=self.target,
                 )
-
-        for xml_path in self.vm_xml:
-            yield ChildTargetRecord(
-                type=self.__type__,
-                path=xml_path.resolve(),
-                _target=self.target,
-            )
