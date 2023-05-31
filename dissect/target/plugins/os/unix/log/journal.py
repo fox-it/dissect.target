@@ -216,8 +216,9 @@ class JournalFile:
         - https://github.com/libyal/dtformats/blob/c4fc2b8102702c64b58f145971821986bf74e6c0/documentation/Systemd%20journal%20file%20format.asciidoc
     """  # noqa: E501
 
-    def __init__(self, fh: BinaryIO):
+    def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
+        self.target = target
         self.header = c_journal.Header(self.fh)
         self.signature = "".join(chr(c) for c in self.header.signature)
         self.entry_array_offset = self.header.entry_array_offset
@@ -292,7 +293,10 @@ class JournalFile:
                         key, value = self.decode_value(data)
                         event[key] = value
 
-                except Exception:
+                except Exception as e:
+                    self.target.log.warning(
+                        "The data object in Journal file %s could not be parsed", self.fh.name, exc_info=e
+                    )
                     continue
 
             yield event
@@ -327,7 +331,7 @@ class JournalPlugin(Plugin):
             for f in self.target.fs.listdir_ext(_path):
                 fh = f.open()
 
-                journal = JournalFile(fh)
+                journal = JournalFile(fh, self.target)
 
                 if not journal.signature == self.JOURNAL_SIGNATURE:
                     self.target.log.warning("The Journal log file %s has an invalid magic header", f.path)
@@ -384,6 +388,6 @@ class JournalPlugin(Plugin):
                         udev_devnode=get_optional(entry.get("udev_devnode"), path.from_posix),
                         udev_devlink=get_optional(entry.get("udev_devlink"), path.from_posix),
                         journal_hostname=entry.get("hostname"),
-                        filepath=path.from_posix(f.path),
+                        filepath=f.path,
                         _target=self.target,
                     )
