@@ -8,7 +8,7 @@ from flow.record import GroupedRecord
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugins.os.windows._tasks_records import (
+from dissect.target.plugins.os.windows.task_helpers._tasks_records import (
     DailyTriggerRecord,
     ExecRecord,
     MonthlyDateTriggerRecord,

@@ -6,8 +6,8 @@ from flow.record import GroupedRecord
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.windows._tasks_job import AtTask
-from dissect.target.plugins.os.windows._tasks_xml import XmlTask
+from dissect.target.plugins.os.windows.task_helpers._tasks_job import AtTask
+from dissect.target.plugins.os.windows.task_helpers._tasks_xml import XmlTask
 from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
