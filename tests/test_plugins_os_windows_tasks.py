@@ -34,7 +34,7 @@ def assert_xml_task_properties(xml_task):
     assert xml_task.principal_id == "Users"
     assert xml_task.user_id is None
     assert xml_task.logon_type is None
-    assert xml_task.group_id is None
+    assert xml_task.group_id == "S-1-5-4"
     assert xml_task.display_name is None
     assert xml_task.run_level is None
     assert xml_task.process_token_sid_type is None

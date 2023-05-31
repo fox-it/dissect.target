@@ -6,8 +6,8 @@ from flow.record import GroupedRecord
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.windows.task_helpers._tasks_job import AtTask
-from dissect.target.plugins.os.windows.task_helpers._tasks_xml import XmlTask
+from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
+from dissect.target.plugins.os.windows.task_helpers.tasks_xml import XmlTask
 from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -69,50 +69,6 @@ class TasksPlugin(Plugin):
         target: The target system.
     """
 
-    ATTRIBUTES = [
-        "uri",
-        "security_descriptor",
-        "source",
-        "date",
-        "last_run_date",
-        "author",
-        "version",
-        "description",
-        "documentation",
-        "principal_id",
-        "user_id",
-        "logon_type",
-        "display_name",
-        "run_level",
-        "process_token_sid_type",
-        "required_privileges",
-        "allow_start_on_demand",
-        "restart_on_failure_interval",
-        "restart_on_failure_count",
-        "mutiple_instances_policy",
-        "dissalow_start_on_batteries",
-        "stop_going_on_batteries",
-        "start_when_available",
-        "network_profile_name",
-        "run_only_network_available",
-        "wake_to_run",
-        "enabled",
-        "hidden",
-        "delete_expired_task_after",
-        "idle_duration",
-        "idle_wait_timeout",
-        "idle_stop_on_idle_end",
-        "idle_restart_on_idle",
-        "network_settings_name",
-        "network_settings_id",
-        "execution_time_limit",
-        "priority",
-        "run_only_idle",
-        "unified_scheduling_engine",
-        "disallow_start_on_remote_app_session",
-        "data",
-    ]
-
     PATHS = [
         "sysvol/windows/system32/tasks",
         "sysvol/windows/system32/tasks_migrated",
@@ -157,7 +113,7 @@ class TasksPlugin(Plugin):
                 task_object = AtTask(task_file, self.target)
 
             record_kwargs = {}
-            for attr in self.ATTRIBUTES:
+            for attr in TaskRecord.fields.keys():
                 record_kwargs[attr] = getattr(task_object, attr, None)
 
             record = TaskRecord(**record_kwargs, _target=self.target)
