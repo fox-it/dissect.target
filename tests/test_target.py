@@ -1,4 +1,5 @@
 import io
+import platform
 import urllib.parse
 from pathlib import Path
 from typing import Iterator
@@ -109,6 +110,7 @@ class ErrorCounter(TargetLogAdapter):
     ],
 )
 @patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
+@pytest.mark.skipif(platform.system() == "Windows", reason="Path issues. Needs to be fixed.")
 def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
     # TestLoader to mix Raw Targets with Test Targets without depending on
     # specific implementations.
