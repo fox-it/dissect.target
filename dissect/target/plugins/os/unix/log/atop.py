@@ -3,7 +3,6 @@ from io import BytesIO
 from typing import BinaryIO, Iterator
 
 from dissect.cstruct import Instance, cstruct
-from flow.record.fieldtypes import path
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -297,19 +296,23 @@ class AtopPlugin(Plugin):
             container (string): The Docker Container ID of the process.
             filepath (path): The file name.
         """
-        for f in self.target.fs.path(self.ATOP_PATH).glob(self.ATOP_GLOB):
-            fh = f.open()
+        for file in self.target.fs.path(self.ATOP_PATH).glob(self.ATOP_GLOB):
+            fh = file.open()
 
             atop_magic = int.from_bytes(fh.read(4), "little")
 
             if not atop_magic == self.ATOP_MAGIC:
-                self.target.log.warning("The Atop log file %s has an invalid magic header", f.name)
+                self.target.log.warning("The Atop log file %s has an invalid magic header", file.name)
                 continue
 
             atop = AtopFile(fh)
 
             if atop.version not in self.ATOP_VERSIONS:
-                self.target.log.warning("The version %s of the Atop log file %s is incompatible", atop.version, f.name)
+                self.target.log.warning(
+                    "The version %s of the Atop log file %s is incompatible",
+                    atop.version,
+                    file.name,
+                )
                 continue
 
             for entry in atop:
@@ -340,6 +343,6 @@ class AtopPlugin(Plugin):
                     vpid=entry.gen.vpid,
                     wasinactive=entry.gen.wasinactive,
                     container=entry.gen.container.decode().strip("\x00"),
-                    filepath=path.from_posix(f.name),
+                    filepath=file,
                     _target=self.target,
                 )
