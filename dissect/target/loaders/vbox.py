@@ -5,6 +5,8 @@ from dissect.target.loader import Loader
 
 
 class VBoxLoader(Loader):
+    """Load Oracle VirtualBox files."""
+
     def __init__(self, path, **kwargs):
         path = path.resolve()
 
