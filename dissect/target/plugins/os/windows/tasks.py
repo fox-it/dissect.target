@@ -1,4 +1,6 @@
 import warnings
+from typing import Optional
+from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
 from flow.record import GroupedRecord, RecordDescriptor
@@ -13,6 +15,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
     [
+        ("path", "task_path"),
         ("uri", "uri"),
         ("string", "security_descriptor"),
         ("string", "source"),
@@ -190,12 +193,16 @@ class Task:
     def __init__(self, xml_data):
         self.xml_data = xml_data
 
-    def get_element(self, path, xml_data=None):
+    def get_element(self, path: str, xml_data: Element = None, element: str = None) -> Optional[str]:
         xml_data = xml_data or self.xml_data
-        try:
-            return xml_data.find(path).text
-        except AttributeError:
+        data = xml_data.find(path)
+
+        if data is None:
             return
+        if element:
+            return data.get(element)
+
+        return data.text
 
     def get_raw(self, path):
         data = self.xml_data.find(path)
@@ -353,15 +360,23 @@ class Task:
 class TasksPlugin(Plugin):
     """TODO."""
 
-    PATHS = [
+    PATHS = {
         "sysvol/windows/system32/tasks",
         "sysvol/windows/system32/tasks_migrated",
         "sysvol/windows/syswow64/tasks",
+    }
+    GLOB_PATHS = [
+        "**/Preferences/ScheduledTasks",
     ]
 
     def __init__(self, target):
         super().__init__(target)
         self.files = []
+
+        for path in self.GLOB_PATHS:
+            for entry in self.target.fs.path("").rglob(path):
+                if not entry.is_file():
+                    self.PATHS.add(entry)
 
         for path in self.PATHS:
             fpath = self.target.fs.path(path)
@@ -391,119 +406,124 @@ class TasksPlugin(Plugin):
                 for entry in self.parse_task(f):
                     yield entry
             except Exception as e:
-                self.target.log.warning("An error occured parsing task %s: %s", f, str(e))
+                self.target.log.warning("An error occurred parsing task %s: %s", f, str(e))
                 self.target.log.debug("", exc_info=e)
 
     def parse_task(self, entry):
         try:
             task_xml = strip_namespace(ElementTree.fromstring(entry.open().read(), forbid_dtd=True))
+            tasks = [task_xml]
+            if task_xml.tag != "Task":
+                tasks = [element for element in task_xml.iter() if element.tag == "Task"]
         except ElementTree.ParseError:
             raise InvalidTaskError()
 
-        # RegistrationInfo
-        task = Task(task_xml)
-        task.hostname = self.target.hostname
-        task.uri = task.get_element("RegistrationInfo/URI")
-        task.security_descriptor = task.get_element("RegistrationInfo/SecurityDescriptor")
-        task.source = task.get_element("RegistrationInfo/Source")
-        task.date = task.get_element("RegistrationInfo/Date")
-        task.author = task.get_element("RegistrationInfo/Author")
-        task.version = task.get_element("RegistrationInfo/Version")
-        task.description = task.get_element("RegistrationInfo/Description")
-        task.documentation = task.get_element("RegistrationInfo/Documentation")
+        for task in tasks:
+            # RegistrationInfo
+            task = Task(task)
+            task.hostname = self.target.hostname
+            task.uri = task.get_element("RegistrationInfo/URI")
+            task.security_descriptor = task.get_element("RegistrationInfo/SecurityDescriptor")
+            task.source = task.get_element("RegistrationInfo/Source")
+            task.date = task.get_element("RegistrationInfo/Date")
+            task.author = task.get_element("RegistrationInfo/Author")
+            task.version = task.get_element("RegistrationInfo/Version")
+            task.description = task.get_element("RegistrationInfo/Description")
+            task.documentation = task.get_element("RegistrationInfo/Documentation")
 
-        # Principals
-        task.principal_id = task_xml.find("Principals/Principal").get("id")
-        task.user_id = task.get_element("Principals/Principal/UserId")
-        task.logon_type = task.get_element("Principals/Principal/LogonType")
-        task.group_id = task.get_element("Principals/Principal/GroupId")
-        task.display_name = task.get_element("Principals/Principal/DisplayName")
-        task.run_level = task.get_element("Principals/Principal/RunLevel")
-        task.process_token_sid_type = task.get_element("Principals/Principal/ProcessTokenSidType")
-        task.required_privileges = task.get_element("Principals/Principal/RequiredPrivileges")
+            # Principals
+            task.principal_id = task.get_element("Principals/Principal", element="id")
+            task.user_id = task.get_element("Principals/Principal/UserId")
+            task.logon_type = task.get_element("Principals/Principal/LogonType")
+            task.group_id = task.get_element("Principals/Principal/GroupId")
+            task.display_name = task.get_element("Principals/Principal/DisplayName")
+            task.run_level = task.get_element("Principals/Principal/RunLevel")
+            task.process_token_sid_type = task.get_element("Principals/Principal/ProcessTokenSidType")
+            task.required_privileges = task.get_element("Principals/Principal/RequiredPrivileges")
 
-        # Settings
-        task.allow_start_on_demand = task.get_element("Settings/AllowStartOnDemand")
-        task.restart_on_failure_interval = task.get_element("Settings/RestartOnFailure/Interval")
-        task.restart_on_failure_count = task.get_element("Settings/RestartOnFailure/Count")
-        task.mutiple_instances_policy = task.get_element("Settings/MultipleInstancesPolicy")
-        task.dissalow_start_on_batteries = task.get_element("Settings/DisallowStartIfOnBatteries")
-        task.stop_going_on_batteries = task.get_element("Settings/StopIfGoingOnBatteries")
-        task.allow_hard_terminate = task.get_element("Settings/AllowHardTerminate")
-        task.start_when_available = task.get_element("Settings/StartWhenAvailable")
-        task.network_profile_name = task.get_element("Settings/NetworkProfileName")
-        task.run_only_network_available = task.get_element("Settings/RunOnlyIfNetworkAvailable")
-        task.wake_to_run = task.get_element("Settings/WakeToRun")
-        task.enabled = task.get_element("Settings/Enabled")
-        task.hidden = task.get_element("Settings/Hidden")
-        task.delete_expired_task_after = task.get_element("Settings/DeleteExpiredTaskAfter")
-        task.idle_duration = task.get_element("Settings/IdleSettings/Duration")
-        task.idle_wait_timeout = task.get_element("Settings/IdleSettings/WaitTimeout")
-        task.idle_stop_on_idle_end = task.get_element("Settings/IdleSettings/StopOnIdleEnd")
-        task.idle_restart_on_idle = task.get_element("Settings/IdleSettings/RestartOnIdle")
-        task.network_settings_name = task.get_element("Settings/NetworkSettings/Name")
-        task.network_settings_id = task.get_element("Settings/NetworkSettings/Id")
-        task.execution_time_limit = task.get_element("Settings/ExecutionTimeLimit")
-        task.priority = task.get_element("Settings/Priority")
-        task.run_only_idle = task.get_element("Settings/RunOnlyIfIdle")
-        task.unified_scheduling_engine = task.get_element("Settings/UseUnifiedSchedulingEngine")
-        task.disallow_start_on_remote_app_session = task.get_element("Settings/DisallowStartOnRemoteAppSession")
+            # Settings
+            task.allow_start_on_demand = task.get_element("Settings/AllowStartOnDemand")
+            task.restart_on_failure_interval = task.get_element("Settings/RestartOnFailure/Interval")
+            task.restart_on_failure_count = task.get_element("Settings/RestartOnFailure/Count")
+            task.mutiple_instances_policy = task.get_element("Settings/MultipleInstancesPolicy")
+            task.dissalow_start_on_batteries = task.get_element("Settings/DisallowStartIfOnBatteries")
+            task.stop_going_on_batteries = task.get_element("Settings/StopIfGoingOnBatteries")
+            task.allow_hard_terminate = task.get_element("Settings/AllowHardTerminate")
+            task.start_when_available = task.get_element("Settings/StartWhenAvailable")
+            task.network_profile_name = task.get_element("Settings/NetworkProfileName")
+            task.run_only_network_available = task.get_element("Settings/RunOnlyIfNetworkAvailable")
+            task.wake_to_run = task.get_element("Settings/WakeToRun")
+            task.enabled = task.get_element("Settings/Enabled")
+            task.hidden = task.get_element("Settings/Hidden")
+            task.delete_expired_task_after = task.get_element("Settings/DeleteExpiredTaskAfter")
+            task.idle_duration = task.get_element("Settings/IdleSettings/Duration")
+            task.idle_wait_timeout = task.get_element("Settings/IdleSettings/WaitTimeout")
+            task.idle_stop_on_idle_end = task.get_element("Settings/IdleSettings/StopOnIdleEnd")
+            task.idle_restart_on_idle = task.get_element("Settings/IdleSettings/RestartOnIdle")
+            task.network_settings_name = task.get_element("Settings/NetworkSettings/Name")
+            task.network_settings_id = task.get_element("Settings/NetworkSettings/Id")
+            task.execution_time_limit = task.get_element("Settings/ExecutionTimeLimit")
+            task.priority = task.get_element("Settings/Priority")
+            task.run_only_idle = task.get_element("Settings/RunOnlyIfIdle")
+            task.unified_scheduling_engine = task.get_element("Settings/UseUnifiedSchedulingEngine")
+            task.disallow_start_on_remote_app_session = task.get_element("Settings/DisallowStartOnRemoteAppSession")
 
-        # Data
-        task.data = task.get_raw("Data")
+            # Data
+            task.data = task.get_raw("Data")
 
-        record = TaskRecord(
-            uri=uri.from_windows(task.uri) if task.uri else None,
-            security_descriptor=task.security_descriptor,
-            source=task.source,
-            date=task.date,
-            author=task.author,
-            version=task.version,
-            description=task.description,
-            documentation=task.documentation,
-            principal_id=task.principal_id,
-            user_id=task.user_id,
-            logon_type=task.logon_type,
-            display_name=task.display_name,
-            run_level=task.run_level,
-            process_token_sid_type=task.process_token_sid_type,
-            required_privileges=task.required_privileges,
-            allow_start_on_demand=task.allow_start_on_demand,
-            restart_on_failure_interval=task.restart_on_failure_interval,
-            restart_on_failure_count=task.restart_on_failure_count,
-            mutiple_instances_policy=task.mutiple_instances_policy,
-            dissalow_start_on_batteries=task.dissalow_start_on_batteries,
-            stop_going_on_batteries=task.stop_going_on_batteries,
-            start_when_available=task.start_when_available,
-            network_profile_name=task.network_profile_name,
-            run_only_network_available=task.run_only_network_available,
-            wake_to_run=task.wake_to_run,
-            enabled=task.enabled,
-            hidden=task.hidden,
-            delete_expired_task_after=task.delete_expired_task_after,
-            idle_duration=task.idle_duration,
-            idle_wait_timeout=task.idle_wait_timeout,
-            idle_stop_on_idle_end=task.idle_stop_on_idle_end,
-            idle_restart_on_idle=task.idle_restart_on_idle,
-            network_settings_name=task.network_settings_name,
-            network_settings_id=task.network_settings_id,
-            execution_time_limit=task.execution_time_limit,
-            priority=task.priority,
-            run_only_idle=task.run_only_idle,
-            unified_scheduling_engine=task.unified_scheduling_engine,
-            disallow_start_on_remote_app_session=task.disallow_start_on_remote_app_session,
-            data=task.data,
-            _target=self.target,
-        )
+            record = TaskRecord(
+                task_path=entry,
+                uri=uri.from_windows(task.uri) if task.uri else None,
+                security_descriptor=task.security_descriptor,
+                source=task.source,
+                date=task.date,
+                author=task.author,
+                version=task.version,
+                description=task.description,
+                documentation=task.documentation,
+                principal_id=task.principal_id,
+                user_id=task.user_id,
+                logon_type=task.logon_type,
+                display_name=task.display_name,
+                run_level=task.run_level,
+                process_token_sid_type=task.process_token_sid_type,
+                required_privileges=task.required_privileges,
+                allow_start_on_demand=task.allow_start_on_demand,
+                restart_on_failure_interval=task.restart_on_failure_interval,
+                restart_on_failure_count=task.restart_on_failure_count,
+                mutiple_instances_policy=task.mutiple_instances_policy,
+                dissalow_start_on_batteries=task.dissalow_start_on_batteries,
+                stop_going_on_batteries=task.stop_going_on_batteries,
+                start_when_available=task.start_when_available,
+                network_profile_name=task.network_profile_name,
+                run_only_network_available=task.run_only_network_available,
+                wake_to_run=task.wake_to_run,
+                enabled=task.enabled,
+                hidden=task.hidden,
+                delete_expired_task_after=task.delete_expired_task_after,
+                idle_duration=task.idle_duration,
+                idle_wait_timeout=task.idle_wait_timeout,
+                idle_stop_on_idle_end=task.idle_stop_on_idle_end,
+                idle_restart_on_idle=task.idle_restart_on_idle,
+                network_settings_name=task.network_settings_name,
+                network_settings_id=task.network_settings_id,
+                execution_time_limit=task.execution_time_limit,
+                priority=task.priority,
+                run_only_idle=task.run_only_idle,
+                unified_scheduling_engine=task.unified_scheduling_engine,
+                disallow_start_on_remote_app_session=task.disallow_start_on_remote_app_session,
+                data=task.data,
+                _target=self.target,
+            )
 
-        yield record  # Without groups
+            yield record  # Without groups
 
-        # Actions
-        for entry in task.get_actions():
-            grouped = GroupedRecord("filesystem/windows/task/grouped", [record, entry])
-            yield grouped
+            # Actions
+            for entry in task.get_actions():
+                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, entry])
+                yield grouped
 
-        # Triggers
-        for entry in task.get_triggers():
-            grouped = GroupedRecord("filesystem/windows/task/grouped", [record, entry])
-            yield grouped
+            # Triggers
+            for entry in task.get_triggers():
+                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, entry])
+                yield grouped
