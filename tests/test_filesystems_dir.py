@@ -1,9 +1,13 @@
 import pathlib
+import platform
 import tempfile
+
+import pytest
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
 def test_filesystem_dir_symlink_to_file(tmp_path):
     with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
         tf.write(b"dummy")

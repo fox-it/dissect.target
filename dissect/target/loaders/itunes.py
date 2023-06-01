@@ -59,6 +59,12 @@ DOMAIN_TRANSLATION = {
 
 
 class ITunesLoader(Loader):
+    """Load iTunes backup files.
+
+    References:
+        - https://support.apple.com/en-us/HT204215
+    """
+
     def __init__(self, path: Path, **kwargs):
         super().__init__(path)
 

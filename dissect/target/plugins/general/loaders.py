@@ -1,5 +1,6 @@
 import itertools
 
+from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS, DirLoader
 from dissect.target.plugin import Plugin, export
 
@@ -14,10 +15,14 @@ class LoaderListPlugin(Plugin):
     def loaders(self):
         """List the available loaders."""
 
-        loaders = itertools.chain(LOADERS, [DirLoader])
-        loader_names = [loader.attr for loader in loaders]
-        loader_names.sort()
+        loaders_info = {}
+        for loader in itertools.chain(LOADERS, [DirLoader]):
+            try:
+                docstring = get_docstring(loader, "No documentation.").splitlines()[0].strip()
+                loaders_info[loader.attr] = docstring
+            except ImportError:
+                continue
 
         print("Available loaders:")
-        for loader_name in loader_names:
-            print(f"    {loader_name}")
+        for loader_name, loader_description in sorted(loaders_info.items()):
+            print(f"    {loader_name} - {loader_description}")
