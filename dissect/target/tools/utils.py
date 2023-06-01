@@ -1,7 +1,11 @@
 import argparse
+import errno
 import inspect
 import json
+import os
+import sys
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
@@ -228,3 +232,25 @@ def persist_execution_report(output_dir: Path, report_data: Dict, timestamp: dat
     report_full_path = output_dir / report_filename
     report_full_path.write_text(json.dumps(report_data, sort_keys=True, indent=4))
     return report_full_path
+
+
+def catch_sigpipe(func: Callable) -> Callable:
+    """Catches KeyboardInterrupt and BrokenPipeError (OSError 22 on Windows)."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except KeyboardInterrupt:
+            print("Aborted!", file=sys.stderr)
+            return 1
+        except OSError as e:
+            # Only catch BrokenPipeError or OSError 22
+            if e.errno in (errno.EPIPE, errno.EINVAL):
+                devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull, sys.stdout.fileno())
+                return 1
+            # Raise other exceptions
+            raise
+
+    return wrapper
