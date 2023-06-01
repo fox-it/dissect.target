@@ -11,7 +11,7 @@ from ._utils import absolute_path
         (
             "target_win_users",
             "fs_win",
-            "users/John/AppData/Roaming/Microsoft/Windows/PowerShell/psreadline/ConsoleHost_history.txt",
+            "users\\John\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\psreadline\\ConsoleHost_history.txt",
         ),
         ("target_unix_users", "fs_unix", "/root/.local/share/powershell/PSReadLine/ConsoleHost_history.txt"),
     ],
@@ -23,8 +23,8 @@ def test_plugins_os_windows_powershell(target, fs, target_file, request):
     history_file = absolute_path("data/plugins/os/windows/powershell/ConsoleHost_history.txt")
     fs.map_file(target_file, history_file)
 
-    if target_file.startswith("users/"):
-        target_file = target_file.replace("users/", "C:/Users/")
+    if target_file.startswith("users\\"):
+        target_file = target_file.replace("users\\", "C:\\Users\\")
 
     target.add_plugin(PowerShellHistoryPlugin)
 

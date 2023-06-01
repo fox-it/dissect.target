@@ -1,8 +1,10 @@
+import platform
 from datetime import datetime, timezone
 from io import BytesIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.filesystem import VirtualFilesystem
@@ -11,6 +13,7 @@ from dissect.target.plugins.os.unix.log.auth import AuthLogRecord, AuthPlugin
 from ._utils import absolute_path
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_auth_plugin(target_unix, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/etc/timezone", BytesIO("Europe/Amsterdam".encode()))
 
@@ -32,6 +35,7 @@ def test_auth_plugin(target_unix, fs_unix: VirtualFilesystem):
         assert results[-1].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/etc/timezone", BytesIO("Pacific/Honolulu".encode()))
 
@@ -56,6 +60,7 @@ def test_auth_plugin_with_gz(target_unix, fs_unix: VirtualFilesystem):
         assert results[-1].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/etc/timezone", BytesIO("America/Nuuk".encode()))
 
@@ -80,6 +85,7 @@ def test_auth_plugin_with_bz(target_unix, fs_unix: VirtualFilesystem):
         assert results[-1].message == "CRON[1]: pam_unix(cron:session): session opened for user root by (uid=0)"
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
 

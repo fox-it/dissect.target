@@ -2,8 +2,6 @@ import re
 from itertools import chain
 from typing import Iterator
 
-from flow.record.fieldtypes import path
-
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -68,6 +66,6 @@ class MessagesPlugin(Plugin):
                     daemon=daemon,
                     pid=pid,
                     message=message,
-                    source=path.from_posix(log_file),
+                    source=log_file,
                     _target=self.target,
                 )
