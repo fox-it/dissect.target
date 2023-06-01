@@ -8,6 +8,8 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 
 class ProfileLoader(Loader):
+    """Load NTUSER.DAT files."""
+
     def __init__(self, path, **kwargs):
         path = Path(path).resolve()
         super().__init__(path)
