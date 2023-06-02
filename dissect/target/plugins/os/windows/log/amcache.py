@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Union
-
-from flow.record.fieldtypes import uri
+from typing import TYPE_CHECKING, Union, Iterator, Any
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
@@ -22,8 +20,8 @@ COMMON_ELEMENTS = [
     ("datetime", "created"),
     ("datetime", "modified"),
     ("datetime", "access"),
-    ("uri", "path"),
-    ("uri", "filename"),
+    ("path", "path"),
+    ("path", "filename"),
     ("string", "size"),
     ("string", "magic"),
     ("string", "size_of_image"),
@@ -50,7 +48,7 @@ COMMON_ELEMENTS = [
 ]
 
 FileCreateElements = COMMON_ELEMENTS.copy()
-FileCreateElements.insert(CREATED_URI_INDEX, ("uri", "file_created"))
+FileCreateElements.insert(CREATED_URI_INDEX, ("path", "file_created"))
 
 AmcacheFileCreateRecord = TargetRecordDescriptor(
     "filesystem/windows/amcache/install",
@@ -58,7 +56,7 @@ AmcacheFileCreateRecord = TargetRecordDescriptor(
 )
 
 ArpCreateElements = COMMON_ELEMENTS.copy()
-ArpCreateElements.insert(CREATED_URI_INDEX, ("uri", "arp_created"))
+ArpCreateElements.insert(CREATED_URI_INDEX, ("path", "arp_created"))
 
 AmcacheArpCreateRecord = TargetRecordDescriptor(
     "filesystem/windows/amcache/install",
@@ -66,47 +64,49 @@ AmcacheArpCreateRecord = TargetRecordDescriptor(
 )
 
 
-def _fill_common_descriptions(
-    description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord], filename: str, entry: dict, target: Target
+def create_record(
+    description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord],
+    filename: str,
+    dictionary: dict,
+    entry: Any,
+    target: Target,
 ) -> TargetRecordDescriptor:
     if description is AmcacheFileCreateRecord:
         entry_type = "file_created"
-    elif description is AmcacheArpCreateRecord:
+    else:
         entry_type = "arp_created"
 
-    desc = description(
-        start_time=datetime.strptime(entry["starttime"], "%m/%d/%Y %H:%M:%S"),
-        stop_time=datetime.strptime(entry["stoptime"], "%m/%d/%Y %H:%M:%S"),
-        created=datetime.strptime(entry["created"], "%m/%d/%Y %H:%M:%S"),
-        modified=datetime.strptime(entry["modified"], "%m/%d/%Y %H:%M:%S"),
-        access=datetime.strptime(entry["lastaccessed"], "%m/%d/%Y %H:%M:%S"),
-        path=uri.from_windows(entry["path"]),
-        filename=uri.from_windows(str(filename)),
-        link_date=datetime.strptime(entry["linkdate"], "%m/%d/%Y %H:%M:%S"),
-        size_of_image=entry.get("sizeofimage"),
-        file_description=entry.get("filedescription"),
-        size=entry.get("size"),
-        digests=[None, entry.get("id")[4:], None],  # remove leading zeros from the entry to create a sha1 hash
-        company_name=entry.get("companyname"),
-        binary_type=entry.get("binarytype"),
-        bin_product_version=entry.get("binproductversion"),
-        bin_file_version=entry.get("binfileversion"),
-        filesize=entry.get("filesize"),
-        pe_image=entry.get("peimagetype"),
-        product_version=entry.get("productversion"),
-        crc_checksum=entry.get("crcchecksum"),
-        legal=entry.get("legalcopyright"),
-        magic=entry.get("magic"),
-        linker_version=entry.get("linkerversion"),
-        product_name=entry.get("productname"),
-        pe_subsystem=entry.get("pesubsystem"),
-        longname=entry.get("longname"),
-        pe_checksum=entry.get("pechecksum"),
+    return description(
+        start_time=datetime.strptime(dictionary.get("starttime"), "%m/%d/%Y %H:%M:%S"),
+        stop_time=datetime.strptime(dictionary.get("stoptime"), "%m/%d/%Y %H:%M:%S"),
+        created=datetime.strptime(dictionary.get("created"), "%m/%d/%Y %H:%M:%S"),
+        modified=datetime.strptime(dictionary.get("modified"), "%m/%d/%Y %H:%M:%S"),
+        access=datetime.strptime(dictionary.get("lastaccessed"), "%m/%d/%Y %H:%M:%S"),
+        link_date=datetime.strptime(dictionary.get("linkdate"), "%m/%d/%Y %H:%M:%S"),
+        path=dictionary.get("path"),
+        filename=filename,
+        size_of_image=dictionary.get("sizeofimage"),
+        file_description=dictionary.get("filedescription"),
+        size=dictionary.get("size"),
+        digests=[None, dictionary.get("id")[4:], None],  # remove leading zeros from the entry to create a sha1 hash
+        company_name=dictionary.get("companyname"),
+        binary_type=dictionary.get("binarytype"),
+        bin_product_version=dictionary.get("binproductversion"),
+        bin_file_version=dictionary.get("binfileversion"),
+        filesize=dictionary.get("filesize"),
+        pe_image=dictionary.get("peimagetype"),
+        product_version=dictionary.get("productversion"),
+        crc_checksum=dictionary.get("crcchecksum"),
+        legal=dictionary.get("legalcopyright"),
+        magic=dictionary.get("magic"),
+        linker_version=dictionary.get("linkerversion"),
+        product_name=dictionary.get("productname"),
+        pe_subsystem=dictionary.get("pesubsystem"),
+        longname=dictionary.get("longname"),
+        pe_checksum=dictionary.get("pechecksum"),
+        **{entry_type: entry},
         _target=target,
     )
-    setattr(desc, entry_type, entry)
-
-    return desc
 
 
 class AmcacheInstallPlugin(Plugin):
@@ -120,9 +120,13 @@ class AmcacheInstallPlugin(Plugin):
         if not self.logs.exists():
             raise UnsupportedPluginError("No amcache install logs found")
 
-    @export(record=DynamicDescriptor(["uri"]))
-    def amcache_install(self):
-        """Return the contents of the Amcache install log."""
+    @export(record=[AmcacheArpCreateRecord, AmcacheFileCreateRecord])
+    def amcache_install(self) -> Iterator[AmcacheArpCreateRecord, AmcacheFileCreateRecord]:
+        """Return the contents of the Amcache install log.
+
+        The log file contains the changes an installer performed on the system.
+        These only get created when the executable is an installer.
+        """
         for f in self.logs.iterdir():
             d = {}
             arp = []
@@ -143,10 +147,10 @@ class AmcacheInstallPlugin(Plugin):
 
             filename = str(f)
             for entry in arp:
-                yield _fill_common_descriptions(
-                    AmcacheArpCreateRecord, filename=filename, entry=entry, target=self.target
+                yield create_record(
+                    AmcacheArpCreateRecord, filename=filename, dictionary=d, entry=entry, target=self.target
                 )
             for entry in created:
-                yield _fill_common_descriptions(
-                    AmcacheFileCreateRecord, filename=filename, entry=entry, target=self.target
+                yield create_record(
+                    AmcacheFileCreateRecord, filename=filename, dictionary=d, entry=entry, target=self.target
                 )
