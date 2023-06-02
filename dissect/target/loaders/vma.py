@@ -5,15 +5,21 @@ from dissect.target.loader import Loader
 
 
 class VmaLoader(Loader):
+    """Load Proxmox Virtual Machine Archive (VMA) files.
+
+    References:
+        - https://pve.proxmox.com/wiki/VMA
+    """
+
     def __init__(self, path, **kwargs):
         path = path.resolve()
         super().__init__(path)
-        self.xva = vma.VMA(open(path, "rb"))
+        self.vma = vma.VMA(open(path, "rb"))
 
     @staticmethod
     def detect(path):
         return path.suffix.lower() == ".vma"
 
     def map(self, target):
-        for device in self.xva.devices():
+        for device in self.vma.devices():
             target.disks.add(RawContainer(device.open()))

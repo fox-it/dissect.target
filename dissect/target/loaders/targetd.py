@@ -16,7 +16,7 @@ from dissect.target.target import Target
 TARGETD_AVAILABLE = False
 try:
     from flow import remoting
-    from targetd.client import Client
+    from targetd.clients import Client
 
     TARGETD_AVAILABLE = True
 except Exception:
@@ -140,3 +140,4 @@ if TARGETD_AVAILABLE:
         targetd.easy_connect_remoting(remoting, link, caller.peers)
         func = getattr(targetd.rpcs, targetd.command)
         caller.output = list(func())
+        targetd.close()

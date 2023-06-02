@@ -1,33 +1,34 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from dissect.evidence import AsdfSnapshot
+from dissect.evidence.asdf.asdf import IDX_METADATA
 
 from dissect.target.containers.asdf import AsdfContainer
-from dissect.target.helpers import fsutil
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loader import Loader
-from dissect.target.loaders.tar import TarFile
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class AsdfLoader(Loader):
     METADATA_PREFIX = "$asdf$"
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)
         self.asdf = AsdfSnapshot(open(path, "rb"))
 
     @staticmethod
-    def detect(path):
+    def detect(path) -> bool:
         return path.suffix.lower() == ".asdf"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         for disk in self.asdf.disks():
             target.disks.add(AsdfContainer(disk))
 
-        overlay = target.fs.add_layer()
-        for member in self.asdf.metadata.members():
-            if member.isdir():
-                continue
-
-            path = fsutil.join(self.METADATA_PREFIX, member.name)
-            entry = TarFile(overlay, path, member.name, self.asdf.metadata.tar)
-            overlay.map_file_entry(entry.path, entry)
+        target.fs.mount(self.METADATA_PREFIX, TarFilesystem(self.asdf.open(IDX_METADATA)))

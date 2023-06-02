@@ -48,5 +48,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
 
     def _volumes(self) -> Iterator[Volume]:
         for num, lv in enumerate(self.lvm.volume_group.logical_volumes):
-            name = f"{lv.vg.name}-{lv.metadata.name}"
+            # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
+            # Emulate that here for the volume name
+            name = f"{lv.vg.name.replace('-', '--')}-{lv.metadata.name.replace('-', '--')}"
             yield Volume(lv, num, None, lv.size, None, name, raw=lv, vs=self)

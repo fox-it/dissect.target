@@ -5,7 +5,7 @@ from dissect.target.plugins.os.windows.wer import WindowsErrorReportingPlugin
 from ._utils import absolute_path
 
 
-def test_wer_plugin(target_win, fs_win, tmpdir_name):
+def test_wer_plugin(target_win, fs_win):
     wer_dir = absolute_path("data/wer/")
     fs_win.map_dir("ProgramData/Microsoft/Windows/WER/ReportQueue/test", wer_dir)
     target_win.add_plugin(WindowsErrorReportingPlugin)

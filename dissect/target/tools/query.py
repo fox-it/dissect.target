@@ -202,10 +202,16 @@ def main():
         basic_entries = []
         yield_entries = []
 
+        # Keep a set of plugins that were already executed on the target.
+        executed_plugins = set()
+
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in funcs:
+        for func_def in find_plugin_functions(target, args.function, False):
+            if func_def.method_name in executed_plugins:
+                continue
+
             try:
                 output_type, result, cli_params_unparsed = execute_function_on_target(
                     target, func_def, cli_params_unparsed
@@ -213,17 +219,17 @@ def main():
             except UnsupportedPluginError as e:
                 target.log.error(
                     "Unsupported plugin for `%s`: %s",
-                    func,
+                    func_def,
                     e.root_cause_str(),
                 )
 
                 target.log.debug("", exc_info=e)
                 continue
             except PluginNotFoundError:
-                target.log.error("Cannot find plugin `%s`", func)
+                target.log.error("Cannot find plugin `%s`", func_def)
                 continue
             except Exception:
-                target.log.error("Exception while executing function `%s`", func, exc_info=True)
+                target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
                 continue
 
             if first_seen_output_type and output_type != first_seen_output_type:
@@ -236,7 +242,7 @@ def main():
                         "does not match first seen output `%s`."
                     ),
                     output_type,
-                    func,
+                    func_def,
                     first_seen_output_type,
                 )
                 parser.exit()
@@ -244,12 +250,14 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
+            executed_plugins.add(func_def.method_name)
+
             if output_type == "record":
                 record_entries.append(result)
             elif output_type == "yield":
                 yield_entries.append(result)
             elif output_type == "none":
-                target.log.info("No result for function `%s` (output type is set to 'none')", func)
+                target.log.info("No result for function `%s` (output type is set to 'none')", func_def)
                 continue
             else:
                 basic_entries.append(result)

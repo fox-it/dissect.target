@@ -8,6 +8,8 @@ from dissect.target.loader import Loader
 
 
 class TargetLoader(Loader):
+    """Load target files."""
+
     def __init__(self, path, **kwargs):
         super().__init__(path)
         self.base_dir = path.parent

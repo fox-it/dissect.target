@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class DirLoader(Loader):
+    """Load a directory as a filesystem."""
+
     @staticmethod
     def detect(path: Path) -> bool:
         return find_dirs(path)[0] is not None

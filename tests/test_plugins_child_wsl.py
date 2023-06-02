@@ -16,5 +16,5 @@ def test_plugins_child_wsl(target_win_users, fs_win):
     assert children[0].type == "wsl"
     assert (
         str(children[0].path)
-        == "C:/Users/John/AppData/Local/Packages/CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc/LocalState/ext4.vhdx"  # noqa E501
+        == "C:\\Users\\John\\AppData\\Local\\Packages\\CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc\\LocalState\\ext4.vhdx"  # noqa E501
     )

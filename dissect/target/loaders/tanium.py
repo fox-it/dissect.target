@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class TaniumLoader(DirLoader):
+    """Load Tanium forensic image format files."""
+
     @staticmethod
     def detect(path: Path) -> bool:
         # A Tanium package is very similar to a Kape package.

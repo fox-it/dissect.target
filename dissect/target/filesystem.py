@@ -1383,7 +1383,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
                 instance.volume = fh
                 return instance
         except ImportError as e:
-            log.warning("Failed to import %s", filesystem)
+            log.info("Failed to import %s", filesystem)
             log.debug("", exc_info=e)
 
     raise FilesystemError(f"Failed to open filesystem for {fh}")

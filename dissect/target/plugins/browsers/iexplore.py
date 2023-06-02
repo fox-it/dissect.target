@@ -167,7 +167,7 @@ class InternetExplorerPlugin(Plugin):
                     session=None,
                     from_visit=None,
                     from_url=None,
-                    source=str(cache_file),
+                    source=cache_file,
                     _target=self.target,
                     _user=user,
                 )
@@ -203,7 +203,7 @@ class InternetExplorerPlugin(Plugin):
                     url=down_url,
                     size=None,
                     state=None,
-                    source=str(cache_file),
+                    source=cache_file,
                     _target=self.target,
                     _user=user,
                 )

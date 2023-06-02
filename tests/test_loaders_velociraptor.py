@@ -1,12 +1,10 @@
-from pathlib import Path
-
 from dissect.target.loaders.velociraptor import VelociraptorLoader
 
 from ._utils import absolute_path, mkdirs
 
 
-def test_velociraptor_loader_windows_ntfs(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_velociraptor_loader_windows_ntfs(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(
         root,
         [
@@ -40,8 +38,8 @@ def test_velociraptor_loader_windows_ntfs(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 4
 
 
-def test_dir_loader_linux(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_linux(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["uploads.json", "uploads/file/etc", "uploads/file/var"])
 
     assert VelociraptorLoader.detect(root) is True
@@ -52,8 +50,8 @@ def test_dir_loader_linux(mock_target, tmpdir_name):
     assert len(mock_target.filesystems) == 1
 
 
-def test_dir_loader_macos(mock_target, tmpdir_name):
-    root = Path(tmpdir_name)
+def test_dir_loader_macos(mock_target, tmp_path):
+    root = tmp_path
     mkdirs(root, ["uploads.json", "uploads/file/Library"])
 
     assert VelociraptorLoader.detect(root) is True

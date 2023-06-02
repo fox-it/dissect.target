@@ -24,7 +24,7 @@ dependencies = [
     "dissect.regf>=3.3.dev,<4.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.volume>=3.0.dev,<4.0.dev",
-    "flow.record~=3.9",
+    "flow.record~=3.10",
     "structlog",
 ]
 dynamic = ["version"]
@@ -53,7 +53,6 @@ full = [
     "fusepy",
     "pycryptodome",
     "pyyaml",
-    "yara-python",
     # dissect.target's caching uses flow.record functionlity which depends on the
     # zstandard module being available. However flow.record does not define
     # zstandard as a dependency, nor does it allow zstandard to be installed
@@ -62,6 +61,12 @@ full = [
     # Until such time that this dependency can be installed through
     # flow.record, we define it as a dependency of dissect.target.
     "zstandard",
+]
+yara = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    # Enable using the yara rules functionality
+    "yara-python"
 ]
 
 [project.scripts]
