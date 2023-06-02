@@ -135,7 +135,7 @@ class AmcacheInstallPlugin(Plugin):
             d = {}
             arp = []
             created = []
-            for line in f.open().read().decode("utf-16-le").split("\r\n"):
+            for line in f.read_text("utf-16-le").splitlines():
                 match = re_field.match(line.rstrip())
                 if not match:
                     continue
