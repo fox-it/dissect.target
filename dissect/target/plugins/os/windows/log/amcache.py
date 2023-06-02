@@ -64,6 +64,10 @@ AmcacheArpCreateRecord = TargetRecordDescriptor(
 )
 
 
+def _to_log_timestamp(timestamp: str) -> datetime:
+    return datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S")
+
+
 def create_record(
     description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord],
     filename: str,
@@ -77,12 +81,12 @@ def create_record(
         entry_type = "arp_created"
 
     return description(
-        start_time=datetime.strptime(dictionary.get("starttime"), "%m/%d/%Y %H:%M:%S"),
-        stop_time=datetime.strptime(dictionary.get("stoptime"), "%m/%d/%Y %H:%M:%S"),
-        created=datetime.strptime(dictionary.get("created"), "%m/%d/%Y %H:%M:%S"),
-        modified=datetime.strptime(dictionary.get("modified"), "%m/%d/%Y %H:%M:%S"),
-        access=datetime.strptime(dictionary.get("lastaccessed"), "%m/%d/%Y %H:%M:%S"),
-        link_date=datetime.strptime(dictionary.get("linkdate"), "%m/%d/%Y %H:%M:%S"),
+        start_time=_to_log_timestamp(dictionary.get("starttime")),
+        stop_time=_to_log_timestamp(dictionary.get("stoptime")),
+        created=_to_log_timestamp(dictionary.get("created")),
+        modified=_to_log_timestamp(dictionary.get("modified")),
+        access=_to_log_timestamp(dictionary.get("lastaccessed")),
+        link_date=_to_log_timestamp(dictionary.get("linkdate")),
         path=dictionary.get("path"),
         filename=filename,
         size_of_image=dictionary.get("sizeofimage"),
