@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Union, Iterator, Any
+from typing import TYPE_CHECKING, Union, Iterator
+
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -13,7 +15,6 @@ if TYPE_CHECKING:
 
 re_field = re.compile(r"(.+)=(.+)")
 
-CREATED_URI_INDEX = 7
 COMMON_ELEMENTS = [
     ("datetime", "start_time"),
     ("datetime", "stop_time"),
@@ -22,6 +23,7 @@ COMMON_ELEMENTS = [
     ("datetime", "access"),
     ("path", "path"),
     ("path", "filename"),
+    ("path", "create"),
     ("string", "size"),
     ("string", "magic"),
     ("string", "size_of_image"),
@@ -47,20 +49,14 @@ COMMON_ELEMENTS = [
     ("string", "msi"),
 ]
 
-FileCreateElements = COMMON_ELEMENTS.copy()
-FileCreateElements.insert(CREATED_URI_INDEX, ("path", "file_created"))
-
 AmcacheFileCreateRecord = TargetRecordDescriptor(
-    "filesystem/windows/amcache/install",
-    FileCreateElements,
+    "filesystem/windows/amcache/install/file_create",
+    COMMON_ELEMENTS,
 )
 
-ArpCreateElements = COMMON_ELEMENTS.copy()
-ArpCreateElements.insert(CREATED_URI_INDEX, ("path", "arp_created"))
-
 AmcacheArpCreateRecord = TargetRecordDescriptor(
-    "filesystem/windows/amcache/install",
-    ArpCreateElements,
+    "filesystem/windows/amcache/install/arp_create",
+    COMMON_ELEMENTS,
 )
 
 
@@ -72,14 +68,9 @@ def create_record(
     description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord],
     filename: str,
     dictionary: dict,
-    entry: Any,
+    create: str,
     target: Target,
 ) -> TargetRecordDescriptor:
-    if description is AmcacheFileCreateRecord:
-        entry_type = "file_created"
-    else:
-        entry_type = "arp_created"
-
     return description(
         start_time=_to_log_timestamp(dictionary.get("starttime")),
         stop_time=_to_log_timestamp(dictionary.get("stoptime")),
@@ -87,8 +78,9 @@ def create_record(
         modified=_to_log_timestamp(dictionary.get("modified")),
         access=_to_log_timestamp(dictionary.get("lastaccessed")),
         link_date=_to_log_timestamp(dictionary.get("linkdate")),
-        path=dictionary.get("path"),
-        filename=filename,
+        path=path.from_windows(dictionary.get("path")),
+        filename=path.from_windows(filename),
+        create=path.from_windows(create),
         size_of_image=dictionary.get("sizeofimage"),
         file_description=dictionary.get("filedescription"),
         size=dictionary.get("size"),
@@ -108,7 +100,6 @@ def create_record(
         pe_subsystem=dictionary.get("pesubsystem"),
         longname=dictionary.get("longname"),
         pe_checksum=dictionary.get("pechecksum"),
-        **{entry_type: entry},
         _target=target,
     )
 
@@ -150,11 +141,11 @@ class AmcacheInstallPlugin(Plugin):
                     d[match.group(1).lower()] = match.group(2)
 
             filename = str(f)
-            for entry in arp:
+            for arp_create in arp:
                 yield create_record(
-                    AmcacheArpCreateRecord, filename=filename, dictionary=d, entry=entry, target=self.target
+                    AmcacheArpCreateRecord, filename=filename, dictionary=d, create=arp_create, target=self.target
                 )
-            for entry in created:
+            for file_create in created:
                 yield create_record(
-                    AmcacheFileCreateRecord, filename=filename, dictionary=d, entry=entry, target=self.target
+                    AmcacheFileCreateRecord, filename=filename, dictionary=d, create=file_create, target=self.target
                 )
