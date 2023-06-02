@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import ssl
 import time
 from pathlib import Path
 from typing import Union
@@ -84,9 +85,19 @@ class TargetdLoader(Loader):
         required=True,
         help="Minimum number of hosts to wait for before executing query",
     )
+    @arg(
+        "--cacert",
+        dest="cacert",
+        type=str,
+        action="store",
+        required=True,
+        help="SSL: cacert file",
+    )
     @arg("--help-targetd", action="help", help="Show help message for special targetd loader and exit")
     @arg("-h", "--help", action="help", help="Show help message for plugin and exit")
-    def plugin_bridge(self, plugin_func: str, peers: int, host: str, local_link: str, port: int, adapter: str):
+    def plugin_bridge(
+        self, plugin_func: str, peers: int, host: str, local_link: str, port: int, adapter: str, cacert: str
+    ):
         """Command Execution Bridge Plugin for Targetd.
 
         This is a generic plugin interceptor that becomes active only if using
@@ -101,7 +112,10 @@ class TargetdLoader(Loader):
         self.output = None
 
         if self.client is None:
-            self.client = Client(host, port, [self.uri], local_link, "targetd")
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ssl_context.check_hostname = False
+            ssl_context.load_verify_locations(cacert)
+            self.client = Client(host, port, ssl_context, [self.uri], local_link, "targetd")
             self.client.module_fullname = "dissect.target.loaders"
             self.client.module_fromlist = ["command_runner"]
             self.client.command = plugin_func
