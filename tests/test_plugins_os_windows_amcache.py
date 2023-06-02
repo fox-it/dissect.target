@@ -1,11 +1,14 @@
 import datetime
 import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 from flow.record.fieldtypes import path
 
+from dissect.target import Target
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
+from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 
 from ._utils import absolute_path
 
@@ -135,3 +138,28 @@ def test_parse_inventory_application_file(target_win, test_file_id, expected_fil
             call_kwargs = mock_record.call_args.kwargs
 
         assert call_kwargs.get("digests", None) == [None, expected_file_id, None]
+
+
+def test_amcache_install_entry(target_win: Target):
+    amcache_install_plugin = AmcacheInstallPlugin(target_win)
+
+    amcache_install_plugin.logs = Path(absolute_path("data/amcache_install"))
+
+    entries = list(amcache_install_plugin.amcache_install())
+
+    created_order = [
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\7-Zip",
+        r"C:\Program Files\7-Zip\7-zip.dll",
+        r"C:\Program Files\7-Zip\7-zip32.dll",
+        r"C:\Program Files\7-Zip\7z.dll",
+        r"C:\Program Files\7-Zip\7z.exe",
+        r"C:\Program Files\7-Zip\7zFM.exe",
+        r"C:\Program Files\7-Zip\7zG.exe",
+        r"C:\Program Files\7-Zip\Uninstall.exe",
+    ]
+    assert len(entries) == 8
+
+    for create, entry in zip(created_order, entries):
+        assert str(entry.create) == create
+        assert str(entry.path) == r"C:\Users\JohnCena"
+        assert str(entry.longname) == r"7z2201-x64.exe"

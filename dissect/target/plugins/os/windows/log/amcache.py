@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Union, Iterator
+from typing import TYPE_CHECKING, Iterator, Union
 
 from flow.record.fieldtypes import path
 
