@@ -36,6 +36,14 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
 
 
 class VelociraptorLoader(DirLoader):
+    """Load Rapid7 Velociraptor forensic image files.
+
+    References:
+        - https://www.rapid7.com/products/velociraptor/
+        - https://docs.velociraptor.app/
+        - https://github.com/Velocidex/velociraptor
+    """
+
     @staticmethod
     def detect(path: Path) -> bool:
         # The 'uploads' folder contains the data acquired

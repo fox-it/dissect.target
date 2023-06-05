@@ -1,3 +1,4 @@
+import os
 import pathlib
 import tempfile
 import textwrap
@@ -168,3 +169,49 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def xattrs():
+    return {"some_key": b"some_value"}
+
+
+@pytest.fixture
+def listxattr_spec(xattrs):
+    # listxattr() is only available on Linux
+    attr_names = list(xattrs.keys())
+
+    if hasattr(os, "listxattr"):
+        spec = {
+            "create": False,
+            "autospec": True,
+            "return_value": attr_names,
+        }
+    else:
+        spec = {
+            "create": True,
+            "return_value": attr_names,
+        }
+
+    return spec
+
+
+@pytest.fixture
+def getxattr_spec(xattrs):
+    # getxattr() is only available on Linux
+    attr_name = list(xattrs.keys())[0]
+    attr_value = xattrs.get(attr_name)
+
+    if hasattr(os, "getxattr"):
+        spec = {
+            "create": False,
+            "autospec": True,
+            "return_value": attr_value,
+        }
+    else:
+        spec = {
+            "create": True,
+            "return_value": attr_value,
+        }
+
+    return spec

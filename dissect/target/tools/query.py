@@ -16,6 +16,7 @@ from dissect.target.helpers import cache, hashutil
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
     generate_argparse_for_bound_method,
@@ -45,6 +46,7 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
