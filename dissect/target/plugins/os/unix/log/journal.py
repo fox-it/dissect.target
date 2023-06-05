@@ -295,7 +295,9 @@ class JournalFile:
 
                 except Exception as e:
                     self.target.log.warning(
-                        "The data object in Journal file %s could not be parsed", self.fh.name, exc_info=e
+                        "The data object in Journal file %s could not be parsed",
+                        self.fh.name if self.fh.name else None,
+                        exc_info=e,
                     )
                     continue
 
@@ -303,17 +305,16 @@ class JournalFile:
 
 
 class JournalPlugin(Plugin):
-    JOURNAL_GLOBS = ["/var/log/journal/*", "/run/systemd/journal/*"]
+    JOURNAL_PATHS = ["/var/log/journal", "/run/systemd/journal"]
+    JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
     JOURNAL_SIGNATURE = "LPKSHHRH"
 
     def __init__(self, target: Target):
         super().__init__(target)
         self.journal_paths = []
 
-        for glob in self.JOURNAL_GLOBS:
-            for journal_path in self.target.fs.glob(glob):
-                if self.target.fs.is_dir(journal_path):
-                    self.journal_paths.append(journal_path)
+        for _path in self.JOURNAL_PATHS:
+            self.journal_paths.extend(self.target.fs.path(_path).glob(self.JOURNAL_GLOB))
 
     def check_compatible(self) -> bool:
         return bool(len(self.journal_paths))
@@ -328,66 +329,65 @@ class JournalPlugin(Plugin):
         """  # noqa: E501
 
         for _path in self.journal_paths:
-            for f in self.target.fs.listdir_ext(_path):
-                fh = f.open()
+            fh = _path.open()
 
-                journal = JournalFile(fh, self.target)
+            journal = JournalFile(fh, self.target)
 
-                if not journal.signature == self.JOURNAL_SIGNATURE:
-                    self.target.log.warning("The Journal log file %s has an invalid magic header", f.path)
-                    continue
+            if not journal.signature == self.JOURNAL_SIGNATURE:
+                self.target.log.warning("The Journal log file %s has an invalid magic header", _path)
+                continue
 
-                for entry in journal:
-                    yield JournalRecord(
-                        ts=entry.get("ts"),
-                        message=entry.get("message"),
-                        message_id=entry.get("message_id"),
-                        priority=get_optional(entry.get("priority"), int),
-                        code_file=get_optional(entry.get("code_file"), path.from_posix),
-                        code_line=get_optional(entry.get("code_line"), int),
-                        code_func=entry.get("code_func"),
-                        errno=get_optional(entry.get("errno"), int),
-                        invocation_id=entry.get("invocation_id"),
-                        user_invocation_id=entry.get("user_invocation_id"),
-                        syslog_facility=get_optional(entry.get("syslog_facility"), int),
-                        syslog_identifier=entry.get("syslog_identifier"),
-                        syslog_pid=get_optional(entry.get("syslog_pid"), int),
-                        syslog_raw=entry.get("syslog_raw"),
-                        documentation=entry.get("documentation"),
-                        tid=get_optional(entry.get("tid"), int),
-                        unit=entry.get("unit"),
-                        user_unit=entry.get("user_unit"),
-                        pid=get_optional(entry.get("pid"), int),
-                        uid=get_optional(entry.get("uid"), int),
-                        gid=get_optional(entry.get("gid"), int),
-                        comm=entry.get("comm"),
-                        exe=get_optional(entry.get("exe"), path.from_posix),
-                        cmdline=entry.get("cmdline"),
-                        cap_effective=entry.get("cap_effective"),
-                        audit_session=get_optional(entry.get("audit_session"), int),
-                        audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
-                        systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path.from_posix),
-                        systemd_slice=entry.get("systemd_slice"),
-                        systemd_unit=entry.get("systemd_unit"),
-                        systemd_user_unit=entry.get("systemd_user_unit"),
-                        systemd_user_slice=entry.get("systemd_user_slice"),
-                        systemd_session=entry.get("systemd_session"),
-                        systemd_owner_uid=entry.get("systemd_owner_uid"),
-                        selinux_context=entry.get("selinux_context"),
-                        boot_id=entry.get("boot_id"),
-                        machine_id=entry.get("machine_id"),
-                        systemd_invocation_id=entry.get("systemd_invocation_id"),
-                        transport=entry.get("transport"),
-                        stream_id=entry.get("stream_id"),
-                        line_break=entry.get("line_break"),
-                        namespace=entry.get("namespace"),
-                        runtime_scope=entry.get("runtime_scope"),
-                        kernel_device=entry.get("kernel_device"),
-                        kernel_subsystem=entry.get("kernel_subsystem"),
-                        udev_sysname=entry.get("udev_sysname"),
-                        udev_devnode=get_optional(entry.get("udev_devnode"), path.from_posix),
-                        udev_devlink=get_optional(entry.get("udev_devlink"), path.from_posix),
-                        journal_hostname=entry.get("hostname"),
-                        filepath=f.path,
-                        _target=self.target,
-                    )
+            for entry in journal:
+                yield JournalRecord(
+                    ts=entry.get("ts"),
+                    message=entry.get("message"),
+                    message_id=entry.get("message_id"),
+                    priority=get_optional(entry.get("priority"), int),
+                    code_file=get_optional(entry.get("code_file"), path.from_posix),
+                    code_line=get_optional(entry.get("code_line"), int),
+                    code_func=entry.get("code_func"),
+                    errno=get_optional(entry.get("errno"), int),
+                    invocation_id=entry.get("invocation_id"),
+                    user_invocation_id=entry.get("user_invocation_id"),
+                    syslog_facility=get_optional(entry.get("syslog_facility"), int),
+                    syslog_identifier=entry.get("syslog_identifier"),
+                    syslog_pid=get_optional(entry.get("syslog_pid"), int),
+                    syslog_raw=entry.get("syslog_raw"),
+                    documentation=entry.get("documentation"),
+                    tid=get_optional(entry.get("tid"), int),
+                    unit=entry.get("unit"),
+                    user_unit=entry.get("user_unit"),
+                    pid=get_optional(entry.get("pid"), int),
+                    uid=get_optional(entry.get("uid"), int),
+                    gid=get_optional(entry.get("gid"), int),
+                    comm=entry.get("comm"),
+                    exe=get_optional(entry.get("exe"), path.from_posix),
+                    cmdline=entry.get("cmdline"),
+                    cap_effective=entry.get("cap_effective"),
+                    audit_session=get_optional(entry.get("audit_session"), int),
+                    audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
+                    systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path.from_posix),
+                    systemd_slice=entry.get("systemd_slice"),
+                    systemd_unit=entry.get("systemd_unit"),
+                    systemd_user_unit=entry.get("systemd_user_unit"),
+                    systemd_user_slice=entry.get("systemd_user_slice"),
+                    systemd_session=entry.get("systemd_session"),
+                    systemd_owner_uid=entry.get("systemd_owner_uid"),
+                    selinux_context=entry.get("selinux_context"),
+                    boot_id=entry.get("boot_id"),
+                    machine_id=entry.get("machine_id"),
+                    systemd_invocation_id=entry.get("systemd_invocation_id"),
+                    transport=entry.get("transport"),
+                    stream_id=entry.get("stream_id"),
+                    line_break=entry.get("line_break"),
+                    namespace=entry.get("namespace"),
+                    runtime_scope=entry.get("runtime_scope"),
+                    kernel_device=entry.get("kernel_device"),
+                    kernel_subsystem=entry.get("kernel_subsystem"),
+                    udev_sysname=entry.get("udev_sysname"),
+                    udev_devnode=get_optional(entry.get("udev_devnode"), path.from_posix),
+                    udev_devlink=get_optional(entry.get("udev_devlink"), path.from_posix),
+                    journal_hostname=entry.get("hostname"),
+                    filepath=_path,
+                    _target=self.target,
+                )
