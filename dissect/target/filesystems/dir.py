@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import BinaryIO, Iterator
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -120,8 +120,8 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(self.entry.lstat())
 
-    def attr(self) -> Any:
-        raise TypeError()
+    def attr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=True)
 
-    def lattr(self) -> Any:
-        raise TypeError()
+    def lattr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=False)

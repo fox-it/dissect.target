@@ -908,6 +908,12 @@ class MappedFile(VirtualFile):
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(os.lstat(self.entry))
 
+    def attr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=True)
+
+    def lattr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=False)
+
 
 class VirtualSymlink(FilesystemEntry):
     """Virtual symlink implementation."""
