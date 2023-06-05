@@ -89,40 +89,48 @@ union sd_id128_t {
     uint64_t  qwords[2];
 };
 
+enum IncompatibleFlag : le32_t {
+    HEADER_INCOMPATIBLE_COMPRESSED_XZ   = 1,
+    HEADER_INCOMPATIBLE_COMPRESSED_LZ4  = 2,
+    HEADER_INCOMPATIBLE_KEYED_HASH      = 4,
+    HEADER_INCOMPATIBLE_COMPRESSED_ZSTD = 8,
+    HEADER_INCOMPATIBLE_COMPACT         = 16,         // indicates that the Journal file uses the new binary format
+};
+
 struct Header {
-    uint8_t     signature[8];
-    le32_t      compatible_flags;
-    le32_t      incompatible_flags;
-    State       state;
-    uint8_t     reserved[7];
-    sd_id128_t  file_id;
-    sd_id128_t  machine_id;
-    sd_id128_t  tail_entry_boot_id;
-    sd_id128_t  seqnum_id;
-    le64_t      header_size;
-    le64_t      arena_size;
-    le64_t      data_hash_table_offset;
-    le64_t      data_hash_table_size;
-    le64_t      field_hash_table_offset;
-    le64_t      field_hash_table_size;
-    le64_t      tail_object_offset;
-    le64_t      n_objects;
-    le64_t      n_entries;
-    le64_t      tail_entry_seqnum;
-    le64_t      head_entry_seqnum;
-    le64_t      entry_array_offset;
-    le64_t      head_entry_realtime;
-    le64_t      tail_entry_realtime;
-    le64_t      tail_entry_monotonic;
-    le64_t      n_data;
-    le64_t      n_fields;
-    le64_t      n_tags;
-    le64_t      n_entry_arrays;
-    le64_t      data_hash_chain_depth;
-    le64_t      field_hash_chain_depth;
-    le32_t      tail_entry_array_offset;
-    le32_t      tail_entry_array_n_entries;
-    le64_t      tail_entry_offset;
+    uint8_t           signature[8];
+    le32_t            compatible_flags;
+    IncompatibleFlag  incompatible_flags;
+    State             state;
+    uint8_t           reserved[7];
+    sd_id128_t        file_id;
+    sd_id128_t        machine_id;
+    sd_id128_t        tail_entry_boot_id;
+    sd_id128_t        seqnum_id;
+    le64_t            header_size;
+    le64_t            arena_size;
+    le64_t            data_hash_table_offset;
+    le64_t            data_hash_table_size;
+    le64_t            field_hash_table_offset;
+    le64_t            field_hash_table_size;
+    le64_t            tail_object_offset;
+    le64_t            n_objects;
+    le64_t            n_entries;
+    le64_t            tail_entry_seqnum;
+    le64_t            head_entry_seqnum;
+    le64_t            entry_array_offset;
+    le64_t            head_entry_realtime;
+    le64_t            tail_entry_realtime;
+    le64_t            tail_entry_monotonic;
+    le64_t            n_data;
+    le64_t            n_fields;
+    le64_t            n_tags;
+    le64_t            n_entry_arrays;
+    le64_t            data_hash_chain_depth;
+    le64_t            field_hash_chain_depth;
+    le32_t            tail_entry_array_offset;
+    le32_t            tail_entry_array_n_entries;
+    le64_t            tail_entry_offset;
 };
 
 enum ObjectType : uint8 {
@@ -146,10 +154,10 @@ enum ObjectFlag : uint8 {
 };
 
 struct ObjectHeader {
-    ObjectType  type;               // The type field is one of the object types listed above
-    uint8_t     flags;              // If DATA object the value is ObjectFlag
+    ObjectType  type;                                 // The type field is one of the object types listed above
+    uint8_t     flags;                                // If DATA object the value is ObjectFlag
     uint8_t     reserved[6];
-    le64_t      size;               // The size field encodes the size of the object including all its headers and payload
+    le64_t      size;                                 // The size field encodes the size of the object including all its headers and payload
 };
 
 
@@ -165,14 +173,35 @@ struct DataObject {
     le64_t      entry_offset;
     le64_t      entry_array_offset;
     le64_t      n_entries;
-    char        payload[size - 64];  // Data objects carry actual field data in the payload[] array.
+    char        payload[size - 64];                   // Data objects carry actual field data in the payload[] array.
+};
+
+// If the HEADER_INCOMPATIBLE_COMPACT flag is set, two extra fields are stored to allow immediate access
+// to the tail entry array in the DATA object's entry array chain.
+struct DataObject_Compact {
+    ObjectType  type;
+    ObjectFlag  flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      hash;
+    le64_t      next_hash_offset;
+    le64_t      next_field_offset;
+    le64_t      entry_offset;
+    le64_t      entry_array_offset;
+    le64_t      n_entries;
+    le32_t      tail_entry_array_offset;
+    le32_t      tail_entry_array_n_entries;
+    char        payload[size - 72];                   // Data objects carry actual field data in the payload[] array.
 };
 
 struct EntryItem {
-    le32_t object_offset;
-    le32_t unknown1;
-    le64_t unknown2;
+    le64_t object_offset;
+    le64_t hash;
 };
+
+struct EntryItem_Compact {
+    le32_t object_offset;
+}
 
 // The first four members are copied from ObjectHeader, so that the size can be used as the length of items
 struct EntryObject {
@@ -185,7 +214,22 @@ struct EntryObject {
     le64_t      monotonic;
     sd_id128_t  boot_id;
     le64_t      xor_hash;
-    EntryItem   items[size / 64];
+    EntryItem   items[size - 64 / 16];                // The size minus the previous members divided by the size of the items
+};
+
+// If the HEADER_INCOMPATIBLE_COMPACT flag is set, DATA object offsets are stored as 32-bit integers instead of 64bit
+// and the unused hash field per data object is not stored anymore.
+struct EntryObject_Compact {
+    ObjectType  type;
+    uint8_t     flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      seqnum;
+    le64_t      realtime;
+    le64_t      monotonic;
+    sd_id128_t  boot_id;
+    le64_t      xor_hash;
+    EntryItem_Compact   items[size - 64 / 4];
 };
 
 // The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
@@ -195,7 +239,16 @@ struct EntryArrayObject {
     uint8_t     reserved[6];
     le64_t      size;
     le64_t      next_entry_array_offset;
-    le64_t      entry_object_offsets[size - 24 / 8];
+    le64_t      entry_object_offsets[size - 24 / 8];  // The size minus the previous members divided by the size of the offset
+};
+
+struct EntryArrayObject_Compact {
+    ObjectType  type;
+    uint8_t     flags;
+    uint8_t     reserved[6];
+    le64_t      size;
+    le64_t      next_entry_array_offset;
+    le32_t      entry_object_offsets[size - 24 / 4];
 };
 """  # noqa: E501
 
@@ -237,7 +290,11 @@ class JournalFile:
             if object.type == c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
                 # After the object is checked, read again but with EntryArrayObject instead of ObjectHeader
                 self.fh.seek(offset)
-                entry_array_object = c_journal.EntryArrayObject(self.fh)
+
+                if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                    entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
+                else:
+                    entry_array_object = c_journal.EntryArrayObject(self.fh)
 
                 for entry_object_offset in entry_array_object.entry_object_offsets:
                     # Check if the offset is not zero and points to nothing
@@ -262,7 +319,11 @@ class JournalFile:
 
         for offset in self.entry_object_offsets():
             self.fh.seek(offset)
-            entry = c_journal.EntryObject(self.fh)
+
+            if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                entry = c_journal.EntryObject_Compact(self.fh)
+            else:
+                entry = c_journal.EntryObject(self.fh)
 
             event = {}
             event["ts"] = ts.from_unix_us(entry.realtime)
@@ -276,7 +337,10 @@ class JournalFile:
                     if object.type == c_journal.ObjectType.OBJECT_DATA:
                         self.fh.seek(item.object_offset)
 
-                        data_object = c_journal.DataObject(self.fh)
+                        if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                            data_object = c_journal.DataObject_Compact(self.fh)
+                        else:
+                            data_object = c_journal.DataObject(self.fh)
 
                         data = data_object.payload
 
