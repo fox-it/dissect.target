@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO, Iterator
+
 from dissect.util import stream
 
 from dissect.target import filesystem
 from dissect.target.loader import Loader
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 BLOCK_SIZE = 64 * 0x100000  # 64 MiB
 
@@ -12,7 +20,11 @@ EXTFS_NEEDLE_OFFSET = 0x36 * 1024
 FS_NEEDLES = [NTFS_NEEDLE, EXTFS_NEEDLE]
 
 
-def scrape_pos(fp, needles, block_size=BLOCK_SIZE):
+def scrape_pos(
+    fp: BinaryIO,
+    needles: list[bytes],
+    block_size: int = BLOCK_SIZE,
+) -> Iterator[tuple[bytes, int]]:
     while True:
         file_pos = fp.tell()
         block = fp.read(block_size)
@@ -39,10 +51,10 @@ class PhobosLoader(Loader):
     """
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         return path.suffix.lower() == ".eight"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         fh = self.path.open("rb")
 
         fs_idx = 0
@@ -53,7 +65,7 @@ class PhobosLoader(Loader):
                 if needle == NTFS_NEEDLE:
                     volume = stream.RelativeStream(fh, offset)
                     fs = filesystem.open(volume)
-                    size = fs.ntfs.header.sector_count_64 * fs.ntfs.header.bytes_per_sector
+                    size = fs.ntfs.boot_sector.NumberSectors * fs.ntfs.sector_size
                 elif needle == EXTFS_NEEDLE:
                     volume = stream.RelativeStream(fh, offset - EXTFS_NEEDLE_OFFSET)
                     fs = filesystem.open(volume)
