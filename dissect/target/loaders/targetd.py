@@ -88,7 +88,7 @@ class TargetdLoader(Loader):
     @arg(
         "--cacert",
         dest="cacert",
-        type=str,
+        type=Path,
         action="store",
         required=True,
         help="SSL: cacert file",
@@ -96,7 +96,7 @@ class TargetdLoader(Loader):
     @arg("--help-targetd", action="help", help="Show help message for special targetd loader and exit")
     @arg("-h", "--help", action="help", help="Show help message for plugin and exit")
     def plugin_bridge(
-        self, plugin_func: str, peers: int, host: str, local_link: str, port: int, adapter: str, cacert: str
+        self, plugin_func: str, peers: int, host: str, local_link: str, port: int, adapter: str, cacert: Path
     ):
         """Command Execution Bridge Plugin for Targetd.
 
@@ -114,6 +114,8 @@ class TargetdLoader(Loader):
         if self.client is None:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ssl_context.check_hostname = False
+            if not cacert.exists():
+                raise LoaderError(f"file not found: {cacert}")
             ssl_context.load_verify_locations(cacert)
             self.client = Client(host, port, ssl_context, [self.uri], local_link, "targetd")
             self.client.module_fullname = "dissect.target.loaders"
