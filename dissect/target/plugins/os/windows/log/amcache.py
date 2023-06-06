@@ -67,39 +67,43 @@ def _to_log_timestamp(timestamp: str) -> datetime:
 def create_record(
     description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord],
     filename: str,
-    dictionary: dict,
+    install_properties: dict[str, str],
     create: str,
     target: Target,
 ) -> TargetRecordDescriptor:
     return description(
-        start_time=_to_log_timestamp(dictionary.get("starttime")),
-        stop_time=_to_log_timestamp(dictionary.get("stoptime")),
-        created=_to_log_timestamp(dictionary.get("created")),
-        modified=_to_log_timestamp(dictionary.get("modified")),
-        access=_to_log_timestamp(dictionary.get("lastaccessed")),
-        link_date=_to_log_timestamp(dictionary.get("linkdate")),
-        path=path.from_windows(dictionary.get("path")),
+        start_time=_to_log_timestamp(install_properties.get("starttime")),
+        stop_time=_to_log_timestamp(install_properties.get("stoptime")),
+        created=_to_log_timestamp(install_properties.get("created")),
+        modified=_to_log_timestamp(install_properties.get("modified")),
+        access=_to_log_timestamp(install_properties.get("lastaccessed")),
+        link_date=_to_log_timestamp(install_properties.get("linkdate")),
+        path=path.from_windows(install_properties.get("path")),
         filename=path.from_windows(filename),
         create=path.from_windows(create),
-        size_of_image=dictionary.get("sizeofimage"),
-        file_description=dictionary.get("filedescription"),
-        size=dictionary.get("size"),
-        digests=[None, dictionary.get("id")[4:], None],  # remove leading zeros from the entry to create a sha1 hash
-        company_name=dictionary.get("companyname"),
-        binary_type=dictionary.get("binarytype"),
-        bin_product_version=dictionary.get("binproductversion"),
-        bin_file_version=dictionary.get("binfileversion"),
-        filesize=dictionary.get("filesize"),
-        pe_image=dictionary.get("peimagetype"),
-        product_version=dictionary.get("productversion"),
-        crc_checksum=dictionary.get("crcchecksum"),
-        legal=dictionary.get("legalcopyright"),
-        magic=dictionary.get("magic"),
-        linker_version=dictionary.get("linkerversion"),
-        product_name=dictionary.get("productname"),
-        pe_subsystem=dictionary.get("pesubsystem"),
-        longname=dictionary.get("longname"),
-        pe_checksum=dictionary.get("pechecksum"),
+        size_of_image=install_properties.get("sizeofimage"),
+        file_description=install_properties.get("filedescription"),
+        size=install_properties.get("size"),
+        digests=[
+            None,
+            install_properties.get("id")[4:],
+            None,
+        ],  # remove leading zeros from the entry to create a sha1 hash
+        company_name=install_properties.get("companyname"),
+        binary_type=install_properties.get("binarytype"),
+        bin_product_version=install_properties.get("binproductversion"),
+        bin_file_version=install_properties.get("binfileversion"),
+        filesize=install_properties.get("filesize"),
+        pe_image=install_properties.get("peimagetype"),
+        product_version=install_properties.get("productversion"),
+        crc_checksum=install_properties.get("crcchecksum"),
+        legal=install_properties.get("legalcopyright"),
+        magic=install_properties.get("magic"),
+        linker_version=install_properties.get("linkerversion"),
+        product_name=install_properties.get("productname"),
+        pe_subsystem=install_properties.get("pesubsystem"),
+        longname=install_properties.get("longname"),
+        pe_checksum=install_properties.get("pechecksum"),
         _target=target,
     )
 
@@ -123,29 +127,37 @@ class AmcacheInstallPlugin(Plugin):
         These only get created when the executable is an installer.
         """
         for f in self.logs.iterdir():
-            d = {}
-            arp = []
-            created = []
+            install_properties = {}
+            arp_created = []
+            file_created = []
             for line in f.read_text("utf-16-le").splitlines():
                 match = re_field.match(line.rstrip())
                 if not match:
                     continue
 
                 if match.group(1) == "FileCreate":
-                    created.append(match.group(2))
+                    file_created.append(match.group(2))
 
                 elif match.group(1) == "ArpCreate":
-                    arp.append(match.group(2))
+                    arp_created.append(match.group(2))
 
                 else:
-                    d[match.group(1).lower()] = match.group(2)
+                    install_properties[match.group(1).lower()] = match.group(2)
 
             filename = str(f)
-            for arp_create in arp:
+            for arp_create in arp_created:
                 yield create_record(
-                    AmcacheArpCreateRecord, filename=filename, dictionary=d, create=arp_create, target=self.target
+                    AmcacheArpCreateRecord,
+                    filename=filename,
+                    install_properties=install_properties,
+                    create=arp_create,
+                    target=self.target,
                 )
-            for file_create in created:
+            for file_create in file_created:
                 yield create_record(
-                    AmcacheFileCreateRecord, filename=filename, dictionary=d, create=file_create, target=self.target
+                    AmcacheFileCreateRecord,
+                    filename=filename,
+                    install_properties=install_properties,
+                    create=file_create,
+                    target=self.target,
                 )
