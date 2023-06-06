@@ -90,7 +90,6 @@ class TargetdLoader(Loader):
         dest="cacert",
         type=Path,
         action="store",
-        required=True,
         help="SSL: cacert file",
     )
     @arg("--help-targetd", action="help", help="Show help message for special targetd loader and exit")
@@ -114,9 +113,12 @@ class TargetdLoader(Loader):
         if self.client is None:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             ssl_context.check_hostname = False
-            if not cacert.exists():
+            if cacert and not cacert.exists():
                 raise LoaderError(f"file not found: {cacert}")
-            ssl_context.load_verify_locations(cacert)
+            if cacert:
+                ssl_context.load_verify_locations(cacert)
+            else:
+                ssl_context.load_default_certs(purpose=ssl.Purpose.SERVER_AUTH)
             self.client = Client(host, port, ssl_context, [self.uri], local_link, "targetd")
             self.client.module_fullname = "dissect.target.loaders"
             self.client.module_fromlist = ["command_runner"]
