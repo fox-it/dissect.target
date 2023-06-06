@@ -27,13 +27,15 @@ class OSInfoPlugin(plugin.Plugin):
             if os_func in ["is_compatible", "get_all_records"]:
                 continue
             value = getattr(self.target._os, os_func)
-            record = OSInfoRecord(name=os_func, value=repr(value), _target=self.target)
-            yield record
-            if isinstance(value, Callable):
+            record = OSInfoRecord(name=os_func, value=None, _target=self.target)
+            if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
                 try:
-                    for subvalue in value():
-                        yield GroupedRecord("generic/osinfo/grouped", [record, subvalue])
+                    yield record
+                    yield GroupedRecord("generic/osinfo/grouped", [record] + list(subrecords))
                 except (PluginError, TypeError):
                     # Ignore exceptions triggered by functions
                     # that cannot be executed in this context
                     continue
+            else:
+                record.value = value
+                yield record

@@ -195,10 +195,10 @@ def main():
     default_output_type = None
 
     if not len(output_types):
+        # Otherwise you see a confusing mixed output types message, can still generate output
+        # because some plugins have output file/dir options
         pass
 
-    # Otherwise you see a confusing mixed output types message, can still generate output
-    # because some plugins have output file/dir options
     elif len(output_types) > 1:
         # Give this warning beforehand, if mixed, set default to record (no errors)
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
