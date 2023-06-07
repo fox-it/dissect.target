@@ -12,6 +12,20 @@ from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 camel_case_patterns = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"(\w)[.\s](\w)")]
+arraylike_pattern = re.compile(r"([_a-zA-Z][a-zA-Z0-9]*)\[(\d+)\]")
+
+
+def _clean_key(key: str) -> str:
+    def _clean(c):
+        return "_" + key[0].encode("unicode_escape").hex()
+    first = key[0] if (key[0].isidentifier() and key[0].isascii()) else _clean(key[0])
+
+    def _is_valid(c):
+        if c.isascii():
+            return c.isidentifier() or c.isdecimal()
+        return False
+
+    return first + ''.join([c if _is_valid(c) else _clean(c) for c in key[1:]])
 
 
 def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
@@ -44,12 +58,22 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
                 category, name = name.split(".", 1)
                 key = f"{category.split('[')[0]}{name}"
 
+            # array-like entries
+            elif arraylike_pattern.match(name):
+                match = arraylike_pattern.match(name)
+                key = match.group(1) + "_" + match.group(2)
+
             if "EventTime" in name:
                 value = wintimestamp(int(value))
                 record_type = "datetime"
                 key = "ts"
 
             key = _key_to_snake_case(key if key else name)
+
+            # Windows wer files might contain any valid unicode character in its field names
+            # but we use the field name as python identifier. So, some character are not allowed
+            # to be used.
+            key = _clean_key(key)
 
             record_values[key] = value
             record_fields.append((record_type, key)) if key != "ts" else record_fields.insert(0, (record_type, key))
