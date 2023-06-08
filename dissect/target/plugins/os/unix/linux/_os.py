@@ -22,7 +22,13 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
-            if fs.exists("/var") and fs.exists("/etc") and fs.exists("/opt") and not fs.exists("/Library"):
+            if (
+                fs.exists("/var")
+                and fs.exists("/etc")
+                and fs.exists("/opt")
+                or (fs.exists("/sys") or fs.exists("/proc"))
+                and not fs.exists("/Library")
+            ):
                 return fs
         return None
 
