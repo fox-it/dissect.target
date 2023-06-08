@@ -1,4 +1,4 @@
-from typing import Callable, Generator
+from typing import Callable, Generator, Iterator, Union
 
 from flow.record import GroupedRecord, Record
 
@@ -22,7 +22,7 @@ class OSInfoPlugin(plugin.Plugin):
         return True
 
     @plugin.export(record=OSInfoRecord)
-    def osinfo(self) -> Generator[Record, None, None]:
+    def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
         for os_func in self.target._os.__functions__:
             if os_func in ["is_compatible", "get_all_records"]:
                 continue
@@ -30,9 +30,8 @@ class OSInfoPlugin(plugin.Plugin):
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
                 try:
-                    yield record
                     yield GroupedRecord("generic/osinfo/grouped", [record] + list(subrecords))
-                except (PluginError, TypeError):
+                except Exception:
                     # Ignore exceptions triggered by functions
                     # that cannot be executed in this context
                     continue
