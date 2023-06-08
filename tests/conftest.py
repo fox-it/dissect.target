@@ -60,9 +60,24 @@ def fs_unix_proc(fs_unix):
     fs = fs_unix
 
     procs = (
-        ("proc/1", VirtualSymlink(fs, "/proc/1/fd/4", "socket:[1337]"), "test\x00cmdline\x00", "VAR=1"),
-        ("proc/2", VirtualSymlink(fs, "/proc/2/fd/4", "socket:[1338]"), "\x00", "VAR=1\x00"),
-        ("proc/3", VirtualSymlink(fs, "/proc/3/fd/4", "socket:[1339]"), "sshd", "VAR=1"),
+        (
+            "proc/1",
+            VirtualSymlink(fs, "/proc/1/fd/4", "socket:[1337]"),
+            "test\x00cmdline\x00",
+            "VAR=1",
+        ),
+        (
+            "proc/2",
+            VirtualSymlink(fs, "/proc/2/fd/4", "socket:[1338]"),
+            "\x00",
+            "VAR=1\x00",
+        ),
+        (
+            "proc/3",
+            VirtualSymlink(fs, "/proc/3/fd/4", "socket:[1339]"),
+            "sshd",
+            "VAR=1",
+        ),
         (
             "proc/1337",
             VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
@@ -107,17 +122,17 @@ def fs_unix_proc_sockets(fs_unix_proc):
 """  # noqa: E501
 
     tcp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n
-0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 0000000085d2a181 100 0 0 10 0\n   
+0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 0000000085d2a181 100 0 0 10 0\n
 1: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1338 1 00000000bb201f51 100 0 0 10 0\n
 """  # noqa: E501
 
-    udp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n  
-344: 884010AC:0044 FE4010AC:0043 01 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000c414b4d1 0\n  
-477: 00000000:E4C9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000009ce0849c 0\n  
-509: 00000000:14E9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1339 2 00000000388d9bb8 0\n  
+    udp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
+344: 884010AC:0044 FE4010AC:0043 01 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000c414b4d1 0\n
+477: 00000000:E4C9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000009ce0849c 0\n
+509: 00000000:14E9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1339 2 00000000388d9bb8 0\n
 """  # noqa: E501
 
-    udp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n  
+    udp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
 497: 00000000000000000000000000000000:E8DD 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1337 2 00000000bb422355 0\n
 509: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000005c20ab36 0\n
 """  # noqa: E501
@@ -126,7 +141,7 @@ def fs_unix_proc_sockets(fs_unix_proc):
 253: 00000000:00FD 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000f7e50cca 0\n
 """  # noqa: E501
 
-    raw6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n   
+    raw6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
 58: 00000000000000000000000000000000:003A 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000fa98d32c 0\n
 """  # noqa: E501
 
@@ -205,11 +220,19 @@ def target_win_users(hive_hklm, hive_hku, target_win):
 
     profile1_key = VirtualKey(hive_hklm, "S-1-5-18")
     profile1_key.add_value(
-        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
+        "ProfileImagePath",
+        VirtualValue(
+            hive_hklm,
+            "ProfileImagePath",
+            "%systemroot%\\system32\\config\\systemprofile",
+        ),
     )
 
     profile2_key = VirtualKey(hive_hklm, "S-1-5-21-3263113198-3007035898-945866154-1002")
-    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
+    profile2_key.add_value(
+        "ProfileImagePath",
+        VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"),
+    )
 
     profile_list_key.add_subkey("subkey1", profile1_key)
     profile_list_key.add_subkey("subkey2", profile2_key)
