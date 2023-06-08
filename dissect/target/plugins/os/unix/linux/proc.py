@@ -36,14 +36,10 @@ class NetSocket:
     ref: Optional[str]  # socket reference count
     pointer: Optional[str]  # location of socket in memory
     drops: Optional[str]  # retransmit timeout
-    predicted_tick: Optional[
-        str
-    ]  # predicted tick of soft slock (delayed ACK control data)
+    predicted_tick: Optional[str]  # predicted tick of soft slock (delayed ACK control data)
     ack_pingpong: Optional[str]  # ack.quick<<1|ack.pingpong
     congestion_window: Optional[str]  # sending congestion window
-    size_threshold: Optional[
-        str
-    ]  # slow start size threshhold or -f if the threshold is >= 0xFFFF
+    size_threshold: Optional[str]  # slow start size threshhold or -f if the threshold is >= 0xFFFF
 
     # Values parsed from raw values listed above.
     protocol_string: str
@@ -74,9 +70,7 @@ class NetSocket:
 
         self.uid = int(self.uid)
         self.inode = int(self.inode)
-        self.tx_queue, self.rx_queue = [
-            int(queue, 16) for queue in self.tx_rx_queue.split(":")
-        ]
+        self.tx_queue, self.rx_queue = [int(queue, 16) for queue in self.tx_rx_queue.split(":")]
         self.local_port, self.remote_port = [
             int(port, 16)
             for port in (
@@ -97,9 +91,7 @@ class UnixSocket:
     type: int  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
     state: int  # the internal state of the socket.
     inode: int  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
-    path: str = field(
-        default=None
-    )  # sockets in the abstract namespace are included in the list,
+    path: str = field(default=None)  # sockets in the abstract namespace are included in the list,
     # and are shown with a Path that commences with the character '@'.
 
     # Values parsed from raw values listed above.
@@ -328,9 +320,7 @@ class Sockets:
         """Yield parsed /proc/net/unix entries."""
         yield from self._parse_unix_sockets()
 
-    def _parse_net_sockets(
-        self, protocol: str = "tcp", version: int = None
-    ) -> Iterator[NetSocket]:
+    def _parse_net_sockets(self, protocol: str = "tcp", version: int = None) -> Iterator[NetSocket]:
         """Internal function to parse /proc/net/{tcp(6),udp(6), raw(6)} entries
 
         Args:
@@ -364,9 +354,7 @@ class Sockets:
             remote_ip = socket.rem_address.split(":")[0]
 
             socket.local_ip = self._ipv6(local_ip) if version else self._ipv4(local_ip)
-            socket.remote_ip = (
-                self._ipv6(remote_ip) if version else self._ipv4(remote_ip)
-            )
+            socket.remote_ip = self._ipv6(remote_ip) if version else self._ipv4(remote_ip)
 
             user = self.target.user_details.find(uid=socket.uid)
             user_name = user.user.name if user else str(socket.uid)
@@ -455,9 +443,7 @@ class Sockets:
 
 
 class ProcProcess:
-    def __init__(
-        self, target: Target, pid: Union[int, str], proc_root: str = "/proc"
-    ) -> None:
+    def __init__(self, target: Target, pid: Union[int, str], proc_root: str = "/proc") -> None:
         self._pid = int(pid)
         self.target = target
 
@@ -473,9 +459,7 @@ class ProcProcess:
                 else:
                     self.entry = target.fs.get(fsutil.join(proc_root, str(pid)))
             except FileNotFoundError:
-                raise ProcessLookupError(
-                    f"Process with PID {pid} could not be found on target: {target}"
-                )
+                raise ProcessLookupError(f"Process with PID {pid} could not be found on target: {target}")
 
             self._stat_file = self._parse_proc_stat_entry()
             self.name = self._process_name
@@ -637,11 +621,7 @@ class ProcProcess:
     def uptime(self) -> datetime:
         """Returns the uptime of the system from the moment it was acquired."""
         # uptime is saved in seconds from boottime
-        uptime = timedelta(
-            seconds=float(
-                self.target.fs.get("/proc/uptime").open().readline().split()[0]
-            )
-        )
+        uptime = timedelta(seconds=float(self.target.fs.get("/proc/uptime").open().readline().split()[0]))
 
         return uptime
 
