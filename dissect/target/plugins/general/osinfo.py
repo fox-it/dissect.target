@@ -1,9 +1,8 @@
 from typing import Callable, Generator, Iterator, Union
 
-from flow.record import GroupedRecord, Record
+from flow.record import GroupedRecord
 
 from dissect.target import plugin
-from dissect.target.exceptions import PluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 OSInfoRecord = TargetRecordDescriptor(
