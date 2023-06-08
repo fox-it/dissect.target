@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Generator
+from typing import Generator, Optional
 
 from flow.record import RecordDescriptor
 
@@ -16,20 +16,30 @@ class UsersPlugin(InternalPlugin):
     def check_compatible(self) -> bool:
         return hasattr(self.target, "users")
 
-    def find(self, sid: str = None, uid: str = None, username: str = None, force_case_sensitive=False) -> UserDetails:
+    def find(
+        self,
+        sid: Optional[str] = None,
+        uid: Optional[str] = None,
+        username: Optional[str] = None,
+        force_case_sensitive: bool = False,
+    ) -> Optional[UserDetails]:
         """Find User record matching provided sid, uid or username and return UserDetails object"""
-        if sum(bool(i) for i in [sid, uid, username]) != 1:
+        if all(map(lambda x: x is None, [sid, uid, username])):
             raise ValueError("Either sid or uid or username is expected")
 
-        def is_name_matching(user):
+        def is_name_matching(name: str) -> bool:
             if force_case_sensitive or self.target.os != "windows":
                 # always do case-sensitive match for non-Windows OSes
-                return user.name == username
+                return name == username
             else:
-                return user.name.lower() == username.lower()
+                return name.lower() == username.lower()
 
         for user in self.target.users():
-            if (sid and user.sid == sid) or (uid and user.uid == uid) or (username and is_name_matching(user)):
+            if (
+                (sid is not None and user.sid == sid)
+                or (uid is not None and user.uid == uid)
+                or (username is not None and is_name_matching(user.name))
+            ):
                 return self.get(user)
 
     def get(self, user: RecordDescriptor) -> UserDetails:
