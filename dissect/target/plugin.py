@@ -843,8 +843,8 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
         modulepath = available["module"]
         if modulepath.endswith("._os"):
             if not target._os:
-                # if no target available mention general OS instead of specific one
-                available["module"] = "OS"
+                # if no target available add a namespaceless section
+                available["module"] = ""
             elif target._os.__class__.__name__ != available["class"]:
                 continue
             rootset.add(modulepath.split(".")[0])

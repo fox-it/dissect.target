@@ -87,7 +87,7 @@ def get_description_dict(
     output_descriptions = []
     for key in structure_dict.keys():
         output_descriptions += [
-            textwrap.indent(key + ":", prefix=" " * indentation_step)
+            textwrap.indent(key + ":", prefix=" " * indentation_step) if key != "" else "OS plugins"
         ] + output_plugin_description_recursive(
             structure_dict[key],
             print_docs,

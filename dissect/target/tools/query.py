@@ -175,14 +175,27 @@ def main():
     if not args.function:
         parser.error("argument -f/--function is required")
 
-    # Verify uniformity of output types, otherwise default to records
+    # Verify uniformity of output types, otherwise default to records.
+    # Note that this is a heuristic, the targets are not opened yet because of
+    # performance, so it might generate a false positive
+    # (os.* on Windows includes other OS plugins),
+    # however this is highly hypothetical, most plugins across OSes have
+    # the same output types and most output types are records anyway.
+    # Furthermore we really want the notification at the top, so this is the only
+    # way forward. In the very unlikely case you have a
+    # collection of non-record plugins that have record counterparts for
+    # other OSes just refine the wildcard to exclude other OSes.
+    # The only scenario that might cause this is with
+    # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
     funcs = find_plugin_functions(Target(), args.function, False)
     for func in funcs:
         output_types.add(func.output_type)
 
     default_output_type = None
+
     if len(output_types) > 1:
+        # Give this warning beforehand, if mixed, set default to record (no errors)
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
         default_output_type = "record"
 
@@ -214,6 +227,14 @@ def main():
             if func_def.method_name in executed_plugins:
                 continue
 
+            # If the default type is record (meaning we skip everything else)
+            # and actual output type is not record, continue.
+            # We perform this check here because plugins that require output files/dirs
+            # will exit if we attempt to exec them without (because they are implied by the wildcard).
+            # Also this saves cycles of course.
+            if default_output_type == "record" and func_def.output_type != "record":
+                continue
+
             try:
                 output_type, result, cli_params_unparsed = execute_function_on_target(
                     target, func_def, cli_params_unparsed
@@ -235,9 +256,6 @@ def main():
                 continue
 
             if first_seen_output_type and output_type != first_seen_output_type:
-                # if default is set to record, we already know so continue... (probably a wildcard)
-                if default_output_type == "record":
-                    continue
                 target.log.error(
                     (
                         "Can't mix functions that generate different outputs: output type `%s` from `%s` "
