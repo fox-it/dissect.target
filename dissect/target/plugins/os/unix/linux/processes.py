@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 ProcProcessRecord = TargetRecordDescriptor(
-    "unix/proc/processes",
+    "unix/linux/proc/processes",
     [
         ("datetime", "ts"),
         ("string", "name"),

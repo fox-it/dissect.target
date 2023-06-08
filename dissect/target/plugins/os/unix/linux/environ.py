@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 EnvironmentVariableRecord = TargetRecordDescriptor(
-    "unix/proc/environ",
+    "unix/linux/proc/environ",
     [
         ("datetime", "ts"),
         ("string", "name"),
@@ -46,4 +46,5 @@ class EnvironPlugin(Plugin):
                     pid=process.pid,
                     variable=environ.variable,
                     content=environ.contents,
+                    _target=self.target,
                 )

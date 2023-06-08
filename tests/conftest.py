@@ -5,7 +5,7 @@ from io import BytesIO
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.windows import registry
@@ -52,6 +52,103 @@ def fs_unix():
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
+    yield fs
+
+
+@pytest.fixture
+def fs_unix_proc(fs_unix):
+    fs = fs_unix
+
+    procs = (
+        ("proc/1", VirtualSymlink(fs, "/proc/1/fd/4", "socket:[1337]"), "test\x00cmdline\x00", "VAR=1"),
+        ("proc/2", VirtualSymlink(fs, "/proc/2/fd/4", "socket:[1338]"), "\x00", "VAR=1\x00"),
+        ("proc/3", VirtualSymlink(fs, "/proc/3/fd/4", "socket:[1339]"), "sshd", "VAR=1"),
+        (
+            "proc/1337",
+            VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
+            "acquire\x00-p\x00full\x00--proc\x00",
+            "VAR=1",
+        ),
+    )
+    stat_files_data = (
+        "1 (systemd) S 0 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "2 (kthread) K 1 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "3 (sshd) W 1 2 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "1337 (acquire) R 3 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+    )
+
+    for idx, proc in enumerate(procs):
+        dir, fd, cmdline, environ = proc
+        fs.makedirs(dir)
+        fs.map_file_entry(fd.path, fd)
+
+        fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
+        fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
+        fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
+
+    # symlink acquire process to self
+    fs.link("/proc/1337", "/proc/self")
+
+    # boottime and uptime are needed for for time tests
+    fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
+    fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
+
+    yield fs
+
+
+@pytest.fixture
+def fs_unix_proc_sockets(fs_unix_proc):
+    fs = fs_unix_proc
+
+    tcp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 000000000e5941ba 100 0 0 10 0
+1: 0100007F:0277 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1338 1 000000008b915f09 100 0 0 10 0
+2: 884010AC:0016 014010AC:C122 01 00000000:00000000 02:00010C92 00000000     0        0 0
+"""  # noqa: E501
+
+    tcp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n
+0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 0000000085d2a181 100 0 0 10 0\n   
+1: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1338 1 00000000bb201f51 100 0 0 10 0\n
+"""  # noqa: E501
+
+    udp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n  
+344: 884010AC:0044 FE4010AC:0043 01 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000c414b4d1 0\n  
+477: 00000000:E4C9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000009ce0849c 0\n  
+509: 00000000:14E9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1339 2 00000000388d9bb8 0\n  
+"""  # noqa: E501
+
+    udp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n  
+497: 00000000000000000000000000000000:E8DD 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1337 2 00000000bb422355 0\n
+509: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000005c20ab36 0\n
+"""  # noqa: E501
+
+    raw_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
+253: 00000000:00FD 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000f7e50cca 0\n
+"""  # noqa: E501
+
+    raw6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n   
+58: 00000000000000000000000000000000:003A 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000fa98d32c 0\n
+"""  # noqa: E501
+
+    packet_socket_data = """sk       RefCnt Type Proto  Iface R Rmem   User   Inode\n
+00000000819f8865 3      3    0003   2     1 0      0      1337\n
+"""
+    unix_socket_data = """Num       RefCount Protocol Flags    Type St Inode Path\n
+00000000a6061ba5: 00000002 00000000 00010000 0001 01 1337 /run/systemd/private\n
+0000000065bb3d75: 00000003 00000000 00000000 0001 03 1338\n
+000000008d0bfa50: 00000002 00000000 00010000 0001 01 1339 /run/systemd/io.system.ManagedOOM\n
+00000000fb54422c: 00000002 00000000 00010000 0001 01 0 @/tmp/dbus-YLq1FHVh\n
+"""
+
+    fs.map_file_fh("/proc/net/unix", BytesIO(textwrap.dedent(unix_socket_data).encode()))
+    fs.map_file_fh("/proc/net/packet", BytesIO(textwrap.dedent(packet_socket_data).encode()))
+    fs.map_file_fh("/proc/net/raw6", BytesIO(textwrap.dedent(raw6_socket_data).encode()))
+    fs.map_file_fh("/proc/net/raw", BytesIO(textwrap.dedent(raw_socket_data).encode()))
+    fs.map_file_fh("/proc/net/udp6", BytesIO(textwrap.dedent(udp6_socket_data).encode()))
+    fs.map_file_fh("/proc/net/udp", BytesIO(textwrap.dedent(udp_socket_data).encode()))
+    fs.map_file_fh("/proc/net/tcp6", BytesIO(textwrap.dedent(tcp6_socket_data).encode()))
+    fs.map_file_fh("/proc/net/tcp", BytesIO(textwrap.dedent(tcp_socket_data).encode()))
+
     yield fs
 
 

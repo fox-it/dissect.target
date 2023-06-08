@@ -4,8 +4,8 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-CmdlineRecordRecord = TargetRecordDescriptor(
-    "unix/proc/cmdline",
+CmdlineRecord = TargetRecordDescriptor(
+    "unix/linux/proc/cmdline",
     [
         ("datetime", "ts"),
         ("string", "name"),
@@ -16,12 +16,12 @@ CmdlineRecordRecord = TargetRecordDescriptor(
 )
 
 
-class EnvironPlugin(Plugin):
+class CmdlinePlugin(Plugin):
     def check_compatible(self) -> None:
         if not self.target.proc:
             raise UnsupportedPluginError("No /proc directory found")
 
-    @export(record=CmdlineRecordRecord)
+    @export(record=CmdlineRecord)
     def cmdline(self) -> Iterator[TargetRecordDescriptor]:
         """This plugin yields the complete command line for the process .
 
@@ -29,10 +29,10 @@ class EnvironPlugin(Plugin):
         strings, those changes will show up here.  This is not the
         same thing as modifying the argv array.
 
-        Think of this file as the command line that the process
+        Think of this output as the command line that the process
         wants you to see.
 
-        Yields CmdlineRecordRecord with the following fields:
+        Yields CmdlineRecord with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The starttime of the process.
@@ -42,7 +42,7 @@ class EnvironPlugin(Plugin):
         """
 
         for process in self.target.proc.processes():
-            yield CmdlineRecordRecord(
+            yield CmdlineRecord(
                 ts=process.starttime,
                 name=process.name,
                 pid=process.pid,

@@ -9,7 +9,7 @@ from enum import IntEnum
 from ipaddress import IPv4Address, IPv6Address
 from socket import htonl
 from struct import pack, unpack
-from typing import Iterator, Tuple, Union
+from typing import Iterator, Optional, Tuple, Union
 
 from dissect.util.ts import from_unix
 
@@ -84,12 +84,11 @@ class UnixSocket:
     ref: int  # the number of users of the socket.
     protocol: int  # currently always 0. "Unix"
     flags: str  # the internal kernel flags holding the status of the socket.
-    type: int  # the socket type. For SOCK_STREAM sockets, this is 0001; for SOCK_DGRAM sockets, it is 0002; and for SOCK_SEQPACKET sockets, it is 0005. # noqa
+    type: int  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
     state: int  # the internal state of the socket.
     inode: int  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
-    path: str = field(
-        default=None
-    )  # sockets in the abstract namespace are included in the list, and are shown with a Path that commences with the character '@'. # noqa
+    path: str = field(default=None)  # sockets in the abstract namespace are included in the list,
+    # and are shown with a Path that commences with the character '@'.
 
     # Values parsed from raw values listed above.
     state_string: str = field(default=None)
@@ -119,7 +118,7 @@ class UnixSocket:
 
 @dataclass(order=True, init=False)
 class PacketSocket:
-    sk: str  # socket number
+    sk: int  # socket number
     ref: int  # the number of processes using this socket.
     type: int  # type of the socket.
     protocol: int  # protocol used by the socket to capture ie. 0003 is ETH_P_ALL
@@ -142,7 +141,7 @@ class PacketSocket:
             field_names = fields(self)
 
             if field_names[idx].name == "sk":
-                setattr(self, field_names[idx].name, value)
+                setattr(self, field_names[idx].name, int(value, 16))
             else:
                 setattr(self, field_names[idx].name, int(value))
 
@@ -157,7 +156,7 @@ class Environ:
 
 class ProcessStateEnum(StrEnum):
     R = "Running"  # Running
-    I = "Idle"  # Idle # noqa
+    I = "Idle"  # Idle # noqa: E741
     S = "Sleeping"  # Sleeping in an interruptible wait
     D = "Waiting"  # Waiting in uninterruptible disk sleep
     Z = "Zombie"  # Zombie
@@ -353,9 +352,9 @@ class Sockets:
             socket.local_ip = self._ipv6(local_ip) if version else self._ipv4(local_ip)
             socket.remote_ip = self._ipv6(remote_ip) if version else self._ipv4(remote_ip)
 
-            # uid 0 incidates root, which does not get resolved by target.user_details.find(uid=0)
-            socket.owner = self._resolve_uid(socket.uid)
-            processes = self.target.proc.inode_to_pid(socket.inode)
+            user = self.target.user_details.find(uid=socket.uid)
+            user_name = user.user.name if user else str(socket.uid)
+            socket.owner = user_name
 
             # inode 0 could indicate a kernel process. which has no assiciated PID or FDs in /proc
             # or a inode of 0 could mean the socket is in a TIME_WAIT state.
@@ -363,6 +362,8 @@ class Sockets:
                 socket.pid = socket.inode
                 yield socket
             else:
+                processes = self.target.proc.inode_to_pids(socket.inode)
+
                 for process in processes:
                     socket.pid = process.pid
                     socket.name = process.name
@@ -408,29 +409,19 @@ class Sockets:
 
             socket = PacketSocket().from_line(line)
 
-            processes = self.target.proc.inode_to_pid(socket.inode)
+            processes = self.target.proc.inode_to_pids(socket.inode)
 
             socket.protocol_type = self.PacketProtocolTypes(socket.protocol).name
-            # uid 0 (usually) incidates root, which does not get resolved by target.user_details.find(uid=0) yet.
-            socket.owner = self._resolve_uid(socket.user)
+
+            user = self.target.user_details.find(uid=socket.user)
+            user_name = user.user.name if user else str(socket.user)
+            socket.owner = user_name
 
             for proc in processes:
                 socket.pid = proc.pid
                 socket.name = proc.name
                 socket.cmdline = proc.cmdline
                 yield socket
-
-    def _resolve_uid(self, uid: int) -> str:
-        """Internal function to resolve a uid to a username. Returns the uid as a string if no username can be found."""
-        if uid == 0:
-            # NOTE: currently target.user_details.find(uid=0) does not get resolved. so we return "0"
-            return "0"
-
-        user = self.target.user_details.find(uid=uid)
-        if user:
-            return user.user.name
-
-        return str(uid)
 
     def _ipv6(self, addr: str | int) -> str:
         """Convert /proc/net IPv6 hex address into standard IPv6 notation."""
@@ -448,11 +439,11 @@ class Sockets:
 
 
 class ProcProcess:
-    def __init__(self, target: Target, pid: int, proc_root: str = "/proc") -> None:
+    def __init__(self, target: Target, pid: Union[int, str], proc_root: str = "/proc") -> None:
         self._pid = int(pid)
         self.target = target
 
-        # TODO map ttys and pttys to process
+        # Note: ttys and pttys are not yet mapped to the process
         if self._pid == 0:
             # The process with PID 0 is responsible for paging and is referred to as the "swapper" or "sched" process.
             # It is a part of the kernel and is not a regular user-mode process.
@@ -466,129 +457,8 @@ class ProcProcess:
             except FileNotFoundError:
                 raise ProcessLookupError(f"Process with PID {pid} could not be found on target: {target}")
 
-            # self._status_file = self._parse_proc_status_entry()
             self._stat_file = self._parse_proc_stat_entry()
             self.name = self._process_name
-
-    @internal
-    def get(self, path) -> FilesystemEntry:
-        """Returns a FilesystemEntry relative to this process."""
-        return self.entry.get(path)
-
-    @property
-    def owner(self) -> str:
-        """Return the username or the uid (if owner is not found) of the owner of this process."""
-        if self.uid:
-            owner = self.target.user_details.find(uid=self.uid)
-            return owner.user.name
-
-        # uid is 0 we still want to return that
-        return str(self.uid)
-
-    @property
-    def uid(self) -> int:
-        """Return the uid of the owner of this process."""
-
-        uid = int((self.get("loginuid").open().read()))
-        # loginuid can hold the value "4294967295". Which is defined as "not set" and -1 should be returned.
-        return -1 if c_int32(uid) == -1 else uid
-
-    @property
-    def pid(self) -> int:
-        """Returns the process id (pid) associated to this process."""
-        return self._pid
-
-    @property
-    def parent(self) -> Union[ProcProcess, None]:
-        """Returns the parent `ProcProcess of this process."""
-        if self.pid == 0:
-            return None
-        return ProcProcess(self.target, self._stat_file.get("ppid"))
-
-    @property
-    def ppid(self) -> int:
-        """Returns the parent process id (ppid) assiciated to this process."""
-        if self.pid == 0:
-            return None
-        return self.parent.pid
-
-    @property
-    def ppid_name(self) -> str:
-        """Returns the name accociated to the parent process id (ppid) of this process."""
-        return self.parent.name
-
-    @property
-    def state(self) -> str:
-        """Returns the state of the process (S'leeping, R'unning, I'dle, etc."""
-        return ProcessStateEnum[self._stat_file.get("state")].value
-
-    @property
-    def starttime(self) -> datetime:
-        """Returns the start time of the process."""
-        # Starttime is saved in clockticks per second from the boot time.
-        # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
-        starttime = self._stat_file.get("starttime") / 100
-
-        return from_unix(self._boottime + starttime)
-
-    @property
-    def _boottime(self) -> int:
-        """Returns the boot time of the system.
-
-        Used internally to determine process start- and run times.
-        """
-        for line in self.target.fs.get("/proc/stat").open().readlines():
-            if not line.startswith(b"btime"):
-                continue
-
-            return int(line.split()[1])
-
-    @property
-    def runtime(self) -> timedelta:
-        """Returns the runtime of a process until the moment of acquisition."""
-        runtime = self.now - self.starttime
-        return runtime
-
-    @property
-    def now(self) -> datetime:
-        """Returns the `now()` timestamp of the system of the moment of acquisition."""
-        now = self.uptime + from_unix(self._boottime)
-        return now
-
-    @internal
-    def environ(self) -> Iterator[Environ]:
-        """Yields the content of the environ file associated with the process as variable name and content pair.
-
-        Yields:
-            An iterator containing a tuple with the variable name and contents thereof.
-        """
-        yield from self._parse_environ()
-
-    @property
-    def uptime(self) -> datetime:
-        """Returns the uptime of the system from the moment it was acquired."""
-        # uptime is saved in seconds from boottime
-        uptime = timedelta(seconds=float(self.target.fs.get("/proc/uptime").open().readline().split()[0]))
-
-        return uptime
-
-    @property
-    def _process_name(self) -> str:
-        """Internal function that returns the name of the process."""
-        return self._stat_file.get("comm", None).decode()
-
-    @property
-    def cmdline(self) -> str:
-        """Return the command line of a process."""
-        cmdline = self.get("cmdline").open().readline().decode()
-        # Cmdlines are null-terminated and use null-bytes for spaces. Translate this back.
-        cmdline = cmdline.rstrip("\x00").replace("\x00", " ")
-        return cmdline
-
-    @internal
-    def stat(self) -> fsutil.stat_result:
-        """Return a stat entry of the process."""
-        return self.entry.stat()
 
     @internal
     def _parse_proc_status_entry(self) -> dict:
@@ -604,7 +474,6 @@ class ProcProcess:
 
         return status_dict
 
-    @internal
     def _parse_proc_stat_entry(self) -> dict:
         """Internal function to parse the contents of /proc/[pid]/stat."""
         status = self.get("stat").open().readline()
@@ -616,7 +485,7 @@ class ProcProcess:
 
         head = status[:start_name]
         tail = status[end_name:]
-        name = status[start_name + 1 : end_name]  # noqa
+        name = status[start_name + 1 : end_name]  # noqa: E203
         status = head + tail
 
         for idx, part in enumerate(status.split()):
@@ -631,7 +500,6 @@ class ProcProcess:
 
         return status_dict
 
-    @internal
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in /proc/[pid]/environ"""
         # entries in /proc/<pid>/environ are null-terminated
@@ -652,6 +520,124 @@ class ProcProcess:
 
             yield Environ(variable=variable, contents=contents)
 
+    @property
+    def _boottime(self) -> int:
+        """Returns the boot time of the system.
+
+        Used internally to determine process start- and runtimes.
+        """
+        for line in self.target.fs.get("/proc/stat").open().readlines():
+            if not line.startswith(b"btime"):
+                continue
+
+            return int(line.split()[1])
+
+    @internal
+    def get(self, path) -> FilesystemEntry:
+        """Returns a FilesystemEntry relative to this process."""
+        return self.entry.get(path)
+
+    @property
+    def owner(self) -> str:
+        """Return the username or the uid (if owner is not found) of the owner of this process."""
+        if self.uid:
+            owner = self.target.user_details.find(uid=self.uid)
+            return owner.user.name
+
+        return str(self.uid)
+
+    @property
+    def uid(self) -> int:
+        """Return the uid of the owner of this process."""
+
+        uid = int((self.get("loginuid").open().read()))
+        # loginuid can hold the value "4294967295". Which is defined as "not set" and -1 should be returned.
+        return -1 if c_int32(uid) == -1 else uid
+
+    @property
+    def pid(self) -> int:
+        """Returns the process id (pid) associated to this process."""
+        return self._pid
+
+    @property
+    def parent(self) -> Optional[ProcProcess]:
+        """Returns the parent `ProcProcess of this process."""
+        if self.pid == 0:
+            return None
+        return ProcProcess(self.target, self._stat_file.get("ppid"))
+
+    @property
+    def ppid(self) -> int:
+        """Returns the parent process id (ppid) assiciated to this process."""
+        if self.pid == 0:
+            return None
+        return self.parent.pid
+
+    @property
+    def ppid_name(self) -> str:
+        """Returns the name accociated to the parent process id (ppid) of this process."""
+        return self.parent.name
+
+    @property
+    def state(self) -> str:
+        """Returns the state of the process (S'leeping, R'unning, I'dle, etc)."""
+        return ProcessStateEnum[self._stat_file.get("state")].value
+
+    @property
+    def starttime(self) -> datetime:
+        """Returns the start time of the process."""
+        # Starttime is saved in clockticks per second from the boot time.
+        # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
+        starttime = self._stat_file.get("starttime") / 100
+
+        return from_unix(self._boottime + starttime)
+
+    @property
+    def runtime(self) -> timedelta:
+        """Returns the runtime of a process until the moment of acquisition."""
+        runtime = self.now - self.starttime
+        return runtime
+
+    @property
+    def now(self) -> datetime:
+        """Returns the `now()` timestamp of the system at the moment of acquisition."""
+        now = self.uptime + from_unix(self._boottime)
+        return now
+
+    @internal
+    def environ(self) -> Iterator[Environ]:
+        """Yields the content of the environ file associated with the process as variable name and value pairs.
+
+        Yields:
+            An iterator containing a tuple with the variable name and value thereof.
+        """
+        yield from self._parse_environ()
+
+    @property
+    def uptime(self) -> datetime:
+        """Returns the uptime of the system from the moment it was acquired."""
+        # uptime is saved in seconds from boottime
+        uptime = timedelta(seconds=float(self.target.fs.get("/proc/uptime").open().readline().split()[0]))
+
+        return uptime
+
+    @property
+    def _process_name(self) -> str:
+        """Internal function that returns the name of the process."""
+        return self._stat_file.get("comm", None).decode()
+
+    @property
+    def cmdline(self) -> str:
+        """Return the command line of a process."""
+        cmdline = self.get("cmdline").open().readline().decode()
+        # Cmdlines are null-terminated and use null-bytes to separate the different parts. Translate this back.
+        cmdline = cmdline.rstrip("\x00").replace("\x00", " ")
+        return cmdline
+
+    def stat(self) -> fsutil.stat_result:
+        """Return a stat entry of the process."""
+        return self.entry.stat()
+
 
 class ProcPlugin(Plugin):
     __namespace__ = "proc"
@@ -662,7 +648,15 @@ class ProcPlugin(Plugin):
         self.inode_map = None
         self.sockets = Sockets(self.target)
 
-    @internal
+    def _iter_proc_pids(self) -> Iterator[Tuple[str, FilesystemEntry]]:
+        """Yields /proc/<pid> filesystems entries for every process id (pid) found in procfs
+
+        Yields:
+            An iterator containing the process id (pid) and corrensponding filesystem entry.
+        """
+        for entry in self.target.fs.glob_ext("/proc/[0-9]*"):
+            yield entry.name, entry
+
     def _set_inode_pid_map(self) -> None:
         """Creates a inode to pid mapping for all process ids in /proc/[pid]"""
         if not self.inode_map:
@@ -692,13 +686,23 @@ class ProcPlugin(Plugin):
         return None
 
     @internal
-    def inode_to_pid(self, inode: int) -> list:
+    def iter_proc(self) -> Iterator[str]:
+        for _, entry in self._iter_proc_pids():
+            yield str(entry.path)
+
+    @internal
+    def iter_proc_ext(self) -> Iterator[FilesystemEntry]:
+        for _, entry in self._iter_proc_pids():
+            yield entry
+
+    @internal
+    def inode_to_pids(self, inode: int) -> list:
         if self.inode_map:
             return self.inode_map.get(inode, [])
 
         # only create the mapping when actually needed
         self._set_inode_pid_map()
-        return self.inode_to_pid(inode)
+        return self.inode_to_pids(inode)
 
     @internal
     def process(self, pid) -> ProcProcess:
@@ -708,23 +712,3 @@ class ProcPlugin(Plugin):
     def processes(self) -> Iterator[ProcProcess]:
         for pid, _ in self._iter_proc_pids():
             yield ProcProcess(self.target, pid)
-
-    @internal
-    def _iter_proc_pids(self) -> Iterator[Tuple[str, FilesystemEntry]]:
-        """Yields /proc/<pid> filesystems entries for every process id (pid) found in procfs
-
-        Yields:
-            An iterator containing the process id (pid) and corrensponding filesystem entry.
-        """
-        for entry in self.target.fs.glob_ext("/proc/[0-9]*"):
-            yield entry.name, entry
-
-    @internal
-    def iter_proc(self) -> Iterator[str]:
-        for _, entry in self._iter_proc_pids():
-            yield str(entry.path)
-
-    @internal
-    def iter_proc_ext(self) -> Iterator[ProcProcess]:
-        for _, entry in self._iter_proc_pids():
-            yield entry

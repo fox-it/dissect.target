@@ -74,7 +74,7 @@ class NetSocketPlugin(Plugin):
     @export(record=PacketSocketRecord)
     def packet(self) -> Iterator[PacketSocketRecord]:
         for packetsocket in self.sockets.packet():
-            """This plugin yields the packet sockets and available stats assiciated with them.
+            """This plugin yields the packet sockets and available stats associated with them.
 
             Yields PacketSocketRecord with the following fields:
                 hostname (string): The target hostname.
@@ -93,11 +93,11 @@ class NetSocketPlugin(Plugin):
                 cmdline (string): The command line used to start the socket with.
                 owner (string): The resolved user ID of the socket.
             """
-            yield self._generate_record(packetsocket)
+            yield self._generate_packet_socket_records(packetsocket)
 
     @export(record=UnixSocketRecord)
     def unix(self) -> Iterator[UnixSocketRecord]:
-        """This plugin yields the unix sockets and available stats assiciated with them.
+        """This plugin yields the unix sockets and available stats associated with them.
 
         Yields UnixSocketRecord with the following fields:
             hostname (string): The target hostname.
@@ -110,11 +110,11 @@ class NetSocketPlugin(Plugin):
             path (string): The path associated to the socket.
         """
         for unixsocket in self.sockets.unix():
-            yield self._generate_record(unixsocket)
+            yield self._generate_unix_socket_record(unixsocket)
 
     @export(record=NetSocketRecord)
     def raw(self) -> Iterator[NetSocketRecord]:
-        """This plugin yields the raw and raw6 sockets and available stats assiciated with them.
+        """This plugin yields the raw and raw6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
             hostname (string): The target hostname.
@@ -135,11 +135,11 @@ class NetSocketPlugin(Plugin):
         """
         sockets = chain(self.sockets.raw(), self.sockets.raw6())
         for netsocket in sockets:
-            yield self._generate_record(netsocket)
+            yield self._generate_net_socket_record(netsocket)
 
     @export(record=NetSocketRecord)
     def udp(self) -> Iterator[NetSocketRecord]:
-        """This plugin yields the udp and udp6 sockets and available stats assiciated with them.
+        """This plugin yields the udp and udp6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
             hostname (string): The target hostname.
@@ -160,11 +160,11 @@ class NetSocketPlugin(Plugin):
         """
         sockets = chain(self.sockets.udp(), self.sockets.udp6())
         for netsocket in sockets:
-            yield self._generate_record(netsocket)
+            yield self._generate_net_socket_record(netsocket)
 
     @export(record=NetSocketRecord)
     def tcp(self) -> Iterator[NetSocketRecord]:
-        """This plugin yields the tcp and tcp6 sockets and available stats assiciated with them.
+        """This plugin yields the tcp and tcp6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
             hostname (string): The target hostname.
@@ -185,44 +185,42 @@ class NetSocketPlugin(Plugin):
         """
         sockets = chain(self.sockets.tcp(), self.sockets.tcp6())
         for netsocket in sockets:
-            yield self._generate_record(netsocket)
+            yield self._generate_net_socket_record(netsocket)
 
-    def _generate_record(self, data: dataclass) -> Union[NetSocketRecord, UnixSocketRecord]:
-        protocol = data.protocol_string
+    def _generate_unix_socket_record(self, data: dataclass) -> UnixSocketRecord:
+        return UnixSocketRecord(
+            protocol=data.protocol_string,
+            ref=data.ref,
+            flags=data.flags,
+            type=data.stream_type_string,
+            state=data.state_string,
+            inode=data.inode,
+            path=data.path,
+            _target=self.target,
+        )
 
-        if protocol == "unix":
-            return UnixSocketRecord(
-                protocol=protocol,
-                ref=data.ref,
-                flags=data.flags,
-                type=data.stream_type_string,
-                state=data.state_string,
-                inode=data.inode,
-                path=data.path,
-                _target=self.target,
-            )
+    def _generate_packet_socket_record(self, data: dataclass) -> PacketSocketRecord:
+        return PacketSocketRecord(
+            protocol=data.protocol_string,
+            protocol_type=data.protocol_type,
+            sk=data.sk,
+            ref=data.ref,
+            type=data.type,
+            iface=data.iface,
+            r=data.r,
+            rmem=data.rmem,
+            user=data.user,
+            inode=data.inode,
+            pid=data.pid,
+            name=data.name,
+            cmdline=data.cmdline,
+            owner=data.owner,
+            _target=self.target,
+        )
 
-        elif protocol == "packet":
-            return PacketSocketRecord(
-                protocol=protocol,
-                protocol_type=data.protocol_type,
-                sk=data.sk,
-                ref=data.ref,
-                type=data.type,
-                iface=data.iface,
-                r=data.r,
-                rmem=data.rmem,
-                user=data.user,
-                inode=data.inode,
-                pid=data.pid,
-                name=data.name,
-                cmdline=data.cmdline,
-                owner=data.owner,
-                _target=self.target,
-            )
-
+    def _generate_net_socket_record(self, data: dataclass) -> NetSocketRecord:
         return NetSocketRecord(
-            protocol=protocol,
+            protocol=data.protocol_string,
             rx_queue=data.rx_queue,
             tx_queue=data.tx_queue,
             local_ip=data.local_ip,
