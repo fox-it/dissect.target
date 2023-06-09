@@ -20,10 +20,13 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
     record_fields = []
     key = None
 
+    # Default encoding, when no BOM is present
+    encoding = "utf-16-le"
+
     # Check for the presence of a BOM header and use the correct encoding
     with wer_file.open("rb") as fh:
-        bom = fh.read(len(codecs.BOM))
-    encoding = "utf-16" if bom == codecs.BOM_UTF16_LE else "utf-16-le"
+        if fh.read(len(codecs.BOM)) == codecs.BOM_UTF16_LE:
+            encoding = "utf-16"
 
     for line in wer_file.read_text(encoding).splitlines():
         if len(line_split := line.rstrip().split("=", 1)) == 2:
