@@ -18,7 +18,7 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
     record_values = {}
     record_fields = []
     key = None
-    for line in wer_file.read_text("utf-16").splitlines():
+    for line in wer_file.read_text("utf-16-le").splitlines():
         if len(line_split := line.rstrip().split("=", 1)) == 2:
             name, value = line_split
             record_type = "string"
