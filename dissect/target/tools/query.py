@@ -13,6 +13,7 @@ from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 from dissect.target import Target
 from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import cache, hashutil
+from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
@@ -127,8 +128,9 @@ def main():
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
         if issubclass(func.class_object, OSPlugin):
-            func.class_object = OSPlugin
-        obj = getattr(func.class_object, func.method_name)
+            obj = getattr(OSPlugin, func.method_name)
+        else:
+            obj = getattr(func.class_object, func.method_name)
         if isinstance(obj, type) and issubclass(obj, Plugin):
             parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
         elif isinstance(obj, Callable) or isinstance(obj, property):
@@ -146,6 +148,8 @@ def main():
         if args.targets:
             for target in args.targets:
                 plugin_target = Target.open(target)
+                if isinstance(plugin_target._loader, ProxyLoader):
+                    parser.error("can't list compatible plugins for remote targets.")
                 funcs = find_plugin_functions(plugin_target, args.list, True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
