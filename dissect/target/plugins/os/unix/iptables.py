@@ -144,3 +144,6 @@ class IptablesSavePlugin(Plugin):
                             byte_count=rule["byte_count"] or None,
                             source=rule_path,
                         )
+
+                    else:
+                        self.target.log.warn(f"Unable to parse line: {line} in file {rule_path}")
