@@ -25,7 +25,7 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
 
     # Check for the presence of a BOM header and use the correct encoding
     with wer_file.open("rb") as fh:
-        if fh.read(len(codecs.BOM)) == codecs.BOM_UTF16_LE:
+        if fh.read(len(codecs.BOM)) in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
             encoding = "utf-16"
 
     for line in wer_file.read_text(encoding).splitlines():
