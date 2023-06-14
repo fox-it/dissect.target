@@ -30,6 +30,10 @@ def test_target_query_list(capsys, monkeypatch):
             "version,foo,wireguard.config,bar,apps.webservers.iis*",
             "foo, bar",
         ),
+        (
+            "browsers.*.downloads,bar,version,foo",
+            "bar, foo",
+        ),
     ],
 )
 def test_target_query_invalid_functions(capsys, monkeypatch, given_funcs, invalid_funcs):

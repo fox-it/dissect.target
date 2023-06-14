@@ -200,6 +200,11 @@ def main():
         if (f := f"{func.plugin_desc['module']}.{func.method_name}") in invalid_funcs:
             invalid_funcs.remove(f)
 
+        # e.g. browsers.*.downloads
+        for child_func in func.plugin_desc["functions"]:
+            if (f := f"{func.plugin_desc['module'].split('.')[0]}.*.{child_func}") in invalid_funcs:
+                invalid_funcs.remove(f)
+
     if any(invalid_funcs):
         parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
 
