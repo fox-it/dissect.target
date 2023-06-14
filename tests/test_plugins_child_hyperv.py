@@ -18,7 +18,6 @@ def test_plugins_child_wsl(target_win, fs_win):
     children = list(target_win.list_children())
 
     assert len(children) == 5
-
     assert (
         str(children[0].path) == "C:\\Hyper-V\\EasyToFind\\Virtual Machines\\EC04F346-DB96-4700-AF5B-77B3C56C38BD.vmcx"
     )
