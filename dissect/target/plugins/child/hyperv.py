@@ -54,6 +54,6 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
         for xml_path in self.vm_xml:
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=path.from_windows(xml_path.resolve()),
+                path=xml_path.resolve(),
                 _target=self.target,
             )
