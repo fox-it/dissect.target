@@ -100,8 +100,7 @@ class SophosPlugin(Plugin):
 
                     path_to_infected_file = None
                     if targets := details.get("targets", None):
-                        if len(targets) > 0:
-                            path_to_infected_file = targets[0].get("file_path", None)
+                        path_to_infected_file = targets[0].get("file_path", None)
 
                     yield SophosLogRecord(
                         ts=ts,
