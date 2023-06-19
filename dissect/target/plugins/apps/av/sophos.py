@@ -86,7 +86,7 @@ class SophosPlugin(Plugin):
         Yields SophosLogRecord with the following fields:
             ts (datetime): Timestamp.
             description (string): Short description of the alert.
-            path (string): Path to the infected file (if available).
+            path (path): Path to the infected file (if available).
 
         """
         log = self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le")
