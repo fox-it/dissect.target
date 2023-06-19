@@ -89,8 +89,11 @@ class IISLogsPlugin(plugin.Plugin):
 
     @plugin.internal
     def parse_autodetect_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
-        yield from self.parse_iis_format_log(path)
-        yield from self.parse_w3c_format_log(path)
+        first_line = path.open().readline().decode("utf-8", errors="backslashreplace").strip()
+        if first_line.startswith("#"):
+            yield from self.parse_w3c_format_log(path)
+        else:
+            yield from self.parse_iis_format_log(path)
 
     @plugin.internal
     def parse_iis_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
