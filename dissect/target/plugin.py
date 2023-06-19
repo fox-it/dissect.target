@@ -837,14 +837,16 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
         yield from os_plugins()
         yield from child_plugins()  # Doesn't export anything but added for completeness.
 
-    for available in all_plugins():
+    for available_original in all_plugins():
+        # Prevent modifying the global PLUGINS dict, otherwise -f os.windows._os.users fails for instance.
+        available = available_original.copy()
         if "get_all_records" in available["exports"]:
             available["exports"].remove("get_all_records")
         modulepath = available["module"]
         if modulepath.endswith("._os"):
             if not target._os:
-                # if no target available mention general OS instead of specific one
-                available["module"] = "OS"
+                # if no target available add a namespaceless section
+                available["module"] = ""
             elif target._os.__class__.__name__ != available["class"]:
                 continue
             rootset.add(modulepath.split(".")[0])

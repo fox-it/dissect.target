@@ -11,6 +11,7 @@ import gzip
 import hashlib
 import io
 import logging
+import os
 import posixpath
 import re
 from pathlib import Path, PurePath, _PathParents, _PosixFlavour
@@ -1045,3 +1046,28 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
 
     if lines:
         yield lines[0]
+
+
+def fs_attrs(
+    path: Union[os.PathLike, str, bytes],
+    follow_symlinks: bool = True,
+) -> dict[Union[os.PathLike, str, bytes], bytes]:
+    """Return the extended attributes for a given path on the local filesystem.
+
+    This is currently only implemented for Linux using os.listxattr and related functions.
+
+    Args:
+        path: The path to get the extended attributes for.
+        follow_symlinks: Wether to follow the symlink if the given path is a symlink.
+
+    Returns:
+        A dict containing the attribute names as keys and their values.
+    """
+    attrs = {}
+    if hasattr(os, "listxattr"):
+        # os.listxattr etc. are only available on Linux
+        attr_names = os.listxattr(path, follow_symlinks=follow_symlinks)
+        for attr_name in attr_names:
+            attrs[attr_name] = os.getxattr(path, attr_name, follow_symlinks=follow_symlinks)
+
+    return attrs

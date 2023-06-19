@@ -2,7 +2,7 @@ import os
 import platform
 import stat
 from tempfile import NamedTemporaryFile, TemporaryDirectory
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -724,3 +724,20 @@ def test_filesystem_root_filesystem_get():
     assert isinstance(nested_rootfs_entry, RootFilesystemEntry)
     assert len(nested_rootfs_entry.entries) == 1
     assert vfs2_entry in nested_rootfs_entry.entries
+
+
+@pytest.fixture
+def mapped_file():
+    return MappedFile(Mock(), "/some/path", Mock())
+
+
+def test_filesystem_mapped_file_attr(mapped_file):
+    with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
+        mapped_file.attr()
+        fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=True)
+
+
+def test_filesystem_mapped_file_lattr(mapped_file):
+    with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
+        mapped_file.lattr()
+        fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=False)
