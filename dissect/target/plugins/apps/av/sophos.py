@@ -3,8 +3,10 @@ from typing import Iterator
 
 from dissect.sql import sqlite3
 from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import path
 
 from dissect.target import Target
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -35,7 +37,7 @@ class SophosPlugin(Plugin):
     LOG_SOPHOS_HITMAN = "sysvol/ProgramData/HitmanPro.Alert/excalibur.db"
     MARKER_INFECTION = '{"command":"clean-threat'
 
-    MARKERS = [LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN]
+    LOGS = [LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN]
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
@@ -43,7 +45,7 @@ class SophosPlugin(Plugin):
 
     def check_compatible(self) -> bool:
         is_compatible = False
-        for marker in self.MARKERS:
+        for marker in self.LOGS:
             if self.target.fs.path(marker).exists():
                 is_compatible = True
                 break
@@ -95,10 +97,16 @@ class SophosPlugin(Plugin):
                 try:
                     ts, json_data = line.split(" ", maxsplit=2)
                     details = json.loads(json_data)
+
+                    path_to_infected_file = None
+                    if targets := details.get("targets", None):
+                        if len(targets) > 0:
+                            path_to_infected_file = targets[0].get("file_path", None)
+
                     yield SophosLogRecord(
                         ts=ts,
                         description=details.get("threat_name", details),
-                        path=details.get("targets", [{}])[0].get("file_path", None),
+                        path=path.from_windows(path_to_infected_file),
                         _target=self.target,
                     )
                 except Exception as error:
