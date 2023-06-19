@@ -120,7 +120,7 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions = find_plugin_functions(Target(), args.function, False)
+        found_functions, _ = find_plugin_functions(Target(), args.function, False)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
@@ -144,11 +144,11 @@ def main():
         if args.targets:
             for target in args.targets:
                 plugin_target = Target.open(target)
-                funcs = find_plugin_functions(plugin_target, args.list, True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
         else:
-            funcs = find_plugin_functions(Target(), args.list, False)
+            funcs, _ = find_plugin_functions(Target(), args.list, False)
             for func in funcs:
                 collected_plugins[func.name] = func.plugin_desc
 
@@ -175,35 +175,9 @@ def main():
 
     # Verify uniformity of output types, otherwise default to records
     output_types = set()
-    funcs = find_plugin_functions(Target(), args.function, False)
+    funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
     for func in funcs:
         output_types.add(func.output_type)
-
-    # Verify if all provided plugins exist. Exits if a
-    # given function was not found in `find_plugin_functions`.
-    # TODO: Are there any other ways to call a function using target-query?
-    invalid_funcs = [func.strip(" *!?[]") for func in args.function.split(",")]
-    for func in funcs:
-        # e.g. users
-        if func.method_name in invalid_funcs:
-            invalid_funcs.remove(func.method_name)
-
-        # e.g. browsers.chrome
-        if (f := f"{func.plugin_desc['namespace']}.{func.method_name}") in invalid_funcs:
-            invalid_funcs.remove(f)
-
-        # e.g. apps.webservers.iis*
-        if (f := f"{func.plugin_desc['module']}") in invalid_funcs:
-            invalid_funcs.remove(f)
-
-        # e.g. apps.webservers.iis.logs
-        if (f := f"{func.plugin_desc['module']}.{func.method_name}") in invalid_funcs:
-            invalid_funcs.remove(f)
-
-        # e.g. browsers.*.downloads
-        for child_func in func.plugin_desc["functions"]:
-            if (f := f"{func.plugin_desc['module'].split('.')[0]}.*.{child_func}") in invalid_funcs:
-                invalid_funcs.remove(f)
 
     if any(invalid_funcs):
         parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
@@ -237,7 +211,7 @@ def main():
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in find_plugin_functions(target, args.function, False):
+        for func_def, _ in find_plugin_functions(target, args.function, False):
             if func_def.method_name in executed_plugins:
                 continue
 
