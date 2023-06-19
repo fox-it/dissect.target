@@ -36,4 +36,3 @@ class LogLoader(Loader):
             vfs.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
         target.fs = vfs
-        target.datetime = datetime.today()

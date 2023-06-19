@@ -9,7 +9,7 @@ from flow.record.base import RE_VALID_FIELD_NAME
 
 from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
@@ -106,8 +106,14 @@ class IISLogsPlugin(plugin.Plugin):
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311%28v=ws.10%29
             - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
         """  # noqa: E501
-
-        tzinfo = self.target.datetime.tzinfo
+        
+        tzinfo = None
+        try:
+            tzinfo = self.target.datetime.tzinfo
+        except PluginNotFoundError as error:
+            # No target context available
+            pass
+            
 
         def parse_datetime(date_str: str, time_str: str) -> datetime:
             # Example: 10/1/2021 7:19:59
