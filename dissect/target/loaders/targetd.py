@@ -5,6 +5,7 @@ import ssl
 import time
 import urllib
 from pathlib import Path
+from platform import os
 from typing import Union
 
 from dissect.util.stream import AlignedStream
@@ -49,7 +50,7 @@ class TargetdLoader(ProxyLoader):
         self.adapter = "Flow.Remoting"
         self.host = "localhost"
         self.port = 1883
-        self.local_link = "unix:///tmp/targetd"
+        self.local_link = "unix:///tmp/targetd" if os.name == "posix" else "pipe:///tmp/targetd"
         # @todo Add these options to loader help (when available)
         self.configurables = [
             ["cacert", Path, "SSL: cacert file"],
