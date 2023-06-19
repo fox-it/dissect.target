@@ -838,7 +838,7 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
         yield from child_plugins()  # Doesn't export anything but added for completeness.
 
     for available_original in all_plugins():
-        # Otherwise -f os.windows._os.users fails for instance
+        # Prevent modifying the global PLUGINS dict, otherwise -f os.windows._os.users fails for instance.
         available = available_original.copy()
         if "get_all_records" in available["exports"]:
             available["exports"].remove("get_all_records")
