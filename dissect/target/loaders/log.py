@@ -15,12 +15,11 @@ class LogLoader(Loader):
         "iis": "sysvol/files/logs/",
     }
 
-    def __init__(self, path: Union[Path, str], **kwargs):
+    def __init__(self, path: Union[Path, str], parsed_path=None):
         super().__init__(path)
-        uri = kwargs.get("parsed_path")
         self.options = {}
-        if uri:
-            self.options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
+        if parsed_path:
+            self.options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True))
 
     @staticmethod
     def detect(path: Path) -> bool:
