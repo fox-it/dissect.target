@@ -1,4 +1,5 @@
 import os
+import sys
 import traceback
 from typing import Callable
 
@@ -23,8 +24,8 @@ class FatalError(Error):
 
     def emit_last_message(self, emitter: Callable) -> None:
         emitter(str(self))
-        os.dup2(os.open(os.devnull, os.O_RDWR), 1)
-        os.dup2(os.open(os.devnull, os.O_RDWR), 2)
+        os.dup2(os.open(os.devnull, os.O_RDWR), sys.stdout.fileno())
+        os.dup2(os.open(os.devnull, os.O_RDWR), sys.stderr.fileno())
 
 
 class TargetError(Error):
