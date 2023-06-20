@@ -89,7 +89,7 @@ union sd_id128_t {
     uint64_t  qwords[2];
 };
 
-enum IncompatibleFlag : le32_t {
+flag IncompatibleFlag : le32_t {
     HEADER_INCOMPATIBLE_COMPRESSED_XZ   = 1,
     HEADER_INCOMPATIBLE_COMPRESSED_LZ4  = 2,
     HEADER_INCOMPATIBLE_KEYED_HASH      = 4,
@@ -145,7 +145,7 @@ enum ObjectType : uint8 {
     _OBJECT_TYPE_MAX
 };
 
-enum ObjectFlag : uint8 {
+flag ObjectFlag : uint8 {
     OBJECT_UNCOMPRESSED      =  0,
     OBJECT_COMPRESSED_XZ     =  1,
     OBJECT_COMPRESSED_LZ4    =  2,
@@ -291,7 +291,7 @@ class JournalFile:
                 # After the object is checked, read again but with EntryArrayObject instead of ObjectHeader
                 self.fh.seek(offset)
 
-                if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                     entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
                 else:
                     entry_array_object = c_journal.EntryArrayObject(self.fh)
@@ -347,11 +347,11 @@ class JournalFile:
                         if not data:
                             # If the payload is empty
                             continue
-                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
+                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
                             data = lzma.decompress(data)
-                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
+                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
                             data = lz4.decompress(data[8:])
-                        elif data_object.flags == c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
+                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
                             data = zstandard.decompress(data)
 
                         key, value = self.decode_value(data)
@@ -360,7 +360,7 @@ class JournalFile:
                 except Exception as e:
                     self.target.log.warning(
                         "The data object in Journal file %s could not be parsed",
-                        self.fh.name if self.fh.name else None,
+                        getattr(self.fh, "name", None),
                         exc_info=e,
                     )
                     continue
@@ -369,7 +369,7 @@ class JournalFile:
 
 
 class JournalPlugin(Plugin):
-    JOURNAL_PATHS = ["/var/log/journal", "/run/systemd/journal"]
+    JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
     JOURNAL_SIGNATURE = "LPKSHHRH"
 
