@@ -146,4 +146,4 @@ class IptablesSavePlugin(Plugin):
                         )
 
                     else:
-                        self.target.log.warn(f"Unable to parse line: {line} in file {rule_path}")
+                        self.target.log.warn("Unable to parse line: %s in file %s", line, rule_path)
