@@ -12,7 +12,7 @@ from dissect.util.stream import AlignedStream
 from flow.record import Record
 
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import LoaderError
+from dissect.target.exceptions import FatalError, LoaderError
 from dissect.target.loader import Loader
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -37,7 +37,7 @@ class ProxyLoader(Loader):
     pass
 
 
-class TargetdInvalidStateError(RuntimeError):
+class TargetdInvalidStateError(FatalError):
     pass
 
 

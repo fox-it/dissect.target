@@ -11,7 +11,11 @@ from typing import Callable
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 
 from dissect.target import Target
-from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import (
+    FatalError,
+    PluginNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers import cache, hashutil
 from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
@@ -255,6 +259,9 @@ def main():
             except PluginNotFoundError:
                 target.log.error("Cannot find plugin `%s`", func_def)
                 continue
+            except FatalError as fatal:
+                fatal.emit_last_message(target.log.error)
+                parser.exit(1)
             except Exception:
                 target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
                 continue
