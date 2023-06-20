@@ -860,7 +860,9 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
 
 
 def find_plugin_functions(
-    target: Target, patterns: str, compatibility: bool = False
+    target: Target,
+    patterns: str,
+    compatibility: bool = False,
 ) -> tuple[list[PluginFunction], set[str]]:
     """Finds plugins that match the target and the patterns.
 
