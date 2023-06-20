@@ -37,6 +37,10 @@ class ProxyLoader(Loader):
     pass
 
 
+class TargetdInvalidStateError(RuntimeError):
+    pass
+
+
 class TargetdLoader(ProxyLoader):
     instance = None
 
@@ -106,7 +110,15 @@ class TargetdLoader(ProxyLoader):
             self.client.module_fromlist = ["command_runner"]
             self.client.command = plugin_func
             self.peers = self.peers
-            self.client.start()
+            try:
+                self.client.start()
+            except Exception:
+                # If something happens that prevents targetd from properly closing/resetting the
+                # connection, this exception is thrown during the next connection and the connection
+                # is closed properly after all so that the next time the loader will be able to
+                # use a new connection with a new session.
+                self.client.close()
+                raise TargetdInvalidStateError("Targetd connection is in invalid state, retry.")
         else:
             self.client.command = plugin_func
             self.client.exec_command()
