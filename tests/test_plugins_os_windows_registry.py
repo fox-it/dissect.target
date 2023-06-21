@@ -8,7 +8,7 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
 
 
-def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
+def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> None:
     target = Target()
     target.filesystems.add(fs_win)
 
@@ -26,7 +26,7 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
     assert [record.message for record in caplog.records if record.filename == "registry.py"] == expected
 
 
-def test_missing_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture):
+def test_missing_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture) -> None:
     fs_win.makedirs("Users/John")
 
     caplog.set_level(logging.DEBUG)
@@ -38,7 +38,7 @@ def test_missing_user_hives(fs_win: VirtualFilesystem, target_win_users: Target,
     ]
 
 
-def test_empty_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
+def test_empty_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> None:
     fs_win.map_file_fh("windows/system32/config/SYSTEM", BytesIO())
     fs_win.map_file_fh("boot/BCD", BytesIO())
 
@@ -54,7 +54,7 @@ def test_empty_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture):
     ]
 
 
-def test_empty_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture):
+def test_empty_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture) -> None:
     fs_win.map_file_fh("Users/John/ntuser.dat", BytesIO())
     fs_win.map_file_fh("Users/John/AppData/Local/Microsoft/Windows/usrclass.dat", BytesIO())
 

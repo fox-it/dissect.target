@@ -16,6 +16,9 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 
+KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
+"""The possible key types that can be returned from the registry."""
+
 ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
 
@@ -61,6 +64,9 @@ class RegistryKey:
 
     def __init__(self, hive: Optional[RegistryHive] = None):
         self.hive = hive
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.name}>"
 
     @property
     def ts(self) -> datetime:
@@ -117,9 +123,6 @@ class RegistryKey:
         """Returns a list of all the values from this key."""
         raise NotImplementedError()
 
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.name}>"
-
 
 class RegistryValue:
     """Base class for registry values.
@@ -130,6 +133,9 @@ class RegistryValue:
 
     def __init__(self, hive: Optional[RegistryHive] = None):
         self.hive = hive
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.name}={self.value!r}>"
 
     @property
     def name(self) -> str:
@@ -150,15 +156,15 @@ class RegistryValue:
         """
         raise NotImplementedError()
 
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.name}={self.value!r}>"
-
 
 class VirtualHive(RegistryHive):
     """Virtual hive implementation."""
 
     def __init__(self):
-        self._root = VirtualKey(self, "VROOT")
+        self._root = VirtualKey(self, "")
+
+    def __repr__(self) -> str:
+        return "<VirtualHive>"
 
     def make_keys(self, path: str) -> VirtualKey:
         """Create a key structure in this virtual hive from the given path.
@@ -243,9 +249,6 @@ class VirtualHive(RegistryHive):
         vkey = self.make_keys(path)
         vkey.add_value(name, value)
 
-    def root(self) -> RegistryKey:
-        return self._root
-
     def key(self, key: str) -> RegistryKey:
         path = key.strip("\\")
         vkey = self._root
@@ -259,17 +262,17 @@ class VirtualHive(RegistryHive):
 
         return vkey
 
-    def __repr__(self):
-        return "<VirtualHive>"
-
 
 class VirtualKey(RegistryKey):
     """Virtual key implementation."""
 
     def __init__(self, hive: RegistryHive, path: str, class_name: Optional[str] = None):
-        self._path: str = path
-        self._name: str = path.split("\\")[-1]
-        self._class_name: str = class_name
+        self._path = path
+        if not path.strip("\\"):
+            self._name = "VROOT"
+        else:
+            self._name = path.split("\\")[-1]
+        self._class_name = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
         self.top: RegistryKey = None
@@ -591,7 +594,7 @@ class RegfHive(RegistryHive):
 class RegfKey(RegistryKey):
     """Key implementation for regf keys."""
 
-    def __init__(self, hive: RegistryHive, key: RegistryKey):
+    def __init__(self, hive: RegistryHive, key: KeyType):
         self.key = key
         super().__init__(hive=hive)
 
