@@ -190,6 +190,10 @@ class UnixPlugin(OSPlugin):
                         last_mount = volume.fs.extfs.last_mount
                     elif volume.fs.__fstype__ == "fat":
                         fs_id = volume.fs.fatfs.volume_id
+                        # This normalizes fs_id to comply with libblkid generated UUIDs
+                        # This is needed because FAT filesystems don't have a real UUID,
+                        # but instead a volume_id which is not case-sensitive
+                        fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
 
                 if (
                     (fs_id and (fs_id == dev_id))
