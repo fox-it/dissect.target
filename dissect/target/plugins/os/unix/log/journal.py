@@ -304,7 +304,7 @@ class JournalFile:
                 offset = entry_array_object.next_entry_array_offset
 
     def decode_value(self, value: bytes) -> tuple[str, str]:
-        value = value.decode().strip()
+        value = value.decode(encoding="utf-8", errors="surrogateescape").strip()
 
         # Strip leading underscores part of the field name
         value = value.lstrip("_")
