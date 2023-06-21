@@ -4,6 +4,7 @@ from typing import Union
 
 from dissect.target import Target, filesystem
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -22,6 +23,7 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(

@@ -97,7 +97,7 @@ __target_function ()
 if command -v target-query &> /dev/null
 then
     echo Loading Dissect plugin list
-    DISSECT_PLUGINS=$(target-query --quiet --list | grep ' -' | awk '{print $1}')
+    DISSECT_PLUGINS=$(target-query --quiet --list | grep -e '^\s\+[a-z][a-z\._]\+ -' | awk '{print $1}')
 
     echo Loading Dissect help prompts
     declare -A DISSECT_HELP

@@ -1,3 +1,4 @@
+import codecs
 import re
 from typing import Iterator
 
@@ -18,7 +19,16 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
     record_values = {}
     record_fields = []
     key = None
-    for line in wer_file.read_text("utf-16").splitlines():
+
+    # Default encoding when no BOM is present
+    encoding = "utf-16-le"
+
+    # If a BOM header is present we can decode it using utf-16
+    with wer_file.open("rb") as fh:
+        if fh.read(len(codecs.BOM)) in (codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE):
+            encoding = "utf-16"
+
+    for line in wer_file.read_text(encoding).splitlines():
         if len(line_split := line.rstrip().split("=", 1)) == 2:
             name, value = line_split
             record_type = "string"
