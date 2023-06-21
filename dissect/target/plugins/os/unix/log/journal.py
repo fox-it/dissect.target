@@ -320,7 +320,7 @@ class JournalFile:
         for offset in self.entry_object_offsets():
             self.fh.seek(offset)
 
-            if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+            if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                 entry = c_journal.EntryObject_Compact(self.fh)
             else:
                 entry = c_journal.EntryObject(self.fh)
