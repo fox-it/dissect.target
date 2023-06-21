@@ -337,7 +337,7 @@ class JournalFile:
                     if object.type == c_journal.ObjectType.OBJECT_DATA:
                         self.fh.seek(item.object_offset)
 
-                        if self.header.incompatible_flags == c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                        if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                             data_object = c_journal.DataObject_Compact(self.fh)
                         else:
                             data_object = c_journal.DataObject(self.fh)
