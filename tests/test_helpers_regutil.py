@@ -3,7 +3,7 @@ from dissect.target.helpers.regutil import RegFlex
 from ._utils import absolute_path
 
 
-def test_regflex():
+def test_regflex() -> None:
     regflex = RegFlex()
 
     with open(absolute_path("data/regflex.reg"), "rt") as fh:
