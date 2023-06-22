@@ -185,7 +185,7 @@ class UnixPlugin(OSPlugin):
                 if dev_id:
                     if volume.fs.__fstype__ == "xfs":
                         fs_id = volume.fs.xfs.uuid
-                    elif volume.fs.__fstype__ == "extfs":
+                    elif volume.fs.__fstype__ == "ext":
                         fs_id = volume.fs.extfs.uuid
                         last_mount = volume.fs.extfs.last_mount
                     elif volume.fs.__fstype__ == "fat":
