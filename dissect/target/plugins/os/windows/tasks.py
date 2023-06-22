@@ -83,13 +83,13 @@ class TasksPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.task_files = set()
+        self.task_files = []
 
         for path in self.GLOB_PATHS:
             start_path, pattern = path.split("*", 1)
             for entry in self.target.fs.path(start_path).rglob("*" + pattern):
                 if entry.is_file() and entry.suffix == ".xml":
-                    self.task_files.add(entry)
+                    self.task_files.append(entry)
 
         for file_path in self.PATHS:
             fpath = self.target.fs.path(file_path)
@@ -98,7 +98,7 @@ class TasksPlugin(Plugin):
 
             for entry in fpath.rglob("*"):
                 if entry.is_file() and (entry.suffix.lower() == ".job" or not entry.suffix):
-                    self.task_files.add(entry)
+                    self.task_files.append(entry)
 
     def check_compatible(self):
         if len(self.task_files) == 0:
