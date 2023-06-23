@@ -118,7 +118,8 @@ class NtfsFilesystemEntry(FilesystemEntry):
         return not self.is_dir()
 
     def is_symlink(self) -> bool:
-        return self.dereference().is_reparse_point()
+        entry = self.dereference()
+        return entry.is_symlink() or entry.is_mount_point()
 
     def readlink(self) -> str:
         # Note: we only need to check and resolve symlinks when actually interacting with the target, such as
