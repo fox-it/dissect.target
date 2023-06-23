@@ -182,34 +182,32 @@ def assert_at_task_grouped_monthly_date(at_task_grouped):
 
 
 @pytest.mark.parametrize(
-    "record_index,assert_func",
+    "assert_func,marker",
     [
-        (0, assert_xml_task_properties),
-        (2, assert_at_task_properties),
+        (assert_xml_task_properties, "toast"),
+        (assert_at_task_properties, "AtTask"),
     ],
 )
-def test_single_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+def test_single_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
     assert len(records) == 8
-
-    record = records[record_index]
-    assert_func(record)
+    records = filter(lambda x: str(x).find(marker) > -1, records)
+    assert_func(list(records)[0])
 
 
 @pytest.mark.parametrize(
-    "record_index,assert_func",
+    "assert_func,marker",
     [
-        (1, assert_xml_task_grouped_properties),
-        (3, assert_at_task_grouped_exec),
-        (4, assert_at_task_grouped_daily),
-        (5, assert_at_task_grouped_monthlydow),
-        (6, assert_at_task_grouped_weekly),
-        (7, assert_at_task_grouped_monthly_date),
+        (assert_xml_task_grouped_properties, "ComHandler"),
+        (assert_at_task_grouped_exec, "NOTEPAD.EXE"),
+        (assert_at_task_grouped_daily, "PT13H15M"),
+        (assert_at_task_grouped_monthlydow, "June"),
+        (assert_at_task_grouped_weekly, "Friday"),
+        (assert_at_task_grouped_monthly_date, "2023-05-29"),
     ],
 )
-def test_grouped_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
     assert len(records) == 8
-
-    grouped_record = records[record_index]
-    assert_func(grouped_record)
+    grouped_records = filter(lambda x: str(x).find(marker) > -1, records)
+    assert_func(list(grouped_records)[0])
