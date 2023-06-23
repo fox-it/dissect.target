@@ -153,7 +153,7 @@ class AtTask:
         except Exception as e:
             raise InvalidTaskError(e)
 
-        self.source = job_file
+        self.task_path = job_file
 
         last_year = self.at_data.last_year
         last_month = self.at_data.last_month

@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 import pytest
@@ -13,6 +14,9 @@ def setup_tasks_test(target_win, fs_win):
     atjob_task_file = absolute_path("data/plugins/os/windows/tasks/AtTask.job")
 
     fs_win.map_file("windows/system32/tasks/Microsoft/Windows/Maps/MapsToastTask", xml_task_file)
+    fs_win.map_file(
+        "windows/system32/GroupPolicy/DataStore/ANY_SID/Machine/Preferences/ScheduledTasks/test_xml.xml", xml_task_file
+    )
     fs_win.map_file("windows/tasks/AtTask.job", atjob_task_file)
 
     target_win.add_plugin(TasksPlugin)
@@ -69,7 +73,7 @@ def assert_xml_task_properties(xml_task):
 def assert_at_task_properties(at_task):
     assert at_task.uri is None
     assert at_task.security_descriptor is None
-    assert at_task.source == "sysvol/windows/tasks/AtTask.job"
+    assert str(at_task.task_path) == "sysvol\\windows\\tasks\\AtTask.job"
     assert at_task.date is None
     assert at_task.last_run_date == datetime.strptime("2023-05-21 10:44:25.794000", "%Y-%m-%d %H:%M:%S.%f")
     assert at_task.author == "user1"
@@ -182,34 +186,36 @@ def assert_at_task_grouped_monthly_date(at_task_grouped):
 
 
 @pytest.mark.parametrize(
-    "record_index,assert_func",
+    "assert_func,marker",
     [
-        (0, assert_xml_task_properties),
-        (2, assert_at_task_properties),
+        (assert_xml_task_properties, "test_xml.xml.*ComHandler"),
+        (assert_xml_task_properties, "MapsToastTask.*toast"),
+        (assert_at_task_properties, "AtTask"),
     ],
 )
-def test_single_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+def test_single_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
-    assert len(records) == 8
-
-    record = records[record_index]
-    assert_func(record)
+    assert len(records) == 10
+    pat = re.compile(rf"{marker}")
+    records = filter(lambda x: re.findall(pat, str(x)), records)
+    assert_func(list(records)[0])
 
 
 @pytest.mark.parametrize(
-    "record_index,assert_func",
+    "assert_func,marker",
     [
-        (1, assert_xml_task_grouped_properties),
-        (3, assert_at_task_grouped_exec),
-        (4, assert_at_task_grouped_daily),
-        (5, assert_at_task_grouped_monthlydow),
-        (6, assert_at_task_grouped_weekly),
-        (7, assert_at_task_grouped_monthly_date),
+        (assert_xml_task_grouped_properties, "test_xml.xml.*ComHandler"),
+        (assert_xml_task_grouped_properties, "MapsToastTask.*ComHandler"),
+        (assert_at_task_grouped_exec, "NOTEPAD.EXE"),
+        (assert_at_task_grouped_daily, "PT13H15M"),
+        (assert_at_task_grouped_monthlydow, "June"),
+        (assert_at_task_grouped_weekly, "Friday"),
+        (assert_at_task_grouped_monthly_date, "2023-05-29"),
     ],
 )
-def test_grouped_record_properties(target_win, setup_tasks_test, record_index, assert_func):
+def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
-    assert len(records) == 8
-
-    grouped_record = records[record_index]
-    assert_func(grouped_record)
+    assert len(records) == 10
+    pat = re.compile(rf"{marker}")
+    grouped_records = filter(lambda x: re.findall(pat, str(x)), records)
+    assert_func(list(grouped_records)[0])
