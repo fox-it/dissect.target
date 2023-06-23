@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 import pytest
@@ -13,6 +14,9 @@ def setup_tasks_test(target_win, fs_win):
     atjob_task_file = absolute_path("data/plugins/os/windows/tasks/AtTask.job")
 
     fs_win.map_file("windows/system32/tasks/Microsoft/Windows/Maps/MapsToastTask", xml_task_file)
+    fs_win.map_file(
+        "windows/system32/GroupPolicy/DataStore/ANY_SID/Machine/Preferences/ScheduledTasks/test_xml.xml", xml_task_file
+    )
     fs_win.map_file("windows/tasks/AtTask.job", atjob_task_file)
 
     target_win.add_plugin(TasksPlugin)
@@ -184,21 +188,24 @@ def assert_at_task_grouped_monthly_date(at_task_grouped):
 @pytest.mark.parametrize(
     "assert_func,marker",
     [
-        (assert_xml_task_properties, "toast"),
+        (assert_xml_task_properties, "test_xml.xml.*ComHandler"),
+        (assert_xml_task_properties, "MapsToastTask.*toast"),
         (assert_at_task_properties, "AtTask"),
     ],
 )
 def test_single_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
-    assert len(records) == 8
-    records = filter(lambda x: str(x).find(marker) > -1, records)
+    assert len(records) == 10
+    pat = re.compile(rf"{marker}")
+    records = filter(lambda x: re.findall(pat, str(x)), records)
     assert_func(list(records)[0])
 
 
 @pytest.mark.parametrize(
     "assert_func,marker",
     [
-        (assert_xml_task_grouped_properties, "ComHandler"),
+        (assert_xml_task_grouped_properties, "test_xml.xml.*ComHandler"),
+        (assert_xml_task_grouped_properties, "MapsToastTask.*ComHandler"),
         (assert_at_task_grouped_exec, "NOTEPAD.EXE"),
         (assert_at_task_grouped_daily, "PT13H15M"),
         (assert_at_task_grouped_monthlydow, "June"),
@@ -208,6 +215,7 @@ def test_single_record_properties(target_win, setup_tasks_test, assert_func, mar
 )
 def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, marker):
     records = list(target_win.tasks())
-    assert len(records) == 8
-    grouped_records = filter(lambda x: str(x).find(marker) > -1, records)
+    assert len(records) == 10
+    pat = re.compile(rf"{marker}")
+    grouped_records = filter(lambda x: re.findall(pat, str(x)), records)
     assert_func(list(grouped_records)[0])
