@@ -1,4 +1,4 @@
-import socket
+import ipaddress
 import struct
 
 from dissect.util.ts import from_unix
@@ -49,6 +49,12 @@ class WtmpPlugin(Plugin):
                 if entry.ut_type in utmp.Type.reverse:
                     r_type = utmp.Type.reverse[entry.ut_type]
 
+                # Check if the value is an IPv6 address
+                if entry.ut_addr_v6[1:] == [0, 0, 0]:
+                    ut_addr = struct.pack("<i", entry.ut_addr_v6[0])
+                else:
+                    ut_addr = struct.pack("<4i", *entry.ut_addr_v6)
+
                 yield WtmpRecord(
                     ts=from_unix(entry.ut_tv.tv_sec),
                     ut_type=r_type,
@@ -57,6 +63,6 @@ class WtmpPlugin(Plugin):
                     ut_line=entry.ut_line.decode().strip("\x00"),
                     ut_id=entry.ut_id.decode().strip("\x00"),
                     ut_host=entry.ut_host.decode().strip("\x00"),
-                    ut_addr=socket.inet_ntoa(struct.pack("<i", entry.ut_addr_v6[0])),
+                    ut_addr=ipaddress.ip_address(ut_addr),
                     _target=self.target,
                 )
