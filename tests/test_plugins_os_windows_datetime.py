@@ -1,9 +1,10 @@
 import datetime
 
 from dissect.target.plugins.os.windows.datetime import DateTimePlugin
+from dissect.target.target import Target
 
 
-def test_windows_datetime(target_win_tzinfo):
+def test_windows_datetime(target_win_tzinfo: Target) -> None:
     target_win_tzinfo.add_plugin(DateTimePlugin)
 
     # Easter Island has a flipped DST to Amsterdam
@@ -50,3 +51,9 @@ def test_windows_datetime(target_win_tzinfo):
     # Test the switch moment to DST
     assert not eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 2, 0, 0, tzinfo=eu_tzinfo))
     assert eu_tzinfo.is_dst(datetime.datetime(2022, 3, 27, 3, 0, 0, tzinfo=eu_tzinfo))
+
+
+def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
+    # Older Windows version (prior to Windows 7) use localized time zone ids like "Paaseiland"
+    target_win_tzinfo_legacy.add_plugin(DateTimePlugin)
+    assert target_win_tzinfo_legacy.datetime.tzinfo.display == "(UTC-06:00) Easter Island"

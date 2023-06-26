@@ -162,6 +162,26 @@ def target_win_tzinfo(hive_hklm, target_win):
 
 
 @pytest.fixture
+def target_win_tzinfo_legacy(hive_hklm, target_win):
+    tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
+    tz_info = VirtualKey(hive_hklm, tz_info_path)
+    tz_info.add_value("StandardName", "Paaseiland")
+
+    east_tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\Easter Island Standard Time"
+    east_tz_data = VirtualKey(hive_hklm, east_tz_data_path)
+    east_tz_data.add_value("Display", "(UTC-06:00) Easter Island")
+    east_tz_data.add_value("Dlt", "Easter Island Daylight Time")
+    east_tz_data.add_value("Std", "Paaseiland")
+    east_tzi = bytes.fromhex("6801000000000000c4ffffff0000040006000100160000000000000000000900060001001600000000000000")
+    east_tz_data.add_value("TZI", east_tzi)
+
+    hive_hklm.map_key(tz_info_path, tz_info)
+    hive_hklm.map_key(east_tz_data_path, east_tz_data)
+
+    yield target_win
+
+
+@pytest.fixture
 def target_unix_users(target_unix, fs_unix):
     passwd = """
     root:x:0:0:root:/root:/bin/bash
