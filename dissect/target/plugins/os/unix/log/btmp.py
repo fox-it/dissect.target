@@ -1,11 +1,6 @@
-import socket
-import struct
-
-from dissect.util.ts import from_unix
-
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.unix.log.utmp import UtmpFile, utmp
+from dissect.target.plugins.os.unix.log.utmp import UtmpFile
 
 BtmpRecord = TargetRecordDescriptor(
     "linux/log/btmp",
@@ -45,19 +40,16 @@ class BtmpPlugin(Plugin):
                 btmp = UtmpFile(self.target.fs.open(btmp_path), compressed=True)
             else:
                 btmp = UtmpFile(self.target.fs.open(btmp_path))
-            r_type = ""
-            for entry in btmp:
-                if entry.ut_type in utmp.Type.reverse:
-                    r_type = utmp.Type.reverse[entry.ut_type]
 
+            for entry in btmp:
                 yield BtmpRecord(
-                    ts=from_unix(entry.ut_tv.tv_sec),
-                    ut_type=r_type,
+                    ts=entry.ts,
+                    ut_type=entry.ut_type,
                     ut_pid=entry.ut_pid,
-                    ut_user=entry.ut_user.decode().strip("\x00"),
-                    ut_line=entry.ut_line.decode().strip("\x00"),
-                    ut_id=entry.ut_id.decode().strip("\x00"),
-                    ut_host=entry.ut_host.decode().strip("\x00"),
-                    ut_addr=socket.inet_ntoa(struct.pack("<i", entry.ut_addr_v6[0])),
+                    ut_user=entry.ut_user,
+                    ut_line=entry.ut_line,
+                    ut_id=entry.ut_id,
+                    ut_host=entry.ut_host,
+                    ut_addr=entry.ut_addr,
                     _target=self.target,
                 )

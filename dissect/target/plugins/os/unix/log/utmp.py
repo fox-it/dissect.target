@@ -1,7 +1,11 @@
 import gzip
+import ipaddress
+import struct
+from collections import namedtuple
 
 from dissect import cstruct
 from dissect.util.stream import BufferedStream
+from dissect.util.ts import from_unix
 
 c_utmp = """
 #define UT_LINESIZE     32
@@ -51,6 +55,20 @@ struct entry {
 utmp = cstruct.cstruct()
 utmp.load(c_utmp)
 
+UTMP_ENTRY = namedtuple(
+    "UTMPRecord",
+    [
+        "ts",
+        "ut_type",
+        "ut_user",
+        "ut_pid",
+        "ut_line",
+        "ut_id",
+        "ut_host",
+        "ut_addr",
+    ],
+)
+
 
 class UtmpFile:
     """utmp maintains a full accounting of the current status of the system"""
@@ -68,6 +86,29 @@ class UtmpFile:
 
         while True:
             try:
-                yield utmp.entry(byte_stream)
+                entry = utmp.entry(byte_stream)
+
+                r_type = ""
+                if entry.ut_type in utmp.Type.reverse:
+                    r_type = utmp.Type.reverse[entry.ut_type]
+
+                # Check if the value is an IPv6 address
+                if entry.ut_addr_v6[1:] == [0, 0, 0]:
+                    ut_addr = struct.pack("<i", entry.ut_addr_v6[0])
+                else:
+                    ut_addr = struct.pack("<4i", *entry.ut_addr_v6)
+
+                utmp_entry = UTMP_ENTRY(
+                    ts=from_unix(entry.ut_tv.tv_sec),
+                    ut_type=r_type,
+                    ut_pid=entry.ut_pid,
+                    ut_user=entry.ut_user.decode().strip("\x00"),
+                    ut_line=entry.ut_line.decode().strip("\x00"),
+                    ut_id=entry.ut_id.decode().strip("\x00"),
+                    ut_host=entry.ut_host.decode().strip("\x00"),
+                    ut_addr=ipaddress.ip_address(ut_addr),
+                )
+
+                yield utmp_entry
             except EOFError:
                 break
