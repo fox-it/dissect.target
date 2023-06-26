@@ -15,6 +15,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
     [
+        ("path", "task_path"),
         ("string", "uri"),
         ("string", "security_descriptor"),
         ("string", "source"),
@@ -69,16 +70,26 @@ class TasksPlugin(Plugin):
         target: The target system.
     """
 
-    PATHS = [
+    PATHS = {
         "sysvol/windows/system32/tasks",
         "sysvol/windows/system32/tasks_migrated",
         "sysvol/windows/syswow64/tasks",
         "sysvol/windows/tasks",  # at.exe job file location
+    }
+    GLOB_PATHS = [
+        "sysvol/windows/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
+        "sysvol/ProgramData/Microsoft/*/Preferences/ScheduledTasks/*",
     ]
 
     def __init__(self, target: Target):
         super().__init__(target)
         self.task_files = []
+
+        for path in self.GLOB_PATHS:
+            start_path, pattern = path.split("*", 1)
+            for entry in self.target.fs.path(start_path).rglob("*" + pattern):
+                if entry.is_file() and entry.suffix == ".xml":
+                    self.task_files.append(entry)
 
         for file_path in self.PATHS:
             fpath = self.target.fs.path(file_path)
@@ -107,7 +118,7 @@ class TasksPlugin(Plugin):
             The scheduled tasks found on the target.
         """
         for task_file in self.task_files:
-            if not task_file.suffix:
+            if not task_file.suffix or task_file.suffix == ".xml":
                 task_object = XmlTask(task_file, self.target)
             else:
                 task_object = AtTask(task_file, self.target)
