@@ -3,7 +3,6 @@ from typing import Iterator
 
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
-from dissect.target.plugins.general.users import UsersPlugin
 from dissect.target.target import Target
 
 
