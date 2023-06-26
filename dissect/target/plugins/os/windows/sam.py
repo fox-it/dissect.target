@@ -293,9 +293,9 @@ class SamPlugin(Plugin):
     SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
 
     def check_compatible(self) -> bool:
-        for k in [self.SAM_KEY, self.SYSTEM_KEY]:
-            if not len(list(self.target.registry.iterkeys(k))) > 0:
-                raise UnsupportedPluginError(f"Registry key not found: {k}")
+        for key in [self.SAM_KEY, self.SYSTEM_KEY]:
+            if not len(list(self.target.registry.keys(key))) > 0:
+                raise UnsupportedPluginError(f"Registry key not found: {key}")
         return True
 
     def retrieve_syskey(self) -> bytes:

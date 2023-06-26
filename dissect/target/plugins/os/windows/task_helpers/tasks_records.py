@@ -57,14 +57,6 @@ ExecRecord = TargetRecordDescriptor(
     ],
 )
 
-DailyTriggerRecord = TargetRecordDescriptor(
-    "filesystem/windows/task/trigger/daily",
-    [
-        ("uint16", "days_between_triggers"),
-        ("uint16[]", "unused"),
-    ],
-)
-
 IdleTriggerRecord = TargetRecordDescriptor(
     "filesystem/windows/task/trigger/idle_trigger",
     [],

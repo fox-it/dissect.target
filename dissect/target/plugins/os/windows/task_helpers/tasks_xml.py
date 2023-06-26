@@ -38,6 +38,7 @@ class XmlTask:
         except Exception as e:
             raise InvalidTaskError(e)
 
+        self.task_path = xml_file
         self.uri = self.get_element("RegistrationInfo/URI")
         self.security_descriptor = self.get_element("RegistrationInfo/SecurityDescriptor")
         self.source = self.get_element("RegistrationInfo/Source")
@@ -48,7 +49,7 @@ class XmlTask:
         self.documentation = self.get_element("RegistrationInfo/Documentation")
 
         # Principals
-        self.principal_id = self.xml_data.find("Principals/Principal").get("id")
+        self.principal_id = self.get_element("Principals/Principal", attribute="id")
         self.user_id = self.get_element("Principals/Principal/UserId")
         self.logon_type = self.get_element("Principals/Principal/LogonType")
         self.group_id = self.get_element("Principals/Principal/GroupId")
@@ -106,21 +107,28 @@ class XmlTask:
                     element.tag = element.tag[len(ns) :]
         return data
 
-    def get_element(self, xml_path: str, xml_data: Optional[Element] = None) -> str:
+    def get_element(
+        self, xml_path: str, xml_data: Optional[Element] = None, attribute: Optional[str] = None
+    ) -> Optional[str]:
         """Get the value of the specified XML element.
 
         Args:
             xml_path: The string used to locate the element.
             xml_data: The XML data to search in. If not provided, use self.xml_data.
+            attribute: The name of a specific attribute from an element that should be returned.
 
         Returns:
             str: The value of the XML element if found, otherwise None.
         """
         xml_data = xml_data or self.xml_data
-        try:
-            return xml_data.find(xml_path).text
-        except AttributeError:
+        data = xml_data.find(xml_path)
+
+        if data is None:
             return
+        if attribute:
+            return data.get(attribute)
+
+        return data.text
 
     def get_raw(self, xml_path: str) -> str:
         """Get the raw XML data of the specified element.
