@@ -202,11 +202,11 @@ class DateTimePlugin(Plugin):
 
         timezone_information = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
         try:
-            tz_name = timezone_information.value("TimeZoneKeyName").value  # Windows 7+
+            # Windows 7+
+            tz_name = timezone_information.value("TimeZoneKeyName").value
         except RegistryValueNotFoundError:
-            tz_name_localized = timezone_information.value(
-                "StandardName"
-            ).value  # < Windows 7 (https://github.com/dateutil/dateutil/issues/210)
+            # < Windows 7 (https://github.com/dateutil/dateutil/issues/210)
+            tz_name_localized = timezone_information.value("StandardName").value
             for timezone_key in self.target.registry.key(
                 "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
             ).subkeys():
