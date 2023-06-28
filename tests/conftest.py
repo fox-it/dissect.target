@@ -126,7 +126,7 @@ def target_win_users(hive_hklm, hive_hku, target_win):
 
 
 @pytest.fixture
-def target_win_tzinfo(hive_hklm, target_win):
+def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
     tz_info = VirtualKey(hive_hklm, tz_info_path)
     tz_info.add_value("TimeZoneKeyName", "Easter Island Standard Time")
@@ -162,7 +162,7 @@ def target_win_tzinfo(hive_hklm, target_win):
 
 
 @pytest.fixture
-def target_win_tzinfo_legacy(hive_hklm, target_win):
+def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
     tz_info = VirtualKey(hive_hklm, tz_info_path)
     tz_info.add_value("StandardName", "Paaseiland")

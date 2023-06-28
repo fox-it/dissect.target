@@ -226,9 +226,7 @@ class DateTimePlugin(Plugin):
     @internal
     def tz(self, name: str) -> tzinfo:
         """Return a datetime.tzinfo of the given timezone name."""
-        tz_data = self.target.registry.key(
-            f"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\{name}"
-        )
+        tz_data = self.target.registry.key(f"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\{name}")
         return WindowsTimezone(name, tz_data)
 
     @internal(property=True)
