@@ -3,6 +3,7 @@ import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
+from typing import Iterator
 
 import pytest
 
