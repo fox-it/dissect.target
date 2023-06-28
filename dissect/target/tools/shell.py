@@ -62,11 +62,14 @@ Access: {atime}
 Modify: {mtime}
 Change: {ctime}"""
 
+FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32"  # noqa: E501
+
 
 def prepare_ls_colors():
     """Parse the LS_COLORS environment variable so we can use it later."""
     d = {}
-    for line in os.environ.get("LS_COLORS", "").split(":"):
+    ls_colors = os.environ.get("LS_COLORS", "") or FALLBACK_LS_COLORS
+    for line in ls_colors.split(":"):
         if not line:
             continue
 
@@ -430,7 +433,12 @@ class TargetCli(TargetCmd):
                     elif file_.is_file():
                         file_type = "fi"
 
-                result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
+                result.append(
+                    (
+                        file_,
+                        fmt_ls_colors(file_type, file_.name) if color else file_.name,
+                    )
+                )
 
                 # If we happen to scan an NTFS filesystem see if any of the
                 # entries has an alternative data stream and also list them.
@@ -441,7 +449,12 @@ class TargetCli(TargetCmd):
                         for data_stream in attrs.DATA:
                             if data_stream.name != "":
                                 name = f"{file_.name}:{data_stream.name}"
-                                result.append((file_, fmt_ls_colors(file_type, name) if color else name))
+                                result.append(
+                                    (
+                                        file_,
+                                        fmt_ls_colors(file_type, name) if color else name,
+                                    )
+                                )
 
             result.sort(key=lambda e: e[0].name)
 
