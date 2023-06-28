@@ -85,7 +85,7 @@ class ZipFilesystemEntry(VirtualFile):
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         raise NotImplementedError()
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 
@@ -113,7 +113,7 @@ class ZipFilesystemDirectoryEntry(VirtualDirectory):
         super().__init__(fs, path)
         self.entry = entry
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 

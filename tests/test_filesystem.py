@@ -2,9 +2,11 @@ import os
 import platform
 import stat
 from tempfile import NamedTemporaryFile, TemporaryDirectory
+from typing import Union
 from unittest.mock import Mock, patch
 
 import pytest
+from _pytest.fixtures import FixtureRequest
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -38,7 +40,7 @@ from ._utils import absolute_path
 @pytest.fixture
 def vfs():
     vfs = VirtualFilesystem()
-    vfs.map_file_entry("/path/to/some/file", VirtualFile(vfs, "file", None))
+    vfs.map_file_entry("/path/to/some/file", VirtualFile(vfs, "path/to/some/file", None))
 
     vfs.symlink("/path/to/some/", "dirlink1")
     vfs.symlink("dirlink1", "dirlink2")
@@ -238,7 +240,7 @@ def test_recursive_symlink_dev(mock_target):
         ),
     ],
 )
-def test_filesystem_link_resolve(entry, link_dict):
+def test_link_resolve(entry, link_dict):
     """Test wether each filesystem resolves a link as intended."""
     if entry is None:
         pytest.skip("dissect.vmfs is required")
@@ -266,7 +268,7 @@ def test_filesystem_link_resolve(entry, link_dict):
     assert link.readlink_ext() == actual_file
 
 
-def test_filesystem_virtual_symlink_to_dir_get(vfs):
+def test_virtual_symlink_to_dir_get(vfs):
     some_file = vfs.get("/path/to/some/file")
     symlink = vfs.get("/dirlink1")
 
@@ -275,13 +277,13 @@ def test_filesystem_virtual_symlink_to_dir_get(vfs):
     assert some_file is some_file2
 
 
-def test_filesystem_virtual_symlink_to_file_get(vfs):
+def test_virtual_symlink_to_file_get(vfs):
     symlink = vfs.get("/filelink1")
     with pytest.raises(NotADirectoryError):
         symlink.get("does_not_exist")
 
 
-def test_filesystem_virtual_symlink_to_symlink_get(vfs):
+def test_virtual_symlink_to_symlink_get(vfs):
     some_file = vfs.get("/path/to/some/file")
     symlink = vfs.get("/dirlink2")
 
@@ -305,14 +307,14 @@ def test_filesystem_virtual_symlink_to_symlink_get(vfs):
         "/dirlink1",
     ],
 )
-def test_filesystem_virtual_entry_get_self(vfs, path, entry_name):
+def test_virtual_entry_get_self(vfs, path, entry_name):
     some_entry = vfs.get(entry_name)
     some_entry2 = some_entry.get(path)
 
     assert some_entry is some_entry2
 
 
-def test_filesystem_virtual_filesystem_get():
+def test_virtual_filesystem_get():
     vfs = VirtualFilesystem()
     file_entry = VirtualFile(vfs, "file", None)
     vfs.map_file_entry("path/to/some/file", file_entry)
@@ -343,7 +345,7 @@ def test_filesystem_virtual_filesystem_get():
         ("/", "/dirlink2/../../../"),
     ],
 )
-def test_filesystem_virtual_filesystem_get_equal_vfs_paths(vfs, vfs_path1, vfs_path2):
+def test_virtual_filesystem_get_equal_vfs_paths(vfs, vfs_path1, vfs_path2):
     assert vfs.get(vfs_path1) is vfs.get(vfs_path2)
 
 
@@ -358,7 +360,7 @@ def test_filesystem_virtual_filesystem_get_equal_vfs_paths(vfs, vfs_path1, vfs_p
         ("/dirlink1", "/dirlink2"),
     ],
 )
-def test_filesystem_virtual_filesystem_get_unequal_vfs_paths(vfs, vfs_path1, vfs_path2):
+def test_virtual_filesystem_get_unequal_vfs_paths(vfs, vfs_path1, vfs_path2):
     assert vfs.get(vfs_path1) is not vfs.get(vfs_path2)
 
 
@@ -371,12 +373,12 @@ def test_filesystem_virtual_filesystem_get_unequal_vfs_paths(vfs, vfs_path1, vfs
         ("/path/to/other/path/to/some/non-exisiting-file", FileNotFoundError),
     ],
 )
-def test_filesystem_virtual_filesystem_get_erroring_vfs_paths(vfs, vfs_path, exception):
+def test_virtual_filesystem_get_erroring_vfs_paths(vfs, vfs_path, exception):
     with pytest.raises(exception):
         vfs.get(vfs_path)
 
 
-def test_filesystem_vritual_filesystem_get_case_sensitive():
+def test_virtual_filesystem_get_case_sensitive():
     vfs = VirtualFilesystem()
     vfs.map_file_entry("/path/to/some/file_lower_case", VirtualFile(vfs, "file_lower_case", None))
     vfs.map_file_entry("/path/TO/some/FILE_UPPER_CASE", VirtualFile(vfs, "FILE_UPPER_CASE", None))
@@ -389,7 +391,7 @@ def test_filesystem_vritual_filesystem_get_case_sensitive():
         assert vfs.get("/path/TO/some/file_upper_case")
 
 
-def test_filesystem_vritual_filesystem_get_case_insensitive():
+def test_virtual_filesystem_get_case_insensitive():
     vfs = VirtualFilesystem(case_sensitive=False)
     vfs.map_file_entry("/path/to/some/file_lower_case", VirtualFile(vfs, "file_lower_case", None))
     vfs.map_file_entry("/path/TO/some/FILE_UPPER_CASE", VirtualFile(vfs, "FILE_UPPER_CASE", None))
@@ -413,7 +415,7 @@ def test_filesystem_vritual_filesystem_get_case_insensitive():
         ),
     ],
 )
-def test_filesystem_virtual_filesystem_makedirs(paths):
+def test_virtual_filesystem_makedirs(paths):
     vfs = VirtualFilesystem()
 
     for vfspath in paths:
@@ -428,7 +430,7 @@ def test_filesystem_virtual_filesystem_makedirs(paths):
             assert vfs_entry.path == partial_path.strip("/")
 
 
-def test_filesystem_virtual_filesystem_makedirs_root():
+def test_virtual_filesystem_makedirs_root():
     vfs = VirtualFilesystem()
     vfspath = "/"
 
@@ -439,7 +441,7 @@ def test_filesystem_virtual_filesystem_makedirs_root():
     assert vfs_entry is vfs.root
 
 
-def test_filesystem_virtual_filesystem_map_fs(vfs):
+def test_virtual_filesystem_map_fs(vfs):
     root_vfs = VirtualFilesystem()
     map_path = "/some/dir/"
     file_path = "/path/to/some/file"
@@ -456,12 +458,12 @@ def test_filesystem_virtual_filesystem_map_fs(vfs):
         root_vfs.get(file_path)
 
 
-def test_filesystem_virtual_filesystem_mount(vfs):
+def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
-def test_filesystem_virtual_filesystem_map_dir():
+def test_virtual_filesystem_map_dir():
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
     with TemporaryDirectory() as tmp_dir:
@@ -504,7 +506,7 @@ def test_filesystem_virtual_filesystem_map_dir():
         "/path///to/file",
     ],
 )
-def test_filesystem_virtual_filesystem_map_file(vfs_path):
+def test_virtual_filesystem_map_file(vfs_path):
     vfs = VirtualFilesystem()
     real_path = "/tmp/foo"
 
@@ -518,7 +520,7 @@ def test_filesystem_virtual_filesystem_map_file(vfs_path):
     assert vfs_entry.entry == real_path
 
 
-def test_filesystem_virtual_filesystem_map_file_as_dir():
+def test_virtual_filesystem_map_file_as_dir():
     vfs = VirtualFilesystem()
     real_path = "/tmp/foo"
 
@@ -534,7 +536,7 @@ def test_filesystem_virtual_filesystem_map_file_as_dir():
         "/path///to/file",
     ],
 )
-def test_filesystem_virtual_filesystem_map_file_fh(vfs_path):
+def test_virtual_filesystem_map_file_fh(vfs_path):
     vfs = VirtualFilesystem()
     fh = Mock()
 
@@ -548,7 +550,7 @@ def test_filesystem_virtual_filesystem_map_file_fh(vfs_path):
     assert vfs_entry.entry is fh
 
 
-def test_filesystem_virtual_filesystem_map_file_fh_as_dir():
+def test_virtual_filesystem_map_file_fh_as_dir():
     vfs = VirtualFilesystem()
     fh = Mock()
 
@@ -571,7 +573,7 @@ def test_filesystem_virtual_filesystem_map_file_fh_as_dir():
         "/",
     ],
 )
-def test_filesystem_virtual_filesystem_map_file_entry(vfs_path):
+def test_virtual_filesystem_map_file_entry(vfs_path):
     vfs = VirtualFilesystem()
     entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     dir_entry = VirtualDirectory(vfs, entry_path)
@@ -615,7 +617,7 @@ def test_filesystem_virtual_filesystem_map_file_entry(vfs_path):
         ),
     ],
 )
-def test_filesystem_virtual_filesystem_link(vfs_path, link_path):
+def test_virtual_filesystem_link(vfs_path, link_path):
     vfs = VirtualFilesystem()
     entry_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
     file_object = Mock()
@@ -655,7 +657,7 @@ def test_filesystem_virtual_filesystem_link(vfs_path, link_path):
         ),
     ],
 )
-def test_filesystem_virtual_filesystem_symlink(vfs_path, link_path):
+def test_virtual_filesystem_symlink(vfs_path, link_path):
     vfs = VirtualFilesystem()
 
     vfs.symlink(vfs_path, link_path)
@@ -669,28 +671,262 @@ def test_filesystem_virtual_filesystem_symlink(vfs_path, link_path):
     assert link_entry.target == vfs_path
 
 
-def test_filesystem_root_filesystem_get():
-    vfs1 = VirtualFilesystem()
+@pytest.fixture
+def dir_entry(vfs: VirtualFilesystem) -> VirtualDirectory:
+    return vfs.get("/path/to/some")
 
-    vfs1_entry = VirtualFile(vfs1, "vfs1_entry", Mock())
+
+@pytest.fixture
+def dirlink_entry(vfs: VirtualFilesystem) -> VirtualSymlink:
+    return vfs.get("dirlink1")
+
+
+@pytest.fixture
+def file_entry(vfs: VirtualFilesystem) -> VirtualFile:
+    return vfs.get("/path/to/some/file")
+
+
+@pytest.fixture
+def filelink_entry(vfs: VirtualFilesystem) -> VirtualSymlink:
+    return vfs.get("filelink1")
+
+
+@pytest.mark.parametrize(
+    "src_entry, dst_entry",
+    [
+        ("dir_entry", "dir_entry"),
+        ("dirlink_entry", "dir_entry"),
+        ("file_entry", "file_entry"),
+        ("filelink_entry", "file_entry"),
+    ],
+)
+def test_virtual_filesystem_stat(
+    vfs: VirtualFilesystem,
+    src_entry: str,
+    dst_entry: str,
+    request: FixtureRequest,
+) -> None:
+    src_entry = request.getfixturevalue(src_entry)
+    dst_entry = request.getfixturevalue(dst_entry)
+
+    assert vfs.stat(src_entry.path, follow_symlinks=False) == src_entry.stat(follow_symlinks=False)
+    assert vfs.stat(src_entry.path, follow_symlinks=True) == dst_entry.stat(follow_symlinks=True)
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "dir_entry",
+        "dirlink_entry",
+        "file_entry",
+        "filelink_entry",
+    ],
+)
+def test_virtual_filesystem_lstat(vfs: VirtualFilesystem, entry: str, request: FixtureRequest) -> None:
+    entry = request.getfixturevalue(entry)
+
+    assert vfs.lstat(entry.path) == entry.lstat()
+    assert vfs.stat(entry.path, follow_symlinks=False) == entry.lstat()
+
+
+@pytest.mark.parametrize(
+    "src_entry, dst_entry",
+    [
+        ("dir_entry", "dir_entry"),
+        ("dirlink_entry", "dir_entry"),
+        ("file_entry", "file_entry"),
+        ("filelink_entry", "file_entry"),
+    ],
+)
+def test_virtual_filesystem_is_dir(
+    vfs: VirtualFilesystem,
+    src_entry: str,
+    dst_entry: str,
+    request: FixtureRequest,
+) -> None:
+    src_entry = request.getfixturevalue(src_entry)
+    dst_entry = request.getfixturevalue(dst_entry)
+
+    assert vfs.is_dir(src_entry.path, follow_symlinks=False) == src_entry.is_dir(follow_symlinks=False)
+    assert vfs.is_dir(src_entry.path, follow_symlinks=True) == src_entry.is_dir(follow_symlinks=True)
+    assert vfs.is_dir(src_entry.path, follow_symlinks=True) == dst_entry.is_dir(follow_symlinks=False)
+    assert vfs.is_dir(src_entry.path, follow_symlinks=True) == dst_entry.is_dir(follow_symlinks=True)
+
+
+@pytest.mark.parametrize(
+    "src_entry, dst_entry",
+    [
+        ("dir_entry", "dir_entry"),
+        ("dirlink_entry", "dir_entry"),
+        ("file_entry", "file_entry"),
+        ("filelink_entry", "file_entry"),
+    ],
+)
+def test_virtual_filesystem_is_file(
+    vfs: VirtualFilesystem,
+    src_entry: str,
+    dst_entry: str,
+    request: FixtureRequest,
+) -> None:
+    src_entry = request.getfixturevalue(src_entry)
+    dst_entry = request.getfixturevalue(dst_entry)
+
+    assert vfs.is_file(src_entry.path, follow_symlinks=False) == src_entry.is_file(follow_symlinks=False)
+    assert vfs.is_file(src_entry.path, follow_symlinks=True) == src_entry.is_file(follow_symlinks=True)
+    assert vfs.is_file(src_entry.path, follow_symlinks=True) == dst_entry.is_file(follow_symlinks=False)
+    assert vfs.is_file(src_entry.path, follow_symlinks=True) == dst_entry.is_file(follow_symlinks=True)
+
+
+@pytest.fixture
+def virt_dir() -> VirtualDirectory:
+    return VirtualDirectory(Mock(), "")
+
+
+@pytest.fixture
+def top_virt_dir() -> VirtualDirectory:
+    return VirtualDirectory(Mock(), "")
+
+
+def test_virutal_directory_stat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
+    assert virt_dir.stat(follow_symlinks=False) == virt_dir._stat()
+    assert virt_dir.stat(follow_symlinks=True) == virt_dir._stat()
+
+    virt_dir.top = top_virt_dir
+    assert virt_dir.stat(follow_symlinks=False) == top_virt_dir.stat(follow_symlinks=False)
+    assert virt_dir.stat(follow_symlinks=True) == top_virt_dir.stat(follow_symlinks=True)
+
+
+def test_virutal_directory_lstat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
+    assert virt_dir.lstat() == virt_dir._stat()
+    assert virt_dir.lstat() == virt_dir.stat(follow_symlinks=False)
+    assert virt_dir.lstat().st_mode == stat.S_IFDIR
+
+    virt_dir.top = top_virt_dir
+    assert virt_dir.lstat() == top_virt_dir.lstat()
+
+
+def test_virutal_directory_is_dir(virt_dir: VirtualDirectory) -> None:
+    assert virt_dir.is_dir(follow_symlinks=True)
+    assert virt_dir.is_dir(follow_symlinks=False)
+
+
+def test_virutal_directory_is_file(virt_dir: VirtualDirectory):
+    assert not virt_dir.is_file(follow_symlinks=True)
+    assert not virt_dir.is_file(follow_symlinks=False)
+
+
+@pytest.fixture
+def virt_file() -> VirtualFile:
+    return VirtualFile(Mock(), "", Mock())
+
+
+def test_virutal_file_stat(virt_file: VirtualFile) -> None:
+    assert virt_file.stat(follow_symlinks=False) == virt_file.lstat()
+    assert virt_file.stat(follow_symlinks=True) == virt_file.lstat()
+
+
+def test_virutal_file_lstat(virt_file: VirtualFile) -> None:
+    assert virt_file.lstat().st_mode == stat.S_IFREG
+
+
+def test_virutal_file_is_dir(virt_file: VirtualFile) -> None:
+    assert not virt_file.is_dir(follow_symlinks=True)
+    assert not virt_file.is_dir(follow_symlinks=False)
+
+
+def test_virutal_file_is_file(virt_file: VirtualFile) -> None:
+    assert virt_file.is_file(follow_symlinks=True)
+    assert virt_file.is_file(follow_symlinks=False)
+
+
+def test_virtual_symlink_stat(filelink_entry: VirtualSymlink, file_entry: Union[VirtualFile, VirtualDirectory]) -> None:
+    assert filelink_entry.stat(follow_symlinks=False) == filelink_entry.lstat()
+    assert filelink_entry.stat(follow_symlinks=True) == file_entry.stat()
+
+
+def test_virtual_symlink_lstat(filelink_entry: VirtualSymlink) -> None:
+    assert filelink_entry.lstat().st_mode == stat.S_IFLNK
+
+
+@pytest.mark.parametrize(
+    "virt_link, is_dir",
+    (
+        ("dirlink_entry", True),
+        ("filelink_entry", False),
+    ),
+)
+def test_virtual_symlink_is_dir(virt_link: str, is_dir: bool, request: FixtureRequest) -> None:
+    virt_link = request.getfixturevalue(virt_link)
+
+    assert virt_link.is_dir(follow_symlinks=False) is False
+    assert virt_link.is_dir(follow_symlinks=True) == is_dir
+
+
+@pytest.mark.parametrize(
+    "virt_link, is_file",
+    (
+        ("dirlink_entry", False),
+        ("filelink_entry", True),
+    ),
+)
+def test_virtual_symlink_is_file(virt_link: str, is_file: bool, request: FixtureRequest) -> None:
+    virt_link = request.getfixturevalue(virt_link)
+
+    assert virt_link.is_file(follow_symlinks=False) is False
+    assert virt_link.is_file(follow_symlinks=True) == is_file
+
+
+@pytest.fixture
+def vfs1() -> VirtualFilesystem:
+    return VirtualFilesystem()
+
+
+@pytest.fixture
+def vfs2() -> VirtualFilesystem:
+    return VirtualFilesystem()
+
+
+@pytest.fixture
+def vfs1_entry(vfs1: VirtualFilesystem) -> VirtualFile:
+    return VirtualFile(vfs1, "vfs1_entry", Mock())
+
+
+@pytest.fixture
+def vfs2_entry(vfs2: VirtualFilesystem) -> VirtualFile:
+    return VirtualFile(vfs2, "vfs2_entry", Mock())
+
+
+@pytest.fixture
+def rootfs(
+    vfs1: VirtualFilesystem,
+    vfs2: VirtualFilesystem,
+    vfs1_entry: VirtualFile,
+    vfs2_entry: VirtualFile,
+) -> RootFilesystem:
     vfs1.map_file_entry("/vfs1_entry", vfs1_entry)
-
     vfs1.symlink("/vfs1/vfs2/", "/link_to_vfs2")
-    vfs1_link = vfs1.get("/link_to_vfs2")
 
-    vfs2 = VirtualFilesystem()
-
-    vfs2_entry = VirtualFile(vfs2, "vfs2_entry", Mock())
     vfs2.map_file_entry("/vfs2_entry", vfs2_entry)
-
     vfs2_shared_entry = VirtualFile(vfs2, "shared_entry", Mock())
     vfs2.map_file_entry("/shared_entry", vfs2_shared_entry)
+
+    vfs1.map_file_entry("/path/to/some/file", VirtualFile(vfs1, "path/to/some/file", Mock()))
+    vfs1.symlink("/path/to/some/", "dirlink")
+    vfs1.symlink("/path/to/some/file", "filelink")
 
     target = Mock()
     rootfs = RootFilesystem(target)
     rootfs.mount("/vfs1", vfs1)
     rootfs.mount("/vfs1/vfs2", vfs2)
+    return rootfs
 
+
+def test_root_filesystem_get(
+    rootfs: RootFilesystem,
+    vfs1: VirtualFilesystem,
+    vfs1_entry: VirtualFile,
+    vfs2_entry: VirtualFile,
+):
     entry_path = "/vfs1/vfs1_entry"
     rootfs_entry = rootfs.get(entry_path)
     assert rootfs_entry.path == entry_path
@@ -712,6 +948,7 @@ def test_filesystem_root_filesystem_get():
 
     entry_path = "/vfs1/link_to_vfs2"
     rootfs_entry = rootfs.get(entry_path)
+    vfs1_link = vfs1.get("/link_to_vfs2")
     assert rootfs_entry.path == entry_path
     assert len(rootfs_entry.entries) == 1
     assert vfs1_link in rootfs_entry.entries
@@ -727,17 +964,130 @@ def test_filesystem_root_filesystem_get():
 
 
 @pytest.fixture
-def mapped_file():
+def root_dir_entry(rootfs: RootFilesystem) -> VirtualDirectory:
+    return rootfs.get("/vfs1/path/to/some")
+
+
+@pytest.fixture
+def root_dirlink_entry(rootfs: RootFilesystem) -> VirtualSymlink:
+    return rootfs.get("/vfs1/dirlink")
+
+
+@pytest.fixture
+def root_file_entry(rootfs: RootFilesystem) -> VirtualFile:
+    return rootfs.get("/vfs1/path/to/some/file")
+
+
+@pytest.fixture
+def root_filelink_entry(rootfs: RootFilesystem) -> VirtualSymlink:
+    return rootfs.get("/vfs1/filelink")
+
+
+@pytest.mark.parametrize(
+    "src_entry, dst_entry",
+    [
+        ("root_dir_entry", "root_dir_entry"),
+        ("root_dirlink_entry", "root_dir_entry"),
+        ("root_file_entry", "root_file_entry"),
+        ("root_filelink_entry", "root_file_entry"),
+    ],
+)
+def test_root_filesystem_entry_stat(src_entry: str, dst_entry: str, request: FixtureRequest) -> None:
+    src_entry = request.getfixturevalue(src_entry)
+    dst_entry = request.getfixturevalue(dst_entry)
+
+    assert src_entry.stat(follow_symlinks=False) == src_entry.lstat()
+    assert src_entry.stat(follow_symlinks=True) == dst_entry.stat()
+
+
+@pytest.mark.parametrize(
+    "entry, st_mode",
+    [
+        ("root_dir_entry", stat.S_IFDIR),
+        ("root_dirlink_entry", stat.S_IFLNK),
+        ("root_file_entry", stat.S_IFREG),
+    ],
+)
+def test_root_filesystem_entry_lstat(entry: str, st_mode: int, request: FixtureRequest) -> None:
+    entry = request.getfixturevalue(entry)
+
+    assert entry.lstat().st_mode == st_mode
+
+
+@pytest.mark.parametrize(
+    "entry, src_is_dir, dst_is_dir",
+    [
+        ("root_dir_entry", True, True),
+        ("root_dirlink_entry", False, True),
+        ("root_file_entry", False, False),
+        ("root_filelink_entry", False, False),
+    ],
+)
+def test_root_filesystem_entry_is_dir(entry: str, src_is_dir: bool, dst_is_dir: bool, request: FixtureRequest) -> None:
+    entry = request.getfixturevalue(entry)
+
+    assert entry.is_dir(follow_symlinks=False) == src_is_dir
+    assert entry.is_dir(follow_symlinks=True) == dst_is_dir
+
+
+@pytest.mark.parametrize(
+    "entry, src_is_file, dst_is_file",
+    [
+        ("root_dir_entry", False, False),
+        ("root_dirlink_entry", False, False),
+        ("root_file_entry", True, True),
+        ("root_filelink_entry", False, True),
+    ],
+)
+def test_root_filesystem_entry_is_file(
+    entry: str,
+    src_is_file: bool,
+    dst_is_file: bool,
+    request: FixtureRequest,
+) -> None:
+    entry = request.getfixturevalue(entry)
+
+    assert entry.is_file(follow_symlinks=False) == src_is_file
+    assert entry.is_file(follow_symlinks=True) == dst_is_file
+
+
+@pytest.fixture
+def mapped_file() -> MappedFile:
     return MappedFile(Mock(), "/some/path", Mock())
 
 
-def test_filesystem_mapped_file_attr(mapped_file):
+def test_mapped_file_stat(mapped_file: MappedFile) -> None:
+    mock_stat = Mock()
+
+    with patch("dissect.target.helpers.fsutil.stat_result.copy", autospec=True) as stat_copy:
+        with patch("os.stat", autospec=True, return_value=mock_stat) as os_stat:
+            with patch("os.lstat", autospec=True, return_value=mock_stat) as os_lstat:
+                mapped_file.stat(follow_symlinks=False)
+                os_lstat.assert_called_with(mapped_file.entry)
+                stat_copy.assert_called_with(mock_stat)
+
+                mapped_file.stat(follow_symlinks=True)
+                os_stat.assert_called_with(mapped_file.entry)
+                stat_copy.assert_called_with(mock_stat)
+
+
+def test_mapped_file_lstat(mapped_file: MappedFile) -> None:
+    mock_stat = Mock()
+
+    with patch("dissect.target.helpers.fsutil.stat_result.copy", autospec=True) as stat_copy:
+        with patch("os.lstat", autospec=True, return_value=mock_stat) as os_lstat:
+            mapped_file.lstat()
+            os_lstat.assert_called_with(mapped_file.entry)
+            stat_copy.assert_called_with(mock_stat)
+
+
+def test_mapped_file_attr(mapped_file: MappedFile) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         mapped_file.attr()
         fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=True)
 
 
-def test_filesystem_mapped_file_lattr(mapped_file):
+def test_mapped_file_lattr(mapped_file: MappedFile) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         mapped_file.lattr()
         fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=False)
