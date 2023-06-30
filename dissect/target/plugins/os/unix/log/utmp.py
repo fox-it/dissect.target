@@ -47,10 +47,10 @@ struct entry {
     struct  exit_status ut_exit;
     long    ut_session;
     struct  timeval ut_tv;
-    int32_t ut_addr_v6[4];
+    int32_t ut_addr_v6[4];         // Internet address of remote host; IPv4 address uses just ut_addr_v6[0]
     char    __unused[20];
 };
-"""
+"""  # noqa: E501
 
 utmp = cstruct.cstruct()
 utmp.load(c_utmp)
@@ -92,7 +92,8 @@ class UtmpFile:
                 if entry.ut_type in utmp.Type.reverse:
                     r_type = utmp.Type.reverse[entry.ut_type]
 
-                # Check if the value is an IPv6 address
+                # UTMP misuses the field ut_addr_v6 for IPv4 and IPv6 addresses, because of this
+                # if the last 12 bytes are zero the value is read as an IPv4-address.
                 if entry.ut_addr_v6[1:] == [0, 0, 0]:
                     ut_addr = struct.pack("<i", entry.ut_addr_v6[0])
                 else:
