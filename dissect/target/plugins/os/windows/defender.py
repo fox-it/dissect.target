@@ -81,7 +81,11 @@ DefenderLogRecord = TargetRecordDescriptor(
 
 DefenderExclusionRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/exclusion",
-    [("datetime", "regf_mtime"), ("string", "type"), ("string", "value")],
+    [
+        ("datetime", "regf_mtime"),
+        ("string", "type"),
+        ("string", "value"),
+    ],
 )
 
 DefenderFileQuarantineRecord = TargetRecordDescriptor(
@@ -451,7 +455,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     self.target.log.warning("Unknown Defender Detection Type %s", resource.detection_type)
 
     @plugin.export(record=DefenderExclusionRecord)
-    def exclusions(self) -> Generator[Record, None, None]:
+    def exclusions(self) -> Generator[Record]:
         """Yield Microsoft Defender exclusions from the Registry"""
 
         # Iterate through all possible versions of the key for Defender exclusions
@@ -466,9 +470,10 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # Due to the fact that every exclusion is a registry value and not a registry key, we can only know
                     # the last modified timestamp of the exclusion type for a given exclusion, not a timestamp for the
                     # exclusion itself. We reflect this to the analyst by using the regf_mtime field.
-                    exclusion_type_last_modified = exclusion_type_subkey.timestamp
                     yield DefenderExclusionRecord(
-                        regf_mtime=exclusion_type_last_modified, type=exclusion_type, value=exclusion_value
+                        regf_mtime=exclusion_type_subkey.last_modified,
+                        type=exclusion_type,
+                        value=exclusion_value,
                     )
 
     @plugin.arg(
