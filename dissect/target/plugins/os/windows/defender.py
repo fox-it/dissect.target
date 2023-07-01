@@ -455,7 +455,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     self.target.log.warning("Unknown Defender Detection Type %s", resource.detection_type)
 
     @plugin.export(record=DefenderExclusionRecord)
-    def exclusions(self) -> Iterator[Record]:
+    def exclusions(self) -> Iterator[DefenderExclusionRecord]:
         """Yield Microsoft Defender exclusions from the Registry"""
 
         # Iterate through all possible versions of the key for Defender exclusions
