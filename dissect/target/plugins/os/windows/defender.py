@@ -471,7 +471,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     # the last modified timestamp of the exclusion type for a given exclusion, not a timestamp for the
                     # exclusion itself. We reflect this to the analyst by using the regf_mtime field.
                     yield DefenderExclusionRecord(
-                        regf_mtime=exclusion_type_subkey.last_modified,
+                        regf_mtime=exclusion_type_subkey.timestamp,
                         type=exclusion_type,
                         value=exclusion_value,
                     )
