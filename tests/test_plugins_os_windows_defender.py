@@ -2,17 +2,20 @@ import os
 import platform
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows import defender
+from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
-def test_defender_evtx_logs(target_win, fs_win, tmp_path):
+def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # map default log location to pass EvtxPlugin's compatibility check
     fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
 
@@ -33,7 +36,7 @@ def test_defender_evtx_logs(target_win, fs_win, tmp_path):
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
 
 
-def test_defender_quarantine_entries(target_win, fs_win):
+def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesystem) -> None:
     quarantine_dir = absolute_path("data/defender-quarantine")
 
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
@@ -61,7 +64,7 @@ def test_defender_quarantine_entries(target_win, fs_win):
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="Path error? OSError: [Errno 22] Invalid argument. Needs to be fixed."
 )
-def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
+def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("data/defender-quarantine")
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
@@ -111,9 +114,7 @@ def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
     assert recovery_dst.joinpath(zone_identifier_filename).read_bytes() == expected_zone_identifier_content
 
 
-def test_defender_exclusions(target_win):
-    hive_hklm = VirtualHive()
-
+def test_defender_exclusions(target_win: Target, hive_hklm: VirtualHive) -> None:
     # https://learn.microsoft.com/en-us/exchange/antispam-and-antimalware/windows-antivirus-software?view=exchserver-2019
     exclusions_example = {
         "Extensions": [".config", ".log", ".cfg"],
@@ -122,7 +123,6 @@ def test_defender_exclusions(target_win):
         "IpAddresses": [],
         "TemporaryPaths": [],
     }
-
     # Recreate the 'Exclusions' registry key based on the example dict
     exclusions_key = VirtualKey(hive_hklm, "Software\\Microsoft\\Windows Defender\\Exclusions")
     for exclusion_type, exclusions in exclusions_example.items():
@@ -131,9 +131,7 @@ def test_defender_exclusions(target_win):
             exclusion_type_key.add_value(exclusion, 0)
         exclusions_key.add_subkey(exclusion_type, exclusion_type_key)
 
-    # Prepare the mock target
     hive_hklm.map_key(exclusions_key.path, exclusions_key)
-    target_win.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
     target_win.add_plugin(defender.MicrosoftDefenderPlugin)
 
     exclusion_records = list(target_win.defender.exclusions())
