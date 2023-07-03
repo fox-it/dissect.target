@@ -456,7 +456,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
     @plugin.export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:
-        """Yield Microsoft Defender exclusions from the Registry"""
+        """Yield Microsoft Defender exclusions from the Registry."""
 
         # Iterate through all possible versions of the key for Defender exclusions
         for exclusions_registry_key in self.target.registry.keys(DEFENDER_EXCLUSION_KEY):
