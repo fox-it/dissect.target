@@ -41,6 +41,16 @@ class TargetdInvalidStateError(FatalError):
     pass
 
 
+class TargetdPartial(functools.partial):
+    def __str__(self):
+        result = self()
+        if isinstance(result, list):
+            result = result[0]
+
+        str_value = getattr(result, "value", "")
+        return str(str_value)
+
+
 class TargetdLoader(ProxyLoader):
     instance = None
 
@@ -130,7 +140,7 @@ class TargetdLoader(ProxyLoader):
     def _get_command(self, func: str) -> tuple[Loader, functools.partial]:
         """For target API"""
         curried_plugin_bridge = functools.update_wrapper(
-            functools.partial(self.plugin_bridge, plugin_func=func), self.plugin_bridge
+            TargetdPartial(self.plugin_bridge, plugin_func=func), self.plugin_bridge
         )
         return (self, curried_plugin_bridge)
 
