@@ -18,7 +18,7 @@ PATTERN_IPTABLES_SAVE_RULE = re.compile(
 )
 
 IptablesSaveRecord = TargetRecordDescriptor(
-    "application/firewall/iptables/save",
+    "linux/iptables/save",
     [
         ("datetime", "ts"),
         ("string", "program"),

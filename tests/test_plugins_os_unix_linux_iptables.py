@@ -5,7 +5,7 @@ from flow.record.fieldtypes import datetime
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.iptables import IptablesSavePlugin
+from dissect.target.plugins.os.unix.linux.iptables import IptablesSavePlugin
 
 
 def test_iptables_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem):
