@@ -464,7 +464,6 @@ class ProcProcess:
             self._stat_file = self._parse_proc_stat_entry()
             self.name = self._process_name
 
-    @internal
     def _parse_proc_status_entry(self) -> dict:
         """Internal function to parse the contents of /proc/[pid]/status."""
         status = self.get("status").open()
@@ -536,7 +535,6 @@ class ProcProcess:
 
             return int(line.split()[1])
 
-    @internal
     def get(self, path) -> FilesystemEntry:
         """Returns a FilesystemEntry relative to this process."""
         return self.entry.get(path)
@@ -608,7 +606,6 @@ class ProcProcess:
         now = self.uptime + from_unix(self._boottime)
         return now
 
-    @internal
     def environ(self) -> Iterator[Environ]:
         """Yields the content of the environ file associated with the process as variable name and value pairs.
 
