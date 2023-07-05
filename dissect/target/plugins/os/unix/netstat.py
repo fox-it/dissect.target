@@ -12,7 +12,7 @@ class NetstatPlugin(Plugin):
         if not self.target.proc:
             raise UnsupportedPluginError("No /proc directory found")
 
-    @export(output="none")
+    @export(output="yield")
     def netstat(self) -> None:
         """This plugin mimics the output `netstat -tunelwap` would generate on a Linux machine."""
         sockets = chain(
@@ -21,15 +21,14 @@ class NetstatPlugin(Plugin):
             self.target.sockets.raw(),
         )
 
-        print(NETSTAT_HEADER)
+        yield NETSTAT_HEADER
 
         for record in sockets:
             local_addr = f"{record.local_ip}:{record.local_port}"
             remote_addr = f"{record.remote_ip}:{record.remote_port}"
             pid_program = f"{record.pid}/{record.name}"
 
-            print(
-                NETSTAT_TEMPLATE.format(
+            yield NETSTAT_TEMPLATE.format(
                     protocol=record.protocol,
                     receive_queue=record.rx_queue,
                     transmit_queue=record.tx_queue,
@@ -41,4 +40,3 @@ class NetstatPlugin(Plugin):
                     pid_program=pid_program,
                     cmdline=record.cmdline,
                 )
-            )
