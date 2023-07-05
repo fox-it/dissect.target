@@ -21,7 +21,7 @@ class NetstatPlugin(Plugin):
             self.target.sockets.raw(),
         )
 
-        print(NETSTAT_HEADER)
+        yield NETSTAT_HEADER
 
         for record in sockets:
             local_addr = f"{record.local_ip}:{record.local_port}"
