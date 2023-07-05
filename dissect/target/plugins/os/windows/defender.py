@@ -384,14 +384,17 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
     __namespace__ = "defender"
 
     def check_compatible(self):
-        # Either the Defender log folder, the quarantine folder or the registry
+        # Either the Defender log folder, the quarantine folder or the exclusions registry key
         # has to exist for this plugin to be compatible.
 
         return any(
             [
                 self.target.fs.path(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
-                self.target.has_function("registry"),
+                (
+                    self.target.has_function("registry")
+                    and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
+                ),
             ]
         )
 
