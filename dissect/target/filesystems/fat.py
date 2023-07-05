@@ -85,15 +85,15 @@ class FatFilesystemEntry(FilesystemEntry):
         """Return whether this entry is a link."""
         return False
 
-    def is_dir(self) -> bool:
-        """Return whether this entry is a directory. Resolves symlinks when possible."""
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a directory."""
         return self.entry.is_directory()
 
-    def is_file(self) -> bool:
-        """Return whether this entry is a file. Resolves symlinks when possible."""
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a file."""
         return not self.is_dir()
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 

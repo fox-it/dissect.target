@@ -79,16 +79,19 @@ class CbFilesystemEntry(FilesystemEntry):
 
             yield CbFilesystemEntry(self.fs, self.fs.session.path_join(path, f["filename"]), f)
 
-    def is_dir(self):
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         return "DIRECTORY" in self.entry["attributes"]
 
-    def is_file(self):
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         return "ARCHIVE" in self.entry["attributes"]
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return False
 
-    def stat(self):
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
@@ -110,9 +113,6 @@ class CbFilesystemEntry(FilesystemEntry):
         raise NotImplementedError()
 
     def readlink_ext(self):
-        raise NotImplementedError()
-
-    def lstat(self):
         raise NotImplementedError()
 
     def attr(self):

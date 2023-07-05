@@ -58,13 +58,13 @@ class AD1FilesystemEntry(FilesystemEntry):
             path = fsutil.join(self.path, fname, alt_separator=self.alt_separator)
             yield AD1FilesystemEntry(self.fs, path, file_)
 
-    def is_file(self):
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         return self.entry.is_file()
 
-    def is_dir(self):
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         return self.entry.is_dir()
 
-    def is_symlink(self):
+    def is_symlink(self) -> bool:
         return False
 
     def readlink(self):
@@ -73,10 +73,10 @@ class AD1FilesystemEntry(FilesystemEntry):
     def readlink_ext(self):
         raise NotASymlinkError()
 
-    def stat(self):
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self.lstat()
 
-    def lstat(self):
+    def lstat(self) -> fsutil.stat_result:
         size = self.entry.size if self.entry.is_file() else 0
         entry_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFREG, entry_addr, id(self.fs), 0, 0, 0, size, 0, 0, 0])
