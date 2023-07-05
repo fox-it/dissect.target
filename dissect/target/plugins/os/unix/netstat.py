@@ -12,7 +12,7 @@ class NetstatPlugin(Plugin):
         if not self.target.proc:
             raise UnsupportedPluginError("No /proc directory found")
 
-    @export(output="none")
+    @export(output="yield")
     def netstat(self) -> None:
         """This plugin mimics the output `netstat -tunelwap` would generate on a Linux machine."""
         sockets = chain(
