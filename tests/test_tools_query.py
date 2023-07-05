@@ -36,6 +36,10 @@ def test_target_query_list(capsys, monkeypatch):
             ["browsers.*.downloads", "bar", "version", "foo"],
             ["bar", "foo"],
         ),
+        (
+            ["apps.webservers.iis.doesnt.exist", "apps.webservers.apache.access"],
+            ["apps.webservers.iis.doesnt.exist*"],
+        ),
     ],
 )
 def test_target_query_invalid_functions(capsys, monkeypatch, given_funcs, expected_invalid_funcs):
