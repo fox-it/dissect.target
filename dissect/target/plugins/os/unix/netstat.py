@@ -28,8 +28,7 @@ class NetstatPlugin(Plugin):
             remote_addr = f"{record.remote_ip}:{record.remote_port}"
             pid_program = f"{record.pid}/{record.name}"
 
-            print(
-                NETSTAT_TEMPLATE.format(
+            yield NETSTAT_TEMPLATE.format(
                     protocol=record.protocol,
                     receive_queue=record.rx_queue,
                     transmit_queue=record.tx_queue,
@@ -41,4 +40,3 @@ class NetstatPlugin(Plugin):
                     pid_program=pid_program,
                     cmdline=record.cmdline,
                 )
-            )
