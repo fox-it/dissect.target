@@ -69,7 +69,7 @@ class ADPolicyPlugin(Plugin):
                 task_file_stat = task_file.stat()
                 xml = task_file.read_text()
                 tree = ElementTree.fromstring(xml)
-                for task in tree.findall(".//{}Task"):
+                for task in tree.findall(".//{*}Task"):
                     properties = task.find("Properties") or task
                     task_data = ElementTree.tostring(task)
                     yield ADPolicyRecord(
