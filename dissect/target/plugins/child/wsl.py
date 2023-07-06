@@ -8,11 +8,11 @@ from dissect.target.target import Target
 
 def find_wsl_installs(target: Target) -> Iterator[Path]:
     """Find all WSL disk files.
-    
+
     Disk files for working (custom) Linux distributions can be located anywhere on the system.
     Locations to disk files for each user's WSL instance is stored in the Windows registry at
     ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss``.
-    
+
     References:
         - https://learn.microsoft.com/en-us/windows/wsl/use-custom-distro
         - https://learn.microsoft.com/en-us/windows/wsl/enterprise
