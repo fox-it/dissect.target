@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import stat
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import Any, BinaryIO, Iterator
 
@@ -124,9 +124,12 @@ class CbFilesystemEntry(FilesystemEntry):
         """Return the stat information of the given path, without resolving links."""
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
 
-        atime = ts.to_unix(datetime.strptime(self.entry["last_access_time"], CB_TIMEFORMAT))
-        mtime = ts.to_unix(datetime.strptime(self.entry["last_write_time"], CB_TIMEFORMAT))
-        ctime = ts.to_unix(datetime.strptime(self.entry["create_time"], CB_TIMEFORMAT))
+        # atime = ts.to_unix(datetime.strptime(self.entry["last_access_time"], CB_TIMEFORMAT))
+        # mtime = ts.to_unix(datetime.strptime(self.entry["last_write_time"], CB_TIMEFORMAT))
+        # ctime = ts.to_unix(datetime.strptime(self.entry["create_time"], CB_TIMEFORMAT))
+        atime = ts.to_unix(_parse_ts(self.entry["last_access_time"]))
+        mtime = ts.to_unix(_parse_ts(self.entry["last_write_time"]))
+        ctime = ts.to_unix(_parse_ts(self.entry["create_time"]))
 
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         st_info = [
@@ -142,3 +145,7 @@ class CbFilesystemEntry(FilesystemEntry):
             ctime,
         ]
         return fsutil.stat_result(st_info)
+
+
+def _parse_ts(ts: str) -> datetime:
+    return datetime.strptime(ts, CB_TIMEFORMAT).replace(tzinfo=timezone.utc)

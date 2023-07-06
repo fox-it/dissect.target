@@ -76,6 +76,6 @@ def test_cb_filesystem_windows(monkeypatch) -> None:
         stat_result = entries[0].stat()
         assert stat_result.st_mode == 0o100755
         assert stat_result.st_ino == 3013187826
-        assert stat_result.st_atime == 3376681200.0
-        assert stat_result.st_mtime == 1664834400.0
-        assert stat_result.st_ctime == 3124220400.0
+        assert stat_result.st_atime == 3376684800.0
+        assert stat_result.st_mtime == 1664841600.0
+        assert stat_result.st_ctime == 3124224000.0
