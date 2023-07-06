@@ -29,14 +29,14 @@ class NetstatPlugin(Plugin):
             pid_program = f"{record.pid}/{record.name}"
 
             yield NETSTAT_TEMPLATE.format(
-                    protocol=record.protocol,
-                    receive_queue=record.rx_queue,
-                    transmit_queue=record.tx_queue,
-                    local_addr=local_addr,
-                    remote_addr=remote_addr,
-                    state=record.state,
-                    owner=record.owner,
-                    inode=record.inode,
-                    pid_program=pid_program,
-                    cmdline=record.cmdline,
-                )
+                protocol=record.protocol,
+                receive_queue=record.rx_queue,
+                transmit_queue=record.tx_queue,
+                local_addr=local_addr,
+                remote_addr=remote_addr,
+                state=record.state,
+                owner=record.owner,
+                inode=record.inode,
+                pid_program=pid_program,
+                cmdline=record.cmdline,
+            )
