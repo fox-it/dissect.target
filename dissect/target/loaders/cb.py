@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from enum import IntEnum
+from datetime import datetime
+from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import ParseResult
 
 from cbc_sdk.errors import CredentialError
 from cbc_sdk.live_response_api import LiveResponseSession
 from cbc_sdk.platform import Device
 from cbc_sdk.rest_api import CBCloudAPI
+from dissect.util import ts
 
 from dissect.target.exceptions import (
     LoaderError,
@@ -29,12 +31,6 @@ if TYPE_CHECKING:
     from cbc_sdk.live_response_api import LiveResponseSession
 
     from dissect.target.target import Target
-
-
-class OS(IntEnum):
-    WINDOWS = 1
-    LINUX = 2
-    MAX = 4
 
 
 class CbLoader(Loader):
@@ -84,81 +80,78 @@ class CbLoader(Loader):
         return path_part == "cb"
 
     def map(self, target: Target) -> None:
-        alt_separator = "\\" if self.session.os_type == OS.WINDOWS else "/"
-        case_sensitive = False if self.session.os_type == OS.WINDOWS else True
         for drive in self.session.session_data["drives"]:
-            cbfs = CbFilesystem(
-                self.cbc_api,
-                self.sensor,
-                self.session,
-                drive,
-                alt_separator=alt_separator,
-                case_sensitive=case_sensitive,
-            )
+            cbfs = CbFilesystem(self.session, drive)
+
             target.filesystems.add(cbfs)
             target.fs.mount(drive.lower(), cbfs)
 
+        target.add_plugin(CbRegistry(target, self.session), check_compatible=False)
+
 
 class CbRegistry(RegistryPlugin):
-    def __init__(self, target: Target, session: LiveResponseSession):
+    __findable__ = False
+
+    def __init__(self, target: Target, session: LiveResponseSession = None):
         self.session = session
         super().__init__(target)
 
+    def check_compatible(self) -> bool:
+        return False
+
     def _init_registry(self) -> None:
-        for hive_name, rootkey in self.MAPPINGS.items():
+        for hive_name, root_key in self.MAPPINGS.items():
             try:
-                hive = CbRegistryHive(self.session, rootkey)
+                hive = CbRegistryHive(self.session, root_key)
                 self._add_hive(hive_name, hive, TargetPath(self.target.fs, "CBR"))
-                self._map_hive(rootkey, hive)
+                self._map_hive(root_key, hive)
             except RegistryError:
                 continue
 
 
 class CbRegistryHive(RegistryHive):
-    def __init__(self, session: LiveResponseSession, rootkey: str):
+    def __init__(self, session: LiveResponseSession, root_key: str):
         self.session = session
-        self.rootkey = rootkey
+        self.root_key = root_key
 
     def key(self, key: str) -> CbRegistryKey:
-        key = "\\".join([self.rootkey, key])
-        return CbRegistryKey(self, key)
+        path = "\\".join([self.root_key, key]) if key else self.root_key
+        return CbRegistryKey(self, path)
 
 
 class CbRegistryKey(RegistryKey):
-    def __init__(self, hive: str, key: str, data=None):
+    def __init__(self, hive: str, path: str):
+        self._path: str = path
+        self._name: str = path.split("\\")[-1]
         super().__init__(hive)
-        self.key = key
-        self._data = data
 
-    @property
+    @cached_property
     def data(self) -> dict:
-        if not self._data:
-            self._data = self.hive.session.list_registry_keys_and_values(self.key)
-        return self._data
+        return self.hive.session.list_registry_keys_and_values(self._path)
 
     @property
     def name(self) -> str:
-        return self.key.split("\\")[-1]
+        return self._name
 
     @property
     def path(self) -> str:
-        return self.key
+        return self._path
 
     @property
-    def timestamp(self) -> None:
-        return None
+    def timestamp(self) -> datetime:
+        return ts.from_unix(0)
 
     def subkey(self, subkey: str) -> CbRegistryKey:
         subkey_val = subkey.lower()
 
         for val in self.data["sub_keys"]:
             if val.lower() == subkey_val:
-                return CbRegistryKey(self.hive, "\\".join([self.key, subkey]), None)
+                return CbRegistryKey(self.hive, "\\".join([self._path, subkey]))
         else:
             raise RegistryKeyNotFoundError(subkey)
 
-    def subkeys(self) -> Iterator[CbRegistryKey]:
-        return map(self.subkey, self.data["sub_keys"])
+    def subkeys(self) -> list[CbRegistryKey]:
+        return list(map(self.subkey, self.data["sub_keys"]))
 
     def value(self, value: str) -> str:
         reg_value = value.lower()
@@ -168,18 +161,18 @@ class CbRegistryKey(RegistryKey):
         else:
             raise RegistryValueNotFoundError(value)
 
-    def values(self) -> Iterator[CbRegistryValue]:
-        return (
+    def values(self) -> list[CbRegistryValue]:
+        return [
             CbRegistryValue(self.hive, val["registry_name"], val["registry_data"], val["registry_type"])
             for val in self.data["values"]
-        )
+        ]
 
 
 class CbRegistryValue(RegistryValue):
-    def __init__(self, hive: str, name: str, data: str, type_: str):
+    def __init__(self, hive: str, name: str, data: str, type: str):
         super().__init__(hive)
         self._name = name
-        self._type = type_
+        self._type = type
 
         if self._type == "pbREG_BINARY":
             self._value = bytes.fromhex(data)
@@ -188,6 +181,7 @@ class CbRegistryValue(RegistryValue):
         elif self._type == "pbREG_MULTI_SZ":
             self._value = data.split(",")
         else:
+            # pbREG_NONE, pbREG_SZ, pbREG_EXPAND_SZ
             self._value = data
 
     @property
