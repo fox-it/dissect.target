@@ -48,11 +48,6 @@ class ITunesFilesystem(Filesystem):
 
 
 class ITunesFilesystemEntry(VirtualFile):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         if self.is_dir():
@@ -72,17 +67,17 @@ class ITunesFilesystemEntry(VirtualFile):
             return self._resolve().scandir()
         return super().scandir()
 
-    def is_dir(self) -> bool:
-        """Return whether this entry is a directory. Resolves symlinks when possible."""
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a directory."""
         try:
-            return stat.S_IFMT(self._resolve().entry.mode) == stat.S_IFDIR
+            return stat.S_IFMT(self._resolve(follow_symlinks=follow_symlinks).entry.mode) == stat.S_IFDIR
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
-        """Return whether this entry is a file. Resolves symlinks when possible."""
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a file."""
         try:
-            return stat.S_IFMT(self._resolve().entry.mode) == stat.S_IFREG
+            return stat.S_IFMT(self._resolve(follow_symlinks=follow_symlinks).entry.mode) == stat.S_IFREG
         except FilesystemError:
             return False
 
@@ -101,9 +96,9 @@ class ITunesFilesystemEntry(VirtualFile):
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
         return fsutil.resolve_link(fs=self.fs, entry=self)
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
-        return self._resolve().lstat()
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         metadata = self.entry.metadata
@@ -129,7 +124,7 @@ class ITunesFilesystemDirectoryEntry(VirtualDirectory):
         super().__init__(fs, path)
         self.entry = entry
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 

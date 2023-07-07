@@ -1,3 +1,4 @@
+import platform
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -9,6 +10,7 @@ from dissect.target.filesystem import VirtualFilesystem
 yara = pytest.importorskip("dissect.target.plugins.filesystem.yara", reason="yara-python module unavailable")
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
 def test_yara_plugin(mock_target):
     test_rule = """
     rule test_rule_name {

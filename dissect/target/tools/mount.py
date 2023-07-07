@@ -4,6 +4,7 @@ from typing import Union
 
 from dissect.target import Target, filesystem
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -22,6 +23,7 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -49,9 +51,13 @@ def main():
         fname = f"disks/disk_{i}"
         vfs.map_file_fh(fname, d)
 
-    for v in t.volumes:
-        fname = f"volumes/{v.name}"
+    for i, v in enumerate(t.volumes):
+        fname = f"volumes/{v.name or f'volume_{i}'}"
         vfs.map_file_fh(fname, v)
+
+    for i, fs in enumerate(t.filesystems):
+        fname = f"filesystems/{fs.volume.name if fs.volume else f'fs_{i}'}"
+        vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments
     options = _parse_options(args.options) if args.options else {}

@@ -34,5 +34,5 @@ def test_plugins_child_wsl(target_win, fs_win):
     )
     assert (
         str(children[4].path)
-        == "/sysvol/ProgramData/Microsoft/Windows/Hyper-V/Virtual Machines/B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"
+        == "\\sysvol\\ProgramData\\Microsoft\\Windows\\Hyper-V\\Virtual Machines\\B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"  # noqa E501
     )

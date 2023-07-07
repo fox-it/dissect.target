@@ -115,7 +115,7 @@ class MftPlugin(Plugin):
             FilesystemFilenameCompactRecord,
         ]
     )
-    @arg("--compact", action="store_true")
+    @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
     def mft(self, compact: bool = False):
         """Return the MFT records of all NTFS filesystems.
 

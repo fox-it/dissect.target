@@ -11,11 +11,17 @@ from typing import Callable
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 
 from dissect.target import Target
-from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import (
+    FatalError,
+    PluginNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers import cache, hashutil
+from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
     generate_argparse_for_bound_method,
@@ -45,6 +51,7 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -125,8 +132,9 @@ def main():
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
         if issubclass(func.class_object, OSPlugin):
-            func.class_object = OSPlugin
-        obj = getattr(func.class_object, func.method_name)
+            obj = getattr(OSPlugin, func.method_name)
+        else:
+            obj = getattr(func.class_object, func.method_name)
         if isinstance(obj, type) and issubclass(obj, Plugin):
             parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
         elif isinstance(obj, Callable) or isinstance(obj, property):
@@ -144,6 +152,8 @@ def main():
         if args.targets:
             for target in args.targets:
                 plugin_target = Target.open(target)
+                if isinstance(plugin_target._loader, ProxyLoader):
+                    parser.error("can't list compatible plugins for remote targets.")
                 funcs = find_plugin_functions(plugin_target, args.list, True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
@@ -173,14 +183,27 @@ def main():
     if not args.function:
         parser.error("argument -f/--function is required")
 
-    # Verify uniformity of output types, otherwise default to records
+    # Verify uniformity of output types, otherwise default to records.
+    # Note that this is a heuristic, the targets are not opened yet because of
+    # performance, so it might generate a false positive
+    # (os.* on Windows includes other OS plugins),
+    # however this is highly hypothetical, most plugins across OSes have
+    # the same output types and most output types are records anyway.
+    # Furthermore we really want the notification at the top, so this is the only
+    # way forward. In the very unlikely case you have a
+    # collection of non-record plugins that have record counterparts for
+    # other OSes just refine the wildcard to exclude other OSes.
+    # The only scenario that might cause this is with
+    # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
     funcs = find_plugin_functions(Target(), args.function, False)
     for func in funcs:
         output_types.add(func.output_type)
 
     default_output_type = None
+
     if len(output_types) > 1:
+        # Give this warning beforehand, if mixed, set default to record (no errors)
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
         default_output_type = "record"
 
@@ -202,10 +225,24 @@ def main():
         basic_entries = []
         yield_entries = []
 
+        # Keep a set of plugins that were already executed on the target.
+        executed_plugins = set()
+
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in funcs:
+        for func_def in find_plugin_functions(target, args.function, False):
+            if func_def.method_name in executed_plugins:
+                continue
+
+            # If the default type is record (meaning we skip everything else)
+            # and actual output type is not record, continue.
+            # We perform this check here because plugins that require output files/dirs
+            # will exit if we attempt to exec them without (because they are implied by the wildcard).
+            # Also this saves cycles of course.
+            if default_output_type == "record" and func_def.output_type != "record":
+                continue
+
             try:
                 output_type, result, cli_params_unparsed = execute_function_on_target(
                     target, func_def, cli_params_unparsed
@@ -213,30 +250,30 @@ def main():
             except UnsupportedPluginError as e:
                 target.log.error(
                     "Unsupported plugin for `%s`: %s",
-                    func,
+                    func_def,
                     e.root_cause_str(),
                 )
 
                 target.log.debug("", exc_info=e)
                 continue
             except PluginNotFoundError:
-                target.log.error("Cannot find plugin `%s`", func)
+                target.log.error("Cannot find plugin `%s`", func_def)
                 continue
+            except FatalError as fatal:
+                fatal.emit_last_message(target.log.error)
+                parser.exit(1)
             except Exception:
-                target.log.error("Exception while executing function `%s`", func, exc_info=True)
+                target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
                 continue
 
             if first_seen_output_type and output_type != first_seen_output_type:
-                # if default is set to record, we already know so continue... (probably a wildcard)
-                if default_output_type == "record":
-                    continue
                 target.log.error(
                     (
                         "Can't mix functions that generate different outputs: output type `%s` from `%s` "
                         "does not match first seen output `%s`."
                     ),
                     output_type,
-                    func,
+                    func_def,
                     first_seen_output_type,
                 )
                 parser.exit()
@@ -244,12 +281,14 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
+            executed_plugins.add(func_def.method_name)
+
             if output_type == "record":
                 record_entries.append(result)
             elif output_type == "yield":
                 yield_entries.append(result)
             elif output_type == "none":
-                target.log.info("No result for function `%s` (output type is set to 'none')", func)
+                target.log.info("No result for function `%s` (output type is set to 'none')", func_def)
                 continue
             else:
                 basic_entries.append(result)

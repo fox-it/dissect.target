@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_users_plugin(target_win_users, fs_win, tmp_path):
     users = list(target_win_users.users())
     assert len(users) == 2
@@ -21,3 +24,19 @@ def test_users_plugin(target_win_users, fs_win, tmp_path):
     fs_win.map_dir("Users\\John", tmp_path)
     users_with_home = list(target_win_users.user_details.all_with_home())
     assert len(users_with_home) == 1  # only John has a home dir
+
+
+def test_users_plugin_find_no_params(target_unix_users):
+    with pytest.raises(ValueError):
+        target_unix_users.user_details.find()
+
+
+def test_users_plugin_find_no_usser(target_unix_users):
+    user_details = target_unix_users.user_details.find(uid=13)
+    assert user_details is None
+
+
+def test_users_plugin_find_uid0(target_unix_users):
+    user_details = target_unix_users.user_details.find(uid=0)
+    assert user_details is not None
+    assert user_details.user.uid == 0

@@ -183,7 +183,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         first_fh = first
     else:
         first_path = first
-        if first_path.exists():
+        if first_path.is_file():
             first_fh = first.open("rb")
             first_fh_opened = True
 
@@ -213,4 +213,6 @@ register("vhdx", "VhdxContainer")
 register("vhd", "VhdContainer")
 register("qcow2", "QCow2Container")
 register("vdi", "VdiContainer")
+register("hdd", "HddContainer")
+register("hds", "HdsContainer")
 register("split", "SplitContainer")

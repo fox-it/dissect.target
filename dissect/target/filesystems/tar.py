@@ -68,11 +68,6 @@ class TarFilesystem(Filesystem):
 
 
 class TarFilesystemEntry(VirtualFile):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         if self.is_dir():
@@ -96,17 +91,17 @@ class TarFilesystemEntry(VirtualFile):
             return self._resolve().scandir()
         return super().scandir()
 
-    def is_dir(self) -> bool:
-        """Return whether this entry is a directory. Resolves symlinks when possible."""
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a directory."""
         try:
-            return self._resolve().entry.isdir()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.isdir()
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
-        """Return whether this entry is a file. Resolves symlinks when possible."""
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a file."""
         try:
-            return self._resolve().entry.isfile()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.isfile()
         except FilesystemError:
             return False
 
@@ -125,9 +120,9 @@ class TarFilesystemEntry(VirtualFile):
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
         return fsutil.resolve_link(fs=self.fs, entry=self)
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
-        return self._resolve().lstat()
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
@@ -153,7 +148,7 @@ class TarFilesystemDirectoryEntry(VirtualDirectory):
         super().__init__(fs, path)
         self.entry = entry
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
         return self.lstat()
 

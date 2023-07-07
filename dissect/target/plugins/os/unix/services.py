@@ -2,7 +2,7 @@ import re
 from itertools import chain
 from typing import BinaryIO, Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
@@ -60,12 +60,13 @@ class ServicesPlugin(Plugin):
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
-                        ts=file_.stat().st_mtime,
+                        ts=file_.stat(follow_symlinks=False).st_mtime,
                         name=file_.name,
                         config=None,
-                        source=str(file_),
+                        source=file_,
                         _target=self.target,
                     )
+                    continue
 
                 config = parse_systemd_config(fh)
 
@@ -73,7 +74,7 @@ class ServicesPlugin(Plugin):
                     ts=file_.stat().st_mtime,
                     name=file_.name,
                     config=config,
-                    source=str(file_),
+                    source=file_,
                     _target=self.target,
                 )
 
@@ -93,7 +94,7 @@ class ServicesPlugin(Plugin):
                         ts=file_.stat().st_mtime,
                         name=file_.name,
                         config=None,
-                        source=str(file_),
+                        source=file_,
                         _target=self.target,
                     )
 
@@ -144,4 +145,4 @@ def parse_systemd_config(fh: BinaryIO) -> str:
     except UnicodeDecodeError:
         pass
 
-    return variables
+    return variables.strip()

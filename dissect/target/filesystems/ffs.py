@@ -49,11 +49,6 @@ class FfsFilesystem(Filesystem):
 
 
 class FfsFilesystemEntry(FilesystemEntry):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
@@ -87,15 +82,15 @@ class FfsFilesystemEntry(FilesystemEntry):
             entry_path = fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator)
             yield FfsFilesystemEntry(self.fs, entry_path, entry)
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_dir()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_file()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_file()
         except FilesystemError:
             return False
 
@@ -108,8 +103,8 @@ class FfsFilesystemEntry(FilesystemEntry):
 
         return self.entry.link
 
-    def stat(self) -> fsutil.stat_result:
-        return self._resolve().lstat()
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         node = self.entry.inode

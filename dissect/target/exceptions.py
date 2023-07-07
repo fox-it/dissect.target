@@ -1,4 +1,7 @@
+import os
+import sys
 import traceback
+from typing import Callable
 
 
 class Error(Exception):
@@ -12,6 +15,17 @@ class Error(Exception):
         super().__init__(message)
         self.__cause__ = cause
         self.__extra__ = extra
+
+
+# Use FatalError if you don't want your error to be buried by other errors
+# but just mark it as fatal so the tools 'on top' may proceed to shutdown
+class FatalError(Error):
+    """An error occurred that cannot be resolved."""
+
+    def emit_last_message(self, emitter: Callable) -> None:
+        emitter(str(self))
+        os.dup2(os.open(os.devnull, os.O_RDWR), sys.stdout.fileno())
+        os.dup2(os.open(os.devnull, os.O_RDWR), sys.stderr.fileno())
 
 
 class TargetError(Error):

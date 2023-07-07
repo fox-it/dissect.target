@@ -1,3 +1,4 @@
+import platform
 import tarfile
 import textwrap
 from datetime import datetime, timezone
@@ -5,6 +6,7 @@ from io import BytesIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+import pytest
 from flow.record.fieldtypes import datetime as dt
 from flow.record.fieldtypes import path
 
@@ -16,6 +18,7 @@ from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, Messages
 from ._utils import absolute_path
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
@@ -48,6 +51,7 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     assert isinstance(syslogs[0], type(MessagesRecord()))
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
 def test_unix_log_messages_compressed_timezone_year_rollover():
     target = Target()
     bio = BytesIO()

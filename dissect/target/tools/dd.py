@@ -10,6 +10,7 @@ from dissect.util.stream import RangeStream
 
 from dissect.target import Target
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -19,6 +20,7 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -58,7 +60,9 @@ def main():
 
         shutil.copyfileobj(fhin, fhout)
     finally:
-        fhout.close()
+        # We should not close the stdout buffer
+        if fhout is not sys.stdout.buffer:
+            fhout.close()
 
 
 if __name__ == "__main__":
