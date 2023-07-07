@@ -176,7 +176,7 @@ class CbRegistryValue(RegistryValue):
 
         if self._type == "pbREG_BINARY":
             self._value = bytes.fromhex(data)
-        elif self._type in ("pbREG_DWORD", "pbREG_QWORD"):
+        elif self._type in ("pbREG_DWORD", "pbREG_QWORD", "pbREG_DWORD_BIG_ENDIAN"):
             self._value = int(data)
         elif self._type == "pbREG_MULTI_SZ":
             self._value = data.split(",")
