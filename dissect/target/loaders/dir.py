@@ -17,9 +17,13 @@ class DirLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
+        if (path / "fs").exists():
+            path /= "fs"
         return find_dirs(path)[0] is not None
 
     def map(self, target: Target) -> None:
+        if (self.path / "fs").exists():
+            self.path /= "fs"
         find_and_map_dirs(target, self.path)
 
 
@@ -81,7 +85,7 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
     if path.is_dir():
         for p in path.iterdir():
             # Look for directories like C or C:
-            if p.is_dir() and is_drive_letter_path(p):
+            if p.is_dir() and (is_drive_letter_path(p) or p.name == "sysvol" or p.name == "$rootfs$"):
                 dirs.append(p)
 
                 if not os_type:
