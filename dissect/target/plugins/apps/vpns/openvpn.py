@@ -4,6 +4,7 @@ from os.path import basename
 from typing import Iterator, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, OperatingSystem
 
@@ -75,7 +76,7 @@ class OpenVPNPlugin(Plugin):
 
     def __init__(self, target) -> None:
         super().__init__(target)
-        self.configs = []
+        self.configs: list[fsutil.TargetPath] = []
         for path in self.config_globs:
             # TODO: Remove .path?
             self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
