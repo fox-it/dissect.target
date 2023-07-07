@@ -51,7 +51,7 @@ class ResolverPlugin(Plugin):
         path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
         # The \??\ pseudo path is used to point to the directory containing
-        # (the user's) devices, e.g. \??\C:\foo\bar. 
+        # (the user's) devices, e.g. \??\C:\foo\bar.
         # The \\?\ prefix in Windows file I/O bypasses string parsing and
         # allows exceeding the MAX_PATH limit, e.g. \\?\C:\very\long\path.
         # For more information see:
