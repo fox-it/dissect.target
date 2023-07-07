@@ -22,9 +22,7 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
         for distribution_key in lxss_key.subkeys():
             if not distribution_key.name.startswith("{"):
                 continue
-            base_path = distribution_key.value("BasePath").value.replace(
-                "\\\\?\\", ""
-            )  # "\\?\" not resolved by Dissect, temporary replace.
+            base_path = target.resolve(distribution_key.value("BasePath").value)
             # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
             yield from target.fs.path(base_path).glob("*.vhdx")
 
