@@ -3,7 +3,7 @@ from io import BytesIO
 
 from flow.record.fieldtypes import path
 
-from dissect.target.plugins.os.unix.ssh import SSHPlugin
+from dissect.target.plugins.apps.ssh.openssh import SSHPlugin
 
 
 def test_authorized_keys_plugin(target_unix_users, fs_unix):
