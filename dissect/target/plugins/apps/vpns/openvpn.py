@@ -1,6 +1,9 @@
+import re
+
 from os.path import basename
 from typing import Iterator, Union
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, OperatingSystem
 
@@ -43,6 +46,9 @@ OpenVPNClient = TargetRecordDescriptor(
 )
 
 
+CONFIG_COMMENT_SPLIT_REGEX = re.compile("(#|;)")
+
+
 class OpenVPNPlugin(Plugin):
     """OpenVPN configuration parser.
 
@@ -51,9 +57,6 @@ class OpenVPNPlugin(Plugin):
     """
 
     __namespace__ = "openvpn"
-
-    """
-    """
 
     config_globs = [
         # This catches openvpn@, openvpn-client@, and openvpn-server@ systemd configurations
@@ -65,28 +68,27 @@ class OpenVPNPlugin(Plugin):
         "sysvol/Program Files/OpenVPN/config/*.conf",
     ]
 
+    user_config_paths = {
+        OperatingSystem.WINDOWS.value: ["OpenVPN/config/*.conf"],
+        OperatingSystem.OSX.value: ["Library/Application Support/OpenVPN Connect/profiles/*.conf"],
+    }
+
     def __init__(self, target) -> None:
         super().__init__(target)
         self.configs = []
         for path in self.config_globs:
-            cfgs = list(self.target.fs.path().glob(path.lstrip("/")))
-            if len(cfgs) > 0:
-                for cfg in cfgs:
-                    self.configs.append(cfg)
+            # TODO: Remove .path?
+            self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
 
-        if target.os == OperatingSystem.WINDOWS.value:
+        user_paths = self.user_config_paths.get(target.os, [])
+        for path in user_paths:
             for user_details in self.target.user_details.all_with_home():
-                for cfg in user_details.home_path.glob("OpenVPN/config/*.conf"):
-                    self.configs.append(cfg)
-
-        if target.os == OperatingSystem.OSX.value:
-            for user_details in self.target.user_details.all_with_home():
-                for cfg in user_details.home_path.glob("Library/Application Support/OpenVPN Connect/profiles/*.conf"):
-                    self.configs.append(cfg)
+                self.configs.extend(user_details.home_path.glob(path))
 
     def check_compatible(self) -> bool:
         if len(self.configs) > 0:
             return True
+        raise UnsupportedPluginError("No OpenVPN configuration files found")
 
     @export(record=[OpenVPNServer, OpenVPNClient])
     def config(self) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
@@ -138,6 +140,7 @@ class OpenVPNPlugin(Plugin):
                 if isinstance(pushed_options, str):
                     pushed_options = [pushed_options]
                 pushed_options = [opt.strip('"').strip("'") for opt in pushed_options]
+                # Defaults here are taken from `man (8) openvpn`
                 yield OpenVPNServer(
                     name=name,
                     proto=proto,
@@ -162,21 +165,23 @@ class OpenVPNPlugin(Plugin):
                 )
 
 
-def _parse_config(content: str) -> dict:
+def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
     """Parses Openvpn config  files"""
     lines = content.splitlines()
     res = {}
 
     for line in lines:
         # As per man (8) openvpn, lines starting with ; or # are comments
-        if line and not (line.startswith(";") or line.startswith("#")):
+        if line and not line.startswith((";", "#")):
             key, *value = line.split(" ", 1)
-            value = next(iter(value), "")
-            value = value.split("#", 1)[0].strip()
-            if old_key := res.get(key):
-                if not isinstance(old_key, list):
-                    old_key = [old_key]
-                res[key] = [*old_key, value]
+            value = value[0] if value else ""
+            # This removes all text after the first comment
+            value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
+            # value = value.split("#", 1)[0].strip()
+            if old_value := res.get(key):
+                if not isinstance(old_value, list):
+                    old_value = [old_value]
+                res[key] = old_value + [value]
             else:
                 res[key] = value
     return res
