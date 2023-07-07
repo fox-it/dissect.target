@@ -124,9 +124,6 @@ class CbFilesystemEntry(FilesystemEntry):
         """Return the stat information of the given path, without resolving links."""
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
 
-        # atime = ts.to_unix(datetime.strptime(self.entry["last_access_time"], CB_TIMEFORMAT))
-        # mtime = ts.to_unix(datetime.strptime(self.entry["last_write_time"], CB_TIMEFORMAT))
-        # ctime = ts.to_unix(datetime.strptime(self.entry["create_time"], CB_TIMEFORMAT))
         atime = ts.to_unix(_parse_ts(self.entry["last_access_time"]))
         mtime = ts.to_unix(_parse_ts(self.entry["last_write_time"]))
         ctime = ts.to_unix(_parse_ts(self.entry["create_time"]))
