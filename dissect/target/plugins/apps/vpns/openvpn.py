@@ -86,9 +86,9 @@ class OpenVPNPlugin(Plugin):
                 self.configs.extend(user_details.home_path.glob(path))
 
     def check_compatible(self) -> bool:
-        if len(self.configs) > 0:
-            return True
-        raise UnsupportedPluginError("No OpenVPN configuration files found")
+        if not self.configs:
+            raise UnsupportedPluginError("No OpenVPN configuration files found")
+        return True
 
     @export(record=[OpenVPNServer, OpenVPNClient])
     def config(self) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
