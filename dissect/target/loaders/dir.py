@@ -19,7 +19,6 @@ class DirLoader(Loader):
     PREFIXES = ["", "fs"]
 
     @classmethod
-    @cache
     def _find_entry_path(cls, path: Path):
         for prefix in cls.PREFIXES:
             if find_dirs(path / prefix)[0] is not None:
