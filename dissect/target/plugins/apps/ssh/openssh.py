@@ -2,9 +2,9 @@ import re
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.ssh import SSHPrivateKey
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import Plugin, export
 
 AuthorizedKeysRecord = TargetRecordDescriptor(
