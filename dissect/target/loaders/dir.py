@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,7 +18,7 @@ class DirLoader(Loader):
     PREFIXES = ["", "fs"]
 
     @classmethod
-    def _find_entry_path(cls, path: Path):
+    def _find_entry_path(cls, path: Path) -> str | None:
         for prefix in cls.PREFIXES:
             if find_dirs(path / prefix)[0] is not None:
                 return prefix
