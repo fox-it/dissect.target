@@ -42,7 +42,7 @@ class Alternatives:
         alternative = cls()
         alternative.os_type = target._os.os
         alternative.seperator = "/"
-        alternative.label = ""
+        alternative.label = "NO_LABEL"
 
         if alternative.os_type == "windows":
             alternative.seperator = target.fs.alt_separator
@@ -204,7 +204,9 @@ def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
     assert private_key.comment == "long comment here"
     assert private_key.public_key == public_key_data
     assert not private_key.encrypted
-    assert str(private_key.source) == target_system.filesystem_path("ssh_host_ed25519_key", TargetDir.SSHD)
+    assert str(private_key.source) == target_system.filesystem_path("ssh_host_ed25519_key", TargetDir.SSHD).replace(
+        target_system.label, "\\sysvol\\"
+    )
 
 
 def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
@@ -385,4 +387,6 @@ def test_public_keys_plugin(target_and_filesystem):
     assert host_public_key.key_type == host_public_key_data.split(" ", 2)[0]
     assert host_public_key.public_key == host_public_key_data.split(" ", 2)[1]
     assert host_public_key.comment == host_public_key_data.split(" ", 2)[2]
-    assert str(host_public_key.source) == target_system.filesystem_path("ssh_host_rsa_key.pub", TargetDir.SSHD)
+    assert str(host_public_key.source) == target_system.filesystem_path("ssh_host_rsa_key.pub", TargetDir.SSHD).replace(
+        target_system.label, "\\sysvol\\"
+    )
