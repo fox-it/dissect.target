@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,15 +16,24 @@ if TYPE_CHECKING:
 class DirLoader(Loader):
     """Load a directory as a filesystem."""
 
+    PREFIXES = ["", "fs"]
+
+    @classmethod
+    @cache
+    def _find_entry_path(cls, path: Path):
+        found = None
+        for prefix in cls.PREFIXES:
+            if find_dirs(path / prefix)[0] is not None:
+                found = prefix
+                break
+        return found
+
     @staticmethod
     def detect(path: Path) -> bool:
-        if (path / "fs").exists():
-            path /= "fs"
-        return find_dirs(path)[0] is not None
+        return DirLoader._find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        if (self.path / "fs").exists():
-            self.path /= "fs"
+        self.path /= self._find_entry_path(self.path)
         find_and_map_dirs(target, self.path)
 
 
