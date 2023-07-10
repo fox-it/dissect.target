@@ -8,7 +8,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import Plugin, export
 
 AuthorizedKeysRecord = TargetRecordDescriptor(
-    "unix/ssh/authorized_keys",
+    "application/openssh/authorized_keys",
     [
         ("string", "user"),
         ("string", "keytype"),
@@ -21,7 +21,7 @@ AuthorizedKeysRecord = TargetRecordDescriptor(
 
 
 KnownHostRecord = TargetRecordDescriptor(
-    "unix/ssh/known_host",
+    "application/openssh/known_host",
     [
         ("string", "user"),
         ("string", "hostname_pattern"),
@@ -35,7 +35,7 @@ KnownHostRecord = TargetRecordDescriptor(
 
 
 PrivateKeyRecord = TargetRecordDescriptor(
-    "unix/ssh/private_key",
+    "application/openssh/private_key",
     [
         ("datetime", "mtime_ts"),
         ("string", "user"),
@@ -49,7 +49,7 @@ PrivateKeyRecord = TargetRecordDescriptor(
 )
 
 PublicKeyRecord = TargetRecordDescriptor(
-    "unix/ssh/public_key",
+    "application/openssh/public_key",
     [
         ("datetime", "mtime_ts"),
         ("string", "user"),
