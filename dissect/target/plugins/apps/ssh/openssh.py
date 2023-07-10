@@ -4,6 +4,7 @@ from typing import Iterator
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.ssh import SSHPrivateKey
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugin import Plugin, export
 
 AuthorizedKeysRecord = TargetRecordDescriptor(
@@ -64,7 +65,13 @@ class SSHPlugin(Plugin):
     __namespace__ = "ssh"
 
     def check_compatible(self):
-        return len(list(self.target.users())) > 0 and self.target.os != "windows"
+        return len(list(self.target.users())) > 0
+
+    def _sshd_directory(self) -> TargetPath:
+        if (target_path := self.target.fs.path("/sysvol/ProgramData/ssh")).exists():
+            return target_path
+
+        return self.target.fs.path("/etc/ssh/")
 
     @export(record=AuthorizedKeysRecord)
     def authorized_keys(self) -> Iterator[AuthorizedKeysRecord]:
@@ -103,7 +110,7 @@ class SSHPlugin(Plugin):
                 [(user_details, path) for path in user_details.home_path.glob(".ssh/known_hosts*")]
             )
 
-        etc_known_hosts = self.target.fs.path("/etc/sshd/ssh_known_hosts")
+        etc_known_hosts = self._sshd_directory().joinpath("ssh_known_hosts")
         if etc_known_hosts.exists():
             known_hosts_files.append((None, etc_known_hosts))
 
@@ -139,7 +146,7 @@ class SSHPlugin(Plugin):
             for file_path in user_details.home_path.glob(".ssh/*"):
                 private_key_files.append((user_details.user.name, file_path))
 
-        for file_path in self.target.fs.path("/etc/ssh/").glob("*"):
+        for file_path in self._sshd_directory().glob("*"):
             private_key_files.append((None, file_path))
 
         for user, file_path in private_key_files:
@@ -178,7 +185,7 @@ class SSHPlugin(Plugin):
             for file_path in user_details.home_path.glob(".ssh/*.pub"):
                 public_key_files.append((user_details.user.name, file_path))
 
-        for file_path in self.target.fs.path("/etc/ssh/").glob("*.pub"):
+        for file_path in self._sshd_directory().glob("*.pub"):
             public_key_files.append((None, file_path))
 
         for user, file_path in public_key_files:
