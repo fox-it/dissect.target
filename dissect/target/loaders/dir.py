@@ -21,12 +21,9 @@ class DirLoader(Loader):
     @classmethod
     @cache
     def _find_entry_path(cls, path: Path):
-        found = None
         for prefix in cls.PREFIXES:
             if find_dirs(path / prefix)[0] is not None:
-                found = prefix
-                break
-        return found
+                return prefix
 
     @staticmethod
     def detect(path: Path) -> bool:
