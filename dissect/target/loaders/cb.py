@@ -6,10 +6,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 from urllib.parse import ParseResult
 
-from cbc_sdk.errors import CredentialError
-from cbc_sdk.live_response_api import LiveResponseSession
-from cbc_sdk.platform import Device
-from cbc_sdk.rest_api import CBCloudAPI
+try:
+    from cbc_sdk.errors import CredentialError
+    from cbc_sdk.live_response_api import LiveResponseSession
+    from cbc_sdk.platform import Device
+    from cbc_sdk.rest_api import CBCloudAPI
+except ImportError:
+    raise ImportError("Please install 'carbon-black-cloud-sdk-python' to use the 'cb://' target.")
+
 from dissect.util import ts
 
 from dissect.target.exceptions import (
