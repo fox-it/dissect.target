@@ -103,10 +103,10 @@ class UtmpFile:
                     ts=from_unix(entry.ut_tv.tv_sec),
                     ut_type=r_type,
                     ut_pid=entry.ut_pid,
-                    ut_user=entry.ut_user.decode().strip("\x00"),
-                    ut_line=entry.ut_line.decode().strip("\x00"),
-                    ut_id=entry.ut_id.decode().strip("\x00"),
-                    ut_host=entry.ut_host.decode().strip("\x00"),
+                    ut_user=entry.ut_user.decode(errors="surrogateescape").strip("\x00"),
+                    ut_line=entry.ut_line.decode(errors="surrogateescape").strip("\x00"),
+                    ut_id=entry.ut_id.decode(errors="surrogateescape").strip("\x00"),
+                    ut_host=entry.ut_host.decode(errors="surrogateescape").strip("\x00"),
                     ut_addr=ipaddress.ip_address(ut_addr),
                 )
 
