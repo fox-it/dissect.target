@@ -14,12 +14,6 @@ if TYPE_CHECKING:
 PREFIXES = ["", "fs"]
 
 
-def find_entry_path(path: Path) -> str | None:
-    for prefix in PREFIXES:
-        if find_dirs(path / prefix)[0] is not None:
-            return prefix
-
-
 class DirLoader(Loader):
     """Load a directory as a filesystem."""
 
@@ -30,6 +24,12 @@ class DirLoader(Loader):
     def map(self, target: Target) -> None:
         self.path /= find_entry_path(self.path)
         find_and_map_dirs(target, self.path)
+
+
+def find_entry_path(path: Path) -> str | None:
+    for prefix in PREFIXES:
+        if find_dirs(path / prefix)[0] is not None:
+            return prefix
 
 
 def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
