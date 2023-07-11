@@ -11,24 +11,24 @@ from dissect.target.plugin import OperatingSystem
 if TYPE_CHECKING:
     from dissect.target import Target
 
+PREFIXES = ["", "fs"]
+
+
+def find_entry_path(path: Path) -> str | None:
+    for prefix in PREFIXES:
+        if find_dirs(path / prefix)[0] is not None:
+            return prefix
+
 
 class DirLoader(Loader):
     """Load a directory as a filesystem."""
 
-    PREFIXES = ["", "fs"]
-
-    @classmethod
-    def _find_entry_path(cls, path: Path) -> str | None:
-        for prefix in cls.PREFIXES:
-            if find_dirs(path / prefix)[0] is not None:
-                return prefix
-
     @staticmethod
     def detect(path: Path) -> bool:
-        return DirLoader._find_entry_path(path) is not None
+        return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        self.path /= self._find_entry_path(self.path)
+        self.path /= find_entry_path(self.path)
         find_and_map_dirs(target, self.path)
 
 
