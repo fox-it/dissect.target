@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 class CbLoader(Loader):
     def __init__(self, path: str, parsed_path: ParseResult = None, **kwargs):
         self.host, _, instance = parsed_path.netloc.partition("@")
-        super(CbLoader, self).__init__(path)
+        super().__init__(path)
 
         # A profile will need to be given as argument to CBCloudAPI
         # e.g. cb://workstation@instance
@@ -94,9 +94,9 @@ class CbLoader(Loader):
 
 
 class CbRegistry(RegistryPlugin):
-    __findable__ = False
+    __register__ = False
 
-    def __init__(self, target: Target, session: LiveResponseSession = None):
+    def __init__(self, target: Target, session: LiveResponseSession):
         self.session = session
         super().__init__(target)
 
@@ -124,14 +124,15 @@ class CbRegistryHive(RegistryHive):
 
 
 class CbRegistryKey(RegistryKey):
-    def __init__(self, hive: str, path: str):
+    def __init__(self, hive: CbRegistryHive, path: str):
+        self.session = hive.session
         self._path: str = path
-        self._name: str = path.split("\\")[-1]
+        self._name: str = path.rsplit("\\", 1)[-1]
         super().__init__(hive)
 
     @cached_property
     def data(self) -> dict:
-        return self.hive.session.list_registry_keys_and_values(self._path)
+        return self.session.list_registry_keys_and_values(self._path)
 
     @property
     def name(self) -> str:

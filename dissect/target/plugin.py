@@ -203,6 +203,8 @@ class Plugin:
     """Defines the plugin namespace."""
     __record_descriptors__: list[RecordDescriptor] = None
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
+    __register__: bool = True
+    """Determines whether this plugin will be registered."""
     __findable__: bool = True
     """Determines whether this plugin will be revealed when using search patterns.
 
@@ -219,7 +221,7 @@ class Plugin:
         super().__init_subclass__(**kwargs)
 
         # Do not register the "base" subclassess `OSPlugin` and `ChildTargetPlugin`
-        if cls.__name__ not in ("OSPlugin", "ChildTargetPlugin"):
+        if cls.__name__ not in ("OSPlugin", "ChildTargetPlugin") and cls.__register__:
             register(cls)
 
         record_descriptors = get_descriptors_on_nonprivate_methods(cls)

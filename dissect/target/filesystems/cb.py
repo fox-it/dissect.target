@@ -63,8 +63,10 @@ class CbFilesystem(Filesystem):
                 }
             else:
                 res = self.session.list_directory(cbpath)
-                if len(res) == 1:
-                    entry = res[0]
+                if len(res) != 1:
+                    raise FileNotFoundError(path)
+
+                entry = res[0]
 
             return CbFilesystemEntry(self, path, entry, cbpath)
         except LiveResponseError:
@@ -81,7 +83,7 @@ class CbFilesystemEntry(FilesystemEntry):
         full_path = fsutil.join(self.path, path)
         return self.fs.get(full_path)
 
-    def open(self) -> bytes:
+    def open(self) -> BinaryIO:
         """Returns file handle (file-like object)."""
         return self.fs.session.get_raw_file(self.cbpath)
 
@@ -97,11 +99,12 @@ class CbFilesystemEntry(FilesystemEntry):
 
         seperator = "\\" if self.fs.session.os_type == OS.WINDOWS else "/"
         for entry in self.fs.session.list_directory(self.cbpath + seperator):
-            if entry["filename"] in (".", ".."):
+            filename = entry["filename"]
+            if filename in (".", ".."):
                 continue
 
-            path = fsutil.join(self.path, entry["filename"], alt_separator=self.fs.alt_separator)
-            cbpath = seperator.join([self.cbpath, entry["filename"]])
+            path = fsutil.join(self.path, filename, alt_separator=self.fs.alt_separator)
+            cbpath = seperator.join([self.cbpath, filename])
             yield CbFilesystemEntry(self.fs, path, entry, cbpath)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
