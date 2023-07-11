@@ -1,12 +1,12 @@
+from typing import Union
+
 from dissect.target.plugins.apps.vpns.openvpn import (
-    OpenVPNPlugin,
     OpenVPNClient,
+    OpenVPNPlugin,
     OpenVPNServer,
 )
 
 from ._utils import absolute_path
-
-from typing import Union
 
 
 def test_openvpn_plugin_unix(target_unix_users, fs_unix):

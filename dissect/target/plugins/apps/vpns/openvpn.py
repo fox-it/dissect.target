@@ -1,13 +1,12 @@
+import itertools
 import re
-
 from os.path import basename
 from typing import Iterator, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, OperatingSystem
-
+from dissect.target.plugin import OperatingSystem, Plugin, export
 
 COMMON_ELEMENTS = [
     ("string", "name"),  # basename of .conf file
@@ -78,18 +77,15 @@ class OpenVPNPlugin(Plugin):
         super().__init__(target)
         self.configs: list[fsutil.TargetPath] = []
         for path in self.config_globs:
-            # TODO: Remove .path?
             self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
 
         user_paths = self.user_config_paths.get(target.os, [])
-        for path in user_paths:
-            for user_details in self.target.user_details.all_with_home():
-                self.configs.extend(user_details.home_path.glob(path))
+        for path, user_details in itertools.product(user_paths, self.target.user_details.all_with_home()):
+            self.configs.extend(user_details.home_path.glob(path))
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not self.configs:
             raise UnsupportedPluginError("No OpenVPN configuration files found")
-        return True
 
     @export(record=[OpenVPNServer, OpenVPNClient])
     def config(self) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
@@ -178,7 +174,6 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
             value = value[0] if value else ""
             # This removes all text after the first comment
             value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
-            # value = value.split("#", 1)[0].strip()
             if old_value := res.get(key):
                 if not isinstance(old_value, list):
                     old_value = [old_value]
