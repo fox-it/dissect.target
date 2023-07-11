@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 import ssl
 import time
 import urllib
@@ -20,11 +21,15 @@ from dissect.target.target import Target
 TARGETD_AVAILABLE = False
 try:
     from flow import remoting
+    from flow.remoting.exceptions import RemoteException
     from targetd.clients import Client
 
     TARGETD_AVAILABLE = True
 except Exception:
     pass
+
+
+log = logging.getLogger(__name__)
 
 
 class TargetdStream(AlignedStream):
@@ -46,6 +51,7 @@ class TargetdLoader(ProxyLoader):
 
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
+        self.log = log
         self._plugin_func = None
         self.client = None
         self.output = None
@@ -77,7 +83,7 @@ class TargetdLoader(ProxyLoader):
             configuration = self.options.get(configurable)
             if not configuration:
                 default_value = getattr(self, configurable)
-                target.log.warning(f"{description} not configured, using: {configurable}={default_value}")
+                self.log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
             else:
                 setattr(self, configurable, value_type(configuration))
 
@@ -95,6 +101,7 @@ class TargetdLoader(ProxyLoader):
             raise ImportError("This loader requires the targetd package to be installed.")
 
         self.output = None
+        self.has_output = False
 
         if self.client is None:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -112,6 +119,10 @@ class TargetdLoader(ProxyLoader):
             self.peers = self.peers
             try:
                 self.client.start()
+            except RemoteException as remote_exception:
+                self.log.warning(remote_exception)
+                self.has_output = True
+                self.output = []
             except Exception:
                 # If something happens that prevents targetd from properly closing/resetting the
                 # connection, this exception is thrown during the next connection and the connection
@@ -123,7 +134,7 @@ class TargetdLoader(ProxyLoader):
             self.client.command = plugin_func
             self.client.exec_command()
 
-        while not self.output:
+        while not self.has_output:
             time.sleep(1)
         return self.output
 
@@ -159,5 +170,6 @@ if TARGETD_AVAILABLE:
         if not targetd.rpcs:
             targetd.easy_connect_remoting(remoting, link, caller.peers)
         func = getattr(targetd.rpcs, targetd.command)
+        caller.has_output = True
         caller.output = list(func())
         targetd.reset()
