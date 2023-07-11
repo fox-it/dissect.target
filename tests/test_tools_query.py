@@ -14,7 +14,7 @@ def test_target_query_list(capsys, monkeypatch):
         out, err = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
-        assert out.endswith("Failed to load:\n    None\n")
+        assert "Failed to load:\n    None\nAvailable loaders:\n" in out
 
 
 @pytest.mark.parametrize(
