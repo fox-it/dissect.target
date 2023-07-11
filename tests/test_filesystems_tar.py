@@ -161,11 +161,13 @@ def test_filesystems_tar(obj, base, request):
         tsymf = fs.get("sym_1")
 
         assert tsymf.is_file()
+        assert not tsymf.is_file(follow_symlinks=False)
         assert not tsymf.is_dir()
         assert tsymf.is_symlink()
 
         assert tsymf.lstat().st_mode == 0o120777
         assert tsymf.stat().st_mode == 0o100777
+        assert tsymf.stat(follow_symlinks=False) == tsymf.lstat()
 
         with pytest.raises(NotADirectoryError):
             tsymf.listdir()
@@ -177,10 +179,12 @@ def test_filesystems_tar(obj, base, request):
 
         assert not tsymd.is_file()
         assert tsymd.is_dir()
+        assert not tsymd.is_dir(follow_symlinks=False)
         assert tsymd.is_symlink()
 
         assert tsymd.lstat().st_mode == 0o120777
         assert tsymd.stat().st_mode == 0o40777
+        assert tsymd.stat(follow_symlinks=False) == tsymd.lstat()
 
         with pytest.raises(IsADirectoryError):
             tsymd.open()

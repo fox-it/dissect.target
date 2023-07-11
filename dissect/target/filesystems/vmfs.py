@@ -51,11 +51,6 @@ class VmfsFilesystem(Filesystem):
 
 
 class VmfsFilesystemEntry(FilesystemEntry):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         """Get a filesystem entry relative from the current one."""
         full_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
@@ -92,17 +87,17 @@ class VmfsFilesystemEntry(FilesystemEntry):
             path = fsutil.join(self.path, f.name, alt_separator=self.fs.alt_separator)
             yield VmfsFilesystemEntry(self.fs, path, f)
 
-    def is_dir(self) -> bool:
-        """Return whether this entry is a directory. Resolves symlinks when possible."""
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a directory."""
         try:
-            return self._resolve().entry.is_dir()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
-        """Return whether this entry is a file. Resolves symlinks when possible."""
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        """Return whether this entry is a file."""
         try:
-            resolved = self._resolve()
+            resolved = self._resolve(follow_symlinks=follow_symlinks)
             return resolved.entry.is_file() or resolved.entry.is_system()
         except FilesystemError:
             return False
@@ -118,9 +113,9 @@ class VmfsFilesystemEntry(FilesystemEntry):
 
         return self.entry.link
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""
-        return self._resolve().lstat()
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""

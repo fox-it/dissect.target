@@ -11,6 +11,7 @@ from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -38,6 +39,7 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
@@ -123,7 +125,7 @@ def print_target_info(target: Target) -> None:
     print()
     print(f"Hostname      : {target.hostname}")
     print(f"Domain        : {target.domain}")
-    print(f"IPs           : {', '.join(target.ips)}")
+    print(f"IPs           : {', '.join(target.ips or ['None'])}")
     print(f"OS family     : {target.os} ({target._os_plugin.__name__})")
     print(f"OS version    : {target.version}")
     print(f"Architecture  : {target.architecture}")

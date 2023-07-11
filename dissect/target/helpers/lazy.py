@@ -10,7 +10,7 @@ class LazyImport:
         if not self._module:
             try:
                 self._module = importlib.import_module(self._module_name)
-            except ImportError as e:
+            except Exception as e:
                 self._module = FailedImport(e, self)
 
     def __getattr__(self, attr):
@@ -44,22 +44,26 @@ class LazyAttr:
         self.module = module
         self._realattr = None
 
-    def __call__(self, *args, **kwargs):
+    @property
+    def realattr(self):
         if not self._realattr:
-            self.module._import()  # noqa
-            self._realattr = getattr(self.module._module, self.attr)  # noqa
+            self.module._import()
+            self._realattr = getattr(self.module._module, self.attr)
 
-        return self._realattr(*args, **kwargs)
+        return self._realattr
+
+    @property
+    def __doc__(self):
+        return self.realattr.__doc__
+
+    def __call__(self, *args, **kwargs):
+        return self.realattr(*args, **kwargs)
 
     def __getattr__(self, attr):
-        if not self._realattr:
-            self.module._import()  # noqa
-            self._realattr = getattr(self.module._module, self.attr)  # noqa
-
-        return getattr(self._realattr, attr)
+        return getattr(self.realattr, attr)
 
     def __repr__(self):
-        return f"<lazyattr {self.module._module_name}.{self.attr} loaded={self._realattr is not None}>"
+        return f"<lazyattr {self.module._module_name}.{self.attr} loaded={self.realattr is not None}>"
 
 
 def import_lazy(module_name):

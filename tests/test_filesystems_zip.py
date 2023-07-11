@@ -123,6 +123,7 @@ def test_filesystems_zip(obj, base, request):
     assert file1.open().read() == b"contents 1"
 
     assert zfile.stat().st_mode == 0o100777
+    assert zfile.stat(follow_symlinks=False) == zfile.lstat()
 
     if isinstance(zdir, ZipFilesystemEntry):
         assert zdir.stat().st_mode == 0o40777

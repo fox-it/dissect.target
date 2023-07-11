@@ -287,31 +287,38 @@ class Filesystem:
         except Exception:
             return False
 
-    def is_file(self, path: str) -> bool:
-        """Determine if ``path`` is a file on the filesystem, resolving symlinks when possible.
+    def is_file(self, path: str, follow_symlinks: bool = True) -> bool:
+        """Determine if ``path`` is a file on the filesystem.
 
         Args:
-            path: the path on the filesystem.
+            path: The path on the filesystem.
+            follow_symlinks: Whether to resolve the path if it is a symbolic link.
 
         Returns:
-            ``True`` if the given path is a file, ``False`` otherwise.
+            ``True`` if the given path is a file or a symbolic link to a file, return ``False`` otherwise.  If
+            ``follow_symlinks`` is ``False``, return ``True`` only if the given path is a file (without
+            following symlinks).
         """
         try:
-            return self.get(path).is_file()
+            return self.get(path).is_file(follow_symlinks=follow_symlinks)
         except FileNotFoundError:
             return False
 
-    def is_dir(self, path: str) -> bool:
-        """Determine whether the given ``path`` is a directory on the filesystem, resolving symlinks when possible.
+    def is_dir(self, path: str, follow_symlinks: bool = True) -> bool:
+        """Determine whether the given ``path`` is a directory on the filesystem.
 
         Args:
-            path: the path on the filesystem.
+            path: The path on the filesystem.
+            follow_symlinks: Whether to resolve the path if it is a symbolic link.
 
         Returns:
-            ``True`` if the given path is a directory, ``False`` otherwise.
+            ``True`` if the given path is a directory or a symbolic link to a directory, return ``False``
+            otherwise.
+            If ``follow_symlinks`` is ``False``, return ``True`` only if the given path is a directory
+            (without following symlinks).
         """
         try:
-            return self.get(path).is_dir()
+            return self.get(path).is_dir(follow_symlinks=follow_symlinks)
         except FileNotFoundError:
             return False
 
@@ -319,7 +326,7 @@ class Filesystem:
         """Determine wether the given ``path`` is a symlink on the filesystem.
 
         Args:
-            path: the path on the filesystem.
+            path: The path on the filesystem.
 
         Returns:
             ``True`` if the given path is a symbolic link, ``False`` otherwise.
@@ -336,7 +343,7 @@ class Filesystem:
         This means it follows the path a link points to, it tries to do it recursively.
 
         Args:
-            path: the symbolic link to read.
+            path: The symbolic link to read.
 
         Returns:
             The path the link points to.
@@ -357,18 +364,20 @@ class Filesystem:
         """
         return self.get(path).readlink_ext()
 
-    def stat(self, path: str) -> fsutil.stat_result:
-        """Determine the stat information of a ``path`` on the filesystem, resolving any symlinks.
+    def stat(self, path: str, follow_symlinks: bool = True) -> fsutil.stat_result:
+        """Determine the stat information of a ``path`` on the filesystem.
 
-        If the path is a symlink, it gets resolved, attempting to stat the path where to points to.
+        If ``path`` is a symlink and ``follow_symlinks`` is ``True``, it gets resolved, attempting to stat the
+        path where it points to.
 
         Args:
             path: The filesystem path we want the stat information from.
+            follow_symlinks: Whether to resolve the path if it is a symbolic link.
 
         Returns:
             The stat information of the given path.
         """
-        return self.get(path).stat()
+        return self.get(path).stat(follow_symlinks=follow_symlinks)
 
     def lstat(self, path: str) -> fsutil.stat_result:
         """Determine the stat information of a ``path`` on the filesystem, **without** resolving symlinks.
@@ -451,6 +460,22 @@ class FilesystemEntry:
 
     def __str__(self) -> str:
         return str(self.path)
+
+    def _resolve(self, follow_symlinks: bool = True) -> FilesystemEntry:
+        """Helper method to resolve symbolic links.
+
+        If ``follow_symlinks`` is ``False``, this function is effectively a no-op.
+
+        Args:
+            follow_symlinks: Whether to resolve the entry if it is a symbolic link.
+
+        Returns:
+            The resolved symbolic link if ``follow_symlinks`` is ``True`` and the ``FilesystemEntry`` is a
+            symbolic link or else the ``FilesystemEntry`` itself.
+        """
+        if follow_symlinks and self.is_symlink():
+            return self.readlink_ext()
+        return self
 
     def get(self, path: str) -> FilesystemEntry:
         """Retrieve a FilesystemEntry relative to this entry.
@@ -610,24 +635,36 @@ class FilesystemEntry:
         except Exception:
             return False
 
-    def is_file(self) -> bool:
-        """Determine if this entry is a file, resolving symlinks when possible.
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        """Determine if this entry is a file.
+
+        Args:
+            follow_symlinks: Whether to resolve the entry if it is a symbolic link.
 
         Returns:
-            ``True`` if the entry is a file, ``False`` otherwise.
+            ``True`` if the entry is a file or a symbolic link to a file, return ``False`` otherwise.
+            If ``follow_symlinks`` is ``False``, return ``True`` only if the entry is a file (without
+            following symlinks).
         """
         raise NotImplementedError()
 
-    def is_dir(self) -> bool:
-        """Determine if this entry is a directory, resolving symlinks when possible.
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """Determine if this entry is a directory.
+
+        Args:
+            follow_symlinks: Whether to resolve the entry if it is a symbolic link.
 
         Returns:
-            ``True`` if the entry is a directory, ``False`` otherwise.
+            ``True`` if the entry is a directory or a symbolic link to a directory, return ``False``
+            otherwise.
+            If ``follow_symlinks`` is ``False``, return ``True`` only if the entry is a directory (without
+            following symlinks).
+
         """
         raise NotImplementedError()
 
     def is_symlink(self) -> bool:
-        """Determine wether this entry is a symlink.
+        """Determine whether this entry is a symlink.
 
         Returns:
             ``True`` if the entry is a symbolic link, ``False`` otherwise.
@@ -657,10 +694,14 @@ class FilesystemEntry:
         # Default behavior, resolve link own filesystem.
         return fsutil.resolve_link(fs=self.fs, entry=self)
 
-    def stat(self) -> fsutil.stat_result:
-        """Determine the stat information of this entry, resolving any symlinks.
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        """Determine the stat information of this entry.
 
-        If the entry is a symlink, it gets resolved, attempting to stat the path where to points to.
+        If the entry is a symlink and ``follow_symlinks`` is ``True``, it gets resolved, attempting to stat
+        the path where it points to.
+
+        Args:
+            follow_symlinks: Whether to resolve the symbolic link if this entry is a symbolic link.
 
         Returns:
             The stat information of this entry.
@@ -805,9 +846,9 @@ class VirtualDirectory(FilesystemEntry):
         path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 0, 0, 0, 0, 0, 0, 0])
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if self.top:
-            return self.top.stat()
+            return self.top.stat(follow_symlinks=follow_symlinks)
         return self._stat()
 
     def lstat(self) -> fsutil.stat_result:
@@ -815,10 +856,10 @@ class VirtualDirectory(FilesystemEntry):
             return self.top.lstat()
         return self._stat()
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         return True
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         return False
 
     def is_symlink(self) -> bool:
@@ -873,17 +914,18 @@ class VirtualFile(FilesystemEntry):
     def open(self) -> BinaryIO:
         return VirtualFileHandle(self.entry)
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
         size = getattr(self.entry, "size", 0)
         file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 0, 0, 0, size, 0, 0, 0])
 
-    lstat = stat
-
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         return False
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         return True
 
     def is_symlink(self) -> bool:
@@ -902,11 +944,20 @@ class MappedFile(VirtualFile):
     def open(self) -> BinaryIO:
         return io.open(self.entry, "rb")
 
-    def stat(self) -> fsutil.stat_result:
-        return fsutil.stat_result.copy(os.stat(self.entry))
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        if follow_symlinks:
+            return fsutil.stat_result.copy(os.stat(self.entry))
+        else:
+            return self.lstat()
 
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(os.lstat(self.entry))
+
+    def attr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=True)
+
+    def lattr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=False)
 
 
 class VirtualSymlink(FilesystemEntry):
@@ -934,17 +985,23 @@ class VirtualSymlink(FilesystemEntry):
     def open(self) -> BinaryIO:
         return self.readlink_ext().open()
 
-    def stat(self) -> fsutil.stat_result:
-        return self.readlink_ext().stat()
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         link_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFLNK, link_addr, id(self.fs), 0, 0, 0, len(self.target), 0, 0, 0])
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks:
+            return False
+
         return self.readlink_ext().is_dir()
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks:
+            return False
+
         return self.readlink_ext().is_file()
 
     def is_symlink(self) -> bool:
@@ -1266,12 +1323,6 @@ class RootFilesystemEntry(FilesystemEntry):
             exceptions = "No entries"
         raise FilesystemError(f"Can't resolve {func} for {self}: {exceptions}")
 
-    def _resolve(self) -> FilesystemEntry:
-        """Helper method to resolve symbolic links."""
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         self.fs.target.log.debug("%r::get(%r)", self, path)
         return self.fs.get(path, self._resolve())
@@ -1316,17 +1367,17 @@ class RootFilesystemEntry(FilesystemEntry):
             path = fsutil.join(selfentry.path, entry_name, alt_separator=selfentry.fs.alt_separator)
             yield RootFilesystemEntry(selfentry.fs, path, entries)
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         self.fs.target.log.debug("%r::is_file()", self)
         try:
-            return self._resolve()._exec("is_file")
+            return self._resolve(follow_symlinks=follow_symlinks)._exec("is_file", follow_symlinks=follow_symlinks)
         except FileNotFoundError:
             return False
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         self.fs.target.log.debug("%r::is_dir()", self)
         try:
-            return self._resolve()._exec("is_dir")
+            return self._resolve(follow_symlinks=follow_symlinks)._exec("is_dir", follow_symlinks=follow_symlinks)
         except FileNotFoundError:
             return False
 
@@ -1340,9 +1391,9 @@ class RootFilesystemEntry(FilesystemEntry):
             raise FilesystemError(f"Not a link: {self}")
         return self._exec("readlink")
 
-    def stat(self) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         self.fs.target.log.debug("%r::stat()", self)
-        return self._resolve()._exec("stat")
+        return self._resolve(follow_symlinks=follow_symlinks)._exec("stat", follow_symlinks=follow_symlinks)
 
     def lstat(self) -> fsutil.stat_result:
         self.fs.target.log.debug("%r::lstat()", self)

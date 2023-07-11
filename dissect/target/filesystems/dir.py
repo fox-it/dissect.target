@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import BinaryIO, Iterator
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -55,11 +55,6 @@ class DirectoryFilesystem(Filesystem):
 
 
 class DirectoryFilesystemEntry(FilesystemEntry):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return self.fs.get(path)
@@ -96,15 +91,15 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         except FilesystemError:
             return False
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_dir()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_file()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.is_file()
         except FilesystemError:
             return False
 
@@ -114,14 +109,14 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         return os.readlink(self.entry)  # Python 3.7 compatibility
 
-    def stat(self) -> fsutil.stat_result:
-        return self._resolve().entry.lstat()
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
 
     def lstat(self) -> fsutil.stat_result:
         return fsutil.stat_result.copy(self.entry.lstat())
 
-    def attr(self) -> Any:
-        raise TypeError()
+    def attr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=True)
 
-    def lattr(self) -> Any:
-        raise TypeError()
+    def lattr(self) -> dict[str, bytes]:
+        return fsutil.fs_attrs(self.entry, follow_symlinks=False)

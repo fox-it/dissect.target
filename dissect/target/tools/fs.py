@@ -12,6 +12,7 @@ import sys
 from dissect.target import Target
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
@@ -72,6 +73,7 @@ def _extract_path(path: TargetPath, output_path: str) -> None:
         log.exception(e)
 
 
+@catch_sigpipe
 def main():
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(

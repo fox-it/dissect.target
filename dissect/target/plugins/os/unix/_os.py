@@ -185,11 +185,15 @@ class UnixPlugin(OSPlugin):
                 if dev_id:
                     if volume.fs.__fstype__ == "xfs":
                         fs_id = volume.fs.xfs.uuid
-                    elif volume.fs.__fstype__ == "extfs":
+                    elif volume.fs.__fstype__ == "ext":
                         fs_id = volume.fs.extfs.uuid
                         last_mount = volume.fs.extfs.last_mount
                     elif volume.fs.__fstype__ == "fat":
                         fs_id = volume.fs.fatfs.volume_id
+                        # This normalizes fs_id to comply with libblkid generated UUIDs
+                        # This is needed because FAT filesystems don't have a real UUID,
+                        # but instead a volume_id which is not case-sensitive
+                        fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
 
                 if (
                     (fs_id and (fs_id == dev_id))
@@ -224,7 +228,7 @@ class UnixPlugin(OSPlugin):
         os_release = {}
 
         for path in self.target.fs.glob(glob):
-            if self.target.fs.path(path).exists():
+            if self.target.fs.path(path).is_file():
                 with self.target.fs.path(path).open("rt") as release_file:
                     for line in release_file:
                         if line.startswith("#"):

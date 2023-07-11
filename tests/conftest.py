@@ -1,7 +1,9 @@
+import os
 import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
+from typing import Iterator
 
 import pytest
 
@@ -125,7 +127,7 @@ def target_win_users(hive_hklm, hive_hku, target_win):
 
 
 @pytest.fixture
-def target_win_tzinfo(hive_hklm, target_win):
+def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
     tz_info = VirtualKey(hive_hklm, tz_info_path)
     tz_info.add_value("TimeZoneKeyName", "Easter Island Standard Time")
@@ -161,6 +163,26 @@ def target_win_tzinfo(hive_hklm, target_win):
 
 
 @pytest.fixture
+def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
+    tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
+    tz_info = VirtualKey(hive_hklm, tz_info_path)
+    tz_info.add_value("StandardName", "Paaseiland")
+
+    east_tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\Easter Island Standard Time"
+    east_tz_data = VirtualKey(hive_hklm, east_tz_data_path)
+    east_tz_data.add_value("Display", "(UTC-06:00) Easter Island")
+    east_tz_data.add_value("Dlt", "Easter Island Daylight Time")
+    east_tz_data.add_value("Std", "Paaseiland")
+    east_tzi = bytes.fromhex("6801000000000000c4ffffff0000040006000100160000000000000000000900060001001600000000000000")
+    east_tz_data.add_value("TZI", east_tzi)
+
+    hive_hklm.map_key(tz_info_path, tz_info)
+    hive_hklm.map_key(east_tz_data_path, east_tz_data)
+
+    yield target_win
+
+
+@pytest.fixture
 def target_unix_users(target_unix, fs_unix):
     passwd = """
     root:x:0:0:root:/root:/bin/bash
@@ -168,3 +190,49 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def xattrs():
+    return {"some_key": b"some_value"}
+
+
+@pytest.fixture
+def listxattr_spec(xattrs):
+    # listxattr() is only available on Linux
+    attr_names = list(xattrs.keys())
+
+    if hasattr(os, "listxattr"):
+        spec = {
+            "create": False,
+            "autospec": True,
+            "return_value": attr_names,
+        }
+    else:
+        spec = {
+            "create": True,
+            "return_value": attr_names,
+        }
+
+    return spec
+
+
+@pytest.fixture
+def getxattr_spec(xattrs):
+    # getxattr() is only available on Linux
+    attr_name = list(xattrs.keys())[0]
+    attr_value = xattrs.get(attr_name)
+
+    if hasattr(os, "getxattr"):
+        spec = {
+            "create": False,
+            "autospec": True,
+            "return_value": attr_value,
+        }
+    else:
+        spec = {
+            "create": True,
+            "return_value": attr_value,
+        }
+
+    return spec
