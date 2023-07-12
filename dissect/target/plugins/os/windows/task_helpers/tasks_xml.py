@@ -19,9 +19,48 @@ from dissect.target.plugins.os.windows.task_helpers.tasks_records import (
     TimeTriggerRecord,
     TriggerRecord,
 )
-from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
+
+
+class ScheduledTasks:
+    def __init__(self, xml_file: TargetPath):
+        try:
+            self.xml_data = self.strip_namespace(ElementTree.fromstring(xml_file.open().read(), forbid_dtd=True))
+        except Exception as e:
+            raise InvalidTaskError(e)
+
+        self.task_path = xml_file
+        self.tasks = self.get_tasks()
+
+    def strip_namespace(self, data: Element) -> Element:
+        """Strip namespace from XML data.
+
+        If the data has a namespace, it will be removed from all the XML tags.
+
+        Args:
+            data: The XML data as an Element object.
+
+        Returns:
+            The XML data with the stripped namespace.
+        """
+        if data.tag.startswith("{"):
+            ns_length = data.tag.find("}")
+            ns = data.tag[0 : ns_length + 1]
+            for element in data.iter():
+                if element.tag.startswith(ns):
+                    element.tag = element.tag[len(ns) :]
+        return data
+
+    def get_tasks(self):
+        tasks = []
+        if self.xml_data.tag == "Task":
+            tasks.append(XmlTask(self.xml_data, self.task_path))
+        else:
+            for task_element in self.xml_data.findall(".//{*}Task"):
+                tasks.append(XmlTask(task_element, self.task_path))
+
+        return tasks
 
 
 class XmlTask:
@@ -32,13 +71,21 @@ class XmlTask:
         target: the target system.
     """
 
-    def __init__(self, xml_file: TargetPath, target: Target):
-        try:
-            self.xml_data = self.strip_namespace(ElementTree.fromstring(xml_file.open().read(), forbid_dtd=True))
-        except Exception as e:
-            raise InvalidTaskError(e)
+    def __init__(self, task_element: Element, task_path: TargetPath):
+        self.task_path = task_path
+        self.task_element = task_element
 
-        self.task_path = xml_file
+        # Properties
+        self.task_name = self.get_element("Properties", attribute="name")
+        self.app_name = self.get_element("Properties", attribute="appName")
+        self.args = self.get_element("Properties", attribute="args")
+        self.start_in = self.get_element("Properties", attribute="startIn")
+        self.comment = self.get_element("Properties", attribute="comment")
+        self.run_as = self.get_element("Properties", attribute="runAs")
+        self.cpassword = self.get_element("Properties", attribute="cpassword")
+        self.enabled = self.get_element("Properties", attribute="enabled")
+        self.action = self.get_element("Properties", attribute="action")
+
         self.uri = self.get_element("RegistrationInfo/URI")
         self.security_descriptor = self.get_element("RegistrationInfo/SecurityDescriptor")
         self.source = self.get_element("RegistrationInfo/Source")
@@ -88,6 +135,8 @@ class XmlTask:
         # Data
         self.data = self.get_raw("Data")
 
+        self.raw_data = self.get_raw()
+
     def strip_namespace(self, data: Element) -> Element:
         """Strip namespace from XML data.
 
@@ -120,7 +169,7 @@ class XmlTask:
         Returns:
             str: The value of the XML element if found, otherwise None.
         """
-        xml_data = xml_data or self.xml_data
+        xml_data = xml_data or self.task_element
         data = xml_data.find(xml_path)
 
         if data is None:
@@ -130,7 +179,7 @@ class XmlTask:
 
         return data.text
 
-    def get_raw(self, xml_path: str) -> str:
+    def get_raw(self, xml_path: Optional[str] = None) -> str:
         """Get the raw XML data of the specified element.
 
         Args:
@@ -139,9 +188,9 @@ class XmlTask:
         Returns:
             bytes: The raw XML data as string of the element if found, otherwise None.
         """
-        data = self.xml_data.find(xml_path)
+        data = self.task_element.find(xml_path) if xml_path else self.task_element
         if data:
-            return ElementTree.tostring(data, encoding="utf-8")
+            return ElementTree.tostring(data, encoding="utf-8").strip()
 
     def get_triggers(self) -> Iterator[GroupedRecord]:
         """Get the triggers from the XML task data.
@@ -149,7 +198,7 @@ class XmlTask:
         Yields:
             GroupedRecord: The grouped record representing a trigger.
         """
-        for trigger in self.xml_data.findall("Triggers/*"):
+        for trigger in self.task_element.findall("Triggers/*"):
             trigger_type = trigger.tag
             enabled = self.get_element("Enabled", trigger)
             start_boundary = self.get_element("StartBoundary", trigger)
@@ -233,7 +282,7 @@ class XmlTask:
         Yields:
             ActionRecord: The action record representing an action.
         """
-        for action in self.xml_data.findall("Actions/*"):
+        for action in self.task_element.findall("Actions/*"):
             action_type = action.tag
             if action_type == "Exec":
                 command = self.get_element("Actions/Exec/Command")
