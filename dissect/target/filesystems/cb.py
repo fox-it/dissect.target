@@ -89,15 +89,15 @@ class CbFilesystemEntry(FilesystemEntry):
 
     def iterdir(self) -> Iterator[str]:
         """List the directory contents of a directory. Returns a generator of strings."""
-        for f in self.scandir():
-            yield f.name
+        for entry in self.scandir():
+            yield entry.name
 
     def scandir(self) -> Iterator[CbFilesystemEntry]:
         """List the directory contents of this directory. Returns a generator of filesystem entries."""
         if not self.is_dir():
             raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-        seperator = "\\" if self.fs.session.os_type == OS.WINDOWS else "/"
+        seperator = self.alt_seperator or "/"
         for entry in self.fs.session.list_directory(self.cbpath + seperator):
             filename = entry["filename"]
             if filename in (".", ".."):
