@@ -21,7 +21,6 @@ from dissect.target.target import Target
 TARGETD_AVAILABLE = False
 try:
     from flow import remoting
-    from flow.remoting.exceptions import RemoteException
     from targetd.clients import Client
 
     TARGETD_AVAILABLE = True
@@ -51,7 +50,6 @@ class TargetdLoader(ProxyLoader):
 
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
-        self.log = log
         self._plugin_func = None
         self.client = None
         self.output = None
@@ -83,7 +81,7 @@ class TargetdLoader(ProxyLoader):
             configuration = self.options.get(configurable)
             if not configuration:
                 default_value = getattr(self, configurable)
-                self.log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
+                log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
             else:
                 setattr(self, configurable, value_type(configuration))
 
@@ -119,10 +117,6 @@ class TargetdLoader(ProxyLoader):
             self.peers = self.peers
             try:
                 self.client.start()
-            except RemoteException as remote_exception:
-                self.log.warning(remote_exception)
-                self.has_output = True
-                self.output = []
             except Exception:
                 # If something happens that prevents targetd from properly closing/resetting the
                 # connection, this exception is thrown during the next connection and the connection
@@ -169,6 +163,7 @@ if TARGETD_AVAILABLE:
         caller = TargetdLoader.instance
         if not targetd.rpcs:
             targetd.easy_connect_remoting(remoting, link, caller.peers)
+            targetd.rpcs.attach_logger(log)
         func = getattr(targetd.rpcs, targetd.command)
         caller.has_output = True
         caller.output = list(func())
