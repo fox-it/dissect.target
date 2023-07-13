@@ -1,56 +1,48 @@
+from pathlib import Path
 from typing import Union
 
+from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.apps.vpns.openvpn import (
     OpenVPNClient,
     OpenVPNPlugin,
     OpenVPNServer,
 )
+from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
-def test_openvpn_plugin_unix(target_unix_users, fs_unix):
+def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
     client_config = absolute_path("data/vpns/openvpn/client.conf")
     server_config = absolute_path("data/vpns/openvpn/server.conf")
-    fs_unix.map_file("etc/openvpn/server.conf", server_config)
-    fs_unix.map_file("etc/openvpn/client.conf", client_config)
+    filesystem.map_file(str(target_dir.joinpath("server.conf")), server_config)
+    filesystem.map_file(str(target_dir.joinpath("client.conf")), client_config)
 
+
+def test_openvpn_plugin_unix(target_unix_users: Target, fs_unix: Filesystem):
+    map_openvpn_configs(fs_unix, fs_unix.path("etc/openvpn"))
     target_unix_users.add_plugin(OpenVPNPlugin)
     records = list(target_unix_users.openvpn.config())
-    assert len(records) == 2
     _verify_records(records)
 
 
-def test_openvpn_plugin_windows_system(target_win_users, fs_win):
-    client_config = absolute_path("data/vpns/openvpn/client.conf")
-    server_config = absolute_path("data/vpns/openvpn/server.conf")
-    fs_win.map_file("Program Files/OpenVPN/config/server.conf", server_config)
-    fs_win.map_file("Program Files/OpenVPN/config/client.conf", client_config)
-
+def test_openvpn_plugin_windows_system(target_win_users: Target, fs_win: Filesystem):
+    map_openvpn_configs(fs_win, fs_win.path("Program Files/OpenVPN/config"))
     target_win_users.add_plugin(OpenVPNPlugin)
     records = list(target_win_users.openvpn.config())
-    assert len(records) == 2
     _verify_records(records)
 
 
 def test_openvpn_plugin_windows_users(target_win_users, fs_win):
-    client_config = absolute_path("data/vpns/openvpn/client.conf")
-    server_config = absolute_path("data/vpns/openvpn/server.conf")
-    user = target_win_users.user_details.find(username="John")
-    config_path = user.home_path.joinpath("OpenVPN/config/")
-
-    # drop C:/
-    fs_win.map_file(str(config_path.joinpath("server.conf"))[3:], server_config)
-    fs_win.map_file(str(config_path.joinpath("client.conf"))[3:], client_config)
-
+    map_openvpn_configs(fs_win, fs_win.path("Users/John/OpenVPN/config/"))
     target_win_users.add_plugin(OpenVPNPlugin)
     records = list(target_win_users.openvpn.config())
-    assert len(records) == 2
     _verify_records(records)
 
 
 def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
-    # Server
+    assert len(records) == 2
+
     for record in records:
         if record.name == "server":
             assert record.name == "server"
