@@ -23,10 +23,10 @@ def test_load_config():
         symlink.symlink_to(temp_dir2)
 
         config_file = Path(temp_dir1).joinpath(config.CONFIG_NAME)
-        config_file.write_text('raise Exception("config-file-found")')
+        config_file.write_text('CONFIG_FILE = "found"')
 
-        with pytest.raises(Exception, match="config-file-found"):
-            config.load(str(symlink))
+        result = config.load(symlink)
+        assert result.CONFIG_FILE == "found"
 
 
 @pytest.fixture
