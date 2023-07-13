@@ -97,7 +97,7 @@ class CbFilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-        seperator = self.alt_seperator or "/"
+        seperator = self.fs.alt_separator or "/"
         for entry in self.fs.session.list_directory(self.cbpath + seperator):
             filename = entry["filename"]
             if filename in (".", ".."):
