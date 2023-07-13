@@ -65,7 +65,7 @@ class SSHPlugin(Plugin):
     __namespace__ = "ssh"
 
     def check_compatible(self):
-        return len(list(self.target.users())) > 0
+        return len(list(self.target.users())) > 0 or self._sshd_directory().exists()
 
     def _sshd_directory(self) -> TargetPath:
         if (target_path := self.target.fs.path("/sysvol/ProgramData/ssh")).exists():
