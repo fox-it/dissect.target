@@ -15,6 +15,8 @@ from dissect.target.helpers.regutil import (
     RegistryKey,
     ValueCollection,
     VirtualHive,
+    glob_ext,
+    glob_split,
 )
 from dissect.target.plugin import Plugin, internal
 from dissect.target.plugins.general.users import UserDetails
@@ -132,10 +134,7 @@ class RegistryPlugin(Plugin):
             else:
                 try:
                     ntuserhive = RegfHive(ntuser)
-                    self._add_hive(user.sid, ntuserhive, ntuser)
-
-                    self._map_hive(f"HKEY_USERS\\{user.sid}", ntuserhive)
-
+                    self.add_hive(user.sid, f"HKEY_USERS\\{user.sid}", ntuserhive, ntuser)
                     self._hives_to_users[ntuserhive] = user_details
                 except Exception as e:
                     self.target.log.warning("Could not open ntuser.dat: %s", ntuser, exc_info=e)
@@ -149,9 +148,8 @@ class RegistryPlugin(Plugin):
             else:
                 try:
                     usr_class_hive = RegfHive(usrclass)
-                    self._add_hive(f"{user.sid}_Classes", usr_class_hive, usrclass)
+                    self.add_hive(f"{user.sid}_Classes", f"HKEY_USERS\\{user.sid}_Classes", usr_class_hive, usrclass)
                     self._map_hive(f"HKEY_USERS\\{user.sid}\\Software\\Classes", usr_class_hive)
-                    self._map_hive(f"HKEY_USERS\\{user.sid}_Classes", usr_class_hive)
 
                     self._hives_to_users[usr_class_hive] = user_details
                 except Exception as e:
@@ -323,3 +321,14 @@ class RegistryPlugin(Plugin):
         details = self._hives_to_users.get(key.hive)
         if details:
             return details.user
+
+    @internal
+    def glob_ext(self, pattern: str) -> Iterator[KeyCollection]:
+        key_path, pattern = glob_split(pattern)
+
+        try:
+            key_collection = self.key(key_path)
+        except RegistryKeyNotFoundError:
+            return
+        else:
+            yield from glob_ext(key_collection, pattern)

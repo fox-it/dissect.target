@@ -1,6 +1,8 @@
 """ Registry related abstractions """
 from __future__ import annotations
 
+import fnmatch
+import re
 import struct
 from collections import defaultdict
 from datetime import datetime
@@ -15,6 +17,9 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
+
+GLOB_INDEX_REGEX = re.compile(r"(^[^\\]*[*?[]|(?<=\\)[^\\]*[*?[])")
+GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 
 KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
 """The possible key types that can be returned from the registry."""
@@ -92,6 +97,22 @@ class RegistryKey:
     def timestamp(self) -> datetime:
         """Returns the last modified timestamp of this key."""
         raise NotImplementedError()
+
+    def get(self, key_path: str) -> RegistryKey:
+        """Returns the RegistryKey pointed to by ``path``.
+
+        Args:
+            key_path: The path relative to this ``RegistryKey``.
+
+        Returns:
+            A relative ``RegistryKey``
+        """
+        key_path = key_path.strip("\\")
+        if not key_path:
+            return self
+
+        key_path = "\\".join([self.path, key_path])
+        return self.hive.key(key_path)
 
     def subkey(self, subkey: str) -> RegistryKey:
         """Returns a specific subkey from this key.
@@ -492,6 +513,19 @@ class KeyCollection(RegistryKey):
     def timestamp(self) -> datetime:
         return self._key().timestamp
 
+    def get(self, key_path: str) -> KeyCollection:
+        ret = KeyCollection()
+        for key in self:
+            try:
+                ret.add(key.get(key_path))
+            except RegistryKeyNotFoundError:
+                pass
+
+        if not ret:
+            raise RegistryKeyNotFoundError(key_path)
+
+        return ret
+
     def subkey(self, subkey: str) -> KeyCollection:
         ret = KeyCollection()
         for key in self:
@@ -777,3 +811,126 @@ def parse_flex_value(value: str) -> ValueType:
             return struct.unpack(">Q", value)[0]
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
+
+
+def has_glob_magic(pattern: str) -> bool:
+    """Return whether ``pattern`` contains any glob patterns
+
+    Args:
+        pattern: The string to check on glob patterns.
+
+    Returns:
+        Whether ``pattern`` contains any glob patterns.
+    """
+    return GLOB_MAGIC_REGEX.search(pattern) is not None
+
+
+def glob_split(pattern: str) -> tuple[str]:
+    """Split a key path with glob patterns on the first key path part with glob patterns
+
+    Args:
+        pattern: A key path with glob patterns to split.
+
+    Returns:
+        A tuple of two strings, where the first contains the first number of
+        key path parts (if any) which don't have a glob pattern. The second
+        contains the rest of the key path with parts containing glob patterns.
+    """
+    first_glob = GLOB_INDEX_REGEX.search(pattern)
+
+    if not first_glob:
+        return pattern, ""
+
+    pos = first_glob.start()
+    return pattern[:pos], pattern[pos:]
+
+
+def glob_ext(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
+    """Yield all subkeys of ``key_collection`` that match the glob ``pattern``
+
+    Args:
+        key_collection: The ``KeyCollection`` to start the path pattern glob matching on.
+        pattern: A key path with glob patterns.
+
+    Yields:
+        All subkeys that match ``pattern``
+    """
+    # This function operates by recursively stripping the last key path part
+    # from pattern and recursively resolving the remaining part.
+
+    if not has_glob_magic(pattern):
+        # Short-cut if the pattern does not contain any actual globs.
+        yield from glob_ext0(key_collection, pattern)
+        return
+
+    # The path pattern is stripped one key path part at a time for as long as
+    # key_path contains glob patterns, starting at the end of the path.
+    # At the final strip, key_path will be empty an last_key will contain the
+    # very first part of the path pattern.
+    key_path, _, last_key = pattern.strip("\\").rpartition("\\")
+
+    if not key_path:
+        # The end of the path is reached and the last key path part has glob
+        # patterns (otherwise the shortcut at the start of the function would
+        # have been taken).
+        yield from glob_ext1(key_collection, last_key)
+        return
+
+    if has_glob_magic(key_path):
+        # strip the next last key path part
+        key_collections = glob_ext(key_collection, key_path)
+    else:
+        # This condition will generally not be true when the caller uses
+        # glob_split() before calling this function (as
+        # RegistryPlugin.glob_ext() does). In that case pattern (and thus
+        # key_path), will start with a globbed path part.
+        #
+        # But if it is true, the key_path will not have any glob patterns, as
+        # they were stripped off in the last path part (in last_key). So as a
+        # short-cut the remaining key_path can be resolved directly instead of
+        # recursively.
+        key_collections = glob_ext0(key_collection, key_path)
+
+    if has_glob_magic(last_key):
+        glob_in_key_path = glob_ext1
+    else:
+        glob_in_key_path = glob_ext0
+
+    for key_collection in key_collections:
+        yield from glob_in_key_path(key_collection, last_key)
+
+
+def glob_ext0(key_collection: KeyCollection, key_path: str) -> Iterator[KeyCollection]:
+    """Yield the subkey given by ``key_path`` relative to ``key_collection``
+
+    Args:
+        key_collection: The ``KeyCollection`` to yield the subkey from.
+        key_path: The key path to the subkey, relative to ``key_collection``.
+
+    Yields:
+        The subkey from ``key_collection`` pointed to by ``key_path``.
+    """
+    try:
+        yield key_collection.get(key_path)
+    except RegistryKeyNotFoundError:
+        pass
+
+
+def glob_ext1(key_collection: KeyCollection, pattern: str) -> Iterator[KeyCollection]:
+    """Yield all subkeys from ``key_collection`` which match the glob pattern ``pattern``
+
+    Args:
+        key_collection: The ``KeyCollection`` from which subkeys should be matched.
+        pattern: The pattern a subkey must match.
+
+    Yields:
+        All KeyCollections of subkeys that match ``pattern``.
+    """
+    subkeys = key_collection.subkeys()
+    # Note that the Windows registry is case insensitive, while
+    # fnmatch.fnmatch() may not be on certain systems.
+    pattern = pattern.lower()
+
+    for subkey in subkeys:
+        if fnmatch.fnmatch(subkey.name.lower(), pattern):
+            yield subkey
