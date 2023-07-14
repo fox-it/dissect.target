@@ -1,6 +1,7 @@
 import logging
 from io import BytesIO
 
+import pytest
 from pytest import LogCaptureFixture
 
 from dissect.target.filesystem import VirtualFilesystem
@@ -65,3 +66,53 @@ def test_empty_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, c
         f"{target_win_users}: Empty NTUSER.DAT hive: C:/Users/John/ntuser.dat",
         f"{target_win_users}: Empty UsrClass.DAT hive: C:/Users/John/AppData/Local/Microsoft/Windows/usrclass.dat",
     ]
+
+
+@pytest.mark.parametrize(
+    "pattern, key_names",
+    [
+        (
+            "\\HKLM\\SOFTWARE\\Microsoft",
+            ["Microsoft"],
+        ),
+        (
+            "\\*\\SOFTWARE\\Microsoft",
+            ["Microsoft"],
+        ),
+        (
+            "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\*\\",
+            [
+                "S-1-5-18",
+                "S-1-5-21-3263113198-3007035898-945866154-1002",
+            ],
+        ),
+        (
+            "\\HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows XP\\*",
+            [],
+        ),
+        (
+            "\\*",
+            [
+                "HKEY_LOCAL_MACHINE",
+                "HKEY_USERS",
+            ],
+        ),
+        (
+            "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\*\\CurrentVersion\\ProfileList",
+            ["ProfileList"],
+        ),
+        (
+            "HKEY_LOCAL_MACHINE\\SOFTWARE\\*\\Windows NT\\*\\ProfileList\\",
+            ["ProfileList"],
+        ),
+    ],
+)
+def test_registry_plugin_glob_ext(target_win_users, pattern, key_names) -> None:
+    registry_plugin = target_win_users.registry
+
+    key_collections = registry_plugin.glob_ext(pattern)
+    collection_names = []
+    for key_collection in key_collections:
+        collection_names.append(key_collection.name)
+
+    assert sorted(collection_names) == sorted(key_names)
