@@ -163,7 +163,6 @@ if TARGETD_AVAILABLE:
         caller = TargetdLoader.instance
         if not targetd.rpcs:
             targetd.easy_connect_remoting(remoting, link, caller.peers)
-            targetd.rpcs.attach_logger(log)
         func = getattr(targetd.rpcs, targetd.command)
         caller.has_output = True
         caller.output = list(func())
