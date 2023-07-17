@@ -81,7 +81,7 @@ class TargetdLoader(ProxyLoader):
             configuration = self.options.get(configurable)
             if not configuration:
                 default_value = getattr(self, configurable)
-                log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
+                target.log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
             else:
                 setattr(self, configurable, value_type(configuration))
 
