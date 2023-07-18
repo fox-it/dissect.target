@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import logging
 import ssl
 import time
 import urllib
