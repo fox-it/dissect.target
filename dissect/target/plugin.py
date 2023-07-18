@@ -895,7 +895,7 @@ def find_plugin_functions(
             pattern += "*"
 
         if wildcard or treematch:
-            matches = 0
+            matches = False
             for index_name in fnmatch.filter(functions.keys(), pattern):
                 func = functions[index_name]
 
@@ -915,7 +915,7 @@ def find_plugin_functions(
                     except Exception:
                         continue
 
-                matches += 1
+                matches = True
                 result.append(
                     PluginFunction(
                         name=index_name,
