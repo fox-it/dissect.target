@@ -39,7 +39,8 @@ def test_ntfs_fileentry_open(ads, name, output):
     mocked_entry = Mock()
     mocked_entry.attributes = AttributeMap()
     mocked_entry.is_dir.return_value = False
-    mocked_entry.is_reparse_point.return_value = False
+    mocked_entry.is_symlink.return_value = False
+    mocked_entry.is_mount_point.return_value = False
     entry = NtfsFilesystemEntry(vfs, "some/random/path", entry=mocked_entry)
     entry.ads = ads
     entry.open(name)
@@ -52,7 +53,8 @@ def test_ntfs_unknown_file():
     mocked_entry = Mock()
     mocked_entry.attributes = AttributeMap()
     mocked_entry.is_dir.return_value = False
-    mocked_entry.is_reparse_point.return_value = False
+    mocked_entry.is_symlink.return_value = False
+    mocked_entry.is_mount_point.return_value = False
     mocked_entry.size.side_effect = [NtfsFileNotFoundError]
     entry = NtfsFilesystemEntry(vfs, "some/random/path", entry=mocked_entry)
     with pytest.raises(FileNotFoundError):

@@ -111,14 +111,21 @@ class NtfsFilesystemEntry(FilesystemEntry):
             path = fsutil.join(self.path, index_entry.attribute.file_name, alt_separator=self.fs.alt_separator)
             yield NtfsFilesystemEntry(self.fs, path, index_entry=index_entry)
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks and self.is_symlink():
+            return False
+
         return self.dereference().is_dir()
 
-    def is_file(self) -> bool:
-        return not self.is_dir()
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        if not follow_symlinks and self.is_symlink():
+            return False
+
+        return not self.is_dir(follow_symlinks=follow_symlinks)
 
     def is_symlink(self) -> bool:
-        return self.dereference().is_reparse_point()
+        entry = self.dereference()
+        return entry.is_symlink() or entry.is_mount_point()
 
     def readlink(self) -> str:
         # Note: we only need to check and resolve symlinks when actually interacting with the target, such as
@@ -137,10 +144,8 @@ class NtfsFilesystemEntry(FilesystemEntry):
             print_name = "\\" + print_name
         return fsutil.normalize(print_name, self.fs.alt_separator)
 
-    def stat(self) -> fsutil.stat_result:
-        if self.is_symlink():
-            return self.readlink_ext().lstat()
-        return self.lstat()
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         record = self.dereference()

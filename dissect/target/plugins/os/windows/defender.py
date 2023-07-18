@@ -72,9 +72,20 @@ EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
 
+DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
+
 DefenderLogRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/evtx",
     [("datetime", "ts")] + DEFENDER_EVTX_FIELDS,
+)
+
+DefenderExclusionRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/exclusion",
+    [
+        ("datetime", "regf_mtime"),
+        ("string", "type"),
+        ("string", "value"),
+    ],
 )
 
 DefenderFileQuarantineRecord = TargetRecordDescriptor(
@@ -373,12 +384,17 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
     __namespace__ = "defender"
 
     def check_compatible(self):
-        # Either the Defender log folder or the quarantine folder has to exist for this plugin to be compatible.
+        # Either the Defender log folder, the quarantine folder or the exclusions registry key
+        # has to exist for this plugin to be compatible.
 
         return any(
             [
                 self.target.fs.path(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
+                (
+                    self.target.has_function("registry")
+                    and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
+                ),
             ]
         )
 
@@ -440,6 +456,28 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     yield DefenderFileQuarantineRecord(**fields, _target=self.target)
                 else:
                     self.target.log.warning("Unknown Defender Detection Type %s", resource.detection_type)
+
+    @plugin.export(record=DefenderExclusionRecord)
+    def exclusions(self) -> Iterator[DefenderExclusionRecord]:
+        """Yield Microsoft Defender exclusions from the Registry."""
+
+        # Iterate through all possible versions of the key for Defender exclusions
+        for exclusions_registry_key in self.target.registry.keys(DEFENDER_EXCLUSION_KEY):
+            # Every subkey of the exclusions key is a 'type' of exclusion, e.g. 'path' 'process' or 'extension'.
+            for exclusion_type_subkey in exclusions_registry_key.subkeys():
+                # Every value is an exclusion for a said type. The 'name' property of said registry value holds
+                # what is being excluded from Defender (e.g. powershell.exe, notepad.txt)
+                for exclusion in exclusion_type_subkey.values():
+                    exclusion_value = exclusion.name
+                    exclusion_type = exclusion_type_subkey.name
+                    # Due to the fact that every exclusion is a registry value and not a registry key, we can only know
+                    # the last modified timestamp of the exclusion type for a given exclusion, not a timestamp for the
+                    # exclusion itself. We reflect this to the analyst by using the regf_mtime field.
+                    yield DefenderExclusionRecord(
+                        regf_mtime=exclusion_type_subkey.timestamp,
+                        type=exclusion_type,
+                        value=exclusion_value,
+                    )
 
     @plugin.arg(
         "--output",
