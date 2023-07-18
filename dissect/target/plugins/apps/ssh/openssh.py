@@ -63,7 +63,7 @@ PublicKeyRecord = TargetRecordDescriptor(
 )
 
 
-class SSHPlugin(Plugin):
+class OpenSSHPlugin(Plugin):
     __namespace__ = "ssh"
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
@@ -176,7 +176,7 @@ class SSHPlugin(Plugin):
 
     @export(record=PublicKeyRecord)
     def public_keys(self) -> Iterator[PublicKeyRecord]:
-        """Yields all SSH public keys from all user home directories and the ssh daemon configuration directory."""
+        """Yields all OpenSSH public keys from all user home directories and the ssh daemon configuration directory."""
 
         for user, file_path in self.ssh_directory_globs("*.pub", "*.pub"):
             if not file_path.is_file():

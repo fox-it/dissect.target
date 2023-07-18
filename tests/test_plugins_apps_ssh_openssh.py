@@ -8,7 +8,7 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.ssh.openssh import SSHPlugin
+from dissect.target.plugins.apps.ssh.openssh import OpenSSHPlugin
 
 
 @pytest.fixture(
@@ -88,7 +88,7 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
         BytesIO(textwrap.dedent(authorized_keys_data).encode()),
     )
 
-    plugin = SSHPlugin(target)
+    plugin = OpenSSHPlugin(target)
 
     results = list(plugin.authorized_keys())
     assert len(results) == 10
@@ -135,7 +135,7 @@ def test_known_hosts_plugin(target_and_filesystem):
         BytesIO(textwrap.dedent(known_hosts_data).encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.known_hosts())
     assert len(results) == 6
@@ -197,7 +197,7 @@ def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
         BytesIO(textwrap.dedent("FOO PRIVATE KEY----- BAR").encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.private_keys())
     assert len(results) == 1
@@ -272,7 +272,7 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.private_keys())
     private_key = results[0]
@@ -302,7 +302,7 @@ def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.private_keys())
     private_key = results[0]
@@ -335,7 +335,7 @@ def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.private_keys())
     private_key = results[0]
@@ -374,7 +374,7 @@ def test_public_keys_plugin(target_and_filesystem):
         BytesIO(textwrap.dedent(host_public_key_data).encode()),
     )
 
-    target.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
     results = list(target.ssh.public_keys())
 
