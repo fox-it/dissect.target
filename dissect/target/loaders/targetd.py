@@ -28,9 +28,6 @@ except Exception:
     pass
 
 
-log = logging.getLogger(__name__)
-
-
 class TargetdStream(AlignedStream):
     def _read(self, offset: int, length: int) -> bytes:
         return b""
