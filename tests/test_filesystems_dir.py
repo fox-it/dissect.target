@@ -23,8 +23,10 @@ def test_filesystem_dir_symlink_to_file(tmp_path):
 
         assert symlink_entry.is_symlink()
         assert symlink_entry.is_file()
+        assert not symlink_entry.is_file(follow_symlinks=False)
         assert not symlink_entry.is_dir()
         assert symlink_entry.exists()
+        assert symlink_entry.stat(follow_symlinks=False) == symlink_entry.lstat()
 
         assert symlink_entry.readlink() == f"/{tmpfile_path.name}"
         assert symlink_entry.readlink_ext().entry == fs.get(tmpfile_path.name).entry
@@ -50,7 +52,9 @@ def test_filesystem_dir_symlink_to_dir(tmp_path):
     assert symlink_entry.is_symlink()
     assert not symlink_entry.is_file()
     assert symlink_entry.is_dir()
+    assert not symlink_entry.is_dir(follow_symlinks=False)
     assert symlink_entry.exists()
+    assert symlink_entry.stat(follow_symlinks=False) == symlink_entry.lstat()
 
     assert symlink_entry.readlink() == "/nested"
     assert symlink_entry.readlink_ext().entry == fs.get("/nested").entry

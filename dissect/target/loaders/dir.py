@@ -11,16 +11,25 @@ from dissect.target.plugin import OperatingSystem
 if TYPE_CHECKING:
     from dissect.target import Target
 
+PREFIXES = ["", "fs"]
+
 
 class DirLoader(Loader):
     """Load a directory as a filesystem."""
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return find_dirs(path)[0] is not None
+        return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
+        self.path /= find_entry_path(self.path)
         find_and_map_dirs(target, self.path)
+
+
+def find_entry_path(path: Path) -> str | None:
+    for prefix in PREFIXES:
+        if find_dirs(path / prefix)[0] is not None:
+            return prefix
 
 
 def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
@@ -81,7 +90,7 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
     if path.is_dir():
         for p in path.iterdir():
             # Look for directories like C or C:
-            if p.is_dir() and is_drive_letter_path(p):
+            if p.is_dir() and (is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
                 dirs.append(p)
 
                 if not os_type:

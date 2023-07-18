@@ -52,10 +52,13 @@ class ResolverPlugin(Plugin):
 
         # The \??\ pseudo path is used to point to the directory containing
         # (the user's) devices, e.g. \??\C:\foo\bar.
+        # The \\?\ prefix in Windows file I/O bypasses string parsing and
+        # allows exceeding the MAX_PATH limit, e.g. \\?\C:\very\long\path.
         # For more information see:
         # - https://googleprojectzero.blogspot.com/2016/02/the-definitive-guide-on-win32-to-nt.html
         # - https://stackoverflow.com/questions/23041983/path-prefixes-and
-        path = path.replace("/??/", "")
+        # - https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#win32-file-namespaces
+        path = path.replace("/??/", "").replace("/?/", "")
 
         if self.target.fs.exists(path):
             return path

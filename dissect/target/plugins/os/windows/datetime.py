@@ -5,7 +5,11 @@ from typing import Dict, Tuple
 
 from dissect import cstruct
 
-from dissect.target.exceptions import RegistryError, UnsupportedPluginError
+from dissect.target.exceptions import (
+    RegistryError,
+    RegistryValueNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, internal
 
@@ -194,14 +198,26 @@ class DateTimePlugin(Plugin):
     def __init__(self, target):
         super().__init__(target)
 
-        tz_info_key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation"
+        tz_name = None
 
+        timezone_information = self.target.registry.key("HKLM\\SYSTEM\\CurrentControlSet\\Control\\TimeZoneInformation")
         try:
-            tz_name = self.target.registry.key(tz_info_key).value("TimeZoneKeyName").value
-            self._tzinfo = self.tz(tz_name)
-        except RegistryError:
+            # Windows 7+
+            tz_name = timezone_information.value("TimeZoneKeyName").value
+        except RegistryValueNotFoundError:
+            # < Windows 7 (https://github.com/dateutil/dateutil/issues/210)
+            tz_name_localized = timezone_information.value("StandardName").value
+            for timezone_key in self.target.registry.key(
+                "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
+            ).subkeys():
+                if tz_name_localized == timezone_key.value("Std").value:
+                    tz_name = timezone_key.name
+
+        if tz_name is None:
             self.target.log.error("Failed to load timezone information")
             self._tzinfo = None
+        else:
+            self._tzinfo = self.tz(tz_name)
 
     def check_compatible(self):
         if not self._tzinfo:
@@ -210,8 +226,7 @@ class DateTimePlugin(Plugin):
     @internal
     def tz(self, name: str) -> tzinfo:
         """Return a datetime.tzinfo of the given timezone name."""
-        tz_data_key = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones"
-        tz_data = self.target.registry.key("\\".join([tz_data_key, name]))
+        tz_data = self.target.registry.key(f"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\{name}")
         return WindowsTimezone(name, tz_data)
 
     @internal(property=True)

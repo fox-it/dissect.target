@@ -184,6 +184,7 @@ def test_filesystems_exfat_exfat_filesystem_entry_is_dir(
 ):
     assert not other_file.is_dir()
     assert some_path.is_dir()
+    assert some_path.is_dir(follow_symlinks=False)
 
 
 def test_filesystems_exfat_exfat_filesystem_entry_is_file(
@@ -192,4 +193,5 @@ def test_filesystems_exfat_exfat_filesystem_entry_is_file(
     some_path: ExfatFilesystemEntry,
 ):
     assert other_file.is_file()
+    assert other_file.is_file(follow_symlinks=False)
     assert not some_path.is_file()

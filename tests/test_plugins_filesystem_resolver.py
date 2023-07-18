@@ -101,6 +101,11 @@ def mock_user_env(user):
             "C:/windows/system32/calc.exe",
         ),
         (
+            "\\\\?\\C:\\Users\\Testpath\\Testfile",
+            None,
+            "C:/Users/Testpath/Testfile",
+        ),
+        (
             "C:/windows/system32/calc.exe -args",
             None,
             "C:/windows/system32/calc.exe",
