@@ -83,11 +83,15 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
         target_system.mapping_path(".ssh/authorized_keys", target_dir=TargetDir.HOME),
         BytesIO(textwrap.dedent(authorized_keys_data).encode()),
     )
+    fs.map_file_fh(
+        target_system.mapping_path("administrator_authorized_keys", target_dir=TargetDir.SSHD),
+        BytesIO(textwrap.dedent(authorized_keys_data).encode()),
+    )
 
     plugin = SSHPlugin(target)
 
     results = list(plugin.authorized_keys())
-    assert len(results) == 5
+    assert len(results) == 10
 
     assert results[0].keytype == "ssh-ed25519"
     assert results[0].options is None
