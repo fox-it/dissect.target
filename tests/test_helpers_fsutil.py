@@ -317,6 +317,9 @@ def test_fs_attrs(xattrs, listxattr_spec, getxattr_spec, follow_symlinks):
 
 @contextmanager
 def no_listxattr():
+    if not hasattr(os, "listxattr"):
+        yield
+        return
     listxattr = os.listxattr
     try:
         del os.listxattr
