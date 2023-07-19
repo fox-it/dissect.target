@@ -1,12 +1,12 @@
 from functools import lru_cache
 
-from dissect.cstruct import Instance
 from dissect.etl.etl import ETL, Event
 
 from dissect.target import Target
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.windows.datetime import parse_tzi
 
 
 class EtlRecordBuilder:
@@ -32,11 +32,15 @@ class EtlRecordBuilder:
 
         for key, value in etl_event.event_values().items():
             record_type = "bytes"
-            if isinstance(value, list):
+            if key == "TimeZoneInformation":
+                # Pretty print TimezoneInformation
+                value = parse_tzi(bytes(value))
+                record_type = "string"
+            elif isinstance(value, list):
                 record_type = "string[]"
             elif isinstance(value, int):
                 record_type = "varint"
-            elif isinstance(value, str) and value.isprintable() or isinstance(value, Instance):
+            elif isinstance(value, str):
                 record_type = "string"
 
             record_fields.append((record_type, key))
