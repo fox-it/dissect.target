@@ -176,7 +176,7 @@ class OpenSSHPlugin(Plugin):
 
     @export(record=PublicKeyRecord)
     def public_keys(self) -> Iterator[PublicKeyRecord]:
-        """Yields all OpenSSH public keys from all user home directories and the ssh daemon configuration directory."""
+        """Yields all OpenSSH public keys from all user home directories and the OpenSSH daemon directory."""
 
         for user, file_path in self.ssh_directory_globs("*.pub", "*.pub"):
             if not file_path.is_file():
