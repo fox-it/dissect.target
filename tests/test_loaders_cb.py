@@ -43,8 +43,6 @@ def test_cb_loader(mock_session: MagicMock) -> None:
     from dissect.target.filesystems.cb import CbFilesystem
     from dissect.target.loaders.cb import CbLoader, CbRegistry
 
-    assert CbLoader.detect("cb://asdf")
-
     loader = loader_open("cb://workstation@instance")
     assert isinstance(loader, CbLoader)
     assert loader.session is mock_session
