@@ -1,3 +1,4 @@
+import stat
 from typing import BinaryIO, Iterator, Optional
 
 from dissect.squashfs import INode, SquashFS, c_squashfs, exceptions
@@ -42,15 +43,9 @@ class SquashFSFilesystem(Filesystem):
 
 
 class SquashFSFilesystemEntry(FilesystemEntry):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
-
         return SquashFSFilesystemEntry(self.fs, entry_path, entry)
 
     def open(self) -> BinaryIO:
@@ -81,20 +76,20 @@ class SquashFSFilesystemEntry(FilesystemEntry):
             entry_path = fsutil.join(self.path, entry.name, alt_separator=self.fs.alt_separator)
             yield SquashFSFilesystemEntry(self.fs, entry_path, entry)
 
-    def is_dir(self) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_dir()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.type == stat.S_IFDIR
         except FilesystemError:
             return False
 
-    def is_file(self) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         try:
-            return self._resolve().entry.is_file()
+            return self._resolve(follow_symlinks=follow_symlinks).entry.type == stat.S_IFREG
         except FilesystemError:
             return False
 
     def is_symlink(self) -> bool:
-        return self.entry.is_symlink()
+        return self.entry.type == stat.S_IFLNK
 
     def readlink(self) -> str:
         if not self.is_symlink():
@@ -102,32 +97,28 @@ class SquashFSFilesystemEntry(FilesystemEntry):
 
         return self.entry.link
 
-    def stat(self) -> fsutil.stat_result:
-        return self._resolve().lstat()
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         node = self.entry
 
-        # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
         st_info = fsutil.stat_result(
             [
-                self.entry.mode,
-                self.entry.inode_number,
-                0,
-                0,
+                node.mode,
+                node.inode_number,
+                id(self.fs),
+                0,  # nlink
                 node.uid,
                 node.gid,
                 node.size,
-                0,
-                self.entry.mtime.timestamp(),
-                0,
+                0,  # atime
+                node.mtime.timestamp(),
+                0,  # ctime
             ]
         )
 
-        if "nlink" in dir(self.entry):
-            st_info.st_nlink = self.entry.nlink
-
-        if "ctime" in dir(self.entry):
-            st_info.st_ctime = self.entry.ctime
+        if "nlink" in dir(node):
+            st_info.st_nlink = node.nlink
 
         return st_info
