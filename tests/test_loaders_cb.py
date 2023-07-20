@@ -60,12 +60,12 @@ def test_cb_loader(mock_session: MagicMock) -> None:
     assert isinstance(t._plugins[0], CbRegistry)
 
 
-def test_cb_registry(mock_session: MagicMock) -> None:
+def test_cb_registry(mock_target: Target, mock_session: MagicMock) -> None:
     from dissect.target.loaders.cb import CbRegistry
 
     mock_session.list_registry_keys_and_values.return_value = {"sub_keys": ["TestKey"]}
 
-    registry = CbRegistry(None, mock_session)
+    registry = CbRegistry(mock_target, mock_session)
 
     test_key = registry.key("HKLM\\SYSTEM\\TestKey")
     assert test_key.name == "TestKey"
