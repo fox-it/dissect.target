@@ -58,18 +58,18 @@ class MacPlugin(BsdPlugin):
 
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
-        for path in self.target.fs.glob("/var/db/dslocal/nodes/Default/users/*.plist"):
-            user = plistlib.load(self.target.fs.path(path).open("rb"))
+        for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+            user = plistlib.loads(path.read_bytes())
 
             # An user account can have multiply home directories
-            for index in range(len(user.get("home"))):
+            for home_dir in user.get("home", []):
                 yield UnixUserRecord(
                     name=user.get("name", [None])[0],
                     passwd=user.get("passwd", [None])[0],
                     uid=user.get("uid", [None])[0],
                     gid=user.get("gid", [None])[0],
                     gecos=user.get("realname", [None])[0],
-                    home=user.get("home")[index],
+                    home=home_dir,
                     shell=user.get("shell", [None])[0],
                     source=path,
                 )
