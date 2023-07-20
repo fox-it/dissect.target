@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from datetime import datetime
 from functools import cached_property
 from pathlib import Path
@@ -25,7 +26,6 @@ from dissect.target.exceptions import (
 from dissect.target.filesystems.cb import CbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
-from dissect.target.helpers.utils import parse_path_uri
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
@@ -38,16 +38,22 @@ if TYPE_CHECKING:
 
 
 class CbLoader(Loader):
+    """Use Carbon Black endpoints as targets using Live Response.
+
+    Use as ``cb://<hostname or IP>[@<instance>]``.
+
+    Refer to the Carbon Black documentation for setting up a ``credentials.cbc`` file.
+    """
+
     def __init__(self, path: str, parsed_path: ParseResult = None, **kwargs):
-        self.host, _, instance = parsed_path.netloc.partition("@")
         super().__init__(path)
 
-        # A profile will need to be given as argument to CBCloudAPI
-        # e.g. cb://workstation@instance
+        self.host, _, instance = parsed_path.netloc.partition("@")
+
         try:
-            self.cbc_api = CBCloudAPI(profile=instance)
+            self.cbc_api = CBCloudAPI(profile=instance or None)
         except CredentialError:
-            raise LoaderError("The Carbon Black Cloud API key was not found or has the wrong set of permissions set")
+            raise LoaderError("The Carbon Black Cloud API key was not found or has the wrong permissions set")
 
         self.sensor = self.get_device()
         if not self.sensor:
@@ -56,7 +62,11 @@ class CbLoader(Loader):
         self.session = self.sensor.lr_session()
 
     def get_device(self) -> Optional[Device]:
-        host_is_ip = self.host.count(".") == 3 and all([part.isdigit() for part in self.host.split(".")])
+        try:
+            ipaddress.ip_address(self.host)
+            host_is_ip = True
+        except ValueError:
+            host_is_ip = False
 
         for cbc_sensor in self.cbc_api.select(Device).all():
             if host_is_ip:
@@ -80,8 +90,7 @@ class CbLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        path_part, _, _ = parse_path_uri(path)
-        return path_part == "cb"
+        return False
 
     def map(self, target: Target) -> None:
         for drive in self.session.session_data["drives"]:
