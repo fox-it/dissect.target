@@ -102,19 +102,19 @@ def test_find_plugin_functions(plugin_loader, target, os_plugins, plugins, searc
     plugin_loader.return_value = MockPlugin()
     target._os = MagicMock()
     target._os.__class__.__name__ = "warp"
-    found = find_plugin_functions(target, search)
+    found, _ = find_plugin_functions(target, search)
     assert len(found) == assert_num_found
 
 
 def test_find_plugin_function_windows(target_win):
-    found = find_plugin_functions(target_win, "services")
+    found, _ = find_plugin_functions(target_win, "services")
 
     assert len(found) == 1
     assert found[0].name == "os.windows.services.services"
 
 
 def test_find_plugin_function_unix(target_unix):
-    found = find_plugin_functions(target_unix, "services")
+    found, _ = find_plugin_functions(target_unix, "services")
 
     assert len(found) == 1
     assert found[0].name == "os.unix.services.services"

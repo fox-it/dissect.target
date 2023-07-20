@@ -8,6 +8,7 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 from dissect.target.filesystems.cb import CbFilesystem
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
@@ -48,7 +49,6 @@ class CbLoader(Loader):
             cbfs = CbFilesystem(self.cb, self.sensor, self.session, drive)
             target.filesystems.add(cbfs)
             target.fs.mount(drive.lower(), cbfs)
-        target.add_plugin(CbRegistry(target, self.session))
 
 
 class CbRegistry(RegistryPlugin):
@@ -58,8 +58,7 @@ class CbRegistry(RegistryPlugin):
 
     def _init_registry(self):
         hive = CbRegistryHive(self.session)
-        self.add_hive("", hive)
-        self.map_hive("", hive)
+        self.add_hive("", "", hive, TargetPath(self.target.fs, "CBR"))
 
 
 class CbRegistryHive(RegistryHive):

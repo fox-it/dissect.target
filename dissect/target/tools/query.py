@@ -127,7 +127,7 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions = find_plugin_functions(Target(), args.function, False)
+        found_functions, _ = find_plugin_functions(Target(), args.function, False)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
@@ -154,11 +154,11 @@ def main():
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
-                funcs = find_plugin_functions(plugin_target, args.list, True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
         else:
-            funcs = find_plugin_functions(Target(), args.list, False)
+            funcs, _ = find_plugin_functions(Target(), args.list, False)
             for func in funcs:
                 collected_plugins[func.name] = func.plugin_desc
 
@@ -196,9 +196,12 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    funcs = find_plugin_functions(Target(), args.function, False)
+    funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
     for func in funcs:
         output_types.add(func.output_type)
+
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
 
     default_output_type = None
 
@@ -231,7 +234,9 @@ def main():
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in find_plugin_functions(target, args.function, False):
+        func_defs, _ = find_plugin_functions(target, args.function, False)
+
+        for func_def in func_defs:
             if func_def.method_name in executed_plugins:
                 continue
 
