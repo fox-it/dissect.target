@@ -30,14 +30,13 @@ class MacPlugin(BsdPlugin):
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
-        for path in ["/Library/Preferences/SystemConfiguration/preferences.plist"]:
-            try:
-                preferencesPlist = self.target.fs.open(path).read().rstrip()
-                preferences = plistlib.loads(preferencesPlist)
-                return preferences["System"]["System"]["ComputerName"]
+        try:
+            preferencesPlist = self.target.fs.path(self.SYSTEM).read_bytes()
+            preferences = plistlib.loads(preferencesPlist)
+            return preferences["System"]["System"]["ComputerName"]
 
-            except FileNotFoundError:
-                pass
+        except FileNotFoundError:
+            pass
 
     @export(property=True)
     def ips(self) -> Optional[list[str]]:
@@ -45,16 +44,15 @@ class MacPlugin(BsdPlugin):
 
     @export(property=True)
     def version(self) -> Optional[str]:
-        for path in ["/System/Library/CoreServices/SystemVersion.plist"]:
-            try:
-                systemVersionPlist = self.target.fs.open(path).read().rstrip()
-                systemVersion = plistlib.loads(systemVersionPlist)
-                productName = systemVersion["ProductName"]
-                productUserVisibleVersion = systemVersion["ProductUserVisibleVersion"]
-                productBuildVersion = systemVersion["ProductBuildVersion"]
-                return f"{productName} {productUserVisibleVersion} ({productBuildVersion})"
-            except FileNotFoundError:
-                pass
+        try:
+            systemVersionPlist = self.target.fs.path(self.VERSION).read_bytes()
+            systemVersion = plistlib.loads(systemVersionPlist)
+            productName = systemVersion["ProductName"]
+            productUserVisibleVersion = systemVersion["ProductUserVisibleVersion"]
+            productBuildVersion = systemVersion["ProductBuildVersion"]
+            return f"{productName} {productUserVisibleVersion} ({productBuildVersion})"
+        except FileNotFoundError:
+            pass
 
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
