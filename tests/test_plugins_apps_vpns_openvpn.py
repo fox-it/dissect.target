@@ -1,3 +1,5 @@
+import pytest
+
 from pathlib import Path
 from typing import Union
 
@@ -19,24 +21,32 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
     filesystem.map_file(str(target_dir.joinpath("client.conf")), client_config)
 
 
-def test_openvpn_plugin_unix(target_unix_users: Target, fs_unix: Filesystem):
-    map_openvpn_configs(fs_unix, fs_unix.path("etc/openvpn"))
-    target_unix_users.add_plugin(OpenVPNPlugin)
-    records = list(target_unix_users.openvpn.config())
-    _verify_records(records)
-
-
-def test_openvpn_plugin_windows_system(target_win_users: Target, fs_win: Filesystem):
-    map_openvpn_configs(fs_win, fs_win.path("Program Files/OpenVPN/config"))
-    target_win_users.add_plugin(OpenVPNPlugin)
-    records = list(target_win_users.openvpn.config())
-    _verify_records(records)
-
-
-def test_openvpn_plugin_windows_users(target_win_users, fs_win):
-    map_openvpn_configs(fs_win, fs_win.path("Users/John/OpenVPN/config/"))
-    target_win_users.add_plugin(OpenVPNPlugin)
-    records = list(target_win_users.openvpn.config())
+@pytest.mark.parametrize(
+    "target, fs, map_path",
+    [
+        (
+            "target_win_users",
+            "fs_win",
+            "Program Files/OpenVPN/config",
+        ),
+        (
+            "target_win_users",
+            "fs_win",
+            "Users/John/OpenVPN/config",
+        ),
+        (
+            "target_unix_users",
+            "fs_unix",
+            "etc/openvpn",
+        ),
+    ],
+)
+def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.FixtureRequest):
+    target: Target = request.getfixturevalue(target)
+    fs: Filesystem = request.getfixturevalue(fs)
+    map_openvpn_configs(fs, fs.path(map_path))
+    target.add_plugin(OpenVPNPlugin)
+    records = list(target.openvpn.config())
     _verify_records(records)
 
 
