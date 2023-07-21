@@ -122,7 +122,7 @@ def parse_systemd_config(fh: BinaryIO) -> str:
     try:
         for segment, configuration in parser.items():
             for key, value in configuration.items():
-                value = re.sub(r"\s\s+", " ", value).replace("\n", " ")
+                value = re.sub(r"(\s\s+|\n)", " ", value)
                 output.write(f'{segment}_{key}="{value}" ')
 
     except UnicodeDecodeError:
