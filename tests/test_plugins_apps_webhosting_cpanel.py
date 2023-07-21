@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from dissect.target.plugins.apps.webhosting.cpanel import CpanelPlugin
+from dissect.target.plugins.apps.webhosting.cpanel import CPanelPlugin
 
 from ._utils import absolute_path
 
@@ -14,7 +14,7 @@ def test_cpanel_plugin(target_unix, fs_unix):
     passwd_file = absolute_path("data/unix/configs/passwd")
     fs_unix.map_file("/etc/passwd", passwd_file)
 
-    target_unix.add_plugin(CpanelPlugin)
+    target_unix.add_plugin(CPanelPlugin)
 
     results = list(target_unix.cpanel.lastlogin())
 

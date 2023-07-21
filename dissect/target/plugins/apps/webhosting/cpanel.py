@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-CpanelLastloginRecord = TargetRecordDescriptor(
+CPanelLastloginRecord = TargetRecordDescriptor(
     "application/log/cpanel/lastlogin",
     [
         ("datetime", "ts"),
@@ -17,15 +18,16 @@ CPANEL_LASTLOGIN = ".lastlogin"
 CPANEL_LOGS_PATH = "/usr/local/cpanel/logs"
 
 
-class CpanelPlugin(Plugin):
+class CPanelPlugin(Plugin):
     # TODO: Parse other log files https://support.cartika.com/portal/en/kb/articles/whm-cpanel-log-files-and-locations
     __namespace__ = "cpanel"
 
     def check_compatible(self) -> None:
-        return bool(self.target.fs.path(CPANEL_LOGS_PATH).exists())
+        if not self.target.fs.path(CPANEL_LOGS_PATH).exists():
+            raise UnsupportedPluginError("No cPanel log path found")
 
-    @export(record=CpanelLastloginRecord)
-    def lastlogin(self) -> Iterator[CpanelLastloginRecord]:
+    @export(record=CPanelLastloginRecord)
+    def lastlogin(self) -> Iterator[CPanelLastloginRecord]:
         """Return the content of the cPanel lastlogin file.
 
         The lastlogin files tracks successful cPanel interface logons. New logon events are only tracked
@@ -55,7 +57,7 @@ class CpanelPlugin(Plugin):
 
                         timestamp = datetime.strptime(f"{date} {time} {utc_offset}", "%Y-%m-%d %H:%M:%S %z")
 
-                        yield CpanelLastloginRecord(
+                        yield CPanelLastloginRecord(
                             ts=timestamp,
                             user=user_details.user.name,
                             remote_ip=remote_ip,
