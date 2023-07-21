@@ -55,7 +55,7 @@ class ExtendableRecordDescriptor(RecordDescriptor):
 
         extended_fields.extend(append_default_fields)
 
-        return super().__init__(name, fields=extended_fields)
+        super().__init__(name, fields=extended_fields)
 
     def __call__(self, *args, **kwargs):
         """Generate a record.
