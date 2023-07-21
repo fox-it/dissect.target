@@ -1,4 +1,6 @@
+import io
 import re
+from configparser import RawConfigParser
 from itertools import chain
 from typing import BinaryIO, Iterator
 
@@ -51,30 +53,29 @@ class ServicesPlugin(Plugin):
             if not path.exists() or not path.is_dir():
                 continue
 
-            for file_ in path.iterdir():
-                if should_ignore_file(file_.name, ignored_suffixes):
+            for service_file in path.iterdir():
+                if should_ignore_file(service_file.name, ignored_suffixes):
                     continue
 
                 try:
-                    fh = file_.open("rt")
+                    with service_file.open("rt") as fh:
+                        config = parse_systemd_config(fh)
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
-                        ts=file_.stat(follow_symlinks=False).st_mtime,
-                        name=file_.name,
+                        ts=service_file.stat(follow_symlinks=False).st_mtime,
+                        name=service_file.name,
                         config=None,
-                        source=file_,
+                        source=service_file,
                         _target=self.target,
                     )
                     continue
 
-                config = parse_systemd_config(fh)
-
                 yield LinuxServiceRecord(
-                    ts=file_.stat().st_mtime,
-                    name=file_.name,
+                    ts=service_file.stat().st_mtime,
+                    name=service_file.name,
                     config=config,
-                    source=file_,
+                    source=service_file,
                     _target=self.target,
                 )
 
@@ -112,37 +113,19 @@ def parse_systemd_config(fh: BinaryIO) -> str:
     This should probably be rewritten to return a proper dict as in
     its current form this is only useful when used in Splunk.
     """
-    variables = ""
+    parser = RawConfigParser(strict=False)
+    # to preserve casing from configuration.
+    parser.optionxform = str
+    parser.read_file(fh)
 
+    output = io.StringIO()
     try:
-        for line in fh:
-            line = line.strip().replace("\n", "")
-
-            # segment start eg. [ExampleSegment]
-            if line[:1] == "[":
-                segment = re.sub(r"\[|\]", "", line)
-
-            # ignore comments and empty lines
-            elif line[:1] == ";" or line[:1] == "#" or line == "":
-                continue
-
-            # if line ends with \ it is likely part of a multi-line command argument
-            elif line[-1] == "\\" or line[-1] == "'":
-                variables = f"{variables} {line} "
-
-            else:
-                line = line.split("=", 1)
-                if "segment" in locals():
-                    # some variables/arguments are not delimited by a '='
-                    # (eg. '-Kvalue' instead of '-key=value')
-                    if len(line) < 2:
-                        variables = f"{variables} {segment}_{line[0]} "
-                    else:
-                        variables = f'{variables} {segment}_{line[0]}="{line[1]}" '
-                else:
-                    variables = f"{variables} {line} ".strip()
+        for segment, configuration in parser.items():
+            for key, value in configuration.items():
+                value = re.sub(r"\s\s+", " ", value).replace("\n", " ")
+                output.write(f'{segment}_{key}="{value}" ')
 
     except UnicodeDecodeError:
         pass
 
-    return variables.strip()
+    return output.getvalue().strip()
