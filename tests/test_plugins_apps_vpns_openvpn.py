@@ -1,7 +1,7 @@
-import pytest
-
 from pathlib import Path
 from typing import Union
+
+import pytest
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.apps.vpns.openvpn import (
