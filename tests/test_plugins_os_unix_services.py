@@ -1,7 +1,8 @@
 from io import StringIO
-from dissect.target.plugins.os.unix.services import ServicesPlugin, parse_systemd_config
 
 import pytest
+
+from dissect.target.plugins.os.unix.services import ServicesPlugin, parse_systemd_config
 
 from ._utils import absolute_path
 
@@ -29,7 +30,7 @@ def test_unix_services(target_unix_users, fs_unix):
     assert str(results[1].source) == "/lib/systemd/system/broken_sym_example.service"
 
     assert results[2].name == "example2.service"
-    expected_config_2 = 'Unit_Description="an example systemd service" Unit_After="foobar.service" Unit_Requires="foo.service bar.service" Service_Type="simple" Service_ExecStart="/bin/bash -c \'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; \\ exit 0\'" Service_SyslogIdentifier="example-service" Service_TimeoutStopSec="5" Install_WantedBy="multi-user.target" Install_Alias="example.service"'  # noqa E501
+    expected_config_2 = 'Unit_Description="an example systemd service" Unit_After="foobar.service" Unit_Requires="foo.service bar.service" Service_Type="simple" Service_ExecStart="/bin/bash -c \'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; exit 0\'" Service_SyslogIdentifier="example-service" Service_TimeoutStopSec="5" Install_WantedBy="multi-user.target" Install_Alias="example.service"'  # noqa E501
     assert results[2].config == expected_config_2
     assert str(results[2].source) == "/usr/lib/systemd/system/example2.service"
 

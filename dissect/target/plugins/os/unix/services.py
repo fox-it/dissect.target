@@ -2,7 +2,7 @@ import io
 import re
 from configparser import ConfigParser
 from itertools import chain
-from typing import TextIO, Iterator
+from typing import Iterator, TextIO
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -125,21 +125,27 @@ def parse_systemd_config(fh: TextIO) -> str:
             previous_value = ""
             concat_value = False
             for key, value in configuration.items():
-                if not concat_value:
-                    # Assign it when empty
-                    original_key = original_key or key
-                else:
+                original_key = original_key or key
+
+                if concat_value:
+                    # A backslash was found at the end of the previous line
+                    # If value is None, it might not contain a backslash
+                    # So we turn it into an empty string.
                     value = f"{previous_value} {key} {value or ''}".strip()
 
                 concat_value = str(value).endswith("\\")
                 if concat_value:
+                    # Remove any dangling empty space or backslashes
                     previous_value = value.rstrip("\\ ")
                 else:
-                    value = re.sub(r"(\\|\n)+", "", str(value)).strip()
                     output.write(f'{segment}_{original_key or key}="{value}" ')
                     original_key = ""
+                    previous_value = ""
 
     except UnicodeDecodeError:
         pass
 
-    return output.getvalue().strip()
+    output_data = output.getvalue()
+    # Remove any back slashes or new line characters.
+    output_data = re.sub(r"(\\|\n)", "", output_data)
+    return output_data.strip()
