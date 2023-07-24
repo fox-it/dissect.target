@@ -9,7 +9,7 @@ from ._utils import absolute_path
 
 
 def test_wtmp_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/wtmp")
+    data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
     fs_unix.map_file("var/log/wtmp", data_file)
 
     target_unix.add_plugin(WtmpPlugin)
@@ -28,7 +28,7 @@ def test_wtmp_plugin(target_unix, fs_unix):
 
 
 def test_lastlog_plugin(target_unix_users, fs_unix):
-    data_file = absolute_path("data/unix/logs/lastlog")
+    data_file = absolute_path("data/plugins/os/unix/log/lastlog/lastlog")
     fs_unix.map_file("/var/log/lastlog", data_file)
 
     target_unix_users.add_plugin(LastLogPlugin)
@@ -44,7 +44,7 @@ def test_lastlog_plugin(target_unix_users, fs_unix):
 
 
 def test_btmp_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/btmp")
+    data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp")
     fs_unix.map_file("var/log/btmp", data_file)
 
     target_unix.add_plugin(BtmpPlugin)
@@ -63,7 +63,7 @@ def test_btmp_plugin(target_unix, fs_unix):
 
 
 def test_atop_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/atop")
+    data_file = absolute_path("data/plugins/os/unix/log/atop/atop")
     fs_unix.map_file("var/log/atop/atop_20221111", data_file)
 
     target_unix.add_plugin(AtopPlugin)
