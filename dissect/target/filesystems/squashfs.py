@@ -23,8 +23,7 @@ class SquashFSFilesystem(Filesystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        sb = c_squashfs.c_squashfs.squashfs_super_block(fh)
-        return sb.s_magic == c_squashfs.c_squashfs.SQUASHFS_MAGIC
+        return int.from_bytes(fh.read(4), "little") == c_squashfs.c_squashfs.SQUASHFS_MAGIC
 
     def get(self, path: str) -> FilesystemEntry:
         return SquashFSFilesystemEntry(self, path, self._get_node(path))
@@ -108,7 +107,7 @@ class SquashFSFilesystemEntry(FilesystemEntry):
                 node.mode,
                 node.inode_number,
                 id(self.fs),
-                0,  # nlink
+                getattr(node.header, "nlink", 0),
                 node.uid,
                 node.gid,
                 node.size,
@@ -117,8 +116,5 @@ class SquashFSFilesystemEntry(FilesystemEntry):
                 0,  # ctime
             ]
         )
-
-        if "nlink" in dir(node):
-            st_info.st_nlink = node.nlink
 
         return st_info
