@@ -2,16 +2,20 @@ import os
 import platform
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows import defender
+from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
-def test_defender_evtx_logs(target_win, fs_win, tmp_path):
+def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # map default log location to pass EvtxPlugin's compatibility check
     fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
 
@@ -32,7 +36,7 @@ def test_defender_evtx_logs(target_win, fs_win, tmp_path):
     assert {r.Threat_Name for r in records} == {None, "TrojanDropper:PowerShell/PowerSploit.S!MSR"}
 
 
-def test_defender_quarantine_entries(target_win, fs_win):
+def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesystem) -> None:
     quarantine_dir = absolute_path("data/defender-quarantine")
 
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
@@ -60,7 +64,7 @@ def test_defender_quarantine_entries(target_win, fs_win):
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="Path error? OSError: [Errno 22] Invalid argument. Needs to be fixed."
 )
-def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
+def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("data/defender-quarantine")
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
@@ -108,3 +112,50 @@ def test_defender_quarantine_recovery(target_win, fs_win, tmp_path):
 
     # Verify valid zone identifier for mimikatz file
     assert recovery_dst.joinpath(zone_identifier_filename).read_bytes() == expected_zone_identifier_content
+
+
+def test_defender_exclusions(target_win: Target, hive_hklm: VirtualHive) -> None:
+    # https://learn.microsoft.com/en-us/exchange/antispam-and-antimalware/windows-antivirus-software?view=exchserver-2019
+    exclusions_example = {
+        "Extensions": [".config", ".log", ".cfg"],
+        "Processes": ["UmService.exe", "UmWorkerProcess.exe"],
+        "Paths": ["C:\\System32\\Cluster\\"],
+        "IpAddresses": [],
+        "TemporaryPaths": [],
+    }
+    # Recreate the 'Exclusions' registry key based on the example dict
+    exclusions_key = VirtualKey(hive_hklm, "Software\\Microsoft\\Windows Defender\\Exclusions")
+    for exclusion_type, exclusions in exclusions_example.items():
+        exclusion_type_key = VirtualKey(hive_hklm, exclusions_key.path + f"\\{exclusion_type}")
+        for exclusion in exclusions:
+            exclusion_type_key.add_value(exclusion, 0)
+        exclusions_key.add_subkey(exclusion_type, exclusion_type_key)
+
+    hive_hklm.map_key(exclusions_key.path, exclusions_key)
+    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+
+    exclusion_records = list(target_win.defender.exclusions())
+
+    # If an exclusion type does not have any exclusions, no records are returned for that type.
+    ip_address_exclusions = [exclusion for exclusion in exclusion_records if exclusion.type == "IpAddresses"]
+    temporary_path_exclusions = [exclusion for exclusion in exclusion_records if exclusion.type == "TemporaryPaths"]
+    assert len(ip_address_exclusions) == 0
+    assert len(temporary_path_exclusions) == 0
+
+    extension_exclusions = [exclusion for exclusion in exclusion_records if exclusion.type == "Extensions"]
+    assert len(extension_exclusions) == 3
+
+    assert any(exclusion.value == ".config" for exclusion in extension_exclusions)
+    assert any(exclusion.value == ".log" for exclusion in extension_exclusions)
+    assert any(exclusion.value == ".cfg" for exclusion in extension_exclusions)
+
+    process_exclusions = [exclusion for exclusion in exclusion_records if exclusion.type == "Processes"]
+    assert len(process_exclusions) == 2
+    assert any(exclusion.value == "UmService.exe" for exclusion in process_exclusions)
+    assert any(exclusion.value == "UmWorkerProcess.exe" for exclusion in process_exclusions)
+
+    path_exclusions = [exclusion for exclusion in exclusion_records if exclusion.type == "Paths"]
+    assert any(exclusion.value == "C:\\System32\\Cluster\\" for exclusion in path_exclusions)
+    assert len(path_exclusions) == 1
+
+    assert len(exclusion_records) == 6

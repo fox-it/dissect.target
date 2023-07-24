@@ -861,7 +861,11 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
     return index, rootset
 
 
-def find_plugin_functions(target: Target, patterns: str, compatibility: bool = False) -> list[PluginFunction]:
+def find_plugin_functions(
+    target: Target,
+    patterns: str,
+    compatibility: bool = False,
+) -> tuple[list[PluginFunction], set[str]]:
     """Finds plugins that match the target and the patterns.
 
     Given a target, a comma separated list of patterns and an optional compatibility flag,
@@ -870,6 +874,8 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
     """
     result = []
     functions, rootset = plugin_function_index(target)
+
+    invalid_funcs = set()
 
     for pattern in patterns.split(","):
         # backward compatibility fix for namespace-level plugins (i.e. chrome)
@@ -889,6 +895,7 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
             pattern += "*"
 
         if wildcard or treematch:
+            matches = False
             for index_name in fnmatch.filter(functions.keys(), pattern):
                 func = functions[index_name]
 
@@ -908,6 +915,7 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                     except Exception:
                         continue
 
+                matches = True
                 result.append(
                     PluginFunction(
                         name=index_name,
@@ -917,6 +925,10 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                         plugin_desc=func,
                     )
                 )
+
+            if not matches:
+                invalid_funcs.add(pattern)
+
         else:
             # otherwise match using ~ classic style
             if pattern.find(".") > -1:
@@ -931,6 +943,9 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                 fmatch = not namespace and not func["namespace"] and funcname in func["exports"]
                 if nsmatch or fmatch:
                     plugin_descriptions.append(func)
+
+            if not plugin_descriptions:
+                invalid_funcs.add(pattern)
 
             for description in plugin_descriptions:
                 loaded_plugin_object = load(description)
@@ -949,4 +964,4 @@ def find_plugin_functions(target: Target, patterns: str, compatibility: bool = F
                     )
                 )
 
-    return list(set(result))
+    return list(set(result)), invalid_funcs

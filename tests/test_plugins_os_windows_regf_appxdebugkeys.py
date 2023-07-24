@@ -11,12 +11,27 @@ def strip_hive(key_path: str) -> str:
     return path
 
 
-PACKAGED_APPX_KEY_NAME = f"{strip_hive(AppxDebugKeysPlugin.REGKEY_PACKAGED_APPX_DEBUG)}\\Some.Appx.Package_1.10.3"
+PACKAGED_APPX_KEY_NAME = strip_hive(
+    AppxDebugKeysPlugin.REGKEY_GLOBS[0].replace(
+        "*",
+        "Some.AppX.Package_1.10.3",
+        1,
+    )
+)
 PACKAGED_APPX_VALUE_NAME = "(Default)"
 
-ACTIVATABLE_CLASSES_KEY_NAME = (
-    f"{strip_hive(AppxDebugKeysPlugin.REGKEY_ACTIVATABLE_CLASS_PACKAGE)}\\Some.Appx.Package_1.10.3\\"
-    f"{AppxDebugKeysPlugin.DEBUG_INFORMATION_KEY_NAME}\\Some.Appx.Package.Component.AppX"
+ACTIVATABLE_CLASSES_KEY_NAME = strip_hive(
+    AppxDebugKeysPlugin.REGKEY_GLOBS[1]
+    .replace(
+        "*",
+        "Some.AppX.Package_1.10.3",
+        1,
+    )
+    .replace(
+        "*",
+        "Some.AppX.Package.Component.AppX",
+        1,
+    ),
 )
 ACTIVATABLE_CLASSES_VALUE_NAME = "DebugPath"
 
@@ -56,18 +71,11 @@ def test_appx_debug_keys_plugin_walk(target_win_appx: Target, hive_hku: Registry
     assert records[1].debug_info is None
 
 
-def test_appx_debug_keys_packaged_appx_debug_keys(target_win_appx: Target) -> None:
+def test_appx_debug_keys__debug_keys(target_win_appx: Target) -> None:
     appx_plugin = AppxDebugKeysPlugin(target_win_appx)
-    records = list(appx_plugin._packaged_appx_debug_keys())
+    records = list(appx_plugin._debug_keys())
 
-    assert len(records) == 1
-
-
-def test_appx_debug_keys_activatable_classes_debug_keys(target_win_appx: Target) -> None:
-    appx_plugin = AppxDebugKeysPlugin(target_win_appx)
-    records = list(appx_plugin._activatable_classes_debug_keys())
-
-    assert len(records) == 2
+    assert len(records) == 3
 
 
 def test_appx_debug_keys_check_compatible(target_win_appx: Target) -> None:

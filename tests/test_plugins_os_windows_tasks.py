@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 
 import pytest
+from flow.record import GroupedRecord
 
 from dissect.target.plugins.os.windows.tasks import TasksPlugin
 
@@ -217,5 +218,5 @@ def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, ma
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
-    grouped_records = filter(lambda x: re.findall(pat, str(x)), records)
+    grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
     assert_func(list(grouped_records)[0])

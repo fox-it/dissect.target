@@ -10,7 +10,7 @@ class LazyImport:
         if not self._module:
             try:
                 self._module = importlib.import_module(self._module_name)
-            except ImportError as e:
+            except Exception as e:
                 self._module = FailedImport(e, self)
 
     def __getattr__(self, attr):
