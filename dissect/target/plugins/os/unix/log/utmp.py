@@ -3,7 +3,7 @@ import ipaddress
 import struct
 from collections import namedtuple
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.stream import BufferedStream
 from dissect.util.ts import from_unix
 
@@ -52,7 +52,7 @@ struct entry {
 };
 """  # noqa: E501
 
-utmp = cstruct.cstruct()
+utmp = cstruct()
 utmp.load(c_utmp)
 
 UTMP_ENTRY = namedtuple(
@@ -92,12 +92,29 @@ class UtmpFile:
                 if entry.ut_type in utmp.Type.reverse:
                     r_type = utmp.Type.reverse[entry.ut_type]
 
+                ut_host = entry.ut_host.decode(errors="surrogateescape").strip("\x00")
+                ut_addr = None
+
                 # UTMP misuses the field ut_addr_v6 for IPv4 and IPv6 addresses, because of this
-                # if the last 12 bytes are zero the value is read as an IPv4-address.
-                if entry.ut_addr_v6[1:] == [0, 0, 0]:
-                    ut_addr = struct.pack("<i", entry.ut_addr_v6[0])
-                else:
-                    ut_addr = struct.pack("<4i", *entry.ut_addr_v6)
+                # the ut_host field is used to determine if the ut_addr_v6 is an IPv6 address
+                # where the last 12 bytes are zeroes.
+                if entry.ut_addr_v6:
+                    if not entry.ut_addr_v6[1:] == [0, 0, 0]:
+                        # IPv6 address
+                        ut_addr = ipaddress.ip_address(struct.pack("<4i", *entry.ut_addr_v6))
+                    else:
+                        try:
+                            if isinstance(ipaddress.ip_address(ut_host), ipaddress.IPv6Address):
+                                # IPv6 address with 12 bytes of trailing zeroes
+                                # If the host contains a valid IPv6 address, the full entry_addr_v6 field is parsed
+                                # instead of the first 4 bytes.
+                                ut_addr = ipaddress.ip_address(struct.pack("<4i", *entry.ut_addr_v6))
+                            else:
+                                # IPv4 address
+                                ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
+                        except ValueError:
+                            # IPv4 address
+                            ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
 
                 utmp_entry = UTMP_ENTRY(
                     ts=from_unix(entry.ut_tv.tv_sec),
@@ -106,8 +123,8 @@ class UtmpFile:
                     ut_user=entry.ut_user.decode(errors="surrogateescape").strip("\x00"),
                     ut_line=entry.ut_line.decode(errors="surrogateescape").strip("\x00"),
                     ut_id=entry.ut_id.decode(errors="surrogateescape").strip("\x00"),
-                    ut_host=entry.ut_host.decode(errors="surrogateescape").strip("\x00"),
-                    ut_addr=ipaddress.ip_address(ut_addr),
+                    ut_host=ut_host,
+                    ut_addr=ut_addr,
                 )
 
                 yield utmp_entry

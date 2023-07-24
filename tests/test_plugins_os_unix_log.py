@@ -8,6 +8,27 @@ from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
 from ._utils import absolute_path
 
 
+def test_utmp_ipv6(target_unix, fs_unix):
+    data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp-ipv6")
+    fs_unix.map_file("var/log/wtmp", data_file)
+
+    target_unix.add_plugin(WtmpPlugin)
+
+    results = list(target_unix.wtmp())
+
+    # IPv6 address
+    results[8].ut_host == ""
+    results[8].ut_addr == "0.0.0.0"
+
+    # IPv6 address with 12 bytes of trailing zeroes
+    results[9].ut_host == "1337:1::"
+    results[9].ut_addr == "1337:1::"
+
+    # IPv6 address
+    results[11].ut_host == "1337::1"
+    results[11].ut_addr == "1337::1"
+
+
 def test_wtmp_plugin(target_unix, fs_unix):
     data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
     fs_unix.map_file("var/log/wtmp", data_file)
