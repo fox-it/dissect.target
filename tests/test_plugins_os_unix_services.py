@@ -1,4 +1,7 @@
-from dissect.target.plugins.os.unix.services import ServicesPlugin
+from io import StringIO
+from dissect.target.plugins.os.unix.services import ServicesPlugin, parse_systemd_config
+
+import pytest
 
 from ._utils import absolute_path
 
@@ -33,3 +36,20 @@ def test_unix_services(target_unix_users, fs_unix):
     assert results[3].name == "example"
     assert results[3].config is None
     assert str(results[3].source) == "/etc/init.d/example"
+
+
+@pytest.mark.parametrize(
+    "assignment, expected_value",
+    [
+        ("[Unit]\nsystemd = help:me", 'Unit_systemd="help:me"'),
+        ("[Unit]\nhelp:me = systemd", 'Unit_help:me="systemd"'),
+        ("[Unit]\nempty_value=", 'Unit_empty_value=""'),
+        ("[Unit]\nnew_lines=hello \\\nworld", 'Unit_new_lines="hello world"'),
+        ("[Unit]\nnew_lines=hello \\\nworld\\\ntest", 'Unit_new_lines="hello world test"'),
+        ("[Unit]\nnew_lines=hello \\\nworld\\\ntest\\\nhelp", 'Unit_new_lines="hello world test help"'),
+        ("[Unit]\ntest", 'Unit_test="None"'),
+    ],
+)
+def test_unix_systemd_parser(assignment, expected_value):
+    data = parse_systemd_config(StringIO(assignment))
+    assert data == expected_value

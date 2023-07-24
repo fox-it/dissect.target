@@ -1,8 +1,8 @@
 import io
 import re
-from configparser import RawConfigParser
+from configparser import ConfigParser
 from itertools import chain
-from typing import BinaryIO, Iterator
+from typing import TextIO, Iterator
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -107,13 +107,13 @@ def should_ignore_file(needle: str, haystack: list) -> bool:
     return False
 
 
-def parse_systemd_config(fh: BinaryIO) -> str:
+def parse_systemd_config(fh: TextIO) -> str:
     """Returns a string of key/value pairs from a toml/ini-like string.
 
     This should probably be rewritten to return a proper dict as in
     its current form this is only useful when used in Splunk.
     """
-    parser = RawConfigParser(strict=False)
+    parser = ConfigParser(strict=False, delimiters=("=",), allow_no_value=True)
     # to preserve casing from configuration.
     parser.optionxform = str
     parser.read_file(fh)
@@ -121,9 +121,23 @@ def parse_systemd_config(fh: BinaryIO) -> str:
     output = io.StringIO()
     try:
         for segment, configuration in parser.items():
+            original_key = ""
+            previous_value = ""
+            concat_value = False
             for key, value in configuration.items():
-                value = re.sub(r"(\s\s+|\n)", " ", value)
-                output.write(f'{segment}_{key}="{value}" ')
+                if not concat_value:
+                    # Assign it when empty
+                    original_key = original_key or key
+                else:
+                    value = f"{previous_value} {key} {value or ''}".strip()
+
+                concat_value = str(value).endswith("\\")
+                if concat_value:
+                    previous_value = value.rstrip("\\ ")
+                else:
+                    value = re.sub(r"(\\|\n)+", "", str(value)).strip()
+                    output.write(f'{segment}_{original_key or key}="{value}" ')
+                    original_key = ""
 
     except UnicodeDecodeError:
         pass
