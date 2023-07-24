@@ -1,12 +1,72 @@
+from __future__ import annotations
+
 import textwrap
+from enum import Enum, auto
 from io import BytesIO
 
-from flow.record.fieldtypes import path
+import pytest
 
-from dissect.target.plugins.os.unix.ssh import SSHPlugin
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.apps.ssh.openssh import OpenSSHPlugin
 
 
-def test_authorized_keys_plugin(target_unix_users, fs_unix):
+@pytest.fixture(
+    params=[
+        ("target_unix_users", "fs_unix"),
+        ("target_win_users", "fs_win"),
+    ],
+    ids=["target_unix", "target_windows"],
+)
+def target_and_filesystem(request) -> tuple[Target, VirtualFilesystem]:
+    target = request.getfixturevalue(request.param[0])
+    filesystem = request.getfixturevalue(request.param[1])
+    return target, filesystem
+
+
+class TargetDir(Enum):
+    HOME = auto()
+    SSHD = auto()
+
+
+class Alternatives:
+    user_name: str
+    home_dir: str
+    sshd_dir: str
+    os_type: str
+    seperator: str
+    label: str
+
+    @classmethod
+    def from_target(cls, target: Target) -> Alternatives:
+        alternative = cls()
+        alternative.os_type = target._os.os
+        alternative.seperator = "/"
+        alternative.label = "NO_LABEL"
+
+        if alternative.os_type == "windows":
+            alternative.seperator = target.fs.alt_separator
+            alternative.home_dir = "C:\\Users\\John"
+            alternative.sshd_dir = "C:\\ProgramData\\ssh"
+            alternative.user_name = "John"
+            alternative.label = "C:\\"
+        else:
+            alternative.home_dir = "/root"
+            alternative.sshd_dir = "/etc/ssh"
+            alternative.user_name = "root"
+
+        return alternative
+
+    def mapping_path(self, file_name: str, target_dir: TargetDir) -> str:
+        return self.filesystem_path(file_name, target_dir).strip(self.label)
+
+    def filesystem_path(self, file_name: str, target_dir: TargetDir) -> str:
+        mapping = {TargetDir.HOME: self.home_dir, TargetDir.SSHD: self.sshd_dir}
+        return self.seperator.join([mapping.get(target_dir), *file_name.split("/")])
+
+
+def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]):
+    target, fs = target_and_filesystem
     authorized_keys_data = """
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw comment
@@ -17,38 +77,46 @@ def test_authorized_keys_plugin(target_unix_users, fs_unix):
     ssh-ed25519
     """
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/authorized_keys",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/authorized_keys", target_dir=TargetDir.HOME),
+        BytesIO(textwrap.dedent(authorized_keys_data).encode()),
+    )
+    fs.map_file_fh(
+        target_system.mapping_path("administrator_authorized_keys", target_dir=TargetDir.SSHD),
         BytesIO(textwrap.dedent(authorized_keys_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    plugin = OpenSSHPlugin(target)
 
-    results = list(target_unix_users.ssh.authorized_keys())
-    assert len(results) == 5
+    results = list(plugin.authorized_keys())
+    assert len(results) == 10
 
-    assert results[0].keytype == "ssh-ed25519"
+    assert results[0].key_type == "ssh-ed25519"
     assert results[0].options is None
     assert results[0].comment == ""
 
-    assert results[1].keytype == "ssh-ed25519"
+    assert results[1].key_type == "ssh-ed25519"
     assert results[1].options is None
     assert results[1].comment == "comment"
 
-    assert results[2].keytype == "ssh-ed25519"
+    assert results[2].key_type == "ssh-ed25519"
     assert results[2].options is None
     assert results[2].comment == "long comment with spaces"
 
-    assert results[3].keytype == "ssh-ed25519"
+    assert results[3].key_type == "ssh-ed25519"
     assert results[3].options == 'command="foo bar"'
     assert results[3].comment == ""
 
-    assert results[4].keytype == "ssh-ed25519"
+    assert results[4].key_type == "ssh-ed25519"
     assert results[4].options == 'command="foo bar"'
     assert results[4].comment == "with a comment"
 
 
-def test_known_hosts_plugin(target_unix_users, fs_unix):
+def test_known_hosts_plugin(target_and_filesystem):
+    target, fs = target_and_filesystem
+
     known_hosts_data = """
     # Comments allowed at start of line
     cvs.example.net,192.0.2.10 ssh-rsa AAAA1234.....= comment with spaces
@@ -60,48 +128,51 @@ def test_known_hosts_plugin(target_unix_users, fs_unix):
     @cert-authority *.mydomain.org,*.mydomain.com ssh-rsa AAAAB5W...
     """
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/known_hosts",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/known_hosts", target_dir=TargetDir.HOME),
         BytesIO(textwrap.dedent(known_hosts_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.known_hosts())
+    results = list(target.ssh.known_hosts())
     assert len(results) == 6
 
     assert results[0].hostname_pattern == "cvs.example.net"
-    assert results[0].keytype == "ssh-rsa"
+    assert results[0].key_type == "ssh-rsa"
     assert results[0].comment == "comment with spaces"
     assert results[0].marker is None
 
     assert results[1].hostname_pattern == "192.0.2.10"
-    assert results[1].keytype == "ssh-rsa"
+    assert results[1].key_type == "ssh-rsa"
     assert results[1].comment == "comment with spaces"
     assert results[1].marker is None
 
     assert results[2].hostname_pattern == "|1|JfKTdBh7rNbXkVAQCRp4OQoPfmI=|USECr3SWf1JUPsms5AqfD5QfxkM="
-    assert results[2].keytype == "ssh-rsa"
+    assert results[2].key_type == "ssh-rsa"
     assert results[2].comment == ""
     assert results[2].marker is None
 
     assert results[3].hostname_pattern == "*"
-    assert results[3].keytype == "ssh-rsa"
+    assert results[3].key_type == "ssh-rsa"
     assert results[3].comment == ""
     assert results[3].marker == "@revoked"
 
     assert results[4].hostname_pattern == "*.mydomain.org"
-    assert results[4].keytype == "ssh-rsa"
+    assert results[4].key_type == "ssh-rsa"
     assert results[4].comment == ""
     assert results[4].marker == "@cert-authority"
 
     assert results[5].hostname_pattern == "*.mydomain.com"
-    assert results[5].keytype == "ssh-rsa"
+    assert results[5].key_type == "ssh-rsa"
     assert results[5].comment == ""
     assert results[5].marker == "@cert-authority"
 
 
-def test_private_keys_plugin_rfc4716_ed25519(target_unix_users, fs_unix):
+def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
+    target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN OPENSSH PRIVATE KEY-----
     b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
@@ -112,21 +183,23 @@ def test_private_keys_plugin_rfc4716_ed25519(target_unix_users, fs_unix):
     -----END OPENSSH PRIVATE KEY-----
     """
 
+    target_system = Alternatives.from_target(target)
+
     public_key_data = "AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw"
 
-    fs_unix.map_file_fh(
-        "/etc/ssh/ssh_host_ed25519_key",
+    fs.map_file_fh(
+        target_system.mapping_path("ssh_host_ed25519_key", TargetDir.SSHD),
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/garbage_file",
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/garbage_file", TargetDir.HOME),
         BytesIO(textwrap.dedent("FOO PRIVATE KEY----- BAR").encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.private_keys())
+    results = list(target.ssh.private_keys())
     assert len(results) == 1
 
     private_key = results[0]
@@ -135,10 +208,13 @@ def test_private_keys_plugin_rfc4716_ed25519(target_unix_users, fs_unix):
     assert private_key.comment == "long comment here"
     assert private_key.public_key == public_key_data
     assert not private_key.encrypted
-    assert private_key.source == path.from_posix("/etc/ssh/ssh_host_ed25519_key")
+    assert str(private_key.path) == target_system.filesystem_path("ssh_host_ed25519_key", TargetDir.SSHD).replace(
+        target_system.label, "\\sysvol\\"
+    )
 
 
-def test_private_keys_plugin_rfc4716_rsa_encrypted(target_unix_users, fs_unix):
+def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
+    target, fs = target_and_filesystem
     # Generated using password "password".
     private_key_data = """
     -----BEGIN OPENSSH PRIVATE KEY-----
@@ -189,14 +265,16 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_unix_users, fs_unix):
         "Xu3jljaeIzR2LDLk282x0A++Di6tG+IzVvMOcgEJIzykofOEXMJt0oVhnvIr9y5VWl/G8X1e20GqjiImLSGKgvZnzPx93RmjHXfOQk8="
     )
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/id_rsa",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/id_rsa", TargetDir.HOME),
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.private_keys())
+    results = list(target.ssh.private_keys())
     private_key = results[0]
 
     assert len(results) == 1
@@ -205,10 +283,11 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_unix_users, fs_unix):
     assert private_key.public_key == public_key_data
     assert private_key.comment == ""
     assert private_key.encrypted
-    assert private_key.source == path.from_posix("/root/.ssh/id_rsa")
+    assert str(private_key.path) == target_system.filesystem_path(".ssh/id_rsa", TargetDir.HOME)
 
 
-def test_private_keys_plugin_pem_ecdsa(target_unix_users, fs_unix):
+def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
+    target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN EC PRIVATE KEY-----
     MHcCAQEEIPLzo1QWDkkMxKEG3X8fW7495i5GtVeQhnkpvXMJTZAooAoGCCqGSM49
@@ -216,25 +295,28 @@ def test_private_keys_plugin_pem_ecdsa(target_unix_users, fs_unix):
     T9q+r/zG2BunHjtTaa0isjJgXWw++3JAzg==
     -----END EC PRIVATE KEY-----"""
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/id_ecdsa",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/id_ecdsa", TargetDir.HOME),
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.private_keys())
+    results = list(target.ssh.private_keys())
     private_key = results[0]
 
     assert len(results) == 1
     assert private_key.key_format == "PEM"
     assert private_key.key_type == "ecdsa"
-    assert private_key.user == "root"
+    assert private_key.username == target_system.user_name
     assert not private_key.encrypted
-    assert private_key.source == path.from_posix("/root/.ssh/id_ecdsa")
+    assert str(private_key.path) == target_system.filesystem_path(".ssh/id_ecdsa", TargetDir.HOME)
 
 
-def test_private_keys_plugin_pkcs8_dsa(target_unix_users, fs_unix):
+def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
+    target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN PRIVATE KEY-----
     MIIBSgIBADCCASsGByqGSM44BAEwggEeAoGBAP78NtXw6e2YgD3caU3LbY3fxCtz
@@ -246,24 +328,27 @@ def test_private_keys_plugin_pkcs8_dsa(target_unix_users, fs_unix):
     Klm96maH1SL9x5+GZR6mAjYyfZ+4sgQWAhROqDuRIc5ilMqjV0pG2spo7HVuwg==
     -----END PRIVATE KEY-----"""
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/id_dsa",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/id_dsa", TargetDir.HOME),
         BytesIO(textwrap.dedent(private_key_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.private_keys())
+    results = list(target.ssh.private_keys())
     private_key = results[0]
 
     assert len(results) == 1
     assert private_key.key_format == "PKCS8"
-    assert private_key.user == "root"
+    assert private_key.username == target_system.user_name
     assert not private_key.encrypted
-    assert private_key.source == path.from_posix("/root/.ssh/id_dsa")
+    assert str(private_key.path) == target_system.filesystem_path(".ssh/id_dsa", TargetDir.HOME)
 
 
-def test_public_keys_plugin(target_unix_users, fs_unix):
+def test_public_keys_plugin(target_and_filesystem):
+    target, fs = target_and_filesystem
     user_public_key_data = (
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw long comment here"
     )
@@ -277,19 +362,21 @@ def test_public_keys_plugin(target_unix_users, fs_unix):
         "s= comment"
     )
 
-    fs_unix.map_file_fh(
-        "/root/.ssh/id_ed25519.pub",
+    target_system = Alternatives.from_target(target)
+
+    fs.map_file_fh(
+        target_system.mapping_path(".ssh/id_ed25519.pub", TargetDir.HOME),
         BytesIO(textwrap.dedent(user_public_key_data).encode()),
     )
 
-    fs_unix.map_file_fh(
-        "/etc/ssh/ssh_host_rsa_key.pub",
+    fs.map_file_fh(
+        target_system.mapping_path("ssh_host_rsa_key.pub", TargetDir.SSHD),
         BytesIO(textwrap.dedent(host_public_key_data).encode()),
     )
 
-    target_unix_users.add_plugin(SSHPlugin)
+    target.add_plugin(OpenSSHPlugin)
 
-    results = list(target_unix_users.ssh.public_keys())
+    results = list(target.ssh.public_keys())
 
     assert len(results) == 2
 
@@ -299,9 +386,11 @@ def test_public_keys_plugin(target_unix_users, fs_unix):
     assert user_public_key.key_type == user_public_key_data.split(" ", 2)[0]
     assert user_public_key.public_key == user_public_key_data.split(" ", 2)[1]
     assert user_public_key.comment == user_public_key_data.split(" ", 2)[2]
-    assert user_public_key.source == path.from_posix("/root/.ssh/id_ed25519.pub")
+    assert str(user_public_key.path) == target_system.filesystem_path(".ssh/id_ed25519.pub", TargetDir.HOME)
 
     assert host_public_key.key_type == host_public_key_data.split(" ", 2)[0]
     assert host_public_key.public_key == host_public_key_data.split(" ", 2)[1]
     assert host_public_key.comment == host_public_key_data.split(" ", 2)[2]
-    assert host_public_key.source == path.from_posix("/etc/ssh/ssh_host_rsa_key.pub")
+    assert str(host_public_key.path) == target_system.filesystem_path("ssh_host_rsa_key.pub", TargetDir.SSHD).replace(
+        target_system.label, "\\sysvol\\"
+    )

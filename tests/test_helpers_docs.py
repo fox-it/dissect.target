@@ -1,56 +1,5 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
-import pytest
-
-from dissect.target.helpers import config, docs, keychain
+from dissect.target.helpers import docs
 from dissect.target.plugins.apps.webservers.iis import IISLogsPlugin
-
-from ._utils import absolute_path
-
-
-def test_load_config():
-    # FS layout:
-    #
-    # temp_dir1
-    #   config_file
-    #   symlink_dir2 -> ../temp_dir2
-    # temp_dir2
-
-    with TemporaryDirectory() as temp_dir1, TemporaryDirectory() as temp_dir2:
-        # create symlink in temp_dir1 pointing to temp_dir2
-        symlink = Path(temp_dir1).joinpath("symlink")
-        symlink.symlink_to(temp_dir2)
-
-        config_file = Path(temp_dir1).joinpath(config.CONFIG_NAME)
-        config_file.write_text('raise Exception("config-file-found")')
-
-        with pytest.raises(Exception, match="config-file-found"):
-            config.load(str(symlink))
-
-
-@pytest.fixture
-def guarded_keychain():
-    keychain.KEYCHAIN.clear()
-    yield
-    keychain.KEYCHAIN.clear()
-
-
-def test_keychain_register_keychain_file(guarded_keychain):
-    keychain_file = Path(absolute_path("data/keychain.csv"))
-
-    keychain.register_keychain_file(keychain_file)
-
-    assert len(keychain.get_keys_without_provider()) == 1
-    assert len(keychain.get_keys_for_provider("some")) == 0
-    assert len(keychain.get_keys_for_provider("bitlocker")) == 2
-
-
-def test_keychain_register_wildcard_value(guarded_keychain):
-    keychain.register_wildcard_value("test-value")
-
-    # number of keys registered is equal number of supported key types
-    assert len(keychain.get_keys_without_provider()) == len(keychain.KeyType)
 
 
 def get_nonempty_lines_set(paragraph):
