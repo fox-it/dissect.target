@@ -341,7 +341,7 @@ class TargetHubCli(cmd.Cmd):
 
 
 class TargetCli(TargetCmd):
-    """Cli for interacting with a target."""
+    """CLI for interacting with a target and browsing the filesystem."""
 
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
@@ -829,9 +829,39 @@ class TargetCli(TargetCmd):
 
         run_cli(cli)
 
+        # Print an additional empty newline after exit
+        print()
+
+    @arg("targets", metavar="TARGETS", nargs="*", help="targets to load")
+    @arg("-p", "--python", action="store_true", help="(I)Python shell")
+    @arg("-r", "--registry", action="store_true", help="registry shell")
+    def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> None:
+        """load one or more files as sub-targets and drop into a sub-shell"""
+        paths = [self.resolve_path(path) for path in args.targets]
+
+        if args.python:
+            # Quick path that doesn't require CLI caching
+            return open_shell(paths, args.python, args.registry)
+
+        clikey = tuple(str(path) for path in paths)
+        try:
+            cli = self._clicache[clikey]
+        except KeyError:
+            targets = list(Target.open_all(paths))
+            cli = create_cli(targets, RegistryCli if args.registry else TargetCli)
+            if not cli:
+                return
+
+            self._clicache[clikey] = cli
+
+        run_cli(cli)
+
+        # Print an additional empty newline after exit
+        print()
+
 
 class RegistryCli(TargetCmd):
-    """Cli for browsing the registry."""
+    """CLI for browsing the registry."""
 
     def __init__(self, target: Target, registry: Optional[regutil.RegfHive] = None):
         TargetCmd.__init__(self, target)
@@ -1035,18 +1065,22 @@ def stat_modestr(st: fsutil.stat_result) -> str:
     return is_dir + "".join(dic.get(x, x) for x in perm)
 
 
-def target_shell(targets: list[Target], cli: type[TargetCmd]) -> None:
-    """Helper method for starting a TargetCli or TargetHubCli for one or multiple targets."""
-    if len(targets) == 1:
-        target = targets[0]
-        if not cli.check_compatible(target):
-            return
+def open_shell(targets: list[Union[str, pathlib.Path]], python: bool, registry: bool) -> None:
+    """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
+    targets = list(Target.open_all(targets))
 
-        cli = cli(targets[0])
+    if python:
+        python_shell(targets)
     else:
-        cli = TargetHubCli(targets, cli)
+        cli_cls = RegistryCli if registry else TargetCli
+        target_shell(targets, cli_cls=cli_cls)
 
-    run_cli(cli)
+
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd]) -> None:
+    """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
+    cli = create_cli(targets, cli_cls)
+    if cli:
+        run_cli(cli)
 
 
 def python_shell(targets: list[Target]) -> None:
@@ -1058,11 +1092,30 @@ def python_shell(targets: list[Target]) -> None:
         import IPython
 
         IPython.embed(header=banner, user_ns=ns, colors="linux")
+
+        # IPython already prints an empty newline
     except ImportError:
         import code
 
         shell = code.InteractiveConsole(ns)
         shell.interact(banner)
+
+        # Print an empty newline on exit
+        print()
+
+
+def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> Optional[cmd.Cmd]:
+    """Helper method for instatiating the appropriate CLI."""
+    if len(targets) == 1:
+        target = targets[0]
+        if not cli_cls.check_compatible(target):
+            return
+
+        cli = cli_cls(target)
+    else:
+        cli = TargetHubCli(targets, cli_cls)
+
+    return cli
 
 
 def run_cli(cli: cmd.Cmd) -> None:
@@ -1074,6 +1127,9 @@ def run_cli(cli: cmd.Cmd) -> None:
     while True:
         try:
             cli.cmdloop()
+
+            # Print an empty newline on exit
+            print()
             return
         except KeyboardInterrupt:
             # Add a line when pressing ctrl+c, so the next one starts at a new line
@@ -1105,15 +1161,7 @@ def main() -> None:
     if args.quiet:
         logging.getLogger("dissect").setLevel(level=logging.ERROR)
 
-    targets = list(Target.open_all(args.targets))
-
-    if args.python:
-        python_shell(targets)
-    else:
-        cli = TargetCli
-        if args.registry:
-            cli = RegistryCli
-        target_shell(targets, cli=cli)
+    open_shell(args.targets, args.python, args.registry)
 
 
 if __name__ == "__main__":
