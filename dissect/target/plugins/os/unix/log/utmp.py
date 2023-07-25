@@ -106,7 +106,7 @@ class UtmpFile:
     """utmp maintains a full accounting of the current status of the system"""
 
     def __init__(self, target: Target, path: TargetPath):
-        self.fh = target.fs.open(path)
+        self.fh = target.fs.path(path).open()
 
         if "gz" in path:
             self.compressed = True
@@ -136,20 +136,22 @@ class UtmpFile:
                 # where the last 12 bytes of trailing zeroes.
                 if entry.ut_addr_v6:
                     if not entry.ut_addr_v6[1:] == [0, 0, 0]:
-                        # IPv6 address
+                        # IPv6 address that uses > 4 bytes
                         ut_addr = ipaddress.ip_address(struct.pack("<4i", *entry.ut_addr_v6))
                     else:
                         try:
                             if isinstance(ipaddress.ip_address(ut_host), ipaddress.IPv6Address):
-                                # IPv6 address that uses 4 bytes with 12 bytes of trailing zeroes
-                                # If the host contains a valid IPv6 address, the full entry_addr_v6 field is parsed as
-                                # IPv6 address instead of the first 4 bytes.
+                                # IPv6 address that uses 4 bytes with 12 bytes of trailing zeroes.
                                 ut_addr = ipaddress.ip_address(struct.pack("<4i", *entry.ut_addr_v6))
-                            else:
-                                # IPv4 address
+                            elif isinstance(ipaddress.ip_address(ut_host), ipaddress.IPv4Address):
+                                # IPv4 address (ut_host, ut_addr_v6)
                                 ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
+                            else:
+                                pass
                         except ValueError:
-                            # IPv4 address
+                            # NOTE: in case the ut_host does not contain a valid IPv6 address,
+                            # ut_addr_v6 is parsed as IPv4 address. This could not lead to incorrect
+                            # results.
                             ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
 
                 utmp_entry = UTMP_ENTRY(
