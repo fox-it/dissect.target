@@ -5,9 +5,9 @@ import os
 import traceback
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar, Union
 
-from dissect.target import filesystem, loader, plugin, volume
+from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
     FilesystemError,
     PluginError,
@@ -653,29 +653,32 @@ class Target:
         return f"<Target {self.path}>"
 
 
-class Collection:
-    def __init__(self, target):
-        self.target = target
-        self.entries = []
+T = TypeVar("T")
 
-    def add(self, entry):
+
+class Collection(Generic[T]):
+    def __init__(self, target: Target):
+        self.target = target
+        self.entries: list[T] = []
+
+    def add(self, entry: T) -> None:
         self.entries.append(entry)
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: str) -> T:
         return self.entries[k]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return iter(self.entries)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entries)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.entries!r}>"
 
 
-class DiskCollection(Collection):
-    def apply(self):
+class DiskCollection(Collection[container.Container]):
+    def apply(self) -> None:
         for disk in self.entries:
             # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
             # may be misidentified as having a valid MBR/GPT on some of the disks
@@ -698,8 +701,8 @@ class DiskCollection(Collection):
             self.target.volumes.add(vol)
 
 
-class VolumeCollection(Collection):
-    def open(self, vol):
+class VolumeCollection(Collection[volume.Volume]):
+    def open(self, vol: volume.Volume) -> None:
         try:
             if not hasattr(vol, "fs") or vol.fs is None:
                 vol.fs = filesystem.open(vol)
@@ -709,7 +712,7 @@ class VolumeCollection(Collection):
             self.target.log.warning("Can't identify filesystem: %s", vol)
             self.target.log.debug("", exc_info=e)
 
-    def apply(self):
+    def apply(self) -> None:
         todo = self.entries
 
         while todo:
@@ -757,5 +760,5 @@ class VolumeCollection(Collection):
                 vol.fs = self.entries[start_fs + rel_vol].fs
 
 
-class FilesystemCollection(Collection):
+class FilesystemCollection(Collection[filesystem.Filesystem]):
     pass
