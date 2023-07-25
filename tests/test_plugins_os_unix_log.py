@@ -1,39 +1,38 @@
 from datetime import datetime, timezone
 
 from dissect.target.plugins.os.unix.log.atop import AtopPlugin
-from dissect.target.plugins.os.unix.log.btmp import BtmpPlugin
 from dissect.target.plugins.os.unix.log.lastlog import LastLogPlugin
-from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
+from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
 
 from ._utils import absolute_path
 
 
 def test_utmp_ipv6(target_unix, fs_unix):
-    data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp-ipv6")
-    fs_unix.map_file("var/log/wtmp", data_file)
+    data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp-ipv6")
+    fs_unix.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(WtmpPlugin)
+    target_unix.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.wtmp())
+    results = list(target_unix.btmp())
+
+    # IPv4 address
+    results[0].ut_host == "127.0.0.1"
+    results[0].ut_addr == "127.0.0.1"
 
     # IPv6 address
-    results[8].ut_host == ""
-    results[8].ut_addr == "0.0.0.0"
+    results[4].ut_host == "1337::1"
+    results[4].ut_addr == "1337::1"
 
     # IPv6 address with 12 bytes of trailing zeroes
-    results[9].ut_host == "1337:1::"
-    results[9].ut_addr == "1337:1::"
-
-    # IPv6 address
-    results[11].ut_host == "1337::1"
-    results[11].ut_addr == "1337::1"
+    results[5].ut_host == "1337:1::"
+    results[5].ut_addr == "1337:1::"
 
 
 def test_wtmp_plugin(target_unix, fs_unix):
     data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
     fs_unix.map_file("var/log/wtmp", data_file)
 
-    target_unix.add_plugin(WtmpPlugin)
+    target_unix.add_plugin(UtmpPlugin)
 
     results = list(target_unix.wtmp())
     assert len(results) == 70
@@ -68,7 +67,7 @@ def test_btmp_plugin(target_unix, fs_unix):
     data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp")
     fs_unix.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(BtmpPlugin)
+    target_unix.add_plugin(UtmpPlugin)
 
     results = list(target_unix.btmp())
     assert len(results) == 10
