@@ -677,18 +677,25 @@ class Collection:
 class DiskCollection(Collection):
     def apply(self):
         for disk in self.entries:
-            try:
-                if not hasattr(disk, "vs") or disk.vs is None:
-                    disk.vs = volume.open(disk)
-                    self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
+            # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
+            # may be misidentified as having a valid MBR/GPT on some of the disks
+            # To counter this, first check if the disk is part of any LVM configurations that we support
+            if not volume.is_lvm_volume(disk):
+                try:
+                    if not hasattr(disk, "vs") or disk.vs is None:
+                        disk.vs = volume.open(disk)
+                        self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
 
-                for vol in disk.vs.volumes:
-                    self.target.volumes.add(vol)
-            except Exception as e:
-                self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
-                self.target.log.debug("", exc_info=e)
-                vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
-                self.target.volumes.add(vol)
+                    for vol in disk.vs.volumes:
+                        self.target.volumes.add(vol)
+                    continue
+                except Exception as e:
+                    self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
+                    self.target.log.debug("", exc_info=e)
+
+            # Fallthrough case for error and if we're part of a logical volume set
+            vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
+            self.target.volumes.add(vol)
 
 
 class VolumeCollection(Collection):
