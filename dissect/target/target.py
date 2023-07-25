@@ -703,31 +703,37 @@ class VolumeCollection(Collection):
             self.target.log.debug("", exc_info=e)
 
     def apply(self):
-        lvm_volumes = []
-        encrypted_volumes = []
-        for vol in self.entries:
-            if volume.is_lvm_volume(vol):
-                lvm_volumes.append(vol)
+        todo = self.entries
 
-            if volume.is_encrypted(vol):
-                encrypted_volumes.append(vol)
+        while todo:
+            new_volumes = []
+            lvm_volumes = []
+            encrypted_volumes = []
 
-            self.open(vol)
+            for vol in todo:
+                if volume.is_lvm_volume(vol):
+                    lvm_volumes.append(vol)
+                elif volume.is_encrypted(vol):
+                    encrypted_volumes.append(vol)
+                else:
+                    self.open(vol)
 
-        self.target.log.debug("LVM volumes found: %s", lvm_volumes)
-        self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
+            self.target.log.debug("LVM volumes found: %s", lvm_volumes)
+            self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
 
-        for lvm in volume.open_lvm(lvm_volumes):
-            self.target.log.debug("Opened LVM: %s", lvm)
-            for lv in lvm.volumes:
-                self.add(lv)
-                self.open(lv)
+            for lvm in volume.open_lvm(lvm_volumes):
+                self.target.log.debug("Opened LVM: %s", lvm)
+                for lv in lvm.volumes:
+                    self.add(lv)
+                    new_volumes.append(lv)
 
-        for enc_volume in encrypted_volumes:
-            for dec_volume in volume.open_encrypted(enc_volume):
-                self.add(dec_volume)
-                self.open(dec_volume)
-                self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+            for enc_volume in encrypted_volumes:
+                for dec_volume in volume.open_encrypted(enc_volume):
+                    self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+                    self.add(dec_volume)
+                    new_volumes.append(dec_volume)
+
+            todo = new_volumes
 
         # ASDF - getting the correct starting system volume
         start_fs = None
