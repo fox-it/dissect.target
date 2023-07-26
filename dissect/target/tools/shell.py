@@ -440,6 +440,9 @@ class TargetCli(TargetCmd):
                     elif file_.is_dir():
                         file_type = "di"
                     elif file_.is_file():
+                        import ipdb
+
+                        ipdb.set_trace()
                         file_type = "fi"
 
                 result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
@@ -807,6 +810,10 @@ class TargetCli(TargetCmd):
     @arg("path", nargs="?", help="load a hive from the given path")
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """drop into a registry shell"""
+        if self.target.os == "linux":
+            run_cli(UnixRegistryCli(self.target))
+            return
+
         hive = None
 
         clikey = "registry"
@@ -858,6 +865,55 @@ class TargetCli(TargetCmd):
 
         # Print an additional empty newline after exit
         print()
+
+
+from dissect.target.plugins.os.unix.registry import UnixRegistry
+
+
+class UnixRegistryCli(TargetCli):
+    def __init__(self, target):
+        TargetCmd.__init__(self, target)
+        self.registry = UnixRegistry(target)
+        self.prompt_base = target.name
+
+        self.cwd = None
+        self.chdir("/")
+
+    @property
+    def prompt(self):
+        return f"{self.prompt_base}/registry {self.cwd}> "
+
+    def check_compatible(target):
+        return target.fs.get("/etc") is not None
+
+    def resolvepath(self, path):
+        if not path:
+            return self.cwd
+
+        if isinstance(path, fsutil.TargetPath):
+            return path
+
+        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.registry.alt_separator)
+        return self.registry.path(path)
+
+    def resolvekey(self, path):
+        return self.registry.key(path)
+
+    def resolveglobpath(self, path):
+        path = self.resolvepath(path)
+        if path.exists():
+            yield path
+        else:
+            # Strip the leading '/' as non-relative patterns are unsupported as glob patterns.
+            glob_path = str(path).lstrip("/")
+            try:
+                for path in self.registry.path("/").glob(glob_path):
+                    yield path
+            except ValueError as err:
+                # The generator returned by glob() will raise a
+                # ValueError if the '**' glob is not used as an entire path
+                # component
+                print(err)
 
 
 class RegistryCli(TargetCmd):
