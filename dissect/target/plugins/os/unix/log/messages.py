@@ -30,14 +30,6 @@ class MessagesPlugin(Plugin):
         return any(var_log.glob("syslog*")) or any(var_log.glob("messages*"))
 
     @export(record=MessagesRecord)
-    def syslog(self) -> Iterator[MessagesRecord]:
-        """Return contents of /var/log/messages* and /var/log/syslog*.
-
-        See ``messages`` for more information.
-        """
-        return self.messages()
-
-    @export(record=MessagesRecord)
     def messages(self) -> Iterator[MessagesRecord]:
         """Return contents of /var/log/messages* and /var/log/syslog*.
 

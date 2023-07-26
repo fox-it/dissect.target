@@ -26,11 +26,6 @@ class AuthPlugin(Plugin):
         return any(var_log.glob("auth.log*")) or any(var_log.glob("secure*"))
 
     @export(record=[AuthLogRecord])
-    def securelog(self) -> Iterator[AuthLogRecord]:
-        """Return contents of /var/log/auth.log* and /var/log/secure*."""
-        return self.authlog()
-
-    @export(record=[AuthLogRecord])
     def authlog(self) -> Iterator[AuthLogRecord]:
         """Return contents of /var/log/auth.log* and /var/log/secure*."""
 
