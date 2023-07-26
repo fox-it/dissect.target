@@ -24,6 +24,7 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
 
     data_file = absolute_path("data/unix/logs/messages")
     fs_unix.map_file("var/log/messages", data_file)
+    fs_unix.map_file("var/log/syslog", data_file)
 
     entry = fs_unix.get("var/log/messages")
     stat = entry.stat()
@@ -44,6 +45,11 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
         assert results[1].message == "Starting Journal Service..."
         assert results[1].pid == 1
         assert results[1].source == path.from_posix("/var/log/messages")
+
+    # assure syslog() behaves the same as messages()
+    syslogs = list(target_unix_users.syslog())
+    assert len(syslogs) == len(results)
+    assert isinstance(syslogs[0], type(MessagesRecord()))
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
