@@ -97,15 +97,15 @@ class OpenVPNPlugin(Plugin):
             name = basename(config_path).replace(".conf", "")
             proto = config.get("proto", "udp")  # Default is UDP
             dev = config.get("dev")
-            ca = config.get("ca").strip('"').strip("'")
-            cert = config.get("cert").strip('"').strip("'")
-            key = config.get("key").strip('"').strip("'")
+            ca = _unquote(config.get("ca"))
+            cert = _unquote(config.get("cert"))
+            key = _unquote(config.get("key"))
             tls_auth = config.get("tls-auth", "")
             # The format of tls-auth is 'tls-auth ta.key <NUM>'.
             # NUM is either 0 or 1 depending on whether the configuration
             # is for the client or server, and that does not interest us
             # This gets rid of the number at the end, while still supporting spaces
-            tls_auth = " ".join(tls_auth.split(" ")[:-1]).strip('"').strip("'")
+            tls_auth = _unquote(" ".join(tls_auth.split(" ")[:-1]))
             status = config.get("status")
             log = config.get("log")
 
@@ -136,7 +136,7 @@ class OpenVPNPlugin(Plugin):
                 # we want to return it as its own list
                 if isinstance(pushed_options, str):
                     pushed_options = [pushed_options]
-                pushed_options = [opt.strip('"').strip("'") for opt in pushed_options]
+                pushed_options = [_unquote(opt) for opt in pushed_options]
                 # Defaults here are taken from `man (8) openvpn`
                 yield OpenVPNServer(
                     name=name,
@@ -150,7 +150,7 @@ class OpenVPNPlugin(Plugin):
                     log=log,
                     local=config.get("local", "0.0.0.0"),
                     port=int(config.get("port", "1194")),
-                    dh=config.get("dh").strip('"').strip("'"),
+                    dh=_unquote(config.get("dh")),
                     topology=config.get("topology"),
                     server=config.get("server"),
                     ifconfig_pool_persist=config.get("ifconfig-pool-persist"),
@@ -181,3 +181,7 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
             else:
                 res[key] = value
     return res
+
+
+def _unquote(content: str) -> str:
+    return content.strip("\"'")
