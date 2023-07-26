@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
+from itertools import chain
 from re import compile, sub
 from typing import Any, Callable, Iterable, Match, Optional, Union
 
@@ -511,7 +512,7 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
 
     # Search through parsed syslogs for DHCP leases.
     try:
-        messages = target.messages()
+        messages = chain(target.messages(), target.syslog())
         for record in messages:
             line = record.message
 
