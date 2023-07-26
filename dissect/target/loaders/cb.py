@@ -137,7 +137,10 @@ class CbRegistryKey(RegistryKey):
 
     @cached_property
     def data(self) -> dict:
-        return self.session.list_registry_keys_and_values(self._path)
+        try:
+            return self.session.list_registry_keys_and_values(self._path)
+        except Exception:
+            raise RegistryKeyNotFoundError(self.path)
 
     @property
     def name(self) -> str:
@@ -152,13 +155,10 @@ class CbRegistryKey(RegistryKey):
         return ts.from_unix(0)
 
     def subkey(self, subkey: str) -> CbRegistryKey:
-        subkey_val = subkey.lower()
-
-        for val in self.data["sub_keys"]:
-            if val.lower() == subkey_val:
-                return CbRegistryKey(self.hive, "\\".join([self._path, subkey]))
-        else:
-            raise RegistryKeyNotFoundError(subkey)
+        # To improve peformance, immediately return a "hollow" key object
+        # Only listing all subkeys or reading a value will result in data being loaded
+        # Technically this means we won't raise a RegistryKeyNotFoundError in the correct place
+        return CbRegistryKey(self.hive, "\\".join([self._path, subkey]))
 
     def subkeys(self) -> list[CbRegistryKey]:
         return list(map(self.subkey, self.data["sub_keys"]))

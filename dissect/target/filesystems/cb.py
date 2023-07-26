@@ -113,7 +113,7 @@ class CbFilesystemEntry(FilesystemEntry):
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         """Return whether this entry is a file."""
-        return "ARCHIVE" in self.entry["attributes"]
+        return not self.is_dir()
 
     def is_symlink(self) -> bool:
         """Return whether this entry is a link."""
