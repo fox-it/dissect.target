@@ -99,7 +99,7 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
 
     with patch.object(entry, "stat", return_value=stat):
         target_unix.add_plugin(AuthPlugin)
-        results = list(target_unix.authlog())
+        results = list(target_unix.securelog())
 
         assert len(results) == 2
         results.reverse()
