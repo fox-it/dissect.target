@@ -50,6 +50,7 @@ def test_unix_services(target_unix_users, fs_unix):
         ("[Unit]\nnew_lines=hello \\\nworld\\\ntest", 'Unit_new_lines="hello world test"'),
         ("[Unit]\ntest", 'Unit_test="None"'),
         ("[Unit]\nnew_lines=hello \\\n#Comment\n;Comment2\nworld", 'Unit_new_lines="hello world"'),
+        ("[Unit]\nlines=hello \\\nworld\\\n\ntest", 'Unit_lines="hello world test"'),
     ],
 )
 def test_unix_systemd_parser(assignment, expected_value):
@@ -58,9 +59,11 @@ def test_unix_systemd_parser(assignment, expected_value):
 
 
 @pytest.mark.xfail
-def test_unix_systemd_known_fail():
-    # While this should return `Hello world test help` it fails because it cannot find something
-    # in the config parser.
+def test_unix_systemd_known_fails():
+    # While this should return `Hello world test help`,
+    # the configparser attempts to append `help` as a value to the list of options
+    # belonging to the key before it `test\\`.
+    # However, `test\\` is `None` or empty in this case it attempts to append on a NoneType object.
     # The future fix would to create a custom Systemd ConfigParser
     systemd_config = """
     [Unit]
@@ -69,5 +72,4 @@ def test_unix_systemd_known_fail():
     test\\
      help
     """
-    config = parse_systemd_config(StringIO(textwrap.dedent(systemd_config)))
-    assert config
+    parse_systemd_config(StringIO(textwrap.dedent(systemd_config)))
