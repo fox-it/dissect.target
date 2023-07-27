@@ -31,7 +31,7 @@ class UserPlugin(Plugin):
     def account_policy(self) -> Iterator[AccountPolicyRecord]:
         # The data is not retrieved from the home folder of the user
         for user_details in self.target.user_details.all():
-            user = plistlib.loads(self.target.fs.path(user_details.user.source).read_bytes())
+            user = plistlib.load(self.target.fs.path(user_details.user.source).open())
 
             if user.get("accountPolicyData"):
                 generateduid = user.get("generateduid", [None])[0]

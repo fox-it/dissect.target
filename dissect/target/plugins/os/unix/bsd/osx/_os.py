@@ -31,8 +31,7 @@ class MacPlugin(BsdPlugin):
     @export(property=True)
     def hostname(self) -> Optional[str]:
         try:
-            preferencesPlist = self.target.fs.path(self.SYSTEM).read_bytes()
-            preferences = plistlib.loads(preferencesPlist)
+            preferences = plistlib.load(self.target.fs.path(self.SYSTEM).open())
             return preferences["System"]["System"]["ComputerName"]
 
         except FileNotFoundError:
@@ -45,8 +44,7 @@ class MacPlugin(BsdPlugin):
     @export(property=True)
     def version(self) -> Optional[str]:
         try:
-            systemVersionPlist = self.target.fs.path(self.VERSION).read_bytes()
-            systemVersion = plistlib.loads(systemVersionPlist)
+            systemVersion = plistlib.load(self.target.fs.path(self.VERSION).open())
             productName = systemVersion["ProductName"]
             productUserVisibleVersion = systemVersion["ProductUserVisibleVersion"]
             productBuildVersion = systemVersion["ProductBuildVersion"]
@@ -57,7 +55,7 @@ class MacPlugin(BsdPlugin):
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
         for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
-            user = plistlib.loads(path.read_bytes())
+            user = plistlib.load(path.open())
 
             # The home directory of an user account can be null,
             # but an user account can also have multiply home directories e.g. the root account.
