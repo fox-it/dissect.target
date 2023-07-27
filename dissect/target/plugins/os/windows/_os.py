@@ -290,6 +290,9 @@ class WindowsPlugin(OSPlugin):
 
     @export(record=WindowsUserRecord)
     def users(self) -> Iterator[WindowsUserRecord]:
+        # Be aware that this function can never do anything which needs user
+        # registry hives. Initializing those hives will need this function,
+        # which will then cause a recursion.
         key = "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
         sids = set()
         for k in self.target.registry.keys(key):

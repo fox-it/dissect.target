@@ -120,6 +120,11 @@ class RegistryPlugin(Plugin):
                 self._map_hive(location, self._hive_collections[hive])
 
     def _init_users(self) -> None:
+        # The initialization of user hives is separated from the initialization
+        # of the class on purpose.
+        # Loading user hives needs user information (through _os.users()),
+        # while getting those users needs a minimal functional registry (the
+        # HKLM hive should be available).
         if self._users_loaded:
             return
 
