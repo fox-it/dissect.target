@@ -79,6 +79,11 @@ yara = [
     # Enable using the yara rules functionality
     "yara-python"
 ]
+smb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "impacket==0.10.0"
+]
 
 [project.scripts]
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
