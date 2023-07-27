@@ -23,6 +23,7 @@ from dissect.target.filesystems.smb import SmbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
 from dissect.target.loader import Loader
+from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
@@ -86,7 +87,9 @@ class SmbLoader(Loader):
         self._domain = self._params.get("domain", os.getenv("SMB_DOMAIN", "."))
         self._username = self._uri.username or os.getenv("SMB_USERNAME", "Guest")
         self._password = self._uri.password or os.getenv("SMB_PASSWORD", "")
-        self._nt, self._lm = self._get_hashes() if not self._password else "", ""
+        self._nt, self._lm = "", ""
+        if not self._password:
+            self._nt, self._lm = self._get_hashes()
 
         krb_ticket_params = self._params.get("ticket", self._params.get("ccache", ""))
         krb_ticket_env = os.getenv("SMB_KERBEROS_TICKET", os.getenv("KRB5CCNAME", ""))
@@ -172,6 +175,7 @@ class SmbLoader(Loader):
                 target.log.warning("Failed to mount share '%s', reason: %s", share_name, e)
 
         target.add_plugin(SmbRegistry(target, self._conn), check_compatible=False)
+        target._os_plugin = WindowsPlugin
 
 
 class SmbRegistry(RegistryPlugin):
@@ -198,10 +202,10 @@ class SmbRegistry(RegistryPlugin):
         hklm_hive = SmbRegistryHive(self._winreg, "HKEY_LOCAL_MACHINE", rrp.hOpenLocalMachine(self._winreg)["phKey"])
         hku_hive = SmbRegistryHive(self._winreg, "HKEY_USERS", rrp.hOpenUsers(self._winreg)["phKey"])
 
-        self.add_hive("HKLM", hklm_hive, TargetPath(self.target.fs, "HKLM"))
-        self.add_hive("HKU", hku_hive, TargetPath(self.target.fs, "HKU"))
-        self.map_hive("HKEY_LOCAL_MACHINE", hklm_hive)
-        self.map_hive("HKEY_USERS", hku_hive)
+        self._add_hive("HKLM", hklm_hive, TargetPath(self.target.fs, "HKLM"))
+        self._add_hive("HKU", hku_hive, TargetPath(self.target.fs, "HKU"))
+        self._map_hive("HKEY_LOCAL_MACHINE", hklm_hive)
+        self._map_hive("HKEY_USERS", hku_hive)
 
     def _init_users(self) -> None:
         pass

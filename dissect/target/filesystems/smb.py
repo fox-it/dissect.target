@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import stat
 from typing import BinaryIO, Iterator
 
 from dissect.util.stream import AlignedStream
@@ -48,7 +49,7 @@ class SmbFilesystem(Filesystem):
 
     def _get_entry(self, path: str) -> SharedFile:
         if not path.strip("/"):
-            # Getting proper information about the root of the share is cumbersome to just fake it
+            # Getting proper information about the root of the share is cumbersome so just fake it
             return SharedFile(0, 0, 0, 0, 0, ATTR_DIRECTORY, "", "")
 
         try:
@@ -128,8 +129,9 @@ class SmbFilesystemEntry(FilesystemEntry):
         return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
+        mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
         st_info = [
-            0o755,
+            mode | 0o755,
             fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
             id(self.fs),
             0,
