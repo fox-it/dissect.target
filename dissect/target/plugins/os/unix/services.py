@@ -1,6 +1,8 @@
+import io
 import re
+from configparser import ConfigParser
 from itertools import chain
-from typing import BinaryIO, Iterator
+from typing import Iterator, TextIO
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -51,30 +53,29 @@ class ServicesPlugin(Plugin):
             if not path.exists() or not path.is_dir():
                 continue
 
-            for file_ in path.iterdir():
-                if should_ignore_file(file_.name, ignored_suffixes):
+            for service_file in path.iterdir():
+                if should_ignore_file(service_file.name, ignored_suffixes):
                     continue
 
                 try:
-                    fh = file_.open("rt")
+                    with service_file.open("rt") as fh:
+                        config = parse_systemd_config(fh)
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
-                        ts=file_.stat(follow_symlinks=False).st_mtime,
-                        name=file_.name,
+                        ts=service_file.stat(follow_symlinks=False).st_mtime,
+                        name=service_file.name,
                         config=None,
-                        source=file_,
+                        source=service_file,
                         _target=self.target,
                     )
                     continue
 
-                config = parse_systemd_config(fh)
-
                 yield LinuxServiceRecord(
-                    ts=file_.stat().st_mtime,
-                    name=file_.name,
+                    ts=service_file.stat().st_mtime,
+                    name=service_file.name,
                     config=config,
-                    source=file_,
+                    source=service_file,
                     _target=self.target,
                 )
 
@@ -106,43 +107,45 @@ def should_ignore_file(needle: str, haystack: list) -> bool:
     return False
 
 
-def parse_systemd_config(fh: BinaryIO) -> str:
+def parse_systemd_config(fh: TextIO) -> str:
     """Returns a string of key/value pairs from a toml/ini-like string.
 
     This should probably be rewritten to return a proper dict as in
     its current form this is only useful when used in Splunk.
     """
-    variables = ""
+    parser = ConfigParser(strict=False, delimiters=("=",), allow_no_value=True)
+    # to preserve casing from configuration.
+    parser.optionxform = str
+    parser.read_file(fh)
 
+    output = io.StringIO()
     try:
-        for line in fh:
-            line = line.strip().replace("\n", "")
+        for segment, configuration in parser.items():
+            original_key = ""
+            previous_value = ""
+            concat_value = False
+            for key, value in configuration.items():
+                original_key = original_key or key
 
-            # segment start eg. [ExampleSegment]
-            if line[:1] == "[":
-                segment = re.sub(r"\[|\]", "", line)
+                if concat_value:
+                    # A backslash was found at the end of the previous line
+                    # If value is None, it might not contain a backslash
+                    # So we turn it into an empty string.
+                    value = f"{previous_value} {key} {value or ''}".strip()
 
-            # ignore comments and empty lines
-            elif line[:1] == ";" or line[:1] == "#" or line == "":
-                continue
-
-            # if line ends with \ it is likely part of a multi-line command argument
-            elif line[-1] == "\\" or line[-1] == "'":
-                variables = f"{variables} {line} "
-
-            else:
-                line = line.split("=", 1)
-                if "segment" in locals():
-                    # some variables/arguments are not delimited by a '='
-                    # (eg. '-Kvalue' instead of '-key=value')
-                    if len(line) < 2:
-                        variables = f"{variables} {segment}_{line[0]} "
-                    else:
-                        variables = f'{variables} {segment}_{line[0]}="{line[1]}" '
+                concat_value = str(value).endswith("\\")
+                if concat_value:
+                    # Remove any dangling empty space or backslashes
+                    previous_value = value.rstrip("\\ ")
                 else:
-                    variables = f"{variables} {line} ".strip()
+                    output.write(f'{segment}_{original_key or key}="{value}" ')
+                    original_key = ""
+                    previous_value = ""
 
     except UnicodeDecodeError:
         pass
 
-    return variables.strip()
+    output_data = output.getvalue()
+    # Remove any back slashes or new line characters.
+    output_data = re.sub(r"(\\|\n)", "", output_data)
+    return output_data.strip()
