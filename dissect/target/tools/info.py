@@ -5,34 +5,14 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Union
 
 from dissect.target import Target
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
-
-InfoRecord = TargetRecordDescriptor(
-    "target/info",
-    [
-        ("datetime", "last_activity"),
-        ("datetime", "install_date"),
-        ("net.ipaddress[]", "ips"),
-        ("string", "os_family"),
-        ("string", "os_version"),
-        ("string", "architecture"),
-        ("string[]", "language"),
-        ("string", "timezone"),
-        ("string[]", "disks"),
-        ("string[]", "volumes"),
-        ("string[]", "children"),
-    ],
-)
-
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -75,36 +55,18 @@ def main():
     for i, target in enumerate(Target.open_all(args.targets)):
         try:
             if args.jsonlines:
-                print(json.dumps(get_target_info(target), default=str))
+                print(json.dumps(list(target.info())[0]._asdict(), default=str))
             elif args.json:
-                print(json.dumps(get_target_info(target), indent=4, default=str))
+                print(json.dumps(list(target.info())[0]._asdict(), indent=4, default=str))
             elif args.record:
                 rs = record_output(args.strings)
-                rs.write(InfoRecord(**get_target_info(target), _target=target))
+                rs.write(list(target.info())[0])
             else:
                 if i > 0:
                     print("-" * 70)
                 print_target_info(target)
         except Exception as e:
             target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
-
-
-def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
-    return {
-        "hostname": target.hostname,
-        "domain": target.domain,
-        "ips": target.ips,
-        "os_family": target.os,
-        "os_version": target.version,
-        "architecture": target.architecture,
-        "language": target.language,
-        "timezone": target.timezone,
-        "install_date": target.install_date,
-        "last_activity": target.activity,
-        "disks": get_disks_info(target),
-        "volumes": get_volumes_info(target),
-        "children": get_children_info(target),
-    }
 
 
 def print_target_info(target: Target) -> None:
@@ -133,18 +95,6 @@ def print_target_info(target: Target) -> None:
     print(f"Timezone      : {target.timezone}")
     print(f"Install date  : {target.install_date}")
     print(f"Last activity : {target.activity}")
-
-
-def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:
-    return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
-
-
-def get_volumes_info(target: Target) -> list[dict[str, Union[str, int]]]:
-    return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
-
-
-def get_children_info(target: Target) -> list[dict[str, str]]:
-    return [{"type": c.type, "path": str(c.path)} for c in target.list_children()]
 
 
 if __name__ == "__main__":
