@@ -10,6 +10,7 @@ def test_smb_filesystem_windows(monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         mock_impacket = MagicMock()
         m.setitem(sys.modules, "impacket", mock_impacket)
+        m.setitem(sys.modules, "impacket.nt_errors", mock_impacket.nt_errors)
         m.setitem(sys.modules, "impacket.smb", mock_impacket.smb)
         m.setitem(sys.modules, "impacket.smb3structs", mock_impacket.smb3structs)
         m.setitem(sys.modules, "impacket.smbconnection", mock_impacket.smbconnection)

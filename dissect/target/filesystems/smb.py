@@ -5,6 +5,7 @@ import stat
 from typing import BinaryIO, Iterator
 
 from dissect.util.stream import AlignedStream
+from impacket.nt_errors import STATUS_NOT_A_DIRECTORY
 from impacket.smb import ATTR_DIRECTORY, SharedFile
 from impacket.smb3structs import (
     FILE_ATTRIBUTE_NORMAL,
@@ -55,7 +56,7 @@ class SmbFilesystem(Filesystem):
         try:
             result = self._conn.listPath(self._share_name, path)
         except SessionError as e:
-            if e.error == 0xC0000103:
+            if e.error == STATUS_NOT_A_DIRECTORY:
                 # STATUS_NOT_A_DIRECTORY
                 raise NotADirectoryError(path, cause=e)
             else:
@@ -103,7 +104,7 @@ class SmbFilesystemEntry(FilesystemEntry):
     def open(self) -> SmbStream:
         log.debug("Attempting to open file: %s", self.path)
         try:
-            return SmbStream(self.fs, self)
+            return SmbStream(self.fs._conn, self.fs._share_name, self.path, self.entry.get_filesize())
         except SessionError as e:
             raise FilesystemError(f"Failed to open file: {self.path}", cause=e)
 
@@ -149,34 +150,35 @@ class SmbFilesystemEntry(FilesystemEntry):
 class SmbStream(AlignedStream):
     """Stream implementation for reading SMB files."""
 
-    def __init__(self, fs: SmbFilesystem, entry: SmbFilesystemEntry):
-        self.fs = fs
-        self.entry = entry
+    def __init__(self, conn: SMBConnection, share_name: str, path: str, size: int):
+        self.conn = conn
+        self.share_name = share_name
+        self.path = path
 
-        self.tree_id = self.fs._conn.connectTree(self.fs._share_name)
-        self.file_id = self.fs._conn.openFile(
+        self.tree_id = self.conn.connectTree(share_name)
+        self.file_id = self.conn.openFile(
             treeId=self.tree_id,
-            pathName=entry.path,
+            pathName=path,
             desiredAccess=FILE_READ_DATA,
             shareMode=FILE_SHARE_READ,
             creationOption=FILE_NON_DIRECTORY_FILE,
             creationDisposition=FILE_OPEN,
             fileAttributes=FILE_ATTRIBUTE_NORMAL,
         )
-        super().__init__(entry.entry.get_filesize())
+        super().__init__(size)
 
     def _read(self, offset: int, length: int) -> bytes:
-        return self.fs._conn.readFile(self.tree_id, self.file_id, offset, length)
+        return self.conn.readFile(self.tree_id, self.file_id, offset, length)
 
     def close(self) -> None:
         try:
-            self.fs._conn.closeFile(self.tree_id, self.file_id)
+            self.conn.closeFile(self.tree_id, self.file_id)
         except Exception as e:
             log.warning("Failed to close file descriptor %d: %s", self.file_id, e)
 
         try:
             log.debug("Attempting to disconnect tree: %s (id=%d)", self.fs._share_name, self.tree_id)
-            self.fs._conn.disconnectTree(self.tree_id)
+            self.conn.disconnectTree(self.tree_id)
         except Exception as e:
             log.warning(
                 "Failed to disconnect from tree (share=%s, tree_id=%d): %s", self.fs._share_name, self.tree_id, e
