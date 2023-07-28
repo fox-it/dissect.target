@@ -136,12 +136,7 @@ class SmbLoader(Loader):
         nt = self._params.get("nt", self.EMPTY_NT)
         lm = self._params.get("lm", self.EMPTY_LM)
 
-        if "hash" in self._params:
-            hashes = self._params["hash"]
-        elif "hashes" in self._params:
-            hashes = self._params["hashes"]
-        else:
-            hashes = f"{nt}:{lm}"
+        hashes = self._params.get("hash", self._params.get("hashes", f"{nt}:{lm}"))
 
         if ":" in hashes:
             nt, lm = hashes.split(":", 1)
