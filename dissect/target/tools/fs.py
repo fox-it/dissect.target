@@ -111,9 +111,6 @@ def main():
     if args.subcommand is None:
         parser.error("No subcommand specified")
 
-    if not args.target.is_file():
-        parser.error(f"Specified target {args.target} is not a file or does not exist")
-
     process_generic_arguments(args)
 
     target = Target.open(args.target)
