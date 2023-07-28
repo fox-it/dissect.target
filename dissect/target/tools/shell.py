@@ -35,6 +35,7 @@ from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_bound_method,
     process_generic_arguments,
@@ -1138,6 +1139,7 @@ def run_cli(cli: cmd.Cmd) -> None:
             pass
 
 
+@catch_sigpipe
 def main() -> None:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
