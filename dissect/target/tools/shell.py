@@ -440,9 +440,6 @@ class TargetCli(TargetCmd):
                     elif file_.is_dir():
                         file_type = "di"
                     elif file_.is_file():
-                        import ipdb
-
-                        ipdb.set_trace()
                         file_type = "fi"
 
                 result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))

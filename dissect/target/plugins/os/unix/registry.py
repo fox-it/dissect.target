@@ -2,15 +2,15 @@ from __future__ import annotations
 from dissect.target import Target
 from dissect.target.plugin import Plugin
 from dissect.target.helpers import fsutil
-from dissect.target.filesystem import Filesystem, FilesystemEntry
-from configparser import RawConfigParser
+from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
+from configparser import RawConfigParser, MissingSectionHeaderError
 import io
 
 
 from typing import Any, Union
 
 
-class UnixRegistryPlugin(Plugin):
+class ConfigurationTree(Plugin):
     __namespace__ = "registry"
 
     def __init__(self, target: Target) -> None:
@@ -31,80 +31,115 @@ class UnixRegistryPlugin(Plugin):
             yield from self.key(key).iterdir()
 
 
-class UnixRegistry(Filesystem):
+class UnixRegistry(VirtualFilesystem):
     __fstype__: str = "META:registry"
 
     def __init__(self, target: Target, **kwargs):
-        super().__init__(None, **kwargs)
-        self.root = target.fs.get("/etc")
+        super().__init__(**kwargs)
+        self.root.top = target.fs.get("/etc")
 
     def get(self, path: str, relentry=None) -> Union[FilesystemEntry, ConfigurationEntry]:
-        entry = relentry or self.root
+        if isinstance(relentry, ConfigurationEntry):
+            return relentry.get(path)
 
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
-        if not path:
-            return entry
+        parts = path.strip("/").split("/")
 
-        for part in path.split("/"):
-            if entry.is_symlink():
-                entry = entry.readlink_ext()
+        if not parts:
+            raise FileNotFoundError()
 
-            if part == "..":
-                entry = entry.up
-                if not entry:
-                    entry = self.root
+        entry = super().get(parts[0], relentry)
+        for part in parts[1:]:
+            if isinstance(entry, ConfigurationEntry):
+                entry = entry.get(part)
+            elif entry.is_file():
+                try:
+                    entry = ConfigurationEntry(self, path, entry)
+                except Exception as e:
+                    pass
             else:
                 entry = entry.get(part)
-                if entry.is_file():
-                    try:
-                        entry = ConfigurationEntry(self, path, entry)
-                    except Exception:
-                        # Couldn't parse the file.
-                        ...
+
         return entry
 
 
 class ConfigurationEntry(FilesystemEntry):
-    def __init__(self, fs: Filesystem, path: str, entry: Any) -> None:
+    def __init__(self, fs: Filesystem, path: str, entry: Any, parser_items=None) -> None:
         super().__init__(fs, path, entry)
-
-        self.parser_items = self.parse_config(entry)
+        if parser_items is None:
+            self.parser_items = self.parse_config(entry)
+        else:
+            self.parser_items = parser_items
 
     def parse_config(self, entry) -> RawConfigParser:
-        if isinstance(entry, FilesystemEntry):
-            parser = RawConfigParser(strict=False)
-            parser.optionxform = str
-            with entry.open() as fp:
-                parser.readfp(fp)
-                return parser
-
-        return entry
+        parser = RawConfigParser(strict=False, delimiters=(" ", "\t"))
+        parser.optionxform = str
+        with entry.open() as fp:
+            open_file = io.TextIOWrapper(fp, encoding="utf-8")
+            try:
+                parser.read_file(open_file, source=entry.name)
+            except MissingSectionHeaderError:
+                open_file.seek(0)
+                open_file = io.StringIO("[DEFAULT]\n" + open_file.read())
+                parser.read_file(open_file, source=entry.name)
+        return parser
 
     def get(self, path: str) -> ConfigurationEntry:
         # Check for path in config entry
-        if self.is_dir():
-            return ConfigurationEntry(self.fs, path, self.parser_items[path])
-        raise NotADirectoryError("Cannot open a 'File' on a value")
+        if path in self.parser_items:
+            return ConfigurationEntry(self.fs, path, self.entry, self.parser_items[path])
+        raise NotADirectoryError(f"Cannot open a {path!r} on a value")
+
+    def _write_value_mapping(self, output: io.BytesIO, data: dict[str, Any]):
+        if hasattr(data, "keys"):
+            output.write(b"\n")
+            for key, value in data.items():
+                output.write(bytes(key, "utf8"))
+                self._write_value_mapping(output, value)
+        else:
+            output.write(b" ")
+            output.write(bytes(data))
+            output.write(b"\n")
 
     def open(self):
         # Return fh for path if entry is a file
         # Return bytes of value if entry is ConfigurationEntry
+
+        if isinstance(self.parser_items, RawConfigParser):
+            # Currently trying to open the underlying entry
+            return self.entry.open()
+
         if self.is_dir():
-            raise IsADirectoryError("Cannot open a directory.")
-        return io.BytesIO(self.parser_items)
+            bytesio = io.BytesIO()
+            for key, value in self.parser_items.items():
+                bytesio.write(bytes(key, "utf8"))
+                bytesio.write(b" ")
+                bytesio.write(bytes(value))
+
+        return io.BytesIO(bytes(self.parser_items, "utf8"))
 
     def iterdir(self):
+        for entry in self.scandir():
+            yield entry.name
+
+    def scandir(self):
         # Return dict keys
         if self.is_file():
             raise NotADirectoryError()
-        yield from self.parser_items.keys()
 
-    def scandir(self):
-        # Return ConfigurationEntry of dict keys
-        yield from self.iterdir()
+        for key, values in self.parser_items.items():
+            yield ConfigurationEntry(self.fs, key, self.entry, values)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
-        return not self.is_dir()
+        return not self.is_dir(follow_symlinks)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
-        return isinstance(self.entry, dict)
+        return hasattr(self.parser_items, "keys")
+
+    def is_symlink(self) -> bool:
+        return False
+
+    def exists(self, path: str) -> bool:
+        return self.entry.exists() and path in self.parser_items
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        return self.entry.stat(follow_symlinks)
