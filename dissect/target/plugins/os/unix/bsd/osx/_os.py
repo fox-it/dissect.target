@@ -57,8 +57,8 @@ class MacPlugin(BsdPlugin):
         for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
             user = plistlib.load(path.open())
 
-            # The home directory of an user account can be null,
-            # but an user account can also have multiply home directories e.g. the root account.
+            # The home directory of a user account can be null,
+            # but a user account can also have multiply home directories e.g. the root account.
             # https://developer.apple.com/documentation/foundation/filemanager/1642853-homedirectory/
             for home_dir in user.get("home", [None]):
                 yield UnixUserRecord(
