@@ -422,8 +422,7 @@ class TargetCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         """Change directory to the given path."""
-        path = self.check_dir(path)
-        if path:
+        if path := self.check_dir(path):
             self.cwd = path
 
     def scandir(self, path: str, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
@@ -1078,8 +1077,7 @@ def open_shell(targets: list[Union[str, pathlib.Path]], python: bool, registry: 
 
 def target_shell(targets: list[Target], cli_cls: type[TargetCmd]) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
-    cli = create_cli(targets, cli_cls)
-    if cli:
+    if cli := create_cli(targets, cli_cls):
         run_cli(cli)
 
 
