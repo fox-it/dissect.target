@@ -35,8 +35,8 @@ class SmbFilesystem(Filesystem):
 
     def __init__(self, conn: SMBConnection, share_name: str, *args, **kwargs):
         super().__init__(None, *args, **kwargs, alt_separator="\\", case_sensitive=False)
-        self._conn = conn
-        self._share_name = share_name
+        self.conn = conn
+        self.share_name = share_name
 
     @staticmethod
     def detect(fh: BinaryIO) -> bool:
@@ -54,7 +54,7 @@ class SmbFilesystem(Filesystem):
             return SharedFile(0, 0, 0, 0, 0, ATTR_DIRECTORY, "", "")
 
         try:
-            result = self._conn.listPath(self._share_name, path)
+            result = self.conn.listPath(self.share_name, path)
         except SessionError as e:
             if e.error == STATUS_NOT_A_DIRECTORY:
                 # STATUS_NOT_A_DIRECTORY
@@ -84,13 +84,13 @@ class SmbFilesystemEntry(FilesystemEntry):
         try:
             entry: SharedFile
 
-            for entry in self.fs._conn.listPath(self.fs._share_name, path):
+            for entry in self.fs.conn.listPath(self.fs.share_name, path):
                 if entry.get_longname() in (".", ".."):
                     continue
 
                 yield entry
         except SessionError as e:
-            log.error("Failed to list directory '%s' share '%s', error: %s", path, self.fs._share_name, e)
+            log.error("Failed to list directory '%s' share '%s', error: %s", path, self.fs.share_name, e)
 
     def iterdir(self) -> Iterator[str]:
         for entry in self._iterdir():
@@ -104,7 +104,7 @@ class SmbFilesystemEntry(FilesystemEntry):
     def open(self) -> SmbStream:
         log.debug("Attempting to open file: %s", self.path)
         try:
-            return SmbStream(self.fs._conn, self.fs._share_name, self.path, self.entry.get_filesize())
+            return SmbStream(self.fs.conn, self.fs.share_name, self.path, self.entry.get_filesize())
         except SessionError as e:
             raise FilesystemError(f"Failed to open file: {self.path}", cause=e)
 
@@ -177,9 +177,7 @@ class SmbStream(AlignedStream):
             log.warning("Failed to close file descriptor %d: %s", self.file_id, e)
 
         try:
-            log.debug("Attempting to disconnect tree: %s (id=%d)", self.fs._share_name, self.tree_id)
+            log.debug("Attempting to disconnect tree: %s (id=%d)", self.share_name, self.tree_id)
             self.conn.disconnectTree(self.tree_id)
         except Exception as e:
-            log.warning(
-                "Failed to disconnect from tree (share=%s, tree_id=%d): %s", self.fs._share_name, self.tree_id, e
-            )
+            log.warning("Failed to disconnect from tree (share=%s, tree_id=%d): %s", self.share_name, self.tree_id, e)
