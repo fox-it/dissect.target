@@ -10,7 +10,10 @@ from dissect.target.plugins.apps.webservers import iis
 from ._utils import absolute_path
 
 
-def test_iis_plugin_iis_format(target_win_tzinfo, fs_win):
+def test_iis_plugin_iis_format(
+    target_win_tzinfo,
+    fs_win,
+):
     config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
 
@@ -32,8 +35,15 @@ def test_iis_plugin_iis_format(target_win_tzinfo, fs_win):
     assert {r.hostname for r in records} == {target_win_tzinfo.hostname}
 
 
-def test_iis_plugin_w3c_format(target_win, fs_win):
-    config_path = absolute_path("data/webservers/iis/iis-applicationHost-w3c.config")
+@pytest.mark.parametrize(
+    "iis_config_path",
+    [
+        "data/webservers/iis/iis-applicationHost-w3c.config",
+        "data/webservers/iis/iis-applicationHost-w3c-alternative.config",
+    ],
+)
+def test_iis_plugin_w3c_format(target_win, fs_win, iis_config_path):
+    config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("data/webservers/iis/iis-logs-w3c")
 
     fs_win.map_file("windows/system32/inetsrv/config/applicationHost.config", config_path)
