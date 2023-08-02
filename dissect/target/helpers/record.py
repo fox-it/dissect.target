@@ -124,7 +124,7 @@ WindowsUserRecord = TargetRecordDescriptor(
 )
 
 UnixUserRecord = TargetRecordDescriptor(
-    "linux/user",
+    "unix/user",
     [
         ("string", "name"),
         ("string", "passwd"),
