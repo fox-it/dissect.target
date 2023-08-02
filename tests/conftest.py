@@ -14,6 +14,8 @@ from dissect.target.plugins.general import default
 from dissect.target.plugins.os.windows import registry
 from dissect.target.target import Target
 
+from ._utils import absolute_path
+
 
 def make_dummy_target():
     target = Target()
@@ -55,6 +57,14 @@ def fs_unix():
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
+    yield fs
+
+
+@pytest.fixture
+def fs_osx():
+    fs = VirtualFilesystem()
+    fs.makedirs("Applications")
+    fs.makedirs("Library")
     yield fs
 
 
@@ -105,6 +115,23 @@ def target_unix(fs_unix):
     mock_target.filesystems.add(fs_unix)
     mock_target.fs.mount("/", fs_unix)
     mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
+def target_osx(fs_osx):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_osx)
+    mock_target.fs.mount("/", fs_osx)
+    mock_target.apply()
+
+    version = absolute_path("data/plugins/os/unix/bsd/osx/os/SystemVersion.plist")
+    fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
+
+    system = absolute_path("data/plugins/os/unix/bsd/osx/os/preferences.plist")
+    fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
+
     yield mock_target
 
 
@@ -202,6 +229,17 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def target_osx_users(target_osx, fs_osx):
+    dissect = absolute_path("data/plugins/os/unix/bsd/osx/os/dissect.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
+
+    test = absolute_path("data/plugins/os/unix/bsd/osx/os/test.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+
+    yield target_osx
 
 
 @pytest.fixture

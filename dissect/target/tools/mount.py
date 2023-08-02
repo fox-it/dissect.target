@@ -62,6 +62,7 @@ def main():
     # This is kinda silly because fusepy will convert this back into string arguments
     options = _parse_options(args.options) if args.options else {}
 
+    options["nothreads"] = True
     options["allow_other"] = True
     options["ro"] = True
 
