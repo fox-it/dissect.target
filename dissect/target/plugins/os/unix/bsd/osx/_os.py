@@ -45,8 +45,7 @@ class MacPlugin(BsdPlugin):
         # Static configured IP-addresses
         for interface in network.values():
             for addresses in [interface.get("IPv4"), interface.get("IPv6")]:
-                for ip_address in addresses.get("Addresses", []):
-                    ips.add(ip_address)
+                ips.update(addresses.get("Addresses", []))
 
         # IP-addresses configured by DHCP
         for lease in self.target.fs.path("/private/var/db/dhcpclient/leases").iterdir():
