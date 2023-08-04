@@ -17,7 +17,7 @@ def test_cpanel_plugin(target_unix_users, fs_unix):
 
     record = results[0]
 
-    assert len(results) == 4
+    assert len(results) == 6
     assert record.ts == datetime(2023, 6, 27, 13, 22, 13, tzinfo=timezone.utc)
     assert record.user == "user"
     assert record.remote_ip == "8.8.8.8"

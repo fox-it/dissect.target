@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Iterator
 
@@ -16,6 +17,7 @@ CPanelLastloginRecord = TargetRecordDescriptor(
 
 CPANEL_LASTLOGIN = ".lastlogin"
 CPANEL_LOGS_PATH = "/usr/local/cpanel/logs"
+CPANEL_PATTERN = re.compile(r"([^\s]+) # ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}) ([+-][0-9]{4})")
 
 
 class CPanelPlugin(Plugin):
@@ -45,25 +47,24 @@ class CPanelPlugin(Plugin):
                         if not line:
                             continue
 
-                        line = line.split()
+                        events = CPANEL_PATTERN.findall(line)
 
-                        # In certain cases two log lines are part of the same line
-                        if len(line) != 5 or len(line[4]) != 5:
+                        if events:
+                            for event in events:
+                                remote_ip, date, time, utc_offset = event
+
+                                timestamp = datetime.strptime(f"{date} {time} {utc_offset}", "%Y-%m-%d %H:%M:%S %z")
+
+                                yield CPanelLastloginRecord(
+                                    ts=timestamp,
+                                    user=user_details.user.name,
+                                    remote_ip=remote_ip,
+                                    _target=self.target,
+                                )
+                        else:
                             self.target.log.warning(
                                 "The cPanel lastlogin line number %s is malformed: %s", index + 1, lastlogin
                             )
-                            continue
-
-                        remote_ip, _, date, time, utc_offset = line
-
-                        timestamp = datetime.strptime(f"{date} {time} {utc_offset}", "%Y-%m-%d %H:%M:%S %z")
-
-                        yield CPanelLastloginRecord(
-                            ts=timestamp,
-                            user=user_details.user.name,
-                            remote_ip=remote_ip,
-                            _target=self.target,
-                        )
 
                 except Exception:
                     self.target.log.warning(
