@@ -51,6 +51,11 @@ def test_unix_services(target_unix_users, fs_unix):
         ("[Unit]\ntest", 'Unit_test="None"'),
         ("[Unit]\nnew_lines=hello \\\n#Comment\n;Comment2\nworld", 'Unit_new_lines="hello world"'),
         ("[Unit]\nlines=hello \\\nworld\\\n\ntest", 'Unit_lines="hello world test"'),
+        (
+            "[Unit]\nDescription=Online ext4 Metadata Check for %I",
+            'Unit_Description="Online ext4 Metadata Check for %I"',
+        ),
+        ("[Unit]\ntest=hello\tme", 'Unit_test="hello\tme"'),
     ],
 )
 def test_unix_systemd_parser(assignment, expected_value):

@@ -113,7 +113,7 @@ def parse_systemd_config(fh: TextIO) -> str:
     This should probably be rewritten to return a proper dict as in
     its current form this is only useful when used in Splunk.
     """
-    parser = ConfigParser(strict=False, delimiters=("=",), allow_no_value=True)
+    parser = ConfigParser(strict=False, delimiters=("=",), allow_no_value=True, interpolation=None)
     # to preserve casing from configuration.
     parser.optionxform = str
     parser.read_file(fh)

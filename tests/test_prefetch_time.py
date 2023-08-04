@@ -95,5 +95,5 @@ def test_prefetch_read_filename(mocked_prefetch):
     filename = mocked_prefetch.read_filename(0x10, 0x10)
 
     mocked_fileheader.read.assert_called_with(0x10 * 2)
-    assert type(filename) == bytes
+    assert isinstance(filename, bytes)
     assert mocked_fileheader.seek.call_count == 2

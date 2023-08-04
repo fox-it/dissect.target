@@ -19,7 +19,7 @@ class StrEnum(str, Enum):
 
 def list_to_frozen_set(function):
     def wrapper(*args):
-        args = [frozenset(x) if type(x) == list else x for x in args]
+        args = [frozenset(x) if isinstance(x, list) else x for x in args]
         return function(*args)
 
     return wrapper
