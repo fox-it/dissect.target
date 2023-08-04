@@ -41,10 +41,11 @@ class CPanelPlugin(Plugin):
             if (lastlogin := user_details.home_path.joinpath(CPANEL_LASTLOGIN)).exists():
                 try:
                     for index, line in enumerate(lastlogin.open("rt")):
+                        line = line.strip()
                         if not line:
                             continue
 
-                        line = line.strip().split()
+                        line = line.split()
 
                         # In certain cases two log lines are part of the same line
                         if len(line) != 5 or len(line[4]) != 5:
