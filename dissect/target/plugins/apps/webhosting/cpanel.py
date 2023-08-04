@@ -17,7 +17,9 @@ CPanelLastloginRecord = TargetRecordDescriptor(
 
 CPANEL_LASTLOGIN = ".lastlogin"
 CPANEL_LOGS_PATH = "/usr/local/cpanel/logs"
-CPANEL_PATTERN = re.compile(r"([^\s]+) # ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}) ([+-][0-9]{4})")
+CPANEL_LASTLOGIN_PATTERN = re.compile(
+    r"([^\s]+) # ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}) ([+-][0-9]{4})"
+)
 
 
 class CPanelPlugin(Plugin):
@@ -47,9 +49,7 @@ class CPanelPlugin(Plugin):
                         if not line:
                             continue
 
-                        events = CPANEL_PATTERN.findall(line)
-
-                        if events:
+                        if events := CPANEL_LASTLOGIN_PATTERN.findall(line):
                             for event in events:
                                 remote_ip, date, time, utc_offset = event
 
