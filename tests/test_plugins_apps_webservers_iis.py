@@ -5,15 +5,14 @@ from unittest.mock import mock_open, patch
 
 import pytest
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webservers import iis
 
 from ._utils import absolute_path
 
 
-def test_iis_plugin_iis_format(
-    target_win_tzinfo,
-    fs_win,
-):
+def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
     config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
 
@@ -42,7 +41,7 @@ def test_iis_plugin_iis_format(
         "data/webservers/iis/iis-applicationHost-w3c-alternative.config",
     ],
 )
-def test_iis_plugin_w3c_format(target_win, fs_win, iis_config_path):
+def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str):
     config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("data/webservers/iis/iis-logs-w3c")
 
@@ -90,7 +89,7 @@ def test_iis_plugin_w3c_format(target_win, fs_win, iis_config_path):
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win_tzinfo, stream, method):
+def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str):
     server = iis.IISLogsPlugin(target_win_tzinfo)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
@@ -98,7 +97,7 @@ def test_iis_plugin_iis_nonutf8(target_win_tzinfo, stream, method):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="IIS Assertion Error. Needs to be fixed.")
-def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo, fs_win):
+def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
     tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("data/webservers/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("data/webservers/iis/iis-logs-iis")
@@ -126,7 +125,7 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo, fs_win
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="IIS Assertion Error. Needs to be fixed.")
-def test_plugins_apps_webservers_iis_access_w3c_format(target_win, fs_win):
+def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem):
     config_path = absolute_path("data/webservers/iis/iis-applicationHost-w3c.config")
     data_dir = absolute_path("data/webservers/iis/iis-logs-w3c")
 
