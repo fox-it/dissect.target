@@ -118,3 +118,12 @@ def test_find_plugin_function_unix(target_unix):
 
     assert len(found) == 1
     assert found[0].name == "os.unix.services.services"
+
+
+def test_find_plugin_function_default(target_default):
+    found, _ = find_plugin_functions(target_default, "services")
+
+    assert len(found) == 2
+    names = [item.name for item in found]
+    assert "os.unix.services.services" in names
+    assert "os.windows.services.services" in names
