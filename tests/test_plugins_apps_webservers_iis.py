@@ -38,7 +38,7 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
     "iis_config_path",
     [
         "data/webservers/iis/iis-applicationHost-w3c.config",
-        "data/webservers/iis/iis-applicationHost-w3c-alternative.config",
+        "data/webservers/iis/iis-applicationHost-w3c-logFile-without-directory-attr.config",
     ],
 )
 def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str):
