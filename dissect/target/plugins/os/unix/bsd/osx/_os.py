@@ -52,9 +52,10 @@ class MacPlugin(BsdPlugin):
             if lease.is_file():
                 lease = plistlib.load(lease.open())
 
-                ips.add(lease.get("IPAddress"))
+                if ip := lease.get("IPAddress"):
+                    ips.add(ip)
 
-        return list(filter(None, ips))
+        return list(ips)
 
     @export(property=True)
     def version(self) -> Optional[str]:
