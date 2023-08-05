@@ -1,67 +1,87 @@
-import struct
-
 from typing import BinaryIO
-from dissect.target.plugins.os.windows.dpapi.types.masterkey import _CUUID, _RestOfData
 
 from dissect import cstruct as _cstruct
+
+from dissect.target.plugins.os.windows.dpapi.types.masterkey import _CUUID
 
 _dpapi_def = """
 struct DPAPIBlob
 {
     DWORD dwVersion;
     UUID provider;
+    DPAPI_START_CAPTURE _start_capture;
     DWORD mkVersion;
     UUID guid;
     DWORD flags;
-    BYTES_WITH_LEN description;
+    DWORD descriptionLength;
+    char description[descriptionLength];
     DWORD CipherAlgId;
     DWORD keyLen;
-    BYTES_WITH_LEN salt;
-    BYTES_WITH_LEN strong;
+    DWORD saltLength;
+    char salt[saltLength];
+    DWORD strongLength;
+    char strong[strongLength];
     DWORD CryptAlgId;
     DWORD hashLen;
-    BYTES_WITH_LEN hmac;
-    BYTES_WITH_LEN cipherText;
-    DPAPI_BLOB blob;
-    BYTES_WITH_LEN sign;
+    DWORD hmacLength;
+    char hmac[hmacLength];
+    DWORD cipherTextLength;
+    char cipherText[cipherTextLength];
+    DPAPI_END_CAPTURE blob[_start_capture];
+    DWORD signLength;
+    char sign[signLength];
 };
 
 """
 
 
-class _BytesWithLen(_cstruct.BaseType):
+class _StartCapture(_cstruct.BaseType):
+    """This records the current position of the seek. To be used later with `_EndCapture`"""
+
     alignment = 0
 
-    def _read(stream, _context):
-        (byte_len,) = struct.unpack("<L", stream.read(4))
-        return stream.read(byte_len)
+    def _read(stream: BinaryIO, *args, **kwargs) -> int:
+        return stream.tell()
 
-    def _write(self, stream: BinaryIO, data) -> int:
-        return stream.write(data)
+    def _write(self, stream: BinaryIO, *args, **kwargs) -> int:
+        return 0
 
 
-class _Blob(_cstruct.BaseType):
+class _EndCapture(_cstruct.BaseType):
+    """This captures a byte range.
+    It returns all bytes between the passed offset (Which may be static, or the result of a `_StartCapture`).
+    This is useful in case we need to extract a part of the struct as raw bytes, without parsing,
+    in addition to the parsed version (For example, verifying content hash).
+    """
+
     alignment = 0
 
-    def _read(stream: BinaryIO, _context):
-        orig_index = stream.tell()
+    def _read_array(stream: BinaryIO, start_index: int, _context) -> bytes:
+        curr_index = stream.tell()
 
-        blobStart = _cstruct.cstruct().uint32.size + _CUUID.size
-        stream.seek(blobStart)
+        # Read all bytes from start_index until the current position
+        stream.seek(start_index)
+        res = stream.read(curr_index - start_index)
 
-        res = stream.read(orig_index - blobStart)
-        assert stream.tell() == orig_index
+        # Make sure that our math is correct
+        assert stream.tell() == curr_index
         return res
 
-    def _write(self, stream: BinaryIO, data) -> int:
-        pass
+    def _read(stream: BinaryIO, *args, **kwargs) -> None:
+        raise NotImplementedError
+
+    def _write(self, stream: BinaryIO, *args, **kwargs) -> int:
+        return 0
 
 
 _c_dpapi = _cstruct.cstruct()
 _c_dpapi.addtype("UUID", _CUUID)
-_c_dpapi.addtype("Bytes", _RestOfData)
-_c_dpapi.addtype("BYTES_WITH_LEN", _BytesWithLen)
-_c_dpapi.addtype("DPAPI_BLOB", _Blob)
+
+# The capture classes allow for capturing all data between start and end.
+# This is used for calculating the HMAC of the struct.
+_c_dpapi.addtype("DPAPI_START_CAPTURE", _StartCapture)
+_c_dpapi.addtype("DPAPI_END_CAPTURE", _EndCapture)
+
 _c_dpapi.load(_dpapi_def)
 
 DPAPIBlobStruct = _c_dpapi.DPAPIBlob

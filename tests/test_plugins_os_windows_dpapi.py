@@ -1,5 +1,6 @@
 from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
+
 from ._utils import absolute_path
 
 SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
@@ -32,11 +33,11 @@ def test_dpapi_decrypt_blob(target_win_users, fs_win, hive_hklm):
 
     fs_win.map_file(
         "Windows/System32/Microsoft/Protect/S-1-5-18/d8ef5e00-328a-4919-9ab6-c058f493a6e3",
-        absolute_path("data/dpapi/master_keys/d8ef5e00-328a-4919-9ab6-c058f493a6e3"),
+        absolute_path("data/plugins/os/windows/dpapi/master_keys/d8ef5e00-328a-4919-9ab6-c058f493a6e3"),
     )
 
     target_win_users.add_plugin(DPAPIPlugin)
 
-    with open(absolute_path("data/dpapi/test_data.dpapi"), "rb") as encrypted_blob:
+    with open(absolute_path("data/plugins/os/windows/dpapi/test_data.dpapi"), "rb") as encrypted_blob:
         blob = target_win_users.dpapi.decrypt_dpapi_system_blob(encrypted_blob.read())
         assert blob.cleartext == b"TestData"

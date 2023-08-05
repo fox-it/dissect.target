@@ -1,5 +1,5 @@
-from uuid import UUID
 from typing import BinaryIO
+from uuid import UUID
 
 from dissect import cstruct as _cstruct
 
