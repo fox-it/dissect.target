@@ -2,7 +2,7 @@ import re
 import warnings
 from collections import defaultdict
 from functools import lru_cache
-from typing import Iterator, Optional, Union
+from typing import Iterator, Union
 
 from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
 from dissect.target.helpers.fsutil import TargetPath
@@ -204,7 +204,7 @@ class RegistryPlugin(Plugin):
 
     @internal
     @lru_cache(4096)
-    def key(self, key: Optional[str] = None) -> KeyCollection:
+    def key(self, key: str = "") -> KeyCollection:
         """Query the virtual registry on the given key.
 
         Returns a KeyCollection which contains all keys that match
