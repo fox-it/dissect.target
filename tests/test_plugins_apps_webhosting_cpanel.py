@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webhosting.cpanel import CPanelPlugin
 
 from ._utils import absolute_path
 
 
-def test_cpanel_plugin(target_unix_users, fs_unix):
+def test_cpanel_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("data/plugins/apps/webhosting/cpanel/lastlogin")
     fs_unix.map_file("/home/user/.lastlogin", data_file)
 
