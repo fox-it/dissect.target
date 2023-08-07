@@ -2,132 +2,106 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import struct
-from abc import ABC, abstractproperty
-from types import ModuleType
-from typing import Optional
+from typing import Optional, Union
 
 from Crypto.Cipher import AES, ARC4
 
-CIPHER_ALGORITHMS: dict[id, CipherAlgorithm] = {}
-HASH_ALGORITHMS: dict[id, HashAlgorithm] = {}
+CIPHER_ALGORITHMS: dict[Union[int, str], CipherAlgorithm] = {}
+HASH_ALGORITHMS: dict[Union[int, str], HashAlgorithm] = {}
 
 
-class CipherAlgorithm(ABC):
+class CipherAlgorithm:
     id: int
     name: str
     key_length: int
     iv_length: int
     block_length: int
-    cipher_module: ModuleType
 
     def __init_subclass__(cls):
         CIPHER_ALGORITHMS[cls.id] = cls
+        CIPHER_ALGORITHMS[cls.name] = cls
 
     @classmethod
     def from_id(cls, id: int) -> CipherAlgorithm:
         return CIPHER_ALGORITHMS[id]()
 
+    @classmethod
+    def from_name(cls, name: str) -> CipherAlgorithm:
+        return CIPHER_ALGORITHMS[name]()
+
     def fixup_key(self, key: bytes) -> bytes:
         return key
 
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
-        """Mimics the corresponding native Microsoft function"""
+        """Mimics the corresponding native Microsoft function."""
         if len(key) > hash_algorithm.block_length:
             key = hashlib.new(hash_algorithm.name, key).digest()
+
         if len(key) >= hash_algorithm.digest_length:
             return key
-        key += b"\x00" * hash_algorithm.block_length
-        pad1 = "".join(chr(key[i] ^ 0x36) for i in range(hash_algorithm.block_length))
-        pad2 = "".join(chr(key[i] ^ 0x5C) for i in range(hash_algorithm.block_length))
-        k = (
-            hashlib.new(hash_algorithm.name, pad1.encode("latin1")).digest()
-            + hashlib.new(hash_algorithm.name, pad2.encode("latin1")).digest()
-        )
+
+        key = key.ljust(hash_algorithm.block_length, b"\x00")
+        pad1 = bytes(c ^ 0x36 for c in key)
+        pad2 = bytes(c ^ 0x5C for c in key)
+        k = hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
         return self.fixup_key(k)
-
-    @property
-    @abstractproperty
-    def id(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def name(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def key_length(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def iv_length(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def block_length(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def cipher_module(self):
-        raise NotImplementedError
 
     def decrypt_with_hmac(
         self, data: bytes, key: bytes, iv: bytes, hash_algorithm: HashAlgorithm, rounds: int
     ) -> bytes:
-        # hname = {"HMAC": "sha1"}.get(hash_algorithm.name, hash_algorithm.name) # TODO: Maybe important
         derived = pbkdf2(key, iv, self.key_length + self.iv_length, rounds, hash_algorithm.name)
         key, iv = derived[: self.key_length], derived[self.key_length :]
         key = key[: self.key_length]
         iv = iv[: self.iv_length]
-        cipher = self.cipher_module.new(key, mode=self.cipher_module.MODE_CBC, IV=iv)
-        return cipher.decrypt(data)
 
-    def decrypt(self, data: bytes, key: bytes, iv: bytes) -> bytes:
-        cipher = self.cipher_module.new(key, mode=self.cipher_module.MODE_CBC, IV=iv)
-        return cipher.decrypt(data)
+        return self.decrypt(data, key, iv)
+
+    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        raise NotImplementedError()
 
 
-class __AES(CipherAlgorithm):
+class _AES(CipherAlgorithm):
     id = 0x6611
     name = "AES"
     key_length = 128 // 8
     iv_length = 128 // 8
     block_length = 128 // 8
-    cipher_module = AES
+
+    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        cipher = AES.new(key[: self.key_length], mode=AES.MODE_CBC, IV=iv or b"\x00" * self.iv_length)
+        return cipher.decrypt(data)
 
 
-class __AES128(__AES):
+class _AES128(_AES):
     id = 0x660E
     name = "AES-128"
 
 
-class __AES192(__AES):
+class _AES192(_AES):
     id = 0x660F
     name = "AES-192"
     key_length = 192 // 8
 
 
-class __AES256(__AES):
+class _AES256(_AES):
     id = 0x6610
     name = "AES-256"
     key_length = 256 // 8
 
 
-class __RC4(CipherAlgorithm):
+class _RC4(CipherAlgorithm):
     id = 0x6801
     name = "RC4"
     key_length = 40 // 8
     iv_length = 128 // 8
     block_length = 1 // 8
-    cipher_module = ARC4
+
+    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        cipher = ARC4.new(key)
+        return cipher.decrypt(data)
 
 
-class HashAlgorithm(ABC):
+class HashAlgorithm:
     id: int
     name: str
     digest_length: int
@@ -140,158 +114,135 @@ class HashAlgorithm(ABC):
     def from_id(cls, id: int) -> HashAlgorithm:
         return HASH_ALGORITHMS[id]()
 
+    @classmethod
     def from_name(cls, name: str) -> Optional[HashAlgorithm]:
-        res = [i for i in HASH_ALGORITHMS.values() if i.name == name]
-        return res[0] if res else None
-
-    @property
-    @abstractproperty
-    def id(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def name(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def digest_length(self):
-        raise NotImplementedError
-
-    @property
-    @abstractproperty
-    def block_length(self):
-        raise NotImplementedError
+        return HASH_ALGORITHMS[name]()
 
 
-class __MD5HashAlgorithm(HashAlgorithm):
+class _MD5(HashAlgorithm):
     id = 0x8003
     name = "md5"
     digest_length = 128 // 8
     block_length = 512 // 8
 
 
-class __SHA1HashAlgorithm(HashAlgorithm):
+class _SHA1(HashAlgorithm):
     id = 0x8004
     name = "sha1"
     digest_length = 160 // 8
     block_length = 512 // 8
 
 
-class __HMACHashAlgorithm(__SHA1HashAlgorithm):
-    """Synonymous to SHA1"""
+class _HMAC(_SHA1):
+    """Synonymous to SHA1."""
 
     id = 0x8009
 
 
-class __SHA256HashAlgorithm(HashAlgorithm):
+class _SHA256(HashAlgorithm):
     id = 0x8004
     name = "sha256"
     digest_length = 256 // 8
     block_length = 512 // 8
 
 
-class __SHA384HashAlgorithm(HashAlgorithm):
+class _SHA384(HashAlgorithm):
     id = 0x800D
     name = "sha384"
     digest_length = 384 // 8
     block_length = 1024 // 8
 
 
-class __SHA512HashAlgorithm(HashAlgorithm):
+class _SHA512(HashAlgorithm):
     id = 0x800E
     name = "sha512"
     digest_length = 512 // 8
     block_length = 1024 // 8
 
 
-def pbkdf2(passphrase: bytes, salt: bytes, key_len: int, iterations: int, digest: Optional[str] = "sha1"):
+def pbkdf2(passphrase: bytes, salt: bytes, key_len: int, iterations: int, digest: str = "sha1") -> bytes:
     """Implementation of PBKDF2 that allows specifying digest algorithm.
-    Returns the corresponding expanded key which is key_len long.
+
+    Returns the corresponding expanded key which is ``key_len`` long.
     """
-    buff = b""
+    key = bytearray()
+
     i = 1
-    while len(buff) < key_len:
-        U = salt + struct.pack("!L", i)
+    while len(key) < key_len:
+        U = salt + i.to_bytes(4, "big")
         i += 1
+
         derived = hmac.new(passphrase, U, digestmod=digest).digest()
-        for r in range(iterations - 1):
+        for _ in range(iterations - 1):
             actual = hmac.new(passphrase, derived, digestmod=digest).digest()
-            derived = (
-                "".join([chr(int(x, 16) ^ int(y, 16)) for (x, y) in zip(derived.hex(), actual.hex())]).encode().hex()
-            )
-            result = ""
-            for j in range(len(derived)):
-                if j % 2 == 1:
-                    result += derived[j]
-            derived = bytes.fromhex(result)
-        buff += derived
-    return buff[:key_len]
+            derived = bytes(x ^ y for x, y in zip(derived, actual))
+        key += derived
+        key.extend(derived)
+
+    return bytes(key[:key_len])
 
 
-def dpapi_hmac(hash_algorithm: HashAlgorithm, pwd_hash: bytes, hmac_salt: bytes, value: bytes):
-    """Internal function used to compute HMACs of DPAPI structures"""
-    # hname = {"HMAC": "sha1"}.get(hash_algorithm.name, hash_algorithm.name) # TODO: Maybe importanbt?
-    enc_key = hmac.new(pwd_hash, digestmod=hash_algorithm.name)
-    enc_key.update(hmac_salt)
-    enc_key = enc_key.digest()
-    rv = hmac.new(enc_key, digestmod=hash_algorithm.name)
-    rv.update(value)
-    return rv.digest()
+def dpapi_hmac(pwd_hash: bytes, hmac_salt: bytes, value: bytes, hash_algorithm: HashAlgorithm) -> bytes:
+    """Internal function used to compute HMACs of DPAPI structures."""
+    key = hmac.new(pwd_hash, hmac_salt, digestmod=hash_algorithm.name).digest()
+    return hmac.new(key, value, digestmod=hash_algorithm.name).digest()
 
 
 def crypt_session_key_type1(
-    masterkey: bytes,
+    master_key: bytes,
     nonce: Optional[bytes],
-    hash_algo: HashAlgorithm,
+    hash_algorithm: HashAlgorithm,
     entropy: Optional[bytes] = None,
     strong_password: Optional[str] = None,
     smart_card_secret: Optional[bytes] = None,
-    verif_blob: Optional[bytes] = None,
-):
-    """Computes the decryption key for Type1 DPAPI blob, given the masterkey and optional information.
+    verify_blob: Optional[bytes] = None,
+) -> bytes:
+    """Computes the decryption key for Type1 DPAPI blob, given the master key and optional information.
 
     This implementation relies on a faulty implementation from Microsoft that does not respect the HMAC RFC.
-    Instead of updating the inner pad, we update the outer pad...
-    This algorithm is also used when checking the HMAC for integrity after decryption
+    Instead of updating the inner pad, we update the outer pad.
+    This algorithm is also used when checking the HMAC for integrity after decryption.
+
     Args:
-        masterkey: decrypted masterkey (should be 64 bytes long)
-        nonce: this is the nonce contained in the blob or the HMAC in the blob (integrity check)
-        hash_algo: a HashAlgorithm to use for calculating block sizes
-        entropy: this is the optional entropy from CryptProtectData() API
-        strong_password: optional password used for decryption or the blob itself
-        smart_card_secret: optional MS Next Gen Crypto secret (e.g. from PIN code)
-        verif_blob: optional encrypted blob used for integrity check
+        master_key: Decrypted master key (should be 64 bytes long).
+        nonce: This is the nonce contained in the blob or the HMAC in the blob (integrity check).
+        hash_algorithm: A :class:`HashAlgorithm` to use for calculating block sizes.
+        entropy: This is the optional entropy from ``CryptProtectData()`` API.
+        strong_password: Optional password used for decryption or the blob itself.
+        smart_card_secret: Optional MS Next Gen Crypto secret (e.g. from PIN code).
+        verify_blob: Optional encrypted blob used for integrity check.
     Returns:
         decryption key
     """
-    if len(masterkey) > 20:
-        masterkey = hashlib.sha1(masterkey).digest()
+    if len(master_key) > 20:
+        master_key = hashlib.sha1(master_key).digest()
 
-    masterkey += b"\x00" * hash_algo.block_length
-    pad1 = "".join(chr(masterkey[i] ^ 0x36) for i in range(hash_algo.block_length))
-    pad2 = "".join(chr(masterkey[i] ^ 0x5C) for i in range(hash_algo.block_length))
+    master_key = master_key.ljust(hash_algorithm.block_length, b"\x00")
+    pad1 = bytes(c ^ 0x36 for c in master_key)
+    pad2 = bytes(c ^ 0x5C for c in master_key)
 
-    digest1 = hashlib.new(hash_algo.name)
-    digest1.update(pad2.encode("latin1"))
+    digest1 = hashlib.new(hash_algorithm.name)
+    digest1.update(pad2)
 
-    digest2 = hashlib.new(hash_algo.name)
-    digest2.update(pad1.encode("latin1"))
+    digest2 = hashlib.new(hash_algorithm.name)
+    digest2.update(pad1)
     digest2.update(nonce)
-    if smart_card_secret is not None:
+
+    if entropy and smart_card_secret:
         digest2.update(entropy + smart_card_secret)
-        if verif_blob is not None:
-            digest2.update(verif_blob)
+        if verify_blob:
+            digest2.update(verify_blob)
 
     digest1.update(digest2.digest())
-    if entropy is not None and smart_card_secret is None:
+    if entropy and smart_card_secret:
         digest1.update(entropy)
-    if strong_password is not None:
-        strong_password = hashlib.sha1(strong_password.rstrip("\x00").encode("UTF-16LE")).digest()
+
+    if strong_password:
+        strong_password = hashlib.sha1(strong_password.rstrip("\x00").encode("utf-16-le")).digest()
         digest1.update(strong_password)
-    if smart_card_secret is None and verif_blob is not None:
-        digest1.update(verif_blob)
+
+    if smart_card_secret and verify_blob:
+        digest1.update(verify_blob)
 
     return digest1.digest()
 
@@ -303,21 +254,21 @@ def crypt_session_key_type2(
     entropy: Optional[bytes] = None,
     strong_password: Optional[str] = None,
     smart_card_secret: Optional[bytes] = None,
-    verif_blob: Optional[bytes] = None,
-):
+    verify_blob: Optional[bytes] = None,
+) -> bytes:
     """Computes the decryption key for Type2 DPAPI blob, given the masterkey and optional information.
 
-    This implementation relies on an RFC compliant HMAC implementation
-    This algorithm is also used when checking the HMAC for integrity after decryption
+    This implementation relies on an RFC compliant HMAC implementation.
+    This algorithm is also used when checking the HMAC for integrity after decryption.
 
     Args:
-        masterkey: decrypted masterkey (should be 64 bytes long)
-        nonce: this is the nonce contained in the blob or the HMAC in the blob (integrity check)
-        hash_algo: a HashAlgorithm to use for calculating block sizes
-        entropy: this is the optional entropy from CryptProtectData() API
-        strong_password: optional password used for decryption or the blob itself
-        smart_card_secret: optional MS Next Gen Crypto secret (e.g. from PIN code). Only for compatibility
-        verif_blob: optional encrypted blob used for integrity check
+        master_key: Decrypted master key (should be 64 bytes long).
+        nonce: This is the nonce contained in the blob or the HMAC in the blob (integrity check).
+        hash_algo: A :class:`HashAlgorithm` to use for calculating block sizes.
+        entropy: This is the optional entropy from ``CryptProtectData()`` API.
+        strong_password: Optional password used for decryption or the blob itself.
+        smart_card_secret: Optional MS Next Gen Crypto secret (e.g. from PIN code). Only for API compatibility.
+        verify_blob: Optional encrypted blob used for integrity check.
     Returns:
         decryption key
     """
@@ -326,16 +277,20 @@ def crypt_session_key_type2(
 
     digest = hmac.new(masterkey, digestmod=hash_algorithm.name)
     digest.update(nonce)
-    if entropy is not None:
+
+    if entropy:
         digest.update(entropy)
-    if strong_password is not None:
-        strong_password = hashlib.sha512(strong_password.rstrip("\x00").encode("UTF-16LE")).digest()
+
+    if strong_password:
+        strong_password = hashlib.sha512(strong_password.rstrip("\x00").encode("utf-16-le")).digest()
         digest.update(strong_password)
-    elif verif_blob is not None:
-        digest.update(verif_blob)
+
+    elif verify_blob:
+        digest.update(verify_blob)
+
     return digest.digest()
 
 
-def derive_pwd_hash(pwdhash: bytes, userSID: str, digest="sha1"):
-    """Internal use. Computes the encryption key from a user's password hash"""
-    return hmac.new(pwdhash, (userSID + "\0").encode("UTF-16LE"), digestmod=digest).digest()
+def derive_password_hash(password_hash: bytes, user_sid: str, digest: str = "sha1") -> bytes:
+    """Internal use. Computes the encryption key from a user's password hash."""
+    return hmac.new(password_hash, (user_sid + "\0").encode("utf-16-le"), digestmod=digest).digest()

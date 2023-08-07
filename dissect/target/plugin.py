@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
+from dissect.target.helpers.utils import StrEnum
 
 try:
     from dissect.target.plugins._pluginlist import PLUGINS
@@ -52,7 +53,7 @@ OUTPUTS = (
 log = logging.getLogger(__name__)
 
 
-class OperatingSystem(enum.Enum):
+class OperatingSystem(StrEnum):
     LINUX = "linux"
     WINDOWS = "windows"
     ESXI = "esxi"

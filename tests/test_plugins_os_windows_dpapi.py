@@ -39,5 +39,5 @@ def test_dpapi_decrypt_blob(target_win_users, fs_win, hive_hklm):
     target_win_users.add_plugin(DPAPIPlugin)
 
     with open(absolute_path("data/plugins/os/windows/dpapi/test_data.dpapi"), "rb") as encrypted_blob:
-        blob = target_win_users.dpapi.decrypt_dpapi_system_blob(encrypted_blob.read())
-        assert blob.cleartext == b"TestData"
+        decrypted = target_win_users.dpapi.decrypt_system_blob(encrypted_blob.read())
+        assert decrypted == b"TestData"

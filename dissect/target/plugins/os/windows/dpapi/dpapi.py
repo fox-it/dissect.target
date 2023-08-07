@@ -1,48 +1,41 @@
 import hashlib
 import re
-from functools import cached_property, lru_cache
-from struct import unpack
-from typing import Optional
+from functools import cached_property
+from pathlib import Path
 
 from Crypto.Cipher import AES, ARC4, DES
 
 from dissect.target import Target
-from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
-from dissect.target.plugins.os.windows.dpapi.masterkey import MasterKeyFile
-from dissect.target.plugins.os.windows.dpapi.types.masterkey import CredSystem
+from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
 
 
 class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
 
-    # This matches master_key file names
+    # This matches master key file names
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
-    DEFAULT_REG_VALUE = "(Default)"
-    SECURITY_KEY = "HKEY_LOCAL_MACHINE\\SECURITY\\Policy\\{KEY}"
-    SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
-    SYSTEM_USERNAME = "System"
 
-    SYSTEM_MASTER_KEY_PATH = "sysvol/Windows/System32/Microsoft/Protect/S-1-5-18"
-    SYSTEM_USER_MASTER_KEY_PATH = f"{SYSTEM_MASTER_KEY_PATH}/User"
-    USER_MASTER_KEY_PATH = "AppData/Roaming/Microsoft/Protect"
+    SECURITY_POLICY_KEY = "HKEY_LOCAL_MACHINE\\SECURITY\\Policy"
+    SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
+
+    SYSTEM_USERNAME = "System"
 
     def __init__(self, target: Target):
         super().__init__(target)
 
         # Some calculations are different pre Vista
-        os_version = self.target._os._nt_version()
+        ntversion = self.target.ntversion
         # This can happen during testing, not sure how to solve in a better way
-        if not os_version:
-            os_version = 99999
-        self._newer_than_vista: float = float(os_version) >= 6.0
+        if not ntversion:
+            ntversion = 99999
+        self._vista_or_newer = float(ntversion) >= 6.0
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
             raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
-
-        return True
 
     @cached_property
     def syskey(self) -> bytes:
@@ -54,127 +47,150 @@ class DPAPIPlugin(InternalPlugin):
         r = bytes.fromhex("".join([lsa.subkey(key).class_name for key in syskey_keys]))
         return bytes(r[i] for i in alterator)
 
-    @lru_cache
-    def _get_lsa_key(self) -> bytes:
-        if self._newer_than_vista:
+    @cached_property
+    def lsakey(self) -> bytes:
+        if self._vista_or_newer:
             policy_key = "PolEKList"
         else:
             policy_key = "PolSecretEncryptionKey"
 
-        encrypted_key = (
-            self.target.registry.key(self.SECURITY_KEY.format(KEY=policy_key)).value(self.DEFAULT_REG_VALUE).value
-        )
+        encrypted_key = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey(policy_key).value("(Default)").value
 
-        if self._newer_than_vista:
+        if self._vista_or_newer:
             lsa_key = _decrypt_aes(encrypted_key, self.syskey)
             lsa_key = lsa_key[68:100]
         else:
-            md5 = hashlib.md5()
-            md5.update(self.syskey)
-            for _ in range(1000):
-                md5.update(encrypted_key[60:76])
-            rc4key = md5.digest()
+            ctx = hashlib.md5()
+            ctx.update(self.syskey)
 
-            rc4 = ARC4.new(rc4key)
-            lsa_key = rc4.decrypt(encrypted_key[12:60])
+            tmp = encrypted_key[60:76]
+            for _ in range(1000):
+                ctx.update(tmp)
+
+            cipher = ARC4.new(ctx.digest())
+            lsa_key = cipher.decrypt(encrypted_key[12:60])
             lsa_key = lsa_key[16:32]
+
         return lsa_key
 
     @cached_property
     def secrets(self) -> dict[str, bytes]:
-        res = {}
-        reg_secrets = self.target.registry.key(self.SECURITY_KEY.format(KEY="Secrets"))
+        result = {}
+
+        reg_secrets = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets")
         for subkey in reg_secrets.subkeys():
-            enc_data = subkey.subkey("CurrVal").value(self.DEFAULT_REG_VALUE).value
-            if self._newer_than_vista:
-                secret = _decrypt_aes(enc_data, self._get_lsa_key())
+            enc_data = subkey.subkey("CurrVal").value("(Default)").value
+            if self._vista_or_newer:
+                secret = _decrypt_aes(enc_data, self.lsakey)
             else:
-                secret = __decrypt_des(enc_data[0xC:], self.syskey)
-            res[subkey.name] = secret
-        return res
+                secret = _decrypt_des(enc_data[12:], self.syskey)
+            result[subkey.name] = secret
+
+        return result
 
     @cached_property
     def master_keys(self) -> dict[str, dict[str, MasterKeyFile]]:
         # This assumes that there is no user named System.
         # As far as I can tell, the name "System" is saved for the actual System user
         # Therefore the user can't actually exist in `all_with_home`
-        user_masterkeys = {self.SYSTEM_USERNAME: {}}
-        for dir in [self.SYSTEM_MASTER_KEY_PATH, self.SYSTEM_USER_MASTER_KEY_PATH]:
-            user_mks = self.load_masterkeys_from_path(
-                self.SYSTEM_USERNAME,
-                dir,
-            )
-            user_masterkeys[self.SYSTEM_USERNAME].update(user_mks)
+        result = {"System": {}}
+
+        system_master_key_path = self.target.fs.path("sysvol/Windows/System32/Microsoft/Protect/S-1-5-18")
+        system_user_master_key_path = system_master_key_path.joinpath("User")
+
+        for dir in [system_master_key_path, system_user_master_key_path]:
+            user_mks = self._load_master_keys_from_path(self.SYSTEM_USERNAME, dir)
+            result[self.SYSTEM_USERNAME].update(user_mks)
 
         for user in self.target.user_details.all_with_home():
-            user_mks = self.load_masterkeys_from_path(
-                user.user.name,
-                user.home_path.joinpath(self.USER_MASTER_KEY_PATH).joinpath(user.user.sid).as_posix(),
-            )
+            path = user.home_path.joinpath("AppData/Roaming/Microsoft/Protect").joinpath(user.user.sid)
+            user_mks = self._load_master_keys_from_path(user.user.name, path)
             if user_mks:
-                user_masterkeys[user.user.name] = user_mks
+                result[user.user.name] = user_mks
 
-        return user_masterkeys
+        return result
 
-    def load_masterkeys_from_path(self, username: str, protect_dir: str) -> dict[str, MasterKeyFile]:
-        try:
-            files = self.target.fs.listdir_ext(protect_dir)
-        except FileNotFoundError:
+    def _load_master_keys_from_path(self, username: str, path: Path) -> dict[str, MasterKeyFile]:
+        if not path.exists():
             return {}
 
-        curr_masterkeys = {}
-        for masterkey in files:
-            if self.MASTER_KEY_REGEX.findall(masterkey.name):
-                with masterkey.open() as m:
-                    mkf = MasterKeyFile()
-                    mkf.read(m)
+        result = {}
+        for file in path.iterdir():
+            if self.MASTER_KEY_REGEX.findall(file.name):
+                with file.open() as fh:
+                    mkf = MasterKeyFile(fh)
+
                 if username == self.SYSTEM_USERNAME:
-                    dpapi_system = self.dpapi_system()
-                    mkf.decrypt_with_key(dpapi_system.pMachine)
-                    if not mkf.decrypted:
-                        mkf.decrypt_with_key(dpapi_system.pUser)
-                    # This should not be possible, decrypting the System masterkey should always succeed
-                    if not mkf.decrypted:
-                        raise Exception("Failed to decrypt System masterkey")
-                curr_masterkeys[masterkey.name] = mkf
-        return curr_masterkeys
+                    dpapi_system = CredSystem(self.secrets["DPAPI_SYSTEM"][16:])
 
-    @lru_cache
-    def dpapi_system(self) -> CredSystem:
-        return CredSystem.read(self.secrets["DPAPI_SYSTEM"][16:])
+                    if not mkf.decrypt_with_key(dpapi_system.machine_key):
+                        mkf.decrypt_with_key(dpapi_system.user_key)
 
-    def decrypt_dpapi_system_blob(self, data: bytes) -> Optional[DPAPIBlob]:
+                    # This should not be possible, decrypting the System master key should always succeed
+                    if not mkf.decrypted:
+                        raise Exception("Failed to decrypt System master key")
+
+                result[file.name] = mkf
+
+        return result
+
+    def decrypt_system_blob(self, data: bytes) -> bytes:
         blob = DPAPIBlob(data)
-        mk = self.master_keys.get(self.SYSTEM_USERNAME, {}).get(blob.mkguid)
-        if not mk:
-            return None
-        if blob.decrypt(mk.key):
-            return blob
-        return None
+
+        if not (mk := self.master_keys.get(self.SYSTEM_USERNAME, {}).get(blob.guid)):
+            raise ValueError("Blob UUID is unknown to system master keys")
+
+        if not blob.decrypt(mk.key):
+            raise ValueError("Failed to decrypt system blob")
+
+        return blob.clear_text
 
 
-def __decrypt_des(secret: bytes, key: bytes) -> bytes:
-    decrypted_data = b""
+def _decrypt_aes(data: bytes, key: bytes) -> bytes:
+    ctx = hashlib.sha256()
+    ctx.update(key)
+
+    tmp = data[28:60]
+    for _ in range(1, 1000 + 1):
+        ctx.update(tmp)
+
+    aeskey = ctx.digest()
+    iv = b"\x00" * 16
+
+    result = []
+    for i in range(60, len(data), 16):
+        cipher = AES.new(aeskey, AES.MODE_CBC, iv)
+        result.append(cipher.decrypt(data[i : i + 16].ljust(16, b"\x00")))
+
+    return b"".join(result)
+
+
+def _decrypt_des(secret: bytes, key: bytes) -> bytes:
+    result = []
+
     j = 0  # key index
-
     for i in range(0, len(secret), 8):
         enc_block = secret[i : i + 8]
         block_key = key[j : j + 7]
-        des_key = __sidbytes_to_key(block_key)
-        des = DES.new(des_key, DES.MODE_ECB)
+        des_key = _sid_bytes_to_key(block_key)
+
+        cipher = DES.new(des_key, DES.MODE_ECB)
         enc_block = enc_block + b"\x00" * int(abs(8 - len(enc_block)) % 8)
-        decrypted_data += des.decrypt(enc_block)  # lgtm [py/weak-cryptographic-algorithm]
+        result.append(cipher.decrypt(enc_block))  # lgtm [py/weak-cryptographic-algorithm]
+
         j += 7
         if len(key[j : j + 7]) < 7:
             j = len(key[j : j + 7])
 
-    (dec_data_len,) = unpack("<L", decrypted_data[:4])
+    decrypted = b"".join(result)
+    decrypted_len = int.from_bytes(decrypted[:4], "little")
 
-    return decrypted_data[8 : 8 + dec_data_len]
+    return decrypted[8 : 8 + decrypted_len]
 
 
-def __sidbytes_to_key(s: bytes) -> bytes:
+def _sid_bytes_to_key(s: bytes) -> bytes:
     odd_parity = b"\x01\x01\x02\x02\x04\x04\x07\x07\x08\x08\x0b\x0b\r\r\x0e\x0e\x10\x10\x13\x13\x15\x15\x16\x16\x19\x19\x1a\x1a\x1c\x1c\x1f\x1f  ##%%&&))**,,//1122447788;;==>>@@CCEEFFIIJJLLOOQQRRTTWWXX[[]]^^aabbddgghhkkmmnnppssuuvvyyzz||\x7f\x7f\x80\x80\x83\x83\x85\x85\x86\x86\x89\x89\x8a\x8a\x8c\x8c\x8f\x8f\x91\x91\x92\x92\x94\x94\x97\x97\x98\x98\x9b\x9b\x9d\x9d\x9e\x9e\xa1\xa1\xa2\xa2\xa4\xa4\xa7\xa7\xa8\xa8\xab\xab\xad\xad\xae\xae\xb0\xb0\xb3\xb3\xb5\xb5\xb6\xb6\xb9\xb9\xba\xba\xbc\xbc\xbf\xbf\xc1\xc1\xc2\xc2\xc4\xc4\xc7\xc7\xc8\xc8\xcb\xcb\xcd\xcd\xce\xce\xd0\xd0\xd3\xd3\xd5\xd5\xd6\xd6\xd9\xd9\xda\xda\xdc\xdc\xdf\xdf\xe0\xe0\xe3\xe3\xe5\xe5\xe6\xe6\xe9\xe9\xea\xea\xec\xec\xef\xef\xf1\xf1\xf2\xf2\xf4\xf4\xf7\xf7\xf8\xf8\xfb\xfb\xfd\xfd\xfe\xfe"  # noqa
+
     key = [
         s[0] >> 1,
         ((s[0] & 0x01) << 6) | (s[1] >> 2),
@@ -185,25 +201,9 @@ def __sidbytes_to_key(s: bytes) -> bytes:
         ((s[5] & 0x3F) << 1) | (s[6] >> 7),
         s[6] & 0x7F,
     ]
+
     for i in range(8):
         key[i] = key[i] << 1
         key[i] = odd_parity[key[i]]
+
     return bytes(key)
-
-
-def _decrypt_aes(encrypted_data: bytes, key: bytes) -> bytes:
-    sha = hashlib.sha256()
-    sha.update(key)
-    for _ in range(1, 1000 + 1):
-        sha.update(encrypted_data[28:60])
-    aeskey = sha.digest()
-
-    data = b""
-    for i in range(60, len(encrypted_data), 16):
-        aes = AES.new(aeskey, AES.MODE_CBC, b"\x00" * 16)
-        buf = encrypted_data[i : i + 16]
-        if len(buf) < 16:
-            buf += (16 - len(buf)) * b"\00"
-        data += aes.decrypt(buf)
-
-    return data
