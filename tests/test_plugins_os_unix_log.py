@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.log.atop import AtopPlugin
 from dissect.target.plugins.os.unix.log.lastlog import LastLogPlugin
 from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
@@ -7,7 +9,7 @@ from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
 from ._utils import absolute_path
 
 
-def test_utmp_ipv6(target_unix, fs_unix):
+def test_utmp_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp-ipv6")
     fs_unix.map_file("var/log/btmp", data_file)
 
@@ -28,7 +30,7 @@ def test_utmp_ipv6(target_unix, fs_unix):
     results[5].ut_addr == "1337:1::"
 
 
-def test_wtmp_plugin(target_unix, fs_unix):
+def test_wtmp_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
     fs_unix.map_file("var/log/wtmp", data_file)
 
@@ -47,13 +49,13 @@ def test_wtmp_plugin(target_unix, fs_unix):
     assert result.ut_addr == "0.0.0.0"
 
 
-def test_lastlog_plugin(target_unix_users, fs_unix):
+def test_lastlog_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/lastlog/lastlog")
     fs_unix.map_file("/var/log/lastlog", data_file)
 
-    target_unix_users.add_plugin(LastLogPlugin)
+    target_unix.add_plugin(LastLogPlugin)
 
-    results = list(target_unix_users.lastlog())
+    results = list(target_unix.lastlog())
     assert len(results) == 1
 
     assert results[0].ts == datetime(2021, 12, 8, 16, 14, 6, tzinfo=timezone.utc)
@@ -63,7 +65,7 @@ def test_lastlog_plugin(target_unix_users, fs_unix):
     assert results[0].ut_tty == "pts/0"
 
 
-def test_btmp_plugin(target_unix, fs_unix):
+def test_btmp_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp")
     fs_unix.map_file("var/log/btmp", data_file)
 
@@ -82,7 +84,7 @@ def test_btmp_plugin(target_unix, fs_unix):
     assert result.ut_addr == "8.210.13.5"
 
 
-def test_atop_plugin(target_unix, fs_unix):
+def test_atop_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/atop/atop")
     fs_unix.map_file("var/log/atop/atop_20221111", data_file)
 
