@@ -12,7 +12,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
-from dissect.target.loaders.targetd import TargetdLoader
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -134,7 +133,7 @@ def generate_argparse_for_plugin(
 
 
 def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
-    if TargetdLoader.instance:
+    if hasattr(target, "instance"):
         return target.get_function(funcname)
 
     if isinstance(plugin, type):

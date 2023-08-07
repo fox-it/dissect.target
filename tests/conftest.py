@@ -91,6 +91,12 @@ def hive_hku():
 
 
 @pytest.fixture
+def target_default():
+    mock_target = next(make_mock_target())
+    yield mock_target
+
+
+@pytest.fixture
 def target_win(hive_hklm, fs_win):
     mock_target = next(make_mock_target())
 

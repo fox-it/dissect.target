@@ -10,6 +10,7 @@ from dissect.target.plugin import (
     get_external_module_paths,
     save_plugin_import_failure,
 )
+from dissect.target.target import Target
 
 
 def test_save_plugin_import_failure():
@@ -106,15 +107,24 @@ def test_find_plugin_functions(plugin_loader, target, os_plugins, plugins, searc
     assert len(found) == assert_num_found
 
 
-def test_find_plugin_function_windows(target_win):
+def test_find_plugin_function_windows(target_win: Target) -> None:
     found, _ = find_plugin_functions(target_win, "services")
 
     assert len(found) == 1
     assert found[0].name == "os.windows.services.services"
 
 
-def test_find_plugin_function_unix(target_unix):
+def test_find_plugin_function_unix(target_unix: Target) -> None:
     found, _ = find_plugin_functions(target_unix, "services")
 
     assert len(found) == 1
     assert found[0].name == "os.unix.services.services"
+
+
+def test_find_plugin_function_default(target_default: Target) -> None:
+    found, _ = find_plugin_functions(target_default, "services")
+
+    assert len(found) == 2
+    names = [item.name for item in found]
+    assert "os.unix.services.services" in names
+    assert "os.windows.services.services" in names
