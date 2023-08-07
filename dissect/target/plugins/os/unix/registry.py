@@ -1,13 +1,14 @@
 from __future__ import annotations
-from dissect.target import Target
-from dissect.target.plugin import Plugin
-from dissect.target.helpers import fsutil
-from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
-from configparser import RawConfigParser, MissingSectionHeaderError
+
 import io
-
-
+from configparser import MissingSectionHeaderError, RawConfigParser
 from typing import Any, Union
+
+from dissect.target import Target
+from dissect.target.exceptions import FilesystemError
+from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
+from dissect.target.helpers import fsutil
+from dissect.target.plugin import Plugin
 
 
 class ConfigurationTree(Plugin):
@@ -38,26 +39,49 @@ class UnixRegistry(VirtualFilesystem):
         super().__init__(**kwargs)
         self.root.top = target.fs.get("/etc")
 
+    def _get_till_file(self, path, relentry) -> tuple[list[str], FilesystemEntry]:
+        entry = relentry or self.root
+        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+
+        if not path:
+            return [], entry
+
+        parts = path.split("/")
+
+        for i, part in enumerate(parts):
+            # If the entry of the previous part (or the starting relentry /
+            # root entry) is a symlink, resolve it first so things like entry.up
+            # work if it is a symlink to a directory.
+            # Note that this will never resolve the final part of the path if
+            # that happens to be a symlink, so things like fs.is_symlink() will
+            # work.
+            if entry.is_symlink():
+                entry = entry.readlink_ext()
+
+            if part == ".":
+                continue
+            elif part == "..":
+                entry = entry.up or self.root
+                continue
+
+            try:
+                entry = super().get(part, entry)
+            except FilesystemError:
+                break
+
+        return parts[i:], entry
+
     def get(self, path: str, relentry=None) -> Union[FilesystemEntry, ConfigurationEntry]:
-        if isinstance(relentry, ConfigurationEntry):
-            return relentry.get(path)
+        parts, entry = self._get_till_file(path, relentry)
 
-        parts = path.strip("/").split("/")
-
-        if not parts:
-            raise FileNotFoundError()
-
-        entry = super().get(parts[0], relentry)
-        for part in parts[1:]:
+        for part in parts:
             if isinstance(entry, ConfigurationEntry):
                 entry = entry.get(part)
-            elif entry.is_file():
-                try:
-                    entry = ConfigurationEntry(self, path, entry)
-                except Exception as e:
-                    pass
             else:
-                entry = entry.get(part)
+                try:
+                    entry = ConfigurationEntry(self, part, entry)
+                except Exception:
+                    pass
 
         return entry
 

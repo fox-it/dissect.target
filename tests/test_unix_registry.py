@@ -1,13 +1,15 @@
-from pathlib import Path
-from typing import Any
-from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.registry import ConfigurationTree, UnixRegistry, ConfigurationEntry
 from io import BytesIO
-
-
-from unittest.mock import Mock, mock_open
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
+
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.os.unix.registry import (
+    ConfigurationEntry,
+    ConfigurationTree,
+    UnixRegistry,
+)
 
 from ._utils import absolute_path
 
