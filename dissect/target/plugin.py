@@ -832,7 +832,8 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
 
     def all_plugins():
         # Filter out plugins based on the target os
-        os_type = type(target._os) if target._os else None
+        os_type = type(target._os) if target._os and target._os.os != "default" else None
+
         yield from plugins(os_type)
         yield from os_plugins()
         yield from child_plugins()  # Doesn't export anything but added for completeness.
