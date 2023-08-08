@@ -3,7 +3,7 @@ import re
 from functools import cached_property
 from pathlib import Path
 
-from Crypto.Cipher import AES, ARC4, DES
+from Crypto.Cipher import AES
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -26,13 +26,6 @@ class DPAPIPlugin(InternalPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
 
-        # Some calculations are different pre Vista
-        ntversion = self.target.ntversion
-        # This can happen during testing, not sure how to solve in a better way
-        if not ntversion:
-            ntversion = 99999
-        self._vista_or_newer = float(ntversion) >= 6.0
-
     def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
             raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
@@ -49,29 +42,13 @@ class DPAPIPlugin(InternalPlugin):
 
     @cached_property
     def lsakey(self) -> bytes:
-        if self._vista_or_newer:
-            policy_key = "PolEKList"
-        else:
-            policy_key = "PolSecretEncryptionKey"
+        policy_key = "PolEKList"
 
         encrypted_key = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey(policy_key).value("(Default)").value
 
-        if self._vista_or_newer:
-            lsa_key = _decrypt_aes(encrypted_key, self.syskey)
-            lsa_key = lsa_key[68:100]
-        else:
-            ctx = hashlib.md5()
-            ctx.update(self.syskey)
+        lsa_key = _decrypt_aes(encrypted_key, self.syskey)
 
-            tmp = encrypted_key[60:76]
-            for _ in range(1000):
-                ctx.update(tmp)
-
-            cipher = ARC4.new(ctx.digest())
-            lsa_key = cipher.decrypt(encrypted_key[12:60])
-            lsa_key = lsa_key[16:32]
-
-        return lsa_key
+        return lsa_key[68:100]
 
     @cached_property
     def secrets(self) -> dict[str, bytes]:
@@ -80,10 +57,7 @@ class DPAPIPlugin(InternalPlugin):
         reg_secrets = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets")
         for subkey in reg_secrets.subkeys():
             enc_data = subkey.subkey("CurrVal").value("(Default)").value
-            if self._vista_or_newer:
-                secret = _decrypt_aes(enc_data, self.lsakey)
-            else:
-                secret = _decrypt_des(enc_data[12:], self.syskey)
+            secret = _decrypt_aes(enc_data, self.lsakey)
             result[subkey.name] = secret
 
         return result
@@ -163,47 +137,3 @@ def _decrypt_aes(data: bytes, key: bytes) -> bytes:
         result.append(cipher.decrypt(data[i : i + 16].ljust(16, b"\x00")))
 
     return b"".join(result)
-
-
-def _decrypt_des(secret: bytes, key: bytes) -> bytes:
-    result = []
-
-    j = 0  # key index
-    for i in range(0, len(secret), 8):
-        enc_block = secret[i : i + 8]
-        block_key = key[j : j + 7]
-        des_key = _sid_bytes_to_key(block_key)
-
-        cipher = DES.new(des_key, DES.MODE_ECB)
-        enc_block = enc_block + b"\x00" * int(abs(8 - len(enc_block)) % 8)
-        result.append(cipher.decrypt(enc_block))  # lgtm [py/weak-cryptographic-algorithm]
-
-        j += 7
-        if len(key[j : j + 7]) < 7:
-            j = len(key[j : j + 7])
-
-    decrypted = b"".join(result)
-    decrypted_len = int.from_bytes(decrypted[:4], "little")
-
-    return decrypted[8 : 8 + decrypted_len]
-
-
-def _sid_bytes_to_key(s: bytes) -> bytes:
-    odd_parity = b"\x01\x01\x02\x02\x04\x04\x07\x07\x08\x08\x0b\x0b\r\r\x0e\x0e\x10\x10\x13\x13\x15\x15\x16\x16\x19\x19\x1a\x1a\x1c\x1c\x1f\x1f  ##%%&&))**,,//1122447788;;==>>@@CCEEFFIIJJLLOOQQRRTTWWXX[[]]^^aabbddgghhkkmmnnppssuuvvyyzz||\x7f\x7f\x80\x80\x83\x83\x85\x85\x86\x86\x89\x89\x8a\x8a\x8c\x8c\x8f\x8f\x91\x91\x92\x92\x94\x94\x97\x97\x98\x98\x9b\x9b\x9d\x9d\x9e\x9e\xa1\xa1\xa2\xa2\xa4\xa4\xa7\xa7\xa8\xa8\xab\xab\xad\xad\xae\xae\xb0\xb0\xb3\xb3\xb5\xb5\xb6\xb6\xb9\xb9\xba\xba\xbc\xbc\xbf\xbf\xc1\xc1\xc2\xc2\xc4\xc4\xc7\xc7\xc8\xc8\xcb\xcb\xcd\xcd\xce\xce\xd0\xd0\xd3\xd3\xd5\xd5\xd6\xd6\xd9\xd9\xda\xda\xdc\xdc\xdf\xdf\xe0\xe0\xe3\xe3\xe5\xe5\xe6\xe6\xe9\xe9\xea\xea\xec\xec\xef\xef\xf1\xf1\xf2\xf2\xf4\xf4\xf7\xf7\xf8\xf8\xfb\xfb\xfd\xfd\xfe\xfe"  # noqa
-
-    key = [
-        s[0] >> 1,
-        ((s[0] & 0x01) << 6) | (s[1] >> 2),
-        ((s[1] & 0x03) << 5) | (s[2] >> 3),
-        ((s[2] & 0x07) << 4) | (s[3] >> 4),
-        ((s[3] & 0x0F) << 3) | (s[4] >> 5),
-        ((s[4] & 0x1F) << 2) | (s[5] >> 6),
-        ((s[5] & 0x3F) << 1) | (s[6] >> 7),
-        s[6] & 0x7F,
-    ]
-
-    for i in range(8):
-        key[i] = key[i] << 1
-        key[i] = odd_parity[key[i]]
-
-    return bytes(key)
