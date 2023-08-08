@@ -5,10 +5,10 @@ from unittest.mock import Mock
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.registry import (
+from dissect.target.plugins.os.unix.config_tree import (
     ConfigurationEntry,
     ConfigurationTree,
-    UnixRegistry,
+    ConfigurationFs,
 )
 
 from ._utils import absolute_path
@@ -18,8 +18,8 @@ from ._utils import absolute_path
 def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem):
     tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
+    tmp_path.joinpath("new/path/config.ini").write_text(Path(absolute_path("data/config_tree/config.ini")).read_text())
     fs_unix.map_dir("/etc", tmp_path)
-    fs_unix.map_file("new/path/config.ini", absolute_path())
 
 
 def test_plugin_compatible(target_unix, fs_unix):
@@ -29,7 +29,7 @@ def test_plugin_compatible(target_unix, fs_unix):
 
 
 def test_unix_registry(target_unix, etc_directory):
-    registry = UnixRegistry(target_unix)
+    registry = ConfigurationFs(target_unix)
     registry_path = list(registry.get("/").iterdir())
 
     assert registry_path == ["new"]
@@ -64,3 +64,16 @@ def test_config_entry():
 
     default_key_values = default_section.get("default")
     assert default_key_values.open().read() == b"test"
+
+
+def test_parse_functions(target_unix, etc_directory):
+    config_fs = ConfigurationFs(target_unix)
+    entry: ConfigurationEntry = config_fs.get("/new/path/config.ini/Unit", collapse=True)
+
+    assert entry.parser_items["help"] == "you"
+    assert entry.parser_items["test"] == "you"
+
+    entry = config_fs.get("/new/path/config.ini/Unit", collapse={"help"})
+
+    assert entry.parser_items["help"] == "you"
+    assert entry.parser_items["test"] == ["me", "you"]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import io
-from configparser import MissingSectionHeaderError, RawConfigParser
-from typing import Any, Union
+from abc import abstractmethod
+from configparser import MissingSectionHeaderError, RawConfigParser, ConfigParser
+from typing import Any, Union, Optional, KeysView, ItemsView
 
 from dissect.target import Target
 from dissect.target.exceptions import FilesystemError
@@ -11,12 +12,77 @@ from dissect.target.helpers import fsutil
 from dissect.target.plugin import Plugin
 
 
+class LinuxConfigurationParser:
+    def __init__(self, collapse: Optional[bool | set] = False) -> None:
+        self.collapse_all = collapse is True
+        self.collapse = collapse if isinstance(collapse, set) else {}
+        self.parsed_data = {}
+
+    @abstractmethod
+    def parse_file(self, fh: bytes) -> None:
+        ...
+
+    def __getitem__(self, item: Any) -> dict | str:
+        return self.parsed_data[item]
+
+    def __contains__(self, item: str):
+        return item in self.parsed_data
+
+    def read_file(self, fh: bytes) -> None:
+        self.parse_file(fh)
+
+        if self.collapse_all or self.collapse:
+            self._collapse_dict(self.parsed_data)
+
+    def keys(self) -> KeysView:
+        return self.parsed_data.keys()
+
+    def items(self) -> ItemsView:
+        return self.parsed_data.items()
+
+    def _collapse_dict(self, dictionary: dict, collapse=False) -> dict:
+        new_dictionary = {}
+
+        if isinstance(dictionary, list) and collapse:
+            return dictionary[-1]
+
+        if not hasattr(dictionary, "items"):
+            return dictionary
+
+        for key, value in dictionary.items():
+            value = self._collapse_dict(value, self.collapse_all or key in self.collapse)
+            new_dictionary.update({key: value})
+
+        return new_dictionary
+
+
+class Ini(LinuxConfigurationParser):
+    def __init__(self, collapse: Optional[bool | set] = True) -> None:
+        super().__init__(collapse)
+
+        self.parsed_data = ConfigParser(strict=False)
+        self.parsed_data.optionxform = str
+
+    def parse_file(self, fh: bytes) -> None:
+        self.parsed_data.read_file(fh)
+
+
+class Unknown(LinuxConfigurationParser):
+    def read_file(self, fh: bytes) -> None:
+        pass
+
+
+CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
+    "ini": Ini,
+}
+
+
 class ConfigurationTree(Plugin):
     __namespace__ = "registry"
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        self._root = UnixRegistry(target)
+        self._root = ConfigurationFs(target)
 
     def check_compatible(self):
         if self.target.fs.get("/etc") is None:
@@ -32,7 +98,7 @@ class ConfigurationTree(Plugin):
             yield from self.key(key).iterdir()
 
 
-class UnixRegistry(VirtualFilesystem):
+class ConfigurationFs(VirtualFilesystem):
     __fstype__: str = "META:registry"
 
     def __init__(self, target: Target, **kwargs):
@@ -49,12 +115,7 @@ class UnixRegistry(VirtualFilesystem):
         parts = path.split("/")
 
         for i, part in enumerate(parts):
-            # If the entry of the previous part (or the starting relentry /
-            # root entry) is a symlink, resolve it first so things like entry.up
-            # work if it is a symlink to a directory.
-            # Note that this will never resolve the final part of the path if
-            # that happens to be a symlink, so things like fs.is_symlink() will
-            # work.
+            # Resolve link
             if entry.is_symlink():
                 entry = entry.readlink_ext()
 
@@ -64,47 +125,58 @@ class UnixRegistry(VirtualFilesystem):
                 entry = entry.up or self.root
                 continue
 
+            if entry is self.root:
+                entry = self.root.top
+
             try:
-                entry = super().get(part, entry)
+                entry = entry.get(part)
+                if entry.is_file():
+                    break
             except FilesystemError:
                 break
 
         return parts[i:], entry
 
-    def get(self, path: str, relentry=None) -> Union[FilesystemEntry, ConfigurationEntry]:
+    def get(
+        self,
+        path: str,
+        relentry=None,
+        collapse: Optional[bool | set] = None,
+    ) -> Union[FilesystemEntry, ConfigurationEntry]:
         parts, entry = self._get_till_file(path, relentry)
 
         for part in parts:
             if isinstance(entry, ConfigurationEntry):
                 entry = entry.get(part)
             else:
-                try:
-                    entry = ConfigurationEntry(self, part, entry)
-                except Exception:
-                    pass
+                if entry.is_file():
+                    try:
+                        entry = ConfigurationEntry(self, part, entry, collapse=collapse)
+                    except Exception as e:
+                        pass
 
         return entry
 
 
 class ConfigurationEntry(FilesystemEntry):
-    def __init__(self, fs: Filesystem, path: str, entry: Any, parser_items=None) -> None:
+    def __init__(self, fs: Filesystem, path: str, entry: Any, parser_items=None, collapse=None) -> None:
         super().__init__(fs, path, entry)
         if parser_items is None:
-            self.parser_items = self.parse_config(entry)
+            self.parser_items = self.parse_config(entry, collapse)
         else:
             self.parser_items = parser_items
 
-    def parse_config(self, entry) -> RawConfigParser:
-        parser = RawConfigParser(strict=False, delimiters=(" ", "\t"))
-        parser.optionxform = str
+    def parse_config(self, entry: FilesystemEntry, collapse=None) -> RawConfigParser:
+        extension = entry.path.rsplit(".", 1)[-1]
+        parser = CONFIG_MAP.get(extension, Unknown)(collapse)
         with entry.open() as fp:
             open_file = io.TextIOWrapper(fp, encoding="utf-8")
             try:
-                parser.read_file(open_file, source=entry.name)
-            except MissingSectionHeaderError:
+                parser.read_file(open_file)
+            except MissingSectionHeaderError as e:
                 open_file.seek(0)
                 open_file = io.StringIO("[DEFAULT]\n" + open_file.read())
-                parser.read_file(open_file, source=entry.name)
+                parser.read_file(open_file)
         return parser
 
     def get(self, path: str) -> ConfigurationEntry:
@@ -128,7 +200,7 @@ class ConfigurationEntry(FilesystemEntry):
         # Return fh for path if entry is a file
         # Return bytes of value if entry is ConfigurationEntry
 
-        if isinstance(self.parser_items, RawConfigParser):
+        if isinstance(self.parser_items, LinuxConfigurationParser):
             # Currently trying to open the underlying entry
             return self.entry.open()
 
@@ -154,7 +226,7 @@ class ConfigurationEntry(FilesystemEntry):
             yield ConfigurationEntry(self.fs, key, self.entry, values)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
-        return not self.is_dir(follow_symlinks)
+        return not self.is_dir(follow_symlinks) or isinstance(self.parser_items, LinuxConfigurationParser)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return hasattr(self.parser_items, "keys")

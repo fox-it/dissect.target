@@ -864,13 +864,13 @@ class TargetCli(TargetCmd):
         print()
 
 
-from dissect.target.plugins.os.unix.registry import UnixRegistry
+from dissect.target.plugins.os.unix.config_tree import ConfigurationTree
 
 
 class UnixRegistryCli(TargetCli):
     def __init__(self, target):
         TargetCmd.__init__(self, target)
-        self.registry = UnixRegistry(target)
+        self.registry = ConfigurationTree(target)
         self.prompt_base = target.name
 
         self.cwd = None
