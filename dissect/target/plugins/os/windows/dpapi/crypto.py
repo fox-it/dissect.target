@@ -51,8 +51,6 @@ class CipherAlgorithm:
     ) -> bytes:
         derived = pbkdf2(key, iv, self.key_length + self.iv_length, rounds, hash_algorithm.name)
         key, iv = derived[: self.key_length], derived[self.key_length :]
-        key = key[: self.key_length]
-        iv = iv[: self.iv_length]
 
         return self.decrypt(data, key, iv)
 
@@ -68,7 +66,7 @@ class _AES(CipherAlgorithm):
     block_length = 128 // 8
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
-        cipher = AES.new(key[: self.key_length], mode=AES.MODE_CBC, IV=iv or b"\x00" * self.iv_length)
+        cipher = AES.new(key[: self.key_length], mode=AES.MODE_CBC, IV=iv[: self.iv_length] or b"\x00" * self.iv_length)
         return cipher.decrypt(data)
 
 
@@ -97,7 +95,7 @@ class _RC4(CipherAlgorithm):
     block_length = 1 // 8
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
-        cipher = ARC4.new(key)
+        cipher = ARC4.new(key[: self.key_length])
         return cipher.decrypt(data)
 
 
