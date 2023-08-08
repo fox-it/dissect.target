@@ -1,5 +1,9 @@
+import argparse
 import sys
+from io import BytesIO
 from unittest.mock import MagicMock
+
+import pytest
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -59,3 +63,31 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
 
     captured = capsys.readouterr()
     assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"
+
+
+@pytest.mark.parametrize(
+    "folders, files, save, expected",
+    [
+        ("/a/b/c|/d", "/a/1.txt|/a/b/2.txt|/d/3.txt", "/a", "a|a/1.txt|a/b|a/b/2.txt|a/b/c"),
+        ("/a/b/c|/d", "/a/1.txt|/b/2.txt|/d/3.txt", "/d", "d|d/3.txt"),
+        ("/a/b/c|/d", "/a/1.txt|/b/2.txt|/d/3.txt", "/b", "b|b/2.txt"),
+        ("/p/q/n", "/p/q/n/1.txt", "/p/q/n/1.txt", "1.txt"),
+        ("/p/q/n", "/p/q/n/1.txt|2.txt", "/p/q/n/1.txt", "1.txt"),
+        (
+            "/save_test/bin|save_test/data",
+            "/save_test/data/hello|/save_test/bin/world",
+            "/save_test",
+            "save_test|save_test/bin|save_test/bin/world|save_test/data|save_test/data/hello",
+        ),
+    ],
+)
+def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
+    cli = TargetCli(target_win)
+    for folder in folders.split("|"):
+        target_win.fs.root.makedirs(folder)
+    for _file in files.split("|"):
+        target_win.fs.root.map_file_fh(_file, BytesIO(_file.encode("utf-8")))
+    args = argparse.Namespace(path=[save], out=tmp_path, verbose=False)
+    cli.cmd_save(args, sys.stdout)
+    tree = "|".join(sorted(map(lambda path: str(path.relative_to(tmp_path)), tmp_path.rglob("*"))))
+    assert tree == expected
