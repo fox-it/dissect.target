@@ -133,7 +133,7 @@ def generate_argparse_for_plugin(
 
 
 def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
-    if hasattr(target, "instance"):
+    if hasattr(target._loader, "instance"):
         return target.get_function(funcname)
 
     if isinstance(plugin, type):
