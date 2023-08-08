@@ -66,7 +66,9 @@ class _AES(CipherAlgorithm):
     block_length = 128 // 8
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
-        cipher = AES.new(key[: self.key_length], mode=AES.MODE_CBC, IV=iv[: self.iv_length] or b"\x00" * self.iv_length)
+        cipher = AES.new(
+            key[: self.key_length], mode=AES.MODE_CBC, IV=iv[: self.iv_length] if iv else b"\x00" * self.iv_length
+        )
         return cipher.decrypt(data)
 
 
