@@ -8,10 +8,13 @@ from typing import Iterator
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.windows import registry
 from dissect.target.target import Target
+
+from ._utils import absolute_path
 
 
 def make_dummy_target():
@@ -58,6 +61,14 @@ def fs_unix():
 
 
 @pytest.fixture
+def fs_osx():
+    fs = VirtualFilesystem()
+    fs.makedirs("Applications")
+    fs.makedirs("Library")
+    yield fs
+
+
+@pytest.fixture
 def hive_hklm():
     hive = VirtualHive()
 
@@ -80,11 +91,22 @@ def hive_hku():
 
 
 @pytest.fixture
+def target_default():
+    mock_target = next(make_mock_target())
+    yield mock_target
+
+
+@pytest.fixture
 def target_win(hive_hklm, fs_win):
     mock_target = next(make_mock_target())
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
-    mock_target.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
+    mock_target.registry.add_hive(
+        "HKEY_LOCAL_MACHINE",
+        "HKEY_LOCAL_MACHINE",
+        hive_hklm,
+        TargetPath(mock_target.fs, ""),
+    )
 
     mock_target.filesystems.add(fs_win)
     mock_target.apply()
@@ -103,25 +125,48 @@ def target_unix(fs_unix):
 
 
 @pytest.fixture
+def target_osx(fs_osx):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_osx)
+    mock_target.fs.mount("/", fs_osx)
+    mock_target.apply()
+
+    version = absolute_path("data/plugins/os/unix/bsd/osx/os/SystemVersion.plist")
+    fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
+
+    system = absolute_path("data/plugins/os/unix/bsd/osx/os/preferences.plist")
+    fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
+
+    yield mock_target
+
+
+@pytest.fixture
 def target_win_users(hive_hklm, hive_hku, target_win):
-    key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
 
-    profile_list_key = VirtualKey(hive_hklm, key_name)
-
-    profile1_key = VirtualKey(hive_hklm, "S-1-5-18")
+    sid_local_system = "S-1-5-18"
+    profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
     profile1_key.add_value(
         "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
     )
 
-    profile2_key = VirtualKey(hive_hklm, "S-1-5-21-3263113198-3007035898-945866154-1002")
+    sid_users_john = "S-1-5-21-3263113198-3007035898-945866154-1002"
+    profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_users_john}")
     profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
 
-    profile_list_key.add_subkey("subkey1", profile1_key)
-    profile_list_key.add_subkey("subkey2", profile2_key)
+    profile_list_key.add_subkey(sid_local_system, profile1_key)
+    profile_list_key.add_subkey(sid_users_john, profile2_key)
 
-    hive_hklm.map_key(key_name, profile_list_key)
+    hive_hklm.map_key(profile_list_key_name, profile_list_key)
 
-    target_win.registry.map_hive("HKEY_USERS\\S-1-5-21-3263113198-3007035898-945866154-1002", hive_hku)
+    target_win.registry.add_hive(
+        "HKEY_USERS",
+        f"HKEY_USERS\\{sid_users_john}",
+        hive_hku,
+        TargetPath(target_win.fs, ""),
+    )
 
     yield target_win
 
@@ -190,6 +235,17 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def target_osx_users(target_osx, fs_osx):
+    dissect = absolute_path("data/plugins/os/unix/bsd/osx/os/dissect.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
+
+    test = absolute_path("data/plugins/os/unix/bsd/osx/os/test.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+
+    yield target_osx
 
 
 @pytest.fixture

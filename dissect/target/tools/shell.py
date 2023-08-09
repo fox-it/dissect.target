@@ -17,8 +17,9 @@ import subprocess
 import sys
 import traceback
 from contextlib import contextmanager
+from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
 
-from dissect import cstruct
+from dissect.cstruct import hexdump
 from flow.record import RecordOutput
 
 from dissect.target.exceptions import (
@@ -34,6 +35,7 @@ from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
+    catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_bound_method,
     process_generic_arguments,
@@ -65,7 +67,7 @@ Change: {ctime}"""
 FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32"  # noqa: E501
 
 
-def prepare_ls_colors():
+def prepare_ls_colors() -> dict[str, str]:
     """Parse the LS_COLORS environment variable so we can use it later."""
     d = {}
     ls_colors = os.environ.get("LS_COLORS", FALLBACK_LS_COLORS)
@@ -105,19 +107,26 @@ class TargetCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
 
+    def __getattr__(self, attr: str) -> Any:
+        if attr.startswith("help_"):
+            _, _, command = attr.partition("_")
+            try:
+                func = getattr(self, self.CMD_PREFIX + command)
+                return lambda: print(func.__doc__)
+            except AttributeError:
+                pass
+
+        return object.__getattribute__(self, attr)
+
     @staticmethod
-    def check_compatible(target):
+    def check_compatible(target: Target) -> bool:
         return True
 
-    def do_exit(self, line):
-        """exit shell"""
-        return True
-
-    def get_names(self):
+    def get_names(self) -> list[str]:
         names = cmd.Cmd.get_names(self)
 
         # Add fake do_ and help_ entries to get_names return value
@@ -128,7 +137,7 @@ class TargetCmd(cmd.Cmd):
 
         return names
 
-    def default(self, line):
+    def default(self, line: str) -> Optional[bool]:
         if line == "EOF":
             return True
 
@@ -146,7 +155,7 @@ class TargetCmd(cmd.Cmd):
 
         return cmd.Cmd.default(self, line)
 
-    def emptyline(self):
+    def emptyline(self) -> None:
         """This function forces Python's cmd.Cmd module to behave like a regular shell.
 
         When entering an empty command, the cmd module will by default repeat the previous command.
@@ -155,11 +164,8 @@ class TargetCmd(cmd.Cmd):
         """
         pass
 
-    def _exec(self, func, command_args_str):
-        """
-        Command execution helper that chains initial command and piped
-        subprocesses (if any) together
-        """
+    def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str) -> Optional[bool]:
+        """Command execution helper that chains initial command and piped subprocesses (if any) together."""
 
         argparts = []
         if command_args_str is not None:
@@ -182,12 +188,12 @@ class TargetCmd(cmd.Cmd):
         except IOError:
             pass
 
-    def _exec_command(self, command, command_args_str):
-        """Command execution helper for cmd_ commands"""
+    def _exec_command(self, command: str, command_args_str: str) -> Optional[bool]:
+        """Command execution helper for ``cmd_`` commands."""
         cmdfunc = getattr(self, self.CMD_PREFIX + command)
         argparser = generate_argparse_for_bound_method(cmdfunc, usage_tmpl=f"{command} {{usage}}")
 
-        def _exec_(argparts, stdout):
+        def _exec_(argparts: list[str], stdout: TextIO) -> bool:
             try:
                 args = argparser.parse_args(argparts)
             except SystemExit:
@@ -196,19 +202,19 @@ class TargetCmd(cmd.Cmd):
 
         return self._exec(_exec_, command_args_str)
 
-    def _exec_target(self, func, command_args_str):
-        """Command exection helper for target plugins"""
+    def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
+        """Command exection helper for target plugins."""
         attr = self.target
         for part in func.split("."):
             attr = getattr(attr, part)
 
-        def _exec_(argparts, stdout):
+        def _exec_(argparts: list[str], stdout: TextIO) -> Optional[bool]:
             if callable(attr):
                 argparser = generate_argparse_for_bound_method(attr)
                 try:
                     args = argparser.parse_args(argparts)
                 except SystemExit:
-                    return
+                    return False
                 value = attr(**vars(args))
             else:
                 value = attr
@@ -239,16 +245,17 @@ class TargetCmd(cmd.Cmd):
         except PluginError:
             traceback.print_exc()
 
-    def __getattr__(self, attr):
-        if attr.startswith("help_"):
-            _, _, command = attr.partition("_")
-            try:
-                func = getattr(self, self.CMD_PREFIX + command)
-                return lambda: print(func.__doc__)
-            except AttributeError:
-                pass
+    def do_python(self, line: str) -> Optional[bool]:
+        """drop into a Python shell"""
+        python_shell([self.target])
 
-        return object.__getattribute__(self, attr)
+    def do_clear(self, line: str) -> Optional[bool]:
+        """clear the terminal screen"""
+        os.system("cls||clear")
+
+    def do_exit(self, line: str) -> Optional[bool]:
+        """exit shell"""
+        return True
 
 
 class TargetHubCli(cmd.Cmd):
@@ -262,7 +269,7 @@ class TargetHubCli(cmd.Cmd):
         "Documented commands (type help <topic>):"
     )
 
-    def __init__(self, targets, cli):
+    def __init__(self, targets: list[Target], cli: TargetCmd):
         cmd.Cmd.__init__(self)
         self.targets = targets
         self._targetcli = cli
@@ -271,21 +278,24 @@ class TargetHubCli(cmd.Cmd):
 
         self._clicache = {}
 
-    def default(self, line):
+    def default(self, line: str) -> Optional[bool]:
         if line == "EOF":
             return True
 
         return cmd.Cmd.default(self, line)
 
-    def do_exit(self, line):
+    def emptyline(self) -> None:
+        pass
+
+    def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
         return True
 
-    def do_list(self, line):
+    def do_list(self, line: str) -> Optional[bool]:
         """list the loaded targets"""
         print("\n".join([f"{i:2d}: {e}" for i, e in enumerate(self._names)]))
 
-    def do_enter(self, line):
+    def do_enter(self, line: str) -> Optional[bool]:
         """enter a target by number or name"""
 
         if line.isdigit():
@@ -314,7 +324,7 @@ class TargetHubCli(cmd.Cmd):
         print(f"Entering {idx}: {self._names[idx]}")
         run_cli(cli)
 
-    def complete_enter(self, text, line, begidx, endidx):
+    def complete_enter(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         if not text:
             return self._names[:]
 
@@ -326,15 +336,15 @@ class TargetHubCli(cmd.Cmd):
 
         return compl
 
-    def do_python(self, line):
+    def do_python(self, line: str) -> Optional[bool]:
         """drop into a Python shell"""
         python_shell(self.targets)
 
 
 class TargetCli(TargetCmd):
-    """Cli for interacting with a target."""
+    """CLI for interacting with a target and browsing the filesystem."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
         self.prompt_base = target.name
         self._clicache = {}
@@ -343,17 +353,17 @@ class TargetCli(TargetCmd):
         self.chdir("/")
 
     @property
-    def prompt(self):
+    def prompt(self) -> str:
         return f"{self.prompt_base} {self.cwd}> "
 
-    def completedefault(self, text, line, begidx, endidx):
+    def completedefault(self, text: str, line: str, begidx: int, endidx: int):
         path = line[:begidx].rsplit(" ")[-1]
         textlower = text.lower()
 
         r = [fname for _, fname in self.scandir(path) if fname.lower().startswith(textlower)]
         return r
 
-    def resolvepath(self, path):
+    def resolve_path(self, path: str) -> fsutil.TargetPath:
         if not path:
             return self.cwd
 
@@ -363,8 +373,8 @@ class TargetCli(TargetCmd):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.target.fs.path(path)
 
-    def resolveglobpath(self, path):
-        path = self.resolvepath(path)
+    def resolve_glob_path(self, path: str) -> Iterator[fsutil.TargetPath]:
+        path = self.resolve_path(path)
         if path.exists():
             yield path
         else:
@@ -379,8 +389,8 @@ class TargetCli(TargetCmd):
                 # component
                 print(err)
 
-    def checkfile(self, path):
-        path = self.resolvepath(path)
+    def check_file(self, path: str) -> Optional[fsutil.TargetPath]:
+        path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file")
             return
@@ -395,8 +405,8 @@ class TargetCli(TargetCmd):
 
         return path
 
-    def checkdir(self, path):
-        path = self.resolvepath(path)
+    def check_dir(self, path: str) -> Optional[fsutil.TargetPath]:
+        path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such directory")
             return
@@ -411,15 +421,14 @@ class TargetCli(TargetCmd):
 
         return path
 
-    def chdir(self, path):
-        """Change directory to the given path"""
-        path = self.checkdir(path)
-        if path:
+    def chdir(self, path: str) -> None:
+        """Change directory to the given path."""
+        if path := self.check_dir(path):
             self.cwd = path
 
-    def scandir(self, path, color=False):
-        """List a directory for the given path"""
-        path = self.resolvepath(path)
+    def scandir(self, path: str, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
+        """List a directory for the given path."""
+        path = self.resolve_path(path)
         result = []
 
         if path.exists() and path.is_dir():
@@ -450,30 +459,30 @@ class TargetCli(TargetCmd):
 
         return result
 
-    def do_cd(self, line):
+    def do_cd(self, line: str) -> Optional[bool]:
         """change directory"""
         self.chdir(line)
 
-    def do_pwd(self, line):
+    def do_pwd(self, line: str) -> Optional[bool]:
         """print current directory"""
         print(self.cwd)
 
-    def do_disks(self, line):
+    def do_disks(self, line: str) -> Optional[bool]:
         """print target disks"""
         for d in self.target.disks:
             print(str(d))
 
-    def do_volumes(self, line):
+    def do_volumes(self, line: str) -> Optional[bool]:
         """print target volumes"""
         for v in self.target.volumes:
             print(str(v))
 
-    def do_filesystems(self, line):
+    def do_filesystems(self, line: str) -> Optional[bool]:
         """print target filesystems"""
         for fs in self.target.filesystems:
             print(str(fs))
 
-    def do_info(self, line):
+    def do_info(self, line: str) -> Optional[bool]:
         """print target information"""
         return print_target_info(self.target)
 
@@ -481,10 +490,10 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
-    def cmd_ls(self, args, stdout):
+    def cmd_ls(self, args: argparse.Namespace, stdout) -> Optional[bool]:
         """list directory contents"""
 
-        path = self.resolvepath(args.path)
+        path = self.resolve_path(args.path)
 
         if not path or not path.exists():
             return
@@ -502,7 +511,7 @@ class TargetCli(TargetCmd):
             for target_path, name in contents:
                 self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
 
-    def print_extensive_file_stat(self, stdout, target_path: fsutil.TargetPath, name: str) -> None:
+    def print_extensive_file_stat(self, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
         try:
             entry = target_path.get()
@@ -524,9 +533,9 @@ class TargetCli(TargetCmd):
     @arg("path", nargs="?")
     @arg("-name", default="*")
     @arg("-iname")
-    def cmd_find(self, args, stdout):
+    def cmd_find(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """search for files in a directory hierarchy"""
-        path = self.resolvepath(args.path)
+        path = self.resolve_path(args.path)
         if not path:
             return
 
@@ -542,9 +551,9 @@ class TargetCli(TargetCmd):
 
     @arg("path")
     @arg("-L", "--dereference", action="store_true")
-    def cmd_stat(self, args, stdout):
+    def cmd_stat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """display file status"""
-        path = self.resolvepath(args.path)
+        path = self.resolve_path(args.path)
         if not path:
             return
 
@@ -570,9 +579,9 @@ class TargetCli(TargetCmd):
         print(res, file=stdout)
 
     @arg("path")
-    def cmd_file(self, args, stdout):
+    def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """determine file type"""
-        path = self.checkfile(args.path)
+        path = self.check_file(args.path)
         if not path:
             return
 
@@ -590,7 +599,7 @@ class TargetCli(TargetCmd):
     @arg("path", nargs="+")
     @arg("-o", "--out", default=".")
     @arg("-v", "--verbose", action="store_true")
-    def cmd_save(self, args, stdout):
+    def cmd_save(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """save a common file or directory to the host filesystem"""
         dst_path = pathlib.Path(args.out).resolve()
 
@@ -600,11 +609,11 @@ class TargetCli(TargetCmd):
             # items are directories.
             print(f"{dst_path}: cannot save multiple files, destination is not a directory")
 
-        def log_saved_path(src_path, dst_path):
+        def log_saved_path(src_path: pathlib.Path, dst_path: pathlib.Path) -> None:
             if args.verbose:
                 print(f"{src_path} -> {dst_path}")
 
-        def get_diverging_path(path, reference_path):
+        def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
             """Get the part of path where it diverges from reference_path."""
             diverging_path = pathlib.Path("")
 
@@ -618,7 +627,9 @@ class TargetCli(TargetCmd):
 
             return diverging_path
 
-        def save_path(src_path, dst_path, create_dst_subdir=None):
+        def save_path(
+            src_path: pathlib.Path, dst_path: pathlib.Path, create_dst_subdir: Optional[pathlib.Path] = None
+        ) -> None:
             """Save a common file or directory in src_path to dst_path.
 
             If src_path is a file, dst_path can be either a directory or a file
@@ -652,7 +663,7 @@ class TargetCli(TargetCmd):
                 dst_path = dst_path.joinpath(src_name)
                 dst_path.mkdir(parents=True, exist_ok=True)
                 log_saved_path(src_path, dst_path)
-                for path in src_path.rglob("*"):
+                for path in src_path.glob("*"):
                     save_path(path, dst_path)
 
             elif src_path.is_file():
@@ -688,8 +699,8 @@ class TargetCli(TargetCmd):
             # path absolute, but does not resolve symlinks like pathlib's
             # Path.resolve(). This is needed as we need the original filename
             # for saving.
-            src_paths = self.resolveglobpath(path)
-            reference_path = self.resolvepath(path)
+            src_paths = self.resolve_glob_path(path)
+            reference_path = self.resolve_path(path)
             # See if the path has globs in it which resolve to multiple files.
             # If so the dst_path needs to be a directory to properly save all
             # the files resulting from globbing.
@@ -719,12 +730,12 @@ class TargetCli(TargetCmd):
                         save_path(src_path, dst_path, create_dst_subdir=extra_dir)
 
     @arg("path")
-    def cmd_cat(self, args, stdout):
+    def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """print file content"""
-        paths = self.resolveglobpath(args.path)
+        paths = self.resolve_glob_path(args.path)
         stdout = stdout.buffer
         for path in paths:
-            path = self.checkfile(path)
+            path = self.check_file(path)
             if not path:
                 continue
 
@@ -733,12 +744,12 @@ class TargetCli(TargetCmd):
             stdout.flush()
 
     @arg("path")
-    def cmd_zcat(self, args, stdout):
+    def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """print file content from compressed files"""
-        paths = self.resolveglobpath(args.path)
+        paths = self.resolve_glob_path(args.path)
         stdout = stdout.buffer
         for path in paths:
-            path = self.checkfile(path)
+            path = self.check_file(path)
             if not path:
                 continue
 
@@ -747,18 +758,18 @@ class TargetCli(TargetCmd):
             stdout.flush()
 
     @arg("path")
-    def cmd_hexdump(self, args, stdout):
+    def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """print a hexdump of the first X bytes"""
-        path = self.checkfile(args.path)
+        path = self.check_file(args.path)
         if not path:
             return
 
-        print(cstruct.hexdump(path.open().read(16 * 20), output="string"), file=stdout)
+        print(hexdump(path.open().read(16 * 20), output="string"), file=stdout)
 
     @arg("path")
-    def cmd_hash(self, args, stdout):
+    def cmd_hash(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """print the MD5, SHA1 and SHA256 hashes of a file"""
-        path = self.checkfile(args.path)
+        path = self.check_file(args.path)
         if not path:
             return
 
@@ -766,41 +777,41 @@ class TargetCli(TargetCmd):
         print(f"MD5:\t{md5}\nSHA1:\t{sha1}\nSHA256:\t{sha256}", file=stdout)
 
     @arg("path")
-    def cmd_less(self, args, stdout):
+    def cmd_less(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """open the first 10 MB of a file with less"""
-        path = self.checkfile(args.path)
+        path = self.check_file(args.path)
         if not path:
             return
 
         pydoc.pager(path.open("rt", errors="ignore").read(10 * 1024 * 1024))
 
     @arg("path")
-    def cmd_zless(self, args, stdout):
+    def cmd_zless(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """open the first 10 MB of a compressed file with zless"""
-        path = self.checkfile(args.path)
+        path = self.check_file(args.path)
         if not path:
             return
 
         pydoc.pager(fsutil.open_decompress(path, "rt").read(10 * 1024 * 1024))
 
     @arg("path", nargs="+")
-    def cmd_readlink(self, args, stdout):
+    def cmd_readlink(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """print resolved symbolic links or canonical file names"""
         for path in args.path:
-            path = self.resolvepath(path)
+            path = self.resolve_path(path)
             if not path.is_symlink():
                 continue
 
             print(path.get().readlink(), file=stdout)
 
     @arg("path", nargs="?", help="load a hive from the given path")
-    def cmd_registry(self, args, stdout):
+    def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """drop into a registry shell"""
         hive = None
 
         clikey = "registry"
         if args.path:
-            path = self.checkfile(args.path)
+            path = self.check_file(args.path)
             if not path:
                 return
 
@@ -818,19 +829,41 @@ class TargetCli(TargetCmd):
 
         run_cli(cli)
 
-    def do_python(self, line):
-        """drop into a Python shell"""
-        python_shell([self.target])
+        # Print an additional empty newline after exit
+        print()
 
-    def do_clear(self, line):
-        """clears the terminal screen"""
-        os.system("cls||clear")
+    @arg("targets", metavar="TARGETS", nargs="*", help="targets to load")
+    @arg("-p", "--python", action="store_true", help="(I)Python shell")
+    @arg("-r", "--registry", action="store_true", help="registry shell")
+    def cmd_enter(self, args: argparse.Namespace, stdout: TextIO) -> None:
+        """load one or more files as sub-targets and drop into a sub-shell"""
+        paths = [self.resolve_path(path) for path in args.targets]
+
+        if args.python:
+            # Quick path that doesn't require CLI caching
+            return open_shell(paths, args.python, args.registry)
+
+        clikey = tuple(str(path) for path in paths)
+        try:
+            cli = self._clicache[clikey]
+        except KeyError:
+            targets = list(Target.open_all(paths))
+            cli = create_cli(targets, RegistryCli if args.registry else TargetCli)
+            if not cli:
+                return
+
+            self._clicache[clikey] = cli
+
+        run_cli(cli)
+
+        # Print an additional empty newline after exit
+        print()
 
 
 class RegistryCli(TargetCmd):
-    """Cli for browsing the registry."""
+    """CLI for browsing the registry."""
 
-    def __init__(self, target, registry=None):
+    def __init__(self, target: Target, registry: Optional[regutil.RegfHive] = None):
         TargetCmd.__init__(self, target)
         self.registry = registry or target.registry
 
@@ -840,22 +873,22 @@ class RegistryCli(TargetCmd):
         self.chdir("\\")
 
     @staticmethod
-    def check_compatible(target):
+    def check_compatible(target: Target) -> bool:
         if not target.has_function("registry"):
             print("ERROR: Target doesn't have a registry")
             return False
         return True
 
     @property
-    def prompt(self):
+    def prompt(self) -> str:
         prompt_end = self.cwd.strip("\\")
         return f"{self.prompt_base}/registry {prompt_end}> "
 
-    def completedefault(self, text, line, begidx, endidx):
+    def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = line[:begidx].rsplit(" ")[-1]
         return [fname for _, fname in self.scandir(path) if fname.lower().startswith(text.lower())]
 
-    def resolvekey(self, path):
+    def resolve_key(self, path: str) -> regutil.RegistryKey:
         if isinstance(path, regutil.RegistryKey):
             return path
 
@@ -866,32 +899,34 @@ class RegistryCli(TargetCmd):
         path = path.replace("\\\\", "\\")
         return self.registry.key(path.strip("\\"))
 
-    def checkkey(self, path):
+    def check_key(self, path: str) -> regutil.RegistryKey:
         try:
-            return self.resolvekey(path)
+            return self.resolve_key(path)
         except RegistryError:
             print(f"{path}: No such subkey")
 
-    def checkvalue(self, path):
+    def check_value(self, path: str) -> regutil.RegistryValue:
         path, _, value = path.rpartition("\\")
         try:
-            key = self.resolvekey(path)
+            key = self.resolve_key(path)
             return key.value(value)
         except RegistryKeyNotFoundError:
             print(f"{path}: No such subkey")
         except RegistryValueNotFoundError:
             print(f"{path}\\{value}: No such value")
 
-    def chdir(self, path):
+    def chdir(self, path: str) -> None:
         if not path.startswith("\\"):
             path = "\\".join([self.cwd, path])
 
-        if self.checkkey(path):
+        if self.check_key(path):
             self.cwd = "\\" + path.strip("\\")
 
-    def scandir(self, path, color=False):
+    def scandir(
+        self, path: str, color: bool = False
+    ) -> list[tuple[Union[regutil.RegistryKey, regutil.RegistryValue], str]]:
         try:
-            key = self.resolvekey(path)
+            key = self.resolve_key(path)
         except RegistryError:
             return []
 
@@ -905,28 +940,28 @@ class RegistryCli(TargetCmd):
         r.sort(key=lambda e: e[0].name)
         return r
 
-    def do_cd(self, line):
+    def do_cd(self, line: str) -> Optional[bool]:
         """change subkey"""
         self.chdir(line)
 
-    def do_up(self, line):
+    def do_up(self, line: str) -> Optional[bool]:
         """go up a subkey"""
         parent = self.cwd.rpartition("\\")[0]
         if not parent:
             parent = "\\"
         self.chdir(parent)
 
-    def do_pwd(self, line):
+    def do_pwd(self, line: str) -> Optional[bool]:
         """print current path"""
         print(self.cwd)
 
-    def do_recommend(self, line):
+    def do_recommend(self, line: str) -> Optional[bool]:
         """recommend a key"""
         print(random.choice([name for _, name in self.scandir(None)]))
 
     @arg("path", nargs="?")
-    def cmd_ls(self, args, stdout):
-        key = self.checkkey(args.path)
+    def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
+        key = self.check_key(args.path)
         if not key:
             return
 
@@ -934,19 +969,15 @@ class RegistryCli(TargetCmd):
         print("\n".join([name for _, name in r]), file=stdout)
 
     @arg("value")
-    def cmd_cat(self, args, stdout):
-        value = self.checkvalue(args.value)
+    def cmd_cat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
+        value = self.check_value(args.value)
         if not value:
             return
 
         print(repr(value.value), file=stdout)
 
-    def do_clear(self, line):
-        """Clears the terminal screen"""
-        os.system("cls||clear")
 
-
-def fmt_ls_colors(ft, name):
+def fmt_ls_colors(ft: str, name: str) -> str:
     """Helper method to colorize strings according to LS_COLORS."""
     try:
         return LS_COLORS[ft].format(name)
@@ -962,7 +993,7 @@ def fmt_ls_colors(ft, name):
 
 
 @contextmanager
-def build_pipe(pipe_parts, pipe_stdout=subprocess.PIPE):
+def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Iterator[tuple[TextIO, BinaryIO]]:
     """
     Generator context manager that chains piped subprocessess and
     returns a tuple (chain input stream, chain output stream).
@@ -1015,7 +1046,7 @@ def build_pipe(pipe_parts, pipe_stdout=subprocess.PIPE):
 
 
 @contextmanager
-def build_pipe_stdout(pipe_parts):
+def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
     """
     Generator context manager that chains piped subprocessess, with a chain's
     outgoing stream configured to be parent's stdout.
@@ -1026,7 +1057,7 @@ def build_pipe_stdout(pipe_parts):
         yield pipe_stdin
 
 
-def stat_modestr(st):
+def stat_modestr(st: fsutil.stat_result) -> str:
     """Helper method for generating a mode string from a numerical mode value."""
     is_dir = "d" if stat.S_ISDIR(st.st_mode) else "-"
     dic = {"7": "rwx", "6": "rw-", "5": "r-x", "4": "r--", "0": "---"}
@@ -1034,21 +1065,24 @@ def stat_modestr(st):
     return is_dir + "".join(dic.get(x, x) for x in perm)
 
 
-def target_shell(targets, cli):
-    """Helper method for starting a TargetCli or TargetHubCli for one or multiple targets."""
-    if len(targets) == 1:
-        target = targets[0]
-        if not cli.check_compatible(target):
-            return
+def open_shell(targets: list[Union[str, pathlib.Path]], python: bool, registry: bool) -> None:
+    """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
+    targets = list(Target.open_all(targets))
 
-        cli = cli(targets[0])
+    if python:
+        python_shell(targets)
     else:
-        cli = TargetHubCli(targets, cli)
+        cli_cls = RegistryCli if registry else TargetCli
+        target_shell(targets, cli_cls=cli_cls)
 
-    run_cli(cli)
+
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd]) -> None:
+    """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
+    if cli := create_cli(targets, cli_cls):
+        run_cli(cli)
 
 
-def python_shell(targets):
+def python_shell(targets: list[Target]) -> None:
     """Helper method for starting a (I)Python shell with multiple targets."""
     banner = "Loaded targets in 'targets' variable. First target is in 't'."
     ns = {"targets": targets, "t": targets[0]}
@@ -1057,14 +1091,33 @@ def python_shell(targets):
         import IPython
 
         IPython.embed(header=banner, user_ns=ns, colors="linux")
+
+        # IPython already prints an empty newline
     except ImportError:
         import code
 
         shell = code.InteractiveConsole(ns)
         shell.interact(banner)
 
+        # Print an empty newline on exit
+        print()
 
-def run_cli(cli):
+
+def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> Optional[cmd.Cmd]:
+    """Helper method for instatiating the appropriate CLI."""
+    if len(targets) == 1:
+        target = targets[0]
+        if not cli_cls.check_compatible(target):
+            return
+
+        cli = cli_cls(target)
+    else:
+        cli = TargetHubCli(targets, cli_cls)
+
+    return cli
+
+
+def run_cli(cli: cmd.Cmd) -> None:
     """Helper method for running a cmd.Cmd cli.
 
     Loops cli.cmdloop(), skipping KeyboardInterrupts. This is done so
@@ -1073,6 +1126,9 @@ def run_cli(cli):
     while True:
         try:
             cli.cmdloop()
+
+            # Print an empty newline on exit
+            print()
             return
         except KeyboardInterrupt:
             # Add a line when pressing ctrl+c, so the next one starts at a new line
@@ -1083,16 +1139,17 @@ def run_cli(cli):
             pass
 
 
-def main():
+@catch_sigpipe
+def main() -> None:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
         fromfile_prefix_chars="@",
         formatter_class=help_formatter,
     )
-    parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
+    parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
-    parser.add_argument("-r", "--registry", action="store_true", help="Registry shell")
+    parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
 
     configure_generic_arguments(parser)
     args = parser.parse_args()
@@ -1104,15 +1161,7 @@ def main():
     if args.quiet:
         logging.getLogger("dissect").setLevel(level=logging.ERROR)
 
-    targets = list(Target.open_all(args.targets))
-
-    if args.python:
-        python_shell(targets)
-    else:
-        cli = TargetCli
-        if args.registry:
-            cli = RegistryCli
-        target_shell(targets, cli=cli)
+    open_shell(args.targets, args.python, args.registry)
 
 
 if __name__ == "__main__":
