@@ -1,5 +1,11 @@
+import io
+import tarfile
+
+import pytest
+
 from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
+from dissect.target.plugins.os.windows._os import WindowsPlugin
 
 from ._utils import absolute_path
 
@@ -44,3 +50,18 @@ def test_tar_loader_compressed_tar_file_with_empty_dir(target_unix):
     empty_folder = target_unix.fs.path("test/empty_dir")
     assert empty_folder.exists()
     assert empty_folder.is_dir()
+
+
+@pytest.mark.parametrize(
+    "archive",
+    [
+        ("data/test-windows-sysvol-absolute.tar"),
+        ("data/test-windows-sysvol-relative.tar"),
+        ("data/test-windows-fs-c-relative.tar"),
+        ("data/test-windows-fs-c-absolute.tar"),
+    ],
+)
+def test_tar_loader_windows_sysvol_formats(target_default, archive):
+    loader = TarLoader(absolute_path(archive))
+    loader.map(target_default)
+    assert WindowsPlugin(target_default).detect(target_default)
