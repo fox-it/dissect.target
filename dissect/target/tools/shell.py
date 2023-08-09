@@ -663,7 +663,7 @@ class TargetCli(TargetCmd):
                 dst_path = dst_path.joinpath(src_name)
                 dst_path.mkdir(parents=True, exist_ok=True)
                 log_saved_path(src_path, dst_path)
-                for path in src_path.rglob("*"):
+                for path in src_path.glob("*"):
                     save_path(path, dst_path)
 
             elif src_path.is_file():
