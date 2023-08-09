@@ -987,6 +987,9 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
         if "get_all_records" in available["exports"]:
             available["exports"].remove("get_all_records")
         modulepath = available["module"]
+        # Always skip these
+        if available["class"] in ["DefaultPlugin", "ExamplePlugin"]:
+            continue
         if modulepath.endswith("._os"):
             if not target._os:
                 # if no target available add a namespaceless section
@@ -1119,4 +1122,4 @@ def find_plugin_functions(
                     )
                 )
 
-    return list(set(result)), invalid_funcs
+    return sorted(set(result), key=result.index), invalid_funcs

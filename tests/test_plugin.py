@@ -1,4 +1,5 @@
 import os
+from functools import reduce
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -175,3 +176,18 @@ def test_find_plugin_function_default(target_default: Target) -> None:
     names = [item.name for item in found]
     assert "os.unix.services.services" in names
     assert "os.windows.services.services" in names
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        ("version,ips,hostname"),
+        ("ips,version,hostname"),
+        ("hostname,ips,version"),
+        ("users,osinfo"),
+        ("osinfo,users"),
+    ],
+)
+def test_find_plugin_function_order(target_win: Target, pattern: str) -> None:
+    found = ",".join(reduce(lambda rs, el: rs + [el.method_name], find_plugin_functions(target_win, pattern)[0], []))
+    assert found == pattern
