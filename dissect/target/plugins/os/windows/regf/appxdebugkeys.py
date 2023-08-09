@@ -6,7 +6,7 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey, RegistryKeyNotFoundError
+from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 
 AppxDebugKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
@@ -20,11 +20,17 @@ AppxDebugKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtensi
 
 
 class AppxDebugKeysPlugin(Plugin):
-    """Plugin that iterates various AppX debug key locations."""
+    """Plugin that iterates various AppX debug key locations"""
 
-    REGKEY_PACKAGED_APPX_DEBUG = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\PackagedAppXDebug"
-    REGKEY_ACTIVATABLE_CLASS_PACKAGE = "HKEY_CURRENT_USER\\Software\\Classes\\ActivatableClasses\\Package"
-    DEBUG_INFORMATION_KEY_NAME = "DebugInformation"
+    REGKEY_GLOBS = [
+        # The first glob are the AppX package names
+        # The "(Default Value)" contains the debugger command
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\PackagedAppXDebug\\*",
+        # The first glob are the AppX package names
+        # The second glob are the AppX package components
+        # The "DebugPath" value contains the debugger command
+        "HKEY_CURRENT_USER\\Software\\Classes\\ActivatableClasses\\Package\\*\\DebugInformation\\*",
+    ]
 
     def _walk(self, key: RegistryKey) -> Iterator[AppxDebugKeyRecord]:
         user = self.target.registry.get_user(key)
@@ -56,42 +62,15 @@ class AppxDebugKeysPlugin(Plugin):
             for subkey in subkeys:
                 yield from self._walk(subkey)
 
-    def _packaged_appx_debug_keys(self) -> Iterator[AppxDebugKeyRecord]:
-        # "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\PackagedAppXDebug\\*",
-        # the * are AppX package names
-        # value_name="(Default Value)", value_data=<debugger cmd>
-        for key in self.target.registry.keys(self.REGKEY_PACKAGED_APPX_DEBUG):
-            for subkey in key.subkeys():
-                yield from self._walk(subkey)
-
-    def _activatable_classes_debug_keys(self) -> Iterator[AppxDebugKeyRecord]:
-        # "HKEY_CURRENT_USER\\Software\\Classes\\ActivatableClasses\Package\\*\\DebugInformation\\*",
-        # the 1st * are AppX package names
-        # the 2nd * look like AppX package components
-        # value_name="DebugPath", value_data=<debugger cmd>
-        for key in self.target.registry.keys(self.REGKEY_ACTIVATABLE_CLASS_PACKAGE):
-            for subkey in key.subkeys():
-                try:
-                    debug_key = subkey.subkey(self.DEBUG_INFORMATION_KEY_NAME)
-                except RegistryKeyNotFoundError:
-                    pass
-                else:
-                    yield from self._walk(debug_key)
+    def _debug_keys(self) -> Iterator[AppxDebugKeyRecord]:
+        for regkey_glob in self.REGKEY_GLOBS:
+            for key in self.target.registry.glob_ext(regkey_glob):
+                yield from self._walk(key)
 
     def check_compatible(self) -> None:
-        packaged_keys = True
-        activatable_keys = True
         try:
-            next(self._packaged_appx_debug_keys())
+            next(self._debug_keys())
         except StopIteration:
-            packaged_keys = False
-
-        try:
-            next(self._activatable_classes_debug_keys())
-        except StopIteration:
-            activatable_keys = False
-
-        if not packaged_keys and not activatable_keys:
             raise UnsupportedPluginError("No registry AppX debug key found")
 
     @export(record=AppxDebugKeyRecord)
@@ -120,5 +99,4 @@ class AppxDebugKeysPlugin(Plugin):
             user_home (string): The home directory of the user this key belongs to.
         """
 
-        yield from self._packaged_appx_debug_keys()
-        yield from self._activatable_classes_debug_keys()
+        yield from self._debug_keys()

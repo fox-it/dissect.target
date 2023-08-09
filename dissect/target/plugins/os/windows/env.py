@@ -312,7 +312,11 @@ class EnvironmentVariablePlugin(Plugin):
 
     @internal
     def user_env(self, user_sid: Optional[str] = None) -> OrderedDict[str, str]:
-        """Return a dict of all found (user) environment variables."""
+        """Return a dict of all found (user) environment variables.
+
+        If no ``user_sid` is provided, this function will return just the
+        system environment variables.
+        """
         return self._get_user_env_vars(user_sid)
 
     @property

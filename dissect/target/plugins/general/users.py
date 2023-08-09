@@ -44,6 +44,9 @@ class UsersPlugin(InternalPlugin):
 
     def get(self, user: RecordDescriptor) -> UserDetails:
         """Return additional details about the user"""
+        # Resolving the user home can not use the user's environment variables,
+        # as those depend on the user's home to be known first. So we resolve
+        # without providing the user (s)id.
         home_path = self.target.fs.path(self.target.resolve(user.home)) if user.home else None
         return UserDetails(user=user, home_path=home_path)
 

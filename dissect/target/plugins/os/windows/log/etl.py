@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import List
 
 from dissect.etl.etl import ETL, Event
 
@@ -7,6 +6,7 @@ from dissect.target import Target
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.windows.datetime import parse_tzi
 
 
 class EtlRecordBuilder:
@@ -31,12 +31,19 @@ class EtlRecordBuilder:
         record_values["_target"] = target
 
         for key, value in etl_event.event_values().items():
-            if isinstance(value, list):
-                record_fields.append(("string[]", key))
+            record_type = "bytes"
+            if key == "TimeZoneInformation":
+                # Pretty print TimezoneInformation
+                value = parse_tzi(bytes(value))
+                record_type = "string"
+            elif isinstance(value, list):
+                record_type = "string[]"
             elif isinstance(value, int):
-                record_fields.append(("varint", key))
-            else:
-                record_fields.append(("string", key))
+                record_type = "varint"
+            elif isinstance(value, str):
+                record_type = "string"
+
+            record_fields.append((record_type, key))
             record_values[key] = value
 
         # tuple conversion here is needed for lru_cache
@@ -79,7 +86,7 @@ class EtlPlugin(Plugin):
         plugin_target_folders = [self.target.fs.path(file).exists() for file in etl_paths]
         return any(plugin_target_folders)
 
-    def read_etl_files(self, etl_paths: List[str]):
+    def read_etl_files(self, etl_paths: list[str]):
         """Read ETL files using an EtlReader."""
         for etl_path in etl_paths:
             entry = self.target.fs.path(etl_path)

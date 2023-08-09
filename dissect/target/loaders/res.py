@@ -108,8 +108,7 @@ class ResLoader(Loader):
             if name == "HKEY_CURRENT_USER":
                 # name = 'S-0'
                 path = "HKEY_USERS\\S-0"
-            target.registry.add_hive(name, hive, "UPR")
-            target.registry.map_hive(path, hive)
+            target.registry.add_hive(name, path, hive, fsutil.TargetPath(target.fs, "UPR"))
 
 
 class ResFile(filesystem.VirtualFile):
