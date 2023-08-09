@@ -63,8 +63,9 @@ class CommandHistoryPlugin(Plugin):
     def commandhistory(self):
         """Return shell history for all users.
 
-        When using a shell, history of the used commands is kept on the system. It is kept in a hidden file
-        named ".$SHELL_history" and may expose commands that were used by an adversary.
+        When using a shell, history of the used commands is kept on the system. 
+        It is kept in a hidden file named ".$SHELL_history" and may expose 
+        commands that were used by an adversary.
         """
 
         for shell, history_path, user in self._history_files:
@@ -87,6 +88,9 @@ class CommandHistoryPlugin(Plugin):
         #1648598339
         echo "this is a test"
         ```
+
+        Resources:
+            - http://git.savannah.gnu.org/cgit/bash.git/tree/bashhist.c
         """
         next_cmd_ts = None
 
@@ -124,6 +128,9 @@ class CommandHistoryPlugin(Plugin):
         : 1673860722:0;sudo apt install sl
         : :;
         ```
+
+        Resources:
+            - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
         for line in file.open("rt", errors="replace"):
             line = line.strip()
@@ -151,9 +158,6 @@ class CommandHistoryPlugin(Plugin):
     def parse_fish_history(self, history_file: TargetPath, user: UnixUserRecord) -> Iterator[CommandHistoryRecord]:
         """Parses the history file of the fish shell.
 
-        The source code of fish is available on GitHub: fish-shell/fish-shell.
-        The history file is implemented in src/history.cpp.
-
         The fish history file is formatted as pseudo-YAML.
         An example of such a file:
         ```
@@ -166,6 +170,12 @@ class CommandHistoryPlugin(Plugin):
         - cmd: echo "test: test"
           when: 1688986629
         ```
+
+        Note that the last `- cmd: echo "test: test"` is not valid YAML,
+        which is why we cannot safely use the Python yaml module.
+
+        Resources:
+            - https://github.com/fish-shell/fish-shell/blob/master/src/history.cpp
         """
 
         with history_file.open("r") as h_file:
