@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 from abc import abstractmethod
-from configparser import MissingSectionHeaderError, RawConfigParser, ConfigParser
+from configparser import MissingSectionHeaderError, ConfigParser
 from typing import Any, Union, Optional, KeysView, ItemsView
 
 from dissect.target import Target
@@ -12,6 +12,8 @@ from dissect.target.helpers import fsutil
 from dissect.target.plugin import Plugin
 
 
+# TODO: Look if I can just create a parsing function and attach it to the
+# the parser below.
 class LinuxConfigurationParser:
     def __init__(self, collapse: Optional[bool | set] = False) -> None:
         self.collapse_all = collapse is True
@@ -68,7 +70,7 @@ class Ini(LinuxConfigurationParser):
 
 
 class Unknown(LinuxConfigurationParser):
-    def read_file(self, fh: bytes) -> None:
+    def parse_file(self, fh: bytes) -> None:
         pass
 
 
