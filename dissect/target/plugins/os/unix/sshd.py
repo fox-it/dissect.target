@@ -13,16 +13,22 @@ SSHD_BOOLEAN_VALUES = (
 SSHD_BOOLEAN_FIELDS = (
     "AllowAgentForwarding",
     "DebianBanner",
+    "DisableForwarding",
+    "ChallengeResponseAuthentication",
     "ExposeAuthInfo",
-    "GatewayPorts",
+    "GSSAPIAuthentication",
+    "GSSAPICleanupCredentials",
     "GSSAPICleanupCredentials",
     "GSSAPIStrictAcceptorCheck",
+    "GSSAPIStoreCredentialsOnRekey",
     "GSSAPIKeyExchange",
     "GSSAPIStrictAcceptorCheck",
     "GSSAPIStoreCredentialsOnRekey",
+    "HostbasedAuthentication",
     "HostbasedUsesNameFromPacketOnly",
     "IgnoreUserKnownHosts",
     "KbdInteractiveAuthentication",
+    "KeepAlive",
     "KerberosAuthentication",
     "KerberosGetAFSToken",
     "KerberosOrLocalPasswd",
@@ -43,6 +49,7 @@ SSHD_BOOLEAN_FIELDS = (
 )
 
 SSHD_INTEGER_FIELDS = (
+    "ClientAliveCountMax",
     "ClientAliveInterval",
     "LoginGraceTime",
     "MaxAuthTries",
@@ -56,7 +63,7 @@ SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS = (
     "Include",
     "ListenAddress",
     "PermitListen",
-    "PermitListen",
+    "PermitOpen",
     "Port",
 )
 
@@ -81,13 +88,16 @@ class SSHServerPlugin(Plugin):
     def config(self) -> Iterator[DynamicDescriptor]:
         """Parse all fields in the SSH server config in /etc/ssh/sshd_config.
 
-        This function parses each line (not starting with '#') as a key-value pair, delimited by whitespace.
-        The values of these fields can be one of three types: string, integer and boolean (string is the default).
+        This function parses each line (not starting with '#') as a key-value
+        pair, delimited by whitespace. The values of these fields can be one
+        of three types: string, integer and boolean (string is the default).
 
-        We provide two lists that define the integer and boolean fields (SSHD_INTEGER_FIELDS and SSHD_BOOLEAN_FIELDS).
+        We provide two lists that define the integer and boolean fields
+        (SSHD_INTEGER_FIELDS and SSHD_BOOLEAN_FIELDS).
 
-        The fields in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS can be defined multiple times.
-        We set their type to a list of the underlying value (e.g. varint[] for the Port field).
+        The fields in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS can be
+        defined multiple times. We set their type to a list of the
+        underlying value (e.g. varint[] for the Port field).
 
         This parser does not (yet) follow Include directives.
 
@@ -109,21 +119,32 @@ class SSHServerPlugin(Plugin):
                 if not line or line.startswith("#"):
                     continue
 
-                # Passing None as the first argument to split, means splitting on all (ASCII) whitespace.
+                # Passing None as the first argument to split,
+                # means splitting on all (ASCII) whitespace.
                 key, value = line.split(None, 1)
                 value, value_record_type = _parse_sshd_config_value(key, value)
 
+                # If the config key has not been encountered
+                # before and is allowed multiple times,
+                # create a new list for its values.
                 if key not in config and key in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS:
                     config[key] = [value]
                     record_fields.append((f"{value_record_type}[]", key))
 
+                # If the config key has not been encountered
+                # before and is only allowed once, set the value.
                 elif key not in config and key not in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS:
                     config[key] = value
                     record_fields.append((value_record_type, key))
 
+                # If the config key has been encountered before,
+                # but is allowed multiple times, add the value to a list.
                 elif key in config and key in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS:
                     config[key].append(value)
 
+                # If the config key has been encountered before and
+                # is only allowed once, overwrite the value and log a warning.
+                # In the case of duplicate keys, SSHd will use the last encountered value.
                 elif key in config and key not in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS:
                     self.target.log.warning(f"Overwriting sshd_config value: '{key} {value}'.")
                     config[key] = value
@@ -138,8 +159,9 @@ class SSHServerPlugin(Plugin):
 def _parse_sshd_config_value(key: str, value: str) -> Tuple[Union[str, bool, int], str]:
     """Convert a value to either a string, bool or integer, based on the corresponding key.
 
-    If we cannot convert the given value to the expected type, we log a warning and return a string.
-    We return the value (as the expected type) and the name of the type.
+    If we cannot convert the given value to the expected type,
+    we log a warning and return a string. We return the value
+    (as the expected type) and the name of the type.
     """
 
     if key in SSHD_BOOLEAN_FIELDS:
