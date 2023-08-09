@@ -13,11 +13,14 @@ import logging
 import os
 import sys
 import traceback
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
-from dissect.target.exceptions import PluginError
+from flow.record import Record, RecordDescriptor
+
+from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
 
@@ -30,8 +33,6 @@ except Exception:
     GENERATED = False
 
 if TYPE_CHECKING:
-    from flow.record import Record, RecordDescriptor
-
     from dissect.target import Target
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
@@ -425,6 +426,9 @@ def register(plugincls: Type[Plugin]) -> None:
         if isinstance(attr, property):
             attr = attr.fget
 
+        if getattr(attr, "__autogen__", False) and plugincls != plugincls.__nsplugin__:
+            continue
+
         if getattr(attr, "__exported__", False):
             exports.append(attr.__name__)
             functions.append(attr.__name__)
@@ -794,8 +798,146 @@ def _modulepath(cls) -> str:
     return cls.__module__.replace(MODULE_PATH, "").lstrip(".")
 
 
-# Needs to be at the bottom of the module because __init_subclass__ requires everything
+# These need to be at the bottom of the module because __init_subclass__ requires everything
 # in the parent class Plugin to be defined and resolved.
+class NamespacePlugin(Plugin):
+    def __init__(self, target: Target):
+        """A Namespace plugin provides services to access functionality
+        from a group of subplugins through an internal function _func.
+        Upon initialisation, subplugins are collected.
+        """
+        super().__init__(target)
+
+        # The code below only applies to the direct subclass
+        # indirect subclasses are finished here.
+        if self.__class__ != self.__nsplugin__:
+            return
+
+        self._subplugins = []
+        for entry in self.SUBPLUGINS:
+            try:
+                subplugin = getattr(self.target, entry)
+                self._subplugins.append(subplugin)
+            except Exception:  # noqa
+                target.log.exception("Failed to load subplugin: %s", entry)
+
+    def check_compatible(self) -> None:
+        if not len(self._subplugins):
+            raise UnsupportedPluginError("No compatible subplugins found")
+
+    def __init_subclass_namespace__(cls, **kwargs):
+        # If this is a direct subclass of a Namespace Plugin,
+        # create a reference to the current class for indirect subclasses
+        # so that the can autogenerate aggregate methods there
+        cls.__nsplugin__ = cls
+        cls.__findable__ = False
+
+    def __init_subclass_subplugin__(cls, **kwargs):
+        cls.__findable__ = True
+
+        # Does the direct subclass already have a SUBPLUGINS attribute?
+        # if not, create this attribute on the direct subclass
+        if not getattr(cls.__nsplugin__, "SUBPLUGINS", None):
+            cls.__nsplugin__.SUBPLUGINS = set()
+
+        # Register the current plugin class as a subplugin with
+        # the direct subclass of NamespacePlugin
+        cls.__nsplugin__.SUBPLUGINS.add(cls.__namespace__)
+
+        # Collect the public attrs of the subplugin
+        for subplugin_func_name in cls.__exports__:
+            subplugin_func = inspect.getattr_static(cls, subplugin_func_name)
+
+            # The attr need to be callable and exported
+            if not isinstance(subplugin_func, Callable):
+                continue
+
+            # The method needs to have a single record descriptor as output
+            if getattr(subplugin_func, "__output__", None) != "record":
+                continue
+
+            # The method needs to be part of the current subclass and not a parent
+            if not subplugin_func.__qualname__.startswith(cls.__name__):
+                continue
+
+            # If we already have an aggregate method, skip
+            if existing_aggregator := getattr(cls.__nsplugin__, subplugin_func_name, None):
+                existing_aggregator.__subplugins__.append(cls.__namespace__)
+                continue
+
+            # The generic template for the aggregator method
+            def generate_aggregator(method_name):
+                def aggregator(self) -> Iterator[Record]:
+                    for entry in aggregator.__subplugins__:
+                        try:
+                            subplugin = getattr(self.target, entry)
+                            for item in getattr(subplugin, method_name)():
+                                yield item
+                        except Exception:
+                            continue
+
+                # Holds the subplugins that share this method
+                aggregator.__subplugins__ = []
+
+                return aggregator
+
+            # The generic template for the documentation method
+            def generate_documentor(cls, method_name: str, aggregator: Callable) -> str:
+                def documentor(format_spec: str):
+                    return format_spec.format_map(
+                        defaultdict(
+                            lambda: "???",
+                            {
+                                "func_name": f"{cls.__nsplugin__.__namespace__}.{method_name}",
+                                "short_description": "".join(
+                                    [
+                                        f"Return {method_name} for: ",
+                                        ",".join(aggregator.__subplugins__),
+                                    ]
+                                ),
+                                "output_type": "records",
+                            },
+                        )
+                    )
+
+                return documentor
+
+            # Manifacture a method for the namespaced class
+            generated_aggregator = generate_aggregator(subplugin_func_name)
+            generated_documentor = generate_documentor(cls, subplugin_func_name, generated_aggregator)
+
+            # Add as a attribute to the namespace class
+            setattr(cls.__nsplugin__, subplugin_func_name, generated_aggregator)
+
+            # Copy the meta descriptors of the function attribute
+            copy_attrs = ["__output__", "__record__", "__doc__", "__exported__"]
+            for copy_attr in copy_attrs:
+                setattr(generated_aggregator, copy_attr, getattr(subplugin_func, copy_attr, None))
+
+            # Add subplugin to aggregator
+            generated_aggregator.__subplugins__.append(cls.__namespace__)
+
+            # Mark the function as being autogenerated
+            setattr(generated_aggregator, "__autogen__", True)
+
+            # Add the documentor function to the aggregator
+            setattr(generated_aggregator, "__documentor__", generated_documentor)
+
+            # Register the newly auto-created method
+            cls.__nsplugin__.__exports__.append(subplugin_func_name)
+            cls.__nsplugin__.__functions__.append(subplugin_func_name)
+
+    def __init_subclass__(cls, **kwargs):
+        # Upon subclassing, decide whether this is a direct subclass of NamespacePlugin
+        # If this is not the case, autogenerate aggregate methods for methods with similar record types and
+        # signatures in the direct subclass of NamespacePlugin
+        super().__init_subclass__(**kwargs)
+        if cls.__bases__[0] != NamespacePlugin:
+            cls.__init_subclass_subplugin__(cls, **kwargs)
+        else:
+            cls.__init_subclass_namespace__(cls, **kwargs)
+
+
 class InternalPlugin(Plugin):
     """Parent class for internal plugins.
 
@@ -864,9 +1006,7 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
 
 
 def find_plugin_functions(
-    target: Target,
-    patterns: str,
-    compatibility: bool = False,
+    target: Target, patterns: str, compatibility: bool = False, **kwargs
 ) -> tuple[list[PluginFunction], set[str]]:
     """Finds plugins that match the target and the patterns.
 
@@ -878,6 +1018,7 @@ def find_plugin_functions(
     functions, rootset = plugin_function_index(target)
 
     invalid_funcs = set()
+    show_hidden = kwargs.get("show_hidden", False)
 
     for pattern in patterns.split(","):
         # backward compatibility fix for namespace-level plugins (i.e. chrome)
@@ -887,8 +1028,20 @@ def find_plugin_functions(
 
         wildcard = any(char in pattern for char in ["*", "!", "?", "[", "]"])
         treematch = pattern.split(".")[0] in rootset and pattern != "os"
+        exact_match = pattern in functions
 
-        if treematch and not wildcard:
+        # Allow for exact matches, otherwise you cannot reach documented
+        # namespace plugins like browsers.browser.downloads.
+        # You can *always* run these using the namespace/classic-style
+        # like: browser.downloads (but -l lists them in the tree for
+        # documentation purposes so it would be misleading not to allow
+        # tree access as well). Note that these tree items will never
+        # respond to wildcards though (browsers.browser.* won't work)
+        # to avoid duplicate results.
+        if exact_match:
+            show_hidden = True
+
+        if treematch and not wildcard and not exact_match:
             # Examples:
             #     -f browsers -> browsers* (the whole package)
             #     -f apps.webservers.iis -> apps.webservers.iis* (logs etc)
@@ -905,7 +1058,7 @@ def find_plugin_functions(
                 loaded_plugin_object = load(func)
 
                 # Skip plugins that don't want to be found by wildcards
-                if not loaded_plugin_object.__findable__:
+                if not show_hidden and not loaded_plugin_object.__findable__:
                     continue
 
                 fobject = inspect.getattr_static(loaded_plugin_object, method_name)

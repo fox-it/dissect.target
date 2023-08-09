@@ -4,8 +4,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import (
+    PLUGINS,
+    NamespacePlugin,
     environment_variable_paths,
+    export,
     find_plugin_functions,
     get_external_module_paths,
     save_plugin_import_failure,
@@ -119,6 +124,48 @@ def test_find_plugin_function_unix(target_unix: Target) -> None:
 
     assert len(found) == 1
     assert found[0].name == "os.unix.services.services"
+
+
+TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "application/test",
+    [
+        ("string", "test"),
+    ],
+)
+
+
+class _TestNSPlugin(NamespacePlugin):
+    __namespace__ = "NS"
+
+
+class _TestSubPlugin1(_TestNSPlugin):
+    __namespace__ = "t1"
+
+    @export(record=TestRecord)
+    def test(self):
+        yield TestRecord(test="test1")
+
+
+class _TestSubPlugin2(_TestNSPlugin):
+    __namespace__ = "t2"
+
+    @export(record=TestRecord)
+    def test(self):
+        yield TestRecord(test="test2")
+
+
+def test_namespace_plugin(target_win: Target) -> None:
+    assert "SUBPLUGINS" in dir(_TestNSPlugin)
+    # Rename the test functions to protect them from being filtered by NS
+
+    target_win._register_plugin_functions(_TestSubPlugin1(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin2(target_win))
+    target_win._register_plugin_functions(_TestNSPlugin(target_win))
+    assert len(list(target_win.NS.test())) == 2
+    assert len(target_win.NS.SUBPLUGINS) == 2
+
+    # Remove test plugin from list afterwards to avoid order effects
+    del PLUGINS["tests"]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
