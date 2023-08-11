@@ -32,6 +32,7 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
+from dissect.target.plugins.os.unix.config_tree import ConfigurationFs
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
@@ -742,6 +743,7 @@ class TargetCli(TargetCmd):
             fh = path.open()
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
+        print("")
 
     @arg("path")
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
@@ -864,13 +866,10 @@ class TargetCli(TargetCmd):
         print()
 
 
-from dissect.target.plugins.os.unix.config_tree import ConfigurationTree
-
-
 class UnixRegistryCli(TargetCli):
     def __init__(self, target):
         TargetCmd.__init__(self, target)
-        self.registry = ConfigurationTree(target)
+        self.registry = ConfigurationFs(target)
         self.prompt_base = target.name
 
         self.cwd = None
@@ -883,7 +882,7 @@ class UnixRegistryCli(TargetCli):
     def check_compatible(target):
         return target.fs.get("/etc") is not None
 
-    def resolvepath(self, path):
+    def resolve_path(self, path):
         if not path:
             return self.cwd
 
@@ -893,11 +892,11 @@ class UnixRegistryCli(TargetCli):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.registry.alt_separator)
         return self.registry.path(path)
 
-    def resolvekey(self, path):
-        return self.registry.key(path)
+    def resolve_key(self, path):
+        return self.registry.path(path).get()
 
-    def resolveglobpath(self, path):
-        path = self.resolvepath(path)
+    def resolve_glob_path(self, path):
+        path = self.resolve_path(path)
         if path.exists():
             yield path
         else:
