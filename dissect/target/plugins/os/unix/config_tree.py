@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import io
+import re
 from abc import abstractmethod
-from configparser import MissingSectionHeaderError, ConfigParser
-from typing import Any, Union, Optional, KeysView, ItemsView
+from configparser import ConfigParser, MissingSectionHeaderError
+from typing import Any, ItemsView, KeysView, Optional, TextIO, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import FilesystemError
@@ -21,7 +22,7 @@ class LinuxConfigurationParser:
         self.parsed_data = {}
 
     @abstractmethod
-    def parse_file(self, fh: bytes) -> None:
+    def parse_file(self, fh: TextIO) -> None:
         ...
 
     def __getitem__(self, item: Any) -> dict | str:
@@ -30,11 +31,11 @@ class LinuxConfigurationParser:
     def __contains__(self, item: str):
         return item in self.parsed_data
 
-    def read_file(self, fh: bytes) -> None:
+    def read_file(self, fh: TextIO) -> None:
         self.parse_file(fh)
 
         if self.collapse_all or self.collapse:
-            self._collapse_dict(self.parsed_data)
+            self.parsed_data = self._collapse_dict(self.parsed_data)
 
     def keys(self) -> KeysView:
         return self.parsed_data.keys()
@@ -65,18 +66,46 @@ class Ini(LinuxConfigurationParser):
         self.parsed_data = ConfigParser(strict=False)
         self.parsed_data.optionxform = str
 
-    def parse_file(self, fh: bytes) -> None:
+    def parse_file(self, fh: io.TextIO) -> None:
         self.parsed_data.read_file(fh)
 
 
 class Unknown(LinuxConfigurationParser):
-    def parse_file(self, fh: bytes) -> None:
-        pass
+    EMPTY_SPACE = re.compile(r"\s+")
+
+    def parse_file(self, fh: TextIO) -> None:
+        new_info = {}
+        for line in fh.readlines():
+            if line.startswith(("#", "\n")):
+                continue
+            key, *values = self.EMPTY_SPACE.split(line)
+            new_values = " ".join([value for value in values if value])
+
+            if "#" in new_values:
+                new_values = new_values.split("#")[0].strip()
+
+            if old_value := new_info.get(key):
+                if not isinstance(old_value, list):
+                    old_value = [old_value]
+                new_values = old_value + [new_values]
+            new_info[key] = new_values
+
+        self.parsed_data = new_info
 
 
 CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
     "ini": Ini,
 }
+
+
+def subkeys(self) -> list:
+    subkeys = (key for key in self.scandir() if key.is_dir())
+    yield from subkeys
+
+
+def values(self) -> list:
+    values = (key for key in self.scandir() if key.is_file())
+    yield from values
 
 
 class ConfigurationTree(Plugin):
@@ -109,6 +138,7 @@ class ConfigurationFs(VirtualFilesystem):
 
     def _get_till_file(self, path, relentry) -> tuple[list[str], FilesystemEntry]:
         entry = relentry or self.root
+
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
 
         if not path:
@@ -154,9 +184,8 @@ class ConfigurationFs(VirtualFilesystem):
                 if entry.is_file():
                     try:
                         entry = ConfigurationEntry(self, part, entry, collapse=collapse)
-                    except Exception as e:
+                    except Exception:
                         pass
-
         return entry
 
 
@@ -168,14 +197,14 @@ class ConfigurationEntry(FilesystemEntry):
         else:
             self.parser_items = parser_items
 
-    def parse_config(self, entry: FilesystemEntry, collapse=None) -> RawConfigParser:
+    def parse_config(self, entry: FilesystemEntry, collapse=None) -> ConfigParser:
         extension = entry.path.rsplit(".", 1)[-1]
         parser = CONFIG_MAP.get(extension, Unknown)(collapse)
         with entry.open() as fp:
             open_file = io.TextIOWrapper(fp, encoding="utf-8")
             try:
                 parser.read_file(open_file)
-            except MissingSectionHeaderError as e:
+            except MissingSectionHeaderError:
                 open_file.seek(0)
                 open_file = io.StringIO("[DEFAULT]\n" + open_file.read())
                 parser.read_file(open_file)
@@ -188,7 +217,11 @@ class ConfigurationEntry(FilesystemEntry):
         raise NotADirectoryError(f"Cannot open a {path!r} on a value")
 
     def _write_value_mapping(self, output: io.BytesIO, data: dict[str, Any]):
-        if hasattr(data, "keys"):
+        if isinstance(data, list):
+            for x in data:
+                output.write(bytes(x, "utf-8"))
+                output.write(b"\n")
+        elif hasattr(data, "keys"):
             output.write(b"\n")
             for key, value in data.items():
                 output.write(bytes(key, "utf8"))
@@ -208,11 +241,8 @@ class ConfigurationEntry(FilesystemEntry):
 
         if self.is_dir():
             bytesio = io.BytesIO()
-            for key, value in self.parser_items.items():
-                bytesio.write(bytes(key, "utf8"))
-                bytesio.write(b" ")
-                bytesio.write(bytes(value))
-
+            self._write_value_mapping(bytesio, self.parser_items)
+            return bytesio
         return io.BytesIO(bytes(self.parser_items, "utf8"))
 
     def iterdir(self):
@@ -228,7 +258,7 @@ class ConfigurationEntry(FilesystemEntry):
             yield ConfigurationEntry(self.fs, key, self.entry, values)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
-        return not self.is_dir(follow_symlinks) or isinstance(self.parser_items, LinuxConfigurationParser)
+        return not self.is_dir(follow_symlinks)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return hasattr(self.parser_items, "keys")
@@ -241,3 +271,6 @@ class ConfigurationEntry(FilesystemEntry):
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self.entry.stat(follow_symlinks)
+
+    def lstat(self) -> fsutil.stat_result:
+        return self.entry.lstat()

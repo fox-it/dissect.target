@@ -1,4 +1,4 @@
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -7,8 +7,9 @@ import pytest
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.config_tree import (
     ConfigurationEntry,
-    ConfigurationTree,
     ConfigurationFs,
+    ConfigurationTree,
+    Unknown,
 )
 
 from ._utils import absolute_path
@@ -18,7 +19,7 @@ from ._utils import absolute_path
 def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem):
     tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/path/config.ini").write_text(Path(absolute_path("data/config_tree/config.ini")).read_text())
+    tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("data/config_tree/config")).read_text())
     fs_unix.map_dir("/etc", tmp_path)
 
 
@@ -34,7 +35,7 @@ def test_unix_registry(target_unix, etc_directory):
 
     assert registry_path == ["new"]
     assert list(registry.get("/new").iterdir()) == ["path", "config"]
-    assert isinstance(registry.get("/new/path/config.ini"), ConfigurationEntry)
+    assert isinstance(registry.get("/new/path/config"), ConfigurationEntry)
 
 
 def test_config_entry():
@@ -45,9 +46,10 @@ def test_config_entry():
         def __exit__(self, _, __, ___):
             return
 
-    mocked_open = MockableRead(binary_data=BytesIO(b"default test\n[Unit]\nhelp me\n"))
+    mocked_open = MockableRead(binary_data=BytesIO(b"default=test\n[Unit]\nhelp=me\n"))
     mocked_entry = Mock()
     mocked_entry.open.return_value = mocked_open
+    mocked_entry.path = "config.ini"
 
     entry = ConfigurationEntry(
         Mock(),
@@ -68,12 +70,25 @@ def test_config_entry():
 
 def test_parse_functions(target_unix, etc_directory):
     config_fs = ConfigurationFs(target_unix)
-    entry: ConfigurationEntry = config_fs.get("/new/path/config.ini/Unit", collapse=True)
+    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True)
 
     assert entry.parser_items["help"] == "you"
     assert entry.parser_items["test"] == "you"
 
-    entry = config_fs.get("/new/path/config.ini/Unit", collapse={"help"})
+    entry = config_fs.get("/new/path/config", collapse={"help"})
 
     assert entry.parser_items["help"] == "you"
     assert entry.parser_items["test"] == ["me", "you"]
+
+
+@pytest.mark.parametrize(
+    "parser_string, key, value",
+    [
+        ("hello world", "hello", "world"),
+        ("hello world\t# new info", "hello", "world"),
+    ],
+)
+def test_unknown_parser(parser_string: str, key: str, value: str):
+    parser = Unknown(None)
+    parser.read_file(StringIO(parser_string))
+    assert parser.parsed_data[key] == value
