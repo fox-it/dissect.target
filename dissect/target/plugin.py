@@ -63,6 +63,7 @@ class OperatingSystem(enum.Enum):
     VYOS = "vyos"
     IOS = "ios"
     FORTIGATE = "fortigate"
+    CITRIX = "citrix"
 
 
 def export(*args, **kwargs) -> Callable:
