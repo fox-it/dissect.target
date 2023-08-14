@@ -40,7 +40,7 @@ class CitrixBsdPlugin(BsdPlugin):
                     # Current configuration of the netscaler
                     if hostname_match := RE_CONFIG_HOSTNAME.search(config):
                         self._hostname = hostname_match.groupdict()["hostname"]
-                    if timezone_match := RE_CONFIG_TIMEZONE.search(config)
+                    if timezone_match := RE_CONFIG_TIMEZONE.search(config):
                         tzinfo = timezone_match.groupdict()
                         self.target.timezone = tzinfo["zone_name"]
 
