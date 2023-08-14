@@ -26,7 +26,7 @@ class CitrixBsdPlugin(BsdPlugin):
         self.config_usernames = []
         self._parse_netscaler_configs()
 
-    def _parse_netscaler_configs(self):
+    def _parse_netscaler_configs(self) -> None:
         ips = set()
         usernames = set()
         for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
@@ -96,16 +96,21 @@ class CitrixBsdPlugin(BsdPlugin):
             if entry.is_dir() and entry.name != "#nsinternal#":
                 nstmp_users.add(entry.name)
         for username in self._config_usernames:
-            if username == "root" and self.target.fs.exists("/root"):
-                yield UnixUserRecord(name="root", home="/root")
-
             nstmp_home = nstmp_user_path.format(username=username)
             user_home = nstmp_home if self.target.fs.exists(nstmp_home) else None
+
             if user_home:
                 # After this loop we will yield all users who are not in the config, but are listed in /var/nstmp/
                 # To prevent double records, we remove entries from the set that we are already yielding here.
                 nstmp_users.remove(username)
+
+            if username == "root" and self.target.fs.exists("/root"):
+                # If we got here, 'root' is present both in /var/nstmp and in /root. In such cases, we yield
+                # the 'root' user as having '/root' as a home, not in /var/nstmp.
+                user_home = "/root"
+
             yield UnixUserRecord(name=username, home=user_home)
+
         for username in nstmp_users:
             yield UnixUserRecord(name=username, home=nstmp_user_path.format(username=username))
 
