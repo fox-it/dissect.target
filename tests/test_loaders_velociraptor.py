@@ -50,7 +50,7 @@ from ._utils import absolute_path, mkdirs
         ),
     ],
 )
-def test_velociraptor_loader_windows_ntfs(paths: List[str], mock_target: Target, tmp_path: Path):
+def test_velociraptor_loader_windows_ntfs(paths: List[str], mock_target: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 
@@ -88,7 +88,7 @@ def test_velociraptor_loader_windows_ntfs(paths: List[str], mock_target: Target,
         (["uploads.json", "uploads/auto/Library", "uploads/auto/Applications"]),
     ],
 )
-def test_dir_loader_unix(paths: List[str], mock_target: Target, tmp_path: Path):
+def test_dir_loader_unix(paths: List[str], mock_target: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 
