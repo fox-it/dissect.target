@@ -44,4 +44,3 @@ def test_unix_bsd_citrix_os(target_citrix):
 
     assert users[5].name == "root"  # User entry for /root
     assert users[5].home == "/root"
-    assert users[5].home == "/root"

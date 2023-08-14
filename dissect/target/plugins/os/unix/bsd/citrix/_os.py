@@ -29,20 +29,18 @@ class CitrixBsdPlugin(BsdPlugin):
     def _parse_netscaler_configs(self):
         ips = set()
         usernames = set()
-        for config_path in self.target.fs.glob("/flash/nsconfig/ns.conf*"):
-            with self.target.fs.path(config_path).open("rt") as config_file:
+        for config_path in self.target.fs.path("/flash/nsconfig/").glob("ns.conf*"):
+            with config_path.open("rt") as config_file:
                 config = config_file.read()
                 for match in RE_CONFIG_IP.finditer(config):
                     ips.add(match.groupdict()["ip"])
                 for match in RE_CONFIG_USER.finditer(config):
                     usernames.add(match.groupdict()["user"])
-                if config_path.endswith("ns.conf"):
+                if config_path.name == "ns.conf":
                     # Current configuration of the netscaler
-                    hostname_match = RE_CONFIG_HOSTNAME.search(config)
-                    if hostname_match:
+                    if hostname_match := RE_CONFIG_HOSTNAME.search(config):
                         self._hostname = hostname_match.groupdict()["hostname"]
-                    timezone_match = RE_CONFIG_TIMEZONE.search(config)
-                    if timezone_match:
+                    if timezone_match := RE_CONFIG_TIMEZONE.search(config)
                         tzinfo = timezone_match.groupdict()
                         self.target.timezone = tzinfo["zone_name"]
 
@@ -77,8 +75,7 @@ class CitrixBsdPlugin(BsdPlugin):
         version_path = self.target.fs.path("/flash/.version")
         version = version_path.read_text().strip()
         loader_conf = self.target.fs.path("/flash/boot/loader.conf").read_text()
-        match = RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf)
-        if match:
+        if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
             kernel_version = match.groupdict()["version"]
             return f"{version} ({kernel_version})"
         self.target.log.warn("Could not determine kernel version")
