@@ -950,7 +950,7 @@ class InternalPlugin(Plugin):
 class PluginFunction:
     name: str
     output_type: str
-    class_object: Plugin
+    class_object: type[Plugin]
     method_name: str
     plugin_desc: dict = field(hash=False)
 
