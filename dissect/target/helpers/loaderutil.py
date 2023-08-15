@@ -3,7 +3,7 @@ import re
 import urllib
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
@@ -57,7 +57,7 @@ def _try_open(fs: Filesystem, path: str) -> None:
             pass
 
 
-def extract_path_info(path: Union[str, Path]) -> Tuple[Path, Optional[urllib.parse.ParseResult]]:
+def extract_path_info(path: Union[str, Path]) -> tuple[Path, Optional[urllib.parse.ParseResult]]:
     """
     Extracts a ParseResult from a path if it has
     a scheme and adjusts the path if necessary.

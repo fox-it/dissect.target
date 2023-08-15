@@ -71,7 +71,7 @@ class VelociraptorLoader(DirLoader):
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.path)
         if os_type == OperatingSystem.WINDOWS:
-            # Velociraptor doesn't have the correct filenames the paths $J and $Secure:$SDS".
+            # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
             map_dirs(
                 target,
                 dirs,
