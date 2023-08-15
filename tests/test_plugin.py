@@ -96,6 +96,7 @@ def test_find_plugin_functions(plugin_loader, target, os_plugins, plugins, searc
     class MockPlugin(MagicMock):
         __exports__ = ["f6"]  # OS exports f6
         __findable__ = findable
+        __skip__ = False
 
         def get_all_records():
             return []
