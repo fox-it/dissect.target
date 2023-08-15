@@ -102,8 +102,8 @@ def get_plugin_functions_desc(plugin_class: Type, with_docstrings: bool = False)
     descriptions = []
     for func_name in plugin_class.__exports__:
         func_obj = getattr(plugin_class, func_name)
-        if getattr(func_obj, "__documentor__", None):
-            func_desc = func_obj.__documentor__(FUNC_DOC_TEMPLATE)
+        if getattr(func_obj, "get_func_doc_spec", None):
+            func_desc = FUNC_DOC_TEMPLATE.format_map(func_obj.get_func_doc_spec())
         else:
             _, func = get_real_func_obj(func_obj)
             func_desc = get_func_description(func, with_docstrings=with_docstrings)

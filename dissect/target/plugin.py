@@ -205,7 +205,6 @@ class Plugin:
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
     __findable__: bool = True
     """Determines whether this plugin will be revealed when using search patterns.
-    
 
     Some (meta)-plugins are not very suitable for wild cards on CLI or
     plugin searches, because they will produce duplicate records or results.
@@ -826,8 +825,8 @@ class NamespacePlugin(Plugin):
             raise UnsupportedPluginError("No compatible subplugins found")
 
     def __init_subclass_namespace__(cls, **kwargs):
-        # If this is a direct subclass of a Namespace plugin, create a reference to the current class for indirect subclasses
-        # This is necessary to autogenerate aggregate methods there
+        # If this is a direct subclass of a Namespace plugin, create a reference to the current class for indirect
+        # subclasses. This is necessary to autogenerate aggregate methods there
         cls.__nsplugin__ = cls
         cls.__findable__ = False
 
@@ -880,21 +879,19 @@ class NamespacePlugin(Plugin):
 
             # The generic template for the documentation method
             def generate_documentor(cls, method_name: str, aggregator: Callable) -> str:
-                def documentor(format_spec: str):
-                    return format_spec.format_map(
-                        defaultdict(
-                            lambda: "???",
-                            {
-                                "func_name": f"{cls.__nsplugin__.__namespace__}.{method_name}",
-                                "short_description": "".join(
-                                    [
-                                        f"Return {method_name} for: ",
-                                        ",".join(aggregator.__subplugins__),
-                                    ]
-                                ),
-                                "output_type": "records",
-                            },
-                        )
+                def documentor():
+                    return defaultdict(
+                        lambda: "???",
+                        {
+                            "func_name": f"{cls.__nsplugin__.__namespace__}.{method_name}",
+                            "short_description": "".join(
+                                [
+                                    f"Return {method_name} for: ",
+                                    ",".join(aggregator.__subplugins__),
+                                ]
+                            ),
+                            "output_type": "records",
+                        },
                     )
 
                 return documentor
@@ -917,7 +914,7 @@ class NamespacePlugin(Plugin):
             setattr(generated_aggregator, "__autogen__", True)
 
             # Add the documentor function to the aggregator
-            setattr(generated_aggregator, "__documentor__", generated_documentor)
+            setattr(generated_aggregator, "get_func_doc_spec", generated_documentor)
 
             # Register the newly auto-created method
             cls.__nsplugin__.__exports__.append(subplugin_func_name)
