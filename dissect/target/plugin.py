@@ -1025,14 +1025,11 @@ def find_plugin_functions(
         treematch = pattern.split(".")[0] in rootset and pattern != "os"
         exact_match = pattern in functions
 
-        # Allow for exact matches, otherwise you cannot reach documented
-        # namespace plugins like browsers.browser.downloads.
-        # You can *always* run these using the namespace/classic-style
-        # like: browser.downloads (but -l lists them in the tree for
-        # documentation purposes so it would be misleading not to allow
-        # tree access as well). Note that these tree items will never
-        # respond to wildcards though (browsers.browser.* won't work)
-        # to avoid duplicate results.
+        # Allow for exact matches, otherwise you cannot reach documented namespace plugins like
+        # browsers.browser.downloads. You can *always* run these using the namespace/classic-style like:
+        # browser.downloads (but -l lists them in the tree for documentation purposes so it would be misleading
+        # not to allow tree access as well). Note that these tree items will never respond to wildcards though
+        # (browsers.browser.* won't work) to avoid duplicate results.
         if exact_match:
             show_hidden = True
 
