@@ -205,6 +205,7 @@ class Plugin:
     """Defines a list of :class:`~flow.record.RecordDescriptor` of the exported plugin functions."""
     __findable__: bool = True
     """Determines whether this plugin will be revealed when using search patterns.
+    
 
     Some (meta)-plugins are not very suitable for wild cards on CLI or
     plugin searches, because they will produce duplicate records or results.
@@ -803,7 +804,7 @@ def _modulepath(cls) -> str:
 class NamespacePlugin(Plugin):
     def __init__(self, target: Target):
         """A namespace plugin provides services to access functionality from a group of subplugins.
-        
+
         Support is currently limited to shared exported functions that yield records.
         """
         super().__init__(target)
@@ -906,8 +907,7 @@ class NamespacePlugin(Plugin):
             setattr(cls.__nsplugin__, subplugin_func_name, generated_aggregator)
 
             # Copy the meta descriptors of the function attribute
-            copy_attrs = ["__output__", "__record__", "__doc__", "__exported__"]
-            for copy_attr in copy_attrs:
+            for copy_attr in ["__output__", "__record__", "__doc__", "__exported__"]:
                 setattr(generated_aggregator, copy_attr, getattr(subplugin_func, copy_attr, None))
 
             # Add subplugin to aggregator
@@ -925,8 +925,7 @@ class NamespacePlugin(Plugin):
 
     def __init_subclass__(cls, **kwargs):
         # Upon subclassing, decide whether this is a direct subclass of NamespacePlugin
-        # If this is not the case, autogenerate aggregate methods for methods with similar record types and
-        # signatures in the direct subclass of NamespacePlugin
+        # If this is not the case, autogenerate aggregate methods for methods record output.
         super().__init_subclass__(**kwargs)
         if cls.__bases__[0] != NamespacePlugin:
             cls.__init_subclass_subplugin__(cls, **kwargs)
