@@ -1058,7 +1058,7 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
 
         if prev_offset == offset:
             # Previous lines are unreadable due to decoding errors
-            break
+            raise UnicodeDecodeError(fh.encoding, b"", 0, offset + 1, "failed to decode line")
 
         prev_offset = offset
 
