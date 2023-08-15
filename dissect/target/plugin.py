@@ -950,7 +950,7 @@ class InternalPlugin(Plugin):
 class PluginFunction:
     name: str
     output_type: str
-    class_object: str
+    class_object: Plugin
     method_name: str
     plugin_desc: dict = field(hash=False)
 
@@ -979,9 +979,7 @@ def plugin_function_index(target: Target) -> tuple[dict[str, Any], set[str]]:
         if "get_all_records" in available["exports"]:
             available["exports"].remove("get_all_records")
         modulepath = available["module"]
-        # Always skip these
-        if available["class"] in ["DefaultPlugin", "ExamplePlugin"]:
-            continue
+
         if modulepath.endswith("._os"):
             if not target._os:
                 # if no target available add a namespaceless section
@@ -1011,8 +1009,12 @@ def find_plugin_functions(
     """
     result = []
 
+    # Avoid cyclic import
+    from dissect.target.plugins.general.default import DefaultPlugin  # noqa
+    from dissect.target.plugins.general.example import ExamplePlugin  # noqa
+
     def add_to_result(func: PluginFunction) -> None:
-        if func not in result:
+        if func not in result and func.class_object not in [DefaultPlugin, ExamplePlugin]:
             result.append(func)
 
     functions, rootset = plugin_function_index(target)
