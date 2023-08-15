@@ -210,7 +210,7 @@ class RegistryPlugin(Plugin):
         Returns a KeyCollection which contains all keys that match
         the query.
         """
-        key = key.strip("\\")
+        key = (key or "").strip("\\")
 
         if not key:
             return KeyCollection([self._root.root()])
