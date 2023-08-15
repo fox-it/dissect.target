@@ -825,9 +825,8 @@ class NamespacePlugin(Plugin):
             raise UnsupportedPluginError("No compatible subplugins found")
 
     def __init_subclass_namespace__(cls, **kwargs):
-        # If this is a direct subclass of a Namespace Plugin,
-        # create a reference to the current class for indirect subclasses
-        # so that the can autogenerate aggregate methods there
+        # If this is a direct subclass of a Namespace plugin, create a reference to the current class for indirect subclasses
+        # This is necessary to autogenerate aggregate methods there
         cls.__nsplugin__ = cls
         cls.__findable__ = False
 
