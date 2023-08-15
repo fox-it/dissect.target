@@ -1010,6 +1010,11 @@ def find_plugin_functions(
     a list of plugin function descriptors (including output types).
     """
     result = []
+
+    def add_to_result(func: PluginFunction) -> None:
+        if func not in result:
+            result.append(func)
+
     functions, rootset = plugin_function_index(target)
 
     invalid_funcs = set()
@@ -1063,7 +1068,7 @@ def find_plugin_functions(
                         continue
 
                 matches = True
-                result.append(
+                add_to_result(
                     PluginFunction(
                         name=index_name,
                         class_object=loaded_plugin_object,
@@ -1101,7 +1106,7 @@ def find_plugin_functions(
                 if compatibility and not loaded_plugin_object(target).is_compatible():
                     continue
 
-                result.append(
+                add_to_result(
                     PluginFunction(
                         name=f"{description['module']}.{pattern}",
                         class_object=loaded_plugin_object,
@@ -1111,4 +1116,4 @@ def find_plugin_functions(
                     )
                 )
 
-    return sorted(set(result), key=result.index), invalid_funcs
+    return result, invalid_funcs
