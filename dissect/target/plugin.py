@@ -802,9 +802,9 @@ def _modulepath(cls) -> str:
 # in the parent class Plugin to be defined and resolved.
 class NamespacePlugin(Plugin):
     def __init__(self, target: Target):
-        """A Namespace plugin provides services to access functionality
-        from a group of subplugins through an internal function _func.
-        Upon initialisation, subplugins are collected.
+        """A namespace plugin provides services to access functionality from a group of subplugins.
+        
+        Support is currently limited to shared exported functions that yield records.
         """
         super().__init__(target)
 
