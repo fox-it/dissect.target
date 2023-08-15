@@ -212,6 +212,8 @@ class Plugin:
     produce redundant results when used with a wild card
     (browser.* -> browser.history + browser.*.history).
     """
+    __skip__: bool = False
+    """Prevents plugin functions from indexing this plugin at all."""
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -1009,12 +1011,8 @@ def find_plugin_functions(
     """
     result = []
 
-    # Avoid cyclic import
-    from dissect.target.plugins.general.default import DefaultPlugin  # noqa
-    from dissect.target.plugins.general.example import ExamplePlugin  # noqa
-
     def add_to_result(func: PluginFunction) -> None:
-        if func not in result and func.class_object not in [DefaultPlugin, ExamplePlugin]:
+        if func not in result and not func.class_object.__skip__:
             result.append(func)
 
     functions, rootset = plugin_function_index(target)
