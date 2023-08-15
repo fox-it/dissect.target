@@ -1,3 +1,4 @@
+import logging
 import re
 import urllib
 from os import PathLike
@@ -5,7 +6,10 @@ from pathlib import Path
 from typing import Optional, Tuple, Union
 
 from dissect.target.exceptions import FileNotFoundError
+from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+
+log = logging.getLogger(__name__)
 
 
 def add_virtual_ntfs_filesystem(
@@ -38,12 +42,17 @@ def add_virtual_ntfs_filesystem(
         fs.ntfs = ntfs.ntfs
 
 
-def _try_open(fs, path):
+def _try_open(fs: Filesystem, path: str) -> None:
     paths = [path] if not isinstance(path, list) else path
 
     for path in paths:
         try:
-            return fs.open(path)
+            path = fs.get(path)
+            if path.stat().st_size > 0:
+                return path.open()
+            else:
+                log.warning("The file size of %s is zero and thus cannot be parsed", path)
+                pass
         except FileNotFoundError:
             pass
 
