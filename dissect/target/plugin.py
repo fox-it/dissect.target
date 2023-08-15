@@ -817,7 +817,7 @@ class NamespacePlugin(Plugin):
             try:
                 subplugin = getattr(self.target, entry)
                 self._subplugins.append(subplugin)
-            except Exception:  # noqa
+            except Exception:
                 target.log.exception("Failed to load subplugin: %s", entry)
 
     def check_compatible(self) -> None:
