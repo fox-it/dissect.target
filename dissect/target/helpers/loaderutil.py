@@ -51,7 +51,7 @@ def _try_open(fs: Filesystem, path: str) -> None:
             if path.stat().st_size > 0:
                 return path.open()
             else:
-                log.warning("The file size of %s is zero and thus cannot be parsed", path)
+                log.warning("File is empty and will be skipped: %s", path)
                 pass
         except FileNotFoundError:
             pass
