@@ -849,7 +849,7 @@ class NamespacePlugin(Plugin):
             if not isinstance(subplugin_func, Callable):
                 continue
 
-            # The method needs to have a single record descriptor as output
+            # The method needs to output records
             if getattr(subplugin_func, "__output__", None) != "record":
                 continue
 
