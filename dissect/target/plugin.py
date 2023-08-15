@@ -833,8 +833,6 @@ class NamespacePlugin(Plugin):
     def __init_subclass_subplugin__(cls, **kwargs):
         cls.__findable__ = True
 
-        # Does the direct subclass already have a SUBPLUGINS attribute?
-        # if not, create this attribute on the direct subclass
         if not getattr(cls.__nsplugin__, "SUBPLUGINS", None):
             cls.__nsplugin__.SUBPLUGINS = set()
 
