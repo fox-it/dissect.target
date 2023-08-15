@@ -900,7 +900,7 @@ class NamespacePlugin(Plugin):
             generated_aggregator = generate_aggregator(subplugin_func_name)
             generated_documentor = generate_documentor(cls, subplugin_func_name, generated_aggregator)
 
-            # Add as a attribute to the namespace class
+            # Add as an attribute to the namespace class
             setattr(cls.__nsplugin__, subplugin_func_name, generated_aggregator)
 
             # Copy the meta descriptors of the function attribute
