@@ -296,6 +296,15 @@ def test_helpers_fsutil_reverse_readlines():
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
 
+    broken_content = (b"foobar\r\n" * 1) + (b"\xc2broken\r\n") + (b"barfoo\r\n") * 1
+    vfs.map_file_fh("file_multi_broken", io.BytesIO(broken_content))
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_broken").open("rt"))) == ["barfoo\n"]
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_broken").open("rt", errors="backslashreplace"))) == [
+        "barfoo\n",
+        "\\xc2broken\n",
+        "foobar\n",
+    ]
+
 
 @pytest.mark.parametrize(
     "follow_symlinks",
