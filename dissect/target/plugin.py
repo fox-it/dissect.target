@@ -863,7 +863,7 @@ class NamespacePlugin(Plugin):
                 continue
 
             # The generic template for the aggregator method
-            def generate_aggregator(method_name):
+            def generate_aggregator(method_name: str) -> Callable:
                 def aggregator(self) -> Iterator[Record]:
                     for entry in aggregator.__subplugins__:
                         try:
