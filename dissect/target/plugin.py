@@ -808,8 +808,7 @@ class NamespacePlugin(Plugin):
         """
         super().__init__(target)
 
-        # The code below only applies to the direct subclass
-        # indirect subclasses are finished here.
+        # The code below only applies to the direct subclass, indirect subclasses are finished here.
         if self.__class__ != self.__nsplugin__:
             return
 
