@@ -14,8 +14,18 @@
 			<dict/>
 			<key>IPv4</key>
 			<dict>
-				<key>ConfigMethod</key>
-				<string>DHCP</string>
+			    <key>Addresses</key>
+						<array>
+ 							<string>10.42.43.64</string>
+						</array>
+					<key>ConfigMethod</key>
+					<string>Manual</string>
+					<key>Router</key>
+					<string>10.42.42.1</string>
+					<key>SubnetMasks</key>
+					<array>
+						<string>255.255.0.0</string>
+					</array>
 			</dict>
 			<key>IPv6</key>
 			<dict>
