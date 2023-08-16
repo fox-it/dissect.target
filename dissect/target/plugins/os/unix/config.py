@@ -10,7 +10,6 @@ from dissect.target import Target
 from dissect.target.exceptions import FilesystemError, ConfigurationParsingError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
-from dissect.target.plugin import Plugin
 
 
 # TODO: Look if I can just create a parsing function and attach it to the
@@ -111,27 +110,6 @@ CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
 KNOWN_FILES: dict[str, LinuxConfigurationParser] = {
     "ulogd.conf": Ini,
 }
-
-
-class ConfigurationTree(Plugin):
-    __namespace__ = "registry"
-
-    def __init__(self, target: Target) -> None:
-        super().__init__(target)
-        self._root = ConfigurationFs(target)
-
-    def check_compatible(self):
-        if self.target.fs.get("/etc") is None:
-            raise NotImplementedError()
-
-    def key(self, key: str = None) -> FilesystemEntry:
-        if key:
-            return self._root.get(key)
-        return self._root.get("/")
-
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[FilesystemEntry]:
-        for key in keys:
-            yield from self.key(key).iterdir()
 
 
 class ConfigurationFs(VirtualFilesystem):
