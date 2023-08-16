@@ -7,7 +7,7 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from typing import Any, ItemsView, KeysView, Optional, TextIO, Union, BinaryIO, Iterator
 
 from dissect.target import Target
-from dissect.target.exceptions import FilesystemError, ConfigurationParsingError
+from dissect.target.exceptions import ConfigurationParsingError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 
@@ -143,11 +143,8 @@ class ConfigurationFs(VirtualFilesystem):
             if entry is self.root:
                 entry = self.root.top
 
-            try:
-                entry = entry.get(part)
-                if entry.is_file():
-                    break
-            except FilesystemError:
+            entry = entry.get(part)
+            if entry.is_file():
                 break
 
         return parts[idx:], entry
@@ -194,8 +191,8 @@ class ConfigurationEntry(FilesystemEntry):
         known_file = KNOWN_FILES.get(entry.name, Unknown)
         parser = CONFIG_MAP.get(extension, known_file)(collapse)
 
-        with entry.open() as fp:
-            open_file = io.TextIOWrapper(fp, encoding="utf-8")
+        with entry.open() as fh:
+            open_file = io.TextIOWrapper(fh, encoding="utf-8")
             parser.read_file(open_file)
 
         return parser
@@ -209,8 +206,8 @@ class ConfigurationEntry(FilesystemEntry):
     def _write_value_mapping(self, output: io.BytesIO, values: dict[str, Any]) -> None:
         """Writes a dictionary to the output, c style."""
         if isinstance(values, list):
-            for x in values:
-                output.write(bytes(x, "utf-8"))
+            for value in values:
+                output.write(bytes(value, "utf-8"))
                 output.write(b"\n")
         elif hasattr(values, "keys"):
             output.write(b"\n")
