@@ -69,18 +69,16 @@ class CbLoader(Loader):
                 if cbc_sensor.last_internal_ip_address == self.host:
                     return cbc_sensor
             else:
-                try:
-                    device_name = cbc_sensor.name.lower()
-                except AttributeError:
-                    continue
+                if device_name := getattr(cbc_sensor, "name", None):
+                    device_name = device_name.lower()
 
-                # Sometimes the domain name is included in the device name
-                # E.g. DOMAIN\\Hostname
-                if "\\" in device_name:
-                    device_name = device_name.split("\\")[1]
+                    # Sometimes the domain name is included in the device name
+                    # E.g. DOMAIN\\Hostname
+                    if "\\" in device_name:
+                        device_name = device_name.split("\\")[1]
 
-                if device_name == self.host.lower():
-                    return cbc_sensor
+                    if device_name == self.host.lower():
+                        return cbc_sensor
 
         return None
 
@@ -179,7 +177,7 @@ class CbRegistryKey(RegistryKey):
 
 
 class CbRegistryValue(RegistryValue):
-    def __init__(self, hive: str, name: str, data: str, type: str):
+    def __init__(self, hive: CbRegistryHive, name: str, data: str, type: str):
         super().__init__(hive)
         self._name = name
         self._type = type

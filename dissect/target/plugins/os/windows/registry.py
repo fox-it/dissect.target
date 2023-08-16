@@ -200,7 +200,7 @@ class RegistryPlugin(Plugin):
     @internal
     def root(self) -> KeyCollection:
         """Returns the root of the virtual registry."""
-        return self.key("")
+        return self.key()
 
     @internal
     @lru_cache(4096)
