@@ -24,7 +24,7 @@ class LinuxConfigurationParser:
     def parse_file(self, fh: TextIO) -> None:
         ...
 
-    def __getitem__(self, item: Any) -> dict | str:
+    def __getitem__(self, item: Any) -> Union[dict, str]:
         return self.parsed_data[item]
 
     def __contains__(self, item: str) -> bool:
