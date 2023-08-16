@@ -4,11 +4,11 @@ from unittest.mock import Mock
 
 import pytest
 
+from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.config_tree import (
     ConfigurationEntry,
     ConfigurationFs,
-    ConfigurationTree,
     Unknown,
 )
 
@@ -16,26 +16,22 @@ from ._utils import absolute_path
 
 
 @pytest.fixture
-def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem):
+def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem) -> VirtualFilesystem:
     tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("data/config_tree/config")).read_text())
     fs_unix.map_dir("/etc", tmp_path)
 
-
-def test_plugin_compatible(target_unix, fs_unix):
-    registry = ConfigurationTree(target_unix)
-
-    registry.check_compatible()
+    return fs_unix
 
 
-def test_unix_registry(target_unix, etc_directory):
-    registry = ConfigurationFs(target_unix)
-    registry_path = list(registry.get("/").iterdir())
+def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem):
+    config_fs = ConfigurationFs(target_unix)
+    config_path = list(config_fs.get("/").iterdir())
 
-    assert registry_path == ["new"]
-    assert list(registry.get("/new").iterdir()) == ["path", "config"]
-    assert isinstance(registry.get("/new/path/config"), ConfigurationEntry)
+    assert config_path == ["new"]
+    assert list(config_fs.get("/new").iterdir()) == ["path", "config"]
+    assert isinstance(config_fs.get("/new/path/config"), ConfigurationEntry)
 
 
 def test_config_entry():
@@ -68,7 +64,7 @@ def test_config_entry():
     assert default_key_values.open().read() == b"test"
 
 
-def test_parse_functions(target_unix, etc_directory):
+def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
     config_fs = ConfigurationFs(target_unix)
     entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True)
 
