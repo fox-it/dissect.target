@@ -32,7 +32,7 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import RootFilesystemEntry, FilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
-from dissect.target.plugins.os.unix.config_tree import ConfigurationFs
+from dissect.target.plugins.os.unix.config import ConfigurationFs
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (

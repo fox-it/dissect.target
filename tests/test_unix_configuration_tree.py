@@ -6,7 +6,7 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.config_tree import (
+from dissect.target.plugins.os.unix.config import (
     ConfigurationEntry,
     ConfigurationFs,
     Unknown,
