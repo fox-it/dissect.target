@@ -46,7 +46,7 @@ class LinuxConfigurationParser:
     def items(self) -> ItemsView:
         return self.parsed_data.items()
 
-    def _collapse_dict(self, dictionary: dict, collapse=False) -> dict[str | dict]:
+    def _collapse_dict(self, dictionary: dict, collapse: bool = False) -> dict[str, dict]:
         new_dictionary = {}
 
         if isinstance(dictionary, list) and collapse:
@@ -108,16 +108,9 @@ class Unknown(LinuxConfigurationParser):
 CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
     "ini": Ini,
 }
-
-
-def subkeys(self) -> Iterator[FilesystemEntry]:
-    subkeys = (key for key in self.scandir() if key.is_dir())
-    yield from subkeys
-
-
-def values(self) -> Iterator[FilesystemEntry]:
-    values = (key for key in self.scandir() if key.is_file())
-    yield from values
+KNOWN_FILES: dict[str, LinuxConfigurationParser] = {
+    "ulogd.conf": Ini,
+}
 
 
 class ConfigurationTree(Plugin):
@@ -184,8 +177,8 @@ class ConfigurationFs(VirtualFilesystem):
     def get(
         self,
         path: str,
-        relentry=None,
-        collapse: Optional[bool | set] = None,
+        relentry: Optional[FilesystemEntry] = None,
+        collapse: Optional[Union[bool, set]] = None,
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
         parts, entry = self._get_till_file(path, relentry)
 
@@ -199,25 +192,34 @@ class ConfigurationFs(VirtualFilesystem):
                     # All errors except parsing should be let through.
                     pass
 
-        entry.subkeys = subkeys
-        entry.values = values
         return entry
 
 
 class ConfigurationEntry(FilesystemEntry):
-    def __init__(self, fs: Filesystem, path: str, entry: Any, parser_items=None, collapse=None) -> None:
+    def __init__(
+        self,
+        fs: Filesystem,
+        path: str,
+        entry: FilesystemEntry,
+        parser_items: Optional[Union[dict, Any]] = None,
+        collapse: Optional[Union[bool, set]] = None,
+    ) -> None:
         super().__init__(fs, path, entry)
         if parser_items is None:
             self.parser_items = self.parse_config(entry, collapse)
         else:
             self.parser_items = parser_items
 
-    def parse_config(self, entry: FilesystemEntry, collapse=None) -> ConfigParser:
+    def parse_config(self, entry: FilesystemEntry, collapse: Optional[Union[bool, set]] = None) -> ConfigParser:
         extension = entry.path.rsplit(".", 1)[-1]
-        parser = CONFIG_MAP.get(extension, Unknown)(collapse)
+
+        known_file = KNOWN_FILES.get(entry.name, Unknown)
+        parser = CONFIG_MAP.get(extension, known_file)(collapse)
+
         with entry.open() as fp:
             open_file = io.TextIOWrapper(fp, encoding="utf-8")
             parser.read_file(open_file)
+
         return parser
 
     def get(self, path: str) -> ConfigurationEntry:
@@ -226,20 +228,20 @@ class ConfigurationEntry(FilesystemEntry):
             return ConfigurationEntry(self.fs, path, self.entry, self.parser_items[path])
         raise NotADirectoryError(f"Cannot open a {path!r} on a value")
 
-    def _write_value_mapping(self, output: io.BytesIO, data: dict[str, Any]) -> None:
+    def _write_value_mapping(self, output: io.BytesIO, values: dict[str, Any]) -> None:
         """Writes a dictionary to the output, c style."""
-        if isinstance(data, list):
-            for x in data:
+        if isinstance(values, list):
+            for x in values:
                 output.write(bytes(x, "utf-8"))
                 output.write(b"\n")
-        elif hasattr(data, "keys"):
+        elif hasattr(values, "keys"):
             output.write(b"\n")
-            for key, value in data.items():
+            for key, value in values.items():
                 output.write(bytes(key, "utf8"))
                 self._write_value_mapping(output, value)
         else:
             output.write(b" ")
-            output.write(bytes(data))
+            output.write(bytes(values))
             output.write(b"\n")
 
     def open(self) -> BinaryIO:
