@@ -14,7 +14,7 @@ def test_anydesk_plugin_global_log(target_win_users, fs_win):
 
     adp = AnydeskPlugin(target_win_users)
 
-    records = list(adp.remoteaccess())
+    records = list(adp.logs())
     assert len(records) == 1
 
     record = records[0]
@@ -36,7 +36,7 @@ def test_anydesk_plugin_user_log(target_win_users, fs_win):
 
     adp = AnydeskPlugin(target_win_users)
 
-    records = list(adp.remoteaccess())
+    records = list(adp.logs())
     assert len(records) == 1
 
     record = records[0]
