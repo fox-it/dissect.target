@@ -11,7 +11,6 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
 class AnydeskPlugin(RemoteAccessPlugin):
     """
     Anydesk plugin.
-
     """
 
     __namespace__ = "anydesk"
