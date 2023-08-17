@@ -39,7 +39,23 @@ class MacPlugin(BsdPlugin):
 
     @export(property=True)
     def ips(self) -> Optional[list[str]]:
-        raise NotImplementedError
+        ips = set()
+        network = plistlib.load(self.target.fs.path(self.SYSTEM).open()).get("NetworkServices")
+
+        # Static configured IP-addresses
+        for interface in network.values():
+            for addresses in [interface.get("IPv4"), interface.get("IPv6")]:
+                ips.update(addresses.get("Addresses", []))
+
+        # IP-addresses configured by DHCP
+        for lease in self.target.fs.path("/private/var/db/dhcpclient/leases").iterdir():
+            if lease.is_file():
+                lease = plistlib.load(lease.open())
+
+                if ip := lease.get("IPAddress"):
+                    ips.add(ip)
+
+        return list(ips)
 
     @export(property=True)
     def version(self) -> Optional[str]:

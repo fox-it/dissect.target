@@ -199,3 +199,5 @@ register("log", "LogLoader")
 register("phobos", "PhobosLoader")
 register("velociraptor", "VelociraptorLoader")
 register("smb", "SmbLoader")
+register("cb", "CbLoader")
+register("multiraw", "MultiRawLoader")  # Should be last
