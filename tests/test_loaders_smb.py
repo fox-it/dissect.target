@@ -51,7 +51,7 @@ def test_smb_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> Non
 
     assert len(t.filesystems) == 1
     assert isinstance(t.fs.mounts["c:"], SmbFilesystem)
-    assert t.fs.mounts["c:"]._share_name == "C$"
+    assert t.fs.mounts["c:"].share_name == "C$"
 
     assert len(t._plugins) == 1
     assert isinstance(t._plugins[0], SmbRegistry)
