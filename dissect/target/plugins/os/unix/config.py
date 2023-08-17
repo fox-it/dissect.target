@@ -4,7 +4,7 @@ import io
 import re
 from abc import abstractmethod
 from configparser import ConfigParser, MissingSectionHeaderError
-from typing import Any, ItemsView, KeysView, Optional, TextIO, Union, BinaryIO, Iterator
+from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError

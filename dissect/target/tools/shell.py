@@ -29,7 +29,7 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
-from dissect.target.filesystem import RootFilesystemEntry, FilesystemEntry
+from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.plugins.os.unix.config import ConfigurationFs
