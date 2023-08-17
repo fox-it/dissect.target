@@ -16,9 +16,9 @@ class AnydeskPlugin(RemoteAccessPlugin):
     __namespace__ = "anydesk"
 
     # Anydesk logs when installed as a service
-    SERVICE_GLOBS = [  # Only if service is installed
+    SERVICE_GLOBS = [
         "/sysvol/ProgramData/AnyDesk/*.trace",  # Standard client >= Windows 7
-        "/sysvol/ProgramData/AnyDesk/ad_*/*.trace",  # Custom client   >= Windows 7
+        "/sysvol/ProgramData/AnyDesk/ad_*/*.trace",  # Custom client  >= Windows 7
         "/var/log/anydesk*.trace",  # Standard/Custom client Linux/MacOS
     ]
 
