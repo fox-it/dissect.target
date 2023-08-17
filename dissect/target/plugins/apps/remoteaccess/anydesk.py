@@ -11,25 +11,24 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
 class AnydeskPlugin(RemoteAccessPlugin):
     """
     Anydesk plugin.
-    
-    Trace file location based on https://support.anydesk.com/knowledge/trace-files#trace-file-locations
+
     """
 
     __namespace__ = "anydesk"
 
     # Anydesk logs when installed as a service
-    SERVICE_GLOBS = [                                   # Only if service is installed
-        "/sysvol/ProgramData/AnyDesk/*.trace",          # Standard client >= Windows 7
-        "/sysvol/ProgramData/AnyDesk/ad_*/*.trace",     # Custom client   >= Windows 7
-        "/var/log/anydesk*.trace",                      # Standard/Custom client Linux/MacOS
+    SERVICE_GLOBS = [  # Only if service is installed
+        "/sysvol/ProgramData/AnyDesk/*.trace",  # Standard client >= Windows 7
+        "/sysvol/ProgramData/AnyDesk/ad_*/*.trace",  # Custom client   >= Windows 7
+        "/var/log/anydesk*.trace",  # Standard/Custom client Linux/MacOS
     ]
 
     # User specific Anydesk logs
     USER_GLOBS = [
-        "appdata/roaming/AnyDesk/*.trace",              # Standard client Windows
-        "appdata/roaming/AnyDesk/ad_*/*.trace",          # Custom client Windows
-        ".anydesk/*.trace",                             # Standard client Linux/MacOS
-        ".anydesk_ad_*/*.trace",                        # Custom client Linux/MacOS
+        "appdata/roaming/AnyDesk/*.trace",  # Standard client Windows
+        "appdata/roaming/AnyDesk/ad_*/*.trace",  # Custom client Windows
+        ".anydesk/*.trace",  # Standard client Linux/MacOS
+        ".anydesk_ad_*/*.trace",  # Custom client Linux/MacOS
     ]
 
     def __init__(self, target):
