@@ -81,7 +81,12 @@ class Ini(LinuxConfigurationParser):
         self.parsed_data.read_file(open_file)
 
 
-class Unknown(LinuxConfigurationParser):
+class Txt(LinuxConfigurationParser):
+    def parse_file(self, fh: TextIO) -> None:
+        self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
+
+
+class Default(LinuxConfigurationParser):
     EMPTY_SPACE = re.compile(r"\s+")
 
     def parse_file(self, fh: TextIO) -> None:
@@ -106,6 +111,12 @@ class Unknown(LinuxConfigurationParser):
 
 CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
     "ini": Ini,
+    "xml": Txt,
+    "json": Txt,
+    "cnf": Default,
+    "conf": Default,
+    "sample": Txt,
+    "template": Txt,
 }
 KNOWN_FILES: dict[str, LinuxConfigurationParser] = {
     "ulogd.conf": Ini,
@@ -188,7 +199,7 @@ class ConfigurationEntry(FilesystemEntry):
     def parse_config(self, entry: FilesystemEntry, collapse: Optional[Union[bool, set]] = None) -> ConfigParser:
         extension = entry.path.rsplit(".", 1)[-1]
 
-        known_file = KNOWN_FILES.get(entry.name, Unknown)
+        known_file = KNOWN_FILES.get(entry.name, Default)
         parser = CONFIG_MAP.get(extension, known_file)(collapse)
 
         with entry.open() as fh:

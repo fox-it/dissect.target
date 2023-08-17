@@ -9,7 +9,7 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.config import (
     ConfigurationEntry,
     ConfigurationFs,
-    Unknown,
+    Default,
 )
 
 from ._utils import absolute_path
@@ -85,6 +85,6 @@ def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
     ],
 )
 def test_unknown_parser(parser_string: str, key: str, value: str):
-    parser = Unknown(None)
+    parser = Default(None)
     parser.read_file(StringIO(parser_string))
     assert parser.parsed_data[key] == value
