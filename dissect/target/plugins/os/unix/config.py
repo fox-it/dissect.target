@@ -223,7 +223,7 @@ class ConfigurationEntry(FilesystemEntry):
         elif hasattr(values, "keys"):
             output.write(b"\n")
             for key, value in values.items():
-                output.write(bytes(key, "utf8"))
+                output.write(bytes(key, "utf-8"))
                 self._write_value_mapping(output, value)
         else:
             output.write(b" ")
