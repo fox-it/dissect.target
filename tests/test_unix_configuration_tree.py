@@ -30,7 +30,7 @@ def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem):
     config_path = list(config_fs.get("/").iterdir())
 
     assert config_path == ["new"]
-    assert list(config_fs.get("/new").iterdir()) == ["path", "config"]
+    assert sorted(list(config_fs.get("/new").iterdir())) == ["config", "path"]
     assert isinstance(config_fs.get("/new/path/config"), ConfigurationEntry)
 
 
