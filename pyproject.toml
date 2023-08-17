@@ -78,6 +78,11 @@ yara = [
     "dissect.target[full]",
     "yara-python"
 ]
+smb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "impacket==0.10.0"
+]
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
