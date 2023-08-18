@@ -3,7 +3,7 @@ import re
 import urllib
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Union
+from typing import BinaryIO, Optional, Union
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
@@ -42,7 +42,7 @@ def add_virtual_ntfs_filesystem(
         fs.ntfs = ntfs.ntfs
 
 
-def _try_open(fs: Filesystem, path: str) -> None:
+def _try_open(fs: Filesystem, path: str) -> BinaryIO:
     paths = [path] if not isinstance(path, list) else path
 
     for path in paths:
