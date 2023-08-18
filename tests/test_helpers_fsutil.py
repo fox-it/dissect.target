@@ -265,6 +265,32 @@ def test_helpers_fsutil_open_decompress(file_name, compressor, content):
     assert fsutil.open_decompress(vfs.path(file_name)).read() == content
 
 
+def test_helpers_fsutil_open_decompress_text_modes():
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("test", io.BytesIO(b"zomgbbq"))
+
+    fh = fsutil.open_decompress(vfs.path("test"))
+    assert not isinstance(fh, io.TextIOWrapper)
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r")
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "UTF-8"
+    assert fh.errors == "backslashreplace"
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r", errors=None)
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "UTF-8"
+    assert fh.errors == "strict"
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r", encoding="ascii")
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "ascii"
+    assert fh.errors == "backslashreplace"
+
+    with pytest.raises(ValueError, match="binary mode doesn't take an encoding argument"):
+        fh = fsutil.open_decompress(vfs.path("test"), encoding="ascii")
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Encoding error. Needs to be fixed.")
 def test_helpers_fsutil_reverse_readlines():
     vfs = VirtualFilesystem()
