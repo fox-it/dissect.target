@@ -1,11 +1,15 @@
+import logging
 import re
 import urllib
 from os import PathLike
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import BinaryIO, Optional, Union
 
 from dissect.target.exceptions import FileNotFoundError
+from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+
+log = logging.getLogger(__name__)
 
 
 def add_virtual_ntfs_filesystem(
@@ -38,17 +42,21 @@ def add_virtual_ntfs_filesystem(
         fs.ntfs = ntfs.ntfs
 
 
-def _try_open(fs, path):
+def _try_open(fs: Filesystem, path: str) -> BinaryIO:
     paths = [path] if not isinstance(path, list) else path
 
     for path in paths:
         try:
-            return fs.open(path)
+            path = fs.get(path)
+            if path.stat().st_size > 0:
+                return path.open()
+            else:
+                log.warning("File is empty and will be skipped: %s", path)
         except FileNotFoundError:
             pass
 
 
-def extract_path_info(path: Union[str, Path]) -> Tuple[Path, Optional[urllib.parse.ParseResult]]:
+def extract_path_info(path: Union[str, Path]) -> tuple[Path, Optional[urllib.parse.ParseResult]]:
     """
     Extracts a ParseResult from a path if it has
     a scheme and adjusts the path if necessary.
