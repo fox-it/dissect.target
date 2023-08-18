@@ -131,9 +131,8 @@ class UtmpFile:
                 ut_host = entry.ut_host.decode(errors="surrogateescape").strip("\x00")
                 ut_addr = None
 
-                # UTMP misuses the field ut_addr_v6 for IPv4 and IPv6 addresses, because of this
-                # the ut_host field is used to determine if the ut_addr_v6 is an IPv6 address
-                # where the last 12 bytes of trailing zeroes.
+                # UTMP misuses the field ut_addr_v6 for IPv4 and IPv6 addresses, because of this the ut_host field
+                # is used to determine if the ut_addr_v6 is an IPv6 address where the last 12 bytes of trailing zeroes.
                 if entry.ut_addr_v6:
                     if not entry.ut_addr_v6[1:] == [0, 0, 0]:
                         # IPv6 address that uses > 4 bytes
@@ -150,8 +149,7 @@ class UtmpFile:
                                 pass
                         except ValueError:
                             # NOTE: in case the ut_host does not contain a valid IPv6 address,
-                            # ut_addr_v6 is parsed as IPv4 address. This could not lead to incorrect
-                            # results.
+                            # ut_addr_v6 is parsed as IPv4 address. This could not lead to incorrect results.
                             ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
 
                 utmp_entry = UTMP_ENTRY(
@@ -182,8 +180,6 @@ class UtmpPlugin(Plugin):
             ]
         ):
             raise UnsupportedPluginError("No WTMP or BTMP log files found")
-
-        return True
 
     @export(record=[BtmpRecord])
     def btmp(self) -> Iterator[BtmpRecord]:
