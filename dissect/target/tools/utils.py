@@ -12,7 +12,6 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
-from dissect.target.loaders.targetd import TargetdLoader
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -76,7 +75,7 @@ def generate_argparse_for_unbound_method(
     if not inspect.isfunction(method):
         raise ValueError(f"Value `{method}` is not an unbound plugin method")
 
-    desc = docs.get_func_description(method, with_docstrings=True)
+    desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
@@ -134,7 +133,7 @@ def generate_argparse_for_plugin(
 
 
 def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
-    if TargetdLoader.instance:
+    if hasattr(target._loader, "instance"):
         return target.get_function(funcname)
 
     if isinstance(plugin, type):

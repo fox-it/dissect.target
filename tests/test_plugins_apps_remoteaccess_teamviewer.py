@@ -14,7 +14,7 @@ def test_teamviewer_plugin_global_log(target_win_users, fs_win):
 
     tvp = TeamviewerPlugin(target_win_users)
 
-    records = list(tvp.remoteaccess())
+    records = list(tvp.logs())
     assert len(records) == 1
 
     record = records[0]
@@ -36,7 +36,7 @@ def test_teamviewer_plugin_user_log(target_win_users, fs_win):
 
     tvp = TeamviewerPlugin(target_win_users)
 
-    records = list(tvp.remoteaccess())
+    records = list(tvp.logs())
     assert len(records) == 1
 
     record = records[0]

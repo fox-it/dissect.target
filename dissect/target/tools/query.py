@@ -18,7 +18,13 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import cache, hashutil
 from dissect.target.loaders.targetd import ProxyLoader
-from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
+from dissect.target.plugin import (
+    PLUGINS,
+    NamespacePlugin,
+    OSPlugin,
+    Plugin,
+    find_plugin_functions,
+)
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -154,11 +160,11 @@ def main():
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
-                funcs, _ = find_plugin_functions(plugin_target, args.list, True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
         else:
-            funcs, _ = find_plugin_functions(Target(), args.list, False)
+            funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
             for func in funcs:
                 collected_plugins[func.name] = func.plugin_desc
 
@@ -197,6 +203,7 @@ def main():
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
     funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
+
     for func in funcs:
         output_types.add(func.output_type)
 
@@ -286,7 +293,9 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
-            executed_plugins.add(func_def.method_name)
+            # Plugins derived from NamespacePlugin are not meant to be unique
+            if not issubclass(func_def.class_object, NamespacePlugin):
+                executed_plugins.add(func_def.method_name)
 
             if output_type == "record":
                 record_entries.append(result)
