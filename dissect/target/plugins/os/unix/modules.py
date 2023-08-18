@@ -35,7 +35,7 @@ class ModulePlugin(Plugin):
         return len(self._module_paths) > 0
 
     @internal
-    def iterate_modules(self):
+    def iterate_modules(self) -> Iterator[Module]:
         for module_path in self._module_paths:
             if self.target.fs.path(module_path + "/initstate").exists():
                 module_folder = self.target.fs.path(module_path)
@@ -62,10 +62,10 @@ class ModulePlugin(Plugin):
                 source=module.path,
             )
 
-    @export(property=True)
+    @export(output="yield")
     def lsmod(self):
         """Return information about active kernel modules in lsmod format"""
-        lsmod_output = f"\n{'Module ':<28} {'Size':<7}  Used by\n"
+        lsmod_output = f"{'Module ':<28} {'Size':<7}  Used by\n"
         for module in self.iterate_modules():
             lsmod_output += f"{module.name:<28} {module.size:<7}  {module.refcnt} {','.join(module.modules_referred)}\n"
-        return lsmod_output
+        yield lsmod_output
