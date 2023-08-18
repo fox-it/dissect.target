@@ -52,7 +52,6 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO:
                 return path.open()
             else:
                 log.warning("File is empty and will be skipped: %s", path)
-                pass
         except FileNotFoundError:
             pass
 
