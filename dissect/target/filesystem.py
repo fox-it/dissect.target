@@ -44,7 +44,7 @@ class Filesystem:
 
     def __init__(
         self,
-        volume: Optional[BinaryIO],
+        volume: Optional[BinaryIO] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:

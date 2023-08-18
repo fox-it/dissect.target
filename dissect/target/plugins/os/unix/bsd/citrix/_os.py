@@ -12,7 +12,7 @@ from dissect.target.target import Target
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
 RE_CONFIG_TIMEZONE = re.compile(
-    r'set ns param -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
+    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
 )
 RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')

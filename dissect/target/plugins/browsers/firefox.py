@@ -10,15 +10,16 @@ from flow.record.fieldtypes import path
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
 from dissect.target.plugins.browsers.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    BrowserPlugin,
     try_idna,
 )
 
 
-class FirefoxPlugin(Plugin):
+class FirefoxPlugin(BrowserPlugin):
     """Firefox browser plugin."""
 
     __namespace__ = "firefox"
@@ -43,7 +44,6 @@ class FirefoxPlugin(Plugin):
 
     def __init__(self, target):
         super().__init__(target)
-
         self.users_dirs = []
         for user_details in self.target.user_details.all_with_home():
             for directory in self.DIRS:
