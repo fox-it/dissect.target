@@ -198,5 +198,4 @@ register("log", "LogLoader")
 # register("res", "ResLoader")
 register("phobos", "PhobosLoader")
 register("velociraptor", "VelociraptorLoader")
-register("velociraptorzip", "VelociraptorZipLoader")
 register("multiraw", "MultiRawLoader")  # Should be last
