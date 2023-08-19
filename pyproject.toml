@@ -76,8 +76,17 @@ full = [
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    # Enable using the yara rules functionality
     "yara-python"
+]
+smb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "impacket==0.10.0"
+]
+cb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "carbon-black-cloud-sdk-python~=1.4.3"
 ]
 
 [project.scripts]
