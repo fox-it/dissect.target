@@ -135,7 +135,7 @@ class SmbFilesystemEntry(FilesystemEntry):
             mode | 0o755,
             fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
             id(self.fs),
-            0,
+            1,
             0,
             0,
             self.entry.get_filesize(),

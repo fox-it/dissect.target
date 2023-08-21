@@ -920,7 +920,7 @@ class VirtualFile(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         size = getattr(self.entry, "size", 0)
         file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
-        return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 0, 0, 0, size, 0, 0, 0])
+        return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 1, 0, 0, size, 0, 0, 0])
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return False
@@ -990,7 +990,7 @@ class VirtualSymlink(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         link_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
-        return fsutil.stat_result([stat.S_IFLNK, link_addr, id(self.fs), 0, 0, 0, len(self.target), 0, 0, 0])
+        return fsutil.stat_result([stat.S_IFLNK, link_addr, id(self.fs), 1, 0, 0, len(self.target), 0, 0, 0])
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         if not follow_symlinks:
@@ -1445,6 +1445,7 @@ register("extfs", "ExtFilesystem")
 register("xfs", "XfsFilesystem")
 register("fat", "FatFilesystem")
 register("ffs", "FfsFilesystem")
+register("btrfs", "BtrfsFilesystem")
 register("vmfs", "VmfsFilesystem")
 register("exfat", "ExfatFilesystem")
 register("ad1", "AD1Filesystem")
