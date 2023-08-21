@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
