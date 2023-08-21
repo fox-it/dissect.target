@@ -42,8 +42,7 @@ class TarLoader(Loader):
             if member.name == ".":
                 continue
 
-            sysvols = ["/fs", "fs/", "/sysvol", "sysvol/"]
-            if not any([member.name.startswith(s) for s in sysvols]):
+            if not member.name.startswith(("/fs", "fs/", "/sysvol", "sysvol/")):
                 if "/" not in volumes:
                     vol = filesystem.VirtualFilesystem(case_sensitive=True)
                     vol.tar = self.tar
@@ -53,9 +52,9 @@ class TarLoader(Loader):
                 volume = volumes["/"]
                 mname = member.name
             else:
-                if not "sysvol" in member.name:
+                if not member.name.startswith(("/sysvol", "sysvol/")):
                     parts = member.name.replace("fs/", "").split("/")
-                    if parts[0] == '':
+                    if parts[0] == "":
                         parts.pop(0)
                 else:
                     parts = member.name.lstrip("/").split("/")
