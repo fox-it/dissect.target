@@ -9,13 +9,13 @@ from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
 from ._utils import absolute_path
 
 
-def test_utmp_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_utmp_ipv6(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp-ipv6")
-    fs_unix.map_file("var/log/btmp", data_file)
+    fs_linux.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(UtmpPlugin)
+    target_linux.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.btmp())
+    results = list(target_linux.btmp())
 
     # IPv4 address
     results[0].ut_host == "127.0.0.1"
@@ -30,13 +30,13 @@ def test_utmp_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     results[5].ut_addr == "1337:1::"
 
 
-def test_wtmp_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_wtmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
-    fs_unix.map_file("var/log/wtmp", data_file)
+    fs_linux.map_file("var/log/wtmp", data_file)
 
-    target_unix.add_plugin(UtmpPlugin)
+    target_linux.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.wtmp())
+    results = list(target_linux.wtmp())
     assert len(results) == 70
     result = results[-1]
     assert result.ts == datetime(2021, 11, 12, 10, 12, 54, tzinfo=timezone.utc)
@@ -49,13 +49,13 @@ def test_wtmp_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert result.ut_addr == "0.0.0.0"
 
 
-def test_lastlog_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_lastlog_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/lastlog/lastlog")
-    fs_unix.map_file("/var/log/lastlog", data_file)
+    fs_linux.map_file("/var/log/lastlog", data_file)
 
-    target_unix.add_plugin(LastLogPlugin)
+    target_linux.add_plugin(LastLogPlugin)
 
-    results = list(target_unix.lastlog())
+    results = list(target_linux.lastlog())
     assert len(results) == 1
 
     assert results[0].ts == datetime(2021, 12, 8, 16, 14, 6, tzinfo=timezone.utc)
@@ -65,13 +65,13 @@ def test_lastlog_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert results[0].ut_tty == "pts/0"
 
 
-def test_btmp_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_btmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp")
-    fs_unix.map_file("var/log/btmp", data_file)
+    fs_linux.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(UtmpPlugin)
+    target_linux.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.btmp())
+    results = list(target_linux.btmp())
     assert len(results) == 10
     result = results[-1]
     assert result.ts == datetime(2021, 11, 30, 23, 2, 9, tzinfo=timezone.utc)

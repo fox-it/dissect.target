@@ -11,7 +11,7 @@ from dissect.util.ts import from_unix
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.target import Target
 
 UTMP_FIELDS = [
@@ -173,7 +173,7 @@ class UtmpPlugin(Plugin):
     BTMP_GLOB = "/var/log/btmp*"
 
     def check_compatible(self) -> None:
-        if not any(
+        if not self.target.os == OperatingSystem.LINUX and not any(
             [
                 list(self.target.fs.glob(self.BTMP_GLOB)),
                 list(self.target.fs.glob(self.WTMP_GLOB)),
