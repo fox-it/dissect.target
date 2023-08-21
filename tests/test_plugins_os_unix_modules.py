@@ -4,7 +4,7 @@ from ._utils import absolute_path
 
 
 def test_modules_plugin(target_unix, fs_unix):
-    test_folder = absolute_path("data/unix/module")
+    test_folder = absolute_path("data/plugins/os/unix/modules/module")
     fs_unix.map_dir("/sys/module", test_folder)
 
     target_unix.add_plugin(ModulePlugin)
