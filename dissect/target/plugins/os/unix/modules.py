@@ -34,7 +34,6 @@ class ModulePlugin(Plugin):
     def check_compatible(self) -> bool:
         return len(self._module_paths) > 0
 
-    @internal
     def _iterate_modules(self) -> Iterator[Module]:
         for module_path in self._module_paths:
             if module_path.joinpath("initstate").exists():
