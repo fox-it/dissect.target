@@ -1,13 +1,19 @@
 from io import BytesIO
 from unittest.mock import patch
 
-from dissect.target.filesystem import VirtualDirectory, VirtualFile, VirtualSymlink
+from dissect.target.filesystem import (
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+    VirtualSymlink,
+)
 from dissect.target.plugins.os.unix.locale import LocalePlugin as UnixLocalePlugin
+from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
-def test_locale_plugin_unix(target_unix_users, fs_unix):
+def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesystem):
     # Locale locations originate from Ubuntu 20.
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(b"LANG=en_US.UTF-8"))
@@ -25,7 +31,7 @@ def test_locale_plugin_unix(target_unix_users, fs_unix):
     assert keyboard[0].backspace == "guess"
 
 
-def test_locale_plugin_unix_quotes(target_unix_users, fs_unix):
+def test_locale_plugin_unix_quotes(target_unix_users: Target, fs_unix: VirtualFilesystem):
     # Older Fedora system
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(b'LANG="en_US.UTF-8"'))
     target_unix_users.add_plugin(UnixLocalePlugin)
@@ -33,7 +39,7 @@ def test_locale_plugin_unix_quotes(target_unix_users, fs_unix):
     assert target_unix_users.language == ["en_US"]
 
 
-def test_locale_etc_localtime_symlink(target_unix_users, fs_unix):
+def test_locale_etc_localtime_symlink(target_unix_users: Target, fs_unix: VirtualFilesystem):
     fs_unix.symlink("/usr/share/zoneinfo/Europe/Amsterdam", "/etc/localtime")
     target_unix_users.add_plugin(UnixLocalePlugin)
 
@@ -41,7 +47,7 @@ def test_locale_etc_localtime_symlink(target_unix_users, fs_unix):
     assert target_unix_users.timezone == "Europe/Amsterdam"
 
 
-def test_locale_etc_localtime_hardlink(target_unix_users, fs_unix):
+def test_locale_etc_localtime_hardlink(target_unix_users: Target, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/usr/share/zoneinfo/Europe/Amsterdam", BytesIO(b"contents of Europe/Amsterdam"))
     fs_unix.link("/usr/share/zoneinfo/Europe/Amsterdam", "/etc/localtime")
     target_unix_users.add_plugin(UnixLocalePlugin)
@@ -58,7 +64,7 @@ def test_locale_etc_localtime_hardlink(target_unix_users, fs_unix):
         assert target_unix_users.timezone == "Europe/Amsterdam"
 
 
-def test_locale_etc_localtime_regular_file(target_unix_users, fs_unix):
+def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("/etc/localtime", BytesIO(b"contents of Europe/Amsterdam"))
     fs_unix.map_file_fh("/usr/share/zoneinfo/UTC", BytesIO(b"contents of UTC"))
     fs_unix.map_file_fh("/usr/share/zoneinfo/Europe/Amsterdam", BytesIO(b"contents of Europe/Amsterdam"))
