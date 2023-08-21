@@ -14,6 +14,15 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 )
 
 
+def timezone_from_path(path):
+    """Return timezone name for given zoneinfo path.
+
+    /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
+    """
+    zoneinfo_path = str(path).split("/")
+    return "/".join(zoneinfo_path[-2:])
+
+
 class LocalePlugin(Plugin):
     def check_compatible(self):
         pass
@@ -28,13 +37,27 @@ class LocalePlugin(Plugin):
             for line in path.open("rt"):
                 return line.strip()
 
-        # /etc/localtime should be a symlink to
+        # /etc/localtime can be a symlink, hardlink or a copy of:
         # eg. /usr/share/zoneinfo/America/New_York
-        # on centos and some other distros
-        if (zoneinfo := self.target.fs.path("/etc/localtime")).exists():
-            zoneinfo_path = str(zoneinfo.readlink()).split("/")
-            timezone = "/".join(zoneinfo_path[-2:])
-            return timezone
+        p_localtime = self.target.fs.path("/etc/localtime")
+
+        # If it's a symlink, read the path of the symlink
+        if p_localtime.is_symlink():
+            return timezone_from_path(p_localtime.readlink())
+
+        # If it's a hardlink, try finding the hardlinked zoneinfo file
+        if p_localtime.stat().st_nlink > 1:
+            for path in self.target.fs.path("/usr/share/zoneinfo").rglob("*"):
+                if p_localtime.samefile(path):
+                    return timezone_from_path(path)
+
+        # If it's a regular file (probably copied), we try finding it by matching size and sha1 hash.
+        if p_localtime.is_file():
+            size = p_localtime.stat().st_size
+            sha1 = p_localtime.get().sha1()
+            for path in self.target.fs.path("/usr/share/zoneinfo").rglob("*"):
+                if path.is_file() and path.stat().st_size == size and path.get().sha1() == sha1:
+                    return timezone_from_path(path)
 
     @export(property=True)
     def language(self):
