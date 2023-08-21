@@ -171,6 +171,7 @@ class ProcessStateEnum(StrEnum):
     K = "Wakekill"  # Wakekill (Linux 2.6.33 to 3.13 only)
     W = "Waking"  # Waking (Linux 2.6.33 to 3.13 only)
     P = "Parked"  # Parked (Linux 3.9 to 3.13 only)
+    N = "None"  # Sentinel value in-case a process' state file is not present
 
 
 PROC_STAT_NAMES = [
@@ -473,28 +474,30 @@ class ProcProcess:
     def _parse_proc_stat_entry(self) -> dict[str, Union[str, int]]:
         """Internal function to parse the contents of ``/proc/[pid]/stat``."""
         # status = self.entry("stat").open().readline()
-
-        status = self.get("stat").open("rt").readline()
         status_dict = {}
+        entry = self.get("stat")
 
-        # The process name exists between parentheses in the second field.
-        # Since the name can be arbitrary we have to find the first and last parentheses.
-        start_name, end_name = status.find("("), status.rfind(")")
+        if entry.exists():
+            status = entry.open("rt").readline()
 
-        head = status[:start_name]
-        tail = status[end_name:]
-        name = status[start_name + 1 : end_name]  # noqa: E203
-        status = head + tail
+            # The process name exists between parentheses in the second field.
+            # Since the name can be arbitrary we have to find the first and last parentheses.
+            start_name, end_name = status.find("("), status.rfind(")")
 
-        for idx, part in enumerate(status.split()):
-            try:
-                part = int(part)
-            except ValueError:
-                part = part
+            head = status[:start_name]
+            tail = status[end_name:]
+            name = status[start_name + 1 : end_name]  # noqa: E203
+            status = head + tail
 
-            status_dict[PROC_STAT_NAMES[idx]] = part
+            for idx, part in enumerate(status.split()[: len(PROC_STAT_NAMES)]):
+                try:
+                    part = int(part)
+                except ValueError:
+                    part = part
 
-        status_dict["comm"] = name
+                status_dict[PROC_STAT_NAMES[idx]] = part
+
+            status_dict["comm"] = name
 
         return status_dict
 
@@ -547,7 +550,7 @@ class ProcProcess:
     def uid(self) -> int:
         """Return the User ID (uid) of the owner of this process."""
         uid = int((self.get("loginuid").open().read()))
-        # loginuid can hold the value "4294967295". Which is defined as "not set" and -1 should be returned.
+        # loginuid can hold the value "4294967295" (0xFFFFFFFF). Which is defined as "not set" and -1 should be returned.
         return -1 if uid == 0xFFFFFFFF else uid
 
     @property
@@ -577,14 +580,14 @@ class ProcProcess:
     @property
     def state(self) -> str:
         """Returns the state of the process (S'leeping, R'unning, I'dle, etc)."""
-        return ProcessStateEnum[self._stat_file.get("state")].value
+        return ProcessStateEnum[self._stat_file.get("state", "N")].value
 
     @property
     def starttime(self) -> datetime:
         """Returns the start time of the process."""
         # Starttime is saved in clockticks per second from the boot time.
         # we asume a standard of 100 clockticks per second. the actual value can be obtained from `getconf CLK_TCK`
-        starttime = self._stat_file.get("starttime") / 100
+        starttime = self._stat_file.get("starttime", 0) / 100
 
         return from_unix(self._boottime + starttime)
 
@@ -614,15 +617,21 @@ class ProcProcess:
     @property
     def _process_name(self) -> str:
         """Internal function that returns the name of the process."""
-        return self._stat_file.get("comm", None)
+        return self._stat_file.get("comm", "")
 
     @property
     def cmdline(self) -> str:
         """Return the command line of a process."""
-        cmdline = self.get("cmdline").open("rt").readline()
-        # Cmdlines are null-terminated and use null-bytes to separate the different parts. Translate this back.
-        cmdline = cmdline.rstrip("\x00").replace("\x00", " ")
-        return cmdline
+
+        line = ""
+        entry = self.get("cmdline")
+
+        if entry.exists():
+            line = entry.open("rt").readline()
+            # Cmdlines are null-terminated and use null-bytes to separate the different parts. Translate this back.
+            line = line.rstrip("\x00").replace("\x00", " ")
+
+        return line
 
     def stat(self) -> fsutil.stat_result:
         """Return a stat entry of the process."""

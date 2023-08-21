@@ -97,7 +97,7 @@ class NetSocketPlugin(Plugin):
             owner (string): The resolved user ID of the socket.
         """
         for packetsocket in self.sockets.packet():
-            yield self._generate_packet_socket_records(packetsocket)
+            yield self._generate_packet_socket_record(packetsocket)
 
     @export(record=UnixSocketRecord)
     def unix(self) -> Iterator[UnixSocketRecord]:
