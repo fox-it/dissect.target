@@ -13,7 +13,7 @@ from dissect.target.target import Target
 from ._utils import absolute_path
 
 
-def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     # Locale locations originate from Ubuntu 20.
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(b"LANG=en_US.UTF-8"))
@@ -31,7 +31,7 @@ def test_locale_plugin_unix(target_unix_users: Target, fs_unix: VirtualFilesyste
     assert keyboard[0].backspace == "guess"
 
 
-def test_locale_plugin_unix_quotes(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_locale_plugin_unix_quotes(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     # Older Fedora system
     fs_unix.map_file_fh("/etc/default/locale", BytesIO(b'LANG="en_US.UTF-8"'))
     target_unix_users.add_plugin(UnixLocalePlugin)
@@ -39,7 +39,7 @@ def test_locale_plugin_unix_quotes(target_unix_users: Target, fs_unix: VirtualFi
     assert target_unix_users.language == ["en_US"]
 
 
-def test_locale_etc_localtime_symlink(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_locale_etc_localtime_symlink(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.symlink("/usr/share/zoneinfo/Europe/Amsterdam", "/etc/localtime")
     target_unix_users.add_plugin(UnixLocalePlugin)
 
@@ -47,7 +47,7 @@ def test_locale_etc_localtime_symlink(target_unix_users: Target, fs_unix: Virtua
     assert target_unix_users.timezone == "Europe/Amsterdam"
 
 
-def test_locale_etc_localtime_hardlink(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_locale_etc_localtime_hardlink(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/usr/share/zoneinfo/Europe/Amsterdam", BytesIO(b"contents of Europe/Amsterdam"))
     fs_unix.link("/usr/share/zoneinfo/Europe/Amsterdam", "/etc/localtime")
     target_unix_users.add_plugin(UnixLocalePlugin)
@@ -64,7 +64,7 @@ def test_locale_etc_localtime_hardlink(target_unix_users: Target, fs_unix: Virtu
         assert target_unix_users.timezone == "Europe/Amsterdam"
 
 
-def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/localtime", BytesIO(b"contents of Europe/Amsterdam"))
     fs_unix.map_file_fh("/usr/share/zoneinfo/UTC", BytesIO(b"contents of UTC"))
     fs_unix.map_file_fh("/usr/share/zoneinfo/Europe/Amsterdam", BytesIO(b"contents of Europe/Amsterdam"))
