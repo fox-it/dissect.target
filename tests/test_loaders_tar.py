@@ -1,6 +1,3 @@
-import io
-import tarfile
-
 import pytest
 
 from dissect.target import Target
