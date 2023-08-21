@@ -25,10 +25,10 @@ class ProcProcesses(Plugin):
 
     @export(record=ProcProcessRecord)
     def processes(self) -> Iterator[TargetRecordDescriptor]:
-        """This plugin yields the processes available in /proc and the stats associated with them.
+        """This plugin yields the processes available in ``/proc`` and the stats associated with them.
 
         There is a numerical subdirectory for each running process; the subdirectory is named by the process ID.
-        Each /proc/[pid] subdirectory contains various pseudo-files.
+        Each ``/proc/[pid]`` subdirectory contains various pseudo-files.
 
         Yields ProcProcessRecord with the following fields:
             hostname (string): The target hostname.

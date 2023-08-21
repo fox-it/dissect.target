@@ -1,10 +1,14 @@
-from dataclasses import dataclass
 from itertools import chain
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.os.unix.linux.proc import (
+    NetSocket,
+    PacketSocket,
+    UnixSocket,
+)
 from dissect.target.target import Target
 
 NetSocketRecord = TargetRecordDescriptor(
@@ -73,26 +77,26 @@ class NetSocketPlugin(Plugin):
 
     @export(record=PacketSocketRecord)
     def packet(self) -> Iterator[PacketSocketRecord]:
-        for packetsocket in self.sockets.packet():
-            """This plugin yields the packet sockets and available stats associated with them.
+        """This plugin yields the packet sockets and available stats associated with them.
 
-            Yields PacketSocketRecord with the following fields:
-                hostname (string): The target hostname.
-                domain (string): The target domain.
-                protocol (int): The captured protocol i.e. 0003 is ETH_P_ALL
-                protocol_type (str): The canonical name of the captured protocol.
-                sk (string): The socket number.
-                type (int): The integer type of the socket (packet).
-                iface (int): The interface index of the socket.
-                r (int): The number of bytes that have been received by the socket and are waiting to be processed.
-                rmem (int): The size of the receive buffer for the socket.
-                user (int): The user ID of the process that created the socket.
-                inode (int): The inode associated to the socket.
-                pid (int): The pid associated with this socket.
-                name (string): The process name associated to this socket.
-                cmdline (string): The command line used to start the socket with.
-                owner (string): The resolved user ID of the socket.
-            """
+        Yields PacketSocketRecord with the following fields:
+            hostname (string): The target hostname.
+            domain (string): The target domain.
+            protocol (int): The captured protocol i.e. 0003 is ETH_P_ALL
+            protocol_type (str): The canonical name of the captured protocol.
+            sk (string): The socket number.
+            type (int): The integer type of the socket (packet).
+            iface (int): The interface index of the socket.
+            r (int): The number of bytes that have been received by the socket and are waiting to be processed.
+            rmem (int): The size of the receive buffer for the socket.
+            user (int): The user ID of the process that created the socket.
+            inode (int): The inode associated to the socket.
+            pid (int): The pid associated with this socket.
+            name (string): The process name associated to this socket.
+            cmdline (string): The command line used to start the socket with.
+            owner (string): The resolved user ID of the socket.
+        """
+        for packetsocket in self.sockets.packet():
             yield self._generate_packet_socket_records(packetsocket)
 
     @export(record=UnixSocketRecord)
@@ -187,7 +191,7 @@ class NetSocketPlugin(Plugin):
         for netsocket in sockets:
             yield self._generate_net_socket_record(netsocket)
 
-    def _generate_unix_socket_record(self, data: dataclass) -> UnixSocketRecord:
+    def _generate_unix_socket_record(self, data: UnixSocket) -> UnixSocketRecord:
         return UnixSocketRecord(
             protocol=data.protocol_string,
             ref=data.ref,
@@ -199,7 +203,7 @@ class NetSocketPlugin(Plugin):
             _target=self.target,
         )
 
-    def _generate_packet_socket_record(self, data: dataclass) -> PacketSocketRecord:
+    def _generate_packet_socket_record(self, data: PacketSocket) -> PacketSocketRecord:
         return PacketSocketRecord(
             protocol=data.protocol_string,
             protocol_type=data.protocol_type,
@@ -218,7 +222,7 @@ class NetSocketPlugin(Plugin):
             _target=self.target,
         )
 
-    def _generate_net_socket_record(self, data: dataclass) -> NetSocketRecord:
+    def _generate_net_socket_record(self, data: NetSocket) -> NetSocketRecord:
         return NetSocketRecord(
             protocol=data.protocol_string,
             rx_queue=data.rx_queue,

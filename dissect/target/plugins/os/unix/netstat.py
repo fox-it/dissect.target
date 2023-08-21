@@ -1,4 +1,5 @@
 from itertools import chain
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
@@ -8,12 +9,12 @@ NETSTAT_TEMPLATE = "{protocol:<12}{receive_queue:<10}{transmit_queue:<11}{local_
 
 
 class NetstatPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.target.proc:
             raise UnsupportedPluginError("No /proc directory found")
 
     @export(output="yield")
-    def netstat(self) -> None:
+    def netstat(self) -> Iterator[str]:
         """This plugin mimics the output `netstat -tunelwap` would generate on a Linux machine."""
         sockets = chain(
             self.target.sockets.tcp(),
