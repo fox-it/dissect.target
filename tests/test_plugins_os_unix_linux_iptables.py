@@ -1,7 +1,7 @@
 import textwrap
 from io import BytesIO
 
-from flow.record.fieldtypes import datetime
+from flow.record.fieldtypes import datetime, path
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
@@ -114,3 +114,37 @@ def test_iptables_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem):
     assert results[19].rule == "-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER"
     assert results[19].packet_count == 78
     assert results[19].byte_count == 2323
+
+
+def test_iptables_plugin_ufw(target_unix_users, fs_unix):
+    ufw_rules_path = "/etc/ufw/user.rules"
+
+    ufw_rules = """*filter
+    :ufw-user-input - [0:0]
+    :ufw-user-output - [0:0]
+    :ufw-user-forward - [0:0]
+    :ufw-user-limit - [0:0]
+    :ufw-user-limit-accept - [0:0]
+    ### RULES ###
+    -A ufw-user-limit -m limit --limit 3/minute -j LOG --log-prefix "[UFW LIMIT BLOCK] "
+    -A ufw-user-limit -j REJECT
+    -A ufw-user-limit-accept -j ACCEPT
+    COMMIT
+    """
+
+    fs_unix.map_file_fh(
+        ufw_rules_path,
+        BytesIO(textwrap.dedent(ufw_rules).encode()),
+    )
+
+    target_unix_users.add_plugin(IptablesSavePlugin)
+    results = list(target_unix_users.iptables())
+
+    # 5 policies, 3 rules
+    assert len(results) == 5 + 3
+
+    assert results[-1].source == path.from_posix(ufw_rules_path)
+    assert results[-1].rule == "-A ufw-user-limit-accept -j ACCEPT"
+    assert results[-1].table == "filter"
+    assert results[-1].chain == "ufw-user-limit-accept"
+    assert results[-1].type == "rule"
