@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 ModuleRecord = TargetRecordDescriptor(
@@ -37,7 +37,8 @@ class ModulePlugin(Plugin):
     def _iterate_modules(self) -> Iterator[Module]:
         for module_path in self._module_paths:
             if module_path.joinpath("initstate").exists():
-                # Normally the holders folder should exist, however Acquire currently doesn't collect a folder if its empty
+                # Normally the holders folder should exist,
+                # however Acquire currently doesn't collect a folder if its empty
                 holders = []
                 if (holders_path := module_path.joinpath("holders")).exists():
                     holders = [item.name for item in holders_path.iterdir()]
