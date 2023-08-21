@@ -2,22 +2,18 @@ from __future__ import annotations
 
 import logging
 import zipfile
-
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional, Union
 
 from dissect.target import filesystem, target
-from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
+from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import (
     ZipFilesystemDirectoryEntry,
     ZipFilesystemEntry,
 )
-from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers import fsutil, loaderutil
+from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
-
-if TYPE_CHECKING:
-    from dissect.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +26,7 @@ def find_fs_directories(path: Path, is_zip: bool) -> tuple[Optional[OperatingSys
     # As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     # Generic.Collectors.File (Unix) uses the accessors file and auto.
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors
-    # mft, ntfs, lazy_ntfs and ntfs_vss.
+    # mft, ntfs, lazy_ntfs, ntfs_vss and auto.
 
     fs_root = zipfile.Path(path, at=FILESYSTEMS_ROOT) if is_zip else path.joinpath(FILESYSTEMS_ROOT)
 
@@ -106,31 +102,25 @@ class VelociraptorLoader(DirLoader):
         if os_type == OperatingSystem.WINDOWS:
             # Velociraptor doesn't have the correct filenames the paths $J and $Secure:$SDS".
             if not self.is_zip:
-                # map_dirs(
-                #     target,
-                #     dirs,
-                #     os_type,
-                #     usnjrnl_path="$Extend/$UsnJrnl%3A$J",
-                #     sds_path="$Secure%3A$SDS",
-                # )
                 for path in dirs:
                     dfs = DirectoryFilesystem(path, alt_separator="\\", case_sensitive=False)
                     target.filesystems.add(dfs)
 
-                    if os_type == OperatingSystem.WINDOWS:
-                        loaderutil.add_virtual_ntfs_filesystem(
-                            target,
-                            dfs,
-                            os_type,
-                            usnjrnl_path="$Extend/$UsnJrnl%3A$J",
-                            sds_path="$Secure%3A$SDS",
-                        )
+                    loaderutil.add_virtual_ntfs_filesystem(
+                        target,
+                        dfs,
+                        usnjrnl_path="$Extend/$UsnJrnl%3A$J",
+                        sds_path="$Secure%3A$SDS",
+                    )
 
-                        volume_name = parts[2].strip("%3A")[-1].lower()
+                    parts = str(path).split("/")
+                    root = str(self.path).split("/")
+                    vol_name = parts[len(root) + 2].strip("%3A")[-1].lower() + ":"
+                    if vol_name == "c:":
+                        target.fs.mount("c:", dfs)
+                        vol_name == "sysvol"
 
-                        target.fs.mount(vol_name, vol)
-                        if vol_name == "sysvol":
-                            target.fs.mount("c:", vol)
+                    target.fs.mount(vol_name, dfs)
             else:
                 volumes = {}
 
