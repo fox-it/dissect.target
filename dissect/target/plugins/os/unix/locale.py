@@ -14,7 +14,7 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 )
 
 
-def timezone_from_path(path):
+def timezone_from_path(path: Path) -> str:
     """Return timezone name for given zoneinfo path.
 
     /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
