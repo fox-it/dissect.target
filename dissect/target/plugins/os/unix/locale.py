@@ -46,7 +46,7 @@ class LocalePlugin(Plugin):
             return timezone_from_path(p_localtime.readlink())
 
         # If it's a hardlink, try finding the hardlinked zoneinfo file
-        if p_localtime.stat().st_nlink > 1:
+        if p_localtime.exists() and p_localtime.stat().st_nlink > 1:
             for path in self.target.fs.path("/usr/share/zoneinfo").rglob("*"):
                 if p_localtime.samefile(path):
                     return timezone_from_path(path)
