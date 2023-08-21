@@ -19,6 +19,7 @@ class EwfContainer(Container):
         else:
             self.ewf = EWF([path.open("rb") for path in find_files(fhs[0])])
 
+        self._stream = self.ewf.open()
         super().__init__(fh, self.ewf.size, *args, **kwargs)
 
     @staticmethod
@@ -35,13 +36,13 @@ class EwfContainer(Container):
         return re.match(r"\.[EeLs]x?01$", path.suffix)
 
     def read(self, length: int) -> bytes:
-        return self.ewf.read(length)
+        return self._stream.read(length)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
-        return self.ewf.seek(offset, whence)
+        return self._stream.seek(offset, whence)
 
     def tell(self) -> int:
-        return self.ewf.tell()
+        return self._stream.tell()
 
     def close(self) -> None:
-        self.ewf.close()
+        self._stream.close()

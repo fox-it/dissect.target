@@ -75,7 +75,7 @@ def generate_argparse_for_unbound_method(
     if not inspect.isfunction(method):
         raise ValueError(f"Value `{method}` is not an unbound plugin method")
 
-    desc = docs.get_func_description(method, with_docstrings=True)
+    desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 

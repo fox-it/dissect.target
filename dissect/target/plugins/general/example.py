@@ -53,7 +53,9 @@ class ExamplePlugin(Plugin):
             super().__init__(target)
     """
 
+    # IMPORTANT: Remove these attributes when using this as boilerplate for your own plugin!
     __findable__ = False
+    __skip__ = True
 
     def check_compatible(self) -> bool:
         """Perform a compatibility check with the target.
