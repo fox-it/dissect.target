@@ -35,7 +35,7 @@ IptablesSaveRecord = TargetRecordDescriptor(
 
 
 class IptablesSavePlugin(Plugin):
-    """Parser for iptables-save (and ip6tables-save) rules.
+    """Parser for iptables-save, ip6tables-save and ufw rules.
 
     As iptables rules are not stored on disk by default, users
     that want persistent rules need to store them somewhere and
@@ -46,6 +46,7 @@ class IptablesSavePlugin(Plugin):
 
     References:
         - https://git.netfilter.org/iptables/
+        - https://manpages.ubuntu.com/manpages/jammy/en/man8/ufw-framework.8.html
     """
 
     COMMON_SAVE_PATHS = (
@@ -59,6 +60,19 @@ class IptablesSavePlugin(Plugin):
         "/etc/iptables/rules.v6",
         "/etc/iptablesRule.v6",
         "/etc/sysconfig/ip6tables",
+        # UFW
+        "/etc/ufw/before.rules",
+        "/etc/ufw/user.rules",
+        "/etc/ufw/after.rules",
+        "/etc/ufw/before6.rules",
+        "/etc/ufw/user6.rules",
+        "/etc/ufw/after6.rules",
+        "/usr/share/ufw/user.rules",
+        "/usr/share/ufw/user6.rules",
+        "/usr/share/ufw/iptables/user.rules",
+        "/usr/share/ufw/iptables/user6.rules",
+        "/var/lib/ufw/user.rules",
+        "/var/lib/ufw/user6.rules",
     )
 
     LOG_TIME_FORMAT = "%a %b  %d %H:%M:%S %Y"
@@ -79,12 +93,12 @@ class IptablesSavePlugin(Plugin):
                 with rule_path.open("r") as h_rule:
                     first_line = h_rule.readline()
 
-                if PATTERN_IPTABLES_SAVE_GENERATED.match(first_line):
+                if PATTERN_IPTABLES_SAVE_GENERATED.match(first_line) or "*filter" in first_line:
                     yield rule_path
 
     @export(record=IptablesSaveRecord)
     def iptables(self) -> Iterator[IptablesSaveRecord]:
-        """Return iptables rules saved using iptables-save."""
+        """Return iptables and ufw rules saved using iptables-save."""
 
         tzinfo = self.target.datetime.tzinfo
         for rule_path in self._rule_files:
