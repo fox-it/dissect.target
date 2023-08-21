@@ -79,7 +79,7 @@ class VelociraptorLoader(DirLoader):
         #   results/
         #   uploads.json
         #   [...] other files related to the collection
-        if path.suffix == ".zip":
+        if path.suffix == ".zip":  # novermin
             path = zipfile.Path(path)
 
         if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
