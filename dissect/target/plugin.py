@@ -4,7 +4,6 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
-import enum
 import fnmatch
 import importlib
 import importlib.util
