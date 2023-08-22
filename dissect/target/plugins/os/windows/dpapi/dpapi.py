@@ -67,7 +67,7 @@ class DPAPIPlugin(InternalPlugin):
         # This assumes that there is no user named System.
         # As far as I can tell, the name "System" is saved for the actual System user
         # Therefore the user can't actually exist in `all_with_home`
-        result = {"System": {}}
+        result = {self.SYSTEM_USERNAME: {}}
 
         system_master_key_path = self.target.fs.path("sysvol/Windows/System32/Microsoft/Protect/S-1-5-18")
         system_user_master_key_path = system_master_key_path.joinpath("User")

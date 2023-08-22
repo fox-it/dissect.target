@@ -109,6 +109,7 @@ class HashAlgorithm:
 
     def __init_subclass__(cls):
         HASH_ALGORITHMS[cls.id] = cls
+        HASH_ALGORITHMS[cls.name] = cls
 
     @classmethod
     def from_id(cls, id: int) -> HashAlgorithm:
@@ -176,7 +177,6 @@ def pbkdf2(passphrase: bytes, salt: bytes, key_len: int, iterations: int, digest
         for _ in range(iterations - 1):
             actual = hmac.new(passphrase, derived, digestmod=digest).digest()
             derived = bytes(x ^ y for x, y in zip(derived, actual))
-        key += derived
         key.extend(derived)
 
     return bytes(key[:key_len])
@@ -234,14 +234,14 @@ def crypt_session_key_type1(
             digest2.update(verify_blob)
 
     digest1.update(digest2.digest())
-    if entropy and smart_card_secret:
+    if entropy and not smart_card_secret:
         digest1.update(entropy)
 
     if strong_password:
         strong_password = hashlib.sha1(strong_password.rstrip("\x00").encode("utf-16-le")).digest()
         digest1.update(strong_password)
 
-    if smart_card_secret and verify_blob:
+    if verify_blob and not smart_card_secret:
         digest1.update(verify_blob)
 
     return digest1.digest()
