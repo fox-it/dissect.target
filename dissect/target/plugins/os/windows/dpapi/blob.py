@@ -62,7 +62,8 @@ class Blob:
         self.cipher_text = self._blob.cipherText
 
         # All the blob data between the version, provider and sign fields
-        self.blob = data[20 : -(self._blob.signLength + 4)]
+        # TODO: Replace with future offsetof function in cstruct
+        self.blob = data[c_blob.DPAPIBlob.lookup["mkVersion"].offset : -(self._blob.signLength + len(c_blob.DWORD))]
         self.sign = self._blob.sign
 
         self.clear_text = None
