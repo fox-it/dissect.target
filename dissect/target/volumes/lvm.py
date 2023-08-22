@@ -19,13 +19,10 @@ class LvmVolumeSystem(LogicalVolumeSystem):
             if not cls.detect_volume(vol):
                 continue
 
-            pv = lvm.PhysicalVolume(vol)
-            if pv.has_metadata():
-                try:
-                    m = pv.read_metadata()
-                except Exception:
-                    continue
-                lvm_pvs[m.vg.name].append(pv)
+            dev = lvm.LVM2Device(vol)
+            if metadata := dev.metadata:
+                vg_name = next(key for key, value in metadata.items() if isinstance(value, dict))
+                lvm_pvs[vg_name].append(dev)
 
         for pvs in lvm_pvs.values():
             try:
@@ -47,8 +44,9 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         return b"LABELONE" in buf
 
     def _volumes(self) -> Iterator[Volume]:
-        for num, lv in enumerate(self.lvm.volume_group.logical_volumes):
+        for num, (lv_name, lv) in enumerate(self.lvm.volume_group.logical_volumes.items()):
             # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
             # Emulate that here for the volume name
-            name = f"{lv.vg.name.replace('-', '--')}-{lv.metadata.name.replace('-', '--')}"
-            yield Volume(lv, num, None, lv.size, None, name, raw=lv, vs=self)
+            name = f"{lv.vg.name.replace('-', '--')}-{lv_name.replace('-', '--')}"
+            fh = lv.open()
+            yield Volume(fh, num, None, fh.size, None, name, raw=lv, vs=self)
