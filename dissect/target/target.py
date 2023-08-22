@@ -155,6 +155,7 @@ class Target:
         """Resolve all disks, volumes and filesystems and load an operating system on the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
+        self.filesystems.apply()
         self._init_os()
         self._applied = True
 
@@ -712,18 +713,11 @@ class DiskCollection(Collection[container.Container]):
 
 
 class VolumeCollection(Collection[volume.Volume]):
-    def open(self, vol: volume.Volume) -> None:
-        try:
-            if not hasattr(vol, "fs") or vol.fs is None:
-                vol.fs = filesystem.open(vol)
-                self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
-            self.target.filesystems.add(vol.fs)
-        except FilesystemError as e:
-            self.target.log.warning("Can't identify filesystem: %s", vol)
-            self.target.log.debug("", exc_info=e)
-
     def apply(self) -> None:
         todo = self.entries
+        fs_volumes = []
+        lvm_volumes = []
+        encrypted_volumes = []
 
         while todo:
             new_volumes = []
@@ -742,17 +736,17 @@ class VolumeCollection(Collection[volume.Volume]):
                         vs = volume.open(vol)
                     except Exception:
                         # If opening a volume system fails, there's likely none, so open as a filesystem instead
-                        self.open(vol)
+                        fs_volumes.append(vol)
                         continue
 
                     if not len(vs.volumes):
-                        self.open(vol)
+                        fs_volumes.append(vol)
                         continue
 
                     for new_vol in vs.volumes:
                         if new_vol.offset == 0:
                             self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                            self.open(new_vol)
+                            fs_volumes.append(new_vol)
                             continue
                         new_volumes.append(new_vol)
 
@@ -773,20 +767,30 @@ class VolumeCollection(Collection[volume.Volume]):
 
             todo = new_volumes
 
-        # ASDF - getting the correct starting system volume
-        start_fs = None
-        start_vol = None
-        for idx, vol in enumerate(self.entries):
-            if start_fs is None and (vol.name is None):
-                start_fs = idx
+        mv_fs_volumes = []
+        for vol in fs_volumes:
+            try:
+                if getattr(vol, "fs", None) is None:
+                    if filesystem.is_multi_volume_filesystem(vol):
+                        mv_fs_volumes.append(vol)
+                    else:
+                        vol.fs = filesystem.open(vol)
+                        self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
 
-            if start_vol is None and start_fs is not None and (vol.name is not None and vol.fs is None):
-                start_vol = idx
+                if getattr(vol, "fs", None) is not None:
+                    self.target.filesystems.add(vol.fs)
+            except FilesystemError as e:
+                self.target.log.warning("Can't identify filesystem: %s", vol)
+                self.target.log.debug("", exc_info=e)
 
-            if start_fs is not None and start_vol is not None and (vol.name is not None and vol.fs is None):
-                rel_vol = idx - start_vol
-                vol.fs = self.entries[start_fs + rel_vol].fs
+        for fs in filesystem.open_multi_volume(mv_fs_volumes):
+            self.target.filesystems.add(fs)
+            for vol in fs.volume:
+                vol.fs = fs
 
 
 class FilesystemCollection(Collection[filesystem.Filesystem]):
-    pass
+    def apply(self) -> None:
+        for fs in self.entries:
+            for subfs in fs.iter_subfs():
+                self.add(subfs)

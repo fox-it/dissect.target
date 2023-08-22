@@ -3,6 +3,7 @@ import logging
 from typing import Union
 
 from dissect.target import Target, filesystem
+from dissect.target.helpers.utils import parse_options_string
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -70,7 +71,7 @@ def main():
         vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments
-    options = _parse_options(args.options) if args.options else {}
+    options = parse_options_string(args.options) if args.options else {}
 
     options["nothreads"] = True
     options["allow_other"] = True
@@ -81,17 +82,6 @@ def main():
         FUSE(DissectMount(vfs), args.mount, **options)
     except RuntimeError:
         parser.exit("FUSE error")
-
-
-def _parse_options(options: str) -> dict[str, Union[str, bool]]:
-    result = {}
-    for opt in options.split(","):
-        if "=" in opt:
-            key, _, value = opt.partition("=")
-            result[key] = value
-        else:
-            result[opt] = True
-    return result
 
 
 def _format_options(options: dict[str, Union[str, bool]]) -> str:

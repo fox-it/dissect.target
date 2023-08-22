@@ -171,6 +171,7 @@ def mocked_win_volumes_fs():
     mock_good_volume.drive_letter = "W"
 
     mock_good_fs = Mock(name="good-fs")
+    mock_good_fs.iter_subfs.return_value = []
 
     def mock_filesystem_open(volume):
         if volume == mock_good_volume:
