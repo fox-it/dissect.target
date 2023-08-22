@@ -1,12 +1,12 @@
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.modules import ModulePlugin
+from dissect.target.plugins.os.unix.linux.modules import ModulePlugin
 from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
 def test_modules_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    test_folder = absolute_path("data/plugins/os/unix/modules/module")
+    test_folder = absolute_path("data/plugins/os/unix/linux/modules/module")
     fs_unix.map_dir("/sys/module", test_folder)
 
     target_unix.add_plugin(ModulePlugin)

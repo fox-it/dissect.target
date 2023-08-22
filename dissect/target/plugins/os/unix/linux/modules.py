@@ -51,7 +51,7 @@ class ModulePlugin(Plugin):
                 )
 
     @export(record=ModuleRecord)
-    def modules(self) -> Iterator[ModuleRecord]:
+    def sysmodules(self) -> Iterator[ModuleRecord]:
         """Return information about active kernel modules."""
         for module in self._iterate_modules():
             yield ModuleRecord(
