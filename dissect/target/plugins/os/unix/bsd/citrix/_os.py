@@ -12,7 +12,7 @@ from dissect.target.target import Target
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
 RE_CONFIG_TIMEZONE = re.compile(
-    r'set ns param -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
+    r'set ns param.* -timezone "GMT\+(?P<hours>[0-9]+):(?P<minutes>[0-9]+)-.*-(?P<zone_name>.+)"'
 )
 RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
@@ -72,13 +72,21 @@ class CitrixBsdPlugin(BsdPlugin):
 
     @export(property=True)
     def version(self) -> Optional[str]:
+        version = "Unknown"
         version_path = self.target.fs.path("/flash/.version")
-        version = version_path.read_text().strip()
-        loader_conf = self.target.fs.path("/flash/boot/loader.conf").read_text()
-        if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
-            kernel_version = match.groupdict()["version"]
-            return f"{version} ({kernel_version})"
-        self.target.log.warn("Could not determine kernel version")
+        if version_path.is_file():
+            version = version_path.read_text().strip()
+
+        loader_conf_path = self.target.fs.path("/flash/boot/loader.conf")
+        if loader_conf_path.is_file():
+            loader_conf = loader_conf_path.read_text()
+            if match := RE_LOADER_CONFIG_KERNEL_VERSION.search(loader_conf):
+                kernel_version = match.groupdict()["version"]
+                version = f"{version} ({kernel_version})" if version else kernel_version
+
+        if not version:
+            self.target.log.warn("Could not determine kernel version")
+
         return version
 
     @export(property=True)

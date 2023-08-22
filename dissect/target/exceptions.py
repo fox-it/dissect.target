@@ -110,3 +110,7 @@ class HiveUnavailableError(RegistryError):
 
 class RegistryCorruptError(RegistryError):
     """The registry is corrupt."""
+
+
+class ConfigurationParsingError(Error):
+    """An error occurred during configuration parsing."""
