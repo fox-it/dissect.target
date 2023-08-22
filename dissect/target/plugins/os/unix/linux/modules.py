@@ -60,6 +60,7 @@ class ModulePlugin(Plugin):
                 refcount=module.refcnt,
                 used_by=module.used_by,
                 source=module.path,
+                _target=self.target,
             )
 
     @export(output="yield")
