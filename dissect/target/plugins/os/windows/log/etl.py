@@ -18,7 +18,7 @@ class EtlRecordBuilder:
         record_values = {}
         record_fields = [
             ("datetime", "ts"),
-            ("uri", "path"),
+            ("path", "path"),
             ("string", "ProviderName"),
             ("string", "ProviderId"),
             ("string", "EventType"),

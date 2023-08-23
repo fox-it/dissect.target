@@ -16,7 +16,7 @@ GENERIC_THUMBCACHE_FIELDS = [
     ("varint", "data_size"),
     ("bytes", "header_checksum"),
     ("bytes", "data_checksum"),
-    ("uri", "path"),
+    ("path", "path"),
 ]
 IndexRecord = TargetRecordDescriptor(
     "windows/thumbcache/index",
@@ -25,7 +25,7 @@ IndexRecord = TargetRecordDescriptor(
         ("boolean", "in_use"),
         ("varint", "flags"),
         ("datetime", "last_modified"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 ThumbcacheRecord = TargetRecordDescriptor("windows/thumbcache/thumbcache", GENERIC_THUMBCACHE_FIELDS)

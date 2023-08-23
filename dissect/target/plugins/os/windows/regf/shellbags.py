@@ -251,7 +251,7 @@ DELEGATE_ITEM_IDENTIFIER = b"\x74\x1a\x59\x5e\x96\xdf\xd3\x48\x8d\x67\x17\x33\xb
 ShellBagRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/shellbag",
     [
-        ("uri", "path"),
+        ("path", "path"),
         ("datetime", "creation_time"),
         ("datetime", "modification_time"),
         ("datetime", "access_time"),

@@ -4,7 +4,7 @@ from typing import Callable
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path as rpath
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -27,7 +27,7 @@ FilesystemStdCompactRecord = TargetRecordDescriptor(
         ("datetime", "last_change_time"),
         ("datetime", "last_access_time"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -43,7 +43,7 @@ FilesystemStdRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "ts_type"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -62,7 +62,7 @@ FilesystemFilenameCompactRecord = TargetRecordDescriptor(
         ("datetime", "last_access_time"),
         ("uint32", "filename_index"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -79,7 +79,7 @@ FilesystemFilenameRecord = TargetRecordDescriptor(
         ("string", "ts_type"),
         ("uint32", "filename_index"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -192,7 +192,7 @@ class MftPlugin(Plugin):
                 attr=attr,
                 record_type=InformationType.STANDARD_INFORMATION,
                 segment=segment,
-                path=uri.from_windows(path),
+                path=rpath.from_windows(path),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -209,7 +209,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=idx,
                 segment=segment,
-                path=uri.from_windows(filepath),
+                path=rpath.from_windows(filepath),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -232,7 +232,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=None,
                 segment=segment,
-                path=uri.from_windows(ads_path),
+                path=rpath.from_windows(ads_path),
                 owner=owner,
                 filesize=size,
                 resident=resident,

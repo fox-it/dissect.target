@@ -160,7 +160,7 @@ def test_mft_plugin_disk_label(target_win):
     load_mft_plugin(target_win)
     target_win.fs.mounts = {"c:": target_win.filesystems[0]}
     for mft_entries in target_win.mft():
-        assert mft_entries.path.startswith("c:/")
+        assert str(mft_entries.path).startswith("c:\\")
 
 
 def test_mft_plugin_ads(target_win, compact):
@@ -188,11 +188,11 @@ def test_mft_plugin_last_entries(target_win):
         "NamelessDirectory",
         "Food For Thought",
         "text_document.txt",
-        "NamelessDirectory/totally_normal.txt",
-        "NamelessDirectory/totally_normal.txt:secret_text.txt",
+        "NamelessDirectory\\totally_normal.txt",
+        "NamelessDirectory\\totally_normal.txt:secret_text.txt",
     ]
     for mft_entry in mft_data:
-        assert mft_entry.path in test_data
+        assert str(mft_entry.path) in test_data
 
 
 def test_mft_plugin_owner(target_win):

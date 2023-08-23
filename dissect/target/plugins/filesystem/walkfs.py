@@ -13,7 +13,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("datetime", "ctime"),
         ("datetime", "btime"),
         ("varint", "ino"),
-        ("uri", "path"),
+        ("path", "path"),
         ("filesize", "size"),
         ("uint32", "mode"),
         ("uint32", "uid"),

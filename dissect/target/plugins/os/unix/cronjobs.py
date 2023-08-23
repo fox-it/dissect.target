@@ -13,7 +13,7 @@ CronjobRecord = TargetRecordDescriptor(
         ("string", "weekday"),
         ("string", "user"),
         ("wstring", "command"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -22,7 +22,7 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
     [
         ("string", "key"),
         ("string", "value"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 

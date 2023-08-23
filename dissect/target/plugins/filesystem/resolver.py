@@ -34,6 +34,7 @@ class ResolverPlugin(Plugin):
         if not path:
             return path
 
+        path = str(path)
         if self.target.os == "windows":
             return self.resolve_windows(path, user_sid=user)
         else:

@@ -14,7 +14,7 @@ from dissect.target.plugin import Plugin, arg, export
 YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
-        ("uri", "path"),
+        ("path", "path"),
         ("digest", "digest"),
         ("string", "rule"),
         ("string[]", "tags"),

@@ -7,7 +7,7 @@ RemoteAccessRecord = create_extended_descriptor([UserRecordDescriptorExtension])
     [
         ("datetime", "ts"),
         ("string", "tool"),
-        ("uri", "logfile"),
+        ("path", "logfile"),
         ("string", "description"),
     ],
 )

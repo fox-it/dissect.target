@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from dissect.util.ts import from_unix
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryError
 from dissect.target.helpers.descriptor_extensions import (
@@ -23,7 +23,7 @@ AppInitRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/appinit",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -31,7 +31,7 @@ KnownDllRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/knowndlls",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -39,7 +39,7 @@ SessionManagerRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/sessionmanager",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -64,7 +64,7 @@ CommandProcAutoRunRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/commandprocautorun",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -72,7 +72,7 @@ AlternateShellRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/alternateshell",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -80,7 +80,7 @@ BootShellRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/bootshell",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -88,7 +88,7 @@ FileRenameOperationRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/filerenameoperations",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -96,7 +96,7 @@ WinRarRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/winrar",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -104,8 +104,8 @@ WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/winsocknamespaceprovider",
     [
         ("datetime", "ts"),
-        ("uri", "librarypath"),
-        ("uri", "displaystring"),
+        ("path", "librarypath"),
+        ("path", "displaystring"),
         ("bytes", "providerid"),
         ("string", "enabled"),
         ("string", "version"),
@@ -247,10 +247,9 @@ class GenericPlugin(Plugin):
                 user = self.target.registry.get_user(r)
                 try:
                     value = r.value(name)
-                    path = uri.from_windows(value.value)
                     yield AppInitRecord(
                         ts=r.ts,
-                        path=path,
+                        path=path.from_windows(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -277,10 +276,9 @@ class GenericPlugin(Plugin):
             for r in self.target.registry.keys(key):
                 user = self.target.registry.get_user(r)
                 for value in r.values():
-                    path = uri.from_windows(value.value)
                     yield KnownDllRecord(
                         ts=r.ts,
-                        path=path,
+                        path=path.from_windows(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -324,19 +322,17 @@ class GenericPlugin(Plugin):
                         if d == "autocheck autochk *":
                             continue
 
-                        path = uri.from_windows(d)
                         yield SessionManagerRecord(
                             ts=r.ts,
-                            path=path,
+                            path=path.from_windows(d),
                             _target=self.target,
                             _user=user,
                             _key=r,
                         )
                 else:
-                    path = uri.from_windows(data.split(" ")[0])
                     yield SessionManagerRecord(
                         ts=r.ts,
-                        path=path,
+                        path=path.from_windows(data.split(" ")[0]),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -428,10 +424,9 @@ class GenericPlugin(Plugin):
                 user = self.target.registry.get_user(r)
                 try:
                     value = r.value(name)
-                    path = uri.from_windows(value.value)
                     yield CommandProcAutoRunRecord(
                         ts=r.ts,
-                        path=path,
+                        path=path.from_windows(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -455,10 +450,9 @@ class GenericPlugin(Plugin):
         for r in self.target.registry.keys(key):
             user = self.target.registry.get_user(r)
             value = r.value("AlternateShell")
-            path = uri.from_windows(value.value)
             yield AlternateShellRecord(
                 ts=r.ts,
-                path=path,
+                path=path.from_windows(value.value),
                 _target=self.target,
                 _user=user,
                 _key=r,
@@ -480,10 +474,9 @@ class GenericPlugin(Plugin):
             except RegistryError:
                 continue
 
-            path = uri.from_windows(value.value)
             yield BootShellRecord(
                 ts=r.ts,
-                path=path,
+                path=path.from_windows(value.value),
                 _target=self.target,
                 _user=user,
                 _key=r,
@@ -506,14 +499,14 @@ class GenericPlugin(Plugin):
             user = self.target.registry.get_user(r)
             try:
                 value = r.value("PendingFileRenameOperations")
-                paths = map(uri.from_windows, value.value)
+                paths = map(path.from_windows, value.value)
             except RegistryError:
                 continue
 
-            for path in paths:
+            for file_path in paths:
                 yield FileRenameOperationRecord(
                     ts=r.ts,
-                    path=path,
+                    path=file_path,
                     _target=self.target,
                     _user=user,
                     _key=r,
@@ -532,10 +525,9 @@ class GenericPlugin(Plugin):
             for r in self.target.registry.keys(key):
                 user = self.target.registry.get_user(r)
                 for v in r.values():
-                    path = uri.from_windows(v.value)
                     yield WinRarRecord(
                         ts=r.ts,
-                        path=path,
+                        path=path.from_windows(v.value),
                         _target=self.target,
                         _user=user,
                         _key=r,

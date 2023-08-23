@@ -9,7 +9,7 @@ from dissect.target.plugin import Plugin, export
 AcquireHashRecord = TargetRecordDescriptor(
     "filesystem/acquire_hash",
     [
-        ("uri", "path"),
+        ("path", "path"),
         ("filesize", "filesize"),
         ("digest", "digest"),
     ],

@@ -3,7 +3,7 @@ from io import BytesIO
 from dissect import cstruct
 from dissect.util import lzxpress_huffman
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -13,9 +13,9 @@ PrefetchRecord = TargetRecordDescriptor(
     "filesystem/ntfs/prefetch",
     [
         ("datetime", "ts"),
-        ("uri", "filename"),
-        ("uri", "prefetch"),
-        ("uri", "linkedfile"),
+        ("path", "filename"),
+        ("path", "prefetch"),
+        ("path", "linkedfile"),
         ("uint32", "runcount"),
     ],
 )
@@ -25,8 +25,8 @@ GroupedPrefetchRecord = TargetRecordDescriptor(
     "filesystem/ntfs/prefetch",
     [
         ("datetime", "ts"),
-        ("uri", "filename"),
-        ("uri", "prefetch"),
+        ("path", "filename"),
+        ("path", "prefetch"),
         ("uri[]", "linkedfiles"),
         ("uint32", "runcount"),
         ("datetime[]", "previousruns"),
@@ -212,7 +212,7 @@ class Prefetch:
                 self.fn.filename_strings_offset + entry.filename_string_offset,
                 entry.filename_string_number_of_characters,
             )
-            metrics.append(uri.from_windows(filename.decode("utf-16-le")))
+            metrics.append(path.from_windows(filename.decode("utf-16-le")))
         return metrics
 
     def read_filename(self, off, size):

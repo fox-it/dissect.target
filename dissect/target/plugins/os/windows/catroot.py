@@ -1,5 +1,5 @@
 from asn1crypto import algos, core
-from flow.record.fieldtypes import digest, uri
+from flow.record.fieldtypes import digest, path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -14,8 +14,8 @@ CatrootRecord = TargetRecordDescriptor(
     "windows/catroot",
     [
         ("digest", "digest"),
-        ("uri", "hint"),
-        ("uri", "source"),
+        ("path", "hint"),
+        ("path", "source"),
     ],
 )
 
@@ -118,7 +118,7 @@ class CatrootPlugin(Plugin):
 
                             yield CatrootRecord(
                                 digest=fdigest,
-                                hint=uri.from_windows(filehint) if filehint else None,
+                                hint=path.from_windows(filehint) if filehint else None,
                                 source=str(f),
                                 _target=self.target,
                             )

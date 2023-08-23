@@ -18,7 +18,7 @@ CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension
 
 COMMAND_HISTORY_FILES = [".bash_history", ".zsh_history", ".python_history"]
 # TODO: Add support for fish_history YAML-based files.
-IGNORED_HOMES = ["/bin", "/usr/sbin", "/sbin"]
+IGNORED_HOMES = ("/bin", "/usr/sbin", "/sbin")
 
 RE_EXTENDED_BASH = re.compile(r"^#(?P<ts>\d{10})$")
 RE_EXTENDED_ZSH = re.compile(r"^: (?P<ts>\d{10}):\d+;(?P<command>.*)$")
@@ -49,9 +49,8 @@ class CommandHistoryPlugin(Plugin):
         """
 
         for user_details in self.target.user_details.all_with_home():
-            for ih in IGNORED_HOMES:
-                if ih in user_details.user.home:
-                    continue
+            if str(user_details.user.home).startswith(IGNORED_HOMES):
+                continue
 
             for file in user_details.home_path.iterdir():
                 if file.name not in COMMAND_HISTORY_FILES:

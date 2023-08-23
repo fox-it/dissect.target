@@ -1,6 +1,6 @@
 import re
 
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -16,8 +16,8 @@ ServiceRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "name"),
         ("wstring", "displayname"),
-        ("uri", "servicedll"),
-        ("uri", "imagepath"),
+        ("path", "servicedll"),
+        ("path", "imagepath"),
         ("string", "imagepath_args"),
         ("string", "objectname"),
         ("string", "start"),
@@ -100,7 +100,7 @@ class ServicesPlugin(Plugin):
 
                 try:
                     servicedll = key.subkey("Parameters").value("ServiceDll").value
-                    servicedll = uri.from_windows(servicedll)
+                    servicedll = path.from_windows(servicedll)
                 except RegistryError:
                     pass
 
@@ -138,7 +138,7 @@ class ServicesPlugin(Plugin):
                                 image_path = image_path[: m.end(0)].strip()
                             else:
                                 pass
-                        image_path = uri.from_windows(image_path)
+                        image_path = path.from_windows(image_path)
                 except RegistryError:
                     pass
 
