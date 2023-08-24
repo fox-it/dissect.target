@@ -2,7 +2,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 import dissect.target.helpers.hashutil as hashutil
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
@@ -39,9 +39,9 @@ def test_hash_uri_none(resolver):
 @pytest.mark.parametrize(
     "test_input,expected",
     [
-        ({"name": uri}, 1),
-        ({"name": uri, "test": uri}, 2),
-        ({"name": uri, "test": str}, 1),
+        ({"name": path}, 1),
+        ({"name": path, "test": path}, 2),
+        ({"name": path, "test": str}, 1),
     ],
 )
 @patch("flow.record.Record")
@@ -92,7 +92,7 @@ def test_uris_with_exception(hash_uri, side_effects, expected):
     with patch("flow.record.Record") as record:
         # Create a list of uris with the size of the record
         record._desc.name = "test"
-        record._field_types = {str(i): uri for i in range(len(side_effects))}
+        record._field_types = {str(i): path for i in range(len(side_effects))}
         hashed_record = hashutil.hash_uri_records(Mock(), record)
 
         if not expected:
