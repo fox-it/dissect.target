@@ -16,6 +16,7 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         automatically added.
         """
 
+        fields = fields or []
         prepend_default_fields = []
         append_default_fields = []
         extended_fields = []

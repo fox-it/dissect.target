@@ -76,7 +76,7 @@ class UserAssistPlugin(Plugin):
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The entry timestamp.
-            path (uri): The entry path.
+            path (path): The entry path.
             number_of_executions (int): The number of executions for this entry.
             application_focus_count (int): The number of focus acount for this entry.
             application_focus_duration (int): The duration of focus for this entry.

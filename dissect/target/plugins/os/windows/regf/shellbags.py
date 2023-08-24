@@ -2,8 +2,9 @@ import io
 import logging
 import uuid
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import dostimestamp
+from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import shell_folder_ids
@@ -242,7 +243,7 @@ struct EXTENSION_BLOCK_HEADER {
     uint32  signature;
 };
 """
-c_bag = cstruct.cstruct()
+c_bag = cstruct()
 c_bag.load(bag_def)
 
 DELEGATE_ITEM_IDENTIFIER = b"\x74\x1a\x59\x5e\x96\xdf\xd3\x48\x8d\x67\x17\x33\xbc\xee\x28\xba"
@@ -321,7 +322,7 @@ class ShellBagsPlugin(Plugin):
             for item in parse_shell_item_list(value):
                 path = "\\".join(path_prefix + [item.name])
                 yield ShellBagRecord(
-                    path=path,
+                    path=windows_path(path),
                     creation_time=item.creation_time,
                     modification_time=item.modification_time,
                     access_time=item.access_time,

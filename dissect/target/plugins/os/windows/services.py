@@ -79,8 +79,8 @@ class ServicesPlugin(Plugin):
             ts (datatime): The last modified timestamp of the registry key.
             name (string): The service name.
             displayname (string): The service display name.
-            servicedll (uri): The service dll.
-            imagepath (uri): The service image path.
+            servicedll (path): The service dll.
+            imagepath (path): The service image path.
             objectname (string): The object under which the service runs (for example LocalSystem)
             start (string): The service start field.
             type (string): The service type field.

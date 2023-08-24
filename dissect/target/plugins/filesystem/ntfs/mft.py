@@ -4,7 +4,7 @@ from typing import Callable
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
-from flow.record.fieldtypes import path as rpath
+from flow.record.fieldtypes import windows_path
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -192,7 +192,7 @@ class MftPlugin(Plugin):
                 attr=attr,
                 record_type=InformationType.STANDARD_INFORMATION,
                 segment=segment,
-                path=rpath.from_windows(path),
+                path=windows_path.from_windows(path),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -209,7 +209,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=idx,
                 segment=segment,
-                path=rpath.from_windows(filepath),
+                path=windows_path.from_windows(filepath),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -232,7 +232,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=None,
                 segment=segment,
-                path=rpath.from_windows(ads_path),
+                path=windows_path.from_windows(ads_path),
                 owner=owner,
                 filesize=size,
                 resident=resident,

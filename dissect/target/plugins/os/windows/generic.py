@@ -105,7 +105,7 @@ WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
     [
         ("datetime", "ts"),
         ("path", "librarypath"),
-        ("path", "displaystring"),
+        ("string", "displaystring"),
         ("bytes", "providerid"),
         ("string", "enabled"),
         ("string", "version"),
@@ -551,7 +551,7 @@ class GenericPlugin(Plugin):
                 for s in r.subkeys():
                     yield WinSockNamespaceProviderRecord(
                         ts=r.ts,
-                        librarypath=s.value("LibraryPath").value,
+                        librarypath=path.from_windows(s.value("LibraryPath").value),
                         displaystring=s.value("DisplayString").value,
                         providerid=s.value("ProviderID").value,
                         enabled=s.value("Enabled").value,

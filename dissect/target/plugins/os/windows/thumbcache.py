@@ -55,7 +55,7 @@ class ThumbcachePlugin(Plugin):
                 extension=entry.extension,
                 header_checksum=entry.header_checksum,
                 data_checksum=entry.data_checksum,
-                path=str(path),
+                path=path,
                 data_size=len(entry.data),
             )
         for index_entry in cache.index_entries():
@@ -64,7 +64,7 @@ class ThumbcachePlugin(Plugin):
                 in_use=index_entry.in_use(),
                 flags=index_entry.flags,
                 last_modified=index_entry.last_modified,
-                path=str(cache.index_file),
+                path=cache.index_file,
             )
 
     def _parse_thumbcache(

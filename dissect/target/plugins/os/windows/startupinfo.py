@@ -81,7 +81,7 @@ class StartupInfoPlugin(Plugin):
                         pid=process.get("PID"),
                         parent_pid=process.findtext("ParentPID"),
                         parent_start_time=parse_ts(parent_start_time),
-                        parent_name=process.findtext("ParentName"),
+                        parent_name=path.from_windows(process.findtext("ParentName")),
                         disk_usage=process.findtext("DiskUsage"),
                         cpu_usage=process.findtext("CpuUsage"),
                         _target=self.target,

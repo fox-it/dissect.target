@@ -5,8 +5,6 @@ try:
 except ImportError:
     raise ImportError("Please install 'yara-python' to use 'target-query -f yara'.")
 
-from flow.record.fieldtypes import uri
-
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
@@ -51,7 +49,7 @@ class YaraPlugin(Plugin):
 
                 for match in rules.match(data=entry.read_bytes()):
                     yield YaraMatchRecord(
-                        path=uri(str(entry)),
+                        path=entry,
                         digest=entry.get().hash(),
                         rule=match.rule,
                         tags=match.tags,
