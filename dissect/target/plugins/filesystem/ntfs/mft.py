@@ -192,7 +192,7 @@ class MftPlugin(Plugin):
                 attr=attr,
                 record_type=InformationType.STANDARD_INFORMATION,
                 segment=segment,
-                path=windows_path.from_windows(path),
+                path=windows_path(path),
                 owner=owner,
                 filesize=size,
                 resident=resident,
