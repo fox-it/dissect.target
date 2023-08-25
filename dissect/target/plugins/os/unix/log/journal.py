@@ -214,7 +214,7 @@ struct EntryObject {
     le64_t      monotonic;
     sd_id128_t  boot_id;
     le64_t      xor_hash;
-    EntryItem   items[size - 64 / 16];                // The size minus the previous members divided by the size of the items
+    EntryItem   items[(size - 64) / 16];                // The size minus the previous members divided by the size of the items
 };
 
 // If the HEADER_INCOMPATIBLE_COMPACT flag is set, DATA object offsets are stored as 32-bit integers instead of 64bit
@@ -229,7 +229,7 @@ struct EntryObject_Compact {
     le64_t      monotonic;
     sd_id128_t  boot_id;
     le64_t      xor_hash;
-    EntryItem_Compact   items[size - 64 / 4];
+    EntryItem_Compact   items[(size - 64) / 4];
 };
 
 // The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
@@ -239,7 +239,7 @@ struct EntryArrayObject {
     uint8_t     reserved[6];
     le64_t      size;
     le64_t      next_entry_array_offset;
-    le64_t      entry_object_offsets[size - 24 / 8];  // The size minus the previous members divided by the size of the offset
+    le64_t      entry_object_offsets[(size - 24) / 8];  // The size minus the previous members divided by the size of the offset
 };
 
 struct EntryArrayObject_Compact {
@@ -248,7 +248,7 @@ struct EntryArrayObject_Compact {
     uint8_t     reserved[6];
     le64_t      size;
     le64_t      next_entry_array_offset;
-    le32_t      entry_object_offsets[size - 24 / 4];
+    le32_t      entry_object_offsets[(size - 24) / 4];
 };
 """  # noqa: E501
 
