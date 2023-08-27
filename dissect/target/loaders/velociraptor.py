@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
@@ -57,7 +57,7 @@ class VelociraptorLoader(DirLoader):
         - https://github.com/Velocidex/velociraptor
     """
 
-    def __init__(self, path: Union[Path, str], **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path)
 
         if path.suffix == ".zip":

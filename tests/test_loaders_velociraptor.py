@@ -74,9 +74,9 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target,
     )
     root.joinpath(paths[1]).joinpath("$UsnJrnl%3A$J").write_bytes(data)
 
-    shutil.make_archive(f"{tmp_path}/test_ntfs", "zip", tmp_path)
+    shutil.make_archive(tmp_path.joinpath("test_ntfs"), "zip", tmp_path)
 
-    zip_path = Path(f"{tmp_path}/test_ntfs.zip")
+    zip_path = tmp_path.joinpath("test_ntfs.zip")
     assert VelociraptorLoader.detect(zip_path) is True
 
     loader = VelociraptorLoader(zip_path)
@@ -128,9 +128,9 @@ def test_dir_loader_unix_zip(paths: list[str], mock_target: Target, tmp_path: Pa
 
     (root / "uploads.json").write_bytes(b"{}")
 
-    shutil.make_archive(f"{tmp_path}/test_unix", "zip", tmp_path)
+    shutil.make_archive(tmp_path.joinpath("test_unix"), "zip", tmp_path)
 
-    zip_path = Path(f"{tmp_path}/test_unix.zip")
+    zip_path = tmp_path.joinpath("test_unix.zip")
     assert VelociraptorLoader.detect(zip_path) is True
 
     loader = VelociraptorLoader(zip_path)
