@@ -71,6 +71,7 @@ DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
+DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
 
@@ -461,7 +462,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     yield DefenderFileQuarantineRecord(**fields, _target=self.target)
                 else:
                     # For these types, we know that they have no known additional data to add to the Quarantine Record.
-                    if resource.detection_type not in [b"internalbehavior", b"regkey", b"runkey"]:
+                    if resource.detection_type not in DEFENDER_KNOWN_DETECTION_TYPES:
                         self.target.log.warning(
                             "Unknown Defender Detection Type %s, yielding a generic quarantine record.",
                             resource.detection_type,
