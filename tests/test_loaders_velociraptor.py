@@ -9,44 +9,21 @@ from dissect.target.loaders.velociraptor import VelociraptorLoader
 from ._utils import absolute_path, mkdirs
 
 
+def create_paths(sub_dir: str) -> list[str]:
+    return [
+        f"uploads/{sub_dir}/%5C%5C.%5CC%3A/",
+        f"uploads/{sub_dir}/%5C%5C.%5CC%3A/$Extend",
+        f"uploads/{sub_dir}/%5C%5C.%5CC%3A/windows/system32",
+        f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
+    ]
+
+
 @pytest.mark.parametrize(
-    "paths",
-    [
-        (
-            [
-                "uploads/mft/%5C%5C.%5CC%3A/",
-                "uploads/mft/%5C%5C.%5CC%3A/$Extend",
-                "uploads/mft/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/mft/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/ntfs/%5C%5C.%5CC%3A/",
-                "uploads/ntfs/%5C%5C.%5CC%3A/$Extend",
-                "uploads/ntfs/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/ntfs/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/",
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/$Extend",
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/ntfs_vss/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/",
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/$Extend",
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/lazy_ntfs/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-    ],
+    "sub_dir",
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs"],
 )
-def test_velociraptor_loader_windows_ntfs(paths: list[str], mock_target: Target, tmp_path: Path) -> None:
+def test_velociraptor_loader_windows_ntfs(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
+    paths = create_paths(sub_dir)
     root = tmp_path
     mkdirs(root, paths)
 
@@ -76,43 +53,11 @@ def test_velociraptor_loader_windows_ntfs(paths: list[str], mock_target: Target,
 
 
 @pytest.mark.parametrize(
-    "paths",
-    [
-        (
-            [
-                "uploads/mft/%5C%5C.%5CC%3A/",
-                "uploads/mft/%5C%5C.%5CC%3A/$Extend",
-                "uploads/mft/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/mft/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/ntfs/%5C%5C.%5CC%3A/",
-                "uploads/ntfs/%5C%5C.%5CC%3A/$Extend",
-                "uploads/ntfs/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/ntfs/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/",
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/$Extend",
-                "uploads/ntfs_vss/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/ntfs_vss/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-        (
-            [
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/",
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/$Extend",
-                "uploads/lazy_ntfs/%5C%5C.%5CC%3A/windows/system32",
-                "uploads/lazy_ntfs/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1",
-            ]
-        ),
-    ],
+    "sub_dir",
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs"],
 )
-def test_velociraptor_loader_windows_ntfs_zip(paths: list[str], mock_target: Target, tmp_path: Path) -> None:
+def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
+    paths = create_paths(sub_dir)
     root = tmp_path
     mkdirs(root, paths)
 
