@@ -94,7 +94,7 @@ flag IncompatibleFlag : le32_t {
     HEADER_INCOMPATIBLE_COMPRESSED_LZ4  = 2,
     HEADER_INCOMPATIBLE_KEYED_HASH      = 4,
     HEADER_INCOMPATIBLE_COMPRESSED_ZSTD = 8,
-    HEADER_INCOMPATIBLE_COMPACT         = 16,         // indicates that the Journal file uses the new binary format
+    HEADER_INCOMPATIBLE_COMPACT         = 16,             // indicates that the Journal file uses the new binary format
 };
 
 struct Header {
@@ -154,10 +154,10 @@ flag ObjectFlag : uint8 {
 };
 
 struct ObjectHeader {
-    ObjectType  type;                                 // The type field is one of the object types listed above
-    uint8_t     flags;                                // If DATA object the value is ObjectFlag
+    ObjectType  type;                                     // The type field is one of the object types listed above
+    uint8_t     flags;                                    // If DATA object the value is ObjectFlag
     uint8_t     reserved[6];
-    le64_t      size;                                 // The size field encodes the size of the object including all its headers and payload
+    le64_t      size;                                     // The size field encodes the size of the object including all its headers and payload
 };
 
 
@@ -173,7 +173,7 @@ struct DataObject {
     le64_t      entry_offset;
     le64_t      entry_array_offset;
     le64_t      n_entries;
-    char        payload[size - 64];                   // Data objects carry actual field data in the payload[] array.
+    char        payload[size - 64];                       // Data objects carry actual field data in the payload[] array.
 };
 
 // If the HEADER_INCOMPATIBLE_COMPACT flag is set, two extra fields are stored to allow immediate access
@@ -191,7 +191,7 @@ struct DataObject_Compact {
     le64_t      n_entries;
     le32_t      tail_entry_array_offset;
     le32_t      tail_entry_array_n_entries;
-    char        payload[size - 72];                   // Data objects carry actual field data in the payload[] array.
+    char        payload[size - 72];                       // Data objects carry actual field data in the payload[] array.
 };
 
 struct EntryItem {
