@@ -18,13 +18,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import cache, hashutil
 from dissect.target.loaders.targetd import ProxyLoader
-from dissect.target.plugin import (
-    PLUGINS,
-    NamespacePlugin,
-    OSPlugin,
-    Plugin,
-    find_plugin_functions,
-)
+from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -244,7 +238,8 @@ def main():
         func_defs, _ = find_plugin_functions(target, args.function, False)
 
         for func_def in func_defs:
-            if func_def.method_name in executed_plugins:
+            # Avoid executing same plugin for multiple OSes (like hostname)
+            if f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}" in executed_plugins:
                 continue
 
             # If the default type is record (meaning we skip everything else)
@@ -293,9 +288,7 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
-            # Plugins derived from NamespacePlugin are not meant to be unique
-            if not issubclass(func_def.class_object, NamespacePlugin):
-                executed_plugins.add(func_def.method_name)
+            executed_plugins.add(f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}")
 
             if output_type == "record":
                 record_entries.append(result)
