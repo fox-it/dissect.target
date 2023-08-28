@@ -20,7 +20,7 @@ def create_paths(sub_dir: str) -> list[str]:
 
 @pytest.mark.parametrize(
     "sub_dir",
-    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs"],
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
 def test_velociraptor_loader_windows_ntfs(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
     paths = create_paths(sub_dir)
@@ -54,7 +54,7 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, mock_target: Target, tmp
 
 @pytest.mark.parametrize(
     "sub_dir",
-    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs"],
+    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
 def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
     paths = create_paths(sub_dir)
