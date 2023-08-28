@@ -214,7 +214,7 @@ struct EntryObject {
     le64_t      monotonic;
     sd_id128_t  boot_id;
     le64_t      xor_hash;
-    EntryItem   items[(size - 64) / 16];                // The size minus the previous members divided by the size of the items
+    EntryItem   items[(size - 64) / 16];                  // The size minus the previous members divided by the size of the items
 };
 
 // If the HEADER_INCOMPATIBLE_COMPACT flag is set, DATA object offsets are stored as 32-bit integers instead of 64bit
