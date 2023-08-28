@@ -239,7 +239,7 @@ struct EntryArrayObject {
     uint8_t     reserved[6];
     le64_t      size;
     le64_t      next_entry_array_offset;
-    le64_t      entry_object_offsets[(size - 24) / 8];  // The size minus the previous members divided by the size of the offset
+    le64_t      entry_object_offsets[(size - 24) / 8];    // The size minus the previous members divided by the size of the offset
 };
 
 struct EntryArrayObject_Compact {
