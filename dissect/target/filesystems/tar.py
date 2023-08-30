@@ -160,7 +160,7 @@ class TarFilesystemDirectoryEntry(VirtualDirectory):
                 stat.S_IFDIR | self.entry.mode,
                 self.entry.offset,
                 id(self.fs),
-                0,
+                1,
                 self.entry.uid,
                 self.entry.gid,
                 self.entry.size,
