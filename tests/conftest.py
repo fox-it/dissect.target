@@ -61,6 +61,15 @@ def fs_unix():
 
 
 @pytest.fixture
+def fs_linux():
+    fs = VirtualFilesystem()
+    fs.makedirs("var")
+    fs.makedirs("etc")
+    fs.makedirs("opt")
+    yield fs
+
+
+@pytest.fixture
 def fs_osx():
     fs = VirtualFilesystem()
     fs.makedirs("Applications")
@@ -127,6 +136,16 @@ def target_unix(fs_unix):
 
     mock_target.filesystems.add(fs_unix)
     mock_target.fs.mount("/", fs_unix)
+    mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
+def target_linux(fs_linux):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_linux)
+    mock_target.fs.mount("/", fs_linux)
     mock_target.apply()
     yield mock_target
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
 from dissect.target.plugin import OperatingSystem
@@ -47,7 +49,10 @@ def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
         case_sensitive = False
 
     for path in dirs:
-        dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
+        if isinstance(path, zipfile.Path):
+            dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
+        else:
+            dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
         target.filesystems.add(dfs)
 
         if os_type == OperatingSystem.WINDOWS:

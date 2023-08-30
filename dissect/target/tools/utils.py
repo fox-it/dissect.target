@@ -185,7 +185,9 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
         UnsupportedPluginError: When the function was incompatible with the target.
     """
     plugin_class = func.class_object
-    if target.has_function(func.method_name):
+    if ns := getattr(func, "plugin_desc", {}).get("namespace", None):
+        plugin_class = getattr(target, ns)
+    elif target.has_function(func.method_name):
         # If the function is already attached, use the one inside the target.
         plugin_class, _ = target.get_function(func.method_name)
     elif issubclass(plugin_class, OSPlugin):
