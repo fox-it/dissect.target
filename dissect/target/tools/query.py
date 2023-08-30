@@ -154,11 +154,11 @@ def main():
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
-                funcs, _ = find_plugin_functions(plugin_target, args.list, True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
                 for func in funcs:
                     collected_plugins[func.name] = func.plugin_desc
         else:
-            funcs, _ = find_plugin_functions(Target(), args.list, False)
+            funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
             for func in funcs:
                 collected_plugins[func.name] = func.plugin_desc
 
@@ -197,6 +197,7 @@ def main():
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
     funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
+
     for func in funcs:
         output_types.add(func.output_type)
 
@@ -237,7 +238,8 @@ def main():
         func_defs, _ = find_plugin_functions(target, args.function, False)
 
         for func_def in func_defs:
-            if func_def.method_name in executed_plugins:
+            # Avoid executing same plugin for multiple OSes (like hostname)
+            if f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}" in executed_plugins:
                 continue
 
             # If the default type is record (meaning we skip everything else)
@@ -286,7 +288,7 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
-            executed_plugins.add(func_def.method_name)
+            executed_plugins.add(f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}")
 
             if output_type == "record":
                 record_entries.append(result)

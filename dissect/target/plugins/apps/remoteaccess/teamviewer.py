@@ -1,11 +1,14 @@
 from datetime import datetime
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.apps.remoteaccess.remoteaccess import RemoteAccessRecord
+from dissect.target.plugin import export
+from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
+    RemoteAccessPlugin,
+    RemoteAccessRecord,
+)
 
 
-class TeamviewerPlugin(Plugin):
+class TeamviewerPlugin(RemoteAccessPlugin):
     """
     Teamviewer plugin.
     """
@@ -39,7 +42,7 @@ class TeamviewerPlugin(Plugin):
             raise UnsupportedPluginError("No Teamviewer logs found")
 
     @export(record=RemoteAccessRecord)
-    def remoteaccess(self):
+    def logs(self):
         """Return the content of the TeamViewer logs.
 
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a

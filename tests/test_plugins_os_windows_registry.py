@@ -116,3 +116,10 @@ def test_registry_plugin_glob_ext(target_win_users, pattern, key_names) -> None:
         collection_names.append(key_collection.name)
 
     assert sorted(collection_names) == sorted(key_names)
+
+
+def test_registry_plugin_root_none(target_win_users) -> None:
+    plugin: RegistryPlugin = target_win_users.registry
+
+    assert plugin.key()
+    assert plugin.key("")
