@@ -63,8 +63,8 @@ class CommandHistoryPlugin(Plugin):
     def commandhistory(self):
         """Return shell history for all users.
 
-        When using a shell, history of the used commands is kept on the system. 
-        It is kept in a hidden file named ".$SHELL_history" and may expose 
+        When using a shell, history of the used commands is kept on the system.
+        It is kept in a hidden file named ".$SHELL_history" and may expose
         commands that were used by an adversary.
         """
 
