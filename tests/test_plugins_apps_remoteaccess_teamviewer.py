@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamviewerPlugin
 
@@ -18,7 +18,7 @@ def test_teamviewer_plugin_global_log(target_win_users, fs_win):
     assert len(records) == 1
 
     record = records[0]
-    assert record.ts == datetime(2021, 11, 11, 12, 34, 56)
+    assert record.ts == datetime(2021, 11, 11, 12, 34, 56, tzinfo=timezone.utc)
     assert record.description == "Strip the headers, trace the source!"
     assert record.logfile == target_logfile_name
     assert record.username is None
@@ -40,7 +40,7 @@ def test_teamviewer_plugin_user_log(target_win_users, fs_win):
     assert len(records) == 1
 
     record = records[0]
-    assert record.ts == datetime(2021, 11, 11, 12, 34, 56)
+    assert record.ts == datetime(2021, 11, 11, 12, 34, 56, tzinfo=timezone.utc)
     assert record.description == "Strip the headers, trace the source!"
     assert record.logfile == target_logfile_name
     assert record.username == user_details.user.name
