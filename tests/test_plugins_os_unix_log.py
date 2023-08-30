@@ -92,7 +92,7 @@ def test_atop_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     results = list(target_unix.atop())
     assert len(results) == 2219
-    assert str(results[0].ts) == "2022-11-11 19:50:44"
+    assert results[0].ts == datetime(2022, 11, 11, 19, 50, 44, tzinfo=timezone.utc)
     assert results[0].process == "systemd"
     assert results[0].cmdline == "/sbin/init"
     assert results[0].tgid == 1
