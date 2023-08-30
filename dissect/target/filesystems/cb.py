@@ -136,7 +136,7 @@ class CbFilesystemEntry(FilesystemEntry):
             mode | 0o755,
             fsutil.generate_addr(self.cbpath),
             id(self.fs),
-            0,
+            1,
             0,
             0,
             self.entry["size"],

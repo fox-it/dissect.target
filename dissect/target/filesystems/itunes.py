@@ -108,7 +108,7 @@ class ITunesFilesystemEntry(VirtualFile):
                 metadata["Mode"],
                 metadata["InodeNumber"],
                 id(self.fs),
-                0,
+                1,
                 metadata["UserID"],
                 metadata["GroupID"],
                 metadata["Size"],
