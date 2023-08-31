@@ -59,7 +59,7 @@ class ClfsPlugin(Plugin):
                 except InvalidBLFError as e:
                     self.target.log.warning(f"Could not validate BLF: {blf_path}", exc_info=e)
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not self._blfs:
             raise UnsupportedPluginError("No BLF files found")
 

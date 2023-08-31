@@ -4,7 +4,11 @@ from collections import defaultdict
 from functools import lru_cache
 from typing import Iterator, Optional, Union
 
-from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
+from dissect.target.exceptions import (
+    HiveUnavailableError,
+    RegistryKeyNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
@@ -182,8 +186,9 @@ class RegistryPlugin(Plugin):
         self._add_hive(name, hive, path)
         self._map_hive(location, hive)
 
-    def check_compatible(self) -> bool:
-        return len(self._hive_collections) > 0
+    def check_compatible(self) -> None:
+        if not len(self._hive_collections):
+            raise UnsupportedPluginError("No hive collections found")
 
     @property
     def controlsets(self) -> list[str]:

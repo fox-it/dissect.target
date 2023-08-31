@@ -45,7 +45,7 @@ class RunKeysPlugin(Plugin):
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
     ]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:
             raise UnsupportedPluginError("No registry run key found")
 

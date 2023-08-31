@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterator
 
 from dissect.target import plugin
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webservers.webservers import WebserverAccessLogRecord
 from dissect.target.target import Target
@@ -21,8 +21,9 @@ class NginxPlugin(plugin.Plugin):
         super().__init__(target)
         self.log_paths = self.get_log_paths()
 
-    def check_compatible(self) -> bool:
-        return len(self.log_paths) > 0
+    def check_compatible(self) -> None:
+        if not len(self.log_paths):
+            raise UnsupportedPluginError("No NGINX directories found")
 
     @plugin.internal
     def get_log_paths(self) -> list[Path]:

@@ -33,7 +33,7 @@ class BamDamPlugin(Plugin):
         "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\dam\\State\\UserSettings",
     ]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:
             raise UnsupportedPluginError("No bam or dam registry keys not found")
 

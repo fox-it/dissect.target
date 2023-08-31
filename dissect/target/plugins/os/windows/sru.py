@@ -362,7 +362,7 @@ class SRUPlugin(Plugin):
             except Error as e:
                 self.target.log.warning("Error opening SRU database", exc_info=e)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._sru:
             raise UnsupportedPluginError("No SRUDB found")
 

@@ -8,7 +8,7 @@ from dissect.target.plugin import Plugin, export
 
 
 class GenericPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @export(property=True)

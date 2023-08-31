@@ -110,7 +110,7 @@ class TasksPlugin(Plugin):
                 if entry.is_file() and (entry.suffix.lower() == ".job" or not entry.suffix):
                     self.task_files.append(entry)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 

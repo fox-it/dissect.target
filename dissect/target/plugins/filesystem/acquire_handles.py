@@ -2,6 +2,7 @@ import csv
 import gzip
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -29,8 +30,9 @@ class OpenHandlesPlugin(Plugin):
         super().__init__(target)
         self.open_handles_file = target.fs.path("$metadata$/open_handles.csv.gz")
 
-    def check_compatible(self) -> bool:
-        return self.open_handles_file.exists()
+    def check_compatible(self) -> None:
+        if not self.open_handles_file.exists():
+            raise UnsupportedPluginError("No open handles found")
 
     @export(record=AcquireOpenHandlesRecord)
     def acquire_handles(self) -> Iterator[AcquireOpenHandlesRecord]:

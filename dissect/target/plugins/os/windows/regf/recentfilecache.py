@@ -37,7 +37,7 @@ class RecentFileCachePlugin(Plugin):
         super().__init__(target)
         self._recentfiles = self.target.fs.path("sysvol/windows/appcompat/programs/RecentFileCache.bcf")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._recentfiles.exists():
             raise UnsupportedPluginError("Could not load RecentFileCache.bcf")
 

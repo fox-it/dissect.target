@@ -3,6 +3,7 @@ from typing import Generator, Optional
 
 from flow.record import RecordDescriptor
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import InternalPlugin
 
 UserDetails = namedtuple("UserDetails", "user home_path")
@@ -13,8 +14,9 @@ class UsersPlugin(InternalPlugin):
 
     __namespace__ = "user_details"
 
-    def check_compatible(self) -> bool:
-        return hasattr(self.target, "users")
+    def check_compatible(self) -> None:
+        if not hasattr(self.target, "users"):
+            raise UnsupportedPluginError("Unsupported Plugin")
 
     def find(
         self,
