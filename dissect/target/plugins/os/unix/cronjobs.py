@@ -13,7 +13,7 @@ CronjobRecord = TargetRecordDescriptor(
         ("string", "weekday"),
         ("string", "user"),
         ("wstring", "command"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -22,7 +22,7 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
     [
         ("string", "key"),
         ("string", "value"),
-        ("uri", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -66,7 +66,7 @@ class CronjobPlugin(Plugin):
                     weekday=match.group(5),
                     user=usr,
                     command=cmd,
-                    source=str(file_path),
+                    source=file_path,
                     _target=self.target,
                 )
 
@@ -75,7 +75,7 @@ class CronjobPlugin(Plugin):
                 yield EnvironmentVariableRecord(
                     key=s.group(1),
                     value=s.group(2),
-                    source=str(file_path),
+                    source=file_path,
                     _target=self.target,
                 )
 

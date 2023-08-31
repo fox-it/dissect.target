@@ -1,5 +1,5 @@
 from asn1crypto import algos, core
-from flow.record.fieldtypes import digest, uri
+from flow.record.fieldtypes import digest, path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -14,8 +14,8 @@ CatrootRecord = TargetRecordDescriptor(
     "windows/catroot",
     [
         ("digest", "digest"),
-        ("uri", "hint"),
-        ("uri", "source"),
+        ("path", "hint"),
+        ("path", "source"),
     ],
 )
 
@@ -60,8 +60,8 @@ class CatrootPlugin(Plugin):
             hostname (string): The target hostname.
             domain (string): The target domain.
             digest (digest): The parsed digest.
-            hint (uri): File hint, if present.
-            source (uri): Source catroot file.
+            hint (path): File hint, if present.
+            source (path): Source catroot file.
         """
         # So asn1crypt dies when parsing these files, so we kinda bruteforce it
         # Look for the object identifiers of various hash types, and parse from there
@@ -92,7 +92,7 @@ class CatrootPlugin(Plugin):
                             # 4 bytes before the digest type, a sequence starts
                             objseq = core.Sequence.load(buf[offset - 4 :])
                             # The second entry in the sequence is the digest string
-                            hexdigest = objseq[1].native.encode("hex")
+                            hexdigest = objseq[1].native.hex()
 
                             # Later versions of windows also have a file hint
                             # Try to find it
@@ -105,7 +105,7 @@ class CatrootPlugin(Plugin):
                                     file_buf = buf[hintoffset + len(HINT_NEEDLE) + 6 :]
                                     # There's an INTEGER after the Hint BMPString of size 6
                                     filehint = core.OctetString.load(file_buf).native.decode("utf-16-le")
-                                except Exception:  # noqa
+                                except Exception:
                                     pass
 
                             fdigest = digest()
@@ -118,9 +118,9 @@ class CatrootPlugin(Plugin):
 
                             yield CatrootRecord(
                                 digest=fdigest,
-                                hint=uri.from_windows(filehint) if filehint else None,
-                                source=str(f),
+                                hint=path.from_windows(filehint) if filehint else None,
+                                source=f,
                                 _target=self.target,
                             )
-                        except Exception:  # noqa
+                        except Exception:
                             continue

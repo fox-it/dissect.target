@@ -1,5 +1,4 @@
 from dissect.util.ts import from_unix
-from flow.record.fieldtypes import uri
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -13,7 +12,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("datetime", "ctime"),
         ("datetime", "btime"),
         ("varint", "ino"),
-        ("uri", "path"),
+        ("path", "path"),
         ("filesize", "size"),
         ("uint32", "mode"),
         ("uint32", "uid"),
@@ -53,7 +52,7 @@ def generate_record(target, entry, idx):
         mtime=from_unix(stat.st_mtime),
         ctime=from_unix(stat.st_ctime),
         ino=stat.st_ino,
-        path=uri(str(entry)),
+        path=entry,
         size=stat.st_size,
         mode=stat.st_mode,
         uid=stat.st_uid,

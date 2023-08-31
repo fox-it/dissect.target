@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path, uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
@@ -49,7 +49,7 @@ ShortcutAppcompatRecord = TargetRecordDescriptor(
     "windows/appcompat/ApplicationShortcut",
     [
         ("datetime", "mtime_regf"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -62,7 +62,7 @@ FileAppcompatRecord = TargetRecordDescriptor(
         ("datetime", "created_timestamp"),
         ("datetime", "mtime_regf"),
         ("varint", "reference"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "language_code"),
         ("digest", "digests"),
         ("string", "program_id"),
@@ -85,7 +85,7 @@ ProgramsAppcompatRecord = TargetRecordDescriptor(
         ("string", "language_code"),
         ("string", "entry_type"),
         ("string", "uninstall_key"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "product_code"),
         ("string", "package_code"),
         ("string", "msi_package_code"),
@@ -112,7 +112,7 @@ ApplicationAppcompatRecord = TargetRecordDescriptor(
         ("string", "program_instance_id"),
         ("string", "publisher"),
         ("string", "registry_key_path"),
-        ("uri", "root_dir_path"),
+        ("path", "root_dir_path"),
         ("string", "source"),
         ("string", "uninstall_string"),
     ],
@@ -125,7 +125,7 @@ ApplicationFileAppcompatRecord = TargetRecordDescriptor(
         ("datetime", "mtime_regf"),
         ("string", "program_id"),
         ("digest", "digests"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "hash_path"),
         ("wstring", "name"),
         ("wstring", "publisher"),
@@ -146,8 +146,8 @@ BinaryAppcompatRecord = TargetRecordDescriptor(
     "windows/appcompat/InventoryDriverBinary",
     [
         ("datetime", "mtime_regf"),
-        ("uri", "driver_name"),
-        ("uri", "inf"),
+        ("path", "driver_name"),
+        ("path", "inf"),
         ("string", "driver_version"),
         ("wstring", "product"),
         ("string", "product_version"),
@@ -220,7 +220,7 @@ class AmcachePluginOldMixin:
                     created_timestamp=parse_win_timestamp(subkey_data.get("created_timestamp")),
                     mtime_regf=subkey.timestamp,
                     reference=int(subkey.name, 16),
-                    path=uri.from_windows(subkey_data["full_path"]) if subkey_data.get("full_path") else None,
+                    path=path.from_windows(subkey_data["full_path"]) if subkey_data.get("full_path") else None,
                     language_code=subkey_data.get("language_code"),
                     digests=[None, subkey_data["sha1"][-40:] if subkey_data.get("sha1") else None, None],
                     program_id=subkey_data.get("program_id"),
@@ -265,7 +265,7 @@ class AmcachePluginOldMixin:
                         language_code=entry_data.get("LanguageCode"),
                         entry_type=entry_data.get("EntryType"),
                         uninstall_key=entry_data.get("UninstallKey"),
-                        path=uri.from_windows(file_path_entry),
+                        path=path.from_windows(file_path_entry),
                         product_code=entry_data.get("ProductCode"),
                         package_code=entry_data.get("PackageCode"),
                         msi_package_code=entry_data.get("MsiPackageCode"),
@@ -284,7 +284,7 @@ class AmcachePluginOldMixin:
                         language_code=entry_data.get("LanguageCode"),
                         entry_type=entry_data.get("EntryType"),
                         uninstall_key=entry_data.get("UninstallKey"),
-                        path=uri.from_windows(file_entry),
+                        path=path.from_windows(file_entry),
                         product_code=entry_data.get("ProductCode"),
                         package_code=entry_data.get("PackageCode"),
                         msi_package_code=entry_data.get("MsiPackageCode"),
@@ -467,7 +467,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 mtime_regf=entry.timestamp,
                 program_id=entry_data.get("ProgramId"),
                 digests=[None, sha1_digest, None],
-                path=uri.from_windows(entry_data.get("LowerCaseLongPath")),
+                path=path.from_windows(entry_data.get("LowerCaseLongPath")),
                 link_date=parse_win_datetime(entry_data.get("LinkDate")),
                 hash_path=entry_data.get("LongPathHash"),
                 name=entry_data.get("Name"),
@@ -492,8 +492,8 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
             yield BinaryAppcompatRecord(
                 mtime_regf=entry.timestamp,
-                driver_name=uri.from_windows(entry_data.get("DriverName")),
-                inf=uri.from_windows(entry_data.get("Inf")),
+                driver_name=path.from_windows(entry_data.get("DriverName")),
+                inf=path.from_windows(entry_data.get("Inf")),
                 driver_version=entry_data.get("DriverVersion"),
                 product=entry_data.get("Product"),
                 product_version=entry_data.get("ProductVersion"),
@@ -515,7 +515,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         for entry in self.read_key_subkeys(key):
             yield ShortcutAppcompatRecord(
                 mtime_regf=entry.timestamp,
-                path=uri.from_windows(entry.value("ShortCutPath").value),
+                path=path.from_windows(entry.value("ShortCutPath").value),
                 _target=self.target,
             )
 

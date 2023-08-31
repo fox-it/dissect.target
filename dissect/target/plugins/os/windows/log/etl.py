@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from dissect.etl.etl import ETL, Event
 
@@ -12,13 +13,13 @@ from dissect.target.plugins.os.windows.datetime import parse_tzi
 class EtlRecordBuilder:
     RECORD_NAME = "filesystem/windows/etl"
 
-    def _build_record(self, etl_event: Event, etl_path: str, target: Target):
+    def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
         """Builds an ETL event record"""
 
         record_values = {}
         record_fields = [
             ("datetime", "ts"),
-            ("uri", "path"),
+            ("path", "path"),
             ("string", "ProviderName"),
             ("string", "ProviderId"),
             ("string", "EventType"),
@@ -100,7 +101,7 @@ class EtlPlugin(Plugin):
                 self.target.log.exception("Failed to open ETL file: %s", entry)
                 continue
 
-            etl_records = self._etl_record_builder.read_etl_records(entry_data, f"{entry}", self.target)
+            etl_records = self._etl_record_builder.read_etl_records(entry_data, entry, self.target)
             yield from etl_records
 
     @export(record=DynamicDescriptor(["datetime"]))
