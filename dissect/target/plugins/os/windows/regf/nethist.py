@@ -25,9 +25,9 @@ class NethistPlugin(Plugin):
     KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Signatures"
     PROFILE_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Profiles"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
-            raise UnsupportedPluginError("")
+            raise UnsupportedPluginError("No Networklist registry keys found")
 
     @export(record=NetworkHistoryRecord)
     def network_history(self):

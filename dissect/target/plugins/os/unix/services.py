@@ -28,7 +28,7 @@ class ServicesPlugin(Plugin):
 
     INITD_PATHS = ["/etc/rc.d/init.d", "/etc/init.d"]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not any([self.target.fs.path(p).exists() for p in self.SYSTEMD_PATHS + self.INITD_PATHS]):
             raise UnsupportedPluginError("No supported service directories found")
 

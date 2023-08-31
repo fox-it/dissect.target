@@ -46,7 +46,7 @@ class UsbPlugin(Plugin):
     HID = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\HID"
     SCSI = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\SCSI"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.USB_STOR))) > 0:
             raise UnsupportedPluginError(f"Registry key not found: {self.USB_STOR}")
 

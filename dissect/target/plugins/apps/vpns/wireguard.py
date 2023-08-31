@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from os.path import basename
 from typing import Iterator, Union
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -79,9 +80,9 @@ class WireGuardPlugin(Plugin):
                 for cfg in cfgs:
                     self.configs.append(cfg)
 
-    def check_compatible(self) -> bool:
-        if len(self.configs) > 0:
-            return True
+    def check_compatible(self) -> None:
+        if not len(self.configs):
+            raise UnsupportedPluginError("No Wireguard configuration files found")
 
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
     def config(self) -> Iterator[Union[WireGuardInterfaceRecord, WireGuardPeerRecord]]:

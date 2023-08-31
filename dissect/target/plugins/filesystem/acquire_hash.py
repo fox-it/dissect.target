@@ -3,6 +3,7 @@ import gzip
 
 from flow.record.fieldtypes import posix_path, windows_path
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -23,8 +24,9 @@ class AcquireHashPlugin(Plugin):
         super().__init__(target)
         self.hash_file = target.fs.path("$metadata$/file-hashes.csv.gz")
 
-    def check_compatible(self):
-        return self.hash_file.exists()
+    def check_compatible(self) -> None:
+        if not self.hash_file.exists():
+            raise UnsupportedPluginError("No hash file found")
 
     @export(record=AcquireHashRecord)
     def acquire_hashes(self):

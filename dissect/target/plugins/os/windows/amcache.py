@@ -342,7 +342,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         if self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt").exists():
             self.amcache_applaunch = True
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.amcache) > 0 and not self.amcache_applaunch:
             raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 

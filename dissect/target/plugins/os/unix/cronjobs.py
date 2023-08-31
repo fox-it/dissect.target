@@ -28,7 +28,7 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
 
 
 class CronjobPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     def get_record(self, minute, hour, day, month, weekday, usr, cmd, path):

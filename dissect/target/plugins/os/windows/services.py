@@ -59,7 +59,7 @@ class ServicesPlugin(Plugin):
 
     KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Services"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No services found in the registry")
 

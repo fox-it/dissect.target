@@ -96,7 +96,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     continue
                 self.users_dirs.append((user_details.user, cdir))
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Internet Explorer directories found")
 

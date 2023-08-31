@@ -57,7 +57,7 @@ class ActivitiesCachePlugin(Plugin):
                 if cache_file.exists():
                     self.cachefiles.append((user_details.user, cache_file))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len(self.cachefiles) == 0:
             raise UnsupportedPluginError("No ActiviesCache.db files found")
 

@@ -2,7 +2,7 @@ import struct
 
 from dissect.util.ts import wintimestamp
 
-from dissect.target.exceptions import RegistryError
+from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
@@ -116,8 +116,9 @@ class MRUPlugin(Plugin):
 
     __namespace__ = "mru"
 
-    def check_compatible(self):
-        return self.target.has_function("registry")
+    def check_compatible(self) -> None:
+        if not self.target.has_function("registry"):
+            return UnsupportedPluginError("Target has no registry")
 
     @export(record=RunMRURecord)
     def run(self):
