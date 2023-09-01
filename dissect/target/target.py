@@ -517,7 +517,7 @@ class Target:
 
         if check_compatible:
             try:
-                if p.is_compatible() is False:
+                if not p.is_compatible():
                     self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
                     raise UnsupportedPluginError(f"Plugin reported itself as incompatible: {plugin_cls}")
             except PluginError:
