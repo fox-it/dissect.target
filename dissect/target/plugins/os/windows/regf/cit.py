@@ -640,7 +640,7 @@ class CITPlugin(Plugin):
 
     KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No CIT registry key found")
 

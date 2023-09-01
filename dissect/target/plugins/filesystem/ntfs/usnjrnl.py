@@ -25,7 +25,7 @@ UsnjrnlRecord = TargetRecordDescriptor(
 
 
 class UsnjrnlPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @export(record=UsnjrnlRecord)

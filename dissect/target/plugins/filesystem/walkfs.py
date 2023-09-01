@@ -1,6 +1,6 @@
 from dissect.util.ts import from_unix
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
@@ -24,8 +24,9 @@ FilesystemRecord = TargetRecordDescriptor(
 
 
 class WalkFSPlugin(Plugin):
-    def check_compatible(self):
-        return len(self.target.filesystems) > 0
+    def check_compatible(self) -> None:
+        if not len(self.target.filesystems):
+            raise UnsupportedPluginError("No filesystems found")
 
     @export(record=FilesystemRecord)
     def walkfs(self):

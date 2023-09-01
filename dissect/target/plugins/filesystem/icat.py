@@ -5,6 +5,7 @@ import dissect.extfs.exceptions
 import dissect.ntfs.exceptions
 import dissect.xfs.exceptions
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, arg, export
 
 
@@ -13,9 +14,10 @@ class ICatPlugin(Plugin):
 
     FS_SUPPORTED = ["ntfs", "xfs", "ext", "virtual"]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         filesystems = self.target.filesystems
-        return any(fs.__fstype__ in self.FS_SUPPORTED for fs in filesystems)
+        if not any(fs.__fstype__ in self.FS_SUPPORTED for fs in filesystems):
+            raise UnsupportedPluginError("No supported filesystems found")
 
     @arg("--segment", "--inode", "-i", dest="inum", required=True, type=int, help="MFT segment or inode number")
     @arg(

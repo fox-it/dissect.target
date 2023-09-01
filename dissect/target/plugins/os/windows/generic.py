@@ -4,7 +4,7 @@ from typing import Optional
 from dissect.util.ts import from_unix
 from flow.record.fieldtypes import path
 
-from dissect.target.exceptions import RegistryError
+from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
@@ -119,8 +119,9 @@ class GenericPlugin(Plugin):
     Provides some plugins that don't fit in a separate plugin.
     """
 
-    def check_compatible(self):
-        return self.target.has_function("registry")
+    def check_compatible(self) -> None:
+        if not self.target.has_function("registry"):
+            raise UnsupportedPluginError("Unsupported Plugin")
 
     @export(property=True)
     def ntversion(self):

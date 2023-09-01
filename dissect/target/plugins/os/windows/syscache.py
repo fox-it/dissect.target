@@ -37,7 +37,7 @@ class SyscachePlugin(Plugin):
         if fpath.exists():
             self.hive.add(regutil.RegfHive(fpath))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.hive) > 0:
             raise UnsupportedPluginError("Could not load Syscache.hve")
 

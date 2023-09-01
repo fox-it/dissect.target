@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -81,8 +82,9 @@ class IptablesSavePlugin(Plugin):
         super().__init__(target)
         self._rule_files = list(self._get_rule_files())
 
-    def check_compatible(self) -> bool:
-        return len(self._rule_files) > 0
+    def check_compatible(self) -> None:
+        if not len(self._rule_files):
+            raise UnsupportedPluginError("No iptables rules found")
 
     def _get_rule_files(self) -> Iterator[Path]:
         """Yield the paths of iptables-save output files."""
