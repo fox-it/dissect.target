@@ -329,7 +329,7 @@ class Target:
                 continue
 
             try:
-                if child_plugin.is_compatible() is False:
+                if not child_plugin.is_compatible():
                     continue
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
