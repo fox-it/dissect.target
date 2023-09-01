@@ -58,9 +58,6 @@ class MacPlugin(BsdPlugin):
                     if ip := lease.get("IPAddress"):
                         ips.add(ip)
 
-        if ips is False:
-            raise FileNotFoundError()
-
         return list(ips)
 
     @export(property=True)
