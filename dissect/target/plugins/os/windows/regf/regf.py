@@ -30,7 +30,7 @@ RegistryValueRecord = TargetRecordDescriptor(
 class RegfPlugin(Plugin):
     """Regf dump plugin."""
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         try:
             self.target.registry.root()
         except PluginError:

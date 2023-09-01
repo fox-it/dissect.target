@@ -1,5 +1,6 @@
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -24,8 +25,9 @@ UnixShadowRecord = TargetRecordDescriptor(
 
 
 class ShadowPlugin(Plugin):
-    def check_compatible(self) -> bool:
-        return self.target.fs.path("/etc/shadow").exists()
+    def check_compatible(self) -> None:
+        if not self.target.fs.path("/etc/shadow").exists():
+            raise UnsupportedPluginError("No shadow file found")
 
     @export(record=UnixShadowRecord)
     def passwords(self) -> Iterator[UnixShadowRecord]:

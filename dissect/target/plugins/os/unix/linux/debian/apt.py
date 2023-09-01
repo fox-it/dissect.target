@@ -5,6 +5,7 @@ from typing import Iterator
 from zoneinfo import ZoneInfo
 
 from dissect.target import Target, plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
@@ -21,9 +22,10 @@ class AptPlugin(plugin.Plugin):
     LOG_DIR_PATH = "/var/log/apt"
     LOG_FILES_GLOB = "history.*"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         log_files = list(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB))
-        return len(log_files) > 0
+        if not len(log_files):
+            raise UnsupportedPluginError("No APT files found")
 
     @plugin.export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:

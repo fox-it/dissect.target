@@ -52,7 +52,7 @@ class FirefoxPlugin(BrowserPlugin):
                     continue
                 self.users_dirs.append((user_details.user, cur_dir))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 

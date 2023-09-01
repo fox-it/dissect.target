@@ -282,7 +282,7 @@ class ShellBagsPlugin(Plugin):
         super().__init__(target)
         self.bagkeys = list(self.target.registry.keys(self.KEYS))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.bagkeys) > 0:
             raise UnsupportedPluginError("No shellbags found")
 

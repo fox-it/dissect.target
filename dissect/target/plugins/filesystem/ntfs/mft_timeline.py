@@ -5,6 +5,7 @@ from dissect.ntfs.attr import FileName, StandardInformation
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -92,9 +93,10 @@ def format_info(
 
 
 class MftTimelinePlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
-        return len(ntfs_filesystems) > 0
+        if not len(ntfs_filesystems):
+            raise UnsupportedPluginError("No MFT timelines found")
 
     @export(output="yield")
     @arg("--ignore-dos", action="store_true", help="ignore DOS file names")

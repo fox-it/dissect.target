@@ -17,8 +17,8 @@ OSInfoRecord = TargetRecordDescriptor(
 class OSInfoPlugin(plugin.Plugin):
     """Convenience plugin that wraps _os.* functions in records."""
 
-    def check_compatible(self) -> bool:
-        return True
+    def check_compatible(self) -> None:
+        pass
 
     @plugin.export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:

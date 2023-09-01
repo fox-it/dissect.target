@@ -161,7 +161,7 @@ class UalPlugin(Plugin):
         self.identity_db_parser = None
         self.populate_role_guid_map()
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not any([path.exists() for path in self.mdb_paths]):
             raise UnsupportedPluginError("No MDB files found")
 

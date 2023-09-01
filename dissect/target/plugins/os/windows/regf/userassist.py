@@ -57,7 +57,7 @@ class UserAssistPlugin(Plugin):
 
     KEY = "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No UserAssist key found")
 

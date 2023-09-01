@@ -243,7 +243,7 @@ class PrefetchPlugin(Plugin):
         super().__init__(target)
         self.prefetchdir = self.target.fs.path("sysvol/windows/prefetch")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len(list(self.prefetchdir.iterdir())) == 0:
             raise UnsupportedPluginError("No prefetch files found")
 
