@@ -6,6 +6,7 @@ from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
 from flow.record.fieldtypes import windows_path
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -103,9 +104,10 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
-        return len(ntfs_filesystems) > 0
+        if not len(ntfs_filesystems):
+            raise UnsupportedPluginError("No NTFS filesystems found")
 
     @export(
         record=[

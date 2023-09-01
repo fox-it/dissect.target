@@ -14,7 +14,7 @@ class DateTimePlugin(Plugin):
         if not self.timezone:
             self.target.log.warning("Could not determine timezone of target, falling back to UTC for datetime helpers.")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @internal

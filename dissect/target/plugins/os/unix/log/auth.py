@@ -2,6 +2,7 @@ import re
 from itertools import chain
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -21,9 +22,10 @@ RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\S+\s")
 
 
 class AuthPlugin(Plugin):
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         var_log = self.target.fs.path("/var/log")
-        return any(var_log.glob("auth.log*")) or any(var_log.glob("secure*"))
+        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
+            raise UnsupportedPluginError("No auth log files found")
 
     @export(record=[AuthLogRecord])
     def securelog(self) -> Iterator[AuthLogRecord]:

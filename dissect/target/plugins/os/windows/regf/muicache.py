@@ -2,6 +2,7 @@ from typing import Generator
 
 from flow.record.fieldtypes import path
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
@@ -32,8 +33,9 @@ class MuiCachePlugin(Plugin):
 
     FIELD_NAMES = ("FriendlyAppName", "ApplicationCompany")
 
-    def check_compatible(self) -> bool:
-        return len(list(self.target.registry.keys(self.KEYS)))
+    def check_compatible(self) -> None:
+        if not len(list(self.target.registry.keys(self.KEYS))):
+            return UnsupportedPluginError("No MuiCache registry keys found")
 
     @export(record=MuiCacheRecord)
     def muicache(self) -> MuiCacheRecord:

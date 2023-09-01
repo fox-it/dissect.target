@@ -51,7 +51,7 @@ class StartupInfoPlugin(Plugin):
         if path.exists():
             self._files = list(path.iterdir())
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._files:
             raise UnsupportedPluginError("No StartupInfo files found")
 

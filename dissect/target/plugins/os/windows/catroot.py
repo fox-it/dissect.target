@@ -41,7 +41,7 @@ class CatrootPlugin(Plugin):
         super().__init__(target)
         self.catrootdir = self.target.fs.path("sysvol/windows/system32/catroot")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len(list(self.catrootdir.iterdir())) == 0:
             raise UnsupportedPluginError("No catroot dirs found")
 

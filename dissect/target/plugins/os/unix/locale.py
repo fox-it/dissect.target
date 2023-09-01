@@ -26,7 +26,7 @@ def timezone_from_path(path: Path) -> str:
 
 
 class LocalePlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @export(property=True)
