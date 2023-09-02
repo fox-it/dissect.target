@@ -6,11 +6,13 @@ from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 WebserverAccessLogRecord = TargetRecordDescriptor(
-    "application/log/webserver",
+    "application/log/webserver/access",
     [
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
+        ("net.ipaddress", "local_ip"),
+        ("varint", "pid"),
         ("string", "method"),
         ("uri", "uri"),
         ("string", "protocol"),
@@ -18,6 +20,22 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
         ("varint", "bytes_sent"),
         ("uri", "referer"),
         ("string", "useragent"),
+        ("varint", "response_time_ms"),
+        ("path", "source"),
+    ],
+)
+
+WebserverErrorLogRecord = TargetRecordDescriptor(
+    "application/log/webserver/error",
+    [
+        ("datetime", "ts"),
+        ("net.ipaddress", "remote_ip"),
+        ("varint", "pid"),
+        ("string", "module"),
+        ("string", "level"),
+        ("string", "error_source"),
+        ("string", "error_code"),
+        ("string", "message"),
         ("path", "source"),
     ],
 )
