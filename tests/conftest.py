@@ -168,12 +168,13 @@ def target_osx(fs_osx):
 
 
 @pytest.fixture
-def target_citrix(fs_bsd):
+def target_citrix(fs_bsd: VirtualFilesystem) -> Target:
     mock_target = next(make_mock_target())
     mock_target.filesystems.add(fs_bsd)
 
     var_filesystem = VirtualFilesystem()
     var_filesystem.makedirs("/netscaler")
+    var_filesystem.makedirs("/log")
     mock_target.filesystems.add(var_filesystem)
 
     flash_filesystem = VirtualFilesystem()

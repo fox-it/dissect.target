@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from typing import Iterator, Optional
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 from dissect.target.target import Target
 
@@ -49,22 +50,36 @@ class CitrixBsdPlugin(BsdPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
-        newfilesystem = VirtualFilesystem()
-        is_citrix = False
+        ramdisk = None
+        for fs in target.filesystems:
+            # /netscaler can be present on both the ramdisk and the harddisk. Therefore we also check for the /log
+            # folder, which is not present on the ramdisk. We regard the harddisk as the system volume, as it is
+            # possible to only have a disk image of a Netscaler. However, in the case where we only have the ramdisk,
+            # we want to fall back on that as the system volume. Thus we store that filesystem in a fallback variable.
+            if fs.exists("/netscaler"):
+                if fs.exists("/log"):
+                    return fs
+                ramdisk = fs
+
+        # At this point, we could not find the filesystem for '/var'. Thus, we fall back to the ramdisk variable, which
+        # is either 'None' (in which case this isn't a Citrix netscaler), or points to the filesystem of the ramdisk.
+        return ramdisk
+
+    @classmethod
+    def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
-                newfilesystem.map_fs("/", fs)
-                break
+                # If available, mount the ramdisk first.
+                target.fs.mount("/", fs)
+
+        target.fs.mount("/var", sysvol)
+
+        # Enumerate filesystems for flash partition
         for fs in target.filesystems:
             if fs.exists("/nsconfig") and fs.exists("/boot"):
-                newfilesystem.map_fs("/flash", fs)
-                is_citrix = True
-            elif fs.exists("/netscaler"):
-                newfilesystem.map_fs("/var", fs)
-                is_citrix = True
-        if is_citrix:
-            return newfilesystem
-        return None
+                target.fs.mount("/flash", fs)
+
+        return cls(target)
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
@@ -96,16 +111,18 @@ class CitrixBsdPlugin(BsdPlugin):
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
         nstmp_users = set()
-        nstmp_path = "/var/nstmp/"
+        nstmp_path = self.target.fs.path("/var/nstmp/")
 
-        nstmp_user_path = nstmp_path + "{username}"
+        nstmp_contents = []
+        if nstmp_path.exists():
+            nstmp_contents = list(nstmp_path.iterdir())
 
-        for entry in self.target.fs.scandir(nstmp_path):
+        for entry in nstmp_contents:
             if entry.is_dir() and entry.name != "#nsinternal#":
                 nstmp_users.add(entry.name)
         for username in self._config_usernames:
-            nstmp_home = nstmp_user_path.format(username=username)
-            user_home = nstmp_home if self.target.fs.exists(nstmp_home) else None
+            nstmp_home = nstmp_path / username
+            user_home = nstmp_home if nstmp_home.exists() else None
 
             if user_home:
                 # After this loop we will yield all users who are not in the config, but are listed in /var/nstmp/
@@ -120,7 +137,7 @@ class CitrixBsdPlugin(BsdPlugin):
             yield UnixUserRecord(name=username, home=user_home)
 
         for username in nstmp_users:
-            yield UnixUserRecord(name=username, home=nstmp_user_path.format(username=username))
+            yield UnixUserRecord(name=username, home=nstmp_path / username)
 
     @export(property=True)
     def os(self) -> str:

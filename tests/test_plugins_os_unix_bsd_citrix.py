@@ -3,18 +3,17 @@ from io import BytesIO
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
 
 
-def test_unix_bsd_citrix_os(target_citrix):
+def test_unix_bsd_citrix_os(target_citrix, fs_bsd):
+    fs_bsd.map_file_fh("/root/.cli_history", BytesIO(b'echo "hello world"'))
+    fs_bsd.map_file_fh("/var/nstmp/robin/.cli_history", BytesIO(b'echo "hello world"'))
+    fs_bsd.map_file_fh("/var/nstmp/alfred/.cli_history", BytesIO(b'echo "bye world"'))
+
     target_citrix.add_plugin(CitrixBsdPlugin)
 
     assert target_citrix.os == "citrix-netscaler"
-
-    target_citrix.fs.mounts["/"].map_file_fh("/root/.cli_history", BytesIO(b'echo "hello world"'))
-    target_citrix.fs.mounts["/"].map_file_fh("/var/nstmp/robin/.cli_history", BytesIO(b'echo "hello world"'))
-    target_citrix.fs.mounts["/"].map_file_fh("/var/nstmp/alfred/.cli_history", BytesIO(b'echo "bye world"'))
-
     hostname = target_citrix.hostname
     version = target_citrix.version
-    users = sorted(list(target_citrix.users()), key=lambda user: (user.name, user.home if user.home else ""))
+    users = sorted(list(target_citrix.users()), key=lambda user: (user.name, str(user.home) if user.home else ""))
     ips = target_citrix.ips
     ips.sort()
 
