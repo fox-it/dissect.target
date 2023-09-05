@@ -1,9 +1,24 @@
+import logging
 from collections import defaultdict
 from typing import BinaryIO, Iterator, Union
 
 from dissect.volume import lvm
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+log = logging.getLogger(__name__)
+
+OPEN_TYPES = (
+    "linear",
+    "striped",
+    "mirror",
+    "thin",
+)
+
+KNOWN_SKIP_TYPES = (
+    "snapshot",
+    "thin-pool",
+)
 
 
 class LvmVolumeSystem(LogicalVolumeSystem):
@@ -44,9 +59,19 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         return b"LABELONE" in buf
 
     def _volumes(self) -> Iterator[Volume]:
-        for num, (lv_name, lv) in enumerate(self.lvm.volume_group.logical_volumes.items()):
+        num = 1
+
+        for lv_name, lv in self.lvm.volume_group.logical_volumes.items():
+            if lv.type not in OPEN_TYPES:
+                if lv.type not in KNOWN_SKIP_TYPES:
+                    log.debug("Skipping unsupported LVM logical volume type: %s (%s)", lv.type, lv)
+                continue
+
             # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
             # Emulate that here for the volume name
             name = f"{lv.vg.name.replace('-', '--')}-{lv_name.replace('-', '--')}"
+
             fh = lv.open()
             yield Volume(fh, num, None, fh.size, None, name, raw=lv, vs=self)
+
+            num += 1
