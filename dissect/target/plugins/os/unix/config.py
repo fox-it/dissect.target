@@ -18,9 +18,13 @@ class ConfigurationParser:
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
+        seperator: tuple = ("=",),
+        comment_prefixes: tuple = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
         self.collapse = collapse if isinstance(collapse, set) else {}
+        self.seperator = seperator
+        self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
 
     @abstractmethod
@@ -66,9 +70,17 @@ class ConfigurationParser:
 
 class Ini(ConfigurationParser):
     def __init__(self, collapse: Optional[Union[bool, set]] = True) -> None:
-        super().__init__(collapse)
+        super().__init__(
+            collapse,
+            seperator=("=", ";"),
+            comment_prefixes=(";", "#"),
+        )
 
-        self.parsed_data = ConfigParser(strict=False)
+        self.parsed_data = ConfigParser(
+            strict=False,
+            delimiters=self.seperator,
+            comment_prefixes=self.comment_prefixes,
+        )
         self.parsed_data.optionxform = str
 
     def parse_file(self, fh: io.TextIO) -> None:
@@ -90,27 +102,37 @@ class Txt(ConfigurationParser):
 
 
 class Default(ConfigurationParser):
-class Default(LinuxConfigurationParser):
-    EMPTY_SPACE = re.compile(r"\s+")
+    def __init__(
+        self,
+        collapse: Optional[Union[bool, set]] = False,
+        seperator: str = r"\s",
+        comment_prefixes: tuple = (";", "#"),
+    ) -> None:
+        super().__init__(collapse, seperator, comment_prefixes)
+        self.SEPERATOR = re.compile(rf"\s*?{seperator}\s*?")
+        self.COMMENTS = re.compile(f"[{''.join(comment_prefixes)}]")
 
     def parse_file(self, fh: TextIO) -> None:
-        new_info = {}
+        information_dict = {}
+
+        skip_lines = self.comment_prefixes + ("\n",)
         for line in fh.readlines():
-            if line.startswith(("#", "\n")):
+            if line.startswith(skip_lines):
                 continue
-            key, *values = self.EMPTY_SPACE.split(line)
-            new_values = " ".join([value for value in values if value])
 
-            if "#" in new_values:
-                new_values = new_values.split("#")[0].strip()
+            key, *values = self.SEPERATOR.split(line)
+            values = " ".join(value for value in values if value)
 
-            if old_value := new_info.get(key):
+            values, *_ = self.COMMENTS.split(values)
+            values = values.strip()
+
+            if old_value := information_dict.get(key):
                 if not isinstance(old_value, list):
                     old_value = [old_value]
-                new_values = old_value + [new_values]
-            new_info[key] = new_values
+                values = old_value + [values]
+            information_dict[key] = values
 
-        self.parsed_data = new_info
+        self.parsed_data = information_dict
 
 
 CONFIG_MAP: dict[str, type[ConfigurationParser]] = {
