@@ -98,8 +98,8 @@ def get_description_dict(
 
 
 class PluginListPlugin(Plugin):
-    def check_compatible(self):
-        return True
+    def check_compatible(self) -> None:
+        pass
 
     @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true")

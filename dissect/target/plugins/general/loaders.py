@@ -8,8 +8,8 @@ from dissect.target.plugin import Plugin, export
 class LoaderListPlugin(Plugin):
     """Plugin to list the available loaders."""
 
-    def check_compatible(self):
-        return True
+    def check_compatible(self) -> None:
+        pass
 
     @export(output="none")
     def loaders(self):

@@ -16,6 +16,7 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         automatically added.
         """
 
+        fields = fields or []
         prepend_default_fields = []
         append_default_fields = []
         extended_fields = []
@@ -41,7 +42,7 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         if isinstance(fields, RecordDescriptor):
             # Clone fields
             fields = fields.get_field_tuples()
-        elif not fields:
+        elif fields is None:
             name, fields = parse_def(name)
 
         default_field_names = set(field_name for _, field_name in prepend_default_fields + append_default_fields)
@@ -119,7 +120,7 @@ WindowsUserRecord = TargetRecordDescriptor(
     [
         ("string", "sid"),
         ("string", "name"),
-        ("uri", "home"),
+        ("path", "home"),
     ],
 )
 
@@ -131,7 +132,7 @@ UnixUserRecord = TargetRecordDescriptor(
         ("varint", "uid"),
         ("varint", "gid"),
         ("string", "gecos"),
-        ("uri", "home"),
+        ("path", "home"),
         ("string", "shell"),
         ("string", "source"),
     ],

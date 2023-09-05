@@ -1,7 +1,6 @@
 from dissect.util.ts import from_unix
-from flow.record.fieldtypes import uri
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
@@ -13,7 +12,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("datetime", "ctime"),
         ("datetime", "btime"),
         ("varint", "ino"),
-        ("uri", "path"),
+        ("path", "path"),
         ("filesize", "size"),
         ("uint32", "mode"),
         ("uint32", "uid"),
@@ -25,8 +24,9 @@ FilesystemRecord = TargetRecordDescriptor(
 
 
 class WalkFSPlugin(Plugin):
-    def check_compatible(self):
-        return len(self.target.filesystems) > 0
+    def check_compatible(self) -> None:
+        if not len(self.target.filesystems):
+            raise UnsupportedPluginError("No filesystems found")
 
     @export(record=FilesystemRecord)
     def walkfs(self):
@@ -53,7 +53,7 @@ def generate_record(target, entry, idx):
         mtime=from_unix(stat.st_mtime),
         ctime=from_unix(stat.st_ctime),
         ino=stat.st_ino,
-        path=uri(str(entry)),
+        path=entry,
         size=stat.st_size,
         mode=stat.st_mode,
         uid=stat.st_uid,

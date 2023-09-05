@@ -107,7 +107,7 @@ class SquashFSFilesystemEntry(FilesystemEntry):
                 node.mode,
                 node.inode_number,
                 id(self.fs),
-                getattr(node.header, "nlink", 0),
+                getattr(node.header, "nlink", 1),
                 node.uid,
                 node.gid,
                 node.size,

@@ -65,7 +65,7 @@ class NotificationsPlugin(Plugin):
             if appdb_file.exists():
                 self.appdb_files.append((user_details.user, appdb_file))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.wpndb_files and not self.appdb_files:
             raise UnsupportedPluginError("No wpndatabase.db or appdb.dat files found")
 

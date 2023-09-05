@@ -1,9 +1,10 @@
 from functools import lru_cache
+from pathlib import Path
 
 from dissect.etl.etl import ETL, Event
 
 from dissect.target import Target
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.datetime import parse_tzi
@@ -12,13 +13,13 @@ from dissect.target.plugins.os.windows.datetime import parse_tzi
 class EtlRecordBuilder:
     RECORD_NAME = "filesystem/windows/etl"
 
-    def _build_record(self, etl_event: Event, etl_path: str, target: Target):
+    def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
         """Builds an ETL event record"""
 
         record_values = {}
         record_fields = [
             ("datetime", "ts"),
-            ("uri", "path"),
+            ("path", "path"),
             ("string", "ProviderName"),
             ("string", "ProviderId"),
             ("string", "EventType"),
@@ -81,10 +82,11 @@ class EtlPlugin(Plugin):
         super().__init__(target)
         self._etl_record_builder = EtlRecordBuilder()
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         etl_paths = (etl_file for etl_paths in self.PATHS.values() for etl_file in etl_paths)
         plugin_target_folders = [self.target.fs.path(file).exists() for file in etl_paths]
-        return any(plugin_target_folders)
+        if not any(plugin_target_folders):
+            raise UnsupportedPluginError("No ETL paths found")
 
     def read_etl_files(self, etl_paths: list[str]):
         """Read ETL files using an EtlReader."""
@@ -100,7 +102,7 @@ class EtlPlugin(Plugin):
                 self.target.log.exception("Failed to open ETL file: %s", entry)
                 continue
 
-            etl_records = self._etl_record_builder.read_etl_records(entry_data, f"{entry}", self.target)
+            etl_records = self._etl_record_builder.read_etl_records(entry_data, entry, self.target)
             yield from etl_records
 
     @export(record=DynamicDescriptor(["datetime"]))

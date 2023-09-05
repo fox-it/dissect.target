@@ -1,5 +1,6 @@
 import plistlib
 
+from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 
@@ -36,7 +37,7 @@ class IOSPlugin(BsdPlugin):
     def version(self):
         raise NotImplementedError
 
-    @export(property=True)
+    @export(record=EmptyRecord)
     def users(self):
         raise NotImplementedError
 

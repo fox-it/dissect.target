@@ -60,7 +60,7 @@ def test_userassist_plugin(target_win_users, hive_hku):
 
     assert len(results) == 4
     assert str(results[0].ts) == "1601-01-01 00:00:00+00:00"
-    assert results[0].path == "D:/setup64.exe"
+    assert results[0].path == "D:\\setup64.exe"
     assert results[0].number_of_executions is None
     assert results[0].application_focus_count is None
     assert results[0].application_focus_duration is None
