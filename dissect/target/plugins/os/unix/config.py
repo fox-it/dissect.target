@@ -14,8 +14,11 @@ from dissect.target.helpers import fsutil
 
 # TODO: Look if I can just create a parsing function and attach it to the
 # the parser below.
-class LinuxConfigurationParser:
-    def __init__(self, collapse: Optional[Union[bool, set]] = False) -> None:
+class ConfigurationParser:
+    def __init__(
+        self,
+        collapse: Optional[Union[bool, set]] = False,
+    ) -> None:
         self.collapse_all = collapse is True
         self.collapse = collapse if isinstance(collapse, set) else {}
         self.parsed_data = {}
@@ -61,7 +64,7 @@ class LinuxConfigurationParser:
         return new_dictionary
 
 
-class Ini(LinuxConfigurationParser):
+class Ini(ConfigurationParser):
     def __init__(self, collapse: Optional[Union[bool, set]] = True) -> None:
         super().__init__(collapse)
 
@@ -81,11 +84,12 @@ class Ini(LinuxConfigurationParser):
         self.parsed_data.read_file(open_file)
 
 
-class Txt(LinuxConfigurationParser):
+class Txt(ConfigurationParser):
     def parse_file(self, fh: TextIO) -> None:
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
 
 
+class Default(ConfigurationParser):
 class Default(LinuxConfigurationParser):
     EMPTY_SPACE = re.compile(r"\s+")
 
@@ -109,7 +113,7 @@ class Default(LinuxConfigurationParser):
         self.parsed_data = new_info
 
 
-CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
+CONFIG_MAP: dict[str, type[ConfigurationParser]] = {
     "ini": Ini,
     "xml": Txt,
     "json": Txt,
@@ -118,13 +122,13 @@ CONFIG_MAP: dict[str, LinuxConfigurationParser] = {
     "sample": Txt,
     "template": Txt,
 }
-KNOWN_FILES: dict[str, LinuxConfigurationParser] = {
+KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": Ini,
 }
 
 
-class ConfigurationFs(VirtualFilesystem):
-    __fstype__: str = "META:registry"
+class ConfigurationFilesystem(VirtualFilesystem):
+    __fstype__: str = "META:configurations"
 
     def __init__(self, target: Target, **kwargs):
         super().__init__(**kwargs)
@@ -234,7 +238,7 @@ class ConfigurationEntry(FilesystemEntry):
         # Return fh for path if entry is a file
         # Return bytes of value if entry is ConfigurationEntry
 
-        if isinstance(self.parser_items, LinuxConfigurationParser):
+        if isinstance(self.parser_items, ConfigurationParser):
             # Currently trying to open the underlying entry
             return self.entry.open()
 

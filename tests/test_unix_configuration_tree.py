@@ -8,7 +8,7 @@ from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.config import (
     ConfigurationEntry,
-    ConfigurationFs,
+    ConfigurationFilesystem,
     Default,
 )
 
@@ -26,7 +26,7 @@ def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem) -> VirtualFilesyst
 
 
 def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem):
-    config_fs = ConfigurationFs(target_unix)
+    config_fs = ConfigurationFilesystem(target_unix)
     config_path = list(config_fs.get("/").iterdir())
 
     assert config_path == ["new"]
@@ -65,7 +65,7 @@ def test_config_entry():
 
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
-    config_fs = ConfigurationFs(target_unix)
+    config_fs = ConfigurationFilesystem(target_unix)
     entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True)
 
     assert entry.parser_items["help"] == "you"
