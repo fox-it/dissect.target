@@ -70,18 +70,27 @@ RE_SUDO_COMMAND = re.compile(r'^(?P<user>\w+)\s:\sTTY=(?P<tty>\w+\/\w+)\s;\sPWD=
 # Mar 29 17:07:25 my_unix_host sshd[4651]: pam_unix(sshd:session): session opened for user ubuntu by (uid=0)
 RE_CRON_PAM_UNIX = re.compile(r'^pam_unix\(cron:(?P<cron>.*)\): +session +(?P<sessionmode>closed|opened)\sfor\suser\s(?P<user>\w+)(?:\(uid=(?P<useridassociate>\w+)\))?(?:\sby\s)?(?:\(uid=(?P<userid>\w+)\))?$')
 
+# Add all regex to a list for better performance 
+RE_LIST = [
+    RE_SSH_ACCEPTED_PASSWORD, 
+    RE_SSH_ACCEPTED_PUBLICKEY, 
+    RE_SSH_PAM_UNIX, 
+    RE_SSH_CONNECTION, 
+    RE_SUDO_COMMAND, 
+    RE_CRON_PAM_UNIX
+]
+
 class AuthPlugin(Plugin):
     def check_compatible(self) -> None:
         var_log = self.target.fs.path("/var/log")
         if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
             raise UnsupportedPluginError("No auth log files found")
 
-    def apply_regex_on_message(self, pattern, messsage):
+    def _apply_regex_on_message(self, pattern, messsage):
         """Return a data object with the data from the group dict regex"""
         data = {}
         
-        message_data = re.match(pattern, messsage)
-        if message_data:
+        if message_data := re.match(pattern, messsage):
             data.update(message_data.groupdict())
 
         return data
@@ -104,7 +113,7 @@ class AuthPlugin(Plugin):
         var_log = self.target.fs.path("/var/log")
         for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
             for ts, line in year_rollover_helper(auth_file, RE_TS, "%b %d %H:%M:%S", tzinfo):
-                data = {
+                log_entry_dataset = {
                     'ts': ts,
                 }
 
@@ -114,20 +123,17 @@ class AuthPlugin(Plugin):
                     self.target.log.warning("Skipping this line: %s", line)
                     continue
                 
-                data.update(log_entry.groupdict())
+                log_entry_dataset.update(log_entry.groupdict())
+                
+                for regex in RE_LIST:
+                    matches = self._apply_regex_on_message(regex, log_entry["message"])
+                    if matches != {}:
+                        log_entry_dataset.update(matches)
+                        break
 
-                data.update(self.apply_regex_on_message(RE_SSH_ACCEPTED_PASSWORD, log_entry["message"]))
-                data.update(self.apply_regex_on_message(RE_SSH_ACCEPTED_PUBLICKEY, log_entry["message"]))
-                data.update(self.apply_regex_on_message(RE_SSH_PAM_UNIX, log_entry["message"]))
-                data.update(self.apply_regex_on_message(RE_SSH_CONNECTION, log_entry["message"]))
-                data.update(self.apply_regex_on_message(RE_SUDO_COMMAND, log_entry["message"]))
-                data.update(self.apply_regex_on_message(RE_CRON_PAM_UNIX, log_entry["message"]))
-
-                data.update({
-                    'source': auth_file,
-                    '_target': self.target
-                })
                 yield AuthLogRecord(
-                    **data
+                    source=auth_file,
+                    _target=self.target,
+                    **log_entry_dataset
                     )
 
