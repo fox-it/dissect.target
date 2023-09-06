@@ -37,6 +37,12 @@ class ConfigurationParser:
     def __contains__(self, item: str) -> bool:
         return item in self.parsed_data
 
+    def get(self, item: str, default: Optional[Any] = None) -> Any:
+        try:
+            return self.parsed_data[item]
+        except KeyError:
+            return default
+
     def read_file(self, fh: TextIO) -> None:
         try:
             self.parse_file(fh)
@@ -105,34 +111,53 @@ class Default(ConfigurationParser):
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
-        seperator: str = r"\s",
+        seperator: str = (r"\s",),
         comment_prefixes: tuple = (";", "#"),
     ) -> None:
         super().__init__(collapse, seperator, comment_prefixes)
-        self.SEPERATOR = re.compile(rf"\s*?{seperator}\s*?")
-        self.COMMENTS = re.compile(f"[{''.join(comment_prefixes)}]")
+        self.SEPERATOR = re.compile(rf"\s*?[{''.join(seperator)}]\s*?")
+        self.COMMENTS = re.compile(rf"\s*[{''.join(comment_prefixes)}]")
 
     def parse_file(self, fh: TextIO) -> None:
         information_dict = {}
 
         skip_lines = self.comment_prefixes + ("\n",)
+        prev_key = None, None
         for line in fh.readlines():
             if line.startswith(skip_lines):
                 continue
 
-            key, *values = self.SEPERATOR.split(line)
-            values = " ".join(value for value in values if value)
+            # Strip the comments first
+            line, *_ = self.COMMENTS.split(line)
 
-            values, *_ = self.COMMENTS.split(values)
-            values = values.strip()
+            if not line:
+                # There was an indented comment
+                continue
 
-            if old_value := information_dict.get(key):
-                if not isinstance(old_value, list):
-                    old_value = [old_value]
-                values = old_value + [values]
-            information_dict[key] = values
+            if line.startswith((" ", "\t")) and line.strip():
+                # This part was indented
+                # So this one belongs to the previous key
+                new_dictionary = dict()
+                self.parse_value(line.strip(), new_dictionary)
+                information_dict[prev_key] = {information_dict.get(prev_key): new_dictionary}
+                continue
+
+            key = self.parse_value(line, information_dict)
+            prev_key = key
 
         self.parsed_data = information_dict
+
+    def parse_value(self, line: str, data_dict: dict) -> tuple:
+        key, *values = self.SEPERATOR.split(line)
+        values = " ".join(value for value in values if value).strip()
+
+        if old_value := data_dict.get(key):
+            if not isinstance(old_value, list):
+                old_value = [old_value]
+            values = old_value + [values]
+        data_dict[key] = values
+
+        return key
 
 
 CONFIG_MAP: dict[str, type[ConfigurationParser]] = {
