@@ -1,15 +1,14 @@
 from collections import defaultdict
 from typing import BinaryIO, Iterator, Union
 
-from dissect.volume import md
-from dissect.volume.md.md import find_super_block
+from dissect.volume.md.md import MD, Device, find_super_block
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 
 class MdVolumeSystem(LogicalVolumeSystem):
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
-        self.md = md.MD(fh)
+        self.md = MD(fh)
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
@@ -20,7 +19,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
             if not cls.detect_volume(vol):
                 continue
 
-            device = md.Device(vol)
+            device = Device(vol)
             devices[device.set_uuid].append(device)
 
         for devs in devices.values():
