@@ -90,7 +90,7 @@ def test_cit_cit_plugin(target_win_tzinfo, hive_hklm):
     assert len(results) == 48
 
     program = [r for r in results if r._desc.name == "windows/registry/cit/program"][0]
-    assert program.path == "/DEVICE/HARDDISKVOLUME2/WINDOWS/SYSTEM32/CSRSS.EXE"
+    assert program.path == "\\DEVICE\\HARDDISKVOLUME2\\WINDOWS\\SYSTEM32\\CSRSS.EXE"
 
 
 def test_cit_puu_plugin(target_win, hive_hklm):
@@ -172,7 +172,7 @@ def test_cit_telemetry_plugin(target_win, hive_hklm):
 
     assert len(results) == 2
     assert results[0].version == 1705
-    assert results[0].path == "/Device/HarddiskVolume2/Windows/System32/taskhost.exe"
+    assert results[0].path == "\\Device\\HarddiskVolume2\\Windows\\System32\\taskhost.exe"
     assert results[0].value == "DEVICECHANGE"
     assert results[1].value == "POWERBROADCAST|DEVICECHANGE"
 
@@ -215,6 +215,6 @@ def test_cit_modules_plugin(target_win, hive_hklm):
     results = list(target_win.cit.modules())
 
     assert len(results) == 1
-    assert results[0].tracked_module == "System32/mrt100.dll"
-    assert results[0].executable == "/Device/HarddiskVolume1/Windows/System32/backgroundTaskHost.exe"
+    assert results[0].tracked_module == "System32\\mrt100.dll"
+    assert results[0].executable == "\\Device\\HarddiskVolume1\\Windows\\System32\\backgroundTaskHost.exe"
     assert results[0].overflow_quota == results[0].overflow_value

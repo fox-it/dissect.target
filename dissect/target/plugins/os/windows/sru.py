@@ -1,6 +1,6 @@
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -10,7 +10,7 @@ NetworkDataRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/network_data",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "interface_luid"),
         ("varint", "l2_profile_id"),
@@ -24,7 +24,7 @@ NetworkConnectivityRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/network_connectivity",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "interface_luid"),
         ("varint", "l2_profile_id"),
@@ -38,7 +38,7 @@ EnergyEstimatorRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/energy_estimator",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("bytes", "binary_data"),
     ],
@@ -48,7 +48,7 @@ EnergyUsageRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/energy_usage",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "event_timestamp"),
         ("varint", "state_transition"),
@@ -66,7 +66,7 @@ EnergyUsageLTRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/energy_usage_lt",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "active_ac_time"),
         ("varint", "cs_ac_time"),
@@ -87,7 +87,7 @@ ApplicationRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/application",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "foreground_cycle_time"),
         ("varint", "background_cycle_time"),
@@ -111,7 +111,7 @@ PushNotificationRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/push_notification",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "notification_type"),
         ("varint", "payload_size"),
@@ -123,7 +123,7 @@ ApplicationTimelineRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/application_timeline",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "flags"),
         ("datetime", "end_time"),
@@ -172,7 +172,7 @@ VfuRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/vfu",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "flags"),
         ("varint", "start_time"),
@@ -185,7 +185,7 @@ SdpVolumeProviderRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/sdp_volume_provider",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "total"),
         ("varint", "used"),
@@ -196,7 +196,7 @@ SdpPhysicalDiskProviderRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/sdp_physical_disk_provider",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "size_in_bytes"),
     ],
@@ -206,7 +206,7 @@ SdpCpuProviderRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/sdp_cpu_provider",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "processor_time"),
     ],
@@ -216,7 +216,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     "filesystem/windows/sru/sdp_network_provider",
     [
         ("datetime", "ts"),
-        ("uri", "app"),
+        ("path", "app"),
         ("string", "user"),
         ("varint", "bytes_inbound"),
         ("varint", "bytes_outbound"),
@@ -329,7 +329,7 @@ def transform_app_id(value):
             value = value.decode()
         else:
             value = str(value)
-        value = uri.from_windows(value)
+        value = path.from_windows(value)
     return value
 
 
@@ -362,7 +362,7 @@ class SRUPlugin(Plugin):
             except Error as e:
                 self.target.log.warning("Error opening SRU database", exc_info=e)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._sru:
             raise UnsupportedPluginError("No SRUDB found")
 

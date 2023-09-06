@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import traceback
+import urllib
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Union
@@ -250,8 +251,11 @@ class Target:
             TargetError: Raised when not a single ``Target`` can be loaded.
         """
 
-        def _find(find_path: Path):
+        def _find(find_path: Path, parsed_path: Optional[urllib.parse.ParseResult]):
             yield find_path
+            if parsed_path is not None:
+                return
+
             if find_path.is_dir():
                 yield from find_path.iterdir()
 
@@ -264,7 +268,7 @@ class Target:
             path, parsed_path = extract_path_info(path)
 
             # Search for targets one directory deep
-            for entry in _find(path):
+            for entry in _find(path, parsed_path):
                 loader_cls = loader.find_loader(entry, parsed_path=parsed_path, fallbacks=fallback_loaders)
                 if not loader_cls:
                     continue
@@ -325,7 +329,7 @@ class Target:
                 continue
 
             try:
-                if child_plugin.check_compatible() is False:
+                if not child_plugin.is_compatible():
                     continue
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
@@ -419,6 +423,8 @@ class Target:
 
             if isinstance(os_plugin, plugin.OSPlugin):
                 self._os_plugin = os_plugin.__class__
+            elif issubclass(os_plugin, plugin.OSPlugin):
+                os_plugin = os_plugin.create(self, os_plugin.detect(self))
 
             self._os = self.add_plugin(os_plugin)
             return
@@ -511,7 +517,7 @@ class Target:
 
         if check_compatible:
             try:
-                if p.check_compatible() is False:
+                if not p.is_compatible():
                     self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
                     raise UnsupportedPluginError(f"Plugin reported itself as incompatible: {plugin_cls}")
             except PluginError:

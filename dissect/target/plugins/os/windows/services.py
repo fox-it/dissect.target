@@ -1,6 +1,6 @@
 import re
 
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -16,8 +16,8 @@ ServiceRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "name"),
         ("wstring", "displayname"),
-        ("uri", "servicedll"),
-        ("uri", "imagepath"),
+        ("path", "servicedll"),
+        ("path", "imagepath"),
         ("string", "imagepath_args"),
         ("string", "objectname"),
         ("string", "start"),
@@ -59,7 +59,7 @@ class ServicesPlugin(Plugin):
 
     KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Services"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No services found in the registry")
 
@@ -79,8 +79,8 @@ class ServicesPlugin(Plugin):
             ts (datatime): The last modified timestamp of the registry key.
             name (string): The service name.
             displayname (string): The service display name.
-            servicedll (uri): The service dll.
-            imagepath (uri): The service image path.
+            servicedll (path): The service dll.
+            imagepath (path): The service image path.
             objectname (string): The object under which the service runs (for example LocalSystem)
             start (string): The service start field.
             type (string): The service type field.
@@ -100,7 +100,7 @@ class ServicesPlugin(Plugin):
 
                 try:
                     servicedll = key.subkey("Parameters").value("ServiceDll").value
-                    servicedll = uri.from_windows(servicedll)
+                    servicedll = path.from_windows(servicedll)
                 except RegistryError:
                     pass
 
@@ -138,7 +138,7 @@ class ServicesPlugin(Plugin):
                                 image_path = image_path[: m.end(0)].strip()
                             else:
                                 pass
-                        image_path = uri.from_windows(image_path)
+                        image_path = path.from_windows(image_path)
                 except RegistryError:
                     pass
 

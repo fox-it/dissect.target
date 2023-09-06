@@ -1,5 +1,5 @@
 from dissect.ntfs import ntfs
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
@@ -17,7 +17,7 @@ SyscacheRecord = TargetRecordDescriptor(
         ("varint", "object_lru"),
         ("varint", "usn_journal_id"),
         ("varint", "usn"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -37,7 +37,7 @@ class SyscachePlugin(Plugin):
         if fpath.exists():
             self.hive.add(regutil.RegfHive(fpath))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.hive) > 0:
             raise UnsupportedPluginError("Could not load Syscache.hve")
 
@@ -73,10 +73,10 @@ class SyscachePlugin(Plugin):
 
                 file_segment = file_id & ((1 << 48) - 1)
 
-                path = None
+                full_path = None
                 if mft:
                     try:
-                        path = uri.from_windows("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
+                        full_path = path.from_windows("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
                     except ntfs.Error:
                         pass
 
@@ -89,6 +89,6 @@ class SyscachePlugin(Plugin):
                     object_lru=subkey.value("_ObjectLru_").value,
                     usn_journal_id=subkey.value("_UsnJournalId_").value,
                     usn=subkey.value("_Usn_").value,
-                    path=path,
+                    path=full_path,
                     _target=self.target,
                 )

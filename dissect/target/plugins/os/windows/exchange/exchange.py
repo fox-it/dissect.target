@@ -5,10 +5,9 @@ from dissect.target.plugin import Plugin, export
 class ExchangePlugin(Plugin):
     __namespace__ = "exchange"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(self.install_paths()):
             raise UnsupportedPluginError("No Exchange install path found")
-        return True
 
     def install_paths(self):
         paths = []

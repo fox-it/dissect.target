@@ -106,7 +106,7 @@ class WindowsEventlogsMixin:
 
         return file_paths
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.target.fs.path(self.LOGS_DIR_PATH).exists():
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 

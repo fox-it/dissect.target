@@ -114,7 +114,7 @@ class FfsFilesystemEntry(FilesystemEntry):
             [
                 self.entry.mode,
                 self.entry.inum,
-                0,
+                id(self.fs),
                 node.di_nlink,
                 node.di_uid,
                 node.di_gid,

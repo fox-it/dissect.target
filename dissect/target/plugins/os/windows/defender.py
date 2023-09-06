@@ -8,6 +8,7 @@ from dissect.cstruct import Structure, cstruct
 from flow.record import Record
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 DEFENDER_EVTX_FIELDS = [
@@ -71,6 +72,7 @@ DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
+DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
 
@@ -88,6 +90,18 @@ DefenderExclusionRecord = TargetRecordDescriptor(
     ],
 )
 
+DefenderQuarantineRecord = TargetRecordDescriptor(
+    "filesystem/windows/defender/quarantine",
+    [
+        ("datetime", "ts"),
+        ("bytes", "quarantine_id"),
+        ("bytes", "scan_id"),
+        ("varint", "threat_id"),
+        ("string", "detection_type"),
+        ("string", "detection_name"),
+    ],
+)
+
 DefenderFileQuarantineRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/quarantine/file",
     [
@@ -102,18 +116,6 @@ DefenderFileQuarantineRecord = TargetRecordDescriptor(
         ("datetime", "last_write_time"),
         ("datetime", "last_accessed_time"),
         ("string", "resource_id"),
-    ],
-)
-
-DefenderBehaviorQuarantineRecord = TargetRecordDescriptor(
-    "filesystem/windows/defender/quarantine/behavior",
-    [
-        ("datetime", "ts"),
-        ("bytes", "quarantine_id"),
-        ("bytes", "scan_id"),
-        ("varint", "threat_id"),
-        ("string", "detection_type"),
-        ("string", "detection_name"),
     ],
 )
 
@@ -344,6 +346,13 @@ class QuarantineEntryResource:
         self.field_count = self.metadata.FieldCount
         self.detection_type = self.metadata.DetectionType
 
+        # It is possible that certain fields miss from a QuarantineEntryResource even though we expect them. Thus, we
+        # initialize them in advance with a None value.
+        self.resource_id = None
+        self.creation_time = None
+        self.last_access_time = None
+        self.last_write_time = None
+
         self.unknown_fields = []
 
         # As the fields are aligned, we need to parse them individually
@@ -383,11 +392,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
     __namespace__ = "defender"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         # Either the Defender log folder, the quarantine folder or the exclusions registry key
         # has to exist for this plugin to be compatible.
 
-        return any(
+        if not any(
             [
                 self.target.fs.path(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
@@ -396,7 +405,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
                 ),
             ]
-        )
+        ):
+            raise UnsupportedPluginError("No Defender objects found")
 
     @plugin.export(record=DefenderLogRecord)
     def evtx(self) -> Generator[Record, None, None]:
@@ -422,15 +432,15 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
-    @plugin.export(record=[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord])
-    def quarantine(self) -> Iterator[Union[DefenderFileQuarantineRecord, DefenderBehaviorQuarantineRecord]]:
+    @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
+    def quarantine(self) -> Iterator[Union[DefenderQuarantineRecord, DefenderFileQuarantineRecord]]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
         quarantine.
         """
         for entry in self.get_quarantine_entries():
-            # These fields are present for both behavior and file based detections
+            # These fields are present for all (currently known) quarantine entry types
             fields = {
                 "ts": entry.timestamp,
                 "quarantine_id": entry.quarantine_id,
@@ -440,9 +450,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             }
             for resource in entry.resources:
                 fields.update({"detection_type": resource.detection_type})
-                if resource.detection_type == b"internalbehavior":
-                    yield DefenderBehaviorQuarantineRecord(**fields, _target=self.target)
-                elif resource.detection_type == b"file":
+                if resource.detection_type == b"file":
                     # These fields are only available for file based detections
                     fields.update(
                         {
@@ -455,7 +463,14 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     )
                     yield DefenderFileQuarantineRecord(**fields, _target=self.target)
                 else:
-                    self.target.log.warning("Unknown Defender Detection Type %s", resource.detection_type)
+                    # For these types, we know that they have no known additional data to add to the Quarantine Record.
+                    if resource.detection_type not in DEFENDER_KNOWN_DETECTION_TYPES:
+                        self.target.log.warning(
+                            "Unknown Defender Detection Type %s, yielding a generic quarantine record.",
+                            resource.detection_type,
+                        )
+                    # For anything other than a file, we yield a generic DefenderQuarantineRecord.
+                    yield DefenderQuarantineRecord(**fields, _target=self.target)
 
     @plugin.export(record=DefenderExclusionRecord)
     def exclusions(self) -> Iterator[DefenderExclusionRecord]:

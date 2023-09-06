@@ -2,6 +2,7 @@ import re
 from itertools import chain
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -70,9 +71,10 @@ RE_SUDO_COMMAND = re.compile(r'^(?P<user>\w+)\s:\sTTY=(?P<tty>\w+\/\w+)\s;\sPWD=
 RE_CRON_PAM_UNIX = re.compile(r'^pam_unix\(cron:(?P<cron>.*)\): +session +(?P<sessionmode>closed|opened)\sfor\suser\s(?P<user>\w+)(?:\(uid=(?P<useridassociate>\w+)\))?(?:\sby\s)?(?:\(uid=(?P<userid>\w+)\))?$')
 
 class AuthPlugin(Plugin):
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         var_log = self.target.fs.path("/var/log")
-        return any(var_log.glob("auth.log*")) or any(var_log.glob("secure*"))
+        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
+            raise UnsupportedPluginError("No auth log files found")
 
     def apply_regex_on_message(self, pattern, messsage):
         """Return a data object with the data from the group dict regex"""

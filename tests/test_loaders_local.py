@@ -1,14 +1,18 @@
 import platform
 from pathlib import Path
-from unittest.mock import MagicMock, call, mock_open, patch
+from unittest.mock import MagicMock, call, create_autospec, mock_open, patch
 
 import pytest
 
+from dissect.target import Target
 from dissect.target.containers.raw import RawContainer
+from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loaders.local import (
+    LINUX_DEV_DIR,
     LINUX_DRIVE_REGEX,
     _add_disk_as_raw_container_to_target,
     _get_windows_drive_volumes,
+    map_linux_drives,
 )
 from dissect.target.target import TargetLogAdapter
 
@@ -43,23 +47,66 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
 )
-def test_local_loader_drive_skipping(mock_target):
-    mock = mock_open()
+def test__add_disk_as_raw_container_to_target(mock_target: Target) -> None:
     # Does it attempt to open the file and pass a raw container?
-    with patch("builtins.open", mock), patch.object(mock_target.disks, "add") as mock_method:
-        drive = Path("/xdev/fake")
-        _add_disk_as_raw_container_to_target(drive, mock_target)
-        assert isinstance(mock_method.call_args[0][0], RawContainer) is True
-    mock.assert_called_with(Path("/xdev/fake"), "rb")
+    mock = mock_open()
+    drive = Path("/xdev/fake")
 
-    # Does it emit a warning instead of raising an exception?
-    mock.side_effect = IOError
-    with patch.object(TargetLogAdapter, "warning") as mock_method, patch("builtins.open", mock):
-        drive = Path("/xdev/fake")
+    with (
+        patch("builtins.open", mock),
+        patch.object(mock_target.disks, "add") as mock_method,
+    ):
         _add_disk_as_raw_container_to_target(drive, mock_target)
-        assert mock_method.call_args[0][0] == "Unable to open drive: /xdev/fake, skipped"
+
+        assert isinstance(mock_method.call_args[0][0], RawContainer) is True
+        mock.assert_called_with(drive, "rb")
+
+
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
+)
+def test__add_disk_as_raw_container_to_target_skip_fail(mock_target: Target) -> None:
+    # Does it emit a warning instead of raising an exception?
+    mock = mock_open()
+    mock.side_effect = IOError
+    drive = Path("/xdev/fake")
+
+    with (
+        patch.object(TargetLogAdapter, "warning") as mock_method,
+        patch("builtins.open", mock),
+    ):
+        _add_disk_as_raw_container_to_target(drive, mock_target)
+
+        assert mock_method.call_args[0][0] == f"Unable to open drive: {str(drive)}, skipped"
         assert isinstance(mock_method.call_args[1]["exc_info"], OSError) is True
-    mock.assert_called_with(Path("/xdev/fake"), "rb")
+        mock.assert_called_with(drive, "rb")
+
+
+def test_map_linux_drives(mock_target: Target, tmp_path: Path) -> None:
+    mock_drive = LINUX_DEV_DIR.joinpath("sda")
+    mock_dev_dir = create_autospec(Path)
+    mock_dev_dir.iterdir.return_value = iter([mock_drive])
+
+    with (
+        patch("dissect.target.loaders.local.LINUX_DEV_DIR", mock_dev_dir),
+        patch(
+            "dissect.target.loaders.local._add_disk_as_raw_container_to_target",
+            autospec=True,
+        ) as mock_add_raw_disks,
+        patch("dissect.target.loaders.local.VOLATILE_LINUX_PATHS", [tmp_path]),
+        patch.object(mock_target.filesystems, "add", autospec=True) as mock_add_fs,
+        patch.object(mock_target.fs, "mount", autospec=True) as mock_mount,
+    ):
+        map_linux_drives(mock_target)
+
+        mock_add_raw_disks.assert_called_with(mock_drive, mock_target)
+
+        mock_add_fs.assert_called()
+        dir_fs = mock_add_fs.call_args[0][0]
+        assert isinstance(dir_fs, DirectoryFilesystem)
+        assert dir_fs.base_path == tmp_path
+
+        mock_mount.assert_called_with(str(tmp_path), dir_fs)
 
 
 @pytest.mark.parametrize(
@@ -84,5 +131,5 @@ def test_local_loader_drive_skipping(mock_target):
         (Path("/dev/xhdaa"), False),  # Fake
     ],
 )
-def test_linux_drive_regex(drive_path, expected):
+def test_linux_drive_regex(drive_path: Path, expected: bool) -> None:
     assert (LINUX_DRIVE_REGEX.match(drive_path.name) is not None) == expected

@@ -61,10 +61,26 @@ def fs_unix():
 
 
 @pytest.fixture
+def fs_linux():
+    fs = VirtualFilesystem()
+    fs.makedirs("var")
+    fs.makedirs("etc")
+    fs.makedirs("opt")
+    yield fs
+
+
+@pytest.fixture
 def fs_osx():
     fs = VirtualFilesystem()
     fs.makedirs("Applications")
     fs.makedirs("Library")
+    yield fs
+
+
+@pytest.fixture
+def fs_bsd():
+    fs = VirtualFilesystem()
+    fs.map_file("/bin/freebsd-version", absolute_path("data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
     yield fs
 
 
@@ -88,6 +104,12 @@ def hive_hku():
     hive = VirtualHive()
 
     yield hive
+
+
+@pytest.fixture
+def target_default():
+    mock_target = next(make_mock_target())
+    yield mock_target
 
 
 @pytest.fixture
@@ -119,6 +141,16 @@ def target_unix(fs_unix):
 
 
 @pytest.fixture
+def target_linux(fs_linux):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_linux)
+    mock_target.fs.mount("/", fs_linux)
+    mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
 def target_osx(fs_osx):
     mock_target = next(make_mock_target())
 
@@ -132,6 +164,23 @@ def target_osx(fs_osx):
     system = absolute_path("data/plugins/os/unix/bsd/osx/os/preferences.plist")
     fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
 
+    yield mock_target
+
+
+@pytest.fixture
+def target_citrix(fs_bsd):
+    mock_target = next(make_mock_target())
+    mock_target.filesystems.add(fs_bsd)
+
+    var_filesystem = VirtualFilesystem()
+    var_filesystem.makedirs("/netscaler")
+    mock_target.filesystems.add(var_filesystem)
+
+    flash_filesystem = VirtualFilesystem()
+    flash_filesystem.map_dir("/", absolute_path("data/plugins/os/unix/bsd/citrix/flash"))
+    mock_target.filesystems.add(flash_filesystem)
+
+    mock_target.apply()
     yield mock_target
 
 

@@ -29,9 +29,10 @@ from dissect.target.exceptions import (
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
 )
-from dissect.target.filesystem import RootFilesystemEntry
+from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
+from dissect.target.plugins.os.unix.config import ConfigurationFs
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
@@ -663,7 +664,7 @@ class TargetCli(TargetCmd):
                 dst_path = dst_path.joinpath(src_name)
                 dst_path.mkdir(parents=True, exist_ok=True)
                 log_saved_path(src_path, dst_path)
-                for path in src_path.rglob("*"):
+                for path in src_path.glob("*"):
                     save_path(path, dst_path)
 
             elif src_path.is_file():
@@ -742,6 +743,7 @@ class TargetCli(TargetCmd):
             fh = path.open()
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
+        print("")
 
     @arg("path")
     def cmd_zcat(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
@@ -807,6 +809,10 @@ class TargetCli(TargetCmd):
     @arg("path", nargs="?", help="load a hive from the given path")
     def cmd_registry(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """drop into a registry shell"""
+        if self.target.os == "linux":
+            run_cli(UnixConfigTreeCli(self.target))
+            return
+
         hive = None
 
         clikey = "registry"
@@ -858,6 +864,52 @@ class TargetCli(TargetCmd):
 
         # Print an additional empty newline after exit
         print()
+
+
+class UnixConfigTreeCli(TargetCli):
+    def __init__(self, target: Target):
+        TargetCmd.__init__(self, target)
+        self.config_tree = ConfigurationFs(target)
+        self.prompt_base = target.name
+
+        self.cwd = None
+        self.chdir("/")
+
+    @property
+    def prompt(self) -> str:
+        return f"{self.prompt_base}/config_tree {self.cwd}> "
+
+    def check_compatible(target) -> bool:
+        return target.fs.get("/etc") is not None
+
+    def resolve_path(self, path: Optional[Union[str, fsutil.TargetPath]]) -> fsutil.TargetPath:
+        if not path:
+            return self.cwd
+
+        if isinstance(path, fsutil.TargetPath):
+            return path
+
+        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.config_tree.alt_separator)
+        return self.config_tree.path(path)
+
+    def resolve_key(self, path) -> FilesystemEntry:
+        return self.config_tree.path(path).get()
+
+    def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
+        path = self.resolve_path(path)
+        if path.exists():
+            yield path
+        else:
+            # Strip the leading '/' as non-relative patterns are unsupported as glob patterns.
+            glob_path = str(path).lstrip("/")
+            try:
+                for path in self.config_tree.path("/").glob(glob_path):
+                    yield path
+            except ValueError as err:
+                # The generator returned by glob() will raise a
+                # ValueError if the '**' glob is not used as an entire path
+                # component
+                print(err)
 
 
 class RegistryCli(TargetCmd):

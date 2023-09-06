@@ -1,20 +1,42 @@
 from datetime import datetime, timezone
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.log.atop import AtopPlugin
-from dissect.target.plugins.os.unix.log.btmp import BtmpPlugin
 from dissect.target.plugins.os.unix.log.lastlog import LastLogPlugin
-from dissect.target.plugins.os.unix.log.wtmp import WtmpPlugin
+from dissect.target.plugins.os.unix.log.utmp import UtmpPlugin
 
 from ._utils import absolute_path
 
 
-def test_wtmp_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/wtmp")
-    fs_unix.map_file("var/log/wtmp", data_file)
+def test_utmp_ipv6(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp-ipv6")
+    fs_linux.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(WtmpPlugin)
+    target_linux.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.wtmp())
+    results = list(target_linux.btmp())
+
+    # IPv4 address
+    results[0].ut_host == "127.0.0.1"
+    results[0].ut_addr == "127.0.0.1"
+
+    # IPv6 address
+    results[4].ut_host == "1337::1"
+    results[4].ut_addr == "1337::1"
+
+    # IPv6 address with 12 bytes of trailing zeroes
+    results[5].ut_host == "1337:1::"
+    results[5].ut_addr == "1337:1::"
+
+
+def test_wtmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    data_file = absolute_path("data/plugins/os/unix/log/wtmp/wtmp")
+    fs_linux.map_file("var/log/wtmp", data_file)
+
+    target_linux.add_plugin(UtmpPlugin)
+
+    results = list(target_linux.wtmp())
     assert len(results) == 70
     result = results[-1]
     assert result.ts == datetime(2021, 11, 12, 10, 12, 54, tzinfo=timezone.utc)
@@ -27,13 +49,13 @@ def test_wtmp_plugin(target_unix, fs_unix):
     assert result.ut_addr == "0.0.0.0"
 
 
-def test_lastlog_plugin(target_unix_users, fs_unix):
-    data_file = absolute_path("data/unix/logs/lastlog")
-    fs_unix.map_file("/var/log/lastlog", data_file)
+def test_lastlog_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    data_file = absolute_path("data/plugins/os/unix/log/lastlog/lastlog")
+    fs_linux.map_file("/var/log/lastlog", data_file)
 
-    target_unix_users.add_plugin(LastLogPlugin)
+    target_linux.add_plugin(LastLogPlugin)
 
-    results = list(target_unix_users.lastlog())
+    results = list(target_linux.lastlog())
     assert len(results) == 1
 
     assert results[0].ts == datetime(2021, 12, 8, 16, 14, 6, tzinfo=timezone.utc)
@@ -43,13 +65,13 @@ def test_lastlog_plugin(target_unix_users, fs_unix):
     assert results[0].ut_tty == "pts/0"
 
 
-def test_btmp_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/btmp")
-    fs_unix.map_file("var/log/btmp", data_file)
+def test_btmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    data_file = absolute_path("data/plugins/os/unix/log/btmp/btmp")
+    fs_linux.map_file("var/log/btmp", data_file)
 
-    target_unix.add_plugin(BtmpPlugin)
+    target_linux.add_plugin(UtmpPlugin)
 
-    results = list(target_unix.btmp())
+    results = list(target_linux.btmp())
     assert len(results) == 10
     result = results[-1]
     assert result.ts == datetime(2021, 11, 30, 23, 2, 9, tzinfo=timezone.utc)
@@ -62,15 +84,15 @@ def test_btmp_plugin(target_unix, fs_unix):
     assert result.ut_addr == "8.210.13.5"
 
 
-def test_atop_plugin(target_unix, fs_unix):
-    data_file = absolute_path("data/unix/logs/atop")
+def test_atop_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    data_file = absolute_path("data/plugins/os/unix/log/atop/atop")
     fs_unix.map_file("var/log/atop/atop_20221111", data_file)
 
     target_unix.add_plugin(AtopPlugin)
 
     results = list(target_unix.atop())
     assert len(results) == 2219
-    assert str(results[0].ts) == "2022-11-11 19:50:44"
+    assert results[0].ts == datetime(2022, 11, 11, 19, 50, 44, tzinfo=timezone.utc)
     assert results[0].process == "systemd"
     assert results[0].cmdline == "/sbin/init"
     assert results[0].tgid == 1
