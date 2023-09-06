@@ -2,26 +2,50 @@ from __future__ import annotations
 
 from codecs import decode
 from collections import defaultdict
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import IntEnum
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
+from pathlib import Path
 from socket import htonl
 from struct import pack, unpack
 from typing import Iterator, Optional, Union
 
 from dissect.util.ts import from_unix
 
-from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import FilesystemEntry, fsutil
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.filesystem import fsutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import Plugin, internal
 from dissect.target.target import Target
 
 
+def parse_ip(addr: Union[str, int], version: int = 4) -> IPv6Address | IPv4Address:
+    if version == 6:
+        return ipv6(addr)
+
+    return ipv4(addr)
+
+
+def ipv6(addr: Union[str, int]) -> IPv6Address:
+    """Convert ``/proc/net`` IPv6 hex address into standard IPv6 notation."""
+
+    addr = unpack("!LLLL", decode(addr, "hex"))
+    return IPv6Address(pack("@IIII", *addr))
+
+
+def ipv4(addr: Union[str, int]) -> IPv4Address:
+    """Convert ``/proc/net`` IPv4 hex address into standard IPv4 notation."""
+    if isinstance(addr, int):
+        return IPv4Address(htonl(addr))
+
+    addr = int(addr, 16)
+    return IPv4Address(htonl(addr))
+
+
 # Labels are borrowed from https://www.kernel.org/doc/Documentation/networking/proc_net_tcp.txt
-@dataclass(order=True, init=False)
+@dataclass(order=True)
 class NetSocket:
     sl: str  # number of entry
     local_address: str  # local IPv4 or IPv6 address
@@ -33,80 +57,72 @@ class NetSocket:
     uid: int  # uid
     timeout: str  # unanswered 0-window probes
     inode: int  # inode
-    ref: Optional[str]  # socket reference count
-    pointer: Optional[str]  # location of socket in memory
-    drops: Optional[str]  # retransmit timeout
-    predicted_tick: Optional[str]  # predicted tick of soft slock (delayed ACK control data)
-    ack_pingpong: Optional[str]  # ack.quick<<1|ack.pingpong
-    congestion_window: Optional[str]  # sending congestion window
-    size_threshold: Optional[str]  # slow start size threshhold or -f if the threshold is >= 0xFFFF
+    ref: Optional[str] = None  # socket reference count
+    pointer: Optional[str] = None  # location of socket in memory
+    drops: Optional[str] = None  # retransmit timeout
+    predicted_tick: Optional[str] = None  # predicted tick of soft slock (delayed ACK control data)
+    ack_pingpong: Optional[str] = None  # ack.quick<<1|ack.pingpong
+    congestion_window: Optional[str] = None  # sending congestion window
+    size_threshold: Optional[str] = None  # slow start size threshhold or -f if the threshold is >= 0xFFFF
 
     # Values parsed from raw values listed above.
-    protocol_string: str
-    local_ip: Optional[str]  # parsed value from local_address
-    local_port: int  # parsed value from local_address
-    remote_ip: Optional[str]  # parsed value from rem_address
-    remote_port: int  # parsed value from rem_address
-    state_string: str  # parsed value from state
-    owner: str  # resolved owner name of the socket, else "0".
-    rx_queue: int  # parsed value from tx_rx_queue
-    tx_queue: int  # parsed value from tx_rx_queue
-    pid: int  # pid of the socket
-    name: str  # process name associated to the socket
-    cmdline: str = field(default=None)  # process cmdline associated to the socket
+    protocol_string: Optional[str] = None
+    local_ip: Optional[str] = None  # parsed value from local_address
+    local_port: Optional[int] = None  # parsed value from local_address
+    remote_ip: Optional[str] = None  # parsed value from rem_address
+    remote_port: Optional[int] = None  # parsed value from rem_address
+    state_string: Optional[str] = None  # parsed value from state
+    owner: Optional[str] = None  # resolved owner name of the socket, else "0".
+    rx_queue: Optional[int] = None  # parsed value from tx_rx_queue
+    tx_queue: Optional[int] = None  # parsed value from tx_rx_queue
+    pid: Optional[int] = None  # pid of the socket
+    name: Optional[str] = None  # process name associated to the socket
+    cmdline: Optional[str] = None  # process cmdline associated to the socket
 
     @classmethod
-    def from_line(cls, line: str) -> NetSocket:
-        socket = cls()
-
-        # The lines in /proc/net/[protocol] can be of arbitrary column (split) length, but are ordered.
-        # So we use the fields(NetSocket) to dynamically fill the NetSocket dataclass.
-        for idx, value in enumerate(line.split()):
-            field_names = fields(cls)
-            setattr(socket, field_names[idx].name, value)
+    def from_line(cls, line: str, ip_vers: int = 4) -> NetSocket:
+        socket = cls(*line.split())
 
         socket.uid = int(socket.uid)
         socket.inode = int(socket.inode)
         socket.tx_queue, socket.rx_queue = [int(queue, 16) for queue in socket.tx_rx_queue.split(":")]
-        socket.local_port, socket.remote_port = [
-            int(port, 16)
-            for port in (
-                socket.local_address.split(":")[1],
-                socket.rem_address.split(":")[1],
-            )
-        ]
+        socket.local_ip, socket.local_port = socket.local_address.split(":")
+        socket.remote_ip, socket.remote_port = socket.rem_address.split(":")
+
+        (
+            socket.local_ip,
+            socket.remote_ip,
+        ) = parse_ip(
+            socket.local_ip, ip_vers
+        ), parse_ip(socket.remote_ip, ip_vers)
+
+        socket.local_port, socket.remote_port = int(socket.local_port, 16), int(socket.remote_port, 16)
 
         return socket
 
 
-@dataclass(order=True, init=False)
+@dataclass(order=True)
 class UnixSocket:
-    num: str = field(default=None)  # the kernel table slot number.
-    ref: int = field(default=0)  # the number of users of the socket.
-    protocol: int = field(default=0)  # currently always 0. "Unix"
-    flags: str = field(default=None)  # the internal kernel flags holding the status of the socket.
-    type: int = field(
-        default=0
-    )  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
-    state: int = field(default=0)  # the internal state of the socket.
-    inode: int = field(
-        default=0
-    )  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
-    path: str = field(default=None)  # sockets in the abstract namespace are included in the list,
+    num: Optional[str] = None  # the kernel table slot number.
+    ref: Optional[int] = 0  # the number of users of the socket.
+    protocol: Optional[int] = 0  # currently always 0. "Unix"
+    flags: Optional[str] = None  # the internal kernel flags holding the status of the socket.
+    type: Optional[int] = 0  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
+    state: Optional[int] = 0  # the internal state of the socket.
+    inode: Optional[
+        int
+    ] = 0  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
+    path: Optional[str] = None  # sockets in the abstract namespace are included in the list,
     # and are shown with a Path that commences with the character '@'.
 
     # Values parsed from raw values listed above.
-    state_string: str = field(default=None)
-    stream_type_string: str = field(default=None)
-    protocol_string: str = field(default="unix")
+    state_string: Optional[str] = None
+    stream_type_string: Optional[str] = None
+    protocol_string: Optional[str] = "unix"
 
     @classmethod
     def from_line(cls, line: str) -> UnixSocket:
-        socket = cls()
-
-        for idx, value in enumerate(line.split()):
-            field_names = fields(cls)
-            setattr(socket, field_names[idx].name, value)
+        socket = cls(*line.split())
 
         socket.type = int(socket.type)
         socket.protocol = int(socket.protocol)
@@ -117,7 +133,7 @@ class UnixSocket:
         return socket
 
 
-@dataclass(order=True, init=False)
+@dataclass(order=True)
 class PacketSocket:
     sk: int  # socket number
     ref: int  # the number of processes using this socket.
@@ -130,24 +146,17 @@ class PacketSocket:
     inode: int  # inode
 
     # Values parsed from raw values listed above.
-    pid: int  # pid of the socket
-    name: str  # process name associated to the socket
-    cmdline: str  # process cmdline associated to the socket
-    protocol_type: int = field(default=None)  # value parsed from protocol field
-    owner: str = field(default=None)  # resolved owner from user (uid) field
-    protocol_string: str = field(default="packet")
+    pid: Optional[int] = None  # pid of the socket
+    name: Optional[str] = None  # process name associated to the socket
+    cmdline: Optional[str] = None  # process cmdline associated to the socket
+    protocol_type: Optional[int] = None  # value parsed from protocol field
+    owner: Optional[str] = None  # resolved owner from user (uid) field
+    protocol_string: Optional[str] = "packet"
 
     @classmethod
     def from_line(cls, line: str) -> PacketSocket:
-        socket = cls()
-
-        for idx, value in enumerate(line.split()):
-            field_names = fields(cls)
-
-            if field_names[idx].name == "sk":
-                setattr(socket, field_names[idx].name, int(value, 16))
-            else:
-                setattr(socket, field_names[idx].name, int(value))
+        parts = line.split()
+        socket = cls(*[int(parts[0], 16)] + list(map(int, parts[1:])))
 
         return socket
 
@@ -320,7 +329,7 @@ class Sockets:
         """Yield parsed ``/proc/net/unix`` entries."""
         yield from self._parse_unix_sockets()
 
-    def _parse_net_sockets(self, protocol: str = "tcp", version: int = None) -> Iterator[NetSocket]:
+    def _parse_net_sockets(self, protocol: str = "tcp", version: int = 4) -> Iterator[NetSocket]:
         """Internal function to parse ``/proc/net/{tcp(6),udp(6), raw(6)}`` entries
 
         Args:
@@ -329,7 +338,7 @@ class Sockets:
         """
         entry = (
             self.target.fs.path(f"/proc/net/{protocol}{version}")
-            if version
+            if version == 6
             else self.target.fs.path(f"/proc/net/{protocol}")
         )
         contents = entry.open("rt")
@@ -337,22 +346,16 @@ class Sockets:
         # Skip over the header row
         contents.readline()
         for line in contents:
-            if not line.strip():
+            if not (line := line.strip()):
                 continue
 
-            socket = NetSocket().from_line(line)
+            socket = NetSocket.from_line(line, version)
             socket.protocol_string = entry.name
 
             if socket.protocol_string in ("udp", "raw", "udp6", "raw6"):
                 socket.state_string = self.UDPStates(int(socket.state, 16)).name
             else:
                 socket.state_string = self.TCPStates(int(socket.state, 16)).name
-
-            local_ip = socket.local_address.split(":")[0]
-            remote_ip = socket.rem_address.split(":")[0]
-
-            socket.local_ip = self._ipv6(local_ip) if version else self._ipv4(local_ip)
-            socket.remote_ip = self._ipv6(remote_ip) if version else self._ipv4(remote_ip)
 
             user = self.target.user_details.find(uid=socket.uid)
             user_name = user.user.name if user else str(socket.uid)
@@ -409,7 +412,7 @@ class Sockets:
             if not line.strip():
                 continue
 
-            socket = PacketSocket().from_line(line)
+            socket = PacketSocket.from_line(line)
 
             processes = self.target.proc.inode_to_pids(socket.inode)
 
@@ -425,24 +428,11 @@ class Sockets:
                 socket.cmdline = proc.cmdline
                 yield socket
 
-    def _ipv6(self, addr: Union[str, int]) -> str:
-        """Convert ``/proc/net`` IPv6 hex address into standard IPv6 notation."""
-
-        addr = unpack("!LLLL", decode(addr, "hex"))
-        return IPv6Address(pack("@IIII", *addr))
-
-    def _ipv4(self, addr: Union[str, int]) -> IPv4Address:
-        """Convert ``/proc/net`` IPv4 hex address into standard IPv4 notation."""
-        if isinstance(addr, int):
-            return IPv4Address(htonl(addr))
-
-        addr = int(addr, 16)
-        return IPv4Address(htonl(addr))
-
 
 class ProcProcess:
     def __init__(self, target: Target, pid: Union[int, str], proc_root: str = "/proc"):
         self.target = target
+        self.root = proc_root
         self._pid = int(pid)
 
         # Note: ttys and pttys are not yet mapped to the process
@@ -451,7 +441,7 @@ class ProcProcess:
             # It is a part of the kernel and is not a regular user-mode process.
             self.name = "swapper"
         else:
-            self.entry = target.fs.path(fsutil.join(proc_root, str(pid)))
+            self.entry = target.fs.path(fsutil.join(self.root, str(pid)))
             if not self.entry.exists():
                 raise ProcessLookupError(f"Process with PID {pid} could not be found on target: {target}")
 
@@ -473,7 +463,6 @@ class ProcProcess:
 
     def _parse_proc_stat_entry(self) -> dict[str, Union[str, int]]:
         """Internal function to parse the contents of ``/proc/[pid]/stat``."""
-        # status = self.entry("stat").open().readline()
         status_dict = {}
         entry = self.get("stat")
 
@@ -504,15 +493,15 @@ class ProcProcess:
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in ``/proc/[pid]/environ``."""
         # entries in /proc/<pid>/environ are null-terminated
-        environ = self.get("environ").open()
-        lines = environ.read().split(b"\x00")
+        environ = self.get("environ").open("rt")
+        lines = environ.read().split("\x00")
 
         for line in lines:
-            if line == b"":
+            if line == "":
                 # Skip empty line
                 continue
             try:
-                variable, contents = line.decode().split("=", maxsplit=1)
+                variable, contents = line.split("=", maxsplit=1)
             except ValueError:
                 # Convention tells us that variable names and values are split on '='
                 # in practice this is not always the case.
@@ -527,13 +516,13 @@ class ProcProcess:
 
         Used internally to determine process start- and runtimes.
         """
-        for line in self.target.fs.path("/proc/stat").open("rt").readlines():
+        for line in self.target.fs.path(self.root).joinpath("stat").open("rt").readlines():
             if not line.startswith("btime"):
                 continue
 
             return int(line.split()[1])
 
-    def get(self, path: fsutil.TargetPath) -> fsutil.TargetPath:
+    def get(self, path: Path) -> Path:
         """Returns a TargetPath relative to this process."""
         return self.entry.joinpath(path)
 
@@ -548,14 +537,15 @@ class ProcProcess:
 
     @property
     def uid(self) -> int:
-        """Return the User ID (uid) of the owner of this process."""
+        """Return the user ID (uid) of the owner of this process."""
         uid = int((self.get("loginuid").open().read()))
-        # loginuid can hold the value "4294967295" (0xFFFFFFFF). Which is defined as "not set" and -1 should be returned.
+        # loginuid can hold the value "4294967295" (0xFFFFFFFF).
+        # Which is defined as "not set" and -1 should be returned.
         return -1 if uid == 0xFFFFFFFF else uid
 
     @property
     def pid(self) -> int:
-        """Returns the parentprocess id (pid) associated to this process."""
+        """Returns the process ID (pid) associated to this process."""
         return self._pid
 
     @property
@@ -566,16 +556,16 @@ class ProcProcess:
         return ProcProcess(self.target, self._stat_file.get("ppid"))
 
     @property
-    def ppid(self) -> int:
-        """Returns the parent process id (ppid) assiciated to this process."""
-        if self.pid == 0:
-            return None
-        return self.parent.pid
+    def ppid(self) -> Optional[int]:
+        """Returns the parent process ID (ppid) assiciated to this process."""
+        if parent := self.parent:
+            return parent.pid
 
     @property
-    def ppid_name(self) -> str:
-        """Returns the name accociated to the parent process id (ppid) of this process."""
-        return self.parent.name
+    def parent_name(self) -> Optional[str]:
+        """Returns the name accociated to the parent process ID (ppid) of this process."""
+        if parent := self.parent:
+            return parent.name
 
     @property
     def state(self) -> str:
@@ -611,7 +601,7 @@ class ProcProcess:
     def uptime(self) -> datetime:
         """Returns the uptime of the system from the moment it was acquired."""
         # uptime is saved in seconds from boottime
-        uptime = self.target.fs.path("/proc/uptime").read_text().split()[0]
+        uptime = self.target.fs.path(self.root).joinpath("uptime").read_text().split()[0]
         return timedelta(seconds=float(uptime))
 
     @property
@@ -646,47 +636,36 @@ class ProcPlugin(Plugin):
         # make this a lookup instead of a pre-processed map
         self.sockets = Sockets(self.target)
 
-    def _iter_proc_pids(self) -> Iterator[tuple[str, FilesystemEntry]]:
-        """Yields ``/proc/[pid]`` filesystems entries for every process id (pid) found in procfs."""
-        for entry in self.target.fs.glob_ext("/proc/[0-9]*"):
-            yield entry.name, entry
-
-    @cached_property
-    def inode_map(self) -> defaultdict:
-        """Creates a inode to pid mapping for all Process IDs in ``/proc/[pid]``."""
-        map = defaultdict(list)
-
-        for pid, entry in self._iter_proc_pids():
-            try:
-                fds = entry.get("fd").scandir()
-            except FileNotFoundError:
-                continue
-
-            for fd in fds:
-                link = fd.readlink()
-
-                if link.startswith("socket:["):
-                    _, inode = link.split(":")  # socket type, inode
-
-                    # strip brackets from fd string (socket:[1337])
-                    inode = int(inode[1:-1])
-                    map[inode].append(ProcProcess(self.target, pid))
-
-        return map
-
     def check_compatible(self) -> None:
         if not self.target.fs.exists("/proc"):
             raise UnsupportedPluginError("No /proc directory found")
 
-    @internal
-    def iter_proc(self) -> Iterator[str]:
-        for _, entry in self._iter_proc_pids():
-            yield str(entry.path)
+    @cached_property
+    def inode_map(self) -> defaultdict:
+        """Creates a inode to pid mapping for all process IDs in ``/proc/[pid]``."""
+        map = defaultdict(list)
+
+        for path in self.iter_proc():
+            fdpath = path.joinpath("fd")
+            if fdpath.exists():
+                for fd in fdpath.iterdir():
+                    link = fd.readlink().as_posix()
+
+                    if link.startswith("socket:["):
+                        _, inode = link.split(":")  # socket type, inode
+
+                        # strip brackets from fd string (socket:[1337])
+                        inode = int(inode[1:-1])
+                        map[inode].append(ProcProcess(self.target, path.name))
+                    else:
+                        continue
+
+        return map
 
     @internal
-    def iter_proc_ext(self) -> Iterator[FilesystemEntry]:
-        for _, entry in self._iter_proc_pids():
-            yield entry
+    def iter_proc(self) -> Iterator[Path]:
+        """Yields ``/proc/[pid]`` filesystems entries for every process id (pid) found in procfs."""
+        yield from self.target.fs.path("/proc").glob("[0-9]*")
 
     @internal
     def inode_to_pids(self, inode: int) -> list:
@@ -698,5 +677,5 @@ class ProcPlugin(Plugin):
 
     @internal
     def processes(self) -> Iterator[ProcProcess]:
-        for pid, _ in self._iter_proc_pids():
-            yield ProcProcess(self.target, pid)
+        for path in self.iter_proc():
+            yield ProcProcess(self.target, path.name)

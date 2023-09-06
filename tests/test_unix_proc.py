@@ -7,7 +7,7 @@ def test_process(target_unix_users, fs_unix_proc):
     target_unix_users.add_plugin(ProcPlugin)
 
     process = target_unix_users.proc.process(1)
-    assert type(process) == ProcProcess
+    assert isinstance(process, ProcProcess)
     assert process.pid == 1
     assert process.name == "systemd"
     assert process.parent.name == "swapper"
