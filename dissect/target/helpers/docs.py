@@ -75,6 +75,9 @@ def get_full_func_name(plugin_class: Type, func: Callable) -> str:
     return func_name
 
 
+FUNC_DOC_TEMPLATE = "{func_name} - {short_description} (output: {output_type})"
+
+
 def get_func_description(func: Callable, with_docstrings: bool = False) -> str:
     klass, func = get_real_func_obj(func)
     func_output, func_doc = get_func_details(func)
@@ -88,7 +91,9 @@ def get_func_description(func: Callable, with_docstrings: bool = False) -> str:
         desc = "\n".join([func_title, "", func_doc])
     else:
         docstring_first_line = func_doc.splitlines()[0].lstrip()
-        desc = f"{func_name} - {docstring_first_line} (output: {func_output})"
+        desc = FUNC_DOC_TEMPLATE.format(
+            func_name=func_name, short_description=docstring_first_line, output_type=func_output
+        )
 
     return desc
 
@@ -97,9 +102,11 @@ def get_plugin_functions_desc(plugin_class: Type, with_docstrings: bool = False)
     descriptions = []
     for func_name in plugin_class.__exports__:
         func_obj = getattr(plugin_class, func_name)
-        _, func = get_real_func_obj(func_obj)
-
-        func_desc = get_func_description(func, with_docstrings=with_docstrings)
+        if getattr(func_obj, "get_func_doc_spec", None):
+            func_desc = FUNC_DOC_TEMPLATE.format_map(func_obj.get_func_doc_spec())
+        else:
+            _, func = get_real_func_obj(func_obj)
+            func_desc = get_func_description(func, with_docstrings=with_docstrings)
         descriptions.append(func_desc)
 
     # sort functions in the plugin alphabetically

@@ -114,7 +114,7 @@ class XfsFilesystemEntry(FilesystemEntry):
             [
                 node.di_mode,
                 self.entry.inum,
-                0,
+                id(self.fs),
                 node.di_nlink,
                 node.di_uid,
                 node.di_gid,

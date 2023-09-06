@@ -104,7 +104,7 @@ class FatFilesystemEntry(FilesystemEntry):
             (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
             self.entry.cluster,
             id(self.fs),
-            0,
+            1,
             0,
             0,
             self.entry.size,

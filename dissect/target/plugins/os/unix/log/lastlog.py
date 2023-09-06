@@ -3,7 +3,7 @@ from typing import BinaryIO
 from dissect import cstruct
 from dissect.util import ts
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -53,9 +53,10 @@ class LastLogFile:
 
 
 class LastLogPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         lastlog = self.target.fs.path("/var/log/lastlog")
-        return lastlog.exists()
+        if not lastlog.exists():
+            raise UnsupportedPluginError("No lastlog file found")
 
     @export(record=[LastLogRecord])
     def lastlog(self):

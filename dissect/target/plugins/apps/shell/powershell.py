@@ -30,7 +30,7 @@ class PowerShellHistoryPlugin(Plugin):
                 for history_file in history_path.glob("*_history.txt"):
                     self._history.append((user_details.user, history_file))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._history:
             raise UnsupportedPluginError("No ConsoleHost_history.txt files found")
 

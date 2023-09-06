@@ -4,7 +4,11 @@ from collections import defaultdict
 from functools import lru_cache
 from typing import Iterator, Optional, Union
 
-from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
+from dissect.target.exceptions import (
+    HiveUnavailableError,
+    RegistryKeyNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
@@ -120,6 +124,11 @@ class RegistryPlugin(Plugin):
                 self._map_hive(location, self._hive_collections[hive])
 
     def _init_users(self) -> None:
+        # The initialization of user hives is separated from the initialization
+        # of the class on purpose.
+        # Loading user hives needs user information (through _os.users()),
+        # while getting those users needs a minimal functional registry (the
+        # HKLM hive should be available).
         if self._users_loaded:
             return
 
@@ -177,8 +186,9 @@ class RegistryPlugin(Plugin):
         self._add_hive(name, hive, path)
         self._map_hive(location, hive)
 
-    def check_compatible(self) -> bool:
-        return len(self._hive_collections) > 0
+    def check_compatible(self) -> None:
+        if not len(self._hive_collections):
+            raise UnsupportedPluginError("No hive collections found")
 
     @property
     def controlsets(self) -> list[str]:
@@ -205,7 +215,7 @@ class RegistryPlugin(Plugin):
         Returns a KeyCollection which contains all keys that match
         the query.
         """
-        key = key.strip("\\")
+        key = (key or "").strip("\\")
 
         if not key:
             return KeyCollection([self._root.root()])

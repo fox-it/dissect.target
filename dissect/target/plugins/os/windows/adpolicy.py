@@ -59,7 +59,7 @@ class ADPolicyPlugin(Plugin):
             for path in self.paths:
                 self.dirs.append(fs.path(path))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len([d for d in self.dirs if d.exists()]) <= 0:
             raise UnsupportedPluginError("No AD policy directories found")
 

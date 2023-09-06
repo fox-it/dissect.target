@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 from dissect.target.target import Target
@@ -18,13 +19,16 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
         - https://learn.microsoft.com/en-us/windows/wsl/enterprise
     """
 
-    for lxss_key in target.registry.keys("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"):
-        for distribution_key in lxss_key.subkeys():
-            if not distribution_key.name.startswith("{"):
-                continue
-            base_path = target.resolve(distribution_key.value("BasePath").value)
-            # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
-            yield from target.fs.path(base_path).glob("*.vhdx")
+    try:
+        for lxss_key in target.registry.keys("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss"):
+            for distribution_key in lxss_key.subkeys():
+                if not distribution_key.name.startswith("{"):
+                    continue
+                base_path = target.resolve(distribution_key.value("BasePath").value)
+                # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
+                yield from target.fs.path(base_path).glob("*.vhdx")
+    except PluginNotFoundError:
+        pass
 
 
 class WSLChildTargetPlugin(ChildTargetPlugin):
@@ -44,8 +48,9 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
         super().__init__(target)
         self.installs = list(find_wsl_installs(target))
 
-    def check_compatible(self) -> bool:
-        return len(self.installs) > 0
+    def check_compatible(self) -> None:
+        if not len(self.installs):
+            raise UnsupportedPluginError("No WSL installs found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for install_path in self.installs:

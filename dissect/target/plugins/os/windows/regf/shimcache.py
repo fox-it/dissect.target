@@ -4,9 +4,9 @@ from enum import IntEnum, auto
 from io import BytesIO
 from typing import Callable, Generator, Optional, Tuple, Union
 
-from dissect import cstruct
+from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -18,7 +18,7 @@ ShimcacheRecord = TargetRecordDescriptor(
         ("datetime", "last_modified"),
         ("string", "name"),
         ("varint", "index"),
-        ("uri", "path"),
+        ("path", "path"),
     ],
 )
 
@@ -100,10 +100,9 @@ struct WIN10_ENTRY_DATA {
     uint64 ts;
 };
 """
-c_shim = cstruct.cstruct()
+c_shim = cstruct()
 c_shim.load(c_shimdef)
 
-# region shimcache constants
 MAGIC_NT61 = 0xBADC0FEE
 MAGIC_NT52 = 0xBADC0FFE
 MAGIC_WIN81 = 0x73743031
@@ -122,11 +121,11 @@ class SHIMCACHE_WIN_TYPE(IntEnum):
     VERSION_WIN81_NO_HEADER = auto()
 
 
-def win_10_path(ed: cstruct.Structure) -> str:
+def win_10_path(ed: Structure) -> str:
     return ed.path
 
 
-def win_8_path(ed: cstruct.Structure) -> str:
+def win_8_path(ed: Structure) -> str:
     if ed.path_len:
         path = ed.path
     else:
@@ -134,7 +133,7 @@ def win_8_path(ed: cstruct.Structure) -> str:
     return path
 
 
-def nt52_entry_type(fh: bytes) -> cstruct.Structure:
+def nt52_entry_type(fh: bytes) -> Structure:
     entry = c_shim.NT52_ENTRY_32(fh)
 
     if entry.offset == 0:
@@ -144,7 +143,7 @@ def nt52_entry_type(fh: bytes) -> cstruct.Structure:
     return entry_type
 
 
-def nt61_entry_type(_) -> cstruct.Structure:
+def nt61_entry_type(_) -> Structure:
     return c_shim.NT61_64_ENTRY
 
 
@@ -247,7 +246,7 @@ class ShimCache:
         raise NotImplementedError()
 
     def iter_win_8_plus(
-        self, headers: Tuple[cstruct.Structure, cstruct.Structure], offset: int, path_finder: Callable
+        self, headers: Tuple[Structure, Structure], offset: int, path_finder: Callable
     ) -> ShimCacheGeneratorType:
         entry_header, data_header = headers
 
@@ -268,7 +267,7 @@ class ShimCache:
             yield wintimestamp(ed.ts) if hasattr(ed, "ts") else None, path
 
     def iter_nt(
-        self, header: cstruct.Structure, offset: int, header_function: Callable
+        self, header: Structure, offset: int, header_function: Callable
     ) -> Generator[Tuple[datetime, str], None, None]:
         self.fh.seek(0)
 
@@ -353,14 +352,12 @@ class ShimcachePlugin(Plugin):
                 self.target.log.warning("A CRC mismatch occured for entry: %s", item)
                 continue
 
-            ts, path = item
-
-            path = uri.from_windows(self.target.resolve(path))
+            ts, file_path = item
 
             yield ShimcacheRecord(
                 last_modified=ts,
                 name=name,
                 index=index,
-                path=path,
+                path=path.from_windows(self.target.resolve(file_path)),
                 _target=self.target,
             )

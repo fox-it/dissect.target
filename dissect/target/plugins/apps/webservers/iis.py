@@ -73,9 +73,10 @@ class IISLogsPlugin(plugin.Plugin):
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
             for log_file_element in xml_data.findall("*/sites/*/logFile"):
                 log_format = log_file_element.get("logFormat") or "W3C"
-                log_dir = log_file_element.get("directory")
-                log_dir = self.target.resolve(log_dir)
-                log_paths.append((log_format, log_dir))
+                if log_dir := log_file_element.get("directory"):
+                    log_dir = self.target.resolve(log_dir)
+                    log_paths.append((log_format, log_dir))
+
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
             self.target.log.warning(f"Error while parsing {self.config}: {e}")
 

@@ -12,11 +12,12 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
 from dissect.target.plugins.browsers.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    BrowserPlugin,
     try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
@@ -318,7 +319,7 @@ class ChromiumMixin:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
 
-class ChromiumPlugin(ChromiumMixin, Plugin):
+class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     """Chromium browser plugin."""
 
     __namespace__ = "chromium"

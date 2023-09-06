@@ -4,8 +4,9 @@ from typing import Callable
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import windows_path
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -27,7 +28,7 @@ FilesystemStdCompactRecord = TargetRecordDescriptor(
         ("datetime", "last_change_time"),
         ("datetime", "last_access_time"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -43,7 +44,7 @@ FilesystemStdRecord = TargetRecordDescriptor(
         ("datetime", "ts"),
         ("string", "ts_type"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -62,7 +63,7 @@ FilesystemFilenameCompactRecord = TargetRecordDescriptor(
         ("datetime", "last_access_time"),
         ("uint32", "filename_index"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -79,7 +80,7 @@ FilesystemFilenameRecord = TargetRecordDescriptor(
         ("string", "ts_type"),
         ("uint32", "filename_index"),
         ("uint32", "segment"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "owner"),
         ("filesize", "filesize"),
         ("boolean", "resident"),
@@ -103,9 +104,10 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
-        return len(ntfs_filesystems) > 0
+        if not len(ntfs_filesystems):
+            raise UnsupportedPluginError("No NTFS filesystems found")
 
     @export(
         record=[
@@ -192,7 +194,7 @@ class MftPlugin(Plugin):
                 attr=attr,
                 record_type=InformationType.STANDARD_INFORMATION,
                 segment=segment,
-                path=uri.from_windows(path),
+                path=windows_path(path),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -209,7 +211,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=idx,
                 segment=segment,
-                path=uri.from_windows(filepath),
+                path=windows_path(filepath),
                 owner=owner,
                 filesize=size,
                 resident=resident,
@@ -232,7 +234,7 @@ class MftPlugin(Plugin):
                 record_type=InformationType.FILE_INFORMATION,
                 filename_index=None,
                 segment=segment,
-                path=uri.from_windows(ads_path),
+                path=windows_path(ads_path),
                 owner=owner,
                 filesize=size,
                 resident=resident,
