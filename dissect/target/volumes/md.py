@@ -43,5 +43,9 @@ class MdVolumeSystem(LogicalVolumeSystem):
         return offset is not None
 
     def _volumes(self) -> Iterator[Volume]:
-        fh = self.md.open()
-        yield Volume(fh, 1, None, fh.size, None, self.md.name, self.md.uuid, raw=self.md, vs=self)
+        # MD only supports one configuration and virtual disk but doing this as a loop
+        # makes it automatically safe for empty configurations
+        for conf in self.md.configurations:
+            for vd in conf.virtual_disks:
+                fh = vd.open()
+                yield Volume(fh, 1, None, vd.size, None, vd.name, vd.uuid, raw=self.md, vs=self)

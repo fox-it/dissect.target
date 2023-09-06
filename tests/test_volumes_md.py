@@ -16,7 +16,7 @@ def test_md() -> None:
 
         md = sets[0]
         assert len(md.volumes) == 1
-        assert md.volumes[0].size == md.md.size
+        assert md.volumes[0].size == md.md.configurations[0].virtual_disks[0].size
 
 
 def test_nested_md_lvm() -> None:
