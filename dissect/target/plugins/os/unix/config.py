@@ -136,16 +136,19 @@ class Default(ConfigurationParser):
 
 
 CONFIG_MAP: dict[str, type[ConfigurationParser]] = {
-    "ini": Ini,
-    "xml": Txt,
-    "json": Txt,
-    "cnf": Default,
-    "conf": Default,
-    "sample": Txt,
-    "template": Txt,
+    "ini": (Ini,),
+    "xml": (Txt,),
+    "json": (Txt,),
+    "cnf": (Default,),
+    "conf": (Default, (r"\s",)),
+    "sample": (Txt,),
+    "template": (Txt,),
 }
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
-    "ulogd.conf": Ini,
+    "ulogd.conf": (Ini,),
+    "hosts.allow": (Default, (":",), ("#",)),
+    "hosts.deny": (Default, (":",), ("#",)),
+    "hosts": (Default, (r"\s")),
 }
 
 
@@ -225,8 +228,10 @@ class ConfigurationEntry(FilesystemEntry):
     def parse_config(self, entry: FilesystemEntry, collapse: Optional[Union[bool, set]] = None) -> ConfigParser:
         extension = entry.path.rsplit(".", 1)[-1]
 
-        known_file = KNOWN_FILES.get(entry.name, Default)
-        parser = CONFIG_MAP.get(extension, known_file)(collapse)
+        known_extention = CONFIG_MAP.get(extension, (Default,))
+        parser_type, *additional_data = KNOWN_FILES.get(entry.name, known_extention)
+
+        parser = parser_type(collapse, *additional_data)
 
         with entry.open() as fh:
             open_file = io.TextIOWrapper(fh, encoding="utf-8")
