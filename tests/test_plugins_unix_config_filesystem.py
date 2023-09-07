@@ -5,8 +5,8 @@ from unittest.mock import Mock
 import pytest
 
 from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.exceptions import FileNotFoundError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,

@@ -1,10 +1,8 @@
 from io import StringIO
 
-from dissect.target.plugins.os.unix.config import (
-    Default,
-)
-
 import pytest
+
+from dissect.target.plugins.os.unix.config import Default
 
 
 @pytest.mark.parametrize(

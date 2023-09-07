@@ -3,14 +3,14 @@ from __future__ import annotations
 import io
 import re
 from configparser import ConfigParser, MissingSectionHeaderError
-from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 from dataclasses import dataclass
+from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target import Target
-from dissect.target.plugin import Plugin, internal
 from dissect.target.exceptions import ConfigurationParsingError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
+from dissect.target.plugin import Plugin, internal
 
 
 # TODO: Look if I can just create a parsing function and attach it to the

@@ -5,7 +5,10 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.config import ConfigurationEntry, ConfigurationFilesystem
+from dissect.target.plugins.os.unix.config import (
+    ConfigurationEntry,
+    ConfigurationFilesystem,
+)
 
 from ._utils import absolute_path
 
