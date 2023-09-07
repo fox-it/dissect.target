@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import io
 import re
-from abc import abstractmethod
 from configparser import ConfigParser, MissingSectionHeaderError
 from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
+from dataclasses import dataclass
 
 from dissect.target import Target
+from dissect.target.plugin import Plugin, internal
 from dissect.target.exceptions import ConfigurationParsingError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
@@ -18,8 +19,8 @@ class ConfigurationParser:
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
-        seperator: tuple = ("=",),
-        comment_prefixes: tuple = (";", "#"),
+        seperator: tuple[str] = ("=",),
+        comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
         self.collapse = collapse if isinstance(collapse, set) else {}
@@ -27,9 +28,8 @@ class ConfigurationParser:
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
 
-    @abstractmethod
     def parse_file(self, fh: TextIO) -> None:
-        ...
+        raise NotImplementedError()
 
     def __getitem__(self, item: Any) -> Union[dict, str]:
         return self.parsed_data[item]
@@ -111,8 +111,8 @@ class Default(ConfigurationParser):
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
-        seperator: str = (r"\s",),
-        comment_prefixes: tuple = (";", "#"),
+        seperator: tuple[str] = (r"\s",),
+        comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         super().__init__(collapse, seperator, comment_prefixes)
         self.SEPERATOR = re.compile(rf"\s*?[{''.join(seperator)}]\s*?")
@@ -138,16 +138,16 @@ class Default(ConfigurationParser):
                 # This part was indented
                 # So this one belongs to the previous key
                 new_dictionary = dict()
-                self.parse_value(line.strip(), new_dictionary)
+                self._parse_line(line.strip(), new_dictionary)
                 information_dict[prev_key] = {information_dict.get(prev_key): new_dictionary}
                 continue
 
-            key = self.parse_value(line, information_dict)
+            key = self._parse_line(line, information_dict)
             prev_key = key
 
         self.parsed_data = information_dict
 
-    def parse_value(self, line: str, data_dict: dict) -> tuple:
+    def _parse_line(self, line: str, data_dict: dict) -> tuple:
         key, *values = self.SEPERATOR.split(line)
         values = " ".join(value for value in values if value).strip()
 
@@ -160,29 +160,135 @@ class Default(ConfigurationParser):
         return key
 
 
-CONFIG_MAP: dict[str, type[ConfigurationParser]] = {
-    "ini": (Ini,),
-    "xml": (Txt,),
-    "json": (Txt,),
-    "cnf": (Default,),
-    "conf": (Default, (r"\s",)),
-    "sample": (Txt,),
-    "template": (Txt,),
+@dataclass(frozen=True)
+class ParserContents:
+    collapse: Optional[Union[bool, set]] = None
+    seperator: Optional[tuple[str]] = None
+    comment_prefixes: Optional[tuple[str]] = None
+
+
+@dataclass(frozen=True)
+class ParserConfig:
+    parser: type[ConfigurationParser] = Default
+    collapse: Optional[Union[bool, set]] = None
+    seperator: Optional[tuple[str]] = None
+    comment_prefixes: Optional[tuple[str]] = None
+
+    def create_parser(self, contents: Optional[ParserContents] = None) -> ConfigurationParser:
+        kwargs = {}
+
+        for value in ["collapse", "seperator", "comment_prefixes"]:
+            output = getattr(contents, value, None) or getattr(self, value)
+            if output:
+                kwargs.update({value: output})
+
+        return self.parser(**kwargs)
+
+
+CONFIG_MAP: dict[str, ParserConfig] = {
+    "ini": ParserConfig(Ini),
+    "xml": ParserConfig(Txt),
+    "json": ParserConfig(Txt),
+    "cnf": ParserConfig(Default),
+    "conf": ParserConfig(Default, seperator=(r"\s")),
+    "sample": ParserConfig(Txt),
+    "template": ParserConfig(Txt),
 }
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
-    "ulogd.conf": (Ini,),
-    "hosts.allow": (Default, (":",), ("#",)),
-    "hosts.deny": (Default, (":",), ("#",)),
-    "hosts": (Default, (r"\s")),
+    "ulogd.conf": ParserConfig(Ini),
+    "hosts.allow": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
+    "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
+    "hosts": ParserConfig(Default, seperator=(r"\s")),
 }
+
+
+def parse_config(
+    entry: FilesystemEntry,
+    hint: Optional[str] = None,
+    contents: Optional[ParserContents] = None,
+) -> ConfigParser:
+    parser_type = _select_parser(entry, hint)
+
+    parser = parser_type.create_parser(contents)
+
+    with entry.open() as fh:
+        open_file = io.TextIOWrapper(fh, encoding="utf-8")
+        parser.read_file(open_file)
+
+    return parser
+
+
+def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> ParserConfig:
+    if hint and (parser_type := CONFIG_MAP.get(hint)):
+        return parser_type
+
+    extension = entry.path.rsplit(".", 1)[-1]
+
+    known_extention = CONFIG_MAP.get(extension, ParserConfig(Default))
+    parser_type = KNOWN_FILES.get(entry.name, known_extention)
+    return parser_type
+
+
+def create_entry(
+    fs, path: str, entry, hint: str, collapse: str, seperator: tuple[str], comment_prefixes: tuple[str]
+) -> FilesystemEntry:
+    if entry.is_file():
+        contents = ParserContents(collapse, seperator, comment_prefixes)
+        parser_items = parse_config(entry, hint, contents)
+        return ConfigurationEntry(fs, path, entry, parser_items=parser_items)
+    return entry
+
+
+class ConfigurationTreePlugin(Plugin):
+    __namespace__ = "config_tree"
+
+    def __call__(
+        self,
+        path: str = "/",
+        hint: Optional[str] = None,
+        collapse: Optional[Union[bool, set]] = None,
+        seperator: Optional[tuple[str]] = None,
+        comment_prefixes: Optional[tuple[str]] = None,
+    ):
+        target_path = self.target.fs.path(path)
+        file_path = target_path
+
+        while not file_path.exists():
+            file_path = file_path.parent
+
+        if file_path.is_file():
+            file_path = file_path.parent
+
+        fs = ConfigurationFilesystem(self.target, str(file_path))
+
+        output_path = target_path.relative_to(file_path)
+
+        if (path := str(output_path)) != ".":
+            return fs.get(path, file_path.get(), hint, collapse, seperator, comment_prefixes)
+        return fs
+
+    @internal
+    def get(
+        self,
+        path: Optional[str] = None,
+        hint: Optional[str] = None,
+        collapse: Optional[set] = None,
+        seperator: Optional[tuple[str]] = None,
+        comment_prefixes: Optional[tuple[str]] = None,
+    ):
+        return self.__call__(path or "/", hint, collapse, seperator, comment_prefixes)
+
+    def check_compatible(self) -> None:
+        # This should be able to be retrieved, regardless of OS
+        return None
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
-    __fstype__: str = "META:configurations"
+    __fstype__: str = "META:configuration"
 
-    def __init__(self, target: Target, **kwargs):
+    def __init__(self, target: Target, path: str = "/etc", **kwargs):
         super().__init__(**kwargs)
-        self.root.top = target.fs.get("/etc")
+        self.root.top = target.fs.get(path)
 
     def _get_till_file(self, path, relentry) -> tuple[list[str], FilesystemEntry]:
         entry = relentry or self.root
@@ -216,22 +322,24 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
     def get(
         self,
-        path: str,
+        path: Optional[str] = None,
         relentry: Optional[FilesystemEntry] = None,
+        hint: Optional[str] = None,
         collapse: Optional[Union[bool, set]] = None,
+        seperator: Optional[tuple[str]] = None,
+        comment_prefixes: Optional[tuple[str]] = None,
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
-        parts, entry = self._get_till_file(path, relentry)
+        parts, entry = self._get_till_file(path or "", relentry)
 
         for part in parts:
             if isinstance(entry, ConfigurationEntry):
                 entry = entry.get(part)
-            elif entry.is_file():
+            else:
                 try:
-                    entry = ConfigurationEntry(self, part, entry, collapse=collapse)
+                    entry = create_entry(self, part, entry, hint, collapse, seperator, comment_prefixes)
                 except ConfigurationParsingError:
                     # All errors except parsing should be let through.
                     pass
-
         return entry
 
 
@@ -242,30 +350,16 @@ class ConfigurationEntry(FilesystemEntry):
         path: str,
         entry: FilesystemEntry,
         parser_items: Optional[Union[dict, Any]] = None,
-        collapse: Optional[Union[bool, set]] = None,
     ) -> None:
         super().__init__(fs, path, entry)
-        if parser_items is None:
-            self.parser_items = self.parse_config(entry, collapse)
-        else:
-            self.parser_items = parser_items
+        self.parser_items = parser_items
 
-    def parse_config(self, entry: FilesystemEntry, collapse: Optional[Union[bool, set]] = None) -> ConfigParser:
-        extension = entry.path.rsplit(".", 1)[-1]
-
-        known_extention = CONFIG_MAP.get(extension, (Default,))
-        parser_type, *additional_data = KNOWN_FILES.get(entry.name, known_extention)
-
-        parser = parser_type(collapse, *additional_data)
-
-        with entry.open() as fh:
-            open_file = io.TextIOWrapper(fh, encoding="utf-8")
-            parser.read_file(open_file)
-
-        return parser
-
-    def get(self, path: str) -> ConfigurationEntry:
+    def get(self, path: Optional[str] = None) -> ConfigurationEntry:
         # Check for path in config entry
+        if not path:
+            # Return self if configuration was found.
+            return self
+
         if path in self.parser_items:
             return ConfigurationEntry(self.fs, path, self.entry, self.parser_items[path])
         raise NotADirectoryError(f"Cannot open a {path!r} on a value")

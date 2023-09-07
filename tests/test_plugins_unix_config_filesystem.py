@@ -6,9 +6,12 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.plugins.os.unix.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
+    ConfigurationTreePlugin,
+    parse_config,
 )
 
 from ._utils import absolute_path
@@ -46,10 +49,13 @@ def test_config_entry():
     mocked_entry.open.return_value = mocked_open
     mocked_entry.path = "config.ini"
 
+    parser_items = parse_config(mocked_entry)
+
     entry = ConfigurationEntry(
         Mock(),
         "config.ini",
         entry=mocked_entry,
+        parser_items=parser_items,
     )
     assert entry.is_dir()
 
@@ -74,3 +80,17 @@ def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
 
     assert entry.parser_items["help"] == "you"
     assert entry.parser_items["test"] == ["me", "you"]
+
+
+def test_config_tree_plugin(target_unix: Target, etc_directory: VirtualFilesystem):
+    target_unix.add_plugin(ConfigurationTreePlugin)
+
+    assert isinstance(target_unix.config_tree("/etc/new/path/config").get(""), ConfigurationEntry)
+    assert isinstance(target_unix.config_tree("/etc/new/path/config").get("help"), ConfigurationEntry)
+    assert isinstance(target_unix.config_tree("/etc/new/path/config/help"), ConfigurationEntry)
+    assert isinstance(target_unix.config_tree("/etc/").get("/new/path/config"), ConfigurationEntry)
+    assert isinstance(target_unix.config_tree.get(), ConfigurationFilesystem)
+    assert isinstance(target_unix.config_tree.get("/etc/new/path/config/help"), ConfigurationEntry)
+
+    with pytest.raises(FileNotFoundError):
+        target_unix.config_tree("/etc/new/path/help")
