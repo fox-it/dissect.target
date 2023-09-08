@@ -1,3 +1,4 @@
+import logging
 import re
 import warnings
 from collections import defaultdict
@@ -83,9 +84,14 @@ class RegistryPlugin(Plugin):
         self._init_registry()
 
     def _init_registry(self) -> None:
-        dirs = [("sysvol/windows/system32/config", True), ("sysvol/windows/system32/config/RegBack", False)]
+        dirs = [
+            ("sysvol/windows/system32/config", False),
+            # RegBack hives are often empty files
+            ("sysvol/windows/system32/config/RegBack", True),
+        ]
+        has_hive = {}
 
-        for path, warn_empty in dirs:
+        for path, log_empty_to_debug in dirs:
             config_dir = self.target.fs.path(path)
             for fname in self.SYSTEM:
                 hive_file = config_dir.joinpath(fname)
@@ -94,13 +100,15 @@ class RegistryPlugin(Plugin):
                     continue
 
                 if hive_file.stat().st_size == 0:
-                    if warn_empty:
-                        self.target.log.warning("Empty hive: %s", hive_file)
+                    # Only log to debug if we have found a valid hive in a previous path
+                    log_level = (logging.DEBUG if log_empty_to_debug and fname not in has_hive else logging.WARNING,)
+                    self.target.log.log(log_level, "Empty hive: %s", hive_file)
                     continue
 
                 try:
                     hf = RegfHive(hive_file)
                     self._add_hive(fname, hf, hive_file)
+                    has_hive[fname] = True
                 except Exception as e:
                     self.target.log.warning("Could not open hive: %s", hive_file, exc_info=e)
                     continue
