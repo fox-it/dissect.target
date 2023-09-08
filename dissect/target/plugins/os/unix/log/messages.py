@@ -2,6 +2,7 @@ import re
 from itertools import chain
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, export
@@ -25,9 +26,10 @@ RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 
 
 class MessagesPlugin(Plugin):
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         var_log = self.target.fs.path("/var/log")
-        return any(var_log.glob("syslog*")) or any(var_log.glob("messages*"))
+        if not any(var_log.glob("syslog*")) and not any(var_log.glob("messages*")):
+            raise UnsupportedPluginError("No message files found")
 
     @export(record=MessagesRecord)
     def syslog(self) -> Iterator[MessagesRecord]:

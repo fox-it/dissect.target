@@ -2,6 +2,7 @@ import gzip
 from datetime import datetime
 from typing import Dict, Generator, List, TextIO
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -52,9 +53,10 @@ class DpkgPlugin(Plugin):
 
     __namespace__ = "dpkg"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         log_files = list(self.target.fs.glob(LOG_FILES_GLOB))
-        return len(log_files) > 0 or self.target.fs.path(STATUS_FILE_NAME).exists()
+        if not len(log_files) > 0 and not self.target.fs.path(STATUS_FILE_NAME).exists():
+            raise UnsupportedPluginError("No DPKG files found")
 
     @export(record=DpkgPackageStatusRecord)
     def status(self):

@@ -64,7 +64,7 @@ class PackageManagerPlugin(Plugin):
             except Exception:  # noqa
                 target.log.exception(f"Failed to load tool plugin: {entry}")
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible plugins found")
 

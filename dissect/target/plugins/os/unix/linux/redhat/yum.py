@@ -2,6 +2,7 @@ import re
 from typing import Iterator
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
@@ -18,9 +19,10 @@ class YumPlugin(plugin.Plugin):
     LOG_DIR_PATH = "/var/log"
     LOG_FILES_GLOB = "yum.*"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         log_files = list(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB))
-        return len(log_files) > 0
+        if not len(log_files):
+            raise UnsupportedPluginError("No Yum files found")
 
     @plugin.export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:

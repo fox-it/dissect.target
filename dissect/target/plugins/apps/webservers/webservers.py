@@ -43,7 +43,7 @@ class WebserverPlugin(Plugin):
             except Exception:  # noqa
                 target.log.exception("Failed to load webserver plugin: %s", entry)
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not len(self._plugins):
             raise UnsupportedPluginError("No compatible webserver plugins found")
 

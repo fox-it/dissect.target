@@ -52,7 +52,7 @@ FolderHistoryRecord = TargetRecordDescriptor(
 class SevenZipPlugin(Plugin):
     KEY = "HKCU\\Software\\7-Zip"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("7-Zip registry key not found")
 

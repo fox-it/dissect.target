@@ -4,6 +4,7 @@ from typing import Iterator, List, Tuple
 from dissect.util.ts import from_unix
 
 from dissect.target import Target
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, create_extended_descriptor
@@ -40,8 +41,9 @@ class CommandHistoryPlugin(Plugin):
         super().__init__(target)
         self._history_files = list(self._find_history_files())
 
-    def check_compatible(self) -> bool:
-        return len(self._history_files) > 0
+    def check_compatible(self) -> None:
+        if not len(self._history_files):
+            raise UnsupportedPluginError("No command history found")
 
     def _find_history_files(self) -> List[Tuple[str, TargetPath, UnixUserRecord]]:
         """Find existing history files."""

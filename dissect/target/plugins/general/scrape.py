@@ -8,8 +8,8 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 class ScrapePlugin(plugin.Plugin):
     __namespace__ = "scrape"
 
-    def check_compatible(self):
-        return True
+    def check_compatible(self) -> None:
+        pass
 
     @plugin.internal
     def find_needles(

@@ -8,6 +8,7 @@ from dissect.util.compression import lz4
 from flow.record.fieldtypes import path
 
 from dissect.target import Target
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -380,8 +381,9 @@ class JournalPlugin(Plugin):
         for _path in self.JOURNAL_PATHS:
             self.journal_paths.extend(self.target.fs.path(_path).glob(self.JOURNAL_GLOB))
 
-    def check_compatible(self) -> bool:
-        return bool(len(self.journal_paths))
+    def check_compatible(self) -> None:
+        if not len(self.journal_paths):
+            raise UnsupportedPluginError("No journald files found")
 
     @export(record=JournalRecord)
     def journal(self) -> Iterator[JournalRecord]:

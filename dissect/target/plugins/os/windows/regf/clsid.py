@@ -46,7 +46,7 @@ class CLSIDPlugin(Plugin):
     def __init__(self, target):
         super().__init__(target)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(list(self.KEYS.values())))) > 0:
             raise UnsupportedPluginError("No CLSID key found")
 

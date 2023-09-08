@@ -14,7 +14,7 @@ class FirewallPlugin(Plugin):
     FIELD_MAP = {"app": "uri"}
     VALUE_MAP = {"active": lambda val: val == "TRUE"}
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 
