@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 CmdlineRecord = TargetRecordDescriptor(
-    "unix/linux/proc/cmdline",
+    "linux/proc/cmdline",
     [
         ("datetime", "ts"),
         ("string", "name"),

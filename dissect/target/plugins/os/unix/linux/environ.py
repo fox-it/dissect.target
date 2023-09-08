@@ -1,11 +1,10 @@
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 EnvironmentVariableRecord = TargetRecordDescriptor(
-    "unix/linux/proc/environ",
+    "linux/proc/environ",
     [
         ("datetime", "ts"),
         ("string", "name"),
@@ -18,8 +17,7 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
 
 class EnvironPlugin(Plugin):
     def check_compatible(self) -> None:
-        if not self.target.proc:
-            raise UnsupportedPluginError("No /proc directory found")
+        self.target.proc
 
     @export(record=EnvironmentVariableRecord)
     def environ(self) -> Iterator[TargetRecordDescriptor]:

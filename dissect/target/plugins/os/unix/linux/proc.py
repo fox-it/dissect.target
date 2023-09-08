@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from codecs import decode
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -21,22 +20,13 @@ from dissect.target.plugin import Plugin, internal
 from dissect.target.target import Target
 
 
-def parse_ip(addr: Union[str, int], version: int = 4) -> IPv6Address | IPv4Address:
+def parse_ip(addr: Union[str, int], version: int = 4) -> Union[IPv6Address, IPv4Address]:
+    """Convert ``/proc/net`` IPv4 or IPv6 hex address into their standard IP notation."""
+
     if version == 6:
-        return ipv6(addr)
+        addr = unpack("!LLLL", bytes.fromhex(addr))
+        return IPv6Address(pack("@IIII", *addr))
 
-    return ipv4(addr)
-
-
-def ipv6(addr: Union[str, int]) -> IPv6Address:
-    """Convert ``/proc/net`` IPv6 hex address into standard IPv6 notation."""
-
-    addr = unpack("!LLLL", decode(addr, "hex"))
-    return IPv6Address(pack("@IIII", *addr))
-
-
-def ipv4(addr: Union[str, int]) -> IPv4Address:
-    """Convert ``/proc/net`` IPv4 hex address into standard IPv4 notation."""
     if isinstance(addr, int):
         return IPv4Address(htonl(addr))
 
@@ -89,36 +79,30 @@ class NetSocket:
         socket.local_ip, socket.local_port = socket.local_address.split(":")
         socket.remote_ip, socket.remote_port = socket.rem_address.split(":")
 
-        (
-            socket.local_ip,
-            socket.remote_ip,
-        ) = parse_ip(
-            socket.local_ip, ip_vers
-        ), parse_ip(socket.remote_ip, ip_vers)
-
-        socket.local_port, socket.remote_port = int(socket.local_port, 16), int(socket.remote_port, 16)
+        socket.local_ip = parse_ip(socket.local_ip, ip_vers)
+        socket.local_port = int(socket.local_port, 16)
+        socket.remote_ip = parse_ip(socket.remote_ip, ip_vers)
+        socket.remote_port = int(socket.remote_port, 16)
 
         return socket
 
 
 @dataclass(order=True)
 class UnixSocket:
-    num: Optional[str] = None  # the kernel table slot number.
-    ref: Optional[int] = 0  # the number of users of the socket.
-    protocol: Optional[int] = 0  # currently always 0. "Unix"
-    flags: Optional[str] = None  # the internal kernel flags holding the status of the socket.
-    type: Optional[int] = 0  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
-    state: Optional[int] = 0  # the internal state of the socket.
-    inode: Optional[
-        int
-    ] = 0  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
+    num: str  # the kernel table slot number.
+    ref: int  # the number of users of the socket.
+    protocol: int  # currently always 0. "Unix"
+    flags: str  # the internal kernel flags holding the status of the socket.
+    type: int  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
+    state: int  # the internal state of the socket.
+    inode: int  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
     path: Optional[str] = None  # sockets in the abstract namespace are included in the list,
     # and are shown with a Path that commences with the character '@'.
 
     # Values parsed from raw values listed above.
     state_string: Optional[str] = None
     stream_type_string: Optional[str] = None
-    protocol_string: Optional[str] = "unix"
+    protocol_string: str = "unix"
 
     @classmethod
     def from_line(cls, line: str) -> UnixSocket:
@@ -151,7 +135,7 @@ class PacketSocket:
     cmdline: Optional[str] = None  # process cmdline associated to the socket
     protocol_type: Optional[int] = None  # value parsed from protocol field
     owner: Optional[str] = None  # resolved owner from user (uid) field
-    protocol_string: Optional[str] = "packet"
+    protocol_string: str = "packet"
 
     @classmethod
     def from_line(cls, line: str) -> PacketSocket:
@@ -330,17 +314,15 @@ class Sockets:
         yield from self._parse_unix_sockets()
 
     def _parse_net_sockets(self, protocol: str = "tcp", version: int = 4) -> Iterator[NetSocket]:
-        """Internal function to parse ``/proc/net/{tcp(6),udp(6), raw(6)}`` entries
+        """Internal function to parse ``/proc/net/{tcp(6),udp(6), raw(6)}`` entries.
 
         Args:
-            protocol: the protocol in `/proc/net/` to parse entries from.
-            version: the version of the protocol to parse entries from.
+            protocol: The protocol in ``/proc/net/`` to parse entries from.
+            version: The version of the protocol to parse entries from.
         """
-        entry = (
-            self.target.fs.path(f"/proc/net/{protocol}{version}")
-            if version == 6
-            else self.target.fs.path(f"/proc/net/{protocol}")
-        )
+
+        entry = self.target.fs.path(f"/proc/net/{protocol}{version if version == 6 else ''}")
+
         contents = entry.open("rt")
 
         # Skip over the header row
@@ -376,11 +358,8 @@ class Sockets:
                     yield socket
 
     def _parse_unix_sockets(self) -> Iterator[UnixSocket]:
-        """Internal function to parse ``/proc/net/unix`` entries.
+        """Internal function to parse ``/proc/net/unix`` entries."""
 
-        Yields:
-            An iterator containg a `NetSocket` dataclass.
-        """
         entry = self.target.fs.path("/proc/net/unix")
         contents = entry.open("rt")
 
@@ -390,7 +369,7 @@ class Sockets:
             if not line.strip():
                 continue
 
-            socket = UnixSocket().from_line(line)
+            socket = UnixSocket.from_line(line)
 
             socket.stream_type_string = self.SocketStreamType(socket.type).name
             socket.state_string = self.SocketStateType(socket.state).name
@@ -398,18 +377,14 @@ class Sockets:
             yield socket
 
     def _parse_packet_sockets(self) -> Iterator[PacketSocket]:
-        """Internal function to parse ``/proc/net/packet`` entries.
-
-        Yields:
-            An iterator containing a `PacketSocket` dataclass.
-        """
+        """Internal function to parse ``/proc/net/packet`` entries."""
         entry = self.target.fs.path("/proc/net/packet")
         contents = entry.open("rt")
 
         # Skip over the header row
         contents.readline()
         for line in contents:
-            if not line.strip():
+            if not (line := line.strip()):
                 continue
 
             socket = PacketSocket.from_line(line)
@@ -493,13 +468,13 @@ class ProcProcess:
     def _parse_environ(self) -> Iterator[Environ]:
         """Internal function to parse entries in ``/proc/[pid]/environ``."""
         # entries in /proc/<pid>/environ are null-terminated
-        environ = self.get("environ").open("rt")
-        lines = environ.read().split("\x00")
+        lines = self.get("environ").read_text().split("\x00")
 
         for line in lines:
             if line == "":
                 # Skip empty line
                 continue
+
             try:
                 variable, contents = line.split("=", maxsplit=1)
             except ValueError:
@@ -508,7 +483,7 @@ class ProcProcess:
                 variable = None
                 contents = line
 
-            yield Environ(variable=variable, contents=contents)
+            yield Environ(variable, contents)
 
     @property
     def _boottime(self) -> int:
@@ -522,13 +497,13 @@ class ProcProcess:
 
             return int(line.split()[1])
 
-    def get(self, path: Path) -> Path:
+    def get(self, path: str) -> Path:
         """Returns a TargetPath relative to this process."""
         return self.entry.joinpath(path)
 
     @property
     def owner(self) -> str:
-        """Return the username or the User ID (uid) (if owner is not found) of the owner of this process."""
+        """Return the username or the user ID (uid) (if owner is not found) of the owner of this process."""
         if self.uid:
             owner = self.target.user_details.find(uid=self.uid)
             return owner.user.name
@@ -538,7 +513,7 @@ class ProcProcess:
     @property
     def uid(self) -> int:
         """Return the user ID (uid) of the owner of this process."""
-        uid = int((self.get("loginuid").open().read()))
+        uid = int((self.get("loginuid").read_bytes()))
         # loginuid can hold the value "4294967295" (0xFFFFFFFF).
         # Which is defined as "not set" and -1 should be returned.
         return -1 if uid == 0xFFFFFFFF else uid
@@ -557,13 +532,13 @@ class ProcProcess:
 
     @property
     def ppid(self) -> Optional[int]:
-        """Returns the parent process ID (ppid) assiciated to this process."""
+        """Returns the parent process ID (ppid) associated to this process."""
         if parent := self.parent:
             return parent.pid
 
     @property
     def parent_name(self) -> Optional[str]:
-        """Returns the name accociated to the parent process ID (ppid) of this process."""
+        """Returns the name associated to the parent process ID (ppid) of this process."""
         if parent := self.parent:
             return parent.name
 
@@ -594,11 +569,11 @@ class ProcProcess:
         return now
 
     def environ(self) -> Iterator[Environ]:
-        """Yields the content of the environ file associated with the process as variable name and value pairs."""
+        """Yields the content of the environ file associated with the process."""
         yield from self._parse_environ()
 
     @property
-    def uptime(self) -> datetime:
+    def uptime(self) -> timedelta:
         """Returns the uptime of the system from the moment it was acquired."""
         # uptime is saved in seconds from boottime
         uptime = self.target.fs.path(self.root).joinpath("uptime").read_text().split()[0]
@@ -617,7 +592,7 @@ class ProcProcess:
         entry = self.get("cmdline")
 
         if entry.exists():
-            line = entry.open("rt").readline()
+            line = entry.read_text()
             # Cmdlines are null-terminated and use null-bytes to separate the different parts. Translate this back.
             line = line.rstrip("\x00").replace("\x00", " ")
 
@@ -633,11 +608,12 @@ class ProcPlugin(Plugin):
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        # make this a lookup instead of a pre-processed map
         self.sockets = Sockets(self.target)
 
     def check_compatible(self) -> None:
-        if not self.target.fs.exists("/proc"):
+        # The /proc folder can exist on live targets, but is empty.
+        # So we make the check a little more specific using next()
+        if not self.target.fs.exists("/proc") or not next(self.target.fs.iterdir("/proc"), False):
             raise UnsupportedPluginError("No /proc directory found")
 
     @cached_property
@@ -646,8 +622,7 @@ class ProcPlugin(Plugin):
         map = defaultdict(list)
 
         for path in self.iter_proc():
-            fdpath = path.joinpath("fd")
-            if fdpath.exists():
+            if (fdpath := path.joinpath("fd")).exists():
                 for fd in fdpath.iterdir():
                     link = fd.readlink().as_posix()
 
@@ -657,8 +632,6 @@ class ProcPlugin(Plugin):
                         # strip brackets from fd string (socket:[1337])
                         inode = int(inode[1:-1])
                         map[inode].append(ProcProcess(self.target, path.name))
-                    else:
-                        continue
 
         return map
 

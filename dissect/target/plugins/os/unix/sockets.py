@@ -1,7 +1,6 @@
 from itertools import chain
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.linux.proc import (
@@ -12,7 +11,7 @@ from dissect.target.plugins.os.unix.linux.proc import (
 from dissect.target.target import Target
 
 NetSocketRecord = TargetRecordDescriptor(
-    "unix/proc/sockets",
+    "linux/proc/sockets",
     [
         ("string", "protocol"),
         ("uint32", "rx_queue"),
@@ -31,7 +30,7 @@ NetSocketRecord = TargetRecordDescriptor(
 )
 
 UnixSocketRecord = TargetRecordDescriptor(
-    "unix/proc/sockets",
+    "linux/proc/sockets",
     [
         ("string", "protocol"),
         ("uint32", "ref"),
@@ -44,7 +43,7 @@ UnixSocketRecord = TargetRecordDescriptor(
 )
 
 PacketSocketRecord = TargetRecordDescriptor(
-    "unix/proc/sockets",
+    "linux/proc/sockets",
     [
         ("string", "protocol"),
         ("string", "protocol_type"),
@@ -72,8 +71,7 @@ class NetSocketPlugin(Plugin):
         self.sockets = self.target.proc.sockets
 
     def check_compatible(self) -> None:
-        if not self.target.proc:
-            raise UnsupportedPluginError("No /proc directory found")
+        self.target.proc
 
     @export(record=PacketSocketRecord)
     def packet(self) -> Iterator[PacketSocketRecord]:

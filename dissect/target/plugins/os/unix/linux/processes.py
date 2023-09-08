@@ -1,11 +1,10 @@
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 ProcProcessRecord = TargetRecordDescriptor(
-    "unix/linux/proc/processes",
+    "linux/proc/processes",
     [
         ("datetime", "ts"),
         ("string", "name"),
@@ -20,8 +19,7 @@ ProcProcessRecord = TargetRecordDescriptor(
 
 class ProcProcesses(Plugin):
     def check_compatible(self) -> None:
-        if not self.target.proc:
-            raise UnsupportedPluginError("No /proc directory found")
+        self.target.proc
 
     @export(record=ProcProcessRecord)
     def processes(self) -> Iterator[TargetRecordDescriptor]:

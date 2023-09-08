@@ -1,7 +1,6 @@
 from itertools import chain
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 
 NETSTAT_HEADER = f"Active Internet connections (only servers)\n{'Proto':<10}{'Recv-Q':^10}{'Send-Q':^10}{'Local Address':^20}{'Foreign Address':^20}{'State':^10}{'User':^15}{'Inode':^10}{'PID/Program name':^10}{'Command':>10}"  # noqa
@@ -10,8 +9,7 @@ NETSTAT_TEMPLATE = "{protocol:<12}{receive_queue:<10}{transmit_queue:<11}{local_
 
 class NetstatPlugin(Plugin):
     def check_compatible(self) -> None:
-        if not self.target.proc:
-            raise UnsupportedPluginError("No /proc directory found")
+        self.target.proc
 
     @export(output="yield")
     def netstat(self) -> Iterator[str]:
