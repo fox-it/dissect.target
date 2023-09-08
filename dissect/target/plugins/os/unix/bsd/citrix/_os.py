@@ -19,7 +19,7 @@ RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
 
-class CitrixBsdPlugin(BsdPlugin):
+class CitrixPlugin(BsdPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._ips = []
@@ -67,11 +67,17 @@ class CitrixBsdPlugin(BsdPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
+        # A disk image of a Citrix Netscaler contains two partitions, that after boot are mounted to /var and /flash.
+        # The rest of the filesystem is recreated at runtime into a 'ramdisk'. Currently, this plugin does not
+        # yet support recreating the ramdisk from a 'clean' state. This might be possible in a future iteration but
+        # requires further research.
+
+        # When the ramdisk is present within the target's filesystems, mount it accordingly,
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
                 # If available, mount the ramdisk first.
                 target.fs.mount("/", fs)
-
+        # The 'disk' filesystem is mounted at '/var'.
         target.fs.mount("/var", sysvol)
 
         # Enumerate filesystems for flash partition
@@ -113,15 +119,13 @@ class CitrixBsdPlugin(BsdPlugin):
         nstmp_users = set()
         nstmp_path = self.target.fs.path("/var/nstmp/")
 
-        nstmp_contents = []
         if nstmp_path.exists():
-            nstmp_contents = list(nstmp_path.iterdir())
+            for entry in nstmp_path.iterdir():
+                if entry.is_dir() and entry.name != "#nsinternal#":
+                    nstmp_users.add(entry.name)
 
-        for entry in nstmp_contents:
-            if entry.is_dir() and entry.name != "#nsinternal#":
-                nstmp_users.add(entry.name)
         for username in self._config_usernames:
-            nstmp_home = nstmp_path / username
+            nstmp_home = nstmp_path.joinpath(username)
             user_home = nstmp_home if nstmp_home.exists() else None
 
             if user_home:
@@ -137,7 +141,7 @@ class CitrixBsdPlugin(BsdPlugin):
             yield UnixUserRecord(name=username, home=user_home)
 
         for username in nstmp_users:
-            yield UnixUserRecord(name=username, home=nstmp_path / username)
+            yield UnixUserRecord(name=username, home=nstmp_path.joinpath(username))
 
     @export(property=True)
     def os(self) -> str:

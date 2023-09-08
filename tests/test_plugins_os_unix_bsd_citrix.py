@@ -1,14 +1,16 @@
 from io import BytesIO
 
-from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
+from dissect.target.target import Target
 
 
-def test_unix_bsd_citrix_os(target_citrix, fs_bsd):
+def test_unix_bsd_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem):
     fs_bsd.map_file_fh("/root/.cli_history", BytesIO(b'echo "hello world"'))
     fs_bsd.map_file_fh("/var/nstmp/robin/.cli_history", BytesIO(b'echo "hello world"'))
     fs_bsd.map_file_fh("/var/nstmp/alfred/.cli_history", BytesIO(b'echo "bye world"'))
 
-    target_citrix.add_plugin(CitrixBsdPlugin)
+    target_citrix.add_plugin(CitrixPlugin)
 
     assert target_citrix.os == "citrix-netscaler"
     hostname = target_citrix.hostname
