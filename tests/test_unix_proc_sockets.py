@@ -1,7 +1,9 @@
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin
+from dissect.target.target import Target
 
 
-def test_tcp(target_unix_users, fs_unix_proc_sockets):
+def test_tcp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.tcp())
 
@@ -29,7 +31,7 @@ def test_tcp(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline in ("", None, "acquire -p full --proc")
 
 
-def test_tcp6(target_unix_users, fs_unix_proc_sockets):
+def test_tcp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.tcp6())
 
@@ -52,7 +54,7 @@ def test_tcp6(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline in ("", None, "acquire -p full --proc")
 
 
-def test_udp(target_unix_users, fs_unix_proc_sockets):
+def test_udp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.udp())
 
@@ -80,7 +82,7 @@ def test_udp(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline in ("", None, "acquire -p full --proc", "sshd")
 
 
-def test_udp6(target_unix_users, fs_unix_proc_sockets):
+def test_udp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.udp6())
 
@@ -103,7 +105,7 @@ def test_udp6(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline in ("", None, "acquire -p full --proc", "sshd")
 
 
-def test_raw(target_unix_users, fs_unix_proc_sockets):
+def test_raw(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.raw())
 
@@ -126,7 +128,7 @@ def test_raw(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline == "acquire -p full --proc"
 
 
-def test_raw6(target_unix_users, fs_unix_proc_sockets):
+def test_raw6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.raw6())
 
@@ -149,7 +151,7 @@ def test_raw6(target_unix_users, fs_unix_proc_sockets):
         assert result.cmdline == "acquire -p full --proc"
 
 
-def test_packet(target_unix_users, fs_unix_proc_sockets):
+def test_packet(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.packet())
 
@@ -165,7 +167,7 @@ def test_packet(target_unix_users, fs_unix_proc_sockets):
         assert result.owner == "root"
 
 
-def test_unix(target_unix_users, fs_unix_proc_sockets):
+def test_unix(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     results = list(target_unix_users.proc.sockets.unix())
 
@@ -180,4 +182,9 @@ def test_unix(target_unix_users, fs_unix_proc_sockets):
         assert result.state_string in ("CONNECTED", "LISTENING")
         assert result.stream_type_string == "STREAM"
 
-        assert result.path in ("/run/systemd/private", None, "/run/systemd/io.system.ManagedOOM", "@/tmp/dbus-YLq1FHVh")
+        assert result.path in (
+            "/run/systemd/private",
+            None,
+            "/run/systemd/io.system.ManagedOOM",
+            "@/tmp/dbus-YLq1FHVh",
+        )

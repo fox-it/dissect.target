@@ -1,9 +1,12 @@
 import pytest
 
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin, ProcProcess
+from dissect.target.target import Target
 
 
-def test_process(target_unix_users, fs_unix_proc):
+def test_process(target_unix_users: Target, fs_unix_proc: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
 
     process = target_unix_users.proc.process(1)
@@ -21,14 +24,14 @@ def test_process(target_unix_users, fs_unix_proc):
     assert environ[0].contents == "1"
 
 
-def test_process_not_found(target_unix_users, fs_unix_proc):
+def test_process_not_found(target_unix_users: Target, fs_unix_proc: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
     with pytest.raises(ProcessLookupError) as exc:
         target_unix_users.proc.process(404)
     assert str(exc.value) == f"Process with PID 404 could not be found on target: {target_unix_users}"
 
 
-def test_processes(target_unix_users, fs_unix_proc):
+def test_processes(target_unix_users: Target, fs_unix_proc: VirtualFilesystem):
     target_unix_users.add_plugin(ProcPlugin)
 
     for process in target_unix_users.proc.processes():
@@ -41,3 +44,9 @@ def test_processes(target_unix_users, fs_unix_proc):
         for env in process.environ():
             assert env.variable == "VAR"
             assert env.contents == "1"
+
+
+def test_proc_plugin_incompatible(target_unix_users: Target, fs_unix: VirtualFilesystem):
+    with pytest.raises(UnsupportedPluginError) as exc:
+        target_unix_users.add_plugin(ProcPlugin)
+    assert str(exc.value) == "No /proc directory found"

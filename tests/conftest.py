@@ -13,6 +13,8 @@ from dissect.target.plugins.general import default
 from dissect.target.plugins.os.windows import registry
 from dissect.target.target import Target
 
+from ._utils import absolute_path
+
 
 def make_dummy_target():
     target = Target()
@@ -117,54 +119,14 @@ def fs_unix_proc(fs_unix):
 def fs_unix_proc_sockets(fs_unix_proc):
     fs = fs_unix_proc
 
-    tcp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
-0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 000000000e5941ba 100 0 0 10 0
-1: 0100007F:0277 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1338 1 000000008b915f09 100 0 0 10 0
-2: 884010AC:0016 014010AC:C122 01 00000000:00000000 02:00010C92 00000000     0        0 0
-"""  # noqa: E501
-
-    tcp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n
-0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1337 1 0000000085d2a181 100 0 0 10 0\n
-1: 00000000000000000000000001000000:0277 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1338 1 00000000bb201f51 100 0 0 10 0\n
-"""  # noqa: E501
-
-    udp_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
-344: 884010AC:0044 FE4010AC:0043 01 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000c414b4d1 0\n
-477: 00000000:E4C9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000009ce0849c 0\n
-509: 00000000:14E9 00000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1339 2 00000000388d9bb8 0\n
-"""  # noqa: E501
-
-    udp6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
-497: 00000000000000000000000000000000:E8DD 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1337 2 00000000bb422355 0\n
-509: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000   110        0 1338 2 000000005c20ab36 0\n
-"""  # noqa: E501
-
-    raw_socket_data = """sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
-253: 00000000:00FD 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000f7e50cca 0\n
-"""  # noqa: E501
-
-    raw6_socket_data = """sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n
-58: 00000000000000000000000000000000:003A 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000fa98d32c 0\n
-"""  # noqa: E501
-
-    packet_socket_data = """sk       RefCnt Type Proto  Iface R Rmem   User   Inode\n
-00000000819f8865 3      3    0003   2     1 0      0      1337\n
-"""
-    unix_socket_data = """Num       RefCount Protocol Flags    Type St Inode Path\n
-00000000a6061ba5: 00000002 00000000 00010000 0001 01 1337 /run/systemd/private\n
-0000000065bb3d75: 00000003 00000000 00000000 0001 03 1338\n
-000000008d0bfa50: 00000002 00000000 00010000 0001 01 1339 /run/systemd/io.system.ManagedOOM\n
-00000000fb54422c: 00000002 00000000 00010000 0001 01 0 @/tmp/dbus-YLq1FHVh\n
-"""
-
-    fs.map_file_fh("/proc/net/unix", BytesIO(textwrap.dedent(unix_socket_data).encode()))
-    fs.map_file_fh("/proc/net/packet", BytesIO(textwrap.dedent(packet_socket_data).encode()))
-    fs.map_file_fh("/proc/net/raw6", BytesIO(textwrap.dedent(raw6_socket_data).encode()))
-    fs.map_file_fh("/proc/net/raw", BytesIO(textwrap.dedent(raw_socket_data).encode()))
-    fs.map_file_fh("/proc/net/udp6", BytesIO(textwrap.dedent(udp6_socket_data).encode()))
-    fs.map_file_fh("/proc/net/udp", BytesIO(textwrap.dedent(udp_socket_data).encode()))
-    fs.map_file_fh("/proc/net/tcp6", BytesIO(textwrap.dedent(tcp6_socket_data).encode()))
-    fs.map_file_fh("/proc/net/tcp", BytesIO(textwrap.dedent(tcp_socket_data).encode()))
+    fs.map_file_fh("/proc/net/unix", open(absolute_path("data/proc/net/unix"), "rb"))
+    fs.map_file_fh("/proc/net/packet", open(absolute_path("data/proc/net/packet"), "rb"))
+    fs.map_file_fh("/proc/net/raw6", open(absolute_path("data/proc/net/raw6"), "rb"))
+    fs.map_file_fh("/proc/net/raw", open(absolute_path("data/proc/net/raw"), "rb"))
+    fs.map_file_fh("/proc/net/udp6", open(absolute_path("data/proc/net/udp6"), "rb"))
+    fs.map_file_fh("/proc/net/udp", open(absolute_path("data/proc/net/udp"), "rb"))
+    fs.map_file_fh("/proc/net/tcp6", open(absolute_path("data/proc/net/tcp6"), "rb"))
+    fs.map_file_fh("/proc/net/tcp", open(absolute_path("data/proc/net/tcp"), "rb"))
 
     yield fs
 
@@ -222,12 +184,7 @@ def target_win_users(hive_hklm, hive_hku, target_win):
 
     profile1_key = VirtualKey(hive_hklm, "S-1-5-18")
     profile1_key.add_value(
-        "ProfileImagePath",
-        VirtualValue(
-            hive_hklm,
-            "ProfileImagePath",
-            "%systemroot%\\system32\\config\\systemprofile",
-        ),
+        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
     )
 
     profile2_key = VirtualKey(hive_hklm, "S-1-5-21-3263113198-3007035898-945866154-1002")
