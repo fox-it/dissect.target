@@ -21,7 +21,7 @@ FALLBACK_SEARCH_PATHS = [
 
 
 class ResolverPlugin(Plugin):
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @internal

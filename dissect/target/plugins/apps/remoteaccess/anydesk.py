@@ -47,7 +47,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
                 for logfile in user_details.home_path.glob(log_glob):
                     self.logfiles.append([logfile, user_details.user])
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not (len(self.logfiles)):
             raise UnsupportedPluginError("No Anydesk logs found")
 

@@ -4,7 +4,7 @@ from pathlib import Path
 from dissect.etl.etl import ETL, Event
 
 from dissect.target import Target
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.datetime import parse_tzi
@@ -82,10 +82,11 @@ class EtlPlugin(Plugin):
         super().__init__(target)
         self._etl_record_builder = EtlRecordBuilder()
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         etl_paths = (etl_file for etl_paths in self.PATHS.values() for etl_file in etl_paths)
         plugin_target_folders = [self.target.fs.path(file).exists() for file in etl_paths]
-        return any(plugin_target_folders)
+        if not any(plugin_target_folders):
+            raise UnsupportedPluginError("No ETL paths found")
 
     def read_etl_files(self, etl_paths: list[str]):
         """Read ETL files using an EtlReader."""

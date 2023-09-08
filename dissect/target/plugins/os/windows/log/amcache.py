@@ -115,7 +115,7 @@ class AmcacheInstallPlugin(Plugin):
         super().__init__(target)
         self.logs = self.target.fs.path("sysvol/windows/appcompat/programs/install")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.logs.exists():
             raise UnsupportedPluginError("No amcache install logs found")
 

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterator
 
-from dissect.target.exceptions import PluginNotFoundError
+from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 from dissect.target.target import Target
@@ -48,8 +48,9 @@ class WSLChildTargetPlugin(ChildTargetPlugin):
         super().__init__(target)
         self.installs = list(find_wsl_installs(target))
 
-    def check_compatible(self) -> bool:
-        return len(self.installs) > 0
+    def check_compatible(self) -> None:
+        if not len(self.installs):
+            raise UnsupportedPluginError("No WSL installs found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for install_path in self.installs:

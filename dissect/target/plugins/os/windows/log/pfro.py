@@ -26,7 +26,7 @@ class PfroPlugin(Plugin):
         super().__init__(target)
         self.logfile = self.target.fs.path("sysvol/windows/PFRO.log")
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.logfile.exists():
             raise UnsupportedPluginError("No PFRO log found")
 

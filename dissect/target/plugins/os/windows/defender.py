@@ -8,6 +8,7 @@ from dissect.cstruct import Structure, cstruct
 from flow.record import Record
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 DEFENDER_EVTX_FIELDS = [
@@ -391,11 +392,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
     __namespace__ = "defender"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         # Either the Defender log folder, the quarantine folder or the exclusions registry key
         # has to exist for this plugin to be compatible.
 
-        return any(
+        if not any(
             [
                 self.target.fs.path(DEFENDER_LOG_DIR).exists(),
                 self.target.fs.path(DEFENDER_QUARANTINE_DIR).exists(),
@@ -404,7 +405,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     and len(list(self.target.registry.keys(DEFENDER_EXCLUSION_KEY))) > 0
                 ),
             ]
-        )
+        ):
+            raise UnsupportedPluginError("No Defender objects found")
 
     @plugin.export(record=DefenderLogRecord)
     def evtx(self) -> Generator[Record, None, None]:

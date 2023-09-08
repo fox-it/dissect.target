@@ -302,7 +302,7 @@ class EnvironmentVariablePlugin(Plugin):
 
         return env_vars
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         pass
 
     @internal

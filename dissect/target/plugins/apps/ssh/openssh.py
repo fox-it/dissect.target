@@ -4,6 +4,7 @@ from itertools import product
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
@@ -65,12 +66,13 @@ class OpenSSHPlugin(Plugin):
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         ssh_user_dirs = any(
             user_details.home_path.joinpath(".ssh").exists()
             for user_details in self.target.user_details.all_with_home()
         )
-        return ssh_user_dirs or self.sshd_directory.exists()
+        if not ssh_user_dirs and not self.sshd_directory.exists():
+            raise UnsupportedPluginError("No OpenSSH directories found")
 
     @cached_property
     def sshd_directory(self) -> TargetPath:

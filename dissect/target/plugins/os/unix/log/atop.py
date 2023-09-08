@@ -4,6 +4,7 @@ from typing import BinaryIO, Iterator
 
 from dissect.cstruct import Instance, cstruct
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -252,8 +253,9 @@ class AtopPlugin(Plugin):
     ATOP_PATH = "/var/log/atop"
     ATOP_VERSIONS = ["2.6", "2.7"]
 
-    def check_compatible(self) -> bool:
-        return self.target.fs.path(self.ATOP_PATH).exists()
+    def check_compatible(self) -> None:
+        if not self.target.fs.path(self.ATOP_PATH).exists():
+            raise UnsupportedPluginError("No ATOP files found")
 
     @export(record=AtopRecord)
     def atop(self) -> AtopRecord:

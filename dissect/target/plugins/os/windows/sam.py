@@ -292,11 +292,10 @@ class SamPlugin(Plugin):
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
     SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         for key in [self.SAM_KEY, self.SYSTEM_KEY]:
             if not len(list(self.target.registry.keys(key))) > 0:
                 raise UnsupportedPluginError(f"Registry key not found: {key}")
-        return True
 
     def retrieve_syskey(self) -> bytes:
         lsa = self.target.registry.key(self.SYSTEM_KEY)

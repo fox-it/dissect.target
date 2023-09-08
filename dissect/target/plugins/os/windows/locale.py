@@ -1,3 +1,4 @@
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -20,8 +21,9 @@ class LocalePlugin(Plugin):
             for lang in k.values()
         }
 
-    def check_compatible(self):
-        return self.target.has_function("registry")
+    def check_compatible(self) -> None:
+        if not self.target.has_function("registry"):
+            raise UnsupportedPluginError("Unsupported Plugin")
 
     @export(record=WindowsKeyboardRecord)
     def keyboard(self):
