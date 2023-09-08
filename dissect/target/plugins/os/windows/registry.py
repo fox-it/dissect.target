@@ -85,17 +85,16 @@ class RegistryPlugin(Plugin):
     def _init_registry(self) -> None:
         dirs = [("sysvol/windows/system32/config", True), ("sysvol/windows/system32/config/RegBack", False)]
 
-        for path, warn in dirs:
+        for path, warn_empty in dirs:
             config_dir = self.target.fs.path(path)
             for fname in self.SYSTEM:
                 hive_file = config_dir.joinpath(fname)
                 if not hive_file.exists():
-                    if warn:
-                        self.target.log.debug("Could not find hive: %s", hive_file)
+                    self.target.log.debug("Could not find hive: %s", hive_file)
                     continue
 
                 if hive_file.stat().st_size == 0:
-                    if warn:
+                    if warn_empty:
                         self.target.log.warning("Empty hive: %s", hive_file)
                     continue
 
