@@ -28,7 +28,6 @@ RE_FISH = re.compile(r"- cmd: (?P<command>.+?)\s+when: (?P<ts>\d+)")
 class CommandHistoryPlugin(Plugin):
     COMMAND_HISTORY_RELATIVE_PATHS = (
         ("bash", ".bash_history"),
-        ("netscaler-cli", ".nscli_history"),
         ("fish", ".local/share/fish/fish_history"),
         ("mongodb", ".dbshell"),
         ("mysql", ".mysql_history"),
@@ -77,9 +76,6 @@ class CommandHistoryPlugin(Plugin):
 
             elif shell == "fish":
                 yield from self.parse_fish_history(history_path, user)
-
-            elif shell == "netscaler-cli":
-                yield from self.parse_netscaler_cli_history(history_path, user)
 
             else:
                 yield from self.parse_generic_history(history_path, user, shell)
@@ -192,31 +188,6 @@ class CommandHistoryPlugin(Plugin):
                 ts=from_unix(int(ts)),
                 command=command,
                 shell="fish",
-                source=history_file,
-                _target=self.target,
-                _user=user,
-            )
-
-    @internal
-    def parse_netscaler_cli_history(
-        self,
-        history_file: TargetPath,
-        user: UnixUserRecord,
-    ) -> Iterator[CommandHistoryRecord]:
-        """
-        Parses the history file of the Citrix Netscaler CLI.
-        The only difference compared to generic bash history files is that the first line will start with
-        '_HiStOrY_V2_', which we will skip.
-        """
-
-        for idx, command in enumerate(history_file.open("rt")):
-            command = command.rstrip()  # Strip trailing whitespace
-            if idx == 0 and command == "_HiStOrY_V2_":
-                continue
-            yield CommandHistoryRecord(
-                ts=None,
-                command=command,
-                shell="netscaler-cli",
                 source=history_file,
                 _target=self.target,
                 _user=user,

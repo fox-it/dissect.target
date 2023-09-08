@@ -112,34 +112,6 @@ def test_commandhistory_zsh_history(target_unix_users, fs_unix):
     assert results[1].source.as_posix() == "/root/.zsh_history"
 
 
-def test_commandhistory_netscaler_cli_history(target_citrix, fs_bsd):
-    commandhistory_data = """\
-    _HiStOrY_V2_
-    help
-    shell
-    """
-
-    fs_bsd.map_file_fh(
-        "/var/nstmp/user/.nscli_history",
-        BytesIO(textwrap.dedent(commandhistory_data).encode()),
-    )
-
-    target_citrix.add_plugin(CommandHistoryPlugin)
-
-    results = list(target_citrix.commandhistory())
-    assert len(results) == 2
-
-    assert not results[0].ts
-    assert results[0].command == "help"
-    assert results[0].shell == "netscaler-cli"
-    assert results[0].source.as_posix() == "/var/nstmp/user/.nscli_history"
-
-    assert not results[1].ts
-    assert results[1].command == "shell"
-    assert results[1].shell == "netscaler-cli"
-    assert results[1].source.as_posix() == "/var/nstmp/user/.nscli_history"
-
-
 def test_commandhistory_fish_history(target_unix_users, fs_unix):
     commandhistory_data = """
     - cmd: ls
