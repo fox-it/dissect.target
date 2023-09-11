@@ -6,6 +6,8 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
@@ -59,7 +61,7 @@ class UnixPlugin(OSPlugin):
                         uid=pwent.get(2),
                         gid=pwent.get(3),
                         gecos=pwent.get(4),
-                        home=pwent.get(5),
+                        home=posix_path(pwent.get(5)),
                         shell=pwent.get(6),
                         source=passwd_file,
                         _target=self.target,
