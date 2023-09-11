@@ -558,13 +558,15 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
         and osfilter.__module__.startswith(MODULE_PATH)
     ):
         osfilter, _, _ = osfilter.__module__.replace(MODULE_PATH, "", 1).strip(".").rpartition(".")
-        # NOTE: A dirty fix to ensure OS plugins are filtered by the top level OS name
-        # As an example, it uses os.unix instead of os.unix.debian
-        osfilter = ".".join(osfilter.split(".")[:2])
-    else:
-        osfilter = None
 
-    yield from _walk(osfilter, _get_plugins())
+        # Continue walking up the OS filter tree until we hit the second level
+        # As an example, it walk os.unix.debian, followed by os.unix, then exit
+        os_parts = osfilter.split(".")
+        while len(os_parts) >= 2:
+            yield from _walk(".".join(os_parts), _get_plugins())
+            os_parts.pop()
+    else:
+        yield from _walk(None, _get_plugins())
 
 
 def _special_plugins(special_key: str) -> Iterator[PluginDescriptor]:
