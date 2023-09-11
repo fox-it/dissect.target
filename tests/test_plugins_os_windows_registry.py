@@ -1,5 +1,6 @@
 import logging
 from io import BytesIO
+from unittest.mock import patch
 
 import pytest
 from pytest import LogCaptureFixture
@@ -55,6 +56,23 @@ def test_empty_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> No
     ]
 
 
+def test_empty_hives_skip_warning(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> None:
+    fake_fh = BytesIO()
+    fake_fh.size = 1
+    fs_win.map_file_fh("windows/system32/config/SYSTEM", fake_fh)
+    fs_win.map_file_fh("windows/system32/config/RegBack/SYSTEM", BytesIO())
+
+    target = Target()
+    target.filesystems.add(fs_win)
+
+    caplog.set_level(logging.WARNING)
+
+    with patch("dissect.target.plugins.os.windows.registry.RegfHive"):
+        target.apply()
+
+    assert [record.message for record in caplog.records if record.filename == "registry.py"] == []
+
+
 def test_empty_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, caplog: LogCaptureFixture) -> None:
     fs_win.map_file_fh("Users/John/ntuser.dat", BytesIO())
     fs_win.map_file_fh("Users/John/AppData/Local/Microsoft/Windows/usrclass.dat", BytesIO())
@@ -107,7 +125,7 @@ def test_empty_user_hives(fs_win: VirtualFilesystem, target_win_users: Target, c
         ),
     ],
 )
-def test_registry_plugin_glob_ext(target_win_users, pattern, key_names) -> None:
+def test_registry_plugin_glob_ext(target_win_users: Target, pattern: str, key_names: list[str]) -> None:
     registry_plugin = target_win_users.registry
 
     key_collections = registry_plugin.glob_ext(pattern)
@@ -118,7 +136,7 @@ def test_registry_plugin_glob_ext(target_win_users, pattern, key_names) -> None:
     assert sorted(collection_names) == sorted(key_names)
 
 
-def test_registry_plugin_root_none(target_win_users) -> None:
+def test_registry_plugin_root_none(target_win_users: Target) -> None:
     plugin: RegistryPlugin = target_win_users.registry
 
     assert plugin.key()
