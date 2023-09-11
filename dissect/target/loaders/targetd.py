@@ -6,7 +6,7 @@ import time
 import urllib
 from pathlib import Path
 from platform import os
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union
 
 from dissect.util.stream import AlignedStream
 
@@ -56,7 +56,7 @@ class CommandProxy:
         namespace = None if self._func == self._namespace else self._namespace
         return self._get(namespace, self._func)
 
-    def _get(self, namespace: str, plugin_func: Callable) -> Callable:
+    def _get(self, namespace: Optional[str], plugin_func: Callable) -> Callable:
         if namespace:
             func = functools.update_wrapper(
                 functools.partial(self._loader.plugin_bridge, plugin_func=self._func, namespace=self._namespace),
@@ -130,8 +130,7 @@ class TargetdLoader(ProxyLoader):
         self.output = None
         self.has_output = False
 
-        plugin_func = kwargs.get("plugin_func")
-        del kwargs["plugin_func"]
+        plugin_func = kwargs.pop("plugin_func", None)
 
         if self.client is None:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -178,7 +177,6 @@ class TargetdLoader(ProxyLoader):
                     result += func(target)
             except Exception as failure:
                 target.log.warning("Exception while applying function to target: %s: %s", peer, failure)
-            target.select(peer)
         return result
 
     def _add_plugin(self, plugin: Plugin):
