@@ -89,7 +89,7 @@ class RegistryPlugin(Plugin):
             # RegBack hives are often empty files
             ("sysvol/windows/system32/config/RegBack", True),
         ]
-        has_hive = {}
+        opened_hives = set()
 
         for path, log_empty_to_debug in dirs:
             config_dir = self.target.fs.path(path)
@@ -101,14 +101,14 @@ class RegistryPlugin(Plugin):
 
                 if hive_file.stat().st_size == 0:
                     # Only log to debug if we have found a valid hive in a previous path
-                    log_level = logging.DEBUG if log_empty_to_debug and fname in has_hive else logging.WARNING
+                    log_level = logging.DEBUG if log_empty_to_debug and fname in opened_hives else logging.WARNING
                     self.target.log.log(log_level, "Empty hive: %s", hive_file)
                     continue
 
                 try:
                     hf = RegfHive(hive_file)
                     self._add_hive(fname, hf, hive_file)
-                    has_hive[fname] = True
+                    opened_hives.add(fname)
                 except Exception as e:
                     self.target.log.warning("Could not open hive: %s", hive_file, exc_info=e)
                     continue
