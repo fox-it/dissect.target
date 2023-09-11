@@ -6,9 +6,9 @@ import traceback
 import urllib
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar, Union
 
-from dissect.target import filesystem, loader, plugin, volume
+from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
     FilesystemError,
     PluginError,
@@ -659,46 +659,56 @@ class Target:
         return f"<Target {self.path}>"
 
 
-class Collection:
-    def __init__(self, target):
-        self.target = target
-        self.entries = []
+T = TypeVar("T")
 
-    def add(self, entry):
+
+class Collection(Generic[T]):
+    def __init__(self, target: Target):
+        self.target = target
+        self.entries: list[T] = []
+
+    def add(self, entry: T) -> None:
         self.entries.append(entry)
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: str) -> T:
         return self.entries[k]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return iter(self.entries)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entries)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.entries!r}>"
 
 
-class DiskCollection(Collection):
-    def apply(self):
+class DiskCollection(Collection[container.Container]):
+    def apply(self) -> None:
         for disk in self.entries:
-            try:
-                if not hasattr(disk, "vs") or disk.vs is None:
-                    disk.vs = volume.open(disk)
-                    self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
+            # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
+            # may be misidentified as having a valid MBR/GPT on some of the disks
+            # To counter this, first check if the disk is part of any LVM configurations that we support
+            if not volume.is_lvm_volume(disk):
+                try:
+                    if not hasattr(disk, "vs") or disk.vs is None:
+                        disk.vs = volume.open(disk)
+                        self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
 
-                for vol in disk.vs.volumes:
-                    self.target.volumes.add(vol)
-            except Exception as e:
-                self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
-                self.target.log.debug("", exc_info=e)
-                vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
-                self.target.volumes.add(vol)
+                    for vol in disk.vs.volumes:
+                        self.target.volumes.add(vol)
+                    continue
+                except Exception as e:
+                    self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
+                    self.target.log.debug("", exc_info=e)
+
+            # Fallthrough case for error and if we're part of a logical volume set
+            vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
+            self.target.volumes.add(vol)
 
 
-class VolumeCollection(Collection):
-    def open(self, vol):
+class VolumeCollection(Collection[volume.Volume]):
+    def open(self, vol: volume.Volume) -> None:
         try:
             if not hasattr(vol, "fs") or vol.fs is None:
                 vol.fs = filesystem.open(vol)
@@ -708,32 +718,38 @@ class VolumeCollection(Collection):
             self.target.log.warning("Can't identify filesystem: %s", vol)
             self.target.log.debug("", exc_info=e)
 
-    def apply(self):
-        lvm_volumes = []
-        encrypted_volumes = []
-        for vol in self.entries:
-            if volume.is_lvm_volume(vol):
-                lvm_volumes.append(vol)
+    def apply(self) -> None:
+        todo = self.entries
 
-            if volume.is_encrypted(vol):
-                encrypted_volumes.append(vol)
+        while todo:
+            new_volumes = []
+            lvm_volumes = []
+            encrypted_volumes = []
 
-            self.open(vol)
+            for vol in todo:
+                if volume.is_lvm_volume(vol):
+                    lvm_volumes.append(vol)
+                elif volume.is_encrypted(vol):
+                    encrypted_volumes.append(vol)
+                else:
+                    self.open(vol)
 
-        self.target.log.debug("LVM volumes found: %s", lvm_volumes)
-        self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
+            self.target.log.debug("LVM volumes found: %s", lvm_volumes)
+            self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
 
-        for lvm in volume.open_lvm(lvm_volumes):
-            self.target.log.debug("Opened LVM: %s", lvm)
-            for lv in lvm.volumes:
-                self.add(lv)
-                self.open(lv)
+            for lvm in volume.open_lvm(lvm_volumes):
+                self.target.log.debug("Opened LVM: %s", lvm)
+                for lv in lvm.volumes:
+                    self.add(lv)
+                    new_volumes.append(lv)
 
-        for enc_volume in encrypted_volumes:
-            for dec_volume in volume.open_encrypted(enc_volume):
-                self.add(dec_volume)
-                self.open(dec_volume)
-                self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+            for enc_volume in encrypted_volumes:
+                for dec_volume in volume.open_encrypted(enc_volume):
+                    self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+                    self.add(dec_volume)
+                    new_volumes.append(dec_volume)
+
+            todo = new_volumes
 
         # ASDF - getting the correct starting system volume
         start_fs = None
@@ -750,5 +766,5 @@ class VolumeCollection(Collection):
                 vol.fs = self.entries[start_fs + rel_vol].fs
 
 
-class FilesystemCollection(Collection):
+class FilesystemCollection(Collection[filesystem.Filesystem]):
     pass
