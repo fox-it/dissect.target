@@ -88,6 +88,7 @@ class TargetdLoader(ProxyLoader):
         self.adapter = "Flow.Remoting"
         self.host = "localhost"
         self.port = 1883
+        self.chunking = True
         self.local_link = "unix:///tmp/targetd" if os.name == "posix" else "pipe:///tmp/targetd"
         # @todo Add these options to loader help (when available)
         self.configurables = [
@@ -97,6 +98,7 @@ class TargetdLoader(ProxyLoader):
             ["local_link", str, "Domain socket or named pipe"],
             ["adapter", str, "Adapter to use"],
             ["peers", int, "Minimum number of hosts to wait for before executing query"],
+            ["chunking", int, "Chunk mode"],
         ]
         uri = kwargs.get("parsed_path")
         if uri is None:
@@ -217,8 +219,17 @@ if TARGETD_AVAILABLE:
         caller.has_output = True
         result = func(*args, **kwargs)
         if result is not None:
-            result = list(result)
-            if targetd.command == "get" and len(result) == 1:
-                result = result[0]
-        caller.output = result
+            if targetd.command == "get":
+                result = list(result)[0]
+            elif caller.chunking:
+                data = []
+                gen = func()
+                targetd.reset()
+                while True:
+                    try:
+                        data.append(gen.__next__())
+                    except Exception:
+                        break
+                result = data
+            caller.output = result
         targetd.reset()
