@@ -1009,7 +1009,7 @@ def open_decompress(
     file.seek(0)
 
     if "b" in mode:
-        # Reset the default errors mode in case of a binary stream
+        # Reset the default encoding and errors mode in case of a binary stream
         encoding = None
         errors = None
 
