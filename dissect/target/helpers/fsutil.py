@@ -991,7 +991,7 @@ def open_decompress(
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
         mode: The mode in which to open the file.
-        encoding: The decoding for text streams.
+        encoding: The decoding for text streams. By default UTF-8 encoding is used.
         errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
         newline: How newlines are handled for text streams.
 
