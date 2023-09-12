@@ -982,7 +982,7 @@ def resolve_link(
 def open_decompress(
     path: TargetPath,
     mode: str = "rb",
-    encoding: Optional[str] = None,
+    encoding: Optional[str] = "UTF-8",
     errors: Optional[str] = "backslashreplace",
     newline: Optional[str] = None,
 ) -> Union[BinaryIO, TextIO]:
@@ -1010,10 +1010,8 @@ def open_decompress(
 
     if "b" in mode:
         # Reset the default errors mode in case of a binary stream
+        encoding = None
         errors = None
-    else:
-        # Set default encoding as UTF-8 if not binary mode
-        encoding = encoding or "UTF-8"
 
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
