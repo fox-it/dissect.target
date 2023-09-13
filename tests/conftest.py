@@ -119,14 +119,14 @@ def fs_unix_proc(fs_unix):
 def fs_unix_proc_sockets(fs_unix_proc):
     fs = fs_unix_proc
 
-    fs.map_file_fh("/proc/net/unix", open(absolute_path("data/proc/net/unix"), "rb"))
-    fs.map_file_fh("/proc/net/packet", open(absolute_path("data/proc/net/packet"), "rb"))
-    fs.map_file_fh("/proc/net/raw6", open(absolute_path("data/proc/net/raw6"), "rb"))
-    fs.map_file_fh("/proc/net/raw", open(absolute_path("data/proc/net/raw"), "rb"))
-    fs.map_file_fh("/proc/net/udp6", open(absolute_path("data/proc/net/udp6"), "rb"))
-    fs.map_file_fh("/proc/net/udp", open(absolute_path("data/proc/net/udp"), "rb"))
-    fs.map_file_fh("/proc/net/tcp6", open(absolute_path("data/proc/net/tcp6"), "rb"))
-    fs.map_file_fh("/proc/net/tcp", open(absolute_path("data/proc/net/tcp"), "rb"))
+    fs.map_file_fh("/proc/net/unix", open(absolute_path("data/unix/linux/proc/net/unix"), "rb"))
+    fs.map_file_fh("/proc/net/packet", open(absolute_path("data/unix/linux/proc/net/packet"), "rb"))
+    fs.map_file_fh("/proc/net/raw6", open(absolute_path("data/unix/linux/proc/net/raw6"), "rb"))
+    fs.map_file_fh("/proc/net/raw", open(absolute_path("data/unix/linux/proc/net/raw"), "rb"))
+    fs.map_file_fh("/proc/net/udp6", open(absolute_path("data/unix/linux/proc/net/udp6"), "rb"))
+    fs.map_file_fh("/proc/net/udp", open(absolute_path("data/unix/linux/proc/net/udp"), "rb"))
+    fs.map_file_fh("/proc/net/tcp6", open(absolute_path("data/unix/linux/proc/net/tcp6"), "rb"))
+    fs.map_file_fh("/proc/net/tcp", open(absolute_path("data/unix/linux/proc/net/tcp"), "rb"))
 
     yield fs
 
