@@ -5,11 +5,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
     NamespacePlugin,
+    Plugin,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -197,3 +199,13 @@ def test_find_plugin_function_default(target_default: Target) -> None:
 def test_find_plugin_function_order(target_win: Target, pattern: str) -> None:
     found = ",".join(reduce(lambda rs, el: rs + [el.method_name], find_plugin_functions(target_win, pattern)[0], []))
     assert found == pattern
+
+
+class _TestIncompatiblePlugin(Plugin):
+    def check_compatible(self):
+        raise UnsupportedPluginError("My incompatible plugin error")
+
+
+def test_incompatible_plugin(mock_target: Target) -> None:
+    with pytest.raises(UnsupportedPluginError, match="My incompatible plugin error"):
+        mock_target.add_plugin(_TestIncompatiblePlugin)
