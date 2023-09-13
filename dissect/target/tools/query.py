@@ -156,11 +156,11 @@ def main():
                     parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
                 for func in funcs:
-                    collected_plugins[func.name] = func.plugin_desc
+                    collected_plugins[func.path] = func.plugin_desc
         else:
             funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
             for func in funcs:
-                collected_plugins[func.name] = func.plugin_desc
+                collected_plugins[func.path] = func.plugin_desc
 
         # Display in a user friendly manner
         target = Target()
@@ -196,6 +196,7 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
+    # TODO: fix, slow
     funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
 
     for func in funcs:
