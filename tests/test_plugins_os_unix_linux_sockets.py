@@ -3,9 +3,9 @@ from dissect.target.plugins.os.unix.linux.proc import ProcPlugin
 from dissect.target.target import Target
 
 
-def test_tcp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.tcp())
+def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.tcp())
 
     assert len(results) == 4
     assert results[0].local_ip.exploded == "0.0.0.0"
@@ -31,9 +31,9 @@ def test_tcp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem)
         assert result.cmdline in ("", None, "acquire -p full --proc")
 
 
-def test_tcp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.tcp6())
+def test_tcp6(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.tcp6())
 
     assert len(results) == 3
     assert results[0].local_ip.exploded == "0000:0000:0000:0000:0000:0000:0000:0000"
@@ -54,9 +54,9 @@ def test_tcp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem
         assert result.cmdline in ("", None, "acquire -p full --proc")
 
 
-def test_udp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.udp())
+def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.udp())
 
     assert len(results) == 4
     assert results[0].local_ip.exploded == "172.16.64.136"
@@ -82,9 +82,9 @@ def test_udp(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem)
         assert result.cmdline in ("", None, "acquire -p full --proc", "sshd")
 
 
-def test_udp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.udp6())
+def test_udp6(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.udp6())
 
     assert len(results) == 3
     assert results[0].local_ip.exploded == "0000:0000:0000:0000:0000:0000:0000:0000"
@@ -105,9 +105,9 @@ def test_udp6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem
         assert result.cmdline in ("", None, "acquire -p full --proc", "sshd")
 
 
-def test_raw(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.raw())
+def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.raw())
 
     assert len(results) == 2
     assert results[0].local_ip.exploded == "0.0.0.0"
@@ -128,9 +128,9 @@ def test_raw(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem)
         assert result.cmdline == "acquire -p full --proc"
 
 
-def test_raw6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.raw6())
+def test_raw6(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.raw6())
 
     assert len(results) == 2
     assert results[0].local_ip.exploded == "0000:0000:0000:0000:0000:0000:0000:0000"
@@ -151,9 +151,9 @@ def test_raw6(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem
         assert result.cmdline == "acquire -p full --proc"
 
 
-def test_packet(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.packet())
+def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.packet())
 
     assert len(results) == 2
 
@@ -167,9 +167,9 @@ def test_packet(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesyst
         assert result.owner == "root"
 
 
-def test_unix(target_unix_users: Target, fs_unix_proc_sockets: VirtualFilesystem):
-    target_unix_users.add_plugin(ProcPlugin)
-    results = list(target_unix_users.proc.sockets.unix())
+def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
+    results = list(target_linux_users.proc.sockets.unix())
 
     assert len(results) == 4
     for result in results:

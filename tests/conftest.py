@@ -70,8 +70,8 @@ def fs_linux():
 
 
 @pytest.fixture
-def fs_unix_proc(fs_unix):
-    fs = fs_unix
+def fs_linux_proc(fs_linux):
+    fs = fs_linux
 
     procs = (
         (
@@ -122,10 +122,12 @@ def fs_unix_proc(fs_unix):
     fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
     fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
 
+    yield fs
+
 
 @pytest.fixture
-def fs_unix_proc_sockets(fs_unix_proc):
-    fs = fs_unix_proc
+def fs_linux_proc_sockets(fs_linux_proc):
+    fs = fs_linux_proc
 
     fs.map_file_fh("/proc/net/unix", open(absolute_path("data/unix/linux/proc/net/unix"), "rb"))
     fs.map_file_fh("/proc/net/packet", open(absolute_path("data/unix/linux/proc/net/packet"), "rb"))
@@ -135,6 +137,8 @@ def fs_unix_proc_sockets(fs_unix_proc):
     fs.map_file_fh("/proc/net/udp", open(absolute_path("data/unix/linux/proc/net/udp"), "rb"))
     fs.map_file_fh("/proc/net/tcp6", open(absolute_path("data/unix/linux/proc/net/tcp6"), "rb"))
     fs.map_file_fh("/proc/net/tcp", open(absolute_path("data/unix/linux/proc/net/tcp"), "rb"))
+
+    yield fs
 
 
 @pytest.fixture
@@ -148,7 +152,10 @@ def fs_osx():
 @pytest.fixture
 def fs_bsd():
     fs = VirtualFilesystem()
-    fs.map_file("/bin/freebsd-version", absolute_path("data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
+    fs.map_file(
+        "/bin/freebsd-version",
+        absolute_path("data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"),
+    )
     yield fs
 
 
@@ -260,12 +267,20 @@ def target_win_users(hive_hklm, hive_hku, target_win):
     sid_local_system = "S-1-5-18"
     profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
     profile1_key.add_value(
-        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
+        "ProfileImagePath",
+        VirtualValue(
+            hive_hklm,
+            "ProfileImagePath",
+            "%systemroot%\\system32\\config\\systemprofile",
+        ),
     )
 
     sid_users_john = "S-1-5-21-3263113198-3007035898-945866154-1002"
     profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_users_john}")
-    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
+    profile2_key.add_value(
+        "ProfileImagePath",
+        VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"),
+    )
 
     profile_list_key.add_subkey(sid_local_system, profile1_key)
     profile_list_key.add_subkey(sid_users_john, profile2_key)
@@ -346,6 +361,16 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
+    passwd = """
+    root:x:0:0:root:/root:/bin/bash
+    user:x:1000:1000:user:/home/user:/bin/bash
+    """
+    fs_linux.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
+    yield target_linux
 
 
 @pytest.fixture
