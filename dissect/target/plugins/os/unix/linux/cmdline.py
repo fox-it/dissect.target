@@ -1,6 +1,5 @@
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -18,19 +17,16 @@ CmdlineRecord = TargetRecordDescriptor(
 
 class CmdlinePlugin(Plugin):
     def check_compatible(self) -> None:
-        if not self.target.proc:
-            raise UnsupportedPluginError("No /proc directory found")
+        self.target.proc
 
     @export(record=CmdlineRecord)
-    def cmdline(self) -> Iterator[TargetRecordDescriptor]:
-        """This plugin yields the complete command line for the process .
+    def cmdline(self) -> Iterator[CmdlineRecord]:
+        """Return the complete command line for all processes.
 
-        If, after an execve(2), the process modifies its argv
-        strings, those changes will show up here.  This is not the
+        If, after an execve(2), the process modifies its argv strings, those changes will show up here. This is not the
         same thing as modifying the argv array.
 
-        Think of this output as the command line that the process
-        wants you to see.
+        Think of this output as the command line that the process wants you to see.
 
         Yields CmdlineRecord with the following fields:
             hostname (string): The target hostname.

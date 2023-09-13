@@ -20,9 +20,8 @@ class EnvironPlugin(Plugin):
         self.target.proc
 
     @export(record=EnvironmentVariableRecord)
-    def environ(self) -> Iterator[TargetRecordDescriptor]:
-        """This plugins yields the initial environment that was set when the currently executing program was started via
-        execve(2).
+    def environ(self) -> Iterator[EnvironmentVariableRecord]:
+        """Return the initial environment for all processes when they were started via execve(2).
 
         If the process modified its environment (e.g., by calling functions such as putenv(3) or modifying
         the environ(7) variable directly), this plugin will not reflect those changes.

@@ -89,15 +89,15 @@ class NetSocket:
 
 @dataclass(order=True)
 class UnixSocket:
-    num: str  # the kernel table slot number.
-    ref: int  # the number of users of the socket.
+    num: str  # the kernel table slot number
+    ref: int  # the number of users of the socket
     protocol: int  # currently always 0. "Unix"
-    flags: str  # the internal kernel flags holding the status of the socket.
+    flags: str  # the internal kernel flags holding the status of the socket
     type: int  # the socket type: 1 for SOCK_STREAM, 2 for SOCK_DGRAM and 5 for SOCK_SEQPACKET sockets
-    state: int  # the internal state of the socket.
+    state: int  # the internal state of the socket
     inode: int  # the inode number of the socket. the inode is commonly refered to as port in tools as ss and netstat
     path: Optional[str] = None  # sockets in the abstract namespace are included in the list,
-    # and are shown with a Path that commences with the character '@'.
+    # and are shown with a Path that commences with the character '@'
 
     # Values parsed from raw values listed above.
     state_string: Optional[str] = None
@@ -120,16 +120,16 @@ class UnixSocket:
 @dataclass(order=True)
 class PacketSocket:
     sk: int  # socket number
-    ref: int  # the number of processes using this socket.
-    type: int  # type of the socket.
+    ref: int  # the number of processes using this socket
+    type: int  # type of the socket
     protocol: int  # protocol used by the socket to capture ie. 0003 is ETH_P_ALL
-    iface: int  # network interface index.
-    r: int  # number of bytes that have been received by the socket and are waiting to be processed.
-    rmem: int  # receive window memory.
-    user: int  # uid from the owner of the socket.
+    iface: int  # network interface index
+    r: int  # number of bytes that have been received by the socket and are waiting to be processed
+    rmem: int  # receive window memory
+    user: int  # uid from the owner of the socket
     inode: int  # inode
 
-    # Values parsed from raw values listed above.
+    # Values parsed from raw values listed above
     pid: Optional[int] = None  # pid of the socket
     name: Optional[str] = None  # process name associated to the socket
     cmdline: Optional[str] = None  # process cmdline associated to the socket
@@ -617,7 +617,7 @@ class ProcPlugin(Plugin):
             raise UnsupportedPluginError("No /proc directory found")
 
     @cached_property
-    def inode_map(self) -> defaultdict:
+    def inode_map(self) -> dict[int, list[ProcProcess]]:
         """Creates a inode to pid mapping for all process IDs in ``/proc/[pid]``."""
         map = defaultdict(list)
 
@@ -641,7 +641,7 @@ class ProcPlugin(Plugin):
         yield from self.target.fs.path("/proc").glob("[0-9]*")
 
     @internal
-    def inode_to_pids(self, inode: int) -> list:
+    def inode_to_pids(self, inode: int) -> list[ProcProcess]:
         return self.inode_map.get(inode, [])
 
     @internal
