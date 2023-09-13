@@ -15,7 +15,7 @@ import os
 import posixpath
 import re
 from pathlib import Path, PurePath, _PathParents, _PosixFlavour
-from typing import Any, BinaryIO, Iterator, Sequence, TextIO, Union
+from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
 
 try:
     import bz2
@@ -979,12 +979,21 @@ def resolve_link(
     return entry
 
 
-def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextIO]:
+def open_decompress(
+    path: TargetPath,
+    mode: str = "rb",
+    encoding: Optional[str] = "UTF-8",
+    errors: Optional[str] = "backslashreplace",
+    newline: Optional[str] = None,
+) -> Union[BinaryIO, TextIO]:
     """Open and decompress a file. Handles gz and bz2 files. Uncompressed files are opened as-is.
 
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
         mode: The mode in which to open the file.
+        encoding: The decoding for text streams. By default UTF-8 encoding is used.
+        errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
+        newline: How newlines are handled for text streams.
 
     Returns:
         An binary or text IO stream, depending on the mode with which the file was opened.
@@ -999,14 +1008,19 @@ def open_decompress(path: TargetPath, mode: str = "rb") -> Union[BinaryIO, TextI
     magic = file.read(4)
     file.seek(0)
 
+    if "b" in mode:
+        # Reset the default encoding and errors mode in case of a binary stream
+        encoding = None
+        errors = None
+
     if magic[:2] == b"\x1f\x8b":
-        return gzip.open(file, mode)
+        return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
     # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
     elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
-        return bz2.open(file, mode)
+        return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
     else:
         file.close()
-        return path.open(mode)
+        return path.open(mode, encoding=encoding, errors=errors, newline=newline)
 
 
 def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:
@@ -1042,6 +1056,11 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
                 fh.seek(offset)
 
         yield from reversed(lines[1:])
+
+        if prev_offset == offset:
+            # Previous lines are unreadable due to decoding errors
+            raise UnicodeDecodeError(fh.encoding, b"", 0, offset + 1, "failed to decode line")
+
         prev_offset = offset
 
     if lines:

@@ -34,7 +34,7 @@ dependencies = [
     "dissect.regf>=3.3.dev,<4.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.volume>=3.0.dev,<4.0.dev",
-    "flow.record~=3.10",
+    "flow.record~=3.12.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -55,6 +55,7 @@ full = [
     "dissect.fat>=3.0.dev,<4.0.dev",
     "dissect.ffs>=3.0.dev,<4.0.dev",
     "dissect.shellitem>=3.0.dev,<4.0.dev",
+    "dissect.squashfs>=1.0.dev,<2.0.dev",
     "dissect.sql>=3.0.dev,<4.0.dev",
     "dissect.thumbcache>=1.0.dev,<2.0.dev",
     "dissect.vmfs>=3.0.dev,<4.0.dev",
@@ -75,8 +76,17 @@ full = [
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    # Enable using the yara rules functionality
     "yara-python"
+]
+smb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "impacket==0.10.0"
+]
+cb = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "carbon-black-cloud-sdk-python~=1.4.3"
 ]
 
 [project.scripts]

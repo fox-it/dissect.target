@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -9,28 +11,39 @@ from dissect.target.plugin import OperatingSystem
 if TYPE_CHECKING:
     from dissect.target import Target
 
+log = logging.getLogger(__name__)
+
 FILESYSTEMS_ROOT = "uploads"
+UNIX_ACCESSORS = ["file", "auto"]
+WINDOWS_ACCESSORS = ["mft", "ntfs", "lazy_ntfs", "ntfs_vss", "auto"]
 
 
 def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional[list[Path]]]:
-    # As of Velociraptor version 0.6.7 the structure of the Velociraptor Offline Collector varies by operating system
-    # Generic.Collectors.File (Linux and OS-X) root filesystem is 'uploads/file/'
-    # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) root filesystem is
-    # 'uploads/<file-accessor>/<drive-name>/'
+    # As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
+    # Generic.Collectors.File (Unix) uses the accessors file and auto.
+    # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors
+    # mft, ntfs, lazy_ntfs, ntfs_vss and auto.
+
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
 
-    # Linux and OS-X
-    file_root = fs_root.joinpath("file")
-    if file_root.exists():
-        os_type, dirs = find_dirs(file_root)
-        if os_type in [OperatingSystem.LINUX, OperatingSystem.OSX]:
-            return os_type, [dirs[0]]
+    # Unix
+    for accessor in UNIX_ACCESSORS:
+        accessor_root = fs_root.joinpath(accessor)
+        if accessor_root.exists():
+            os_type, dirs = find_dirs(accessor_root)
+            if os_type in [OperatingSystem.UNIX, OperatingSystem.LINUX, OperatingSystem.OSX]:
+                return os_type, [dirs[0]]
 
-    # This suppports usage of the ntfs accessor 'uploads/mft/%5C%5C.%5CC%3A' not the accessors lazy_ntfs or auto
-    mft_root = fs_root.joinpath("mft")
-    if mft_root.exists():
-        # If the `mft` directory exists, assume all the subdirectories are volumes
-        return OperatingSystem.WINDOWS, list(mft_root.iterdir())
+    # Windows
+    volumes = set()
+    for accessor in WINDOWS_ACCESSORS:
+        accessor_root = fs_root.joinpath(accessor)
+        if accessor_root.exists():
+            # If the accessor directory exists, assume all the subdirectories are volumes
+            volumes.update(accessor_root.iterdir())
+
+    if volumes:
+        return OperatingSystem.WINDOWS, list(volumes)
 
     return None, None
 
@@ -44,6 +57,18 @@ class VelociraptorLoader(DirLoader):
         - https://github.com/Velocidex/velociraptor
     """
 
+    def __init__(self, path: Path, **kwargs):
+        super().__init__(path)
+
+        if path.suffix == ".zip":
+            log.warning(
+                f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
+                "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
+            )
+            self.root = zipfile.Path(path)
+        else:
+            self.root = path
+
     @staticmethod
     def detect(path: Path) -> bool:
         # The 'uploads' folder contains the data acquired
@@ -54,20 +79,25 @@ class VelociraptorLoader(DirLoader):
         #   results/
         #   uploads.json
         #   [...] other files related to the collection
+        if path.suffix == ".zip":  # novermin
+            path = zipfile.Path(path)
+
         if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
             _, dirs = find_fs_directories(path)
             return bool(dirs)
+
         return False
 
     def map(self, target: Target) -> None:
-        os_type, dirs = find_fs_directories(self.path)
+        os_type, dirs = find_fs_directories(self.root)
         if os_type == OperatingSystem.WINDOWS:
-            # Velociraptor doesn't have the correct filenames for several files, like $J
+            # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
             map_dirs(
                 target,
                 dirs,
                 os_type,
                 usnjrnl_path="$Extend/$UsnJrnl%3A$J",
+                sds_path="$Secure%3A$SDS",
             )
         else:
             map_dirs(target, dirs, os_type)

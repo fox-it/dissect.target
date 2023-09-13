@@ -2,6 +2,7 @@ import struct
 from enum import IntEnum
 from io import BytesIO
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -79,8 +80,9 @@ class Capabilities(IntEnum):
 class CapabilityPlugin(Plugin):
     """Plugin to yield files with capabilites set."""
 
-    def check_compatible(self):
-        return self.target.has_function("walkfs") and self.target.os != "windows"
+    def check_compatible(self) -> None:
+        if not self.target.has_function("walkfs") or self.target.os == "windows":
+            raise UnsupportedPluginError("Unsupported plugin")
 
     @export(record=CapabilityRecord)
     def capability_binaries(self):

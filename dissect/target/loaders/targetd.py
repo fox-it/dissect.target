@@ -77,7 +77,7 @@ class TargetdLoader(ProxyLoader):
             configuration = self.options.get(configurable)
             if not configuration:
                 default_value = getattr(self, configurable)
-                target.log.warning(f"{description} not configured, using: {configurable}={default_value}")
+                target.log.warning("%s not configured, using: %s=%s", description, configurable, default_value)
             else:
                 setattr(self, configurable, value_type(configuration))
 
@@ -95,6 +95,7 @@ class TargetdLoader(ProxyLoader):
             raise ImportError("This loader requires the targetd package to be installed.")
 
         self.output = None
+        self.has_output = False
 
         if self.client is None:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -123,7 +124,7 @@ class TargetdLoader(ProxyLoader):
             self.client.command = plugin_func
             self.client.exec_command()
 
-        while not self.output:
+        while not self.has_output:
             time.sleep(1)
         return self.output
 
@@ -159,5 +160,6 @@ if TARGETD_AVAILABLE:
         if not targetd.rpcs:
             targetd.easy_connect_remoting(remoting, link, caller.peers)
         func = getattr(targetd.rpcs, targetd.command)
+        caller.has_output = True
         caller.output = list(func())
         targetd.reset()

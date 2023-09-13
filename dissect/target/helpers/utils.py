@@ -19,7 +19,7 @@ class StrEnum(str, Enum):
 
 def list_to_frozen_set(function):
     def wrapper(*args):
-        args = [frozenset(x) if type(x) == list else x for x in args]
+        args = [frozenset(x) if isinstance(x, list) else x for x in args]
         return function(*args)
 
     return wrapper
@@ -102,7 +102,13 @@ def year_rollover_helper(
                 log.debug("Skipping line: %s", line)
                 continue
 
-            relative_ts = datetime.strptime(timestamp.group(0), ts_format)
+            try:
+                relative_ts = datetime.strptime(timestamp.group(0), ts_format)
+            except ValueError as e:
+                log.warning("Timestamp '%s' does not match format '%s', skipping line.", timestamp.group(0), ts_format)
+                log.debug("", exc_info=e)
+                continue
+
             if last_seen_month and relative_ts.month > last_seen_month:
                 current_year -= 1
             last_seen_month = relative_ts.month

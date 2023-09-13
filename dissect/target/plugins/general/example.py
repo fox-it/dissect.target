@@ -53,17 +53,22 @@ class ExamplePlugin(Plugin):
             super().__init__(target)
     """
 
+    # IMPORTANT: Remove these attributes when using this as boilerplate for your own plugin!
     __findable__ = False
+    __skip__ = True
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         """Perform a compatibility check with the target.
 
-        This function should return ``True`` or ``False`` on whether it's compatible
-        with the current target (``self.target``). For example, check if a certain
-        file exists. To provide a more detailed reason why your plugin is
-        incompatible, you can also raise :class:`dissect.target.exceptions.UnsupportedPluginError`.
+        This function should return ``None`` if the plugin is compatible with
+        the current target (``self.target``). For example, check if a certain
+        file exists.
+        Otherwise it should raise an ``UnsupportedPluginError``.
+
+        Raises:
+            UnsupportedPluginError: If the plugin could not be loaded.
         """
-        return True
+        pass
 
     @export
     @arg("--flag", action="store_true", help="optional example flag")

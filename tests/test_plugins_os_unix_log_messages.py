@@ -67,6 +67,7 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
         # Create a tar file with correct mtime
         messages_log_contents = """\
         Dec 31 03:14:00 localhost systemd[1]: Starting Journal Service...
+        \xfean  1 03:14:00 localhost systemd[1]: Starting Journal Service...
         Jan  1 13:37:00 localhost systemd: Stopped target Swap."""
         messages_log_file = BytesIO(textwrap.dedent(messages_log_contents).encode())
         messages_log_tar_info = tarfile.TarInfo("var/log/messages")
@@ -87,3 +88,25 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
     assert isinstance(results[1], type(MessagesRecord()))
     assert results[0].ts == dt(2020, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("America/Chicago"))
     assert results[1].ts == dt(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="ZoneInfoNotFoundError. Needs to be fixed.")
+def test_unix_log_messages_malformed_log_year_rollover(target_unix_users, fs_unix):
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
+
+    messages = BytesIO(
+        b"Dec 31 03:14:00 localhost systemd[1]: Starting Journal Service...\r\n"
+        b"\xefan  1 13:37:00 localhost systemd: Stopped target Swap.\r\n"
+        b"Dec 31 03:14:00 localhost systemd[1]: Starting Journal Service...\r\n"
+    )
+    fs_unix.map_file_fh("var/log/messages", messages)
+
+    entry = fs_unix.get("var/log/messages")
+    stat = entry.stat()
+    stat.st_mtime = datetime(2022, 6, 1, tzinfo=timezone.utc).timestamp()
+
+    with patch.object(entry, "stat", return_value=stat):
+        target_unix_users.add_plugin(MessagesPlugin)
+
+        results = list(target_unix_users.messages())
+        assert len(results) == 2

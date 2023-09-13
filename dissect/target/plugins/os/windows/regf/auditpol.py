@@ -134,7 +134,7 @@ class AuditpolPlugin(Plugin):
 
     KEY = "HKLM\\SECURITY\\Policy\\PolAdtEv"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 

@@ -35,7 +35,7 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
         self.data_vmcx = hyperv_path.joinpath("data.vmcx")
         self.vm_xml = list(hyperv_path.joinpath("Virtual Machines").glob("*.xml"))
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.data_vmcx.exists() and not self.vm_xml:
             raise UnsupportedPluginError("No registered VMs and no data.vmcx file found")
 

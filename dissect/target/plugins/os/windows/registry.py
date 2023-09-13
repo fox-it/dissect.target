@@ -1,21 +1,33 @@
+import logging
 import re
 import warnings
 from collections import defaultdict
 from functools import lru_cache
+from typing import Iterator, Optional, Union
 
-from dissect.target.exceptions import HiveUnavailableError, RegistryKeyNotFoundError
+from dissect.target.exceptions import (
+    HiveUnavailableError,
+    RegistryKeyNotFoundError,
+    UnsupportedPluginError,
+)
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.helpers.regutil import (
     HiveCollection,
     KeyCollection,
     RegfHive,
+    RegistryHive,
     RegistryKey,
+    ValueCollection,
     VirtualHive,
+    glob_ext,
+    glob_split,
 )
 from dissect.target.plugin import Plugin, internal
 from dissect.target.plugins.general.users import UserDetails
+from dissect.target.target import Target
 
-controlset_regex = re.compile("CurrentControlSet", flags=re.IGNORECASE)
+CONTROLSET_REGEX = re.compile("CurrentControlSet", flags=re.IGNORECASE)
 
 
 class RegistryPlugin(Plugin):
@@ -58,7 +70,7 @@ class RegistryPlugin(Plugin):
         "ELAM",
     ]
 
-    def __init__(self, target):
+    def __init__(self, target: Target) -> None:
         super().__init__(target)
         self._root = VirtualHive()
         self._hive_collections = defaultdict(HiveCollection)
@@ -71,11 +83,16 @@ class RegistryPlugin(Plugin):
         self._users_loaded = False
         self._init_registry()
 
-    def _init_registry(self):
-        dirs = ["sysvol/windows/system32/config", "sysvol/windows/system32/config/RegBack"]
+    def _init_registry(self) -> None:
+        dirs = [
+            ("sysvol/windows/system32/config", False),
+            # RegBack hives are often empty files
+            ("sysvol/windows/system32/config/RegBack", True),
+        ]
+        opened_hives = set()
 
-        for d in dirs:
-            config_dir = self.target.fs.path(d)
+        for path, log_empty_to_debug in dirs:
+            config_dir = self.target.fs.path(path)
             for fname in self.SYSTEM:
                 hive_file = config_dir.joinpath(fname)
                 if not hive_file.exists():
@@ -83,12 +100,15 @@ class RegistryPlugin(Plugin):
                     continue
 
                 if hive_file.stat().st_size == 0:
-                    self.target.log.warning("Empty hive: %s", hive_file)
+                    # Only log to debug if we have found a valid hive in a previous path
+                    log_level = logging.DEBUG if log_empty_to_debug and fname in opened_hives else logging.WARNING
+                    self.target.log.log(log_level, "Empty hive: %s", hive_file)
                     continue
 
                 try:
                     hf = RegfHive(hive_file)
-                    self.add_hive(fname, hf, hive_file)
+                    self._add_hive(fname, hf, hive_file)
+                    opened_hives.add(fname)
                 except Exception as e:
                     self.target.log.warning("Could not open hive: %s", hive_file, exc_info=e)
                     continue
@@ -104,15 +124,20 @@ class RegistryPlugin(Plugin):
 
             try:
                 hf = RegfHive(bcd)
-                self.add_hive("BCD", hf, bcd)
+                self._add_hive("BCD", hf, bcd)
             except Exception as e:
                 self.target.log.warning("Could not open BCD: %s", bcd, exc_info=e)
 
         for hive, location in self.MAPPINGS.items():
             if hive in self._hive_collections:
-                self.map_hive(location, self._hive_collections[hive])
+                self._map_hive(location, self._hive_collections[hive])
 
-    def _init_users(self):
+    def _init_users(self) -> None:
+        # The initialization of user hives is separated from the initialization
+        # of the class on purpose.
+        # Loading user hives needs user information (through _os.users()),
+        # while getting those users needs a minimal functional registry (the
+        # HKLM hive should be available).
         if self._users_loaded:
             return
 
@@ -127,10 +152,7 @@ class RegistryPlugin(Plugin):
             else:
                 try:
                     ntuserhive = RegfHive(ntuser)
-                    self.add_hive(user.sid, ntuserhive, ntuser)
-
-                    self.map_hive(f"HKEY_USERS\\{user.sid}", ntuserhive)
-
+                    self.add_hive(user.sid, f"HKEY_USERS\\{user.sid}", ntuserhive, ntuser)
                     self._hives_to_users[ntuserhive] = user_details
                 except Exception as e:
                     self.target.log.warning("Could not open ntuser.dat: %s", ntuser, exc_info=e)
@@ -144,9 +166,8 @@ class RegistryPlugin(Plugin):
             else:
                 try:
                     usr_class_hive = RegfHive(usrclass)
-                    self.add_hive(f"{user.sid}_Classes", usr_class_hive, usrclass)
-                    self.map_hive(f"HKEY_USERS\\{user.sid}\\Software\\Classes", usr_class_hive)
-                    self.map_hive(f"HKEY_USERS\\{user.sid}_Classes", usr_class_hive)
+                    self.add_hive(f"{user.sid}_Classes", f"HKEY_USERS\\{user.sid}_Classes", usr_class_hive, usrclass)
+                    self._map_hive(f"HKEY_USERS\\{user.sid}\\Software\\Classes", usr_class_hive)
 
                     self._hives_to_users[usr_class_hive] = user_details
                 except Exception as e:
@@ -155,23 +176,32 @@ class RegistryPlugin(Plugin):
         self._users_loaded = True
 
     @internal
-    def load_user_hives(self):
+    def load_user_hives(self) -> None:
+        """Load and map the user hives present in the target."""
         self._init_users()
 
-    @internal
-    def add_hive(self, name, hive, path):
+    def _add_hive(self, name: str, hive: RegistryHive, path: TargetPath) -> None:
+        """Add a hive to the internal _hive_collections and _hive_paths."""
         self._hive_collections[name.upper()].add(hive)
         self._hive_paths.append((name, hive, path))
 
-    @internal
-    def map_hive(self, location, hive):
+    def _map_hive(self, location: str, hive: RegistryHive) -> None:
+        """Map a hive to a specific location in the root hive."""
         self._root.map_hive(location, hive)
 
-    def check_compatible(self):
-        return len(self._hive_collections) > 0
+    @internal
+    def add_hive(self, name: str, location: str, hive: RegistryHive, path: TargetPath) -> None:
+        """Register and add a hive to a specific location in the root hive."""
+        self._add_hive(name, hive, path)
+        self._map_hive(location, hive)
+
+    def check_compatible(self) -> None:
+        if not len(self._hive_collections):
+            raise UnsupportedPluginError("No hive collections found")
 
     @property
-    def controlsets(self):
+    def controlsets(self) -> list[str]:
+        """Return a list of the different ControlSet names."""
         if not self._controlsets:
             for key in self.key("HKLM\\SYSTEM").subkeys():
                 if key.name.startswith("ControlSet0"):
@@ -182,29 +212,29 @@ class RegistryPlugin(Plugin):
         return self._controlsets
 
     @internal
-    def root(self):
+    def root(self) -> KeyCollection:
         """Returns the root of the virtual registry."""
         return self.key()
 
     @internal
     @lru_cache(4096)
-    def key(self, key=None):
+    def key(self, key: Optional[str] = None) -> KeyCollection:
         """Query the virtual registry on the given key.
 
         Returns a KeyCollection which contains all keys that match
         the query.
         """
+        key = (key or "").strip("\\")
+
         if not key:
-            return self._root.root()
+            return KeyCollection([self._root.root()])
 
-        key = key.strip("\\")
-
-        if controlset_regex.findall(key):
+        if CONTROLSET_REGEX.findall(key):
             if not self._currentcontrolset:
                 self.target.log.warning("No known destination for CurrentControlSet link")
                 raise RegistryKeyNotFoundError(key)
 
-            key = controlset_regex.sub(self._currentcontrolset, key, 1)
+            key = CONTROLSET_REGEX.sub(self._currentcontrolset, key, 1)
 
         hive, _, path = key.partition("\\")
         for short_name, name in self.SHORTNAMES.items():
@@ -240,30 +270,30 @@ class RegistryPlugin(Plugin):
         return res
 
     @internal
-    def value(self, key, value):
+    def value(self, key: str, value: str) -> ValueCollection:
         """Convenience method for accessing a specific value."""
         return self.key(key).value(value)
 
     @internal
-    def subkey(self, key, subkey):
+    def subkey(self, key: str, subkey: str) -> KeyCollection:
         """Convenience method for accessing a specific subkey."""
         return self.key(key).subkey(subkey)
 
     @internal
-    def iterkeys(self, keys):
+    def iterkeys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
         warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning)
         for key in self.keys(keys):
             yield key
 
     @internal
-    def keys(self, keys):
+    def keys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
         """Yields all keys that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also unrolls KeyCollections.
         """
         keys = [keys] if not isinstance(keys, list) else keys
 
-        for key in self._iterkeypaths(keys):
+        for key in self._iter_controlset_keypaths(keys):
             try:
                 res = self.key(key)
                 for r in res:
@@ -273,17 +303,18 @@ class RegistryPlugin(Plugin):
             except HiveUnavailableError:
                 pass
 
-    def _iterkeypaths(self, keys):
+    def _iter_controlset_keypaths(self, keys: list[str]) -> Iterator[str]:
+        """Yield the key transformed for the different control sets."""
         for key in keys:
-            if not self.controlsets or not controlset_regex.search(key):
+            if not self.controlsets or not CONTROLSET_REGEX.search(key):
                 yield key
                 continue
 
             for controlset in self.controlsets:
-                yield controlset_regex.sub(controlset, key)
+                yield CONTROLSET_REGEX.sub(controlset, key)
 
     @internal
-    def iterhives(self):
+    def iterhives(self) -> Iterator[tuple[str, RegistryHive, TargetPath]]:
         """Returns an iterator for all hives.
 
         Items are tuples with three members: (name, hive, path)
@@ -291,7 +322,7 @@ class RegistryPlugin(Plugin):
         return iter(self._hive_paths)
 
     @internal
-    def mappings(self):
+    def mappings(self) -> dict[str, str]:
         """Return hive mappings."""
         return self.MAPPINGS
 
@@ -309,3 +340,14 @@ class RegistryPlugin(Plugin):
         details = self._hives_to_users.get(key.hive)
         if details:
             return details.user
+
+    @internal
+    def glob_ext(self, pattern: str) -> Iterator[KeyCollection]:
+        key_path, pattern = glob_split(pattern)
+
+        try:
+            key_collection = self.key(key_path)
+        except RegistryKeyNotFoundError:
+            return
+        else:
+            yield from glob_ext(key_collection, pattern)

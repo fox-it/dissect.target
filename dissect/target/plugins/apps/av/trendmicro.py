@@ -63,7 +63,7 @@ class TrendMicroPlugin(Plugin):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not self.target.fs.path(self.LOG_FOLDER).exists():
             raise UnsupportedPluginError
 

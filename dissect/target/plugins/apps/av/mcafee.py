@@ -55,7 +55,7 @@ class McAfeePlugin(Plugin):
     TABLE_LOG = "log"
     TABLE_FIELD = "field"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not list(self.get_log_files()):
             raise UnsupportedPluginError("No McAfee Log files found")
 

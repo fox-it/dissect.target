@@ -1,5 +1,6 @@
 import socket
 import ssl
+from struct import unpack
 from unittest.mock import MagicMock, call, patch
 
 from dissect.target.loaders.remote import RemoteStream, RemoteStreamConnection
@@ -11,11 +12,24 @@ def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicM
     rsc = RemoteStreamConnection("remote://127.0.0.1", 9001, options={"ca": "A", "key": "B", "crt": "C"})
     assert rsc.is_connected() is False
     rsc.connect()
-    rsc._ssl_sock.recv = MagicMock(return_value=b"ABC")
+
+    rsc.remote_disk_data = b"ABC"
+    rsc.remote_disk_response = None
+
+    def send(data: bytes) -> None:
+        _, offset, read = unpack(">BQQ", data)
+        rsc.remote_disk_response = rsc.remote_disk_data[offset : offset + read]
+        return len(data)
+
+    def receive(num: bytes) -> bytes:
+        return rsc.remote_disk_response
+
+    rsc._ssl_sock.send = send
+    rsc._ssl_sock.recv = receive
     rs = RemoteStream(rsc, 0, 3)
     rs.align = 1
     rs.seek(1)
-    rs.read(2)
+    data = rs.read(2)
     rs.close()
     mock_socket_class.assert_called_with(socket.AddressFamily.AF_INET, socket.SocketKind.SOCK_STREAM)
     expected = [
@@ -25,9 +39,8 @@ def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicM
         call().load_verify_locations("A"),
         call().wrap_socket(rsc._socket, server_hostname="remote://127.0.0.1"),
         call().wrap_socket().connect(("remote://127.0.0.1", 9001)),
-        call().wrap_socket().send(b"2\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x02"),
-        call().wrap_socket().recv(2),
     ]
+    assert data == b"BC"
     assert mock_context.mock_calls == expected
     assert rs.tell() == 3
     assert rsc.is_connected() is True

@@ -6,6 +6,8 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
@@ -59,7 +61,7 @@ class UnixPlugin(OSPlugin):
                         uid=pwent.get(2),
                         gid=pwent.get(3),
                         gecos=pwent.get(4),
-                        home=pwent.get(5),
+                        home=posix_path(pwent.get(5)),
                         shell=pwent.get(6),
                         source=passwd_file,
                         _target=self.target,
@@ -228,7 +230,7 @@ class UnixPlugin(OSPlugin):
         os_release = {}
 
         for path in self.target.fs.glob(glob):
-            if self.target.fs.path(path).exists():
+            if self.target.fs.path(path).is_file():
                 with self.target.fs.path(path).open("rt") as release_file:
                     for line in release_file:
                         if line.startswith("#"):

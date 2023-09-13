@@ -13,8 +13,18 @@ from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.utils import parse_path_uri
 from dissect.target.loader import Loader
 
+SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
-LINUX_DRIVE_REGEX = re.compile(r"([sh]d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
+
+LINUX_DEV_DIR = Path("/dev")
+LINUX_DRIVE_REGEX = re.compile(r"(([sh]|xv)d[a-z]$)|(fd\d+$)|(nvme\d+n\d+$)")
+VOLATILE_LINUX_PATHS = [
+    Path("/proc"),
+    Path("/sys"),
+]
+
+ESXI_DEV_DIR = Path("/vmfs/devices/disks")
+
 WINDOWS_ERROR_INSUFFICIENT_BUFFER = 0x7A
 WINDOWS_DRIVE_FIXED = 3
 
@@ -59,13 +69,27 @@ class LocalLoader(Loader):
 
 
 def map_linux_drives(target: Target):
-    """Map Linux raw disks.
+    """Map Linux raw disks and /proc and /sys.
 
     Iterate through /dev and match raw device names (not partitions).
+
+    /proc and /sys are mounted if they exists, allowing access to volatile files.
     """
-    for drive in Path("/dev").iterdir():
+    for drive in LINUX_DEV_DIR.iterdir():
         if LINUX_DRIVE_REGEX.match(drive.name):
             _add_disk_as_raw_container_to_target(drive, target)
+
+    # Volatile filesystems are not present when running on a local target's raw
+    # disks, so they are explicitly mounted here.
+    #
+    # Note that when running on a local target using a directory fs (through
+    # force-directory-fs or fallback-to-directory-fs), these filesystems are
+    # already present as they are usually mounted on the local system.
+    for volatile_path in VOLATILE_LINUX_PATHS:
+        if volatile_path.exists():
+            volatile_fs = DirectoryFilesystem(volatile_path)
+            target.filesystems.add(volatile_fs)
+            target.fs.mount(str(volatile_path), volatile_fs)
 
 
 def map_solaris_drives(target):
@@ -73,7 +97,7 @@ def map_solaris_drives(target):
 
     Iterate through /dev/dsk and match raw device names (not slices or partitions).
     """
-    for drive in Path("/dev/dsk").iterdir():
+    for drive in SOLARIS_DEV_DIR.iterdir():
         if not SOLARIS_DRIVE_REGEX.match(drive.name):
             continue
         _add_disk_as_raw_container_to_target(drive, target)
@@ -84,7 +108,7 @@ def map_esxi_drives(target):
 
     Get all devices from /vmfs/devices/disks/* (not partitions).
     """
-    for drive in Path("/vmfs/devices/disks").glob("vml.*"):
+    for drive in ESXI_DEV_DIR.glob("vml.*"):
         if ":" in drive.name:
             continue
         _add_disk_as_raw_container_to_target(drive, target)

@@ -265,6 +265,29 @@ def test_helpers_fsutil_open_decompress(file_name, compressor, content):
     assert fsutil.open_decompress(vfs.path(file_name)).read() == content
 
 
+def test_helpers_fsutil_open_decompress_text_modes():
+    vfs = VirtualFilesystem()
+    vfs.map_file_fh("test", io.BytesIO(b"zomgbbq"))
+
+    fh = fsutil.open_decompress(vfs.path("test"))
+    assert not isinstance(fh, io.TextIOWrapper)
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r")
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "UTF-8"
+    assert fh.errors == "backslashreplace"
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r", errors=None)
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "UTF-8"
+    assert fh.errors == "strict"
+
+    fh = fsutil.open_decompress(vfs.path("test"), "r", encoding="ascii")
+    assert isinstance(fh, io.TextIOWrapper)
+    assert fh.encoding == "ascii"
+    assert fh.errors == "backslashreplace"
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Encoding error. Needs to be fixed.")
 def test_helpers_fsutil_reverse_readlines():
     vfs = VirtualFilesystem()
@@ -296,6 +319,21 @@ def test_helpers_fsutil_reverse_readlines():
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
 
+    broken_content = (b"foobar\r\n" * 2) + (b"\xc2broken\r\n") + (b"barfoo\r\n" * 2)
+    vfs.map_file_fh("file_multi_broken", io.BytesIO(broken_content))
+    with pytest.raises(
+        UnicodeDecodeError, match="'UTF-8' codec can't decode bytes in position 0-17: failed to decode line"
+    ):
+        assert list(fsutil.reverse_readlines(vfs.path("file_multi_broken").open("rt"))) == ["barfoo\n", "barfoo\n"]
+
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_broken").open("rt", errors="backslashreplace"))) == [
+        "barfoo\n",
+        "barfoo\n",
+        "\\xc2broken\n",
+        "foobar\n",
+        "foobar\n",
+    ]
+
 
 @pytest.mark.parametrize(
     "follow_symlinks",
@@ -317,6 +355,9 @@ def test_fs_attrs(xattrs, listxattr_spec, getxattr_spec, follow_symlinks):
 
 @contextmanager
 def no_listxattr():
+    if not hasattr(os, "listxattr"):
+        yield
+        return
     listxattr = os.listxattr
     try:
         del os.listxattr

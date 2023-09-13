@@ -7,10 +7,11 @@ from dissect.util.ts import wintimestamp
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
 from dissect.target.plugins.browsers.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    BrowserPlugin,
     try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
@@ -68,7 +69,7 @@ class WebCache:
         yield from self._iter_records("iedownload")
 
 
-class InternetExplorerPlugin(Plugin):
+class InternetExplorerPlugin(BrowserPlugin):
     """Internet explorer browser plugin."""
 
     __namespace__ = "iexplore"
@@ -95,7 +96,7 @@ class InternetExplorerPlugin(Plugin):
                     continue
                 self.users_dirs.append((user_details.user, cdir))
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Internet Explorer directories found")
 

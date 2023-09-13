@@ -112,7 +112,12 @@ def target_win_mru(target_win_users):
     ]:
         user_hive.map_key(key.path, key)
 
-    target_win_users.registry.map_hive(f"HKEY_USERS\\{user_details.user.sid}", user_hive)
+    target_win_users.registry.add_hive(
+        "HKEY_USERS",
+        f"HKEY_USERS\\{user_details.user.sid}",
+        user_hive,
+        user_hive.filepath,
+    )
     target_win_users.registry._hives_to_users[user_hive] = user_details
     return target_win_users
 
