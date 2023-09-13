@@ -129,14 +129,8 @@ def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
 def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem:
     fs = fs_linux_proc
 
-    fs.map_file_fh("/proc/net/unix", open(absolute_path("data/unix/linux/proc/net/unix"), "rb"))
-    fs.map_file_fh("/proc/net/packet", open(absolute_path("data/unix/linux/proc/net/packet"), "rb"))
-    fs.map_file_fh("/proc/net/raw6", open(absolute_path("data/unix/linux/proc/net/raw6"), "rb"))
-    fs.map_file_fh("/proc/net/raw", open(absolute_path("data/unix/linux/proc/net/raw"), "rb"))
-    fs.map_file_fh("/proc/net/udp6", open(absolute_path("data/unix/linux/proc/net/udp6"), "rb"))
-    fs.map_file_fh("/proc/net/udp", open(absolute_path("data/unix/linux/proc/net/udp"), "rb"))
-    fs.map_file_fh("/proc/net/tcp6", open(absolute_path("data/unix/linux/proc/net/tcp6"), "rb"))
-    fs.map_file_fh("/proc/net/tcp", open(absolute_path("data/unix/linux/proc/net/tcp"), "rb"))
+    for filename in ("unix", "packet", "raw6", "raw", "udp6", "udp", "tcp6", "tcp"):
+        fs.map_file(f"/proc/net/{filename}", absolute_path(f"data/unix/linux/proc/net/{filename}"))
 
     yield fs
 
