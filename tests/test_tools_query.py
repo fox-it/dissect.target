@@ -70,7 +70,7 @@ def test_target_query_invalid_functions(
         assert invalid_funcs == expected_invalid_funcs
 
 
-def test_target_query_unsupported_plugin_log(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch):
+def test_target_query_unsupported_plugin_log(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
