@@ -955,6 +955,7 @@ class InternalPlugin(Plugin):
 @dataclass(frozen=True, eq=True)
 class PluginFunction:
     name: str
+    path: str
     output_type: str
     class_object: type[Plugin]
     method_name: str
@@ -1074,7 +1075,8 @@ def find_plugin_functions(
                 matches = True
                 add_to_result(
                     PluginFunction(
-                        name=index_name,
+                        name=f"{func['namespace']}.{method_name}" if func["namespace"] else method_name,
+                        path=index_name,
                         class_object=loaded_plugin_object,
                         method_name=method_name,
                         output_type=getattr(fobject, "__output__", "text"),
@@ -1112,7 +1114,8 @@ def find_plugin_functions(
 
                 add_to_result(
                     PluginFunction(
-                        name=f"{description['module']}.{pattern}",
+                        name=f"{description['namespace']}.{funcname}" if description["namespace"] else funcname,
+                        path=f"{description['module']}.{pattern}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),

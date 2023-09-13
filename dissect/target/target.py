@@ -329,8 +329,7 @@ class Target:
                 continue
 
             try:
-                if not child_plugin.is_compatible():
-                    continue
+                child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
                 self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
@@ -517,10 +516,9 @@ class Target:
 
         if check_compatible:
             try:
-                if not p.is_compatible():
-                    self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
-                    raise UnsupportedPluginError(f"Plugin reported itself as incompatible: {plugin_cls}")
+                p.check_compatible()
             except PluginError:
+                self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
                 raise
             except Exception as e:
                 raise UnsupportedPluginError(

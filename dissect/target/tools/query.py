@@ -256,12 +256,12 @@ def main():
                 )
             except UnsupportedPluginError as e:
                 target.log.error(
-                    "Unsupported plugin for `%s`: %s",
-                    func_def,
+                    "Unsupported plugin for %s: %s",
+                    func_def.name,
                     e.root_cause_str(),
                 )
 
-                target.log.debug("", exc_info=e)
+                target.log.debug("%s", func_def, exc_info=e)
                 continue
             except PluginNotFoundError:
                 target.log.error("Cannot find plugin `%s`", func_def)
