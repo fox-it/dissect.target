@@ -267,32 +267,19 @@ def target_win_users(hive_hklm, hive_hku, target_win):
     sid_local_system = "S-1-5-18"
     profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
     profile1_key.add_value(
-        "ProfileImagePath",
-        VirtualValue(
-            hive_hklm,
-            "ProfileImagePath",
-            "%systemroot%\\system32\\config\\systemprofile",
-        ),
+        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
     )
 
     sid_users_john = "S-1-5-21-3263113198-3007035898-945866154-1002"
     profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_users_john}")
-    profile2_key.add_value(
-        "ProfileImagePath",
-        VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"),
-    )
+    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
 
     profile_list_key.add_subkey(sid_local_system, profile1_key)
     profile_list_key.add_subkey(sid_users_john, profile2_key)
 
     hive_hklm.map_key(profile_list_key_name, profile_list_key)
 
-    target_win.registry.add_hive(
-        "HKEY_USERS",
-        f"HKEY_USERS\\{sid_users_john}",
-        hive_hku,
-        TargetPath(target_win.fs, ""),
-    )
+    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_users_john}", hive_hku, TargetPath(target_win.fs, ""))
 
     yield target_win
 
