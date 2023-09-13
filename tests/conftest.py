@@ -61,7 +61,7 @@ def fs_unix():
 
 
 @pytest.fixture
-def fs_linux():
+def fs_linux() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
@@ -70,7 +70,7 @@ def fs_linux():
 
 
 @pytest.fixture
-def fs_linux_proc(fs_linux):
+def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
     fs = fs_linux
 
     procs = (
@@ -126,7 +126,7 @@ def fs_linux_proc(fs_linux):
 
 
 @pytest.fixture
-def fs_linux_proc_sockets(fs_linux_proc):
+def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem:
     fs = fs_linux_proc
 
     fs.map_file_fh("/proc/net/unix", open(absolute_path("data/unix/linux/proc/net/unix"), "rb"))
