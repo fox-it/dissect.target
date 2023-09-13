@@ -98,7 +98,7 @@ class Container(io.IOBase):
         """
         raise NotImplementedError()
 
-    def read(self, length: int) -> bytes:
+    def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Container``."""
         raise NotImplementedError()
 
