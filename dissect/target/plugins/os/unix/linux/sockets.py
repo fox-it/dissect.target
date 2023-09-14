@@ -94,8 +94,7 @@ class NetSocketPlugin(Plugin):
             cmdline (string): The command line used to start the socket with.
             owner (string): The resolved user ID of the socket.
         """
-        for packetsocket in self.sockets.packet():
-            yield self._generate_packet_socket_record(packetsocket)
+        yield from map(self._generate_packet_socket_record, self.sockets.packet())
 
     @export(record=UnixSocketRecord)
     def unix(self) -> Iterator[UnixSocketRecord]:
@@ -111,8 +110,7 @@ class NetSocketPlugin(Plugin):
             inode (int): The inode associated to the socket.
             path (string): The path associated to the socket.
         """
-        for unixsocket in self.sockets.unix():
-            yield self._generate_unix_socket_record(unixsocket)
+        yield from map(self._generate_unix_socket_record, self.sockets.unix())
 
     @export(record=NetSocketRecord)
     def raw(self) -> Iterator[NetSocketRecord]:
@@ -135,9 +133,7 @@ class NetSocketPlugin(Plugin):
             name (string): The process name associated with this socket.
             cmdline (string): The command line used to start the socket with.
         """
-        sockets = chain(self.sockets.raw(), self.sockets.raw6())
-        for netsocket in sockets:
-            yield self._generate_net_socket_record(netsocket)
+        yield from map(self._generate_net_socket_record, chain(self.sockets.raw(), self.sockets.raw6()))
 
     @export(record=NetSocketRecord)
     def udp(self) -> Iterator[NetSocketRecord]:
@@ -160,9 +156,7 @@ class NetSocketPlugin(Plugin):
             name (string): The process name associated with this socket.
             cmdline (string): The command line used to start the socket with.
         """
-        sockets = chain(self.sockets.udp(), self.sockets.udp6())
-        for netsocket in sockets:
-            yield self._generate_net_socket_record(netsocket)
+        yield from map(self._generate_net_socket_record, chain(self.sockets.udp(), self.sockets.udp6()))
 
     @export(record=NetSocketRecord)
     def tcp(self) -> Iterator[NetSocketRecord]:
@@ -185,9 +179,7 @@ class NetSocketPlugin(Plugin):
             name (string): The process name associated with this socket.
             cmdline (string): The command line used to start the socket with.
         """
-        sockets = chain(self.sockets.tcp(), self.sockets.tcp6())
-        for netsocket in sockets:
-            yield self._generate_net_socket_record(netsocket)
+        yield from map(self._generate_net_socket_record, chain(self.sockets.tcp(), self.sockets.tcp6()))
 
     def _generate_unix_socket_record(self, data: UnixSocket) -> UnixSocketRecord:
         return UnixSocketRecord(
