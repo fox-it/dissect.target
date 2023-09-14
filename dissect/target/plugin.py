@@ -1115,7 +1115,7 @@ def find_plugin_functions(
                 add_to_result(
                     PluginFunction(
                         name=f"{description['namespace']}.{funcname}" if description["namespace"] else funcname,
-                        path=f"{description['module']}.{pattern}",
+                        path=f"{description['module']}.{funcname}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),
