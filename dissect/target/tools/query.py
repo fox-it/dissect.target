@@ -196,7 +196,6 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    # TODO: fix, slow
     funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
 
     for func in funcs:
