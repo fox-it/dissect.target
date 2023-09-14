@@ -185,6 +185,9 @@ def test_find_plugin_function_default(target_default: Target) -> None:
     assert "os.unix.services.services" in paths
     assert "os.windows.services.services" in paths
 
+    found, _ = find_plugin_functions(target_default, "mcafee.msc")
+    assert found[0].path == "apps.av.mcafee.msc"
+
 
 @pytest.mark.parametrize(
     "pattern",
