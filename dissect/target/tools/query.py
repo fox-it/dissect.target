@@ -156,11 +156,11 @@ def main():
                     parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
                 for func in funcs:
-                    collected_plugins[func.name] = func.plugin_desc
+                    collected_plugins[func.path] = func.plugin_desc
         else:
             funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
             for func in funcs:
-                collected_plugins[func.name] = func.plugin_desc
+                collected_plugins[func.path] = func.plugin_desc
 
         # Display in a user friendly manner
         target = Target()
@@ -256,12 +256,12 @@ def main():
                 )
             except UnsupportedPluginError as e:
                 target.log.error(
-                    "Unsupported plugin for `%s`: %s",
-                    func_def,
+                    "Unsupported plugin for %s: %s",
+                    func_def.name,
                     e.root_cause_str(),
                 )
 
-                target.log.debug("", exc_info=e)
+                target.log.debug("%s", func_def, exc_info=e)
                 continue
             except PluginNotFoundError:
                 target.log.error("Cannot find plugin `%s`", func_def)
