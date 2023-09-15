@@ -33,7 +33,7 @@ class ModulePlugin(Plugin):
         self._module_base_path = self.target.fs.path("/sys/module")
 
     def check_compatible(self) -> bool:
-        if not next(self._module_base_path.iterdir()):
+        if not self._module_base_path.is_dir() or not next(self._module_base_path.iterdir(), None):
             raise UnsupportedPluginError("No module paths found.")
 
     def _iterate_modules(self) -> Iterator[Module]:
