@@ -293,7 +293,7 @@ class SamPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
-            raise UnsupportedPluginError(f"Registry key not found: {key}")
+            raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
 
     def calculate_samkey(self, syskey: bytes) -> bytes:
         aqwerty = b"!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"
