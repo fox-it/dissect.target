@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import hashlib
+from typing import TYPE_CHECKING
 
 from flow.record import GroupedRecord, Record, RecordDescriptor
 from flow.record.fieldtypes import path, posix_path, windows_path
 
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
-from dissect.target.plugins.filesystem.resolver import ResolverPlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 BUFFER_SIZE = 32768
 
@@ -81,10 +86,10 @@ def hash_uri_records(target, record: Record) -> Record:
     return GroupedRecord(record._desc.name, [record, hashed_holder])
 
 
-def hash_uri(target, uri: str) -> Record:
+def hash_uri(target: Target, uri: str) -> Record:
     """Hash the target uri."""
     if uri is None:
         raise FileNotFoundError()
 
-    path = ResolverPlugin(target).resolve(uri)
+    path = target.resolve(uri)
     return (path, target.fs.hash(path))
