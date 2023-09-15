@@ -1,0 +1,43 @@
+from io import BytesIO
+from unittest.mock import patch
+
+import pytest
+
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.target import Target
+from dissect.target.tools.mount import main as target_mount
+from dissect.target.volume import Volume
+
+
+def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-mount", "mock-target", "mock-mount"])
+        m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
+
+        with patch("dissect.target.tools.mount.Target") as MockTarget, patch(
+            "dissect.target.tools.mount.FUSE"
+        ) as MockFUSE:
+            MockTarget.open.return_value = mock_target
+
+            mock_target.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
+            mock_target.volumes.add(Volume(BytesIO(), 2, 0, 0, None, name="second"))
+            mock_target.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second"))
+            mock_target.volumes.add(Volume(BytesIO(), 4, 0, 0, None, name="second"))
+
+            mock_fs = VirtualFilesystem()
+            mock_fs.volume = mock_target.volumes[1]
+            mock_target.filesystems.add(mock_fs)
+            mock_fs = VirtualFilesystem()
+            mock_fs.volume = mock_target.volumes[2]
+            mock_target.filesystems.add(mock_fs)
+            mock_fs = VirtualFilesystem()
+            mock_fs.volume = mock_target.volumes[3]
+            mock_target.filesystems.add(mock_fs)
+
+            target_mount()
+
+            MockFUSE.assert_called_once()
+            vfs = MockFUSE.call_args[0][0].fs
+
+            assert vfs.listdir("/volumes") == ["first", "second", "second_1", "second_2"]
+            assert vfs.listdir("/filesystems") == ["second", "second_1", "second_2"]
