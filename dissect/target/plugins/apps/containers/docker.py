@@ -2,6 +2,7 @@ import json
 import re
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -49,8 +50,9 @@ class DockerPlugin(Plugin):
 
     DOCKER_PATH = "/var/lib/docker"
 
-    def check_compatible(self) -> bool:
-        return self.target.fs.path(self.DOCKER_PATH).exists()
+    def check_compatible(self) -> None:
+        if not self.target.fs.path(self.DOCKER_PATH).exists():
+            raise UnsupportedPluginError("No Docker path found")
 
     @export(record=DockerImageRecord)
     def images(self) -> Iterator[DockerImageRecord]:

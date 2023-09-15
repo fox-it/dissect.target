@@ -1,7 +1,7 @@
 import hashlib
 
 from flow.record import GroupedRecord, Record, RecordDescriptor
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path, posix_path, windows_path
 
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
@@ -11,7 +11,7 @@ BUFFER_SIZE = 32768
 HashRecord = RecordDescriptor(
     "filesystem/file/digest",
     [
-        ("uri[]", "paths"),
+        ("path[]", "paths"),
         ("digest[]", "digests"),
     ],
 )
@@ -57,7 +57,7 @@ def custom(fh, algos):
 
 def hash_uri_records(target, record: Record) -> Record:
     """Hash uri paths inside the record."""
-    uri_fields = (field for field in record._field_types.items() if issubclass(field[1], uri))
+    uri_fields = (field for field in record._field_types.items() if issubclass(field[1], path))
 
     hashed_uri_records = []
     for name, _ in uri_fields:
@@ -70,8 +70,13 @@ def hash_uri_records(target, record: Record) -> Record:
     if not hashed_uri_records:
         return record
 
+    if target.os == "windows":
+        path_type = windows_path
+    else:
+        path_type = posix_path
+
     hashed_uri_records = list(zip(*hashed_uri_records))
-    hashed_holder = HashRecord(paths=hashed_uri_records[0], digests=hashed_uri_records[1])
+    hashed_holder = HashRecord(paths=list(map(path_type, hashed_uri_records[0])), digests=hashed_uri_records[1])
 
     return GroupedRecord(record._desc.name, [record, hashed_holder])
 

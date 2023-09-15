@@ -113,9 +113,8 @@ class WindowsErrorReportingPlugin(Plugin):
         ]
 
     def check_compatible(self) -> None:
-        if self.wer_files:
-            return
-        raise UnsupportedPluginError("No Windows Error Reporting directories found.")
+        if not self.wer_files:
+            raise UnsupportedPluginError("No Windows Error Reporting directories found.")
 
     @export(record=DynamicDescriptor(["path", "string", "datetime"]))
     def wer(self) -> Iterator[DynamicDescriptor]:

@@ -1,4 +1,4 @@
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -13,7 +13,7 @@ RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, Us
     [
         ("datetime", "ts"),
         ("wstring", "name"),
-        ("uri", "path"),
+        ("path", "path"),
         ("string", "key"),
     ],
 )
@@ -45,7 +45,7 @@ class RunKeysPlugin(Plugin):
         "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx",
     ]
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.KEYS))) > 0:
             raise UnsupportedPluginError("No registry run key found")
 
@@ -72,11 +72,10 @@ class RunKeysPlugin(Plugin):
             for r in self.target.registry.keys(key):
                 user = self.target.registry.get_user(r)
                 for entry in r.values():
-                    path = uri.from_windows(entry.value)
                     yield RunKeyRecord(
                         ts=r.ts,
                         name=entry.name,
-                        path=path,
+                        path=path.from_windows(entry.value),
                         key=key,
                         _target=self.target,
                         _key=r,

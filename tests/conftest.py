@@ -7,11 +7,14 @@ from typing import Iterator
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.windows import registry
 from dissect.target.target import Target
+
+from ._utils import absolute_path
 
 
 def make_dummy_target():
@@ -58,6 +61,96 @@ def fs_unix():
 
 
 @pytest.fixture
+def fs_linux() -> VirtualFilesystem:
+    fs = VirtualFilesystem()
+    fs.makedirs("var")
+    fs.makedirs("etc")
+    fs.makedirs("opt")
+    yield fs
+
+
+@pytest.fixture
+def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
+    fs = fs_linux
+
+    procs = (
+        (
+            "proc/1",
+            VirtualSymlink(fs, "/proc/1/fd/4", "socket:[1337]"),
+            "test\x00cmdline\x00",
+            "VAR=1",
+        ),
+        (
+            "proc/2",
+            VirtualSymlink(fs, "/proc/2/fd/4", "socket:[1338]"),
+            "\x00",
+            "VAR=1\x00",
+        ),
+        (
+            "proc/3",
+            VirtualSymlink(fs, "/proc/3/fd/4", "socket:[1339]"),
+            "sshd",
+            "VAR=1",
+        ),
+        (
+            "proc/1337",
+            VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
+            "acquire\x00-p\x00full\x00--proc\x00",
+            "VAR=1",
+        ),
+    )
+    stat_files_data = (
+        "1 (systemd) S 0 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "2 (kthread) K 1 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "3 (sshd) W 1 2 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "1337 (acquire) R 3 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+    )
+
+    for idx, proc in enumerate(procs):
+        dir, fd, cmdline, environ = proc
+        fs.makedirs(dir)
+        fs.map_file_entry(fd.path, fd)
+
+        fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
+        fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
+        fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
+
+    # symlink acquire process to self
+    fs.link("/proc/1337", "/proc/self")
+
+    # boottime and uptime are needed for for time tests
+    fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
+    fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
+
+    yield fs
+
+
+@pytest.fixture
+def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem:
+    fs = fs_linux_proc
+
+    for filename in ("unix", "packet", "raw6", "raw", "udp6", "udp", "tcp6", "tcp"):
+        fs.map_file(f"/proc/net/{filename}", absolute_path(f"data/unix/linux/proc/net/{filename}"))
+
+    yield fs
+
+
+@pytest.fixture
+def fs_osx():
+    fs = VirtualFilesystem()
+    fs.makedirs("Applications")
+    fs.makedirs("Library")
+    yield fs
+
+
+@pytest.fixture
+def fs_bsd():
+    fs = VirtualFilesystem()
+    fs.map_file("/bin/freebsd-version", absolute_path("data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
+    yield fs
+
+
+@pytest.fixture
 def hive_hklm():
     hive = VirtualHive()
 
@@ -80,11 +173,22 @@ def hive_hku():
 
 
 @pytest.fixture
+def target_default():
+    mock_target = next(make_mock_target())
+    yield mock_target
+
+
+@pytest.fixture
 def target_win(hive_hklm, fs_win):
     mock_target = next(make_mock_target())
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
-    mock_target.registry.map_hive("HKEY_LOCAL_MACHINE", hive_hklm)
+    mock_target.registry.add_hive(
+        "HKEY_LOCAL_MACHINE",
+        "HKEY_LOCAL_MACHINE",
+        hive_hklm,
+        TargetPath(mock_target.fs, ""),
+    )
 
     mock_target.filesystems.add(fs_win)
     mock_target.apply()
@@ -103,25 +207,70 @@ def target_unix(fs_unix):
 
 
 @pytest.fixture
+def target_linux(fs_linux):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_linux)
+    mock_target.fs.mount("/", fs_linux)
+    mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
+def target_osx(fs_osx):
+    mock_target = next(make_mock_target())
+
+    mock_target.filesystems.add(fs_osx)
+    mock_target.fs.mount("/", fs_osx)
+    mock_target.apply()
+
+    version = absolute_path("data/plugins/os/unix/bsd/osx/os/SystemVersion.plist")
+    fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
+
+    system = absolute_path("data/plugins/os/unix/bsd/osx/os/preferences.plist")
+    fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
+
+    yield mock_target
+
+
+@pytest.fixture
+def target_citrix(fs_bsd):
+    mock_target = next(make_mock_target())
+    mock_target.filesystems.add(fs_bsd)
+
+    var_filesystem = VirtualFilesystem()
+    var_filesystem.makedirs("/netscaler")
+    mock_target.filesystems.add(var_filesystem)
+
+    flash_filesystem = VirtualFilesystem()
+    flash_filesystem.map_dir("/", absolute_path("data/plugins/os/unix/bsd/citrix/flash"))
+    mock_target.filesystems.add(flash_filesystem)
+
+    mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
 def target_win_users(hive_hklm, hive_hku, target_win):
-    key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
 
-    profile_list_key = VirtualKey(hive_hklm, key_name)
-
-    profile1_key = VirtualKey(hive_hklm, "S-1-5-18")
+    sid_local_system = "S-1-5-18"
+    profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
     profile1_key.add_value(
         "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
     )
 
-    profile2_key = VirtualKey(hive_hklm, "S-1-5-21-3263113198-3007035898-945866154-1002")
+    sid_users_john = "S-1-5-21-3263113198-3007035898-945866154-1002"
+    profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_users_john}")
     profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
 
-    profile_list_key.add_subkey("subkey1", profile1_key)
-    profile_list_key.add_subkey("subkey2", profile2_key)
+    profile_list_key.add_subkey(sid_local_system, profile1_key)
+    profile_list_key.add_subkey(sid_users_john, profile2_key)
 
-    hive_hklm.map_key(key_name, profile_list_key)
+    hive_hklm.map_key(profile_list_key_name, profile_list_key)
 
-    target_win.registry.map_hive("HKEY_USERS\\S-1-5-21-3263113198-3007035898-945866154-1002", hive_hku)
+    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_users_john}", hive_hku, TargetPath(target_win.fs, ""))
 
     yield target_win
 
@@ -190,6 +339,27 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
+    passwd = """
+    root:x:0:0:root:/root:/bin/bash
+    user:x:1000:1000:user:/home/user:/bin/bash
+    """
+    fs_linux.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
+    yield target_linux
+
+
+@pytest.fixture
+def target_osx_users(target_osx, fs_osx):
+    dissect = absolute_path("data/plugins/os/unix/bsd/osx/os/dissect.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
+
+    test = absolute_path("data/plugins/os/unix/bsd/osx/os/test.plist")
+    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+
+    yield target_osx
 
 
 @pytest.fixture

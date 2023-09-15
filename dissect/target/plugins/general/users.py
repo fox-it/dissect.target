@@ -3,6 +3,7 @@ from typing import Generator, Optional
 
 from flow.record import RecordDescriptor
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import InternalPlugin
 
 UserDetails = namedtuple("UserDetails", "user home_path")
@@ -13,8 +14,9 @@ class UsersPlugin(InternalPlugin):
 
     __namespace__ = "user_details"
 
-    def check_compatible(self) -> bool:
-        return hasattr(self.target, "users")
+    def check_compatible(self) -> None:
+        if not hasattr(self.target, "users"):
+            raise UnsupportedPluginError("Unsupported Plugin")
 
     def find(
         self,
@@ -44,7 +46,10 @@ class UsersPlugin(InternalPlugin):
 
     def get(self, user: RecordDescriptor) -> UserDetails:
         """Return additional details about the user"""
-        home_path = self.target.fs.path(self.target.resolve(user.home)) if user.home else None
+        # Resolving the user home can not use the user's environment variables,
+        # as those depend on the user's home to be known first. So we resolve
+        # without providing the user (s)id.
+        home_path = self.target.fs.path(self.target.resolve(str(user.home))) if user.home else None
         return UserDetails(user=user, home_path=home_path)
 
     def all(self) -> Generator[UserDetails, None, None]:

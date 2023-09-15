@@ -291,10 +291,9 @@ class SamPlugin(Plugin):
 
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
-            raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
-        return True
+            raise UnsupportedPluginError(f"Registry key not found: {key}")
 
     def calculate_samkey(self, syskey: bytes) -> bytes:
         aqwerty = b"!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"

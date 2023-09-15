@@ -2,7 +2,7 @@ from typing import Generator
 
 from dissect import cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import uri
+from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -15,9 +15,9 @@ RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/filesystem/recyclebin",
     [
         ("datetime", "ts"),
-        ("uri", "path"),
+        ("path", "path"),
         ("filesize", "filesize"),
-        ("uri", "deleted_path"),
+        ("path", "deleted_path"),
         ("string", "source"),
     ],
 )
@@ -115,10 +115,10 @@ class RecyclebinPlugin(Plugin):
 
         return RecycleBinRecord(
             ts=wintimestamp(entry.timestamp),
-            path=uri.from_windows(entry.filename.rstrip("\x00")),
-            source=uri.from_windows(source_path),
+            path=path.from_windows(entry.filename.rstrip("\x00")),
+            source=path.from_windows(source_path),
             filesize=entry.file_size,
-            deleted_path=uri.from_windows(deleted_path),
+            deleted_path=path.from_windows(deleted_path),
             _target=self.target,
             _user=user,
         )

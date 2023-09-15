@@ -43,7 +43,7 @@ class SophosPlugin(Plugin):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         is_compatible = False
         for marker in self.LOGS:
             if self.target.fs.path(marker).exists():

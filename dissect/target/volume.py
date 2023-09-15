@@ -20,13 +20,19 @@ lvm = import_lazy("dissect.target.volumes.lvm")
 """A lazy import of :mod:`dissect.target.volumes.lvm`."""
 vmfs = import_lazy("dissect.target.volumes.vmfs")
 """A lazy import of :mod:`dissect.target.volumes.vmfs`."""
+md = import_lazy("dissect.target.volumes.md")
+"""A lazy import of :mod:`dissect.target.volumes.md`."""
 bde = import_lazy("dissect.target.volumes.bde")
 """A lazy import of :mod:`dissect.target.volumes.bde`."""
 
 log = logging.getLogger(__name__)
 """A logger instance for this module."""
 
-LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
+LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
+    lvm.LvmVolumeSystem,
+    vmfs.VmfsVolumeSystem,
+    md.MdVolumeSystem,
+]
 """All available :class:`LogicalVolumeSystem` classes."""
 ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
 """All available :class:`EncryptedVolumeSystem` classes."""

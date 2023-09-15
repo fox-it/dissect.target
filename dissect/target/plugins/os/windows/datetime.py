@@ -219,7 +219,7 @@ class DateTimePlugin(Plugin):
         else:
             self._tzinfo = self.tz(tz_name)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self._tzinfo:
             raise UnsupportedPluginError("No time zone information")
 

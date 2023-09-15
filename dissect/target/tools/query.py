@@ -127,7 +127,7 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions = find_plugin_functions(Target(), args.function, False)
+        found_functions, _ = find_plugin_functions(Target(), args.function, False)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
@@ -154,13 +154,13 @@ def main():
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
-                funcs = find_plugin_functions(plugin_target, args.list, True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
                 for func in funcs:
-                    collected_plugins[func.name] = func.plugin_desc
+                    collected_plugins[func.path] = func.plugin_desc
         else:
-            funcs = find_plugin_functions(Target(), args.list, False)
+            funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
             for func in funcs:
-                collected_plugins[func.name] = func.plugin_desc
+                collected_plugins[func.path] = func.plugin_desc
 
         # Display in a user friendly manner
         target = Target()
@@ -196,9 +196,13 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    funcs = find_plugin_functions(Target(), args.function, False)
+    funcs, invalid_funcs = find_plugin_functions(Target(), args.function, False)
+
     for func in funcs:
         output_types.add(func.output_type)
+
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
 
     default_output_type = None
 
@@ -231,8 +235,11 @@ def main():
         first_seen_output_type = default_output_type
         cli_params_unparsed = rest
 
-        for func_def in find_plugin_functions(target, args.function, False):
-            if func_def.method_name in executed_plugins:
+        func_defs, _ = find_plugin_functions(target, args.function, False)
+
+        for func_def in func_defs:
+            # Avoid executing same plugin for multiple OSes (like hostname)
+            if f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}" in executed_plugins:
                 continue
 
             # If the default type is record (meaning we skip everything else)
@@ -249,12 +256,12 @@ def main():
                 )
             except UnsupportedPluginError as e:
                 target.log.error(
-                    "Unsupported plugin for `%s`: %s",
-                    func_def,
+                    "Unsupported plugin for %s: %s",
+                    func_def.name,
                     e.root_cause_str(),
                 )
 
-                target.log.debug("", exc_info=e)
+                target.log.debug("%s", func_def, exc_info=e)
                 continue
             except PluginNotFoundError:
                 target.log.error("Cannot find plugin `%s`", func_def)
@@ -281,7 +288,7 @@ def main():
             if not first_seen_output_type:
                 first_seen_output_type = output_type
 
-            executed_plugins.add(func_def.method_name)
+            executed_plugins.add(f"{getattr(func_def.class_object, '__namespace__', '')}.{func_def.method_name}")
 
             if output_type == "record":
                 record_entries.append(result)

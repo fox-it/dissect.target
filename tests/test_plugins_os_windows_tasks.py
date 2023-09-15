@@ -1,7 +1,8 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
+from flow.record import GroupedRecord
 
 from dissect.target.plugins.os.windows.tasks import TasksPlugin
 
@@ -29,7 +30,7 @@ def assert_xml_task_properties(xml_task):
         == "D:(A;;0x111FFFFF;;;SY)(A;;0x111FFFFF;;;BA)(A;;0x111FFFFF;;;S-1-5-80-3028837079-3186095147-955107200-3701964851-1150726376)(A;;FRFX;;;AU)"  # noqa: E501
     )
     assert xml_task.source is None
-    assert str(xml_task.date) == "2014-11-05 00:00:00"
+    assert xml_task.date == datetime(2014, 11, 5, 0, 0, 0, tzinfo=timezone.utc)
     assert xml_task.last_run_date is None
     assert xml_task.author == "$(@%SystemRoot%\\system32\\mapstoasttask.dll,-600)"
     assert xml_task.version is None
@@ -75,7 +76,7 @@ def assert_at_task_properties(at_task):
     assert at_task.security_descriptor is None
     assert str(at_task.task_path) == "sysvol\\windows\\tasks\\AtTask.job"
     assert at_task.date is None
-    assert at_task.last_run_date == datetime.strptime("2023-05-21 10:44:25.794000", "%Y-%m-%d %H:%M:%S.%f")
+    assert at_task.last_run_date == datetime(2023, 5, 21, 10, 44, 25, 794000, tzinfo=timezone.utc)
     assert at_task.author == "user1"
     assert at_task.version == "1"
     assert at_task.description == "At job task for testing purposes"
@@ -217,5 +218,5 @@ def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, ma
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
-    grouped_records = filter(lambda x: re.findall(pat, str(x)), records)
+    grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
     assert_func(list(grouped_records)[0])

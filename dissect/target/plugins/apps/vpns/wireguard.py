@@ -81,10 +81,9 @@ class WireGuardPlugin(Plugin):
         for path in self.CONFIG_GLOBS:
             self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
 
-    def check_compatible(self) -> bool:
+    def check_compatible(self) -> None:
         if not self.configs:
             raise UnsupportedPluginError("No Wireguard configuration files found")
-        return True
 
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
     def config(self) -> Iterator[Union[WireGuardInterfaceRecord, WireGuardPeerRecord]]:

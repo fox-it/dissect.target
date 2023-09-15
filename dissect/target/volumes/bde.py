@@ -37,7 +37,7 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
             )
         else:
             volume_details = dict(
-                number=None,
+                number=1,
                 offset=0,
                 vtype=None,
                 name=None,

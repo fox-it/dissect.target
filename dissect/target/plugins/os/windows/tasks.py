@@ -7,7 +7,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
-from dissect.target.plugins.os.windows.task_helpers.tasks_xml import XmlTask
+from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
 from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -25,6 +25,15 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "version"),
         ("string", "description"),
         ("string", "documentation"),
+        ("string", "task_name"),
+        ("string", "app_name"),
+        ("string", "args"),
+        ("string", "start_in"),
+        ("string", "comment"),
+        ("string", "run_as"),
+        ("string", "cpassword"),
+        ("string", "enabled"),
+        ("string", "action"),
         ("string", "principal_id"),
         ("string", "user_id"),
         ("string", "logon_type"),
@@ -59,6 +68,7 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "unified_scheduling_engine"),
         ("string", "disallow_start_on_remote_app_session"),
         ("string", "data"),
+        ("string", "raw_data"),
     ],
 )
 
@@ -100,7 +110,7 @@ class TasksPlugin(Plugin):
                 if entry.is_file() and (entry.suffix.lower() == ".job" or not entry.suffix):
                     self.task_files.append(entry)
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if len(self.task_files) == 0:
             raise UnsupportedPluginError("No task files")
 
@@ -119,23 +129,24 @@ class TasksPlugin(Plugin):
         """
         for task_file in self.task_files:
             if not task_file.suffix or task_file.suffix == ".xml":
-                task_object = XmlTask(task_file, self.target)
+                task_objects = ScheduledTasks(task_file).tasks
             else:
-                task_object = AtTask(task_file, self.target)
+                task_objects = [AtTask(task_file, self.target)]
 
-            record_kwargs = {}
-            for attr in TaskRecord.fields.keys():
-                record_kwargs[attr] = getattr(task_object, attr, None)
+            for task_object in task_objects:
+                record_kwargs = {}
+                for attr in TaskRecord.fields.keys():
+                    record_kwargs[attr] = getattr(task_object, attr, None)
 
-            record = TaskRecord(**record_kwargs, _target=self.target)
-            yield record
+                record = TaskRecord(**record_kwargs, _target=self.target)
+                yield record
 
-            # Actions
-            for action in task_object.get_actions():
-                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
-                yield grouped
+                # Actions
+                for action in task_object.get_actions():
+                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, action])
+                    yield grouped
 
-            # Triggers
-            for trigger in task_object.get_triggers():
-                grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
-                yield grouped
+                # Triggers
+                for trigger in task_object.get_triggers():
+                    grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
+                    yield grouped

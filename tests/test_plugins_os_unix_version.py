@@ -59,3 +59,26 @@ def test_unix_version_detection_short(fs_unix, target_unix, content, target_path
     target_unix.add_plugin(os_plugin)
 
     assert target_unix.version == content
+
+
+def test_unix_os_release_directory_regression(fs_unix, target_unix):
+    fs_unix.map_file_fh(
+        "/etc/upstream-release/lsb-release",
+        BytesIO(
+            b"DISTRIB_ID=Ubuntu\n"
+            b"DISTRIB_RELEASE=16.04\n"
+            b"DISTRIB_CODENAME=xenial\n"
+            b'DISTRIB_DESCRIPTION="Ubuntu 16.04 LTS"'
+        ),
+    )
+    fs_unix.map_file_fh(
+        "/etc/lsb-release",
+        BytesIO(
+            b"DISTRIB_ID=LinuxMint\n"
+            b"DISTRIB_RELEASE=19\n"
+            b"DISTRIB_CODENAME=tara\n"
+            b'DISTRIB_DESCRIPTION="Linux Mint 19 Tara"'
+        ),
+    )
+    target_unix.add_plugin(LinuxPlugin)
+    assert target_unix.version == "Linux Mint 19 Tara"

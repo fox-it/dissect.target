@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -35,7 +36,7 @@ IptablesSaveRecord = TargetRecordDescriptor(
 
 
 class IptablesSavePlugin(Plugin):
-    """Parser for iptables-save (and ip6tables-save) rules.
+    """Parser for iptables-save, ip6tables-save and ufw rules.
 
     As iptables rules are not stored on disk by default, users
     that want persistent rules need to store them somewhere and
@@ -46,6 +47,7 @@ class IptablesSavePlugin(Plugin):
 
     References:
         - https://git.netfilter.org/iptables/
+        - https://manpages.ubuntu.com/manpages/jammy/en/man8/ufw-framework.8.html
     """
 
     COMMON_SAVE_PATHS = (
@@ -59,6 +61,19 @@ class IptablesSavePlugin(Plugin):
         "/etc/iptables/rules.v6",
         "/etc/iptablesRule.v6",
         "/etc/sysconfig/ip6tables",
+        # UFW
+        "/etc/ufw/before.rules",
+        "/etc/ufw/user.rules",
+        "/etc/ufw/after.rules",
+        "/etc/ufw/before6.rules",
+        "/etc/ufw/user6.rules",
+        "/etc/ufw/after6.rules",
+        "/usr/share/ufw/user.rules",
+        "/usr/share/ufw/user6.rules",
+        "/usr/share/ufw/iptables/user.rules",
+        "/usr/share/ufw/iptables/user6.rules",
+        "/var/lib/ufw/user.rules",
+        "/var/lib/ufw/user6.rules",
     )
 
     LOG_TIME_FORMAT = "%a %b  %d %H:%M:%S %Y"
@@ -67,8 +82,9 @@ class IptablesSavePlugin(Plugin):
         super().__init__(target)
         self._rule_files = list(self._get_rule_files())
 
-    def check_compatible(self) -> bool:
-        return len(self._rule_files) > 0
+    def check_compatible(self) -> None:
+        if not len(self._rule_files):
+            raise UnsupportedPluginError("No iptables rules found")
 
     def _get_rule_files(self) -> Iterator[Path]:
         """Yield the paths of iptables-save output files."""
@@ -79,12 +95,12 @@ class IptablesSavePlugin(Plugin):
                 with rule_path.open("r") as h_rule:
                     first_line = h_rule.readline()
 
-                if PATTERN_IPTABLES_SAVE_GENERATED.match(first_line):
+                if PATTERN_IPTABLES_SAVE_GENERATED.match(first_line) or "*filter" in first_line:
                     yield rule_path
 
     @export(record=IptablesSaveRecord)
     def iptables(self) -> Iterator[IptablesSaveRecord]:
-        """Return iptables rules saved using iptables-save."""
+        """Return iptables and ufw rules saved using iptables-save."""
 
         tzinfo = self.target.datetime.tzinfo
         for rule_path in self._rule_files:
