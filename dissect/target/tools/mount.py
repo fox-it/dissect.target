@@ -15,7 +15,7 @@ try:
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
-except ImportError:
+except Exception:
     HAS_FUSE = False
 
 log = logging.getLogger(__name__)
