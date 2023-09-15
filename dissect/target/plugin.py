@@ -553,6 +553,7 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
 
     if (
         osfilter
+        and not hasattr(osfilter, "__is_default__")
         and isinstance(osfilter, type)
         and issubclass(osfilter, OSPlugin)
         and osfilter.__module__.startswith(MODULE_PATH)
