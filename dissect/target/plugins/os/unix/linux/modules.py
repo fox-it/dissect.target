@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from typing import Iterator
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 ModuleRecord = TargetRecordDescriptor(
-    "unix/module",
+    "linux/module",
     [
         ("string", "name"),
         ("varint", "size"),
@@ -29,13 +30,14 @@ class Module:
 class ModulePlugin(Plugin):
     def __init__(self, target: Target):
         super().__init__(target)
-        self._module_paths = list(self.target.fs.path("/sys/module").iterdir())
+        self._module_base_path = self.target.fs.path("/sys/module")
 
     def check_compatible(self) -> bool:
-        return len(self._module_paths) > 0
+        if not next(self._module_base_path.iterdir()):
+            raise UnsupportedPluginError("No module paths found.")
 
     def _iterate_modules(self) -> Iterator[Module]:
-        for module_path in self._module_paths:
+        for module_path in self._module_base_path.iterdir():
             if module_path.joinpath("initstate").exists():
                 # Normally the holders folder should exist,
                 # however Acquire currently doesn't collect a folder if its empty
