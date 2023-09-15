@@ -15,8 +15,8 @@ def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPa
         m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
 
         with patch("dissect.target.tools.mount.Target") as MockTarget, patch(
-            "dissect.target.tools.mount.FUSE"
-        ) as MockFUSE:
+            "dissect.target.tools.mount.FUSE", create=True
+        ) as MockFUSE, patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount:
             MockTarget.open.return_value = mock_target
 
             mock_target.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
@@ -37,7 +37,8 @@ def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPa
             target_mount()
 
             MockFUSE.assert_called_once()
-            vfs = MockFUSE.call_args[0][0].fs
+            MockDissectMount.assert_called_once()
+            vfs = MockDissectMount.call_args[0][0]
 
             assert vfs.listdir("/volumes") == ["first", "second", "second_1", "second_2"]
             assert vfs.listdir("/filesystems") == ["second", "second_1", "second_2"]
