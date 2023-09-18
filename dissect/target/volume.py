@@ -278,7 +278,7 @@ class Volume(io.IOBase):
     def __repr__(self) -> str:
         return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
 
-    def read(self, length: int) -> bytes:
+    def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Volume``."""
         return self.fh.read(length)
 
