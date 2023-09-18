@@ -20,13 +20,19 @@ lvm = import_lazy("dissect.target.volumes.lvm")
 """A lazy import of :mod:`dissect.target.volumes.lvm`."""
 vmfs = import_lazy("dissect.target.volumes.vmfs")
 """A lazy import of :mod:`dissect.target.volumes.vmfs`."""
+md = import_lazy("dissect.target.volumes.md")
+"""A lazy import of :mod:`dissect.target.volumes.md`."""
 bde = import_lazy("dissect.target.volumes.bde")
 """A lazy import of :mod:`dissect.target.volumes.bde`."""
 
 log = logging.getLogger(__name__)
 """A logger instance for this module."""
 
-LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [lvm.LvmVolumeSystem, vmfs.VmfsVolumeSystem]
+LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
+    lvm.LvmVolumeSystem,
+    vmfs.VmfsVolumeSystem,
+    md.MdVolumeSystem,
+]
 """All available :class:`LogicalVolumeSystem` classes."""
 ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
 """All available :class:`EncryptedVolumeSystem` classes."""
@@ -272,7 +278,7 @@ class Volume(io.IOBase):
     def __repr__(self) -> str:
         return f"<Volume name={self.name!r} size={self.size!r} fs={self.fs!r}>"
 
-    def read(self, length: int) -> bytes:
+    def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Volume``."""
         return self.fh.read(length)
 
