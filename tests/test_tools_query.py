@@ -5,13 +5,13 @@ import pytest
 from dissect.target.tools.query import main as target_query
 
 
-def test_target_query_list(capsys, monkeypatch):
+def test_target_query_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-query", "--list"])
 
         with pytest.raises((SystemExit, IndexError, ImportError)):
             target_query()
-        out, err = capsys.readouterr()
+        out, _ = capsys.readouterr()
 
         assert out.startswith("Available plugins:")
         assert "Failed to load:\n    None\nAvailable loaders:\n" in out
@@ -42,7 +42,12 @@ def test_target_query_list(capsys, monkeypatch):
         ),
     ],
 )
-def test_target_query_invalid_functions(capsys, monkeypatch, given_funcs, expected_invalid_funcs):
+def test_target_query_invalid_functions(
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    given_funcs: list[str],
+    expected_invalid_funcs: list[str],
+) -> None:
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
@@ -51,7 +56,7 @@ def test_target_query_invalid_functions(capsys, monkeypatch, given_funcs, expect
 
         with pytest.raises((SystemExit)):
             target_query()
-        out, err = capsys.readouterr()
+        _, err = capsys.readouterr()
 
         assert "target-query: error: argument -f/--function contains invalid plugin(s):" in err
 
@@ -63,3 +68,16 @@ def test_target_query_invalid_functions(capsys, monkeypatch, given_funcs, expect
         invalid_funcs.sort()
 
         assert invalid_funcs == expected_invalid_funcs
+
+
+def test_target_query_unsupported_plugin_log(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            ["target-query", "-f", "regf", "tests/data/loaders/tar/test-archive-dot-folder.tgz"],
+        )
+
+        target_query()
+        _, err = capsys.readouterr()
+
+        assert "Unsupported plugin for regf: Registry plugin not loaded" in err

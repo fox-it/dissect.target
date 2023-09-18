@@ -7,7 +7,7 @@ from typing import Iterator
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
@@ -61,11 +61,77 @@ def fs_unix():
 
 
 @pytest.fixture
-def fs_linux():
+def fs_linux() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.makedirs("var")
     fs.makedirs("etc")
     fs.makedirs("opt")
+    yield fs
+
+
+@pytest.fixture
+def fs_linux_proc(fs_linux: VirtualFilesystem) -> VirtualFilesystem:
+    fs = fs_linux
+
+    procs = (
+        (
+            "proc/1",
+            VirtualSymlink(fs, "/proc/1/fd/4", "socket:[1337]"),
+            "test\x00cmdline\x00",
+            "VAR=1",
+        ),
+        (
+            "proc/2",
+            VirtualSymlink(fs, "/proc/2/fd/4", "socket:[1338]"),
+            "\x00",
+            "VAR=1\x00",
+        ),
+        (
+            "proc/3",
+            VirtualSymlink(fs, "/proc/3/fd/4", "socket:[1339]"),
+            "sshd",
+            "VAR=1",
+        ),
+        (
+            "proc/1337",
+            VirtualSymlink(fs, "/proc/1337/fd/4", "socket:[1337]"),
+            "acquire\x00-p\x00full\x00--proc\x00",
+            "VAR=1",
+        ),
+    )
+    stat_files_data = (
+        "1 (systemd) S 0 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "2 (kthread) K 1 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "3 (sshd) W 1 2 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+        "1337 (acquire) R 3 1 1 0 -1 4194560 53787 457726 166 4255 112 260 761 548 20 0 1 0 30 184877056 2658 18446744073709551615 93937510957056 93937511789581 140726499200496 0 0 0 671173123 4096 1260 0 0 0 17 0 0 0 11 0 0 93937512175824 93937512476912 93937519890432 140726499204941 140726499204952 140726499204952 140726499205101 0\n",  # noqa
+    )
+
+    for idx, proc in enumerate(procs):
+        dir, fd, cmdline, environ = proc
+        fs.makedirs(dir)
+        fs.map_file_entry(fd.path, fd)
+
+        fs.map_file_fh(dir + "/stat", BytesIO(stat_files_data[idx].encode()))
+        fs.map_file_fh(dir + "/cmdline", BytesIO(cmdline.encode()))
+        fs.map_file_fh(dir + "/environ", BytesIO(environ.encode()))
+
+    # symlink acquire process to self
+    fs.link("/proc/1337", "/proc/self")
+
+    # boottime and uptime are needed for for time tests
+    fs.map_file_fh("/proc/uptime", BytesIO(b"134368.27 132695.52\n"))
+    fs.map_file_fh("/proc/stat", BytesIO(b"btime 1680559854"))
+
+    yield fs
+
+
+@pytest.fixture
+def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem:
+    fs = fs_linux_proc
+
+    for filename in ("unix", "packet", "raw6", "raw", "udp6", "udp", "tcp6", "tcp"):
+        fs.map_file(f"/proc/net/{filename}", absolute_path(f"data/unix/linux/proc/net/{filename}"))
+
     yield fs
 
 
@@ -204,12 +270,7 @@ def target_win_users(hive_hklm, hive_hku, target_win):
 
     hive_hklm.map_key(profile_list_key_name, profile_list_key)
 
-    target_win.registry.add_hive(
-        "HKEY_USERS",
-        f"HKEY_USERS\\{sid_users_john}",
-        hive_hku,
-        TargetPath(target_win.fs, ""),
-    )
+    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_users_john}", hive_hku, TargetPath(target_win.fs, ""))
 
     yield target_win
 
@@ -278,6 +339,16 @@ def target_unix_users(target_unix, fs_unix):
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
+
+
+@pytest.fixture
+def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
+    passwd = """
+    root:x:0:0:root:/root:/bin/bash
+    user:x:1000:1000:user:/home/user:/bin/bash
+    """
+    fs_linux.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
+    yield target_linux
 
 
 @pytest.fixture
