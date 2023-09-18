@@ -416,7 +416,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 program_instance_id=entry_data.get("ProgramInstanceId"),
                 publisher=entry_data.get("Publisher"),
                 registry_key_path=entry_data.get("RegistryKeyPath"),
-                root_dir_path=entry_data.get("RootDirPath"),
+                root_dir_path=path.from_windows(entry_data.get("RootDirPath")),
                 source=entry_data.get("Source"),
                 uninstall_string=entry_data.get("UninstallString"),
                 type=entry_data.get("Type"),
