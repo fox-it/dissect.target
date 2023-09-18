@@ -101,6 +101,8 @@ class XmlTask:
         self.logon_type = self.get_element("Principals/Principal/LogonType")
         self.group_id = self.get_element("Principals/Principal/GroupId")
         self.display_name = self.get_element("Principals/Principal/DisplayName")
+        if self.display_name == None:
+            self.display_name = str(task_path)[str(task_path).rfind("/")+1:]
         self.run_level = self.get_element("Principals/Principal/RunLevel")
         self.process_token_sid_type = self.get_element("Principals/Principal/ProcessTokenSidType")
         self.required_privileges = self.get_element("Principals/Principal/RequiredPrivileges")
