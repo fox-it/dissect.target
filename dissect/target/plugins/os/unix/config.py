@@ -23,7 +23,7 @@ class ConfigurationParser:
         comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
-        self.collapse = collapse if isinstance(collapse, set) else {}
+        self.collapse = collapse if isinstance(collapse, set) else set()
         self.seperator = seperator
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
@@ -38,10 +38,7 @@ class ConfigurationParser:
         return item in self.parsed_data
 
     def get(self, item: str, default: Optional[Any] = None) -> Any:
-        try:
-            return self.parsed_data[item]
-        except KeyError:
-            return default
+        return self.parsed_data.get(item, None)
 
     def read_file(self, fh: TextIO) -> None:
         try:
@@ -122,9 +119,9 @@ class Default(ConfigurationParser):
         information_dict = {}
 
         skip_lines = self.comment_prefixes + ("\n",)
-        prev_key = None, None
+        prev_key = (None, None)
         for line in fh.readlines():
-            if line.startswith(skip_lines):
+            if line.strip().startswith(skip_lines):
                 continue
 
             # Strip the comments first
@@ -177,10 +174,10 @@ class ParserConfig:
     def create_parser(self, contents: Optional[ParserContents] = None) -> ConfigurationParser:
         kwargs = {}
 
-        for value in ["collapse", "seperator", "comment_prefixes"]:
-            output = getattr(contents, value, None) or getattr(self, value)
-            if output:
-                kwargs.update({value: output})
+        for field_name in ["collapse", "seperator", "comment_prefixes"]:
+            value = getattr(contents, field_name, None) or getattr(self, field_name)
+            if value:
+                kwargs.update({field_name: value})
 
         return self.parser(**kwargs)
 
@@ -224,9 +221,8 @@ def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> Parser
 
     extension = entry.path.rsplit(".", 1)[-1]
 
-    known_extention = CONFIG_MAP.get(extension, ParserConfig(Default))
-    parser_type = KNOWN_FILES.get(entry.name, known_extention)
-    return parser_type
+    known_extension = CONFIG_MAP.get(extension, ParserConfig(Default))
+    return KNOWN_FILES.get(entry.name, known_extension)
 
 
 def create_entry(
