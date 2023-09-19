@@ -73,13 +73,13 @@ def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
     config_fs = ConfigurationFilesystem(target_unix)
     entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True)
 
-    assert entry.parser_items["help"] == "you"
-    assert entry.parser_items["test"] == "you"
+    assert entry["help"] == "you"
+    assert entry["test"] == "you"
 
     entry = config_fs.get("/new/path/config", collapse={"help"})
 
-    assert entry.parser_items["help"] == "you"
-    assert entry.parser_items["test"] == ["me", "you"]
+    assert entry["help"] == "you"
+    assert entry["test"] == ["me", "you"]
 
 
 def test_config_tree_plugin(target_unix: Target, etc_directory: VirtualFilesystem):

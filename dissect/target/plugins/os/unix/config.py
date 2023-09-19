@@ -5,9 +5,10 @@ import re
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
+from functools import lru_cache
 
 from dissect.target import Target
-from dissect.target.exceptions import ConfigurationParsingError
+from dissect.target.exceptions import ConfigurationParsingError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.plugin import Plugin, internal
@@ -72,11 +73,16 @@ class ConfigurationParser:
 
 
 class Ini(ConfigurationParser):
-    def __init__(self, collapse: Optional[Union[bool, set]] = True) -> None:
+    def __init__(
+        self,
+        collapse: Optional[Union[bool, set]] = True,
+        seperator: tuple[str] = ("=",),
+        comment_prefixes: tuple[str] = (";", "#"),
+    ) -> None:
         super().__init__(
             collapse,
-            seperator=("=", ";"),
-            comment_prefixes=(";", "#"),
+            seperator=seperator,
+            comment_prefixes=comment_prefixes,
         )
 
         self.parsed_data = ConfigParser(
@@ -108,11 +114,11 @@ class Default(ConfigurationParser):
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
-        seperator: tuple[str] = (r"\s",),
+        seperator: tuple[str] = (r"=",),
         comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         super().__init__(collapse, seperator, comment_prefixes)
-        self.SEPERATOR = re.compile(rf"\s*?[{''.join(seperator)}]\s*?")
+        self.SEPERATOR = re.compile(rf"\s*[{''.join(seperator)}]\s*")
         self.COMMENTS = re.compile(rf"\s*[{''.join(comment_prefixes)}]")
 
     def parse_file(self, fh: TextIO) -> None:
@@ -127,8 +133,8 @@ class Default(ConfigurationParser):
             # Strip the comments first
             line, *_ = self.COMMENTS.split(line)
 
-            if not line:
-                # There was an indented comment
+            if not line.strip():
+                # The line was empty
                 continue
 
             if line.startswith((" ", "\t")) and line.strip():
@@ -238,6 +244,11 @@ def create_entry(
 class ConfigurationTreePlugin(Plugin):
     __namespace__ = "config_tree"
 
+    def check_compatible(self) -> None:
+        # This should be able to be retrieved, regardless of OS
+        return None
+
+    @lru_cache(1024)
     def __call__(
         self,
         path: str = "/",
@@ -273,10 +284,6 @@ class ConfigurationTreePlugin(Plugin):
         comment_prefixes: Optional[tuple[str]] = None,
     ):
         return self.__call__(path or "/", hint, collapse, seperator, comment_prefixes)
-
-    def check_compatible(self) -> None:
-        # This should be able to be retrieved, regardless of OS
-        return None
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
@@ -419,3 +426,6 @@ class ConfigurationEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         return self.entry.lstat()
+
+    def __getitem__(self, item: str) -> ConfigurationEntry:
+        return self.parser_items[item]

@@ -32,7 +32,6 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
-from dissect.target.plugins.os.unix.config import ConfigurationFilesystem
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
@@ -869,7 +868,7 @@ class TargetCli(TargetCmd):
 class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
-        self.config_tree = ConfigurationFilesystem(target)
+        self.config_tree = target.config_tree("/etc")
         self.prompt_base = target.name
 
         self.cwd = None
