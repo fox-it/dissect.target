@@ -29,9 +29,6 @@ class CipherAlgorithm:
     def from_name(cls, name: str) -> CipherAlgorithm:
         return CIPHER_ALGORITHMS[name]()
 
-    def fixup_key(self, key: bytes) -> bytes:
-        return key
-
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
         """Mimics the corresponding native Microsoft function."""
         if len(key) > hash_algorithm.block_length:
@@ -43,8 +40,7 @@ class CipherAlgorithm:
         key = key.ljust(hash_algorithm.block_length, b"\x00")
         pad1 = bytes(c ^ 0x36 for c in key)
         pad2 = bytes(c ^ 0x5C for c in key)
-        k = hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
-        return self.fixup_key(k)
+        return hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
 
     def decrypt_with_hmac(
         self, data: bytes, key: bytes, iv: bytes, hash_algorithm: HashAlgorithm, rounds: int

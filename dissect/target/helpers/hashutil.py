@@ -86,10 +86,10 @@ def hash_uri_records(target, record: Record) -> Record:
     return GroupedRecord(record._desc.name, [record, hashed_holder])
 
 
-def hash_uri(target: Target, uri: str) -> Record:
-    """Hash the target uri."""
-    if uri is None:
+def hash_uri(target: Target, path: str) -> Record:
+    """Hash the target path."""
+    if path is None:
         raise FileNotFoundError()
 
-    path = target.resolve(uri)
+    path = target.resolve(path)
     return (path, target.fs.hash(path))
