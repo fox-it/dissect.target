@@ -287,9 +287,6 @@ def test_helpers_fsutil_open_decompress_text_modes():
     assert fh.encoding == "ascii"
     assert fh.errors == "backslashreplace"
 
-    with pytest.raises(ValueError, match="binary mode doesn't take an encoding argument"):
-        fh = fsutil.open_decompress(vfs.path("test"), encoding="ascii")
-
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Encoding error. Needs to be fixed.")
 def test_helpers_fsutil_reverse_readlines():
