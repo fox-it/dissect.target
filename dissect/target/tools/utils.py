@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
-from dissect.target.loaders.targetd import CommandProxy
+from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
