@@ -259,7 +259,7 @@ class ConfigurationTreePlugin(Plugin):
         # This should be able to be retrieved, regardless of OS
         return None
 
-    @lru_cache(1024)
+    @lru_cache(128)
     def __call__(
         self,
         path: str = "/",
