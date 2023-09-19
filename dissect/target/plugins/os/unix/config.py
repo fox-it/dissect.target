@@ -106,11 +106,22 @@ class Ini(ConfigurationParser):
 
 
 class Txt(ConfigurationParser):
+    """Read the file into ``content``, and show the bumber of bytes read."""
+
     def parse_file(self, fh: TextIO) -> None:
+        # Cast the size to a string, to print it out later.
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
 
 
 class Default(ConfigurationParser):
+    """Parse a configuration file specified by ``seperator`` and ``comment_prefixes``.
+
+    This parser does the following things:
+
+        key<seperator>value    -> {"key": "value"}
+        <empty_space><comment> -> skip
+    """
+
     def __init__(
         self,
         collapse: Optional[Union[bool, set]] = False,
@@ -257,6 +268,18 @@ class ConfigurationTreePlugin(Plugin):
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
     ):
+        """Create a configuration entry from a file, or a COnfigurationFilesystem from a directory.
+
+        If a directory is specified in ``path``, please provide the other arguments in the ``get`` call.
+
+        Args:
+            path: The path to either a directory or file
+            hint: What kind of parser it should use
+            collapse: Wether it should collapse all or only certain keys.
+            seperator: What seperator should be used for the parser.
+            comment_prefixes: What is specified as a comment.
+
+        """
         target_path = self.target.fs.path(path)
         file_path = target_path
 
