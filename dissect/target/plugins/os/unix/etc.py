@@ -1,10 +1,13 @@
-from dissect.target import Target
-from dissect.target.plugin import Plugin, internal
 from functools import lru_cache
-
 from typing import Optional
-from dissect.target.plugins.os.unix.config import ConfigurationFilesystem, ConfigurationEntry
+
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.plugin import Plugin, internal
+from dissect.target.plugins.os.unix.config import (
+    ConfigurationEntry,
+    ConfigurationFilesystem,
+)
 
 
 class EtcTree(Plugin):

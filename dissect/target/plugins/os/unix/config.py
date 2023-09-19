@@ -4,8 +4,8 @@ import io
 import re
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 from functools import lru_cache
+from typing import Any, BinaryIO, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, NotADirectoryError
