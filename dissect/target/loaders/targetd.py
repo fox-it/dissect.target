@@ -8,10 +8,16 @@ from pathlib import Path
 from platform import os
 from typing import Any, Callable, Optional, Union
 
-from dissect.util.stream import AlignedStream
-
 from dissect.target.containers.raw import RawContainer
-from dissect.target.exceptions import FatalError, LoaderError
+from dissect.target.exceptions import LoaderError
+
+# to avoid loading issues during automatic loader detection
+from dissect.target.helpers.targetd import (
+    CommandProxy,
+    ProxyLoader,
+    TargetdInvalidStateError,
+    TargetdStream,
+)
 from dissect.target.loader import Loader
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -24,55 +30,6 @@ try:
     TARGETD_AVAILABLE = True
 except Exception:
     pass
-
-
-class TargetdStream(AlignedStream):
-    def _read(self, offset: int, length: int) -> bytes:
-        return b""
-
-
-# Marker interface to indicate this loader loads targets from remote machines
-class ProxyLoader(Loader):
-    pass
-
-
-class TargetdInvalidStateError(FatalError):
-    pass
-
-
-class CommandProxy:
-    def __init__(self, loader: TargetdLoader, func: Callable, namespace=None):
-        self._loader = loader
-        self._func = func
-        self._namespace = namespace or func
-
-    def __getattr__(self, func: Callable) -> CommandProxy:
-        if func == "func":
-            return self._func.func
-        self._func = func
-        return self
-
-    def command(self) -> Callable:
-        namespace = None if self._func == self._namespace else self._namespace
-        return self._get(namespace, self._func)
-
-    def _get(self, namespace: Optional[str], plugin_func: Callable) -> Callable:
-        if namespace:
-            func = functools.update_wrapper(
-                functools.partial(self._loader.plugin_bridge, plugin_func=self._func, namespace=self._namespace),
-                self._loader.plugin_bridge,
-            )
-        else:
-            func = functools.update_wrapper(
-                functools.partial(self._loader.plugin_bridge, plugin_func=plugin_func), self._loader.plugin_bridge
-            )
-        return func
-
-    def __call__(self, *args, **kwargs) -> Any:
-        return self.command()(*args, **kwargs)
-
-    def __repr__(self) -> str:
-        return str(self._get(None, "get")(**{"property_name": self._func}))
 
 
 class TargetdLoader(ProxyLoader):
@@ -147,7 +104,6 @@ class TargetdLoader(ProxyLoader):
             self.client.module_fullname = "dissect.target.loaders"
             self.client.module_fromlist = ["command_runner"]
             self.client.command = plugin_func
-            self.peers = self.peers
             try:
                 self.client.start(*args, **kwargs)
             except Exception:
@@ -168,8 +124,23 @@ class TargetdLoader(ProxyLoader):
     def _get_command(self, func: str, namespace: str = None) -> tuple[Loader, functools.partial]:
         return (self, CommandProxy(self, func, namespace=namespace))
 
-    def each(self, func: Callable, target: Target = None) -> Any:
+    def each(self, func: Callable, target: Optional[Target] = None) -> Any:
+        """Allows you to attach a scriptlet (function) to each of the remote hosts.
+        The results of the function are accumulated using +=. Exceptions are
+        catched and logged as warnings.
+
+        Usage:
+
+        def my_function(remote_target):
+            ...do something interesting...
+
+        targets = Target.open( targetd://... )
+        targets.each(my_function)
+
+        """
         result = None
+        if not self.client:
+            target.init()
         for peer in self.client.peers:
             target.select(peer)
             try:
@@ -215,6 +186,11 @@ if TARGETD_AVAILABLE:
         if namespace := kwargs.get("namespace", None):
             obj = getattr(obj, namespace)
 
+        if targetd.command == "init":
+            caller.has_output = True
+            caller.output = True
+            return
+
         func = getattr(obj, targetd.command)
         caller.has_output = True
         result = func(*args, **kwargs)
@@ -227,7 +203,7 @@ if TARGETD_AVAILABLE:
                 targetd.reset()
                 while True:
                     try:
-                        data.append(gen.__next__())
+                        data.append(next(gen))
                     except Exception:
                         break
                 result = data
