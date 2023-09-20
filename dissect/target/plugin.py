@@ -4,7 +4,6 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
-import enum
 import fnmatch
 import importlib
 import importlib.util
@@ -23,6 +22,7 @@ from flow.record import Record, RecordDescriptor
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
+from dissect.target.helpers.utils import StrEnum
 
 try:
     from dissect.target.plugins._pluginlist import PLUGINS
@@ -53,7 +53,7 @@ OUTPUTS = (
 log = logging.getLogger(__name__)
 
 
-class OperatingSystem(enum.Enum):
+class OperatingSystem(StrEnum):
     LINUX = "linux"
     WINDOWS = "windows"
     ESXI = "esxi"

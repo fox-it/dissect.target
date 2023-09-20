@@ -1,11 +1,12 @@
 from collections import OrderedDict
 from configparser import ConfigParser
 from os.path import basename
+from pathlib import Path
 from typing import Iterator, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, export
 
 WireGuardInterfaceRecord = TargetRecordDescriptor(
     "application/vpn/wireguard/interface",
@@ -63,25 +64,25 @@ class WireGuardPlugin(Plugin):
           - C:\\Program Files\\WireGuard\\Data\\Configurations
     """
 
-    config_globs = [
+    CONFIG_GLOBS = [
         # Linux
         "/etc/wireguard/*.conf",
         # MacOS
         "/usr/local/etc/wireguard/*.conf",
         "/opt/homebrew/etc/wireguard/*.conf",
+        # Windows
+        "C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\WireGuard\\Configurations\\*.dpapi",
+        "C:\\Program Files\\WireGuard\\Data\\Configurations\\*.dpapi",
     ]
 
     def __init__(self, target) -> None:
         super().__init__(target)
-        self.configs = []
-        for path in self.config_globs:
-            cfgs = list(self.target.fs.path().glob(path.lstrip("/")))
-            if len(cfgs) > 0:
-                for cfg in cfgs:
-                    self.configs.append(cfg)
+        self.configs: list[Path] = []
+        for path in self.CONFIG_GLOBS:
+            self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
 
     def check_compatible(self) -> None:
-        if not len(self.configs):
+        if not self.configs:
             raise UnsupportedPluginError("No Wireguard configuration files found")
 
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
@@ -89,7 +90,17 @@ class WireGuardPlugin(Plugin):
         """Parses interface config files from wireguard installations."""
 
         for config_path in self.configs:
-            config = _parse_config(config_path.read_text())
+            if self.target.os == OperatingSystem.WINDOWS and config_path.suffix == ".dpapi":
+                try:
+                    config_buf = self.target.dpapi.decrypt_system_blob(config_path.read_bytes())
+                    config_buf = config_buf.decode()
+                except ValueError:
+                    self.target.log.warning("Failed to decrypt WireGuard configuration at %s", config_path)
+                    continue
+            else:
+                config_buf = config_path.read_text()
+
+            config = _parse_config(config_buf)
 
             for section in config.sections():
                 if "Interface" in section:

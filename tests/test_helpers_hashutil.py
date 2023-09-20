@@ -15,13 +15,12 @@ def create_mocked_windows_target():
     return mocked_target
 
 
-@patch("dissect.target.helpers.hashutil.ResolverPlugin.resolve")
-def test_hash_uri(resolver):
+def test_hash_uri():
     """Determine hash functions"""
 
     target = create_mocked_windows_target()
     test_file = open(__file__, "rb")
-    resolver.return_value = test_file
+    target.resolve.return_value = test_file
     output = hashutil.hash_uri(target, __file__)
     assert output[0].name == __file__
     assert len(output[1][0]) == 32
@@ -29,8 +28,7 @@ def test_hash_uri(resolver):
     assert len(output[1][2]) == 64
 
 
-@patch("dissect.target.helpers.hashutil.ResolverPlugin.resolve")
-def test_hash_uri_none(resolver):
+def test_hash_uri_none():
     """Determine hash functions"""
     with pytest.raises(FileNotFoundError):
         hashutil.hash_uri(Mock(), None)
