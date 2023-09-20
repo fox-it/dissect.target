@@ -24,7 +24,7 @@ class TargetdInvalidStateError(FatalError):
 
 
 class CommandProxy:
-    def __init__(self, loader: Loader, func: Callable, namespace=None):
+    def __init__(self, loader: Loader, func: Callable, namespace: Optional[str] = None):
         self._loader = loader
         self._func = func
         self._namespace = namespace or func
