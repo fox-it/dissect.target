@@ -29,7 +29,7 @@ class CommandProxy:
         self._func = func
         self._namespace = namespace or func
 
-    def __getattr__(self, func: Callable) -> CommandProxy:
+    def __getattr__(self, func: Union[Callable, str]) -> CommandProxy:
         if func == "func":
             return self._func.func
         self._func = func
