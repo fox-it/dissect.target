@@ -528,7 +528,7 @@ def arg(*args, **kwargs) -> Callable:
     return decorator
 
 
-def plugins(osfilter: type[OSPlugin] = None) -> Iterator[PluginDescriptor]:
+def plugins(osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors.
 
     Args:
