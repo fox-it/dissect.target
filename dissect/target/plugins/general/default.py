@@ -4,7 +4,6 @@ from dissect.target.plugin import OSPlugin, export
 
 class DefaultPlugin(OSPlugin):
     __skip__ = True
-    __is_default__ = True
 
     def __init__(self, target):
         super().__init__(target)

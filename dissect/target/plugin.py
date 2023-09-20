@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
 from flow.record import Record, RecordDescriptor
 
+import dissect.target.plugins.general as general
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
@@ -527,7 +528,7 @@ def arg(*args, **kwargs) -> Callable:
     return decorator
 
 
-def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
+def plugins(osfilter: Type[OSPlugin] = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors.
 
     Args:
@@ -553,7 +554,7 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
 
     if (
         osfilter
-        and not hasattr(osfilter, "__is_default__")
+        and not isinstance(osfilter, general.default.DefaultPlugin)
         and isinstance(osfilter, type)
         and issubclass(osfilter, OSPlugin)
         and osfilter.__module__.startswith(MODULE_PATH)
