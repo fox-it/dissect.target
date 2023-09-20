@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from dissect.util.stream import AlignedStream
 

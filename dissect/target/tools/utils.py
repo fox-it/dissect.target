@@ -133,7 +133,9 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
-def plugin_factory(target: Target, plugin: Union[type, object], funcname: str, namespace: Optional[str]) -> tuple[Plugin, str]:
+def plugin_factory(
+    target: Target, plugin: Union[type, object], funcname: str, namespace: Optional[str]
+) -> tuple[Plugin, str]:
     if hasattr(target._loader, "instance"):
         return target.get_function(funcname, namespace=namespace)
 
