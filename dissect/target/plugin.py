@@ -609,7 +609,7 @@ def lookup(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
     yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
 
 
-def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_func_name(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by function name.
 
     Args:
@@ -621,7 +621,7 @@ def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[P
             yield plugin_desc
 
 
-def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_namespace(namespace: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by namespace.
 
     Args:
