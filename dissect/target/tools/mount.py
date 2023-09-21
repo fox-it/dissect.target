@@ -56,8 +56,10 @@ def main():
         basename = f"{v.name or f'volume_{i}'}"
         fname = basename
 
-        if fname in vnames:
-            fname = f"{basename}_{len(vnames[basename])}"
+        j = 1
+        while fname in vnames:
+            fname = f"{basename}_{j}"
+            j += 1
 
         vnames[v] = fname
         vnames.setdefault(basename, []).append(v)

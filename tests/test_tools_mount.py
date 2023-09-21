@@ -21,7 +21,7 @@ def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPa
 
             mock_target.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
             mock_target.volumes.add(Volume(BytesIO(), 2, 0, 0, None, name="second"))
-            mock_target.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second"))
+            mock_target.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second_1"))
             mock_target.volumes.add(Volume(BytesIO(), 4, 0, 0, None, name="second"))
 
             mock_fs = VirtualFilesystem()
