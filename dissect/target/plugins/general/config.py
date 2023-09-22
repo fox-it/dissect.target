@@ -18,6 +18,7 @@ class ConfigurationTreePlugin(Plugin):
 
     def __init__(self, target: Target, dir_path: str = "/"):
         super().__init__(target)
+        self.dir_path = dir_path
         self.config_fs = None
 
         target_dir_path = self.target.fs.path(dir_path)
@@ -27,7 +28,7 @@ class ConfigurationTreePlugin(Plugin):
     def check_compatible(self) -> None:
         # This should be able to be retrieved, regardless of OS
         if self.config_fs is None:
-            raise UnsupportedPluginError("The dir_path was")
+            raise UnsupportedPluginError(f"{self.dir_path!r} could not be found.")
         return None
 
     @lru_cache(128)
