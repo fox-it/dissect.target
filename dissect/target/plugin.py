@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
 from flow.record import Record, RecordDescriptor
 
+import dissect.target.plugins.general as general
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
@@ -527,7 +528,7 @@ def arg(*args, **kwargs) -> Callable:
     return decorator
 
 
-def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
+def plugins(osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors.
 
     Args:
@@ -553,6 +554,7 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
 
     if (
         osfilter
+        and not isinstance(osfilter, general.default.DefaultPlugin)
         and isinstance(osfilter, type)
         and issubclass(osfilter, OSPlugin)
         and osfilter.__module__.startswith(MODULE_PATH)
@@ -607,7 +609,7 @@ def lookup(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
     yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
 
 
-def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_func_name(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by function name.
 
     Args:
@@ -619,7 +621,7 @@ def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[P
             yield plugin_desc
 
 
-def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_namespace(namespace: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by namespace.
 
     Args:
