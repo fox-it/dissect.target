@@ -2,7 +2,7 @@ from io import StringIO
 
 import pytest
 
-from dissect.target.plugins.os.unix.config import Default
+from dissect.target.helpers.configparser import Default
 
 
 @pytest.mark.parametrize(
