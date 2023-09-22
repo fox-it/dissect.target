@@ -1,13 +1,16 @@
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import Mock
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.filesystems.config import ConfigurationEntry, ConfigurationFilesystem
+from dissect.target.filesystems.config import (
+    ConfigurationEntry,
+    ConfigurationFilesystem,
+)
 from dissect.target.helpers.configparser import parse_config
 
 from ._utils import absolute_path
@@ -69,7 +72,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
         ),
     ],
 )
-def test_hosts_file(target_unix: Target, mapped_file: str, expected_output: dict):
+def test_parse_file_input(target_unix: Target, mapped_file: str, expected_output: dict) -> None:
     config_filesystem = ConfigurationFilesystem(target_unix)
     entry: ConfigurationEntry = config_filesystem.get(mapped_file)
     check_dictionary(expected_output, entry.parser_items)
@@ -83,7 +86,7 @@ def check_dictionary(expected_dict: dict, data_dict: dict):
             raise AssertionError(f"Key {key!r} was not found in parser_items.")
 
 
-def check_value(expected_value: Any, value: Any):
+def check_value(expected_value: Any, value: Any) -> None:
     assert type(expected_value) is type(value), "The types of the values are not the same"
     if isinstance(expected_value, list):
         # Check if all elements of the expected value are in value
@@ -93,7 +96,7 @@ def check_value(expected_value: Any, value: Any):
         check_dictionary(expected_value, value)
 
 
-def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem):
+def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
     config_fs = ConfigurationFilesystem(target_unix)
     config_path = list(config_fs.get("/").iterdir())
 
@@ -102,7 +105,7 @@ def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem):
     assert isinstance(config_fs.get("/new/path/config"), ConfigurationEntry)
 
 
-def test_config_entry():
+def test_config_entry() -> None:
     class MockableRead(Mock):
         def __enter__(self):
             return self.binary_data
@@ -135,14 +138,14 @@ def test_config_entry():
     assert default_key_values.open().read() == b"test"
 
 
-def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem):
+def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
     config_fs = ConfigurationFilesystem(target_unix)
-    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True)
+    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, seperator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == "you"
 
-    entry = config_fs.get("/new/path/config", collapse={"help"})
+    entry = config_fs.get("/new/path/config", collapse={"help"}, seperator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == ["me", "you"]

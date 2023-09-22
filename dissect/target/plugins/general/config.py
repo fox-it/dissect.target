@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Union, Optional
+from typing import Optional, Union
 
 from dissect.target import Target
-from dissect.target.plugin import Plugin, internal
-from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.filesystems.config import ConfigurationFilesystem, ConfigurationEntry
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.filesystems.config import (
+    ConfigurationEntry,
+    ConfigurationFilesystem,
+)
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.plugin import Plugin, internal
 
 
 class ConfigurationTreePlugin(Plugin):
@@ -30,15 +33,15 @@ class ConfigurationTreePlugin(Plugin):
     @lru_cache(128)
     def __call__(
         self,
-        path: Union[str, TargetPath] = "/",
+        path: Optional[Union[TargetPath, str]] = None,
         hint: Optional[str] = None,
         collapse: Optional[Union[bool, set]] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
-    ) -> ConfigurationEntry:
-        """Create a configuration entry from a file, or a COnfigurationFilesystem from a directory.
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry]:
+        """Create a configuration entry from a file, or a ConfigurationFilesystem from a directory.
 
-        If a directory is specified in ``path``, please provide the other arguments in the ``get`` call.
+        If a directory is specified in ``path``, the other arguments should be provided in the ``get`` call if needed.
 
         Args:
             path: The path to either a directory or file
@@ -48,25 +51,23 @@ class ConfigurationTreePlugin(Plugin):
             comment_prefixes: What is specified as a comment.
 
         """
-
         if not path:
-            return self.config_fs.get("/")
+            return self.config_fs
 
-        target_path = path
-        if isinstance(target_path, str):
-            target_path = self.target.fs.path(path)
+        if isinstance(path, TargetPath):
+            path = str(path)
 
-        return self.config_fs.get(str(target_path), None, hint, collapse, seperator, comment_prefixes)
+        return self.config_fs.get(path, None, hint, collapse, seperator, comment_prefixes)
 
     @internal
     def get(
         self,
-        path: Optional[str] = None,
+        path: Optional[Union[TargetPath, str]] = None,
         hint: Optional[str] = None,
         collapse: Optional[set] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
-    ) -> ConfigurationEntry:
-        return self.__call__(path or "/", hint, collapse, seperator, comment_prefixes)
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry]:
+        return self.__call__(path, hint, collapse, seperator, comment_prefixes)
 
     get.__doc__ = __call__.__doc__

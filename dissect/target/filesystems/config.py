@@ -9,16 +9,22 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesy
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configparser import (
     ConfigurationParser,
-    ParserContents,
+    ParserOptions,
     parse_config,
 )
 
 
 def create_entry(
-    fs, path: str, entry, hint: str, collapse: str, seperator: tuple[str], comment_prefixes: tuple[str]
-) -> FilesystemEntry:
+    fs: Filesystem,
+    path: str,
+    entry: FilesystemEntry,
+    hint: str,
+    collapse: str,
+    seperator: tuple[str],
+    comment_prefixes: tuple[str],
+) -> Union[FilesystemEntry, ConfigurationParser]:
     if entry.is_file():
-        contents = ParserContents(collapse, seperator, comment_prefixes)
+        contents = ParserOptions(collapse, seperator, comment_prefixes)
         parser_items = parse_config(entry, hint, contents)
         return ConfigurationEntry(fs, path, entry, parser_items=parser_items)
     return entry
@@ -31,7 +37,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
         super().__init__(**kwargs)
         self.root.top = target.fs.get(path)
 
-    def _get_till_file(self, path, relentry) -> tuple[list[str], FilesystemEntry]:
+    def _get_till_file(self, path: str, relentry: FilesystemEntry) -> tuple[list[str], FilesystemEntry]:
         entry = relentry or self.root
 
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
@@ -129,11 +135,10 @@ class ConfigurationEntry(FilesystemEntry):
             # Currently trying to open the underlying entry
             return self.entry.open()
 
-        if self.is_dir():
-            bytesio = io.BytesIO()
-            self._write_value_mapping(bytesio, self.parser_items)
-            return bytesio
-        return io.BytesIO(bytes(self.parser_items, "utf-8"))
+        output_stream = io.BytesIO()
+        self._write_value_mapping(output_stream, self.parser_items)
+
+        return output_stream
 
     def iterdir(self) -> Iterator[str]:
         for entry in self.scandir():

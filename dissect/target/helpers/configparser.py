@@ -25,17 +25,17 @@ class ConfigurationParser:
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
 
-    def parse_file(self, fh: TextIO) -> None:
-        raise NotImplementedError()
-
     def __getitem__(self, item: Any) -> Union[dict, str]:
         return self.parsed_data[item]
 
     def __contains__(self, item: str) -> bool:
         return item in self.parsed_data
 
+    def parse_file(self, fh: TextIO) -> None:
+        raise NotImplementedError()
+
     def get(self, item: str, default: Optional[Any] = None) -> Any:
-        return self.parsed_data.get(item, None)
+        return self.parsed_data.get(item, default)
 
     def read_file(self, fh: TextIO) -> None:
         try:
@@ -171,7 +171,7 @@ class Default(ConfigurationParser):
 
 
 @dataclass(frozen=True)
-class ParserContents:
+class ParserOptions:
     collapse: Optional[Union[bool, set]] = None
     seperator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
@@ -184,7 +184,7 @@ class ParserConfig:
     seperator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
-    def create_parser(self, contents: Optional[ParserContents] = None) -> ConfigurationParser:
+    def create_parser(self, contents: Optional[ParserOptions] = None) -> ConfigurationParser:
         kwargs = {}
 
         for field_name in ["collapse", "seperator", "comment_prefixes"]:
@@ -206,6 +206,7 @@ CONFIG_MAP: dict[str, ParserConfig] = {
 }
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": ParserConfig(Ini),
+    "sshd_config": ParserConfig(Default, seperator=(r"\s",)),
     "hosts.allow": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, seperator=(r"\s")),
@@ -215,7 +216,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 def parse_config(
     entry: FilesystemEntry,
     hint: Optional[str] = None,
-    contents: Optional[ParserContents] = None,
+    contents: Optional[ParserOptions] = None,
 ) -> ConfigParser:
     parser_type = _select_parser(entry, hint)
 
@@ -234,5 +235,5 @@ def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> Parser
 
     extension = entry.path.rsplit(".", 1)[-1]
 
-    known_extension = CONFIG_MAP.get(extension, ParserConfig(Default))
-    return KNOWN_FILES.get(entry.name, known_extension)
+    extention_parser = CONFIG_MAP.get(extension, ParserConfig(Default))
+    return KNOWN_FILES.get(entry.name, extention_parser)
