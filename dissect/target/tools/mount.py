@@ -15,7 +15,7 @@ try:
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
-except ImportError:
+except Exception:
     HAS_FUSE = False
 
 log = logging.getLogger(__name__)
@@ -51,12 +51,22 @@ def main():
         fname = f"disks/disk_{i}"
         vfs.map_file_fh(fname, d)
 
+    vnames = {}
     for i, v in enumerate(t.volumes):
-        fname = f"volumes/{v.name or f'volume_{i}'}"
-        vfs.map_file_fh(fname, v)
+        basename = f"{v.name or f'volume_{i}'}"
+        fname = basename
+
+        j = 1
+        while fname in vnames:
+            fname = f"{basename}_{j}"
+            j += 1
+
+        vnames[v] = fname
+        vnames.setdefault(basename, []).append(v)
+        vfs.map_file_fh(f"volumes/{fname}", v)
 
     for i, fs in enumerate(t.filesystems):
-        fname = f"filesystems/{fs.volume.name if fs.volume else f'fs_{i}'}"
+        fname = f"filesystems/{vnames[fs.volume] if fs.volume else f'fs_{i}'}"
         vfs.mount(fname, fs)
 
     # This is kinda silly because fusepy will convert this back into string arguments
