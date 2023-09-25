@@ -124,7 +124,7 @@ class ConfigurationEntry(FilesystemEntry):
                 self._write_value_mapping(output, value)
         else:
             output.write(b" ")
-            output.write(bytes(values))
+            output.write(bytes(values, "utf-8"))
             output.write(b"\n")
 
     def open(self) -> BinaryIO:
