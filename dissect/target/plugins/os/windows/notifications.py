@@ -35,7 +35,7 @@ typedef struct {
     QWORD    Timestamp2;               // Is this time to refresh?
     char     Uri[1024];                // Is this the correct size?
     char     Padding[0x818 - 0x410];
-} PushDescriptor;                    // size: 0x818
+} PushDescriptor;                      // size: 0x818
 
 typedef struct {
     DWORD    Id;
@@ -72,7 +72,7 @@ typedef struct {
 
 typedef struct {
   char Content[0x1400];
-} DataXML;  // 0x1400
+} DataXML;                             // size: 0x1400
 
 typedef struct {
     ChunkHeader     Header;            // Only populated for first chunk, else zeroed
@@ -97,26 +97,42 @@ c_appdb.load(appdb_def)
 APPDB_MAGIC = b"DNPW"
 NUM_APPDB_CHUNKS = 256
 
-AppDBChunkRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "windows/notification/appdb_chunk",
+AppDBRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "windows/notification/appdb",
     [
         ("datetime", "timestamp"),
+        ("varint", "version"),
         ("varint", "next_notification_id"),
+    ],
+)
+
+AppDBPushRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "windows/notification/appdb/push",
+    [
         ("datetime", "push_ts1"),
         ("datetime", "push_ts2"),
+        ("varint", "chunk_num"),
         ("uri", "push_uri"),
-        ("varint", "badge_id"),
+    ],
+)
+
+AppDBBadgeRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "windows/notification/appdb/badge",
+    [
         ("datetime", "badge_ts"),
+        ("varint", "badge_id"),
+        ("varint", "chunk_num"),
         ("string", "badge_data"),
     ],
 )
 
 AppDBTileRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "windows/notification/appdb_tile",
+    "windows/notification/appdb/tile",
     [
-        ("varint", "id"),
         ("datetime", "arrival_time"),
         ("datetime", "expiry_time"),
+        ("varint", "id"),
+        ("varint", "chunk_num"),
         ("varint", "type"),
         ("varint", "index"),
         ("string", "name"),
@@ -125,11 +141,12 @@ AppDBTileRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
 )
 
 AppDBToastRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "windows/notification/appdb_toast",
+    "windows/notification/appdb/toast",
     [
-        ("varint", "id"),
         ("datetime", "arrival_time"),
         ("datetime", "expiry_time"),
+        ("varint", "id"),
+        ("varint", "chunk_num"),
         ("varint", "type"),
         ("varint", "index"),
         ("string", "name1"),
@@ -220,37 +237,79 @@ class NotificationsPlugin(Plugin):
     def _get_appdb_chunk_record(
         self,
         chunk: c_appdb.Chunk,
-        timestamp: Optional[datetime.datetime],
         user: WindowsUserRecord,
-    ) -> AppDBChunkRecord:
-        push_timestamp1 = None
-        if ts := chunk.Push.Timestamp1:
-            push_timestamp1 = wintimestamp(ts)
-        push_timestamp2 = None
-        if ts := chunk.Push.Timestamp2:
-            push_timestamp2 = wintimestamp(ts)
+    ) -> AppDBRecord:
+        chunk_timestamp = None
+        if ts := chunk.Header.Timestamp:
+            chunk_timestamp = wintimestamp(ts)
+
+        return AppDBRecord(
+            timestamp=chunk_timestamp,
+            version=chunk.Header.Version,
+            next_notification_id=chunk.Header.NextNotificationId,
+        )
+
+    def _get_appdb_push_record(
+        self,
+        chunk: c_appdb.Chunk,
+        chunk_num: int,
+        user: WindowsUserRecord,
+    ) -> Optional[AppDBPushRecord]:
+        badge_record = None
         push_uri = chunk.Push.Uri.split(b"\x00")[0]
         push_uri = push_uri.decode("utf-8", errors="surrogateescape")
 
-        badge_ts = None
-        if ts := chunk.Badge.Timestamp:
-            badge_ts = wintimestamp(ts)
-        badge_data = chunk.Badge.Data.decode("utf-8", errors="surrogateescape")
+        if push_uri:
+            push_timestamp1 = None
+            if ts := chunk.Push.Timestamp1:
+                push_timestamp1 = wintimestamp(ts)
+            push_timestamp2 = None
+            if ts := chunk.Push.Timestamp2:
+                push_timestamp2 = wintimestamp(ts)
 
-        return AppDBChunkRecord(
-            timestamp=timestamp,
-            next_notification_id=chunk.Header.NextNotificationId,
-            push_ts1=push_timestamp1,
-            push_ts2=push_timestamp2,
-            push_uri=push_uri,
-            badge_id=chunk.Badge.Id,
-            badge_ts=badge_ts,
-            badge_data=badge_data,
-            _target=self.target,
-            _user=user,
-        )
+            badge_record = AppDBPushRecord(
+                push_ts1=push_timestamp1,
+                push_ts2=push_timestamp2,
+                chunk_num=chunk_num,
+                push_uri=push_uri,
+                _target=self.target,
+                _user=user,
+            )
 
-    def _get_appdb_tile_records(self, chunk: c_appdb.Chunk, user: WindowsUserRecord) -> list[AppDBTileRecord]:
+        return badge_record
+
+    def _get_appdb_badge_record(
+        self,
+        chunk: c_appdb.Chunk,
+        chunk_num: int,
+        user: WindowsUserRecord,
+    ) -> Optional[AppDBBadgeRecord]:
+        badge_record = None
+        badge_id = chunk.Badge.Id
+
+        if badge_id:
+            badge_ts = None
+            if ts := chunk.Badge.Timestamp:
+                badge_ts = wintimestamp(ts)
+            badge_data = chunk.Badge.Data.decode("utf-8", errors="surrogateescape")
+
+            badge_record = AppDBBadgeRecord(
+                badge_id=badge_id,
+                badge_ts=badge_ts,
+                chunk_num=chunk_num,
+                badge_data=badge_data,
+                _target=self.target,
+                _user=user,
+            )
+
+        return badge_record
+
+    def _get_appdb_tile_records(
+        self,
+        chunk: c_appdb.Chunk,
+        chunk_num: int,
+        user: WindowsUserRecord,
+    ) -> list[AppDBTileRecord]:
         tile_records = []
         num_tiles = len(chunk.Tiles)
 
@@ -271,9 +330,10 @@ class NotificationsPlugin(Plugin):
                 tile_xml = tile_xml.decode("utf-8", errors="surrogateescape")
 
                 tile_record = AppDBTileRecord(
-                    id=tile.UniqueId,
                     arrival_time=tile_arrival_time,
                     expiry_time=tile_expiry_time,
+                    id=tile.UniqueId,
+                    chunk_num=chunk_num,
                     type=tile.Type,
                     index=tile.Index,
                     name=name,
@@ -285,7 +345,12 @@ class NotificationsPlugin(Plugin):
                 tile_records.append(tile_record)
         return tile_records
 
-    def _get_appdb_toast_records(self, chunk: c_appdb.Chunk, user: WindowsUserRecord) -> list[AppDBToastRecord]:
+    def _get_appdb_toast_records(
+        self,
+        chunk: c_appdb.Chunk,
+        chunk_num: int,
+        user: WindowsUserRecord,
+    ) -> list[AppDBToastRecord]:
         toast_records = []
         num_toasts = len(chunk.Toasts)
 
@@ -307,9 +372,10 @@ class NotificationsPlugin(Plugin):
                 toast_xml = toast_xml.decode("utf-8", errors="surrogateescape")
 
                 toast_record = AppDBToastRecord(
-                    id=toast.UniqueId,
                     arrival_time=toast_arrival_time,
                     expiry_time=toast_expiry_time,
+                    id=toast.UniqueId,
+                    chunk_num=chunk_num,
                     type=toast.Type,
                     index=toast.Index,
                     name1=name1,
@@ -322,16 +388,22 @@ class NotificationsPlugin(Plugin):
                 toast_records.append(toast_record)
         return toast_records
 
-    @export(record=[AppDBChunkRecord, AppDBTileRecord, AppDBToastRecord])
+    @export(record=[AppDBRecord, AppDBPushRecord, AppDBBadgeRecord, AppDBTileRecord, AppDBToastRecord])
     def appdb(self) -> Iterator[GroupedRecord]:
+        """Retrun the data from Windows appdb.dat file.
+
+        This file contains data presentted to the user, pushed by external
+        sources. The appdb.dat file was used from Windows 8 to Windows 10 pre
+        anniversary version. This plugin only supports appdb.dat version 3 from
+        Windows 10.
+
+        References:
+            - http://www.swiftforensics.com/2016/06/prasing-windows-10-notification-database.html
+        """
         for user, appdb_file in self.appdb_files:
             with appdb_file.open(mode="rb") as fp:
-                timestamp = None
-                for chunk_no in range(NUM_APPDB_CHUNKS):
+                for chunk_num in range(NUM_APPDB_CHUNKS):
                     chunk = c_appdb.Chunk(fp)
-
-                    if chunk_no == 0:
-                        timestamp = wintimestamp(chunk.Header.Timestamp)
 
                     if chunk.Info.InUse == 0:
                         continue
@@ -343,14 +415,22 @@ class NotificationsPlugin(Plugin):
                         )
                         continue
 
-                    chunk_record = self._get_appdb_chunk_record(chunk, timestamp, user)
-                    tile_records = self._get_appdb_tile_records(chunk, user)
-                    toast_records = self._get_appdb_toast_records(chunk, user)
+                    if chunk_num == 0:
+                        yield self._get_appdb_chunk_record(chunk, user)
 
-                    yield GroupedRecord(
-                        "windows/notification/appdb",
-                        [chunk_record] + tile_records + toast_records,
-                    )
+                    push_record = self._get_appdb_push_record(chunk, chunk_num, user)
+                    if push_record:
+                        yield push_record
+
+                    badge_record = self._get_appdb_badge_record(chunk, chunk_num, user)
+                    if badge_record:
+                        yield badge_record
+
+                    for tile_record in self._get_appdb_tile_records(chunk, chunk_num, user):
+                        yield tile_record
+
+                    for toast_record in self._get_appdb_toast_records(chunk, chunk_num, user):
+                        yield toast_record
 
     @export(record=[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord])
     def wpndatabase(self):
