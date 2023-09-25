@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import textwrap
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from dissect.target import Target
@@ -111,21 +112,21 @@ class ConfigurationEntry(FilesystemEntry):
             return ConfigurationEntry(self.fs, path, self.entry, self.parser_items[path])
         raise NotADirectoryError(f"Cannot open a {path!r} on a value")
 
-    def _write_value_mapping(self, output: io.BytesIO, values: dict[str, Any]) -> None:
+    def _write_value_mapping(self, values: dict[str, Any], indentation_nr=0) -> str:
         """Writes a dictionary to the output, c style."""
+        prefix = " " * indentation_nr
+        output_buffer = io.StringIO()
+
         if isinstance(values, list):
-            for value in values:
-                output.write(bytes(value, "utf-8"))
-                output.write(b"\n")
+            output_buffer.write(textwrap.indent(text="\n".join(values), prefix=prefix))
         elif hasattr(values, "keys"):
-            output.write(b"\n")
             for key, value in values.items():
-                output.write(bytes(key, "utf-8"))
-                self._write_value_mapping(output, value)
+                output_buffer.write(textwrap.indent(key, prefix=prefix) + "\n")
+                output_buffer.write(self._write_value_mapping(value, indentation_nr + 4))
         else:
-            output.write(b" ")
-            output.write(bytes(values, "utf-8"))
-            output.write(b"\n")
+            output_buffer.write(textwrap.indent(values, prefix=prefix) + "\n")
+
+        return output_buffer.getvalue()
 
     def open(self) -> BinaryIO:
         # Return fh for path if entry is a file
@@ -135,10 +136,8 @@ class ConfigurationEntry(FilesystemEntry):
             # Currently trying to open the underlying entry
             return self.entry.open()
 
-        output_stream = io.BytesIO()
-        self._write_value_mapping(output_stream, self.parser_items)
-
-        return output_stream
+        output_data = self._write_value_mapping(self.parser_items)
+        return io.BytesIO(bytes(output_data, "utf-8"))
 
     def iterdir(self) -> Iterator[str]:
         for entry in self.scandir():

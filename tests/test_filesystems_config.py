@@ -133,9 +133,10 @@ def test_config_entry() -> None:
     default_section = entry.get("DEFAULT")
     assert default_section.is_dir()
     assert list(default_section.iterdir()) == ["default"]
+    assert default_section.open().read() == b"default\n    test\n"
 
     default_key_values = default_section.get("default")
-    assert default_key_values.open().read() == b"test"
+    assert default_key_values.open().read() == b"test\n"
 
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
