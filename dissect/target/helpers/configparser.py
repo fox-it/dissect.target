@@ -145,11 +145,13 @@ class Default(ConfigurationParser):
                 continue
 
             if line.startswith((" ", "\t")) and line.strip():
-                # This part was indented
-                # So this one belongs to the previous key
-                new_dictionary = dict()
-                self._parse_line(line.strip(), new_dictionary)
-                information_dict[prev_key] = {information_dict.get(prev_key): new_dictionary}
+                # This part was indented so it is a continuation of the previous key
+                prev_value = information_dict.get(prev_key)
+                if not isinstance(prev_value, list):
+                    prev_value = [prev_value]
+                prev_value.append(line.strip())
+
+                information_dict[prev_key] = prev_value
                 continue
 
             key = self._parse_line(line, information_dict)
