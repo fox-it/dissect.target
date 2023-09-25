@@ -868,7 +868,7 @@ class TargetCli(TargetCmd):
 class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
-        self.config_tree = target.config_tree("/etc")
+        self.config_tree = target.etc
         self.prompt_base = target.name
 
         self.cwd = None
@@ -878,8 +878,8 @@ class UnixConfigTreeCli(TargetCli):
     def prompt(self) -> str:
         return f"{self.prompt_base}/config_tree {self.cwd}> "
 
-    def check_compatible(target) -> bool:
-        return target.fs.get("/etc") is not None
+    def check_compatible(target: Target) -> bool:
+        return target.has_function("etc")
 
     def resolve_path(self, path: Optional[Union[str, fsutil.TargetPath]]) -> fsutil.TargetPath:
         if not path:

@@ -25,7 +25,7 @@ def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
         ("hello = world", "=", {"hello": "world"}),
         ("hello=world", r"\s", {"hello=world": ""}),
         ("hello-world;20", ";", {"hello-world": "20"}),
-        ("hello-world;20;20;20;20", ";", {"hello-world": "20 20 20 20"}),
+        ("hello-world;20;20;20;20", ";", {"hello-world": "20;20;20;20"}),
     ],
 )
 def test_custom_seperators(parser_string: str, seperator: tuple, expected_output) -> None:

@@ -134,28 +134,27 @@ class Default(ConfigurationParser):
         skip_lines = self.comment_prefixes + ("\n",)
         prev_key = (None, None)
         for line in fh.readlines():
-            if line.strip().startswith(skip_lines):
+            if line.strip().startswith(skip_lines) or not line.strip():
                 continue
 
             # Strip the comments first
-            line, *_ = self.COMMENTS.split(line)
+            line, *_ = self.COMMENTS.split(line, 1)
 
-            if not line.strip():
-                # The line was empty
-                continue
-
-            if line.startswith((" ", "\t")) and line.strip():
+            if line.startswith((" ", "\t")):
                 # This part was indented so it is a continuation of the previous key
                 prev_value = information_dict.get(prev_key)
-                if not isinstance(prev_value, list):
-                    prev_value = [prev_value]
-                prev_value.append(line.strip())
-
-                information_dict[prev_key] = prev_value
+                information_dict[prev_key] = " ".join([prev_value, line.strip()])
                 continue
 
-            key = self._parse_line(line, information_dict)
-            prev_key = key
+            prev_key, *value = self.SEPERATOR.split(line, 1)
+            value = value[0].strip() if value else ""
+
+            if old_value := information_dict.get(prev_key):
+                if not isinstance(old_value, list):
+                    old_value = [old_value]
+                value = old_value + [value]
+
+            information_dict[prev_key] = value
 
         self.parsed_data = information_dict
 
@@ -186,11 +185,11 @@ class ParserConfig:
     seperator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
-    def create_parser(self, contents: Optional[ParserOptions] = None) -> ConfigurationParser:
+    def create_parser(self, options: Optional[ParserOptions] = None) -> ConfigurationParser:
         kwargs = {}
 
         for field_name in ["collapse", "seperator", "comment_prefixes"]:
-            value = getattr(contents, field_name, None) or getattr(self, field_name)
+            value = getattr(options, field_name, None) or getattr(self, field_name)
             if value:
                 kwargs.update({field_name: value})
 
@@ -218,11 +217,11 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 def parse_config(
     entry: FilesystemEntry,
     hint: Optional[str] = None,
-    contents: Optional[ParserOptions] = None,
+    options: Optional[ParserOptions] = None,
 ) -> ConfigParser:
     parser_type = _select_parser(entry, hint)
 
-    parser = parser_type.create_parser(contents)
+    parser = parser_type.create_parser(options)
 
     with entry.open() as fh:
         open_file = io.TextIOWrapper(fh, encoding="utf-8")

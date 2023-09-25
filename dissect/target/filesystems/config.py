@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import textwrap
+from logging import getLogger
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from dissect.target import Target
@@ -14,6 +15,8 @@ from dissect.target.helpers.configparser import (
     parse_config,
 )
 
+log = getLogger(__name__)
+
 
 def create_entry(
     fs: Filesystem,
@@ -25,8 +28,8 @@ def create_entry(
     comment_prefixes: tuple[str],
 ) -> Union[FilesystemEntry, ConfigurationParser]:
     if entry.is_file():
-        contents = ParserOptions(collapse, seperator, comment_prefixes)
-        parser_items = parse_config(entry, hint, contents)
+        options = ParserOptions(collapse, seperator, comment_prefixes)
+        parser_items = parse_config(entry, hint, options)
         return ConfigurationEntry(fs, path, entry, parser_items=parser_items)
     return entry
 
@@ -34,7 +37,7 @@ def create_entry(
 class ConfigurationFilesystem(VirtualFilesystem):
     __fstype__: str = "META:configuration"
 
-    def __init__(self, target: Target, path: str = "/etc", **kwargs):
+    def __init__(self, target: Target, path: str, **kwargs):
         super().__init__(**kwargs)
         self.root.top = target.fs.get(path)
 
@@ -85,8 +88,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
             else:
                 try:
                     entry = create_entry(self, part, entry, hint, collapse, seperator, comment_prefixes)
-                except ConfigurationParsingError:
-                    # All errors except parsing should be let through.
+                except ConfigurationParsingError as e:
+                    # If a parsing error gets created, it should return the `entry`
+                    log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)
                     pass
         return entry
 
