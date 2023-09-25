@@ -868,7 +868,7 @@ class TargetCli(TargetCmd):
 class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
-        self.config_tree = target.etc
+        self.config_tree = target.etc()
         self.prompt_base = target.name
 
         self.cwd = None
@@ -888,7 +888,8 @@ class UnixConfigTreeCli(TargetCli):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.config_tree.alt_separator)
+        # It uses the alt seperator of the underlying fs
+        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
     def resolve_key(self, path) -> FilesystemEntry:
