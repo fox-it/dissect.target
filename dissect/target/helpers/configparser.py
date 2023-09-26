@@ -112,9 +112,17 @@ class Txt(ConfigurationParser):
 class Default(ConfigurationParser):
     """Parse a configuration file specified by ``seperator`` and ``comment_prefixes``.
 
-    This parser does the following things:
+    This parser splits only on the first ``seperator`` it finds:
 
         key<seperator>value    -> {"key": "value"}
+
+        key<seperator>value\n  -> {"key": "value continuation"}
+          continuation
+
+        # Unless we collapse values, we add them to a list to not overwrite any values.
+        key<seperator>value1   -> {key: [value1, value2]}
+        key<seperator>value2
+
         <empty_space><comment> -> skip
     """
 
