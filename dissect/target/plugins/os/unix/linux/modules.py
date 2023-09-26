@@ -39,8 +39,6 @@ class ModulePlugin(Plugin):
     def _iterate_modules(self) -> Iterator[Module]:
         for module_path in self._module_base_path.iterdir():
             if module_path.joinpath("initstate").exists():
-                # Normally the holders folder should exist,
-                # however Acquire currently doesn't collect a folder if its empty
                 holders = []
                 if (holders_path := module_path.joinpath("holders")).exists():
                     holders = [item.name for item in holders_path.iterdir()]
