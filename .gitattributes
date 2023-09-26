@@ -5,4 +5,7 @@ tests/data/plugins/browsers/firefox/places.sqlite filter=lfs diff=lfs merge=lfs 
 tests/data/plugins/browsers/chrome/History.sqlite filter=lfs diff=lfs merge=lfs -text
 tests/data/plugins/browsers/edge/History.sqlite filter=lfs diff=lfs merge=lfs -text
 tests/data/plugins/browsers/chromium/History.sqlite filter=lfs diff=lfs merge=lfs -text
+tests/data/plugins/os/windows/dpapi/** filter=lfs diff=lfs merge=lfs -text
 tests/data/volumes/md-nested.bin.gz filter=lfs diff=lfs merge=lfs -text
+tests/data/plugins/os/windows/notifications/appdb.dat.v3.gz filter=lfs diff=lfs merge=lfs -text
+tests/data/plugins/os/windows/notifications/wpndatabase.db filter=lfs diff=lfs merge=lfs -text

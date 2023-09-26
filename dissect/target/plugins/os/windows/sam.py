@@ -290,23 +290,10 @@ class SamPlugin(Plugin):
     """
 
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
-    SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
 
     def check_compatible(self) -> None:
-        for key in [self.SAM_KEY, self.SYSTEM_KEY]:
-            if not len(list(self.target.registry.keys(key))) > 0:
-                raise UnsupportedPluginError(f"Registry key not found: {key}")
-
-    def retrieve_syskey(self) -> bytes:
-        lsa = self.target.registry.key(self.SYSTEM_KEY)
-        syskey_keys = ["JD", "Skew1", "GBG", "Data"]
-        permutation_matrix = [0x8, 0x5, 0x4, 0x2, 0xB, 0x9, 0xD, 0x3, 0x0, 0x6, 0x1, 0xC, 0xE, 0xA, 0xF, 0x7]
-
-        r = b""
-        for key in syskey_keys:
-            r += bytes.fromhex(lsa.subkey(key).class_name)
-
-        return bytes(r[i] for i in permutation_matrix)
+        if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
+            raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
 
     def calculate_samkey(self, syskey: bytes) -> bytes:
         aqwerty = b"!@#$%^&*()qwertyUIOPAzxcvbnmQQQQQQQQQQQQ)(*@&%\0"
@@ -373,7 +360,7 @@ class SamPlugin(Plugin):
             nt (string): Parsed NT-hash.
         """
 
-        syskey = self.retrieve_syskey()  # aka. bootkey
+        syskey = self.target.dpapi.syskey  # aka. bootkey
         samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
 
         almpassword = b"LMPASSWORD\0"

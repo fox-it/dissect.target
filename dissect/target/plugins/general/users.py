@@ -1,12 +1,14 @@
-from collections import namedtuple
-from typing import Generator, Optional
-
-from flow.record import RecordDescriptor
+from typing import Generator, NamedTuple, Optional, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.record import UnixUserRecord, WindowsUserRecord
 from dissect.target.plugin import InternalPlugin
 
-UserDetails = namedtuple("UserDetails", "user home_path")
+
+class UserDetails(NamedTuple):
+    user: Union[UnixUserRecord, WindowsUserRecord]
+    home_path: Optional[TargetPath]
 
 
 class UsersPlugin(InternalPlugin):
@@ -44,7 +46,7 @@ class UsersPlugin(InternalPlugin):
             ):
                 return self.get(user)
 
-    def get(self, user: RecordDescriptor) -> UserDetails:
+    def get(self, user: Union[UnixUserRecord, WindowsUserRecord]) -> UserDetails:
         """Return additional details about the user"""
         # Resolving the user home can not use the user's environment variables,
         # as those depend on the user's home to be known first. So we resolve

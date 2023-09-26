@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
+from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.plugin import (
     OSPlugin,
     Plugin,
@@ -132,9 +133,11 @@ def generate_argparse_for_plugin(
     return generate_argparse_for_plugin_class(plugin_instance.__class__, usage_tmpl=usage_tmpl)
 
 
-def plugin_factory(target: Target, plugin: Union[type, object], funcname: str) -> tuple[Plugin, str]:
+def plugin_factory(
+    target: Target, plugin: Union[type, object], funcname: str, namespace: Optional[str]
+) -> tuple[Plugin, str]:
     if hasattr(target._loader, "instance"):
-        return target.get_function(funcname)
+        return target.get_function(funcname, namespace=namespace)
 
     if isinstance(plugin, type):
         plugin_obj = plugin(target)
@@ -201,7 +204,7 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
                 f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
             )
 
-    _, target_attr = plugin_factory(target, plugin_class, func.method_name)
+    _, target_attr = plugin_factory(target, plugin_class, func.method_name, func.plugin_desc["namespace"])
     return target_attr
 
 
@@ -221,6 +224,9 @@ def plugin_function_with_argparser(
 
         plugin_method = plugin_obj.get_all_records
         parser = generate_argparse_for_plugin(plugin_obj)
+    elif isinstance(target_attr, CommandProxy):
+        plugin_method = target_attr.command()
+        parser = generate_argparse_for_bound_method(plugin_method)
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)
