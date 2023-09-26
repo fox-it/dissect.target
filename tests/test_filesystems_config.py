@@ -69,7 +69,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
     ],
 )
 def test_parse_file_input(target_unix: Target, mapped_file: str, expected_output: dict) -> None:
-    config_filesystem = ConfigurationFilesystem(target_unix)
+    config_filesystem = ConfigurationFilesystem(target_unix, "/etc")
     entry: ConfigurationEntry = config_filesystem.get(mapped_file)
     check_dictionary(expected_output, entry.parser_items)
 
@@ -93,7 +93,7 @@ def check_value(expected_value: Any, value: Any) -> None:
 
 
 def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
-    config_fs = ConfigurationFilesystem(target_unix)
+    config_fs = ConfigurationFilesystem(target_unix, "/etc")
     config_path = list(config_fs.get("/").iterdir())
 
     assert config_path == ["new"]
@@ -136,7 +136,7 @@ def test_config_entry() -> None:
 
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
-    config_fs = ConfigurationFilesystem(target_unix)
+    config_fs = ConfigurationFilesystem(target_unix, "/etc")
     entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, seperator=(r"\s",))
 
     assert entry["help"] == "you"
