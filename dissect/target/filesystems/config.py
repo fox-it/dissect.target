@@ -9,29 +9,9 @@ from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.configparser import (
-    ConfigurationParser,
-    ParserOptions,
-    parse,
-)
+from dissect.target.helpers.configparser import ConfigurationParser, parse
 
 log = getLogger(__name__)
-
-
-def create_entry(
-    fs: Filesystem,
-    path: str,
-    entry: FilesystemEntry,
-    hint: str,
-    collapse: str,
-    seperator: tuple[str],
-    comment_prefixes: tuple[str],
-) -> Union[FilesystemEntry, ConfigurationParser]:
-    if entry.is_file():
-        options = ParserOptions(collapse, seperator, comment_prefixes)
-        parser_items = parse(entry, hint, options)
-        return ConfigurationEntry(fs, path, entry, parser_items=parser_items)
-    return entry
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
@@ -87,8 +67,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
                 entry = entry.get(part)
             else:
                 try:
-                    options = parse(entry, hint, collapse, seperator, comment_prefixes)
-                    entry = ConfigurationEntry(self, part, entry, options)
+                    parser_options = parse(entry, hint, collapse, seperator, comment_prefixes)
+                    config_path = fsutil.join(path, part, alt_separator=self.fs.alt_separator)
+                    entry = ConfigurationEntry(self, config_path, entry, parser_options)
                 except (FileNotFoundError, ConfigurationParsingError) as e:
                     # If a parsing error gets created, it should return the `entry`
                     log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)
@@ -117,7 +98,12 @@ class ConfigurationEntry(FilesystemEntry):
             return self
 
         if path in self.parser_items:
-            return ConfigurationEntry(self.fs, path, self.entry, self.parser_items[path])
+            return ConfigurationEntry(
+                self.fs,
+                fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+                self.entry,
+                self.parser_items[path],
+            )
         raise NotADirectoryError(f"Cannot open a {path!r} on a value")
 
     def _write_value_mapping(self, values: dict[str, Any], indentation_nr=0) -> str:

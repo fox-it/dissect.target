@@ -6,10 +6,9 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import Any, ItemsView, KeysView, Optional, TextIO, Union
 
-from dissect.target.exceptions import ConfigurationParsingError
+from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.exceptions import FileNotFoundError
 
 
 # TODO: Look if I can just create a parsing function and attach it to the
@@ -236,7 +235,7 @@ def parse(
     collapse: Optional[Union[bool, set]] = None,
     seperator: Optional[tuple[str]] = None,
     comment_prefixes: Optional[tuple[str]] = None,
-) -> dict:
+) -> ConfigParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
