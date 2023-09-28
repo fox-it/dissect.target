@@ -53,23 +53,22 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
     def get(
         self,
-        path: Optional[str] = None,
+        path: str,
         relentry: Optional[FilesystemEntry] = None,
         hint: Optional[str] = None,
         collapse: Optional[Union[bool, set]] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
-        parts, entry = self._get_till_file(path or "", relentry)
+        parts, entry = self._get_till_file(path, relentry)
 
         for part in parts:
             if isinstance(entry, ConfigurationEntry):
                 entry = entry.get(part)
             else:
                 try:
-                    parser_options = parse(entry, hint, collapse, seperator, comment_prefixes)
-                    config_path = fsutil.join(path, part, alt_separator=self.fs.alt_separator)
-                    entry = ConfigurationEntry(self, config_path, entry, parser_options)
+                    config_parser = parse(entry, hint, collapse, seperator, comment_prefixes)
+                    entry = ConfigurationEntry(self, entry.path, entry, config_parser)
                 except (FileNotFoundError, ConfigurationParsingError) as e:
                     # If a parsing error gets created, it should return the `entry`
                     log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)

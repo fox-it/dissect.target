@@ -75,7 +75,7 @@ class ConfigurationTreePlugin(Plugin):
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
         as_dict: bool = False,
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry]:
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
         return self.__call__(path, hint, collapse, seperator, comment_prefixes, as_dict)
 
     get.__doc__ = __call__.__doc__
