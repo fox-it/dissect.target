@@ -6,13 +6,13 @@ from logging import getLogger
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from dissect.target import Target
-from dissect.target.exceptions import ConfigurationParsingError
+from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configparser import (
     ConfigurationParser,
     ParserOptions,
-    parse_config,
+    parse,
 )
 
 log = getLogger(__name__)
@@ -29,7 +29,7 @@ def create_entry(
 ) -> Union[FilesystemEntry, ConfigurationParser]:
     if entry.is_file():
         options = ParserOptions(collapse, seperator, comment_prefixes)
-        parser_items = parse_config(entry, hint, options)
+        parser_items = parse(entry, hint, options)
         return ConfigurationEntry(fs, path, entry, parser_items=parser_items)
     return entry
 
@@ -87,8 +87,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
                 entry = entry.get(part)
             else:
                 try:
-                    entry = create_entry(self, part, entry, hint, collapse, seperator, comment_prefixes)
-                except ConfigurationParsingError as e:
+                    options = parse(entry, hint, collapse, seperator, comment_prefixes)
+                    entry = ConfigurationEntry(self, part, entry, options)
+                except (FileNotFoundError, ConfigurationParsingError) as e:
                     # If a parsing error gets created, it should return the `entry`
                     log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)
                     pass
@@ -105,6 +106,9 @@ class ConfigurationEntry(FilesystemEntry):
     ) -> None:
         super().__init__(fs, path, entry)
         self.parser_items = parser_items
+
+    def __getitem__(self, item: str) -> ConfigurationEntry:
+        return self.parser_items[item]
 
     def get(self, path: Optional[str] = None) -> ConfigurationEntry:
         # Check for path in config entry
@@ -173,5 +177,5 @@ class ConfigurationEntry(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         return self.entry.lstat()
 
-    def __getitem__(self, item: str) -> ConfigurationEntry:
-        return self.parser_items[item]
+    def as_dict(self) -> dict:
+        return self.parser_items

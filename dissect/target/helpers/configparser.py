@@ -8,6 +8,8 @@ from typing import Any, ItemsView, KeysView, Optional, TextIO, Union
 
 from dissect.target.exceptions import ConfigurationParsingError
 from dissect.target.filesystem import FilesystemEntry
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.exceptions import FileNotFoundError
 
 
 # TODO: Look if I can just create a parsing function and attach it to the
@@ -38,6 +40,12 @@ class ConfigurationParser:
         return self.parsed_data.get(item, default)
 
     def read_file(self, fh: TextIO) -> None:
+        """Parse a configuration file.
+
+        Raises:
+            ConfigurationParsingError: If any exception occurs during during the parsing process
+        """
+
         try:
             self.parse_file(fh)
         except Exception as e:
@@ -220,6 +228,38 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, seperator=(r"\s")),
 }
+
+
+def parse(
+    path: Union[FilesystemEntry, TargetPath],
+    hint: Optional[str] = None,
+    collapse: Optional[Union[bool, set]] = None,
+    seperator: Optional[tuple[str]] = None,
+    comment_prefixes: Optional[tuple[str]] = None,
+) -> dict:
+    """Parses the content of an ``path`` or ``entry`` to a dictionary.
+
+    Args:
+        file_path: An entry or targetpath that with contents to parse
+        hint: A hint to what parser should be used.
+        collapse:
+        seperator: What seperator to use for key value mapping
+        comment_prefixes: The characters that determine a comment.
+
+    Raises:
+        FileNotFoundError: If the ``path`` is not a file.
+    """
+
+    if not path.is_file():
+        raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
+
+    entry = path
+    if isinstance(path, TargetPath):
+        entry = path.get()
+
+    options = ParserOptions(collapse, seperator, comment_prefixes)
+
+    return parse_config(entry, hint, options)
 
 
 def parse_config(

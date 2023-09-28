@@ -30,5 +30,11 @@ def test_config_tree_plugin(target_unix: Target, fs_unix: VirtualFilesystem, tmp
     assert isinstance(target_unix.config_tree.get(), ConfigurationFilesystem)
     assert isinstance(target_unix.config_tree.get("/etc/new/path/config/help", **options), ConfigurationEntry)
 
+    assert sorted(list(target_unix.config_tree("/etc/new/path/config", as_dict=True, **options).keys())) == [
+        "help",
+        "test",
+    ]
+    assert isinstance(target_unix.config_tree.get("/etc/new/path/config/help", as_dict=True, **options), list)
+
     with pytest.raises(FileNotFoundError):
         target_unix.config_tree("/etc/new/path/help", **options)

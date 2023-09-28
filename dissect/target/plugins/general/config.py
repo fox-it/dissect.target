@@ -39,7 +39,8 @@ class ConfigurationTreePlugin(Plugin):
         collapse: Optional[Union[bool, set]] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry]:
+        as_dict: bool = False,
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
         """Create a configuration entry from a file, or a ConfigurationFilesystem from a directory.
 
         If a directory is specified in ``path``, the other arguments should be provided in the ``get`` call if needed.
@@ -50,7 +51,7 @@ class ConfigurationTreePlugin(Plugin):
             collapse: Wether it should collapse all or only certain keys.
             seperator: What seperator should be used for the parser.
             comment_prefixes: What is specified as a comment.
-
+            as_dict: Returns the dictionary instead of an entry.
         """
         if not path:
             return self.config_fs
@@ -58,7 +59,12 @@ class ConfigurationTreePlugin(Plugin):
         if isinstance(path, TargetPath):
             path = str(path)
 
-        return self.config_fs.get(path, None, hint, collapse, seperator, comment_prefixes)
+        entry = self.config_fs.get(path, None, hint, collapse, seperator, comment_prefixes)
+
+        if as_dict:
+            return entry.as_dict()
+
+        return entry
 
     @internal
     def get(
@@ -68,7 +74,8 @@ class ConfigurationTreePlugin(Plugin):
         collapse: Optional[set] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
+        as_dict: bool = False,
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry]:
-        return self.__call__(path, hint, collapse, seperator, comment_prefixes)
+        return self.__call__(path, hint, collapse, seperator, comment_prefixes, as_dict)
 
     get.__doc__ = __call__.__doc__
