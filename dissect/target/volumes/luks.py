@@ -71,9 +71,6 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             log.exception("Failed to unlock LUKS volume with key file %s", key_file)
 
     def unlock_volume(self) -> AlignedStream:
-        import ipdb
-
-        ipdb.set_trace()
         keyslots = list(map(str, self.luks.keyslots.keys()))
         keys = self.get_keys_for_identifiers(keyslots) + self.get_keys_without_identifier()
 
