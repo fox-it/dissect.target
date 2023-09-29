@@ -22,6 +22,8 @@ vmfs = import_lazy("dissect.target.volumes.vmfs")
 """A lazy import of :mod:`dissect.target.volumes.vmfs`."""
 md = import_lazy("dissect.target.volumes.md")
 """A lazy import of :mod:`dissect.target.volumes.md`."""
+ddf = import_lazy("dissect.target.volumes.ddf")
+"""A lazy import of :mod:`dissect.target.volumes.ddf`."""
 bde = import_lazy("dissect.target.volumes.bde")
 """A lazy import of :mod:`dissect.target.volumes.bde`."""
 
@@ -32,6 +34,7 @@ LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
     lvm.LvmVolumeSystem,
     vmfs.VmfsVolumeSystem,
     md.MdVolumeSystem,
+    ddf.DdfVolumeSystem,
 ]
 """All available :class:`LogicalVolumeSystem` classes."""
 ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
