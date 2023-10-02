@@ -103,10 +103,10 @@ def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
         "language": None,
         "timezone": None,
         "install_date": None,
-        "last_activity": None,
+        "activity": None,
     }
 
-    optional = ["domain", "language", "timezone", "install_date", "last_activity"]
+    optional = ["domain", "language", "timezone", "install_date", "activity"]
 
     for func in optional:
         if target.has_function(func):
