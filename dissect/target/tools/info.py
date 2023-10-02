@@ -120,6 +120,8 @@ def print_target_info(target: Target) -> None:
 
     for name, value in get_target_info(target).items():
         if name in ["disks", "volumes", "children"]:
+            if not any(value):
+                continue
             print(f"\n{name.capitalize()}")
             for i in value:
                 values = " ".join([f'{k}="{v}"' for k, v in i.items()])
