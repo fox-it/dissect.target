@@ -20,7 +20,7 @@ from ._utils import absolute_path
 def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem) -> VirtualFilesystem:
     tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("data/config_tree/config")).read_text())
+    tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("data/helpers/configparser/config")).read_text())
     fs_unix.map_dir("/etc", tmp_path)
 
     return fs_unix
@@ -38,7 +38,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
     "test_file, expected_output",
     [
         (
-            "data/config_tree/hosts",
+            "data/helpers/configparser/hosts",
             {
                 "127.0.0.1": "localhost",
                 "::1": "localhost",
@@ -46,19 +46,19 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
             },
         ),
         (
-            "data/config_tree/hosts.allow",
+            "data/helpers/configparser/hosts.allow",
             {"ALL": ["LOCAL @some_netgroup", ".foobar.edu EXCEPT terminalserver.foobar.edu"]},
         ),
         (
-            "data/config_tree/hosts.deny",
+            "data/helpers/configparser/hosts.deny",
             {"ALL": "PARANOID", "ALL EXCEPT in.fingerd": "other.host.name, .other.domain"},
         ),
         (
-            "data/config_tree/resolv.conf",
+            "data/helpers/configparser/resolv.conf",
             {"nameserver": "127.0.0.53", "options": "edns0", "search": "local"},
         ),
         (
-            "data/config_tree/sshd_config",
+            "data/helpers/configparser/sshd_config",
             {
                 "HostKey": [f"__PROGRAMDATA__/ssh/ssh_host_{key}_key" for key in ["rsa", "dsa", "ecdsa", "ed25519"]],
                 "AuthorizedKeysFile": ".ssh/authorized_keys",

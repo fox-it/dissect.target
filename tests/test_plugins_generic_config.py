@@ -18,7 +18,7 @@ def test_config_tree_plugin(target_unix: Target, fs_unix: VirtualFilesystem, tmp
     tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
     tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
     fs_unix.map_dir("/etc", tmp_path)
-    fs_unix.map_file("/etc/new/path/config", absolute_path("data/config_tree/config"))
+    fs_unix.map_file("/etc/new/path/config", absolute_path("data/helpers/configparser/config"))
 
     target_unix.add_plugin(ConfigurationTreePlugin)
 
