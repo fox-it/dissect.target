@@ -24,6 +24,7 @@ class ConfigurationTreePlugin(Plugin):
         target_dir_path = self.target.fs.path(dir_path)
         if target_dir_path.is_dir():
             self.config_fs = ConfigurationFilesystem(target, dir_path)
+        self.__call__ = lru_cache(128)(self.__call__)
 
     def check_compatible(self) -> None:
         # This should be able to be retrieved, regardless of OS
@@ -31,7 +32,6 @@ class ConfigurationTreePlugin(Plugin):
             raise UnsupportedPluginError(f"{self.dir_path!r} could not be found.")
         return None
 
-    @lru_cache(128)
     def __call__(
         self,
         path: Optional[Union[TargetPath, str]] = None,
