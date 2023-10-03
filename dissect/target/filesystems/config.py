@@ -72,7 +72,6 @@ class ConfigurationFilesystem(VirtualFilesystem):
                 except (FileNotFoundError, ConfigurationParsingError) as e:
                     # If a parsing error gets created, it should return the `entry`
                     log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)
-                    pass
         return entry
 
 
