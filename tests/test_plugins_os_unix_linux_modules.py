@@ -19,4 +19,4 @@ def test_modules_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None
     assert results[1].name == "moduleb"
     assert results[1].size == 2
     assert results[1].refcount == 4
-    assert results[1].used_by == ["holdera", "holderb"]
+    assert sorted(results[1].used_by) == ["holdera", "holderb"]
