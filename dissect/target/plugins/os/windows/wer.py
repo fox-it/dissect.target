@@ -16,8 +16,9 @@ arraylike_pattern = re.compile(r"([_a-zA-Z][a-zA-Z0-9]*)\[(\d+)\]")
 
 
 def _clean_key(key: str) -> str:
-    def _clean(c):
-        return "_" + key[0].encode("unicode_escape").hex()
+    def _clean(char: str) -> str:
+        return f"_{ord(char):x}"
+        
     first = key[0] if (key[0].isidentifier() and key[0].isascii()) else _clean(key[0])
 
     def _is_valid(c):
