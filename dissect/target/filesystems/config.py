@@ -76,6 +76,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
                 entry = entry.get(part)
             else:
                 try:
+                    # The parts in _get_till_file also includes the filename, so we do not join
+                    # the part with entry.path here.
                     config_parser = parse(entry, hint, collapse, seperator, comment_prefixes)
                     entry = ConfigurationEntry(self, entry.path, entry, config_parser)
                 except (FileNotFoundError, ConfigurationParsingError) as e:
