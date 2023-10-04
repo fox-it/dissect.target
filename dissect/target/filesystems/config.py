@@ -22,6 +22,15 @@ class ConfigurationFilesystem(VirtualFilesystem):
         self.root.top = target.fs.get(path)
 
     def _get_till_file(self, path: str, relentry: FilesystemEntry) -> tuple[list[str], FilesystemEntry]:
+        """Searches for the file entry that is pointed to by ``path``.
+
+        The ``path`` could contain ``key`` entries too, so it searches for the entry from
+        the start of the path.
+
+        Returns:
+            A list of ``parts``: [filename, keys, into, the, file].
+            And the resolved entry.
+        """
         entry = relentry or self.root
 
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
