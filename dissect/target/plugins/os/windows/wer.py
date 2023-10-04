@@ -76,6 +76,9 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
             # to be used.
             key = _clean_key(key)
 
+            # Fields that start with an underscore are reserved, add a prefix.
+            key = f"n{key}" if key.startswith("_") else key
+
             record_values[key] = value
             record_fields.append((record_type, key)) if key != "ts" else record_fields.insert(0, (record_type, key))
             # reset key necessary for dynamic entries and ts
