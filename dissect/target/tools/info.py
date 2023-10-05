@@ -90,29 +90,26 @@ def main():
 
 
 def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
-    info = {
+    return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
         "children": get_children_info(target),
         "hostname": target.hostname,
-        "domain": None,
+        "domain": get_optional_func(target, "domain"),
         "ips": target.ips,
         "os_family": target.os,
         "os_version": target.version,
         "architecture": target.architecture,
-        "language": None,
-        "timezone": None,
-        "install_date": None,
-        "activity": None,
+        "language": get_optional_func(target, "language"),
+        "timezone": get_optional_func(target, "timezone"),
+        "install_date": get_optional_func(target, "install_date"),
+        "last_activity": get_optional_func(target, "activity"),
     }
 
-    optional = ["domain", "language", "timezone", "install_date", "activity"]
 
-    for func in optional:
-        if target.has_function(func):
-            info[func] = getattr(target, func)
-
-    return info
+def get_optional_func(target: Target, func: str) -> Union[str, None]:
+    if target.has_function(func):
+        return getattr(target, func)
 
 
 def print_target_info(target: Target) -> None:
