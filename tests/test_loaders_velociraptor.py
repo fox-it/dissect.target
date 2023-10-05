@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from dissect.target import Target
+from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.loaders.velociraptor import VelociraptorLoader
 
 from ._utils import absolute_path, mkdirs
@@ -22,7 +23,7 @@ def create_paths(sub_dir: str) -> list[str]:
     "sub_dir",
     ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_velociraptor_loader_windows_ntfs(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
+def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     paths = create_paths(sub_dir)
     root = tmp_path
     mkdirs(root, paths)
@@ -43,20 +44,24 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, mock_target: Target, tmp
     assert VelociraptorLoader.detect(root) is True
 
     loader = VelociraptorLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
     # TODO: Add fake Secure:SDS and verify mft function
-    assert len(list(mock_target.usnjrnl())) == 1
+    usnjrnl_records = 0
+    for fs in target_bare.filesystems:
+        if isinstance(fs, NtfsFilesystem):
+            usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
+    assert usnjrnl_records == 1
 
     # The 2 found directories + the fake NTFS filesystem
-    assert len(mock_target.filesystems) == 3
+    assert len(target_bare.filesystems) == 3
 
 
 @pytest.mark.parametrize(
     "sub_dir",
     ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target, tmp_path: Path) -> None:
+def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     paths = create_paths(sub_dir)
     root = tmp_path
     mkdirs(root, paths)
@@ -80,10 +85,14 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target,
     assert VelociraptorLoader.detect(zip_path) is True
 
     loader = VelociraptorLoader(zip_path)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(list(mock_target.usnjrnl())) == 1
-    assert len(mock_target.filesystems) == 3
+    usnjrnl_records = 0
+    for fs in target_bare.filesystems:
+        if isinstance(fs, NtfsFilesystem):
+            usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
+    assert usnjrnl_records == 1
+    assert len(target_bare.filesystems) == 3
 
 
 @pytest.mark.parametrize(
@@ -97,7 +106,7 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, mock_target: Target,
         (["uploads/auto/Library", "uploads/auto/Applications"]),
     ],
 )
-def test_dir_loader_unix(paths: list[str], mock_target: Target, tmp_path: Path) -> None:
+def test_dir_loader_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 
@@ -106,9 +115,9 @@ def test_dir_loader_unix(paths: list[str], mock_target: Target, tmp_path: Path) 
     assert VelociraptorLoader.detect(root) is True
 
     loader = VelociraptorLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1
 
 
 @pytest.mark.parametrize(
@@ -122,7 +131,7 @@ def test_dir_loader_unix(paths: list[str], mock_target: Target, tmp_path: Path) 
         (["uploads/auto/Library", "uploads/auto/Applications"]),
     ],
 )
-def test_dir_loader_unix_zip(paths: list[str], mock_target: Target, tmp_path: Path) -> None:
+def test_dir_loader_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 
@@ -134,6 +143,6 @@ def test_dir_loader_unix_zip(paths: list[str], mock_target: Target, tmp_path: Pa
     assert VelociraptorLoader.detect(zip_path) is True
 
     loader = VelociraptorLoader(zip_path)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1

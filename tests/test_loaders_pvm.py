@@ -7,7 +7,7 @@ from ._utils import mkdirs
 
 @patch("dissect.target.loaders.pvs.HddContainer")
 @patch("dissect.target.loaders.pvs.pvs.PVS")
-def test_pvm_loader(PVS, HddContainer, mock_target, tmp_path):
+def test_pvm_loader(PVS, HddContainer, target_bare, tmp_path):
     mkdirs(tmp_path, ["Test.pvm"])
     (tmp_path / "Test.pvm" / "config.pvs").touch()
 
@@ -16,7 +16,7 @@ def test_pvm_loader(PVS, HddContainer, mock_target, tmp_path):
     HddContainer.return_value = HddContainer
 
     pvm_loader = PvmLoader(tmp_path / "Test.pvm")
-    pvm_loader.map(mock_target)
+    pvm_loader.map(target_bare)
 
-    assert len(mock_target.disks) == 1
+    assert len(target_bare.disks) == 1
     assert HddContainer.mock_calls == [call(tmp_path.resolve() / "Test.pvm" / "mock.hdd")]
