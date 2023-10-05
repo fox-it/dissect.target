@@ -122,7 +122,7 @@ def print_target_info(target: Target) -> None:
             print(f"\n{name.capitalize()}")
             for i in value:
                 values = " ".join([f'{k}="{v}"' for k, v in i.items()])
-                print(f"- <{name.capitalize()} {values}>")
+                print(f"- <{name.capitalize()[:-1].replace('re', '')} {values}>")
             continue
 
         if isinstance(value, list):
