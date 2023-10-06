@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from dissect.hypervisor import ovf
 
-from dissect.target.containers.vmdk import VmdkContainer
+from dissect.target import container
 from dissect.target.loader import Loader
+from dissect.target.target import Target
 
 
 class OvfLoader(Loader):
@@ -11,29 +14,25 @@ class OvfLoader(Loader):
         - https://en.wikipedia.org/wiki/Open_Virtualization_Format
     """
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         path = path.resolve()
-
         super().__init__(path)
-        with open(path) as fh:
+
+        with path.open("r") as fh:
             self.ovf = ovf.OVF(fh)
         self.base_dir = path.parent
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         return path.suffix.lower() == ".ovf"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         for disk in self.ovf.disks():
+            disk = disk.replace("\\", "/")
+            _, _, fname = disk.rpartition("/")
+            path = self.base_dir.joinpath(fname)
+
             try:
-                path = disk.replace("\\", "/")
-                _, _, fname = path.rpartition("/")
-                fh = self.open(fname)
-            except IOError:
-                target.log.exception("Failed to find disk: %s", disk)
-                continue
-
-            target.disks.add(VmdkContainer(fh))
-
-    def open(self, path):
-        return self.base_dir.joinpath(path).open("rb")
+                target.disks.add(container.open(path))
+            except Exception:
+                target.log.exception("Failed to load disk: %s", disk)
