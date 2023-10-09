@@ -11,28 +11,22 @@ from dissect.target.filesystem import VirtualFilesystem, VirtualSymlink
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
+from dissect.target.plugins.os.unix._os import UnixPlugin
+from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
+from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows import registry
+from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 
 from ._utils import absolute_path
 
 
-def make_dummy_target():
-    target = Target()
-    target.add_plugin(default.DefaultPlugin)
-    return target
-
-
 def make_mock_target():
     with tempfile.NamedTemporaryFile(prefix="MockTarget-") as tmp_file:
-        target = make_dummy_target()
+        target = Target()
         target.path = pathlib.Path(tmp_file.name)
         yield target
-
-
-@pytest.fixture
-def mock_target():
-    yield from make_mock_target()
 
 
 @pytest.fixture
@@ -173,14 +167,23 @@ def hive_hku():
 
 
 @pytest.fixture
+def target_bare():
+    # A target without any associated OSPlugin
+    yield from make_mock_target()
+
+
+@pytest.fixture
 def target_default():
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = default.DefaultPlugin
+    mock_target.apply()
     yield mock_target
 
 
 @pytest.fixture
 def target_win(hive_hklm, fs_win):
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = WindowsPlugin
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
     mock_target.registry.add_hive(
@@ -199,6 +202,7 @@ def target_win(hive_hklm, fs_win):
 @pytest.fixture
 def target_unix(fs_unix):
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = UnixPlugin
 
     mock_target.filesystems.add(fs_unix)
     mock_target.fs.mount("/", fs_unix)
@@ -209,6 +213,7 @@ def target_unix(fs_unix):
 @pytest.fixture
 def target_linux(fs_linux):
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = LinuxPlugin
 
     mock_target.filesystems.add(fs_linux)
     mock_target.fs.mount("/", fs_linux)
@@ -219,6 +224,7 @@ def target_linux(fs_linux):
 @pytest.fixture
 def target_osx(fs_osx):
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = MacPlugin
 
     mock_target.filesystems.add(fs_osx)
     mock_target.fs.mount("/", fs_osx)
@@ -236,6 +242,8 @@ def target_osx(fs_osx):
 @pytest.fixture
 def target_citrix(fs_bsd):
     mock_target = next(make_mock_target())
+    mock_target._os_plugin = CitrixBsdPlugin
+
     mock_target.filesystems.add(fs_bsd)
 
     var_filesystem = VirtualFilesystem()

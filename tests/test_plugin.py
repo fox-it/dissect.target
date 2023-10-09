@@ -16,6 +16,7 @@ from dissect.target.plugin import (
     export,
     find_plugin_functions,
     get_external_module_paths,
+    plugins,
     save_plugin_import_failure,
 )
 from dissect.target.target import Target
@@ -209,6 +210,24 @@ class _TestIncompatiblePlugin(Plugin):
         raise UnsupportedPluginError("My incompatible plugin error")
 
 
-def test_incompatible_plugin(mock_target: Target) -> None:
+def test_incompatible_plugin(target_bare: Target) -> None:
     with pytest.raises(UnsupportedPluginError, match="My incompatible plugin error"):
-        mock_target.add_plugin(_TestIncompatiblePlugin)
+        target_bare.add_plugin(_TestIncompatiblePlugin)
+
+
+def test_plugins(target_default) -> None:
+    all_plugins = list(plugins())
+    default_plugin_plugins = list(plugins(target_default._os_plugin))
+
+    assert default_plugin_plugins == all_plugins
+
+    # The all_with_home is a sentinel function, which should be loaded for a
+    # target with DefaultPlugin as OS plugin.
+    sentinel_function = "all_with_home"
+    has_sentinel_function = False
+    for plugin in default_plugin_plugins:
+        if sentinel_function in plugin.get("functions", []):
+            has_sentinel_function = True
+            break
+
+    assert has_sentinel_function

@@ -6,7 +6,7 @@ from ._utils import absolute_path, mkdirs
 
 
 @patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
-def test_tanium_loader(mock_target, tmp_path):
+def test_tanium_loader(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["file/C/windows/system32", "file/C/$Extend", "file/D/test", "file/E/test"])
 
@@ -25,9 +25,9 @@ def test_tanium_loader(mock_target, tmp_path):
     assert TaniumLoader.detect(root)
 
     loader = TaniumLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
     # The 3 found drive letter directories + the fake NTFS filesystem
-    assert len(mock_target.filesystems) == 4
-    assert len(mock_target.fs.mounts) == 3
-    assert len(list(mock_target.usnjrnl())) == 1
+    assert len(target_bare.filesystems) == 4
+    assert len(target_bare.fs.mounts) == 3
+    assert len(list(target_bare.fs.mounts["C:"].ntfs.usnjrnl.records())) == 1

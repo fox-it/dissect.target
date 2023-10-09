@@ -9,7 +9,7 @@ from dissect.target.tools.mount import main as target_mount
 from dissect.target.volume import Volume
 
 
-def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_duplicate_volume_name(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-mount", "mock-target", "mock-mount"])
         m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
@@ -17,22 +17,22 @@ def test_duplicate_volume_name(mock_target: Target, monkeypatch: pytest.MonkeyPa
         with patch("dissect.target.tools.mount.Target") as MockTarget, patch(
             "dissect.target.tools.mount.FUSE", create=True
         ) as MockFUSE, patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount:
-            MockTarget.open.return_value = mock_target
+            MockTarget.open.return_value = target_bare
 
-            mock_target.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
-            mock_target.volumes.add(Volume(BytesIO(), 2, 0, 0, None, name="second"))
-            mock_target.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second_1"))
-            mock_target.volumes.add(Volume(BytesIO(), 4, 0, 0, None, name="second"))
+            target_bare.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))
+            target_bare.volumes.add(Volume(BytesIO(), 2, 0, 0, None, name="second"))
+            target_bare.volumes.add(Volume(BytesIO(), 3, 0, 0, None, name="second_1"))
+            target_bare.volumes.add(Volume(BytesIO(), 4, 0, 0, None, name="second"))
 
             mock_fs = VirtualFilesystem()
-            mock_fs.volume = mock_target.volumes[1]
-            mock_target.filesystems.add(mock_fs)
+            mock_fs.volume = target_bare.volumes[1]
+            target_bare.filesystems.add(mock_fs)
             mock_fs = VirtualFilesystem()
-            mock_fs.volume = mock_target.volumes[2]
-            mock_target.filesystems.add(mock_fs)
+            mock_fs.volume = target_bare.volumes[2]
+            target_bare.filesystems.add(mock_fs)
             mock_fs = VirtualFilesystem()
-            mock_fs.volume = mock_target.volumes[3]
-            mock_target.filesystems.add(mock_fs)
+            mock_fs.volume = target_bare.volumes[3]
+            target_bare.filesystems.add(mock_fs)
 
             target_mount()
 

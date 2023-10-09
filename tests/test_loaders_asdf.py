@@ -6,15 +6,15 @@ from dissect.target.loaders.asdf import AsdfLoader
 from ._utils import absolute_path
 
 
-def test_asdf_loader_metadata(mock_target: Target):
+def test_asdf_loader_metadata(target_bare: Target):
     asdf_path = Path(absolute_path("data/loaders/asdf/metadata.asdf"))
 
     loader = AsdfLoader(asdf_path)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 0
+    assert len(target_bare.filesystems) == 0
 
-    assert list(map(str, mock_target.fs.path("/").rglob("*"))) == [
+    assert list(map(str, target_bare.fs.path("/").rglob("*"))) == [
         "/$asdf$",
         "/$asdf$/file_1",
         "/$asdf$/dir",
