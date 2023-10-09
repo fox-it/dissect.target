@@ -84,7 +84,7 @@ def test_get(vfs):
     assert vfs.get("filelink2").stat() == vfs.get("/path/to/some/file").stat()
 
 
-def test_symlink_across_layers(mock_target):
+def test_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -92,18 +92,18 @@ def test_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target").readlink_ext()
 
     assert target_dir.stat() == target_entry.entries[0].stat()
 
 
-def test_symlink_files_across_layers(mock_target):
+def test_symlink_files_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -111,19 +111,19 @@ def test_symlink_files_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target/derp")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/derp")
+    target_entry = target_bare.fs.get("/path/to/symlink/target/derp")
 
     assert len(target_entry.entries) != 0
     assert target_dir.stat() == target_entry.stat()
 
 
-def test_symlink_to_symlink_across_layers(mock_target):
+def test_symlink_to_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     target_dir = vfs1.makedirs("/path/target")
@@ -132,18 +132,18 @@ def test_symlink_to_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("../target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
     assert target_dir.stat() == target_entry.stat()
 
 
-def test_recursive_symlink_across_layers(mock_target):
+def test_recursive_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -151,17 +151,17 @@ def test_recursive_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+        target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
 
-def test_symlink_across_3_layers(mock_target):
+def test_symlink_across_3_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -172,24 +172,24 @@ def test_symlink_across_3_layers(mock_target):
     vfs3 = VirtualFilesystem()
     target_dir = vfs3.makedirs("/path/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    layer3 = mock_target.fs.add_layer()
+    layer3 = target_bare.fs.add_layer()
     layer3.mount("/", vfs3)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
     assert target_dir.stat() == target_entry.stat()
-    stat_b = mock_target.fs.get("/path/to/symlink/target/").stat()
-    stat_a = mock_target.fs.get("/path/to/target/").stat()
+    stat_b = target_bare.fs.get("/path/to/symlink/target/").stat()
+    stat_a = target_bare.fs.get("/path/to/target/").stat()
     assert stat_a == stat_b
 
 
-def test_recursive_symlink_open_across_layers(mock_target):
+def test_recursive_symlink_open_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -197,22 +197,22 @@ def test_recursive_symlink_open_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").open()
+        target_bare.fs.get("/path/to/symlink/target/").open()
 
 
-def test_recursive_symlink_dev(mock_target):
+def test_recursive_symlink_dev(target_bare):
     fs1 = ExtFilesystem(fh=open(absolute_path("data/symlink_disk.ext4"), "rb"))
-    mock_target.fs.mount(fs=fs1, path="/")
+    target_bare.fs.mount(fs=fs1, path="/")
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+        target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
 
 @pytest.mark.parametrize(

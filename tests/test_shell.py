@@ -91,8 +91,8 @@ def test_targethubcli_autocomplete_enter(make_mock_targets):
     assert suggestions == ["1"]
 
 
-def test_targetcli_autocomplete(mock_target):
-    target_cli = TargetCli(mock_target)
+def test_targetcli_autocomplete(target_bare):
+    target_cli = TargetCli(target_bare)
 
     base_path = "/base-path/"
     subpath_match = "subpath1"
@@ -112,8 +112,8 @@ def test_targetcli_autocomplete(mock_target):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_pipe_symbol_parsing(capfd, mock_target):
-    cli = TargetCli(mock_target)
+def test_pipe_symbol_parsing(capfd, target_bare):
+    cli = TargetCli(target_bare)
 
     def mock_func(func_args, func_stdout):
         # if the operation of parsing out the first `|` was successful,
@@ -136,8 +136,8 @@ def test_pipe_symbol_parsing(capfd, mock_target):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_exec_target_command(capfd, mock_target):
-    cli = TargetCli(mock_target)
+def test_exec_target_command(capfd, target_default):
+    cli = TargetCli(target_default)
     command = "users"
     # `users` from the general OSPlugin does not ouput any records, but as the
     # ouput is piped to, the records are transformed to a binary record stream,

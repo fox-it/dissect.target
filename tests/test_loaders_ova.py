@@ -8,7 +8,7 @@ from dissect.target.target import Target
 
 @patch("dissect.target.loaders.ovf.container")
 @patch("dissect.target.loaders.ovf.ovf.OVF")
-def test_ova_loader(OVF: MagicMock, container: MagicMock, mock_target: Target, tmp_path: Path):
+def test_ova_loader(OVF: MagicMock, container: MagicMock, target_bare: Target, tmp_path: Path):
     tf = tarfile.open((tmp_path / "test.ova"), "w")
     tf.addfile(tarfile.TarInfo("test.ovf"), b"")
     tf.addfile(tarfile.TarInfo("disk.vmdk"), b"")
@@ -19,7 +19,7 @@ def test_ova_loader(OVF: MagicMock, container: MagicMock, mock_target: Target, t
     container.open.return_value = MagicMock()
 
     ova_loader = OvaLoader(tmp_path / "test.ova")
-    ova_loader.map(mock_target)
+    ova_loader.map(target_bare)
 
-    assert len(mock_target.disks) == 1
+    assert len(target_bare.disks) == 1
     assert container.open.mock_calls == [call(ova_loader.base_dir / "disk.vmdk")]

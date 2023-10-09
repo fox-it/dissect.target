@@ -7,7 +7,7 @@ from dissect.target.target import Target
 
 @patch("dissect.target.loaders.ovf.container")
 @patch("dissect.target.loaders.ovf.ovf.OVF")
-def test_ovf_loader(OVF: MagicMock, container: MagicMock, mock_target: Target, tmp_path: Path):
+def test_ovf_loader(OVF: MagicMock, container: MagicMock, target_bare: Target, tmp_path: Path):
     (tmp_path / "test.ovf").touch()
 
     OVF.return_value = OVF
@@ -15,7 +15,7 @@ def test_ovf_loader(OVF: MagicMock, container: MagicMock, mock_target: Target, t
     container.open.return_value = MagicMock()
 
     ovf_loader = OvfLoader(tmp_path / "test.ovf")
-    ovf_loader.map(mock_target)
+    ovf_loader.map(target_bare)
 
-    assert len(mock_target.disks) == 1
+    assert len(target_bare.disks) == 1
     assert container.open.mock_calls == [call(tmp_path.resolve() / "disk.vmdk")]
