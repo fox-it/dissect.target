@@ -2,7 +2,7 @@ import csv
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import List, NamedTuple, Set
+from typing import NamedTuple, Union
 
 log = logging.getLogger(__name__)
 
@@ -11,33 +11,41 @@ class KeyType(Enum):
     PASSPHRASE = "passphrase"
     RECOVERY_KEY = "recovery_key"
     FILE = "file"
+    RAW = "raw"
 
 
 class Key(NamedTuple):
     key_type: KeyType
-    value: str
+    value: Union[str, bytes]
     provider: str = None
     identifier: str = None
 
 
-KEYCHAIN: Set[Key] = set()
+KEYCHAIN: set[Key] = set()
 
 
-def register_key(key_type: KeyType, value: str, identifier: str = None, provider: str = None):
-    key = Key(provider=provider, key_type=key_type, value=value, identifier=identifier)
+def register_key(key_type: KeyType, value: str, identifier: str = None, provider: str = None) -> None:
+    if key_type == KeyType.RAW:
+        try:
+            value = bytes.fromhex(value)
+        except ValueError:
+            log.warning("Failed to decode raw key as hex, ignoring: %s", value)
+            return
+
+    key = Key(key_type, value, provider, identifier)
     KEYCHAIN.add(key)
     log.info("Registered key %s", key)
 
 
-def get_all_keys() -> List[Key]:
+def get_all_keys() -> list[Key]:
     return list(KEYCHAIN)
 
 
-def get_keys_for_provider(provider: str) -> List[Key]:
+def get_keys_for_provider(provider: str) -> list[Key]:
     return [key for key in KEYCHAIN if key.provider and key.provider.lower() == provider.lower()]
 
 
-def get_keys_without_provider() -> List[Key]:
+def get_keys_without_provider() -> list[Key]:
     return [key for key in KEYCHAIN if not key.provider]
 
 
@@ -48,12 +56,12 @@ def parse_key_type(key_type_name: str) -> KeyType:
     raise ValueError("No KeyType enum values that match %s", key_type_name)
 
 
-def register_wildcard_value(value: str):
+def register_wildcard_value(value: str) -> None:
     for key_type in KeyType:
-        register_key(key_type=key_type, value=value)
+        register_key(key_type, value)
 
 
-def register_keychain_file(keychain_path: Path):
+def register_keychain_file(keychain_path: Path) -> None:
     """Register all keys from provided keychain file.
 
     The keychain file is a CSV file in "excel" dialect with the columns:

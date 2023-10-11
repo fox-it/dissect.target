@@ -52,6 +52,24 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             **volume_details,
         )
 
+    def unlock_with_volume_encryption_key(self, key: bytes, keyslot: Optional[int] = None) -> None:
+        try:
+            if keyslot is None:
+                for keyslot in self.luks.keyslots.keys():
+                    try:
+                        self.luks.unlock(key, keyslot)
+                        break
+                    except ValueError:
+                        continue
+                else:
+                    raise ValueError("Failed to find matching keyslot for provided volume encryption key")
+            else:
+                self.luks.unlock(key, keyslot)
+
+            log.debug("Unlocked LUKS volume with provided volume encryption key")
+        except ValueError:
+            log.exception("Failed to unlock LUKS volume with provided volume encryption key")
+
     def unlock_with_passphrase(self, passphrase: str, keyslot: Optional[int] = None) -> None:
         try:
             self.luks.unlock_with_passphrase(passphrase, keyslot)
@@ -80,6 +98,8 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             except Exception:
                 keyslot = None
 
+            if key.key_type == KeyType.RAW:
+                self.unlock_with_volume_encryption_key(key.value, keyslot)
             if key.key_type == KeyType.PASSPHRASE:
                 self.unlock_with_passphrase(key.value, keyslot)
             elif key.key_type == KeyType.FILE:
