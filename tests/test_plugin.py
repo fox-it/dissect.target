@@ -11,6 +11,7 @@ from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
     NamespacePlugin,
+    OSPlugin,
     Plugin,
     environment_variable_paths,
     export,
@@ -231,3 +232,19 @@ def test_plugins(target_default) -> None:
             break
 
     assert has_sentinel_function
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "hostname",
+        "ips",
+        "version",
+        "os",
+        "architecture",
+    ],
+)
+def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> str:
+    os_plugin = OSPlugin(target_bare)
+    with pytest.raises(NotImplementedError):
+        getattr(os_plugin, method_name)
