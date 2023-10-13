@@ -377,10 +377,22 @@ class OSPlugin(Plugin):
     def os(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with ``@export(property=True)``
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
+        """
+        raise NotImplementedError
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Required OS function.
+
+        Implementations must be decorated with ``@export(property=True)``.
+
+        Returns:
+            A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or
+            'AMD64-win32', or 'unknown' if the architecture is unknown.
         """
         raise NotImplementedError
 
