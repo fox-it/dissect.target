@@ -112,7 +112,7 @@ class UnixPlugin(OSPlugin):
                 )
 
     @export(property=True)
-    def architecture(self) -> str:
+    def architecture(self) -> Optional[str]:
         return self._get_architecture(self.os)
 
     @export(property=True)
