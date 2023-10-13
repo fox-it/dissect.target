@@ -12,7 +12,7 @@ from ._utils import mkdirs
 
 @patch("dissect.target.loaders.vmx.VmdkContainer")
 @patch("dissect.target.loaders.vmx.vmx.VMX")
-def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, mock_target: Target, tmp_path: Path):
+def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, target_bare: Target, tmp_path: Path):
     root = tmp_path
     mkdirs(root, ["Test.vmwarevm"])
     (root / "Test.vmwarevm" / "Test.vmx").touch()
@@ -22,7 +22,7 @@ def test_vmwarevm_loader(VMX: VMX, VmdkContainer: VmdkContainer, mock_target: Ta
     VmdkContainer.return_value = VmdkContainer
 
     vmwarevm_loader = VmwarevmLoader(root / "Test.vmwarevm")
-    vmwarevm_loader.map(mock_target)
+    vmwarevm_loader.map(target_bare)
 
-    assert len(mock_target.disks) == 1
+    assert len(target_bare.disks) == 1
     assert VmdkContainer.mock_calls == [call(root.resolve() / "Test.vmwarevm" / "mock.vmdk")]

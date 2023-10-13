@@ -22,7 +22,7 @@ from ._utils import absolute_path
         ("c:\\Virtual Machines", "c:\\Disks"),
     ],
 )
-def test_hyperv_loader_xml(descriptor_dir, disk_dir, mock_target):
+def test_hyperv_loader_xml(descriptor_dir, disk_dir, target_bare):
     gen1_xml_filename = "B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"
     gen2_xml_filename = "D351C151-DAC7-4042-B434-B72D522C1E4A.xml"
     gen1_vmcx_filename = "EC04F346-DB96-4700-AF5B-77B3C56C38BD.vmcx"
@@ -46,27 +46,27 @@ def test_hyperv_loader_xml(descriptor_dir, disk_dir, mock_target):
     assert HyperVLoader.detect(gen1_xml_path)
     with mock.patch("dissect.target.container.open") as mocked_open:
         loader = HyperVLoader(gen1_xml_path)
-        loader.map(mock_target)
+        loader.map(target_bare)
 
         mocked_open.assert_called_with(vfs.path(f"{disk_dir}\\Default Generation 1.vhdx").resolve())
 
     assert HyperVLoader.detect(gen2_xml_path)
     with mock.patch("dissect.target.container.open") as mocked_open:
         loader = HyperVLoader(gen2_xml_path)
-        loader.map(mock_target)
+        loader.map(target_bare)
 
         mocked_open.assert_called_with(vfs.path(f"{disk_dir}\\Default Generation 2.vhdx").resolve())
 
     assert HyperVLoader.detect(gen1_vmcx_path)
     with mock.patch("dissect.target.container.open") as mocked_open:
         loader = HyperVLoader(gen1_vmcx_path)
-        loader.map(mock_target)
+        loader.map(target_bare)
 
         mocked_open.assert_called_with(vfs.path(f"{disk_dir}\\Default Generation 1.vhdx").resolve())
 
     assert HyperVLoader.detect(gen2_vmcx_path)
     with mock.patch("dissect.target.container.open") as mocked_open:
         loader = HyperVLoader(gen2_vmcx_path)
-        loader.map(mock_target)
+        loader.map(target_bare)
 
         mocked_open.assert_called_with(vfs.path(f"{disk_dir}\\Default Generation 2.vhdx").resolve())

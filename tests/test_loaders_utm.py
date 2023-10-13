@@ -9,7 +9,7 @@ from ._utils import mkdirs
 
 
 @patch("dissect.target.loaders.utm.container")
-def test_utm_loader(container: MagicMock, mock_target: Target, tmp_path: Path):
+def test_utm_loader(container: MagicMock, target_bare: Target, tmp_path: Path):
     dummy_plist = """<?xml version="1.0" encoding="UTF-8"?>
     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
     <plist version="1.0">
@@ -43,7 +43,7 @@ def test_utm_loader(container: MagicMock, mock_target: Target, tmp_path: Path):
     assert UtmLoader.detect(utm_path)
 
     utm_loader = UtmLoader(utm_path)
-    utm_loader.map(mock_target)
+    utm_loader.map(target_bare)
 
-    assert len(mock_target.disks) == 1
+    assert len(target_bare.disks) == 1
     assert container.open.mock_calls == [call(root.resolve() / "Test.utm" / "Data" / "Test.qcow2")]

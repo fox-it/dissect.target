@@ -1,3 +1,4 @@
+import re
 from collections import OrderedDict
 from configparser import ConfigParser
 from os.path import basename
@@ -59,9 +60,6 @@ class WireGuardPlugin(Plugin):
           "/etc/systemd/network/*wg*.netdev",
     TODO: other locations such as $HOME/.config/wireguard
     TODO: parse native network manager formats from MacOS, Ubuntu and Windows.
-    TODO: parse Windows dpapi files at:
-          - C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\WireGuard\\Configurations
-          - C:\\Program Files\\WireGuard\\Data\\Configurations
     """
 
     CONFIG_GLOBS = [
@@ -74,6 +72,8 @@ class WireGuardPlugin(Plugin):
         "C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\WireGuard\\Configurations\\*.dpapi",
         "C:\\Program Files\\WireGuard\\Data\\Configurations\\*.dpapi",
     ]
+
+    TUNNEL_NAME_RE = re.compile(r"\.(conf(\.dpapi)?|netdev)$")
 
     def __init__(self, target) -> None:
         super().__init__(target)
@@ -104,9 +104,13 @@ class WireGuardPlugin(Plugin):
 
             for section in config.sections():
                 if "Interface" in section:
+                    if address := config.get(section, "Address", fallback=None):
+                        address = address.split("/")[0]
+                    name = basename(config_path)
+                    name = self.TUNNEL_NAME_RE.sub("", name)
                     yield WireGuardInterfaceRecord(
-                        name=basename(config_path).replace(".conf", "").replace(".netdev", ""),
-                        address=config.get(section, "Address").split("/")[0],
+                        name=name,
+                        address=address,
                         listen_port=config.get(section, "ListenPort", fallback=None),
                         private_key=config.get(section, "PrivateKey", fallback=None),
                         fw_mark=config.get(section, "FwMark", fallback=None),

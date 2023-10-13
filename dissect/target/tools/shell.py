@@ -32,7 +32,6 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
 from dissect.target.helpers import fsutil, regutil
 from dissect.target.plugin import arg
-from dissect.target.plugins.os.unix.config import ConfigurationFs
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
@@ -869,7 +868,7 @@ class TargetCli(TargetCmd):
 class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
-        self.config_tree = ConfigurationFs(target)
+        self.config_tree = target.etc()
         self.prompt_base = target.name
 
         self.cwd = None
@@ -879,8 +878,8 @@ class UnixConfigTreeCli(TargetCli):
     def prompt(self) -> str:
         return f"{self.prompt_base}/config_tree {self.cwd}> "
 
-    def check_compatible(target) -> bool:
-        return target.fs.get("/etc") is not None
+    def check_compatible(target: Target) -> bool:
+        return target.has_function("etc")
 
     def resolve_path(self, path: Optional[Union[str, fsutil.TargetPath]]) -> fsutil.TargetPath:
         if not path:
@@ -889,7 +888,8 @@ class UnixConfigTreeCli(TargetCli):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.config_tree.alt_separator)
+        # It uses the alt seperator of the underlying fs
+        path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
     def resolve_key(self, path) -> FilesystemEntry:
