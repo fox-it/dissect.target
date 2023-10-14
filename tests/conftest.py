@@ -259,6 +259,19 @@ def target_citrix(fs_bsd):
 
 
 @pytest.fixture
+def target_android() -> Target:
+    mock_target = next(make_mock_target())
+
+    mock_filesystem = VirtualFilesystem()
+    mock_filesystem.map_file("/build.prop", absolute_path("data/plugins/os/unix/linux/android/build.prop"))
+
+    mock_target.filesystems.add(mock_filesystem)
+
+    mock_target.apply()
+    yield mock_target
+
+
+@pytest.fixture
 def target_win_users(hive_hklm, hive_hku, target_win):
     profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
     profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
