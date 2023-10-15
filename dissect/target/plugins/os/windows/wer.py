@@ -15,6 +15,7 @@ camel_case_patterns = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])
 arraylike_pattern = re.compile(r"([_a-zA-Z][a-zA-Z0-9]*)\[(\d+)\]")
 
 
+@functools.lru_cache()
 def _clean_key(key: str) -> str:
     def _clean(char: str) -> str:
         return f"_{ord(char):x}"
