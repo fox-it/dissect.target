@@ -194,6 +194,7 @@ register("vma", "VmaLoader")
 register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
+register("ab", "AndroidBackupLoader")
 register("target", "TargetLoader")
 register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536
