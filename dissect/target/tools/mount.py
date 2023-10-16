@@ -3,6 +3,7 @@ import logging
 from typing import Union
 
 from dissect.target import Target, filesystem
+from dissect.target.exceptions import TargetError
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -44,7 +45,13 @@ def main():
     if not HAS_FUSE:
         parser.exit("fusepy is not installed: pip install fusepy")
 
-    t = Target.open(args.target)
+    try:
+        t = Target.open(args.target)
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
+
     vfs = filesystem.VirtualFilesystem()
     vfs.mount("fs", t.fs)
 
