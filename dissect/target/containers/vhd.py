@@ -18,12 +18,14 @@ class VhdContainer(Container):
 
     @staticmethod
     def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        offset = fh.tell()
-        fh.seek(-512, io.SEEK_END)
-        magic = fh.read(9)
-        fh.seek(offset)
-
-        return b"conectix" in magic
+        try:
+            offset = fh.tell()
+            fh.seek(-512, io.SEEK_END)
+            magic = fh.read(9)
+            fh.seek(offset)
+            return b"conectix" in magic
+        except Exception:
+            return False
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
