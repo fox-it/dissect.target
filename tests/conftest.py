@@ -15,6 +15,7 @@ from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
@@ -145,6 +146,13 @@ def fs_bsd():
 
 
 @pytest.fixture
+def fs_android():
+    fs = VirtualFilesystem()
+    fs.map_file("/build.prop", absolute_path("data/plugins/os/unix/linux/android/build.prop"))
+    yield fs
+
+
+@pytest.fixture
 def hive_hklm():
     hive = VirtualHive()
 
@@ -259,14 +267,10 @@ def target_citrix(fs_bsd):
 
 
 @pytest.fixture
-def target_android() -> Target:
+def target_android(fs_android) -> Target:
     mock_target = next(make_mock_target())
-
-    mock_filesystem = VirtualFilesystem()
-    mock_filesystem.map_file("/build.prop", absolute_path("data/plugins/os/unix/linux/android/build.prop"))
-
-    mock_target.filesystems.add(mock_filesystem)
-
+    mock_target._os_plugin = AndroidPlugin
+    mock_target.filesystems.add(fs_android)
     mock_target.apply()
     yield mock_target
 
