@@ -4,7 +4,7 @@ import io
 import re
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from typing import Any, ItemsView, KeysView, Optional, TextIO, Union
+from typing import Any, ItemsView, KeysView, Optional, TextIO, Union, Iterator
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -142,23 +142,23 @@ class Default(ConfigurationParser):
         super().__init__(collapse, seperator, comment_prefixes)
         self.SEPERATOR = re.compile(rf"\s*[{''.join(seperator)}]\s*")
         self.COMMENTS = re.compile(rf"\s*[{''.join(comment_prefixes)}]")
+        self.skip_lines = self.comment_prefixes + ("\n",)
 
-    def parse_file(self, fh: TextIO) -> None:
-        information_dict = {}
-
-        skip_lines = self.comment_prefixes + ("\n",)
-        prev_key = (None, None)
-        for line in fh.readlines():
-            if line.strip().startswith(skip_lines) or not line.strip():
+    def line_reader(self, fh: TextIO) -> Iterator[str]:
+        for line in fh:
+            if line.strip().startswith(self.skip_lines) or not line.strip():
                 continue
 
             # Strip the comments first
             line, *_ = self.COMMENTS.split(line, 1)
+            yield line
 
-            if line.startswith((" ", "\t")):
-                # This part was indented so it is a continuation of the previous key
-                prev_value = information_dict.get(prev_key)
-                information_dict[prev_key] = " ".join([prev_value, line.strip()])
+    def parse_file(self, fh: TextIO) -> None:
+        information_dict = {}
+
+        prev_key = None
+        for line in self.line_reader(fh):
+            if self._change_scope(line, prev_key, information_dict):
                 continue
 
             prev_key, *value = self.SEPERATOR.split(line, 1)
@@ -173,17 +173,22 @@ class Default(ConfigurationParser):
 
         self.parsed_data = information_dict
 
-    def _parse_line(self, line: str, data_dict: dict) -> tuple:
-        key, *values = self.SEPERATOR.split(line)
-        values = " ".join(value for value in values if value).strip()
+    def _change_scope(self, line, prev_key, data_dict) -> bool:
+        if line.startswith((" ", "\t")):
+            # This part was indented so it is a continuation of the previous key
+            prev_value = data_dict.get(prev_key)
+            data_dict[prev_key] = " ".join([prev_value, line.strip()])
+            return True
+        return False
 
-        if old_value := data_dict.get(key):
-            if not isinstance(old_value, list):
-                old_value = [old_value]
-            values = old_value + [values]
-        data_dict[key] = values
 
-        return key
+class Indentation(Default):
+    def _change_scope(self, line, prev_key, data_dict) -> bool:
+        if line.startswith((" ", "\t")):
+            prev_value = data_dict.get(prev_key)
+            data_dict[prev_key] = {prev_value: line.strip()}
+            return True
+        return False
 
 
 @dataclass(frozen=True)
@@ -222,7 +227,7 @@ CONFIG_MAP: dict[str, ParserConfig] = {
 }
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": ParserConfig(Ini),
-    "sshd_config": ParserConfig(Default, seperator=(r"\s",)),
+    "sshd_config": ParserConfig(Indentation, seperator=(r"\s",)),
     "hosts.allow": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, seperator=(r"\s")),

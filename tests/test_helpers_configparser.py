@@ -2,7 +2,14 @@ from io import StringIO
 
 import pytest
 
-from dissect.target.helpers.configparser import Default
+from dissect.target.helpers.configparser import Default, ConfigurationParser, Indentation
+
+
+def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, **kwargs):
+    """Initializes parser_type as a parser which parses ``data_to_read``"""
+    parser = parser_type(**kwargs)
+    parser.read_file(StringIO(data_to_read))
+    return parser.parsed_data
 
 
 @pytest.mark.parametrize(
@@ -13,9 +20,8 @@ from dissect.target.helpers.configparser import Default
     ],
 )
 def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
-    parser = Default(None, seperator=(r"\s",))
-    parser.read_file(StringIO(parser_string))
-    assert parser.parsed_data[key] == value
+    parsed_data = parse_data(Default, parser_string, seperator=(r"\s",))
+    assert parsed_data[key] == value
 
 
 @pytest.mark.parametrize(
@@ -29,9 +35,8 @@ def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
     ],
 )
 def test_custom_seperators(parser_string: str, seperator: tuple, expected_output) -> None:
-    parser = Default(None, seperator, comment_prefixes=("#",))
-    parser.read_file(StringIO(parser_string))
-    assert parser.parsed_data == expected_output
+    parsed_data = parse_data(Default, parser_string, seperator=seperator, comment_prefixes=("#",))
+    assert parsed_data == expected_output
 
 
 @pytest.mark.parametrize(
@@ -44,8 +49,22 @@ def test_custom_seperators(parser_string: str, seperator: tuple, expected_output
         (";20;20;20;20", (";",)),
     ],
 )
-def test_custom_comments(comment_string: str, comment_prefixes: str) -> None:
-    parser = Default(None, seperator=r"\s", comment_prefixes=comment_prefixes)
-    parser_string = StringIO(f"hello world {comment_string}")
-    parser.read_file(parser_string)
-    assert parser.parsed_data == {"hello": "world"}
+def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...]) -> None:
+    parsed_data = parse_data(
+        Default, f"hello world {comment_string}", seperator=(r"\s",), comment_prefixes=comment_prefixes
+    )
+    assert parsed_data == {"hello": "world"}
+
+
+@pytest.mark.parametrize(
+    "indented_string, expected_output",
+    [
+        (
+            "hello world\n  hello",
+            {"hello": {"world": "hello"}},
+        ),
+    ],
+)
+def test_indented_parser(indented_string, expected_output) -> None:
+    parsed_data = parse_data(Indentation, indented_string, seperator=(r"\s",))
+    assert parsed_data == expected_output
