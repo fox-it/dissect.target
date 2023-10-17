@@ -1,5 +1,6 @@
 import codecs
 import re
+import functools
 from typing import Iterator
 
 from defusedxml import ElementTree
