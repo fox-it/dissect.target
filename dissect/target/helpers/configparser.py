@@ -116,6 +116,17 @@ class Txt(ConfigurationParser):
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
 
 
+def update_dictionary(current: dict[str, Any], key: str, value: Any):
+    if prev_value := current.get(key):
+        if isinstance(prev_value, dict):
+            return
+        if isinstance(prev_value, str):
+            prev_value = [prev_value]
+        if isinstance(prev_value, list):
+            value = prev_value + [value]
+    current[key] = value
+
+
 class Default(ConfigurationParser):
     """Parse a configuration file specified by ``seperator`` and ``comment_prefixes``.
 
@@ -158,37 +169,81 @@ class Default(ConfigurationParser):
 
         prev_key = None
         for line in self.line_reader(fh):
-            if self._change_scope(line, prev_key, information_dict):
+            if line.startswith((" ", "\t")):
+                # This part was indented so it is a continuation of the previous key
+                prev_value = information_dict.get(prev_key)
+                information_dict[prev_key] = " ".join([prev_value, line.strip()])
                 continue
 
             prev_key, *value = self.SEPERATOR.split(line, 1)
             value = value[0].strip() if value else ""
 
-            if old_value := information_dict.get(prev_key):
-                if not isinstance(old_value, list):
-                    old_value = [old_value]
-                value = old_value + [value]
-
-            information_dict[prev_key] = value
+            update_dictionary(information_dict, prev_key, value)
 
         self.parsed_data = information_dict
 
-    def _change_scope(self, line, prev_key, data_dict) -> bool:
-        if line.startswith((" ", "\t")):
-            # This part was indented so it is a continuation of the previous key
-            prev_value = data_dict.get(prev_key)
-            data_dict[prev_key] = " ".join([prev_value, line.strip()])
-            return True
-        return False
-
 
 class Indentation(Default):
-    def _change_scope(self, line, prev_key, data_dict) -> bool:
+    def __init__(
+        self,
+        collapse: Optional[Union[bool, set]] = False,
+        seperator: tuple[str] = (r"=",),
+        comment_prefixes: tuple[str] = (";", "#"),
+    ) -> None:
+        super().__init__(collapse, seperator, comment_prefixes)
+        self._parents = {}
+        self._indentation = 0
+
+    def parse_file(self, fh: TextIO) -> None:
+        root = {}
+        current = root
+
+        prev_key = None
+        prev_value = None
+        for line in self.line_reader(fh):
+            current = self._change_scoping(line, (prev_key, prev_value), current)
+            line = line.strip()
+
+            prev_key, *prev_value = self.SEPERATOR.split(line.strip(), 1)
+            prev_value = prev_value[0].strip() if prev_value else ""
+
+            update_dictionary(current, prev_key, prev_value)
+
+        self.parsed_data = root
+        # Cleanup of internal state
+        self._parents = {}
+        self._indentation = 0
+
+    def _push_scope(self, name: str, current: dict):
+        child = current.get(name, {})
+
+        if not isinstance(child, dict):
+            child = {}
+        parent = current
+        self._parents[id(child)] = parent
+        parent[name] = child
+        return child
+
+    def _pop_scope(self, current: dict):
+        return self._parents[id(current)]
+
+    def _change_scoping(self, line, prev_values, data_dict) -> dict:
+        key, value = prev_values
         if line.startswith((" ", "\t")):
-            prev_value = data_dict.get(prev_key)
-            data_dict[prev_key] = {prev_value: line.strip()}
-            return True
-        return False
+            if self._indentation:
+                # To keep related dicts together
+                return data_dict
+
+            self._indentation = len(line) - len(line.lstrip())
+            child = self._push_scope(key, data_dict)
+            child = self._push_scope(value, child)
+            return child
+
+        elif id(data_dict) in self._parents:
+            self._indentation = 0
+            child = self._pop_scope(data_dict)
+            return self._pop_scope(child)
+        return data_dict
 
 
 @dataclass(frozen=True)
