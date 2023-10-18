@@ -1,19 +1,21 @@
 import logging
-from configparser import ConfigParser
+from datetime import datetime
+from pathlib import Path
 from typing import Iterator, Union
 
 from Crypto.PublicKey import ECC, RSA
+from flow.record.fieldtypes import windows_path
 
-from dissect.target.exceptions import RegistryKeyNotFoundError
+from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import RegfKey, VirtualKey
+from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 
 log = logging.getLogger(__name__)
 
 SshHostKeyRecord = TargetRecordDescriptor(
-    "putty/known_host",
+    "application/putty/known_host",
     [
         ("datetime", "ts"),
         ("string", "host"),
@@ -25,7 +27,7 @@ SshHostKeyRecord = TargetRecordDescriptor(
 )
 
 SessionRecord = TargetRecordDescriptor(
-    "putty/saved_session",
+    "application/putty/saved_session",
     [
         ("datetime", "ts"),
         ("string", "session_name"),
@@ -42,13 +44,11 @@ SessionRecord = TargetRecordDescriptor(
 
 
 class PuTTYPlugin(Plugin):
-    """Extract artifacts from a PuTTY Windows or Linux client.
+    """Extract artifacts from the PuTTY client.
 
-    TODO:
-        - Parse $HOME/.putty/randomseed (GNU/Linux)
+    NOTE:T
+        - Does not parse $HOME/.putty/randomseed (GNU/Linux)
           and HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile (Windows)
-        - Return UserTargetRecordDescriptors
-        - Calculate fingerprint hashes of public keys
 
     Resources:
         - http://www.chiark.greenend.org.uk/~sgtatham/putty/0.78/puttydoc.txt
@@ -60,42 +60,36 @@ class PuTTYPlugin(Plugin):
     def __init__(self, target):
         super().__init__(target)
 
-        self.win_key = "HKCU\\Software\\SimonTatham\\PuTTY"
-        self.linux_path = ".putty/"
+        self.regf_installs, self.path_installs = self._detect_putty()
 
-        self.installs = self._detect_putty()
+    def _detect_putty(self) -> list[list[RegistryKey], list[TargetPath]]:
+        regf_installs, path_installs = [], []
 
-    def _detect_putty(self) -> list[TargetPath]:
-        installs = []
+        if self.target.has_function("registry"):
+            regf_installs = list(self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"))
 
-        if self.target.os == "windows" and (keys := list(self.target.registry.keys(self.win_key))):
-            installs = keys
+        for user_details in self.target.user_details.all_with_home():
+            if (putty_path := user_details.home_path.joinpath(".putty")).exists():
+                path_installs.append(putty_path)
 
-        elif self.target.os == "linux" or self.target.os == "unix":
-            for user_details in self.target.user_details.all_with_home():
-                if (putty_path := user_details.home_path.joinpath(self.linux_path)).exists():
-                    installs.append(putty_path)
+        return regf_installs, path_installs
 
-        return installs
-
-    def check_compatible(self) -> bool:
-        return any(self.installs)
+    def check_compatible(self) -> None:
+        if not any(self.regf_installs + self.path_installs):
+            raise UnsupportedPluginError("No PuTTY installations found")
 
     @export(record=SshHostKeyRecord)
     def known_hosts(self) -> Iterator[SshHostKeyRecord]:
         """Parse PuTTY saved SshHostKeys."""
-        for putty_install in self.installs:
-            if self.target.os == "windows":
-                yield from self._windows_known_hosts(putty_install)
-            else:
-                yield from self._linux_known_hosts(putty_install)
 
-    def _windows_known_hosts(self, putty_key: RegfKey) -> Iterator[Union[SshHostKeyRecord, None]]:
+        for regf_install in self.regf_installs:
+            yield from self._regf_known_hosts(regf_install)
+
+        for path_install in self.path_installs:
+            yield from self._path_known_hosts(path_install)
+
+    def _regf_known_hosts(self, putty_key: RegistryKey) -> Iterator[SshHostKeyRecord]:
         """Parse PuTTY traces in Windows registry."""
-        if type(putty_key) not in [RegfKey, VirtualKey]:
-            raise ValueError(f"Cannot handle type {type(putty_key)}")
-
-        ssh_host_keys = None
 
         try:
             ssh_host_keys = putty_key.subkey("SshHostKeys")
@@ -105,52 +99,50 @@ class PuTTYPlugin(Plugin):
         for entry in ssh_host_keys.values():
             key_type, host = entry.name.split("@")
             port, host = host.split(":")
+
             yield SshHostKeyRecord(
                 ts=ssh_host_keys.ts,
                 key_type=key_type,
                 host=host,
                 port=port,
                 public_key=construct_public_key(key_type, entry.value),
-                source=str(ssh_host_keys.path),
+                source=windows_path(ssh_host_keys.path),  # Technically this is a registry path
                 _target=self.target,
             )
 
-    def _linux_known_hosts(self, putty_path: TargetPath) -> Iterator[Union[SshHostKeyRecord, None]]:
-        """Parse linux traces in .putty folders"""
+    def _path_known_hosts(self, putty_path: TargetPath) -> Iterator[SshHostKeyRecord]:
+        """Parse PuTTY traces in ``.putty`` folders"""
         ssh_host_keys_path = putty_path.joinpath("sshhostkeys")
-        if not ssh_host_keys_path.exists():
-            return
 
-        for line in open_decompress(ssh_host_keys_path, "rt"):
-            line = line.strip()
-            meta = line.split(" ")[0]
-            key_type, host = meta.split("@")
-            port, host = host.split(":")
+        if ssh_host_keys_path.exists():
+            ts = ssh_host_keys_path.stat().st_mtime
 
-            yield SshHostKeyRecord(
-                ts=ssh_host_keys_path.stat().st_mtime,
-                key_type=key_type,
-                host=host,
-                port=port,
-                public_key=construct_public_key(key_type, line.split(" ")[1]),
-                source=ssh_host_keys_path,
-                _target=self.target,
-            )
+            for line in open_decompress(ssh_host_keys_path, "rt"):
+                parts = line.split()
+                key_type, host = parts[0].split("@")
+                port, host = host.split(":")
+
+                yield SshHostKeyRecord(
+                    ts=ts,
+                    key_type=key_type,
+                    host=host,
+                    port=port,
+                    public_key=construct_public_key(key_type, parts[1]),
+                    source=ssh_host_keys_path,
+                    _target=self.target,
+                )
 
     @export(record=SessionRecord)
     def sessions(self) -> Iterator[SessionRecord]:
         """Parse PuTTY saved session configuration files."""
-        for putty_install in self.installs:
-            if self.target.os == "windows":
-                yield from self._windows_sessions(putty_install)
-            else:
-                yield from self._linux_sessions(putty_install)
 
-    def _windows_sessions(self, putty_key: RegfKey) -> Iterator[SessionRecord]:
-        if type(putty_key) not in [RegfKey, VirtualKey]:
-            raise ValueError(f"Cannot handle type {type(putty_key)}")
+        for regf_install in self.regf_installs:
+            yield from self._regf_sessions(regf_install)
 
-        sessions = None
+        for path_install in self.path_installs:
+            yield from self._path_sessions(path_install)
+
+    def _regf_sessions(self, putty_key: RegistryKey) -> Iterator[SessionRecord]:
         try:
             sessions = putty_key.subkey("Sessions")
         except RegistryKeyNotFoundError:
@@ -158,61 +150,42 @@ class PuTTYPlugin(Plugin):
 
         for session in sessions.subkeys():
             cfg = {s.name: s.value for s in session.values()}
+            yield from self._build_session_record(session.ts, session.name, windows_path(session.path), cfg)
 
-            host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
-
-            yield SessionRecord(
-                ts=session.ts,
-                session_name=session.name,
-                protocol=cfg.get("Protocol"),
-                host=host,
-                user=user,
-                port=cfg.get("PortNumber"),
-                remote_command=cfg.get("RemoteCommand"),
-                port_forward=cfg.get("PortForwardings"),
-                manual_ssh_host_keys=cfg.get("SSHManualHostKeys"),
-                source=str(session.path),
-                _target=self.target,
-            )
-
-    def _linux_sessions(self, putty_path: TargetPath) -> Iterator[SessionRecord]:
+    def _path_sessions(self, putty_path: TargetPath) -> Iterator[SessionRecord]:
         sessions_dir = putty_path.joinpath("sessions")
-        if not sessions_dir.exists:
-            return
+        if sessions_dir.exists():
+            for session in sessions_dir.glob("*"):
+                if session.is_file():
+                    cfg = dict(map(str.strip, line.split("=", maxsplit=1)) for line in session.open("rt").readlines())
+                    yield from self._build_session_record(session.stat().st_mtime, session.name, session, cfg)
 
-        for session in sessions_dir.glob("*"):
-            cfg = ConfigParser(strict=False, allow_no_value=True, delimiters=("=",), interpolation=None)
-            cfg.read_string("[global]\n" + session.read_text())
+    def _build_session_record(self, ts, name: Union[float, datetime], source: Path, cfg: dict) -> SessionRecord:
+        host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
 
-            host, user = parse_host_user(cfg["global"].get("HostName"), cfg["global"].get("UserName"))
-
-            yield SessionRecord(
-                ts=session.stat().st_mtime,
-                session_name=session.name,
-                protocol=cfg["global"].get("Protocol"),
-                host=host,
-                user=user,
-                port=cfg["global"].get("PortNumber"),
-                remote_command=cfg["global"].get("RemoteCommand"),
-                port_forward=cfg["global"].get("PortForwardings"),
-                manual_ssh_host_keys=cfg["global"].get("SSHManualHostKeys"),
-                source=session,
-                _target=self.target,
-            )
+        yield SessionRecord(
+            ts=ts,
+            session_name=name,
+            protocol=cfg.get("Protocol"),
+            host=host,
+            user=user,
+            port=cfg.get("PortNumber"),
+            remote_command=cfg.get("RemoteCommand"),
+            port_forward=cfg.get("PortForwardings"),
+            manual_ssh_host_keys=cfg.get("SSHManualHostKeys"),
+            source=source,
+            _target=self.target,
+        )
 
 
 def parse_host_user(host: str, user: str) -> tuple[str, str]:
-    if "@" in host and not user:
-        user = host.split("@")[0]
-        host = host.split("@")[-1]
+    """Parse host and user from PuTTY hostname component."""
+    if "@" in host:
+        parsed_user, parsed_host = host.split("@")
+        user = user or parsed_user
+        host = parsed_host
+
     return host, user
-
-
-def decode_hex(hex: str) -> int:
-    """Decode the hex format used by PuTTY to integers."""
-    if hex.startswith("0x"):
-        hex = hex[2:]
-    return int(hex, 16)
 
 
 def construct_public_key(key_type: str, iv: str) -> str:
@@ -224,9 +197,9 @@ def construct_public_key(key_type: str, iv: str) -> str:
 
     Currently supports ``ssh-ed25519``, ``ecdsa-sha2-nistp256`` and ``rsa2`` key types.
 
-    TODO:
-        - Generate sha256 fingerprints of the reconstructed public keys.
-        - Add more supported key types.
+    NOTE:
+        - Sha256 fingerprints of the reconstructed public keys are currently not generated.
+        - More key types could be supported in the future.
 
     Resources:
         - https://github.com/github/putty/blob/master/contrib/kh2reg.py
@@ -234,22 +207,21 @@ def construct_public_key(key_type: str, iv: str) -> str:
         - https://pycryptodome.readthedocs.io/en/latest/src/public_key/ecc.html
         - https://github.com/mkorthof/reg2kh
     """
-    key = False
 
     if key_type == "ssh-ed25519":
         x, y = iv.split(",")
-        key = ECC.construct(curve="ed25519", point_x=decode_hex(x), point_y=decode_hex(y))
-        return key.public_key().export_key(format="OpenSSH").split(" ")[-1].strip()
+        key = ECC.construct(curve="ed25519", point_x=int(x, 16), point_y=int(y, 16))
+        return key.public_key().export_key(format="OpenSSH").split()[-1]
 
-    elif key_type == "ecdsa-sha2-nistp256":
-        curve, x, y = iv.split(",")
-        key = ECC.construct(curve="NIST P-256", point_x=decode_hex(x), point_y=decode_hex(y))
-        return key.public_key().export_key(format="OpenSSH").split(" ")[-1].strip()
+    if key_type == "ecdsa-sha2-nistp256":
+        _, x, y = iv.split(",")
+        key = ECC.construct(curve="NIST P-256", point_x=int(x, 16), point_y=int(y, 16))
+        return key.public_key().export_key(format="OpenSSH").split()[-1]
 
-    elif key_type == "rsa2":
+    if key_type == "rsa2":
         exponent, modulus = iv.split(",")
-        key = RSA.construct((decode_hex(modulus), decode_hex(exponent)))
-        return key.public_key().export_key(format="OpenSSH").decode("utf-8").split(" ")[-1].strip()
+        key = RSA.construct((int(modulus, 16), int(exponent, 16)))
+        return key.public_key().export_key(format="OpenSSH").decode("utf-8").split()[-1]
 
-    log.warning(f"Could not reconstruct public key: type {key_type} not implemented.")
+    log.warning("Could not reconstruct public key: type %s not implemented.", key_type)
     return iv
