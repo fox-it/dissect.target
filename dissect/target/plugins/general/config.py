@@ -38,6 +38,7 @@ class ConfigurationTreePlugin(Plugin):
         path: Optional[Union[TargetPath, str]] = None,
         hint: Optional[str] = None,
         collapse: Optional[Union[bool, set]] = None,
+        collapse_inverse: Optional[bool] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
         as_dict: bool = False,
@@ -54,7 +55,7 @@ class ConfigurationTreePlugin(Plugin):
             comment_prefixes: What is specified as a comment.
             as_dict: Returns the dictionary instead of an entry.
         """
-        return self.get(path, as_dict, hint, collapse, seperator, comment_prefixes)
+        return self.get(path, as_dict, hint, collapse, collapse_inverse, seperator, comment_prefixes)
 
     @internal
     def get(

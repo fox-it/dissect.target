@@ -2,7 +2,11 @@ from io import StringIO
 
 import pytest
 
-from dissect.target.helpers.configparser import Default, ConfigurationParser, Indentation
+from dissect.target.helpers.configparser import (
+    ConfigurationParser,
+    Default,
+    Indentation,
+)
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, **kwargs):
@@ -68,3 +72,14 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
 def test_indented_parser(indented_string, expected_output) -> None:
     parsed_data = parse_data(Indentation, indented_string, seperator=(r"\s",))
     assert parsed_data == expected_output
+
+
+def test_collapse_inversion():
+    input_data = "hello world\nhello test\nworld world\nworld test"
+    assert parse_data(
+        Default,
+        input_data,
+        seperator=(r"\s",),
+        collapse={"hello"},
+        collapse_inverse=True,
+    ) == {"hello": ["world", "test"], "world": "test"}

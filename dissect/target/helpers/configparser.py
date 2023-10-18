@@ -4,7 +4,7 @@ import io
 import re
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from typing import Any, ItemsView, KeysView, Optional, TextIO, Union, Iterator
+from typing import Any, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -16,12 +16,15 @@ from dissect.target.helpers.fsutil import TargetPath
 class ConfigurationParser:
     def __init__(
         self,
-        collapse: Optional[Union[bool, set]] = False,
+        collapse: Union[bool, set] = False,
+        collapse_inverse: bool = False,
         seperator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
         self.collapse = collapse if isinstance(collapse, set) else set()
+        self._collapse_check = self._key_not_in_collapse if collapse_inverse else self._key_in_collapse
+
         self.seperator = seperator
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
@@ -69,10 +72,16 @@ class ConfigurationParser:
             return dictionary
 
         for key, value in dictionary.items():
-            value = self._collapse_dict(value, self.collapse_all or key in self.collapse)
+            value = self._collapse_dict(value, self.collapse_all or self._collapse_check(key))
             new_dictionary.update({key: value})
 
         return new_dictionary
+
+    def _key_in_collapse(self, key: str):
+        return key in self.collapse
+
+    def _key_not_in_collapse(self, key: str):
+        return key not in self.collapse
 
 
 class Ini(ConfigurationParser):
@@ -231,6 +240,7 @@ class Indentation(Default):
 @dataclass(frozen=True)
 class ParserOptions:
     collapse: Optional[Union[bool, set]] = None
+    collapse_inverse: Optional[bool] = None
     seperator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
@@ -239,13 +249,14 @@ class ParserOptions:
 class ParserConfig:
     parser: type[ConfigurationParser] = Default
     collapse: Optional[Union[bool, set]] = None
+    collapse_inverse: Optional[bool] = None
     seperator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
     def create_parser(self, options: Optional[ParserOptions] = None) -> ConfigurationParser:
         kwargs = {}
 
-        for field_name in ["collapse", "seperator", "comment_prefixes"]:
+        for field_name in ["collapse", "collapse_inverse", "seperator", "comment_prefixes"]:
             value = getattr(options, field_name, None) or getattr(self, field_name)
             if value:
                 kwargs.update({field_name: value})
