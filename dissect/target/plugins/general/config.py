@@ -24,7 +24,8 @@ class ConfigurationTreePlugin(Plugin):
         target_dir_path = self.target.fs.path(dir_path)
         if target_dir_path.is_dir():
             self.config_fs = ConfigurationFilesystem(target, dir_path)
-        self.__call__ = lru_cache(128)(self.__call__)
+
+        self.get = lru_cache(128)(self.get)
 
     def check_compatible(self) -> None:
         # This should be able to be retrieved, regardless of OS
@@ -53,29 +54,23 @@ class ConfigurationTreePlugin(Plugin):
             comment_prefixes: What is specified as a comment.
             as_dict: Returns the dictionary instead of an entry.
         """
+        return self.get(path, as_dict, hint, collapse, seperator, comment_prefixes)
+
+    @internal
+    def get(
+        self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
         if not path:
             return self.config_fs
 
         if isinstance(path, TargetPath):
             path = str(path)
 
-        entry = self.config_fs.get(path, None, hint, collapse, seperator, comment_prefixes)
+        entry = self.config_fs.get(path, None, *args, **kwargs)
 
         if as_dict:
             return entry.as_dict()
 
         return entry
-
-    @internal
-    def get(
-        self,
-        path: Optional[Union[TargetPath, str]] = None,
-        hint: Optional[str] = None,
-        collapse: Optional[set] = None,
-        seperator: Optional[tuple[str]] = None,
-        comment_prefixes: Optional[tuple[str]] = None,
-        as_dict: bool = False,
-    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
-        return self.__call__(path, hint, collapse, seperator, comment_prefixes, as_dict)
 
     get.__doc__ = __call__.__doc__

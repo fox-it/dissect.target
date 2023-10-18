@@ -61,13 +61,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
         return parts[idx:], entry
 
     def get(
-        self,
-        path: str,
-        relentry: Optional[FilesystemEntry] = None,
-        hint: Optional[str] = None,
-        collapse: Optional[Union[bool, set]] = None,
-        seperator: Optional[tuple[str]] = None,
-        comment_prefixes: Optional[tuple[str]] = None,
+        self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
         parts, entry = self._get_till_file(path, relentry)
 
@@ -78,7 +72,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
                 try:
                     # The parts in _get_till_file also includes the filename, so we do not join
                     # the part with entry.path here.
-                    config_parser = parse(entry, hint, collapse, seperator, comment_prefixes)
+                    config_parser = parse(entry, *args, **kwargs)
                     entry = ConfigurationEntry(self, entry.path, entry, config_parser)
                 except (FileNotFoundError, ConfigurationParsingError) as e:
                     # If a parsing error gets created, it should return the `entry`

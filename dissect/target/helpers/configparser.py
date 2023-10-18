@@ -76,17 +76,8 @@ class ConfigurationParser:
 
 
 class Ini(ConfigurationParser):
-    def __init__(
-        self,
-        collapse: Optional[Union[bool, set]] = True,
-        seperator: tuple[str] = ("=",),
-        comment_prefixes: tuple[str] = (";", "#"),
-    ) -> None:
-        super().__init__(
-            collapse,
-            seperator=seperator,
-            comment_prefixes=comment_prefixes,
-        )
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
         self.parsed_data = ConfigParser(
             strict=False,
@@ -144,15 +135,10 @@ class Default(ConfigurationParser):
         <empty_space><comment> -> skip
     """
 
-    def __init__(
-        self,
-        collapse: Optional[Union[bool, set]] = False,
-        seperator: tuple[str] = (r"=",),
-        comment_prefixes: tuple[str] = (";", "#"),
-    ) -> None:
-        super().__init__(collapse, seperator, comment_prefixes)
-        self.SEPERATOR = re.compile(rf"\s*[{''.join(seperator)}]\s*")
-        self.COMMENTS = re.compile(rf"\s*[{''.join(comment_prefixes)}]")
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.SEPERATOR = re.compile(rf"\s*[{''.join(self.seperator)}]\s*")
+        self.COMMENTS = re.compile(rf"\s*[{''.join(self.comment_prefixes)}]")
         self.skip_lines = self.comment_prefixes + ("\n",)
 
     def line_reader(self, fh: TextIO) -> Iterator[str]:
@@ -184,13 +170,8 @@ class Default(ConfigurationParser):
 
 
 class Indentation(Default):
-    def __init__(
-        self,
-        collapse: Optional[Union[bool, set]] = False,
-        seperator: tuple[str] = (r"=",),
-        comment_prefixes: tuple[str] = (";", "#"),
-    ) -> None:
-        super().__init__(collapse, seperator, comment_prefixes)
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(**kwargs)
         self._parents = {}
         self._indentation = 0
 
@@ -290,13 +271,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 }
 
 
-def parse(
-    path: Union[FilesystemEntry, TargetPath],
-    hint: Optional[str] = None,
-    collapse: Optional[Union[bool, set]] = None,
-    seperator: Optional[tuple[str]] = None,
-    comment_prefixes: Optional[tuple[str]] = None,
-) -> ConfigParser:
+def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, *args, **kwargs) -> ConfigParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
@@ -317,7 +292,7 @@ def parse(
     if isinstance(path, TargetPath):
         entry = path.get()
 
-    options = ParserOptions(collapse, seperator, comment_prefixes)
+    options = ParserOptions(*args, **kwargs)
 
     return parse_config(entry, hint, options)
 
