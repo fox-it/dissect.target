@@ -201,7 +201,7 @@ class Indentation(Default):
         prev_key = None
         prev_value = None
         for line in self.line_reader(fh):
-            current = self._change_scoping(line, (prev_key, prev_value), current)
+            current = self._change_scoping(line, prev_key, prev_value, current)
             line = line.strip()
 
             prev_key, *prev_value = self.SEPERATOR.split(line.strip(), 1)
@@ -214,7 +214,7 @@ class Indentation(Default):
         self._parents = {}
         self._indentation = 0
 
-    def _push_scope(self, name: str, current: dict):
+    def _push_scope(self, name: str, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
         child = current.get(name, {})
 
         if not isinstance(child, dict):
@@ -224,26 +224,27 @@ class Indentation(Default):
         parent[name] = child
         return child
 
-    def _pop_scope(self, current: dict):
+    def _pop_scope(self, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
         return self._parents[id(current)]
 
-    def _change_scoping(self, line, prev_values, data_dict) -> dict:
-        key, value = prev_values
+    def _change_scoping(
+        self, line: str, key: Optional[str], value: Optional[Union[str, dict]], current: dict[str, Union[str, dict]]
+    ) -> dict[str, Union[str, dict]]:
         if line.startswith((" ", "\t")):
             if self._indentation:
                 # To keep related dicts together
-                return data_dict
+                return current
 
             self._indentation = len(line) - len(line.lstrip())
-            child = self._push_scope(key, data_dict)
+            child = self._push_scope(key, current)
             child = self._push_scope(value, child)
             return child
 
-        elif id(data_dict) in self._parents:
+        elif id(current) in self._parents:
             self._indentation = 0
-            child = self._pop_scope(data_dict)
+            child = self._pop_scope(current)
             return self._pop_scope(child)
-        return data_dict
+        return current
 
 
 @dataclass(frozen=True)
