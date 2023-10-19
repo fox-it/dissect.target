@@ -9,7 +9,7 @@ from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.configparser import ConfigurationParser, parse
+from dissect.target.helpers.configutil import ConfigurationParser, parse
 
 log = getLogger(__name__)
 

@@ -2,7 +2,7 @@ from io import StringIO
 
 import pytest
 
-from dissect.target.helpers.configparser import (
+from dissect.target.helpers.configutil import (
     ConfigurationParser,
     Default,
     Indentation,

@@ -12,7 +12,7 @@ from dissect.target.filesystems.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
 )
-from dissect.target.helpers.configparser import parse_config
+from dissect.target.helpers.configutil import parse_config
 
 from ._utils import absolute_path
 
