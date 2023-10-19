@@ -116,15 +116,15 @@ class Txt(ConfigurationParser):
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
 
 
-def update_dictionary(current: dict[str, Any], key: str, value: Any):
+def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
     if prev_value := current.get(key):
         if isinstance(prev_value, dict):
             return
         if isinstance(prev_value, str):
             prev_value = [prev_value]
         if isinstance(prev_value, list):
-            value = prev_value + [value]
-    current[key] = value
+            prev_value.appen(value)
+    current[key] = prev_value or value
 
 
 class Default(ConfigurationParser):
@@ -173,7 +173,7 @@ class Default(ConfigurationParser):
             prev_key, *value = self.SEPERATOR.split(line, 1)
             value = value[0].strip() if value else ""
 
-            update_dictionary(information_dict, prev_key, value)
+            _update_dictionary(information_dict, prev_key, value)
 
         self.parsed_data = information_dict
 
@@ -197,7 +197,7 @@ class Indentation(Default):
             prev_key, *prev_value = self.SEPERATOR.split(line.strip(), 1)
             prev_value = prev_value[0].strip() if prev_value else ""
 
-            update_dictionary(current, prev_key, prev_value)
+            _update_dictionary(current, prev_key, prev_value)
 
         self.parsed_data = root
         # Cleanup of internal state
