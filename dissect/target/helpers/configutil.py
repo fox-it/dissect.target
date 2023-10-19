@@ -123,7 +123,7 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
         if isinstance(prev_value, str):
             prev_value = [prev_value]
         if isinstance(prev_value, list):
-            prev_value.appen(value)
+            prev_value.append(value)
     current[key] = prev_value or value
 
 
@@ -194,10 +194,12 @@ class Indentation(Default):
             current = self._change_scoping(line, prev_key, prev_value, current)
             line = line.strip()
 
-            prev_key, *prev_value = self.SEPERATOR.split(line.strip(), 1)
-            prev_value = prev_value[0].strip() if prev_value else ""
-
-            _update_dictionary(current, prev_key, prev_value)
+            if not value:
+                current = self._pop_scope(current)
+                _update_dictionary(current, prev_value, prev_key)
+            else:
+                _update_dictionary(current, prev_key, value)
+                prev_value = value
 
         self.parsed_data = root
         # Cleanup of internal state
@@ -209,13 +211,17 @@ class Indentation(Default):
 
         if not isinstance(child, dict):
             child = {}
+
         parent = current
         self._parents[id(child)] = parent
         parent[name] = child
         return child
 
     def _pop_scope(self, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
-        return self._parents[id(current)]
+        if id(current) in self._parents:
+            return self._parents[id(current)]
+        else:
+            return current
 
     def _change_scoping(
         self, line: str, key: Optional[str], value: Optional[Union[str, dict]], current: dict[str, Union[str, dict]]
@@ -226,14 +232,11 @@ class Indentation(Default):
                 return current
 
             self._indentation = len(line) - len(line.lstrip())
-            child = self._push_scope(key, current)
-            child = self._push_scope(value, child)
-            return child
+            return self._push_scope(value, self._push_scope(key, current))
 
         elif id(current) in self._parents:
             self._indentation = 0
-            child = self._pop_scope(current)
-            return self._pop_scope(child)
+            return self._pop_scope(self._pop_scope(current))
         return current
 
 

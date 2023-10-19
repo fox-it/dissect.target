@@ -9,9 +9,9 @@ from dissect.target.helpers.configutil import (
 )
 
 
-def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, **kwargs):
+def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs):
     """Initializes parser_type as a parser which parses ``data_to_read``"""
-    parser = parser_type(**kwargs)
+    parser = parser_type(*args, **kwargs)
     parser.read_file(StringIO(data_to_read))
     return parser.parsed_data
 
@@ -66,6 +66,14 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
         (
             "hello world\n  hello",
             {"hello": {"world": "hello"}},
+        ),
+        (
+            "hello world\n  hello bye",
+            {"hello": {"world": {"hello": "bye"}}},
+        ),
+        (
+            "hello world\n  hello\nhello world\n  bye",
+            {"hello": {"world": ["hello", "bye"]}},
         ),
     ],
 )
