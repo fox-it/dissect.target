@@ -64,16 +64,16 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
     "indented_string, expected_output",
     [
         (
-            "hello world\n  hello",
-            {"hello": {"world": "hello"}},
+            "key value1\n  value2",
+            {"key": {"value1": "value2"}},
         ),
         (
-            "hello world\n  hello bye",
-            {"hello": {"world": {"hello": "bye"}}},
+            "key1 value1\n  key2 value2",
+            {"key1": {"value1": {"key2": "value2"}}},
         ),
         (
-            "hello world\n  hello\nhello world\n  bye",
-            {"hello": {"world": ["hello", "bye"]}},
+            "key value1\n  value2\nkey value1\n  value3",
+            {"key": {"value1": ["value2", "value3"]}},
         ),
     ],
 )
@@ -91,3 +91,21 @@ def test_collapse_inversion():
         collapse={"hello"},
         collapse_inverse=True,
     ) == {"hello": ["world", "test"], "world": "test"}
+
+
+def test_change_scope():
+    parser = Indentation(seperator=(r"\s",))
+    current = {}
+
+    # Scoping does not change
+    new_current = parser._change_scope("key value", "key2 value2", "key", current)
+    assert id(current) == id(new_current)
+
+    # Scoping changes once
+    new_current = parser._change_scope("key value", "  value2", "key", current)
+    assert id(current) != id(new_current)
+    assert current == {"key": {}}
+
+    # Check if pop works as intended
+    old_current = parser._change_scope("  value2", "test_line", "", new_current)
+    assert id(current) == id(old_current)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 import io
 import re
 from configparser import ConfigParser, MissingSectionHeaderError
@@ -119,6 +120,8 @@ class Txt(ConfigurationParser):
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
     if prev_value := current.get(key):
         if isinstance(prev_value, dict):
+            # We can assume the value would be a dict too here.
+            prev_value.update(value)
             return
         if isinstance(prev_value, str):
             prev_value = [prev_value]
@@ -178,9 +181,36 @@ class Default(ConfigurationParser):
         self.parsed_data = information_dict
 
 
+class PeekableIterator:
+    """Source gotten from:
+    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
+    """
+
+    def __init__(self, iterable):
+        self._it = iter(iterable)
+        self._cache = deque()
+
+    def __iter__(self):
+        return self
+
+    def peek(self):
+        if not self._cache:
+            try:
+                self._cache.append(next(self._it))
+            except StopIteration:
+                return
+        return self._cache[0]
+
+    def __next__(self):
+        if self._cache:
+            return self._cache.popleft()
+
+        return next(self._it)
+
+
 class Indentation(Default):
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
         self._parents = {}
         self._indentation = 0
 
@@ -188,23 +218,34 @@ class Indentation(Default):
         root = {}
         current = root
 
-        prev_key = None
-        prev_value = None
-        for line in self.line_reader(fh):
-            current = self._change_scoping(line, prev_key, prev_value, current)
-            line = line.strip()
+        iterator = PeekableIterator(self.line_reader(fh))
 
-            if not value:
-                current = self._pop_scope(current)
-                _update_dictionary(current, prev_value, prev_key)
-            else:
-                _update_dictionary(current, prev_key, value)
-                prev_value = value
+        for line in iterator:
+            key, value = self._parse_line(line)
+            current = self._change_scope(line, iterator.peek(), key, current)
+
+            if id(current) in self._parents:
+                next_line = next(iterator)
+                next_key, next_value = self._parse_line(next_line)
+
+                if next_value:
+                    _update_dictionary(current, value, {next_key: next_value})
+                else:
+                    _update_dictionary(current, value, next_key)
+                current = self._change_scope(next_line, iterator.peek(), next_key, current)
+                continue
+
+            _update_dictionary(current, key, value)
 
         self.parsed_data = root
         # Cleanup of internal state
         self._parents = {}
         self._indentation = 0
+
+    def _parse_line(self, line: str) -> tuple[str, str]:
+        key, *value = self.SEPERATOR.split(line.strip(), 1)
+        value = value[0].strip() if value else ""
+        return key, value
 
     def _push_scope(self, name: str, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
         child = current.get(name, {})
@@ -218,25 +259,29 @@ class Indentation(Default):
         return child
 
     def _pop_scope(self, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
-        if id(current) in self._parents:
-            return self._parents[id(current)]
-        else:
+        return self._parents.pop(id(current), current)
+
+    def _change_scope(
+        self,
+        line: str,
+        next_line: Optional[str],
+        key: Optional[str],
+        current: dict[str, Union[str, dict]],
+    ) -> dict[str, Union[str, dict]]:
+        if next_line is None:
             return current
 
-    def _change_scoping(
-        self, line: str, key: Optional[str], value: Optional[Union[str, dict]], current: dict[str, Union[str, dict]]
-    ) -> dict[str, Union[str, dict]]:
-        if line.startswith((" ", "\t")):
+        if next_line.startswith((" ", "\t")):
             if self._indentation:
                 # To keep related dicts together
                 return current
 
             self._indentation = len(line) - len(line.lstrip())
-            return self._push_scope(value, self._push_scope(key, current))
+            return self._push_scope(key, current)
 
         elif id(current) in self._parents:
             self._indentation = 0
-            return self._pop_scope(self._pop_scope(current))
+            return self._pop_scope(current)
         return current
 
 
