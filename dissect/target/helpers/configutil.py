@@ -219,21 +219,19 @@ class Indentation(Default):
         current = root
 
         iterator = PeekableIterator(self.line_reader(fh))
-
+        prev_key = None
         for line in iterator:
             key, value = self._parse_line(line)
-            current = self._change_scope(line, iterator.peek(), key, current)
+            prev_dict = current
+            current = self._change_scope(line, iterator.peek(), line.strip(), current)
 
-            if id(current) in self._parents:
-                next_line = next(iterator)
-                next_key, next_value = self._parse_line(next_line)
-
-                if next_value:
-                    _update_dictionary(current, value, {next_key: next_value})
-                else:
-                    _update_dictionary(current, value, next_key)
-                current = self._change_scope(next_line, iterator.peek(), next_key, current)
+            if id(current) != id(prev_dict):
+                prev_key = line.strip()
                 continue
+
+            if not value:
+                key, value = prev_key, key
+                current = self._pop_scope(current)
 
             _update_dictionary(current, key, value)
 
@@ -250,15 +248,13 @@ class Indentation(Default):
     def _push_scope(self, name: str, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
         child = current.get(name, {})
 
-        if not isinstance(child, dict):
-            child = {}
-
         parent = current
         self._parents[id(child)] = parent
         parent[name] = child
         return child
 
     def _pop_scope(self, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
+        self._indentation = 0
         return self._parents.pop(id(current), current)
 
     def _change_scope(
@@ -268,20 +264,17 @@ class Indentation(Default):
         key: Optional[str],
         current: dict[str, Union[str, dict]],
     ) -> dict[str, Union[str, dict]]:
+        empty_space = (" ", "\t")
+
         if next_line is None:
             return current
 
-        if next_line.startswith((" ", "\t")):
-            if self._indentation:
-                # To keep related dicts together
-                return current
+        if not line.startswith(empty_space):
+            current = self._pop_scope(current)
 
-            self._indentation = len(line) - len(line.lstrip())
+        if not line.startswith(empty_space) and next_line.startswith(empty_space):
+            self._indentation = len(next_line) - len(next_line.lstrip())
             return self._push_scope(key, current)
-
-        elif id(current) in self._parents:
-            self._indentation = 0
-            return self._pop_scope(current)
         return current
 
 

@@ -1,5 +1,5 @@
 from io import StringIO
-
+import textwrap
 import pytest
 
 from dissect.target.helpers.configutil import (
@@ -64,21 +64,63 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
     "indented_string, expected_output",
     [
         (
-            "key value1\n  value2",
-            {"key": {"value1": "value2"}},
+            """
+            key value1
+              value2
+            """,
+            {"key value1": "value2"},
         ),
         (
-            "key1 value1\n  key2 value2",
-            {"key1": {"value1": {"key2": "value2"}}},
+            """
+            key1 value1
+              key2 value2
+            """,
+            {"key1 value1": {"key2": "value2"}},
         ),
         (
-            "key value1\n  value2\nkey value1\n  value3",
-            {"key": {"value1": ["value2", "value3"]}},
+            """
+            key value1
+              value2
+            key value1
+              value3
+            """,
+            {"key value1": ["value2", "value3"]},
+        ),
+        (
+            """
+            key value
+              key2 value2
+              key3 value3
+
+            key value4
+              key2 value2
+            """,
+            {"key value": {"key2": "value2", "key3": "value3"}, "key value4": {"key2": "value2"}},
+        ),
+        (
+            """
+            key value
+                key2 value2
+                key3 value3
+
+            key value4
+                key2
+            """,
+            {"key value": {"key2": "value2", "key3": "value3"}, "key value4": "key2"},
+        ),
+        (
+            """
+            key value
+                value2
+            key2 value
+                key3 value3
+            """,
+            {"key value": "value2", "key2 value": {"key3": "value3"}},
         ),
     ],
 )
 def test_indented_parser(indented_string, expected_output) -> None:
-    parsed_data = parse_data(Indentation, indented_string, seperator=(r"\s",))
+    parsed_data = parse_data(Indentation, textwrap.dedent(indented_string), seperator=(r"\s",))
     assert parsed_data == expected_output
 
 
