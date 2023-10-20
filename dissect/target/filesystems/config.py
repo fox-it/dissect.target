@@ -74,9 +74,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
                     # the part with entry.path here.
                     config_parser = parse(entry, *args, **kwargs)
                     entry = ConfigurationEntry(self, entry.path, entry, config_parser)
-                except (FileNotFoundError, ConfigurationParsingError) as e:
+                except (FileNotFoundError, ConfigurationParsingError):
                     # If a parsing error gets created, it should return the `entry`
-                    log.warning(f"Error when parsing {entry.path}/{part}", exc_info=e)
+                    log.debug(f"Error when parsing {entry.path}/{part}")
         return entry
 
 

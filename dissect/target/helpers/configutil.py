@@ -6,6 +6,8 @@ import re
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from typing import Any, ItemsView, Iterator, KeysView, Optional, TextIO, Union
+from fnmatch import fnmatch
+
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -93,6 +95,8 @@ class Ini(ConfigurationParser):
             strict=False,
             delimiters=self.seperator,
             comment_prefixes=self.comment_prefixes,
+            allow_no_value=True,
+            interpolation=None,
         )
         self.parsed_data.optionxform = str
 
@@ -305,7 +309,14 @@ class ParserConfig:
         return self.parser(**kwargs)
 
 
-CONFIG_MAP: dict[str, ParserConfig] = {
+MATCH_MAP: dict[str, ParserConfig] = {
+    "/systemd/*": ParserConfig(Ini),
+    "/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
+    "/sysctl.d/*.conf": ParserConfig(Default),
+}
+
+
+CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
     "xml": ParserConfig(Txt),
     "json": ParserConfig(Txt),
@@ -320,6 +331,8 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "hosts.allow": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
     "hosts": ParserConfig(Default, seperator=(r"\s")),
+    "nsswitch.conf": ParserConfig(Default, seperator=(":",)),
+    "lsb-release": ParserConfig(Default),
 }
 
 
@@ -368,6 +381,15 @@ def parse_config(
 def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> ParserConfig:
     if hint and (parser_type := CONFIG_MAP.get(hint)):
         return parser_type
+
+    matches = []
+
+    for match, value in MATCH_MAP.items():
+        if fnmatch(entry.path, f"*{match}"):
+            matches.append(value)
+
+    if matches:
+        return matches[0]
 
     extension = entry.path.rsplit(".", 1)[-1]
 
