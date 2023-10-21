@@ -60,7 +60,16 @@ class AndroidBackupLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return path.suffix.lower() == ".ab"
+        if path.suffix.lower() == ".ab":
+            return True
+
+        if path.is_file():
+            # The file extension can be chosen freely so let's also test for the file magic
+            with path.open("rb") as fh:
+                if fh.read(15) == b"ANDROID BACKUP\n":
+                    return True
+
+        return False
 
     def map(self, target: Target) -> None:
         if self.ab.compressed or self.ab.encrypted:
@@ -313,10 +322,10 @@ def _encode_bytes(buf: bytes) -> bytes:
     return struct.pack(">32h", *struct.unpack(">32b", buf)).decode("utf-16-be").encode("utf-8")
 
 
-if __name__ == "__main__":
+def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Android Backup file unwrapper")
     parser.add_argument("path", type=Path, help="source path")
     parser.add_argument("-p", "--password", help="encryption password")
     parser.add_argument("-t", "--tar", action="store_true", help="write a tar file instead of a plain Android Backup")
@@ -354,3 +363,7 @@ if __name__ == "__main__":
                 fhout.write(b"none\n")  # encryption
 
             shutil.copyfileobj(fhab, fhout, 1024 * 1024 * 64)
+
+
+if __name__ == "__main__":
+    main()
