@@ -8,10 +8,10 @@ log = logging.getLogger(__name__)
 
 
 class KeyType(Enum):
+    RAW = "raw"
     PASSPHRASE = "passphrase"
     RECOVERY_KEY = "recovery_key"
     FILE = "file"
-    RAW = "raw"
 
 
 class Key(NamedTuple):
@@ -21,7 +21,7 @@ class Key(NamedTuple):
     identifier: str = None
 
 
-KEYCHAIN: set[Key] = set()
+KEYCHAIN: list[Key] = []
 
 
 def register_key(key_type: KeyType, value: str, identifier: str = None, provider: str = None) -> None:
@@ -33,12 +33,12 @@ def register_key(key_type: KeyType, value: str, identifier: str = None, provider
             return
 
     key = Key(key_type, value, provider, identifier)
-    KEYCHAIN.add(key)
+    KEYCHAIN.append(key)
     log.info("Registered key %s", key)
 
 
 def get_all_keys() -> list[Key]:
-    return list(KEYCHAIN)
+    return KEYCHAIN[:]
 
 
 def get_keys_for_provider(provider: str) -> list[Key]:
