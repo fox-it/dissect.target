@@ -1,12 +1,9 @@
-from io import StringIO
 import textwrap
+from io import StringIO
+
 import pytest
 
-from dissect.target.helpers.configutil import (
-    ConfigurationParser,
-    Default,
-    Indentation,
-)
+from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs):
@@ -140,14 +137,17 @@ def test_change_scope():
     current = {}
 
     # Scoping does not change
-    new_current = parser._change_scope("key value", "key2 value2", "key", current)
-    assert id(current) == id(new_current)
+    current2 = parser._change_scope("key value", "key2 value2", "key value", current)
+    assert id(current) == id(current2)
 
     # Scoping changes once
-    new_current = parser._change_scope("key value", "  value2", "key", current)
-    assert id(current) != id(new_current)
-    assert current == {"key": {}}
+    current3 = parser._change_scope("key2 value2", "  value2", "key2 value2", current)
+    assert id(current) != id(current3)
+    assert current == {"key2 value2": {}}
 
-    # Check if pop works as intended
-    old_current = parser._change_scope("  value2", "test_line", "", new_current)
-    assert id(current) == id(old_current)
+    # If the current line still contains empty space, return the same scope
+    current4 = parser._change_scope("  value2", "test_line", "value2", current3)
+    assert id(current3) == id(current4)
+
+    current5 = parser._change_scope("test data", None, "test data", current4)
+    assert id(current3) == id(current5)

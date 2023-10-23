@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from collections import deque
 import io
 import re
+from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
-from typing import Any, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 from fnmatch import fnmatch
-
+from typing import Any, ItemsView, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
