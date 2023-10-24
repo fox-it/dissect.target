@@ -1,14 +1,21 @@
-import fcntl
 import random
 import string
+import struct
 import sys
-import termios
 import time
 from array import array
 from contextlib import contextmanager, redirect_stdout
 from enum import Enum
 from io import StringIO
 from typing import Iterator, Optional
+
+try:
+    import fcntl
+    import termios
+
+    CAN_CYBER = True
+except ImportError:
+    CAN_CYBER = False
 
 # fmt: off
 MASK_TABLE = [
@@ -77,10 +84,12 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
         sys.__stdout__.write(buf)
         return
 
-    orig_row, orig_col = (0, 0)
+    if not CAN_CYBER:
+        sys.__stdout__.write("you're not cybering hard enough\n")
 
+    orig_row, orig_col = (0, 0)
     with _set_terminal():
-        max_rows, max_cols = termios.tcgetwinsize(sys.__stdin__)
+        max_rows, max_cols = _get_win_size()
 
         orig_row, _ = _get_cursor_pos()
 
@@ -232,6 +241,12 @@ def _set_terminal() -> Iterator[None]:
         yield
     finally:
         termios.tcsetattr(sys.__stdin__, termios.TCSANOW, attr)
+
+
+def _get_win_size() -> tuple[int, int]:
+    packed = fcntl.ioctl(sys.__stdin__.buffer, termios.TIOCGWINSZ, struct.pack("HHHH", 0, 0, 0, 0))
+    rows, cols, _, _ = struct.unpack("HHHH", packed)
+    return rows, cols
 
 
 def _get_cursor_pos() -> int:
