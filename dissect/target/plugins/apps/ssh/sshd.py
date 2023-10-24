@@ -169,7 +169,7 @@ class SSHServerPlugin(Plugin):
         return _type, _value
 
 
-def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]):
+def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]) -> Union[list[Any], Callable[Any]]:
     if isinstance(value, list):
         return [unpack_function(val) for val in value]
     return unpack_function(value)

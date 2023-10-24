@@ -79,10 +79,10 @@ class ConfigurationParser:
 
         return new_dictionary
 
-    def _key_in_collapse(self, key: str):
+    def _key_in_collapse(self, key: str) -> bool:
         return key in self.collapse
 
-    def _key_not_in_collapse(self, key: str):
+    def _key_not_in_collapse(self, key: str) -> bool:
         return key not in self.collapse
 
 
@@ -126,10 +126,14 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
             # We can assume the value would be a dict too here.
             prev_value.update(value)
             return
+
         if isinstance(prev_value, str):
             prev_value = [prev_value]
+
         if isinstance(prev_value, list):
+            # We want to append ``value`` to prev_value
             prev_value.append(value)
+
     current[key] = prev_value or value
 
 
@@ -190,7 +194,7 @@ class PeekableIterator:
     """
 
     def __init__(self, iterable):
-        self._it = iter(iterable)
+        self._iterator = iter(iterable)
         self._cache = deque()
 
     def __iter__(self):
@@ -199,7 +203,7 @@ class PeekableIterator:
     def peek(self):
         if not self._cache:
             try:
-                self._cache.append(next(self._it))
+                self._cache.append(next(self._iterator))
             except StopIteration:
                 return
         return self._cache[0]
@@ -208,7 +212,7 @@ class PeekableIterator:
         if self._cache:
             return self._cache.popleft()
 
-        return next(self._it)
+        return next(self._iterator)
 
 
 class Indentation(Default):
