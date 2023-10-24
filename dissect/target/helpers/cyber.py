@@ -36,9 +36,9 @@ MASK_TABLE = [
 # fmt: on
 
 TYPE_EFFECT_SPEED = 4 / 1000
-JUMBLE_SECONDS = 2
+JUMBLE_SECONDS = 1
 JUMBLE_LOOP_SPEED = 35
-REVEAL_SECONDS = 5
+REVEAL_SECONDS = 2
 REVEAL_LOOP_SPEED = 50
 
 
@@ -157,6 +157,8 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
                     orig_row -= 1
                     cur_row -= 1
 
+        remaining = buf[i:]
+
         # Write initial mask
         for char, mask, _, _ in characters:
             if ("\n" in char or "\r\n" in char) or (not mask_space and char == " "):
@@ -226,6 +228,18 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
 
         _clear_input()
         _cursor_show()
+
+        if remaining:
+            time.sleep(0.5)
+
+            if color and "\033" not in remaining:
+                _bold()
+                _foreground_color(color.value)
+
+            sys.__stdout__.write(remaining)
+
+            if color and "\033" not in remaining:
+                _clear_attr()
 
 
 @contextmanager
