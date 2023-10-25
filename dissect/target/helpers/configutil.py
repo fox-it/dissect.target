@@ -155,7 +155,7 @@ class Default(ConfigurationParser):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
         self.SEPERATOR = re.compile(rf"\s*[{''.join(self.seperator)}]\s*")
         self.COMMENTS = re.compile(rf"\s*[{''.join(self.comment_prefixes)}]")
         self.skip_lines = self.comment_prefixes + ("\n",)
