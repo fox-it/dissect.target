@@ -13,6 +13,23 @@ from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
 
 
+def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
+    if prev_value := current.get(key):
+        if isinstance(prev_value, dict):
+            # We can assume the value would be a dict too here.
+            prev_value.update(value)
+            return
+
+        if isinstance(prev_value, str):
+            prev_value = [prev_value]
+
+        if isinstance(prev_value, list):
+            # We want to append ``value`` to prev_value
+            prev_value.append(value)
+
+    current[key] = prev_value or value
+
+
 # TODO: Look if I can just create a parsing function and attach it to the
 # the parser below.
 class ConfigurationParser:
@@ -36,6 +53,27 @@ class ConfigurationParser:
 
     def __contains__(self, item: str) -> bool:
         return item in self.parsed_data
+
+    def _collapse_dict(self, dictionary: dict, collapse: bool = False) -> dict[str, dict]:
+        new_dictionary = {}
+
+        if isinstance(dictionary, list) and collapse:
+            return dictionary[-1]
+
+        if not hasattr(dictionary, "items"):
+            return dictionary
+
+        for key, value in dictionary.items():
+            value = self._collapse_dict(value, self.collapse_all or self._collapse_check(key))
+            new_dictionary.update({key: value})
+
+        return new_dictionary
+
+    def _key_in_collapse(self, key: str) -> bool:
+        return key in self.collapse
+
+    def _key_not_in_collapse(self, key: str) -> bool:
+        return key not in self.collapse
 
     def parse_file(self, fh: TextIO) -> None:
         raise NotImplementedError()
@@ -63,78 +101,6 @@ class ConfigurationParser:
 
     def items(self) -> ItemsView:
         return self.parsed_data.items()
-
-    def _collapse_dict(self, dictionary: dict, collapse: bool = False) -> dict[str, dict]:
-        new_dictionary = {}
-
-        if isinstance(dictionary, list) and collapse:
-            return dictionary[-1]
-
-        if not hasattr(dictionary, "items"):
-            return dictionary
-
-        for key, value in dictionary.items():
-            value = self._collapse_dict(value, self.collapse_all or self._collapse_check(key))
-            new_dictionary.update({key: value})
-
-        return new_dictionary
-
-    def _key_in_collapse(self, key: str) -> bool:
-        return key in self.collapse
-
-    def _key_not_in_collapse(self, key: str) -> bool:
-        return key not in self.collapse
-
-
-class Ini(ConfigurationParser):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.parsed_data = ConfigParser(
-            strict=False,
-            delimiters=self.seperator,
-            comment_prefixes=self.comment_prefixes,
-            allow_no_value=True,
-            interpolation=None,
-        )
-        self.parsed_data.optionxform = str
-
-    def parse_file(self, fh: io.TextIO) -> None:
-        offset = fh.tell()
-        try:
-            self.parsed_data.read_file(fh)
-            return
-        except MissingSectionHeaderError:
-            pass
-
-        fh.seek(offset)
-        open_file = io.StringIO("[DEFAULT]\n" + fh.read())
-        self.parsed_data.read_file(open_file)
-
-
-class Txt(ConfigurationParser):
-    """Read the file into ``content``, and show the bumber of bytes read."""
-
-    def parse_file(self, fh: TextIO) -> None:
-        # Cast the size to a string, to print it out later.
-        self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
-
-
-def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
-    if prev_value := current.get(key):
-        if isinstance(prev_value, dict):
-            # We can assume the value would be a dict too here.
-            prev_value.update(value)
-            return
-
-        if isinstance(prev_value, str):
-            prev_value = [prev_value]
-
-        if isinstance(prev_value, list):
-            # We want to append ``value`` to prev_value
-            prev_value.append(value)
-
-    current[key] = prev_value or value
 
 
 class Default(ConfigurationParser):
@@ -188,62 +154,56 @@ class Default(ConfigurationParser):
         self.parsed_data = information_dict
 
 
-class PeekableIterator:
-    """Source gotten from:
-    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
-    """
+class Ini(ConfigurationParser):
+    """Parses an ini file according using the built-in python ConfigParser"""
 
-    def __init__(self, iterable):
-        self._iterator = iter(iterable)
-        self._cache = deque()
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
 
-    def __iter__(self):
-        return self
+        self.parsed_data = ConfigParser(
+            strict=False,
+            delimiters=self.seperator,
+            comment_prefixes=self.comment_prefixes,
+            allow_no_value=True,
+            interpolation=None,
+        )
+        self.parsed_data.optionxform = str
 
-    def peek(self):
-        if not self._cache:
-            try:
-                self._cache.append(next(self._iterator))
-            except StopIteration:
-                return
-        return self._cache[0]
+    def parse_file(self, fh: io.TextIO) -> None:
+        offset = fh.tell()
+        try:
+            self.parsed_data.read_file(fh)
+            return
+        except MissingSectionHeaderError:
+            pass
 
-    def __next__(self):
-        if self._cache:
-            return self._cache.popleft()
+        fh.seek(offset)
+        open_file = io.StringIO("[DEFAULT]\n" + fh.read())
+        self.parsed_data.read_file(open_file)
 
-        return next(self._iterator)
+
+class Txt(ConfigurationParser):
+    """Read the file into ``content``, and show the bumber of bytes read."""
+
+    def parse_file(self, fh: TextIO) -> None:
+        # Cast the size to a string, to print it out later.
+        self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
 
 
 class Indentation(Default):
+    """This parser is used for the files that use a single level of indentation to specify a different scope.
+
+    Examples of these files are for example the sshd_config file.
+    Where "Match" statments use a single layer of indentaiton to specify a scope for the key value pairs.
+
+    The parser parses this as the following:
+
+      key value       | -> {"key value": {"key2": "value2"}}
+        key2 value2   |
+    """
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._parents = {}
-        self._indentation = 0
-
-    def parse_file(self, fh: TextIO) -> None:
-        root = {}
-        current = root
-
-        iterator = PeekableIterator(self.line_reader(fh))
-        prev_key = None
-        for line in iterator:
-            key, value = self._parse_line(line)
-            prev_dict = current
-            current = self._change_scope(line, iterator.peek(), line.strip(), current)
-
-            if id(current) != id(prev_dict):
-                prev_key = line.strip()
-                continue
-
-            if not value:
-                key, value = prev_key, key
-                current = self._pop_scope(current)
-
-            _update_dictionary(current, key, value)
-
-        self.parsed_data = root
-        # Cleanup of internal state
         self._parents = {}
         self._indentation = 0
 
@@ -284,6 +244,59 @@ class Indentation(Default):
             return self._push_scope(key, current)
         return current
 
+    def parse_file(self, fh: TextIO) -> None:
+        root = {}
+        current = root
+
+        iterator = PeekableIterator(self.line_reader(fh))
+        prev_key = None
+        for line in iterator:
+            key, value = self._parse_line(line)
+            prev_dict = current
+            current = self._change_scope(line, iterator.peek(), line.strip(), current)
+
+            if id(current) != id(prev_dict):
+                prev_key = line.strip()
+                continue
+
+            if not value:
+                key, value = prev_key, key
+                current = self._pop_scope(current)
+
+            _update_dictionary(current, key, value)
+
+        self.parsed_data = root
+        # Cleanup of internal state
+        self._parents = {}
+        self._indentation = 0
+
+
+class PeekableIterator:
+    """Source gotten from:
+    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
+    """
+
+    def __init__(self, iterable):
+        self._iterator = iter(iterable)
+        self._cache = deque()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._cache:
+            return self._cache.popleft()
+
+        return next(self._iterator)
+
+    def peek(self):
+        if not self._cache:
+            try:
+                self._cache.append(next(self._iterator))
+            except StopIteration:
+                return
+        return self._cache[0]
+
 
 @dataclass(frozen=True)
 class ParserOptions:
@@ -313,9 +326,9 @@ class ParserConfig:
 
 
 MATCH_MAP: dict[str, ParserConfig] = {
-    "/systemd/*": ParserConfig(Ini),
-    "/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
-    "/sysctl.d/*.conf": ParserConfig(Default),
+    "*/systemd/*": ParserConfig(Ini),
+    "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
+    "*/sysctl.d/*.conf": ParserConfig(Default),
 }
 
 
@@ -385,14 +398,15 @@ def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> Parser
     if hint and (parser_type := CONFIG_MAP.get(hint)):
         return parser_type
 
-    matches = []
+    found_match = None
 
     for match, value in MATCH_MAP.items():
-        if fnmatch(entry.path, f"*{match}"):
-            matches.append(value)
+        if fnmatch(entry.path, f"{match}"):
+            found_match = value
+            break
 
-    if matches:
-        return matches[0]
+    if found_match:
+        return found_match
 
     extension = entry.path.rsplit(".", 1)[-1]
 

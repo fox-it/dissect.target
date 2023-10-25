@@ -1,5 +1,4 @@
 import re
-from functools import cached_property
 from itertools import product
 from pathlib import Path
 from typing import Iterator
@@ -62,20 +61,15 @@ PublicKeyRecord = OpenSSHUserRecordDescriptor(
 )
 
 
-class CommonSSHD:
+def find_sshd_directory(target: Target) -> TargetPath:
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
 
-    def __init__(self, target: Target):
-        self.target = target
+    for sshd in SSHD_DIRECTORIES:
+        if (target_path := target.fs.path(sshd)).exists():
+            return target_path
 
-    @cached_property
-    def sshd_directory(self) -> TargetPath:
-        for sshd in self.SSHD_DIRECTORIES:
-            if (target_path := self.target.fs.path(sshd)).exists():
-                return target_path
-
-        # A default, so there is no need to check for None
-        return self.target.fs.path("/etc/ssh/")
+    # A default, so there is no need to check for None
+    return target.fs.path("/etc/ssh/")
 
 
 class OpenSSHPlugin(Plugin):
@@ -85,7 +79,7 @@ class OpenSSHPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.sshd_directory = CommonSSHD(target).sshd_directory
+        self.sshd_directory = find_sshd_directory(target)
 
     def check_compatible(self) -> None:
         ssh_user_dirs = any(

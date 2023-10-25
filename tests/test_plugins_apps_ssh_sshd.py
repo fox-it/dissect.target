@@ -1,6 +1,6 @@
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.ssh.sshd import SSHServerPlugin
+from dissect.target.plugins.apps.ssh.opensshd import SSHServerPlugin
 
 from ._utils import absolute_path
 

@@ -4,7 +4,7 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.apps.ssh.openssh import CommonSSHD
+from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
 
 if TYPE_CHECKING:
     from dissect.target.plugins.general.config import ConfigurationTreePlugin
@@ -77,7 +77,7 @@ class SSHServerPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.sshd_directory = CommonSSHD(target).sshd_directory
+        self.sshd_directory = find_sshd_directory(target)
         self.sshd_config_path = self.sshd_directory.joinpath("sshd_config")
 
     def check_compatible(self) -> None:
@@ -169,7 +169,7 @@ class SSHServerPlugin(Plugin):
         return _type, _value
 
 
-def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]) -> Union[list[Any], Callable[Any]]:
+def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]) -> Union[list[Any], Any]:
     if isinstance(value, list):
         return [unpack_function(val) for val in value]
     return unpack_function(value)
