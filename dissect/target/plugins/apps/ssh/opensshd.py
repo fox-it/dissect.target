@@ -163,7 +163,7 @@ class SSHServerPlugin(Plugin):
             _type = "string"
 
         if multiple_fields:
-            # The type can still be a lis, so in that case, we append `[]`
+            # The type can still be a list, so in that case, we append `[]`
             _type = f"{_type}[]"
 
         return _type, _value

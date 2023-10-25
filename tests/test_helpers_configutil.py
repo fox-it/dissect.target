@@ -6,7 +6,7 @@ import pytest
 from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation
 
 
-def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs):
+def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs) -> dict:
     """Initializes parser_type as a parser which parses ``data_to_read``"""
     parser = parser_type(*args, **kwargs)
     parser.read_file(StringIO(data_to_read))
@@ -35,7 +35,7 @@ def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
         ("hello-world;20;20;20;20", ";", {"hello-world": "20;20;20;20"}),
     ],
 )
-def test_custom_seperators(parser_string: str, seperator: tuple, expected_output) -> None:
+def test_custom_seperators(parser_string: str, seperator: tuple, expected_output: dict[str, str]) -> None:
     parsed_data = parse_data(Default, parser_string, seperator=seperator, comment_prefixes=("#",))
     assert parsed_data == expected_output
 
@@ -116,12 +116,12 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
         ),
     ],
 )
-def test_indented_parser(indented_string, expected_output) -> None:
+def test_indented_parser(indented_string: str, expected_output: dict[str, dict]) -> None:
     parsed_data = parse_data(Indentation, textwrap.dedent(indented_string), seperator=(r"\s",))
     assert parsed_data == expected_output
 
 
-def test_collapse_inversion():
+def test_collapse_inversion() -> None:
     input_data = "hello world\nhello test\nworld world\nworld test"
     assert parse_data(
         Default,
@@ -132,7 +132,7 @@ def test_collapse_inversion():
     ) == {"hello": ["world", "test"], "world": "test"}
 
 
-def test_change_scope():
+def test_change_scope() -> None:
     parser = Indentation(seperator=(r"\s",))
     current = {}
 

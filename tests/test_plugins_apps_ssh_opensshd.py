@@ -5,7 +5,7 @@ from dissect.target.plugins.apps.ssh.opensshd import SSHServerPlugin
 from ._utils import absolute_path
 
 
-def test_sshd_config_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_sshd_config_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("data/plugins/apps/sshd_config")
     plugin = SSHServerPlugin(target_unix_users)
     fs_unix.map_file(str(plugin.sshd_config_path), config_file)
