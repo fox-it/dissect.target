@@ -30,6 +30,33 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
     current[key] = prev_value or value
 
 
+class PeekableIterator:
+    """Source gotten from:
+    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
+    """
+
+    def __init__(self, iterable):
+        self._iterator = iter(iterable)
+        self._cache = deque()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._cache:
+            return self._cache.popleft()
+
+        return next(self._iterator)
+
+    def peek(self):
+        if not self._cache:
+            try:
+                self._cache.append(next(self._iterator))
+            except StopIteration:
+                return
+        return self._cache[0]
+
+
 # TODO: Look if I can just create a parsing function and attach it to the
 # the parser below.
 class ConfigurationParser:
@@ -272,33 +299,6 @@ class Indentation(Default):
         # Cleanup of internal state
         self._parents = {}
         self._indentation = 0
-
-
-class PeekableIterator:
-    """Source gotten from:
-    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
-    """
-
-    def __init__(self, iterable):
-        self._iterator = iter(iterable)
-        self._cache = deque()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._cache:
-            return self._cache.popleft()
-
-        return next(self._iterator)
-
-    def peek(self):
-        if not self._cache:
-            try:
-                self._cache.append(next(self._iterator))
-            except StopIteration:
-                return
-        return self._cache[0]
 
 
 @dataclass(frozen=True)
