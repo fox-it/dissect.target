@@ -24,7 +24,7 @@ class VhdContainer(Container):
             magic = fh.read(9)
             fh.seek(offset)
             return b"conectix" in magic
-        except Exception:
+        except OSError:
             return False
 
     @staticmethod

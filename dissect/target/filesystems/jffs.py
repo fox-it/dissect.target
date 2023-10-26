@@ -47,11 +47,6 @@ class JFFSFilesystem(Filesystem):
 
 
 class JFFSFilesystemEntry(FilesystemEntry):
-    def _resolve(self) -> FilesystemEntry:
-        if self.is_symlink():
-            return self.readlink_ext()
-        return self
-
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
@@ -68,25 +63,26 @@ class JFFSFilesystemEntry(FilesystemEntry):
 
         if self.is_symlink():
             for name, entry in self.readlink_ext().iterdir():
-                yield name, entry
+                yield name
         else:
             for name, entry in self.entry.iterdir():
-                yield name, entry
+                yield name
 
     def scandir(self) -> Iterator[FilesystemEntry]:
-        for name, entry in self.iterdir():
+        for name in self.iterdir():
             entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
+            entry = self.fs.get(entry_path)
             yield JFFSFilesystemEntry(self.fs, entry_path, entry)
 
     def is_dir(self, follow_symlinks: bool = False) -> bool:
         try:
-            return self._resolve().entry.is_dir()
+            return self._resolve(follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
 
     def is_file(self, follow_symlinks: bool = False) -> bool:
         try:
-            return self._resolve().entry.is_file()
+            return self._resolve(follow_symlinks).entry.is_file()
         except FilesystemError:
             return False
 
@@ -100,7 +96,7 @@ class JFFSFilesystemEntry(FilesystemEntry):
         return self.entry.link
 
     def stat(self, follow_symlinks: bool = False) -> fsutil.stat_result:
-        return self._resolve().lstat()
+        return self._resolve(follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         node = self.entry.inode
@@ -110,8 +106,8 @@ class JFFSFilesystemEntry(FilesystemEntry):
             [
                 self.entry.mode,
                 self.entry.inum,
-                0,
-                0,
+                id(self.fs),
+                1, # TODO: properly calculate nlink in dissect.jffs
                 node.uid,
                 node.gid,
                 node.isize,
