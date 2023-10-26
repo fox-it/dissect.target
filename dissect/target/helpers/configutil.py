@@ -57,8 +57,6 @@ class PeekableIterator:
         return self._cache[0]
 
 
-# TODO: Look if I can just create a parsing function and attach it to the
-# the parser below.
 class ConfigurationParser:
     def __init__(
         self,
