@@ -133,18 +133,18 @@ class Default(ConfigurationParser):
 
     This parser splits only on the first ``seperator`` it finds:
 
-        key<seperator>value    -> {"key": "value"}
+        key<seperator>value     -> {"key": "value"}
 
         key<seperator>value\n
           continuation
-                                 -> {"key": "value continuation"}
+                                -> {"key": "value continuation"}
 
         # Unless we collapse values, we add them to a list to not overwrite any values.
         key<seperator>value1
         key<seperator>value2
                                 -> {key: [value1, value2]}
 
-        <empty_space><comment> -> skip
+        <empty_space><comment>  -> skip
     """
 
     def __init__(self, *args, **kwargs) -> None:
