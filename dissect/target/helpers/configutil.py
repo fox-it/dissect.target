@@ -110,12 +110,14 @@ class Default(ConfigurationParser):
 
         key<seperator>value    -> {"key": "value"}
 
-        key<seperator>value\n  -> {"key": "value continuation"}
+        key<seperator>value\n
           continuation
+                                 -> {"key": "value continuation"}
 
         # Unless we collapse values, we add them to a list to not overwrite any values.
-        key<seperator>value1   -> {key: [value1, value2]}
+        key<seperator>value1
         key<seperator>value2
+                                -> {key: [value1, value2]}
 
         <empty_space><comment> -> skip
     """
@@ -198,8 +200,9 @@ class Indentation(Default):
 
     The parser parses this as the following:
 
-      key value       | -> {"key value": {"key2": "value2"}}
-        key2 value2   |
+      key value
+        key2 value2
+                       -> {"key value": {"key2": "value2"}}
     """
 
     def __init__(self, *args, **kwargs) -> None:
@@ -398,15 +401,9 @@ def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> Parser
     if hint and (parser_type := CONFIG_MAP.get(hint)):
         return parser_type
 
-    found_match = None
-
     for match, value in MATCH_MAP.items():
         if fnmatch(entry.path, f"{match}"):
-            found_match = value
-            break
-
-    if found_match:
-        return found_match
+            return value
 
     extension = entry.path.rsplit(".", 1)[-1]
 
