@@ -63,6 +63,12 @@ def main():
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
     parser.add_argument("-f", "--function", help="function to execute")
     parser.add_argument("-xf", "--excluded-functions", help="functions to exclude from execution", default="")
+    parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        help="do not execute the functions, but just print which functions would be executed",
+    )
     parser.add_argument("--child", help="load a specific child path or index")
     parser.add_argument("--children", action="store_true", help="include children")
     parser.add_argument(
@@ -241,6 +247,9 @@ def main():
             except Exception:
                 target.log.exception("Exception while opening child '%s'", args.child)
 
+        if args.dry_run:
+            print(f"Dry run on: {target}")
+
         record_entries = []
         basic_entries = []
         yield_entries = []
@@ -262,6 +271,7 @@ def main():
             # Avoid executing same plugin for multiple OSes (like hostname)
             if func_def.name in executed_plugins:
                 continue
+            executed_plugins.add(func_def.name)
 
             # If the default type is record (meaning we skip everything else)
             # and actual output type is not record, continue.
@@ -269,6 +279,10 @@ def main():
             # will exit if we attempt to exec them without (because they are implied by the wildcard).
             # Also this saves cycles of course.
             if default_output_type == "record" and func_def.output_type != "record":
+                continue
+
+            if args.dry_run:
+                print(f"  execute: {func_def.name} ({func_def.path})")
                 continue
 
             try:
@@ -308,8 +322,6 @@ def main():
 
             if not first_seen_output_type:
                 first_seen_output_type = output_type
-
-            executed_plugins.add(func_def.name)
 
             if output_type == "record":
                 record_entries.append(result)
