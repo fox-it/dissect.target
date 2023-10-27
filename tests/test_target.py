@@ -427,3 +427,41 @@ def test_target_send_event():
     ]
     mock_callback1.assert_has_calls(calls)
     mock_callback2.assert_called_once_with(target_bare, Event.FUNC_EXEC, test="FUNC_EXEC")
+
+
+def test_empty_vs(target_bare: Target) -> None:
+    mock_disk = MagicMock()
+    mock_disk.vs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = []
+
+    target_bare.disks.add(mock_disk)
+
+    with patch("dissect.target.volume.open") as volume_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.disks.apply()
+
+        assert len(target_bare.volumes) == 1
+        assert target_bare.volumes[0].disk is mock_disk
+        assert target_bare.volumes[0].offset == 0
+
+
+def test_nested_vs(target_bare: Target) -> None:
+    mock_base_volume = MagicMock()
+    target_bare.volumes.add(mock_base_volume)
+
+    mock_volume = MagicMock()
+    mock_volume.offset = 0
+    mock_volume.fs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = [mock_volume]
+
+    with patch("dissect.target.volume.open") as volume_open, patch("dissect.target.filesystem.open") as filesystem_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.volumes.apply()
+        filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.filesystems) == 1

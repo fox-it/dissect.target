@@ -15,6 +15,7 @@ from dissect.target.exceptions import (
     PluginNotFoundError,
     TargetError,
     UnsupportedPluginError,
+    VolumeSystemError,
 )
 from dissect.target.helpers import config
 from dissect.target.helpers.loaderutil import extract_path_info
@@ -693,11 +694,16 @@ class DiskCollection(Collection[container.Container]):
                         disk.vs = volume.open(disk)
                         self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
 
+                    if not len(disk.vs.volumes):
+                        raise VolumeSystemError("Volume system has no volumes")
+
                     for vol in disk.vs.volumes:
                         self.target.volumes.add(vol)
                     continue
                 except Exception as e:
-                    self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
+                    self.target.log.warning(
+                        "Can't identify volume system or no volumes found, adding as raw volume instead: %s", disk
+                    )
                     self.target.log.debug("", exc_info=e)
 
             # Fallthrough case for error and if we're part of a logical volume set
@@ -730,7 +736,25 @@ class VolumeCollection(Collection[volume.Volume]):
                 elif volume.is_encrypted(vol):
                     encrypted_volumes.append(vol)
                 else:
-                    self.open(vol)
+                    # We could be getting "regular" volume systems out of LVM or encrypted volumes
+                    # Try to open each volume as a regular volume system, or add as a filesystem if it fails
+                    try:
+                        vs = volume.open(vol)
+                    except Exception:
+                        # If opening a volume system fails, there's likely none, so open as a filesystem instead
+                        self.open(vol)
+                        continue
+
+                    if not len(vs.volumes):
+                        self.open(vol)
+                        continue
+
+                    for new_vol in vs.volumes:
+                        if new_vol.offset == 0:
+                            self.target.log.info("Found volume with offset 0, opening as raw volume instead")
+                            self.open(new_vol)
+                            continue
+                        new_volumes.append(new_vol)
 
             self.target.log.debug("LVM volumes found: %s", lvm_volumes)
             self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
