@@ -1,9 +1,9 @@
 import re
-from functools import cached_property
 from itertools import product
 from pathlib import Path
 from typing import Iterator
 
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
@@ -61,10 +61,25 @@ PublicKeyRecord = OpenSSHUserRecordDescriptor(
 )
 
 
+def find_sshd_directory(target: Target) -> TargetPath:
+    SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
+
+    for sshd in SSHD_DIRECTORIES:
+        if (target_path := target.fs.path(sshd)).exists():
+            return target_path
+
+    # A default, so there is no need to check for None
+    return target.fs.path("/etc/ssh/")
+
+
 class OpenSSHPlugin(Plugin):
     __namespace__ = "ssh"
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.sshd_directory = find_sshd_directory(target)
 
     def check_compatible(self) -> None:
         ssh_user_dirs = any(
@@ -73,15 +88,6 @@ class OpenSSHPlugin(Plugin):
         )
         if not ssh_user_dirs and not self.sshd_directory.exists():
             raise UnsupportedPluginError("No OpenSSH directories found")
-
-    @cached_property
-    def sshd_directory(self) -> TargetPath:
-        for sshd in self.SSHD_DIRECTORIES:
-            if (target_path := self.target.fs.path(sshd)).exists():
-                return target_path
-
-        # A default, so there is no need to check for None
-        return self.target.fs.path("/etc/ssh/")
 
     def ssh_directory_globs(self, glob_user: str, glob_sshd: str) -> list[tuple[str, TargetPath]]:
         for user_details in self.target.user_details.all_with_home():
