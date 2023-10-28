@@ -165,7 +165,9 @@ class TargetCmd(cmd.Cmd):
         """
         pass
 
-    def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str) -> Optional[bool]:
+    def _exec(
+        self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False
+    ) -> Optional[bool]:
         """Command execution helper that chains initial command and piped subprocesses (if any) together."""
 
         argparts = []
@@ -187,7 +189,7 @@ class TargetCmd(cmd.Cmd):
                     print(e)
             else:
                 ctx = contextlib.nullcontext()
-                if self.target.props.get("cyber"):
+                if self.target.props.get("cyber") and not no_cyber:
                     ctx = cyber.cyber(color=None, run_at_end=True)
 
                 with ctx:
@@ -207,7 +209,9 @@ class TargetCmd(cmd.Cmd):
                 return
             return cmdfunc(args, stdout)
 
-        return self._exec(_exec_, command_args_str)
+        # These commands enter a subshell, which doesn't work well with cyber
+        no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
+        return self._exec(_exec_, command_args_str, no_cyber)
 
     def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
