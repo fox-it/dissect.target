@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
@@ -215,3 +216,21 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
             for call in mock_execute.mock_calls:
                 executed_func_names.add(call.args[1].name)
             assert executed_func_names == {"foo", "bar"}
+
+
+def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    if os.sep == "\\":
+        target_file = r"tests\data\loaders\tar\test-archive-dot-folder.tgz"
+    else:
+        target_file = "tests/data/loaders/tar/test-archive-dot-folder.tgz"
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            ["target-query", "-f", "general.*", "--dry-run", target_file],
+        )
+
+        target_query()
+        out, _ = capsys.readouterr()
+
+        assert out == f"Dry run on: <Target {target_file}>\n  execute: osinfo (general.osinfo.osinfo)\n"
