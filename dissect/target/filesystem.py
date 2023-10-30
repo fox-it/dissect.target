@@ -1038,7 +1038,7 @@ class VirtualFilesystem(Filesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on VirtualFilesystem class")
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         entry = relentry or self.root
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
         full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)

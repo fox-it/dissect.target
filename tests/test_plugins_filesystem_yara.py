@@ -11,7 +11,7 @@ yara = pytest.importorskip("dissect.target.plugins.filesystem.yara", reason="yar
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
-def test_yara_plugin(mock_target):
+def test_yara_plugin(target_default):
     test_rule = """
     rule test_rule_name {
         strings:
@@ -25,14 +25,14 @@ def test_yara_plugin(mock_target):
     vfs.map_file_fh("test_file", BytesIO(b"test string"))
     vfs.map_file_fh("/test/dir/to/test_file", BytesIO(b"test string"))
 
-    mock_target.filesystems.add(vfs)
+    target_default.filesystems.add(vfs)
 
     with tempfile.NamedTemporaryFile("w+t") as tmp_file:
         tmp_file.write(test_rule)
         tmp_file.flush()
 
-        mock_target.add_plugin(yara.YaraPlugin)
-        results = list(mock_target.yara(rule_files=[Path(tmp_file.name)]))
+        target_default.add_plugin(yara.YaraPlugin)
+        results = list(target_default.yara(rule_files=[Path(tmp_file.name)]))
 
     assert len(results) == 2
     assert results[0].path == "/test_file"

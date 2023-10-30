@@ -91,48 +91,47 @@ def main():
 
 def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
     return {
+        "disks": get_disks_info(target),
+        "volumes": get_volumes_info(target),
+        "children": get_children_info(target),
         "hostname": target.hostname,
-        "domain": target.domain,
+        "domain": get_optional_func(target, "domain"),
         "ips": target.ips,
         "os_family": target.os,
         "os_version": target.version,
         "architecture": target.architecture,
-        "language": target.language,
-        "timezone": target.timezone,
-        "install_date": target.install_date,
-        "last_activity": target.activity,
-        "disks": get_disks_info(target),
-        "volumes": get_volumes_info(target),
-        "children": get_children_info(target),
+        "language": get_optional_func(target, "language"),
+        "timezone": get_optional_func(target, "timezone"),
+        "install_date": get_optional_func(target, "install_date"),
+        "last_activity": get_optional_func(target, "activity"),
     }
+
+
+def get_optional_func(target: Target, func: str) -> Union[str, None]:
+    if target.has_function(func):
+        return getattr(target, func)
 
 
 def print_target_info(target: Target) -> None:
     print(target)
-    print("\nDisks")
-    for d in target.disks:
-        print(f"- {str(d)}")
-    print("\nVolumes")
-    for v in target.volumes:
-        print(f"- {str(v)}")
 
-    children = list(target.list_children())
-    if children:
-        print("\nChildren")
-        for child in children:
-            print(f"- <Child type='{child.type}' path='{child.path}'>")
+    for name, value in get_target_info(target).items():
+        if name in ["disks", "volumes", "children"]:
+            if not any(value):
+                continue
+            print(f"\n{name.capitalize()}")
+            for i in value:
+                values = " ".join([f'{k}="{v}"' for k, v in i.items()])
+                print(f"- <{name.capitalize()[:-1].replace('re', '')} {values}>")
+            continue
 
-    print()
-    print(f"Hostname      : {target.hostname}")
-    print(f"Domain        : {target.domain}")
-    print(f"IPs           : {', '.join(target.ips or ['None'])}")
-    print(f"OS family     : {target.os} ({target._os_plugin.__name__})")
-    print(f"OS version    : {target.version}")
-    print(f"Architecture  : {target.architecture}")
-    print(f"Language(s)   : {', '.join(target.language)}")
-    print(f"Timezone      : {target.timezone}")
-    print(f"Install date  : {target.install_date}")
-    print(f"Last activity : {target.activity}")
+        if isinstance(value, list):
+            value = ", ".join(value)
+
+        if name == "hostname":
+            print()
+
+        print(f"{name.capitalize().replace('_', ' ')}" + (14 - len(name)) * " " + f" : {value}")
 
 
 def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:

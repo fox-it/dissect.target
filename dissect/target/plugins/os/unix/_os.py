@@ -112,7 +112,7 @@ class UnixPlugin(OSPlugin):
                 )
 
     @export(property=True)
-    def architecture(self) -> str:
+    def architecture(self) -> Optional[str]:
         return self._get_architecture(self.os)
 
     @export(property=True)
@@ -320,21 +320,25 @@ def parse_fstab(
         volume_name = None
         if dev.startswith(("/dev/mapper", "/dev/gpt")):
             volume_name = dev.rsplit("/")[-1]
+        elif dev.startswith("/dev/disk/by-uuid"):
+            dev_id = dev.rsplit("/")[-1]
         elif dev.startswith("/dev/") and dev.count("/") == 3:
             # When composing a vg-lv name, LVM2 replaces hyphens with double hyphens in the vg and lv names
             # Emulate that here when combining the vg and lv names
             volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
             dev_id = dev.split("=")[1]
-            try:
-                dev_id = uuid.UUID(dev_id)
-            except ValueError:
-                pass
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue
 
         if mount_point == "/":
             continue
+
+        if dev_id:
+            try:
+                dev_id = uuid.UUID(dev_id)
+            except ValueError:
+                pass
 
         yield dev_id, volume_name, fs_type, mount_point

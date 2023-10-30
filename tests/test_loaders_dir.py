@@ -4,7 +4,7 @@ from dissect.target.plugin import OperatingSystem
 from ._utils import mkdirs
 
 
-def test_dir_loader_windows(mock_target, tmp_path):
+def test_dir_loader_windows(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["windows/system32"])
 
@@ -15,12 +15,12 @@ def test_dir_loader_windows(mock_target, tmp_path):
     assert DirLoader.detect(root)
 
     loader = DirLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_winnt(mock_target, tmp_path):
+def test_dir_loader_winnt(target_bare, tmp_path):
     root = tmp_path
     mkdirs(tmp_path, ["winnt"])
 
@@ -31,12 +31,12 @@ def test_dir_loader_winnt(mock_target, tmp_path):
     assert DirLoader.detect(root)
 
     loader = DirLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_linux(mock_target, tmp_path):
+def test_dir_loader_linux(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["etc", "var"])
 
@@ -47,12 +47,12 @@ def test_dir_loader_linux(mock_target, tmp_path):
     assert DirLoader.detect(root)
 
     loader = DirLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_macos(mock_target, tmp_path):
+def test_dir_loader_macos(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["Library"])
 
@@ -63,12 +63,12 @@ def test_dir_loader_macos(mock_target, tmp_path):
     assert DirLoader.detect(root)
 
     loader = DirLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 1
+    assert len(target_bare.filesystems) == 1
 
 
-def test_dir_loader_windows_drive_letters(mock_target, tmp_path):
+def test_dir_loader_windows_drive_letters(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["C/windows/system32", "D/test", "E/test"])
 
@@ -79,7 +79,7 @@ def test_dir_loader_windows_drive_letters(mock_target, tmp_path):
     assert DirLoader.detect(root)
 
     loader = DirLoader(root)
-    loader.map(mock_target)
+    loader.map(target_bare)
 
-    assert len(mock_target.filesystems) == 3
-    assert len(mock_target.fs.mounts) == 3
+    assert len(target_bare.filesystems) == 3
+    assert len(target_bare.fs.mounts) == 3

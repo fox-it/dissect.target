@@ -377,10 +377,22 @@ class OSPlugin(Plugin):
     def os(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with ``@export(property=True)``
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
+        """
+        raise NotImplementedError
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Required OS function.
+
+        Implementations must be decorated with ``@export(property=True)``.
+
+        Returns:
+            A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or
+            'AMD64-win32', or 'unknown' if the architecture is unknown.
         """
         raise NotImplementedError
 
@@ -532,10 +544,10 @@ def plugins(osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescrip
     """Retrieve all plugin descriptors.
 
     Args:
-        osfilter: The OS module path the plugin should be from.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
 
     Returns:
-        An iterator of all plugin descriptors, optionally filtered on OS module path.
+        An iterator of all plugin descriptors, optionally filtered on OS.
     """
 
     def _walk(osfilter: str = None, root: dict = None) -> Iterator[PluginDescriptor]:
@@ -554,9 +566,9 @@ def plugins(osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescrip
 
     if (
         osfilter
-        and not isinstance(osfilter, general.default.DefaultPlugin)
         and isinstance(osfilter, type)
         and issubclass(osfilter, OSPlugin)
+        and not issubclass(osfilter, general.default.DefaultPlugin)
         and osfilter.__module__.startswith(MODULE_PATH)
     ):
         osfilter, _, _ = osfilter.__module__.replace(MODULE_PATH, "", 1).strip(".").rpartition(".")
@@ -598,12 +610,12 @@ def child_plugins() -> Iterator[PluginDescriptor]:
     yield from _special_plugins("_child")
 
 
-def lookup(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def lookup(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Lookup a plugin descriptor by function name.
 
     Args:
-        func_name (str): Function name to lookup.
-        osfilter (str): OS path the plugin should be from.
+        func_name: Function name to lookup.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     yield from get_plugins_by_func_name(func_name, osfilter=osfilter)
     yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
@@ -613,8 +625,8 @@ def get_plugins_by_func_name(func_name: str, osfilter: Optional[type[OSPlugin]] 
     """Get a plugin descriptor by function name.
 
     Args:
-        func_name (str): Function name to lookup.
-        osfilter (str): OS path the plugin should be from.
+        func_name: Function name to lookup.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     for plugin_desc in plugins(osfilter):
         if not plugin_desc["namespace"] and func_name in plugin_desc["functions"]:
@@ -626,7 +638,7 @@ def get_plugins_by_namespace(namespace: str, osfilter: Optional[type[OSPlugin]] 
 
     Args:
         namespace: Plugin namespace to match.
-        osfilter: The OS module path the plugin should be from.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     for plugin_desc in plugins(osfilter):
         if namespace == plugin_desc["namespace"]:

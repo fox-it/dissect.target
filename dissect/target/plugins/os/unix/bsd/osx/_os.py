@@ -97,3 +97,9 @@ class MacPlugin(BsdPlugin):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.OSX.value
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        # OS-X uses Mach-O binary format. We should implement something similar
+        # to the Unix architecture() function but for Mach-O libraries.
+        pass

@@ -36,12 +36,12 @@ def main():
     parser.add_argument("-o", "--options", help="additional FUSE options")
     configure_generic_arguments(parser)
 
-    if not HAS_FUSE:
-        parser.exit("fusepy is not installed: pip install fusepy")
-
     args = parser.parse_args()
 
     process_generic_arguments(args)
+
+    if not HAS_FUSE:
+        parser.exit("fusepy is not installed: pip install fusepy")
 
     t = Target.open(args.target)
     vfs = filesystem.VirtualFilesystem()

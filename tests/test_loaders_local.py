@@ -47,16 +47,16 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
 )
-def test__add_disk_as_raw_container_to_target(mock_target: Target) -> None:
+def test__add_disk_as_raw_container_to_target(target_bare: Target) -> None:
     # Does it attempt to open the file and pass a raw container?
     mock = mock_open()
     drive = Path("/xdev/fake")
 
     with (
         patch("builtins.open", mock),
-        patch.object(mock_target.disks, "add") as mock_method,
+        patch.object(target_bare.disks, "add") as mock_method,
     ):
-        _add_disk_as_raw_container_to_target(drive, mock_target)
+        _add_disk_as_raw_container_to_target(drive, target_bare)
 
         assert isinstance(mock_method.call_args[0][0], RawContainer) is True
         mock.assert_called_with(drive, "rb")
@@ -65,7 +65,7 @@ def test__add_disk_as_raw_container_to_target(mock_target: Target) -> None:
 @pytest.mark.skipif(
     platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
 )
-def test__add_disk_as_raw_container_to_target_skip_fail(mock_target: Target) -> None:
+def test__add_disk_as_raw_container_to_target_skip_fail(target_bare: Target) -> None:
     # Does it emit a warning instead of raising an exception?
     mock = mock_open()
     mock.side_effect = IOError
@@ -75,14 +75,14 @@ def test__add_disk_as_raw_container_to_target_skip_fail(mock_target: Target) -> 
         patch.object(TargetLogAdapter, "warning") as mock_method,
         patch("builtins.open", mock),
     ):
-        _add_disk_as_raw_container_to_target(drive, mock_target)
+        _add_disk_as_raw_container_to_target(drive, target_bare)
 
         assert mock_method.call_args[0][0] == f"Unable to open drive: {str(drive)}, skipped"
         assert isinstance(mock_method.call_args[1]["exc_info"], OSError) is True
         mock.assert_called_with(drive, "rb")
 
 
-def test_map_linux_drives(mock_target: Target, tmp_path: Path) -> None:
+def test_map_linux_drives(target_bare: Target, tmp_path: Path) -> None:
     mock_drive = LINUX_DEV_DIR.joinpath("sda")
     mock_dev_dir = create_autospec(Path)
     mock_dev_dir.iterdir.return_value = iter([mock_drive])
@@ -94,12 +94,12 @@ def test_map_linux_drives(mock_target: Target, tmp_path: Path) -> None:
             autospec=True,
         ) as mock_add_raw_disks,
         patch("dissect.target.loaders.local.VOLATILE_LINUX_PATHS", [tmp_path]),
-        patch.object(mock_target.filesystems, "add", autospec=True) as mock_add_fs,
-        patch.object(mock_target.fs, "mount", autospec=True) as mock_mount,
+        patch.object(target_bare.filesystems, "add", autospec=True) as mock_add_fs,
+        patch.object(target_bare.fs, "mount", autospec=True) as mock_mount,
     ):
-        map_linux_drives(mock_target)
+        map_linux_drives(target_bare)
 
-        mock_add_raw_disks.assert_called_with(mock_drive, mock_target)
+        mock_add_raw_disks.assert_called_with(mock_drive, target_bare)
 
         mock_add_fs.assert_called()
         dir_fs = mock_add_fs.call_args[0][0]
