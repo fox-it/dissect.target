@@ -107,7 +107,7 @@ class JFFSFilesystemEntry(FilesystemEntry):
                 self.entry.mode,
                 self.entry.inum,
                 id(self.fs),
-                1, # TODO: properly calculate nlink in dissect.jffs
+                1,  # TODO: properly calculate nlink in dissect.jffs
                 node.uid,
                 node.gid,
                 node.isize,
