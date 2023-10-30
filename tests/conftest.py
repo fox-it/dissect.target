@@ -146,7 +146,7 @@ def fs_bsd():
 
 
 @pytest.fixture
-def fs_android():
+def fs_android() -> VirtualFilesystem:
     fs = VirtualFilesystem()
     fs.map_file("/build.prop", absolute_path("data/plugins/os/unix/linux/android/build.prop"))
     yield fs
@@ -267,7 +267,7 @@ def target_citrix(fs_bsd):
 
 
 @pytest.fixture
-def target_android(fs_android) -> Target:
+def target_android(fs_android: VirtualFilesystem) -> Target:
     mock_target = next(make_mock_target())
     mock_target._os_plugin = AndroidPlugin
     mock_target.filesystems.add(fs_android)

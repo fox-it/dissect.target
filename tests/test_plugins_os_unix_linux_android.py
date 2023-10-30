@@ -1,7 +1,8 @@
+from dissect.target import Target
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 
 
-def test_android_os(target_android) -> None:
+def test_android_os(target_android: Target) -> None:
     target_android.add_plugin(AndroidPlugin)
 
     assert target_android.os == "android"
