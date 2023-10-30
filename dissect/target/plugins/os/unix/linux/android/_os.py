@@ -4,7 +4,8 @@ from typing import Iterator, Optional, TextIO
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
 
 
@@ -22,7 +23,7 @@ class BuildProp:
             self.props[k] = v
 
 
-class AndroidPlugin(OSPlugin):
+class AndroidPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
