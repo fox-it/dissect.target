@@ -389,8 +389,11 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
         except ImportError as e:
             log.info("Failed to import %s", manager_cls)
             log.debug("", exc_info=e)
-        except VolumeSystemError:
-            log.exception(f"Failed to open an encrypted volume {volume} with volume manager {manager_cls}")
+        except Exception as e:
+            log.error(
+                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.PROVIDER, e
+            )
+            log.debug("", exc_info=e)
     return None
 
 
