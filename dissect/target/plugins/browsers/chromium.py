@@ -22,13 +22,19 @@ from dissect.target.plugins.browsers.browser import (
 )
 from dissect.target.plugins.general.users import UserDetails
 
+CHROMIUM_DOWNLOAD_RECORD_FIELDS = [
+    ("uri", "tab_url"),
+    ("uri", "tab_referrer_url"),
+    ("string", "mime_type"),
+]
+
 
 class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS

@@ -7,7 +7,10 @@ from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
 )
-from dissect.target.plugins.browsers.chromium import ChromiumMixin
+from dissect.target.plugins.browsers.chromium import (
+    CHROMIUM_DOWNLOAD_RECORD_FIELDS,
+    ChromiumMixin,
+)
 
 
 class ChromePlugin(ChromiumMixin, BrowserPlugin):
@@ -27,7 +30,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         "Library/Application Support/Google/Chrome/Default",
     ]
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/extension", GENERIC_EXTENSION_RECORD_FIELDS

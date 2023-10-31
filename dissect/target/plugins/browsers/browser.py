@@ -9,10 +9,7 @@ GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("varint", "id"),
     ("path", "path"),
     ("uri", "url"),
-    ("uri", "tab_url"),
-    ("uri", "tab_referrer_url"),
     ("filesize", "size"),
-    ("string", "mime_type"),
     ("varint", "state"),
     ("path", "source"),
 ]
