@@ -117,7 +117,10 @@ class ChromiumMixin:
                 id (string): Record ID.
                 path (string): Download path.
                 url (uri): Download URL.
+                tab_url (string): Tab URL.
+                tab_referrer_url (string): Referrer URL.
                 size (varint): Download file size.
+                mime_type (string): MIME type.
                 state (varint): Download state number.
                 source: (path): The source file of the download record.
         Raises:
@@ -151,9 +154,12 @@ class ChromiumMixin:
                         ts_end=webkittimestamp(row.end_time) if row.end_time else None,
                         browser=browser_name,
                         id=row.get("id"),
+                        tab_url=try_idna(row.get("tab_url")),
+                        tab_referrer_url=try_idna(row.get("tab_referrer_url")),
                         path=download_path,
                         url=url,
                         size=row.get("total_bytes"),
+                        mime_type=row.get("mime_type"),
                         state=row.get("state"),
                         source=db_file,
                         _target=self.target,
