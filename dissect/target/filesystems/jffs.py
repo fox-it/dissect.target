@@ -71,7 +71,7 @@ class JFFSFilesystemEntry(FilesystemEntry):
     def scandir(self) -> Iterator[FilesystemEntry]:
         for name in self.iterdir():
             entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            entry = self.fs.get(entry_path)
+            entry = self.fs.get(entry_path).entry
             yield JFFSFilesystemEntry(self.fs, entry_path, entry)
 
     def is_dir(self, follow_symlinks: bool = False) -> bool:
