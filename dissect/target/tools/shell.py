@@ -490,10 +490,18 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
-    def cmd_ls(self, args: argparse.Namespace, stdout) -> Optional[bool]:
+    @arg("-R", action="store_true", dest="recursive", help="Recursively list subdirectories encountered.")
+    @arg("-c", action="store_true", dest="use_ctime", help="Show time when file status was last changed.")
+    @arg("-u", action="store_true", dest="use_atime", help="Show time of last access.")
+    def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """list directory contents"""
 
         path = self.resolve_path(args.path)
+        dir_list = []
+
+        if args.use_ctime and args.use_atime:
+            print("Cannot specify -c and -u at the same time.")
+            return
 
         if not path or not path.exists():
             return
@@ -504,20 +512,61 @@ class TargetCli(TargetCmd):
             contents = [(path, path.name)]
 
         if not args.l:
-            print("\n".join([name for _, name in contents]), file=stdout)
+            for target_path, name in contents:
+                print(name, file=stdout)
+                if args.recursive and target_path.is_dir():
+                    dir_list.append(target_path)
         else:
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
-                self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
+                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
+                if args.recursive and target_path.is_dir():
+                    dir_list.append(target_path)
 
-    def print_extensive_file_stat(self, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
+        if args.recursive and len(dir_list):
+            for dir_name in dir_list:
+                self._recursive_ls(args, dir_name, stdout)
+
+    def _recursive_ls(self, args: argparse.Namespace, dir_name: fsutil.TargetPath, stdout: TextIO) -> Optional[bool]:
+        path = self.resolve_path(dir_name)
+        dir_list = []
+
+        if path.is_dir():
+            contents = self.scandir(path, color=True)
+        elif path.is_file():
+            contents = [(path, path.name)]
+
+        print(f"\n{str(path)}:")
+        if not args.l:
+            for target_path, name in contents:
+                print(name, file=stdout)
+                if target_path.is_dir():
+                    dir_list.append(target_path)
+        else:
+            if len(contents) > 1:
+                print(f"total {len(contents)}", file=stdout)
+            for target_path, name in contents:
+                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
+                if target_path.is_dir():
+                    dir_list.append(target_path)
+
+        if args.recursive and len(dir_list):
+            for dir_name in dir_list:
+                self._recursive_ls(args, dir_name, stdout)
+
+    def print_extensive_file_stat(self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
         try:
             entry = target_path.get()
             stat = entry.lstat()
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
+            if args.use_ctime:
+                utc_time = datetime.datetime.utcfromtimestamp(stat.st_ctime).isoformat()
+            elif args.use_atime:
+                utc_time = datetime.datetime.utcfromtimestamp(stat.st_atime).isoformat()
+            else:
+                utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
 
             print(
                 f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
