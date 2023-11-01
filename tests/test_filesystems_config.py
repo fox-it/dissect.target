@@ -12,7 +12,7 @@ from dissect.target.filesystems.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
 )
-from dissect.target.helpers.configparser import parse_config
+from dissect.target.helpers.configutil import parse_config
 
 from ._utils import absolute_path
 
@@ -64,7 +64,14 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
                 "HostKey": [f"__PROGRAMDATA__/ssh/ssh_host_{key}_key" for key in ["rsa", "dsa", "ecdsa", "ed25519"]],
                 "AuthorizedKeysFile": ".ssh/authorized_keys",
                 "Subsystem": "sftp sftp-server.exe",
-                "Match": "Group administrators AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys",
+                "Match Group administrators": {
+                    "AuthorizedKeysFile": "__PROGRAMDATA__/ssh/administrators_authorized_keys"
+                },
+                "Match User anoncvs": {
+                    "AllowTcpForwarding": "no",
+                    "PermitTTY": "no",
+                    "ForceCommand": "cvs server",
+                },
             },
         ),
     ],
