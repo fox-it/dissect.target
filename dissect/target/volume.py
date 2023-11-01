@@ -26,6 +26,8 @@ ddf = import_lazy("dissect.target.volumes.ddf")
 """A lazy import of :mod:`dissect.target.volumes.ddf`."""
 bde = import_lazy("dissect.target.volumes.bde")
 """A lazy import of :mod:`dissect.target.volumes.bde`."""
+luks = import_lazy("dissect.target.volumes.luks")
+"""A lazy import of :mod:`dissect.target.volumes.luks`."""
 
 log = logging.getLogger(__name__)
 """A logger instance for this module."""
@@ -37,7 +39,7 @@ LOGICAL_VOLUME_MANAGERS: list[type[LogicalVolumeSystem]] = [
     ddf.DdfVolumeSystem,
 ]
 """All available :class:`LogicalVolumeSystem` classes."""
-ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem]
+ENCRYPTED_VOLUME_MANAGERS: list[type[EncryptedVolumeSystem]] = [bde.BitlockerVolumeSystem, luks.LUKSVolumeSystem]
 """All available :class:`EncryptedVolumeSystem` classes."""
 
 
@@ -390,8 +392,11 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
         except ImportError as e:
             log.info("Failed to import %s", manager_cls)
             log.debug("", exc_info=e)
-        except VolumeSystemError:
-            log.exception(f"Failed to open an encrypted volume {volume} with volume manager {manager_cls}")
+        except Exception as e:
+            log.error(
+                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.PROVIDER, e
+            )
+            log.debug("", exc_info=e)
     return None
 
 
