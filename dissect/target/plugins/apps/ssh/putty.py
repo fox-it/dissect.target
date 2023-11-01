@@ -4,29 +4,21 @@ from pathlib import Path
 from typing import Iterator, Union
 
 from Crypto.PublicKey import ECC, RSA
-from flow.record.fieldtypes import windows_path
+from flow.record.fieldtypes import posix_path, windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.record import WindowsUserRecord, create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.apps.ssh.openssh import KnownHostRecord
+from dissect.target.plugins.general.users import UserDetails
 
 log = logging.getLogger(__name__)
 
-SshHostKeyRecord = TargetRecordDescriptor(
-    "application/putty/known_host",
-    [
-        ("datetime", "ts"),
-        ("string", "host"),
-        ("varint", "port"),
-        ("string", "key_type"),
-        ("string", "public_key"),
-        ("path", "source"),
-    ],
-)
-
-SessionRecord = TargetRecordDescriptor(
+PuTTYUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
+PuTTYSessionRecord = PuTTYUserRecordDescriptor(
     "application/putty/saved_session",
     [
         ("datetime", "ts"),
@@ -38,7 +30,7 @@ SessionRecord = TargetRecordDescriptor(
         ("string", "remote_command"),
         ("string", "port_forward"),
         ("string", "manual_ssh_host_keys"),
-        ("path", "source"),
+        ("path", "path"),
     ],
 )
 
@@ -66,11 +58,16 @@ class PuTTYPlugin(Plugin):
         regf_installs, path_installs = [], []
 
         if self.target.has_function("registry"):
-            regf_installs = list(self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"))
+            for key in self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"):
+                user_details = self.target.registry.get_user_details(key)
+                if not user_details:
+                    user = WindowsUserRecord(sid="", name="", home="", _target=self.target)
+                    user_details = UserDetails(user=user, home_path=None)
+                regf_installs.append((key, user_details))
 
         for user_details in self.target.user_details.all_with_home():
             if (putty_path := user_details.home_path.joinpath(".putty")).exists():
-                path_installs.append(putty_path)
+                path_installs.append((putty_path, user_details))
 
         return regf_installs, path_installs
 
@@ -78,17 +75,17 @@ class PuTTYPlugin(Plugin):
         if not any(self.regf_installs + self.path_installs):
             raise UnsupportedPluginError("No PuTTY installations found")
 
-    @export(record=SshHostKeyRecord)
-    def known_hosts(self) -> Iterator[SshHostKeyRecord]:
+    @export(record=KnownHostRecord)
+    def known_hosts(self) -> Iterator[KnownHostRecord]:
         """Parse PuTTY saved SshHostKeys."""
 
-        for regf_install in self.regf_installs:
-            yield from self._regf_known_hosts(regf_install)
+        for putty_key, user_details in self.regf_installs:
+            yield from self._regf_known_hosts(putty_key, user_details)
 
-        for path_install in self.path_installs:
-            yield from self._path_known_hosts(path_install)
+        for putty_path, user_details in self.path_installs:
+            yield from self._path_known_hosts(putty_path, user_details)
 
-    def _regf_known_hosts(self, putty_key: RegistryKey) -> Iterator[SshHostKeyRecord]:
+    def _regf_known_hosts(self, putty_key: RegistryKey, user_details: UserDetails) -> Iterator[KnownHostRecord]:
         """Parse PuTTY traces in Windows registry."""
 
         try:
@@ -100,17 +97,20 @@ class PuTTYPlugin(Plugin):
             key_type, host = entry.name.split("@")
             port, host = host.split(":")
 
-            yield SshHostKeyRecord(
-                ts=ssh_host_keys.ts,
-                key_type=key_type,
+            yield KnownHostRecord(
+                mtime_ts=ssh_host_keys.ts,
                 host=host,
                 port=port,
+                key_type=key_type,
                 public_key=construct_public_key(key_type, entry.value),
-                source=windows_path(ssh_host_keys.path),  # Technically this is a registry path
+                comment="",
+                marker=None,
+                path=windows_path(ssh_host_keys.path),
                 _target=self.target,
+                _user=user_details.user,
             )
 
-    def _path_known_hosts(self, putty_path: TargetPath) -> Iterator[SshHostKeyRecord]:
+    def _path_known_hosts(self, putty_path: TargetPath, user_details: UserDetails) -> Iterator[KnownHostRecord]:
         """Parse PuTTY traces in ``.putty`` folders"""
         ssh_host_keys_path = putty_path.joinpath("sshhostkeys")
 
@@ -122,27 +122,30 @@ class PuTTYPlugin(Plugin):
                 key_type, host = parts[0].split("@")
                 port, host = host.split(":")
 
-                yield SshHostKeyRecord(
-                    ts=ts,
-                    key_type=key_type,
+                yield KnownHostRecord(
+                    mtime_ts=ts,
                     host=host,
                     port=port,
+                    key_type=key_type,
                     public_key=construct_public_key(key_type, parts[1]),
-                    source=ssh_host_keys_path,
+                    comment="",
+                    marker=None,
+                    path=posix_path(ssh_host_keys_path),
                     _target=self.target,
+                    _user=user_details.user,
                 )
 
-    @export(record=SessionRecord)
-    def sessions(self) -> Iterator[SessionRecord]:
+    @export(record=PuTTYSessionRecord)
+    def sessions(self) -> Iterator[PuTTYSessionRecord]:
         """Parse PuTTY saved session configuration files."""
 
-        for regf_install in self.regf_installs:
-            yield from self._regf_sessions(regf_install)
+        for putty_key, user_details in self.regf_installs:
+            yield from self._regf_sessions(putty_key, user_details)
 
-        for path_install in self.path_installs:
-            yield from self._path_sessions(path_install)
+        for putty_path, user_details in self.path_installs:
+            yield from self._path_sessions(putty_path, user_details)
 
-    def _regf_sessions(self, putty_key: RegistryKey) -> Iterator[SessionRecord]:
+    def _regf_sessions(self, putty_key: RegistryKey, user_details: UserDetails) -> Iterator[PuTTYSessionRecord]:
         try:
             sessions = putty_key.subkey("Sessions")
         except RegistryKeyNotFoundError:
@@ -150,20 +153,26 @@ class PuTTYPlugin(Plugin):
 
         for session in sessions.subkeys():
             cfg = {s.name: s.value for s in session.values()}
-            yield from self._build_session_record(session.ts, session.name, windows_path(session.path), cfg)
+            yield from self._build_session_record(
+                session.ts, session.name, windows_path(session.path), cfg, user_details
+            )
 
-    def _path_sessions(self, putty_path: TargetPath) -> Iterator[SessionRecord]:
+    def _path_sessions(self, putty_path: TargetPath, user_details: UserDetails) -> Iterator[PuTTYSessionRecord]:
         sessions_dir = putty_path.joinpath("sessions")
         if sessions_dir.exists():
             for session in sessions_dir.glob("*"):
                 if session.is_file():
                     cfg = dict(map(str.strip, line.split("=", maxsplit=1)) for line in session.open("rt").readlines())
-                    yield from self._build_session_record(session.stat().st_mtime, session.name, session, cfg)
+                    yield from self._build_session_record(
+                        session.stat().st_mtime, session.name, session, cfg, user_details
+                    )
 
-    def _build_session_record(self, ts, name: Union[float, datetime], source: Path, cfg: dict) -> SessionRecord:
+    def _build_session_record(
+        self, ts, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
+    ) -> PuTTYSessionRecord:
         host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
 
-        yield SessionRecord(
+        yield PuTTYSessionRecord(
             ts=ts,
             session_name=name,
             protocol=cfg.get("Protocol"),
@@ -173,8 +182,9 @@ class PuTTYPlugin(Plugin):
             remote_command=cfg.get("RemoteCommand"),
             port_forward=cfg.get("PortForwardings"),
             manual_ssh_host_keys=cfg.get("SSHManualHostKeys"),
-            source=source,
+            path=source,
             _target=self.target,
+            _user=user_details.user,
         )
 
 

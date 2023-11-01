@@ -183,6 +183,7 @@ class VirtualHive(RegistryHive):
 
     def __init__(self):
         self._root = VirtualKey(self, "")
+        self.filepath = None
 
     def __repr__(self) -> str:
         return "<VirtualHive>"

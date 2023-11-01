@@ -32,8 +32,10 @@ AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
 KnownHostRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/known_host",
     [
+        ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
-        ("string", "hostname_pattern"),
+        ("string", "host"),
+        ("varint", "port"),
         ("string", "public_key"),
         ("string", "marker"),
     ],
@@ -136,7 +138,8 @@ class OpenSSHPlugin(Plugin):
 
                 for hostname in hostnames:
                     yield KnownHostRecord(
-                        hostname_pattern=hostname,
+                        host=hostname,
+                        port=None,
                         key_type=keytype,
                         public_key=public_key,
                         comment=comment,
