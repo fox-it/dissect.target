@@ -1,4 +1,3 @@
-import platform
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -10,7 +9,6 @@ from dissect.target.filesystem import VirtualFilesystem
 yara = pytest.importorskip("dissect.target.plugins.filesystem.yara", reason="yara-python module unavailable")
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
 def test_yara_plugin(target_default):
     test_rule = """
     rule test_rule_name {
@@ -27,9 +25,10 @@ def test_yara_plugin(target_default):
 
     target_default.filesystems.add(vfs)
 
-    with tempfile.NamedTemporaryFile("w+t") as tmp_file:
+    with tempfile.NamedTemporaryFile("w+t", delete=False) as tmp_file:
         tmp_file.write(test_rule)
         tmp_file.flush()
+        tmp_file.close()
 
         target_default.add_plugin(yara.YaraPlugin)
         results = list(target_default.yara(rule_files=[Path(tmp_file.name)]))

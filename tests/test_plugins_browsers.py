@@ -1,22 +1,19 @@
 import gzip
-import platform
 import tempfile
-
-import pytest
 
 from dissect.target.plugins.browsers import chrome, chromium, edge, firefox, iexplore
 
 from ._utils import absolute_path
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
 def test_iexplore_plugin(target_win, fs_win, tmp_path, target_win_users):
     cache_archive = absolute_path("data/plugins/browsers/iexplore/WebCacheV01.dat.gz")
 
-    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         with gzip.GzipFile(cache_archive, "rb") as f:
             tf.write(f.read())
         tf.flush()
+        tf.close()
 
         user = target_win_users.user_details.find(username="John")
         webcache_dir = user.home_path.joinpath("AppData/Local/Microsoft/Windows/WebCache/")
