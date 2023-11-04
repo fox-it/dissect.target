@@ -79,10 +79,10 @@ AuthorizedKeysFile	.ssh/authorized_keys
 Subsystem	sftp	sftp-server.exe
 
 # Example of overriding settings on a per-user basis
-#Match User anoncvs
-#	AllowTcpForwarding no
-#	PermitTTY no
-#	ForceCommand cvs server
+Match User anoncvs
+	AllowTcpForwarding no
+	PermitTTY no
+	ForceCommand cvs server
 
 Match Group administrators
        AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys

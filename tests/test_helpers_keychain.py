@@ -27,5 +27,11 @@ def test_keychain_register_keychain_file(guarded_keychain):
 def test_keychain_register_wildcard_value(guarded_keychain):
     keychain.register_wildcard_value("test-value")
 
-    # number of keys registered is equal number of supported key types
+    # Number of keys registered is equal number of supported key types, minus one for an invalid raw key
+    assert len(keychain.get_keys_without_provider()) == len(keychain.KeyType) - 1
+
+    keychain.KEYCHAIN.clear()
+    keychain.register_wildcard_value("0000")
+
+    # Valid raw key now included
     assert len(keychain.get_keys_without_provider()) == len(keychain.KeyType)
