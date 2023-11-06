@@ -33,7 +33,7 @@ class JFFSFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return JFFSFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[jffs2.INode] = None):
+    def _get_node(self, path: str, node: Optional[jffs2.INode] = None) -> jffs2.INode:
         try:
             return self.jffs2.get(path, node)
         except jffs2.FileNotFoundError as e:
@@ -57,21 +57,24 @@ class JFFSFilesystemEntry(FilesystemEntry):
             raise IsADirectoryError(self.path)
         return self._resolve().entry.open()
 
-    def iterdir(self) -> Iterator[str]:
+    def _iterdir(self) -> Iterator[tuple[str, jffs2.INode]]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
         if self.is_symlink():
             for name, entry in self.readlink_ext().iterdir():
-                yield name
+                yield name, entry
         else:
             for name, entry in self.entry.iterdir():
-                yield name
+                yield name, entry
+
+    def iterdir(self) -> Iterator[str]:
+        for _, entry in self._iterdir():
+            yield entry.name
 
     def scandir(self) -> Iterator[FilesystemEntry]:
-        for name in self.iterdir():
+        for name, entry in self._iterdir():
             entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
-            entry = self.fs.get(entry_path).entry
             yield JFFSFilesystemEntry(self.fs, entry_path, entry)
 
     def is_dir(self, follow_symlinks: bool = False) -> bool:
