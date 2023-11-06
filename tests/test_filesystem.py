@@ -472,7 +472,6 @@ def test_virtual_filesystem_map_dir():
         NamedTemporaryFile(dir=some_dir, delete=False) as some_file,
     ):
         some_file.write(b"1337")
-        some_file.seek(0)
         some_file.close()
 
         vfs.map_dir(vfs_path, tmp_dir)
