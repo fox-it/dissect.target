@@ -62,11 +62,9 @@ class JFFSFilesystemEntry(FilesystemEntry):
             raise NotADirectoryError(self.path)
 
         if self.is_symlink():
-            for name, entry in self.readlink_ext().iterdir():
-                yield name, entry
+            yield from self.readlink_ext().iterdir()
         else:
-            for name, entry in self.entry.iterdir():
-                yield name, entry
+            yield from self.entry.iterdir()
 
     def iterdir(self) -> Iterator[str]:
         for _, entry in self._iterdir():
