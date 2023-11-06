@@ -1119,6 +1119,7 @@ class VirtualFilesystem(Filesystem):
             if relroot == ".":
                 relroot = ""
 
+            relroot = fsutil.normalize(relroot, alt_separator=os.path.sep)
             vfsroot = fsutil.join(vfspath, relroot, alt_separator=self.alt_separator)
             directory = self.makedirs(vfsroot)
 

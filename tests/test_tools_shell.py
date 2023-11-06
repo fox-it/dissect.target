@@ -1,14 +1,14 @@
 import argparse
-import platform
 import sys
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
-from dissect.target.helpers.fsutil import TargetPath, stat_result
+from dissect.target.helpers.fsutil import TargetPath, normalize, stat_result
 from dissect.target.tools import shell
 from dissect.target.tools.shell import TargetCli
 
@@ -66,10 +66,6 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
     assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="Path comparison error (path separators are different). Needs to be fixed.",
-)
 @pytest.mark.parametrize(
     "folders, files, save, expected",
     [
@@ -94,5 +90,11 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
         target_win.fs.root.map_file_fh(_file, BytesIO(_file.encode("utf-8")))
     args = argparse.Namespace(path=[save], out=tmp_path, verbose=False)
     cli.cmd_save(args, sys.stdout)
-    tree = "|".join(sorted(map(lambda path: str(path.relative_to(tmp_path)), tmp_path.rglob("*"))))
+
+    def _map_function(path: Path) -> str:
+        relative_path = str(path.relative_to(tmp_path))
+        return normalize(relative_path, alt_separator=target_win.fs.alt_separator)
+
+    path_map = map(lambda path: _map_function(path), tmp_path.rglob("*"))
+    tree = "|".join(sorted(path_map))
     assert tree == expected
