@@ -25,7 +25,7 @@ class ResolverPlugin(Plugin):
         pass
 
     @internal
-    def resolve(self, path: str, user: Optional[str] = None):
+    def resolve(self, path: str, user: Optional[str] = None) -> str:
         """Resolve a partial path string to a file or directory present in the target.
 
         For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
@@ -39,7 +39,7 @@ class ResolverPlugin(Plugin):
         else:
             return self.resolve_default(path, user_id=user)
 
-    def resolve_windows(self, path: str, user_sid: Optional[str] = None):
+    def resolve_windows(self, path: str, user_sid: Optional[str] = None) -> str:
         # Normalize first so the replacements are easier
         path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
@@ -104,5 +104,5 @@ class ResolverPlugin(Plugin):
 
         return path
 
-    def resolve_default(self, path: str, user_id: Optional[str] = None):
+    def resolve_default(self, path: str, user_id: Optional[str] = None) -> str:
         return fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
