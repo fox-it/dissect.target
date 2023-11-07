@@ -171,6 +171,7 @@ class TargetCmd(cmd.Cmd):
         if command_args_str is not None:
             lexer = shlex.shlex(command_args_str, posix=True, punctuation_chars=True)
             lexer.wordchars += "$"
+            lexer.whitespace_split = True
             argparts = list(lexer)
 
         try:

@@ -1,6 +1,6 @@
 import argparse
 import sys
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -11,6 +11,7 @@ from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath, normalize, stat_result
 from dissect.target.tools import shell
 from dissect.target.tools.shell import TargetCli
+from dissect.target.tools.shell import main as target_shell
 
 
 def test_target_cli_ls(target_win, capsys, monkeypatch):
@@ -98,3 +99,27 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
     path_map = map(lambda path: _map_function(path), tmp_path.rglob("*"))
     tree = "|".join(sorted(path_map))
     assert tree == expected
+
+
+@pytest.mark.parametrize(
+    "provided_input, expected_output",
+    [
+        ("hello", "world.txt"),  # Latin
+        ("ħēļľŏ", "ŵőřŀđ.txt"),  # Latin Extended-A
+        ("مرحبًا", "عالم.txt"),  # Arabic
+        ("你好", "世界.txt"),  # Chineese Simplified
+        ("привет", "мир.txt"),  # Cyrillic
+        ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
+    ],
+)
+def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input, expected_output):
+    monkeypatch.setattr("sys.stdin", StringIO(f"ls charsets/{provided_input}"))
+
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-shell", "tests/data/unicode.tgz"])
+        target_shell()
+        out, err = capsys.readouterr()
+        out = out.replace("unicode.tgz />", "").strip()
+
+        assert out == expected_output
+        assert "unrecognized arguments" not in err
