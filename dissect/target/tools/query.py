@@ -355,7 +355,7 @@ def main():
                 try:
                     for record_entries in entry:
                         if args.hash:
-                            rs.write(hashutil.hash_uri_records(target, record_entries))
+                            rs.write(hashutil.hash_path_records(target, record_entries))
                         else:
                             rs.write(record_entries)
                         count += 1

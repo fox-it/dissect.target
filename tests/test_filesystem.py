@@ -1,5 +1,4 @@
 import os
-import platform
 import stat
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Union
@@ -462,40 +461,42 @@ def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
 def test_virtual_filesystem_map_dir():
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
-    with TemporaryDirectory() as tmp_dir:
-        with TemporaryDirectory(dir=tmp_dir) as some_dir:
-            with TemporaryDirectory(dir=tmp_dir) as other_dir:
-                with TemporaryDirectory(dir=other_dir) as second_lvl_dir:
-                    with NamedTemporaryFile(dir=some_dir) as some_file:
-                        some_file.write(b"1337")
-                        some_file.seek(0)
+    with (
+        TemporaryDirectory() as tmp_dir,
+        TemporaryDirectory(dir=tmp_dir) as some_dir,
+        TemporaryDirectory(dir=tmp_dir) as other_dir,
+        TemporaryDirectory(dir=other_dir) as second_lvl_dir,
+        NamedTemporaryFile(dir=some_dir, delete=False) as some_file,
+    ):
+        some_file.write(b"1337")
+        some_file.close()
 
-                        vfs.map_dir(vfs_path, tmp_dir)
+        vfs.map_dir(vfs_path, tmp_dir)
 
-                        rel_path = os.path.relpath(some_dir, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        dir_entry = vfs.get(entry_name)
-                        assert isinstance(dir_entry, VirtualDirectory)
+        rel_path = os.path.relpath(some_dir, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        dir_entry = vfs.get(entry_name)
+        assert isinstance(dir_entry, VirtualDirectory)
 
-                        rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        dir_entry = vfs.get(entry_name)
-                        assert isinstance(dir_entry, VirtualDirectory)
+        rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        dir_entry = vfs.get(entry_name)
+        assert isinstance(dir_entry, VirtualDirectory)
 
-                        rel_path = os.path.relpath(some_file.name, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        file_entry = vfs.get(entry_name)
-                        assert isinstance(file_entry, MappedFile)
+        rel_path = os.path.relpath(some_file.name, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        file_entry = vfs.get(entry_name)
+        assert isinstance(file_entry, MappedFile)
 
-                        fp = file_entry.open()
-                        assert fp.read() == b"1337"
+        fp = file_entry.open()
+        assert fp.read() == b"1337"
+        fp.close()
 
 
 @pytest.mark.parametrize(
