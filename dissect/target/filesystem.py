@@ -1449,16 +1449,18 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
 
 
 def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
+    offset = fh.tell()
     for filesystem in FILESYSTEMS:
         try:
             if filesystem.detect(fh):
-                fh.seek(0)
                 instance = filesystem(fh, *args, **kwargs)
                 instance.volume = fh
                 return instance
         except ImportError as e:
             log.info("Failed to import %s", filesystem)
             log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
 
     raise FilesystemError(f"Failed to open filesystem for {fh}")
 

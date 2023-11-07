@@ -177,6 +177,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     first = item[0] if isinstance(item, list) else item
     first_fh = None
     first_fh_opened = False
+    first_fh_offset = None
     first_path = None
 
     if hasattr(first, "read"):
@@ -186,6 +187,9 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         if first_path.is_file():
             first_fh = first.open("rb")
             first_fh_opened = True
+
+    if first_fh:
+        first_fh_offset = first_fh.tell()
 
     try:
         for container in CONTAINERS + [RawContainer]:
@@ -203,6 +207,8 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     finally:
         if first_fh_opened:
             first_fh.close()
+        elif first_fh:
+            first_fh.seek(first_fh_offset)
 
     raise ContainerError(f"Failed to detect container for {item}")
 
