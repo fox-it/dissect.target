@@ -1,4 +1,3 @@
-import platform
 from pathlib import Path
 from unittest.mock import MagicMock, call, create_autospec, mock_open, patch
 
@@ -44,9 +43,6 @@ def test_local_loader_skip_emulated_drive(extents: MagicMock, log: MagicMock, *a
     )
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
-)
 def test__add_disk_as_raw_container_to_target(target_bare: Target) -> None:
     # Does it attempt to open the file and pass a raw container?
     mock = mock_open()
@@ -62,9 +58,6 @@ def test__add_disk_as_raw_container_to_target(target_bare: Target) -> None:
         mock.assert_called_with(drive, "rb")
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
-)
 def test__add_disk_as_raw_container_to_target_skip_fail(target_bare: Target) -> None:
     # Does it emit a warning instead of raising an exception?
     mock = mock_open()
