@@ -42,11 +42,11 @@ class AndroidPlugin(LinuxPlugin):
     def version(self) -> str:
         full_version = "Android"
 
-        release_version = self.props.props.get("ro.build.version.release")
-        if release_version := self.props.props.get("ro.build.version.release"):
+        release_version = self.props.get("ro.build.version.release")
+        if release_version := self.props.get("ro.build.version.release"):
             full_version += f" {release_version}"
 
-        if security_patch_version := self.props.props.get("ro.build.version.security_patch"):
+        if security_patch_version := self.props.get("ro.build.version.security_patch"):
             full_version += f" ({security_patch_version})"
 
         return full_version
@@ -71,3 +71,5 @@ def _read_props(fh: TextIO) -> dict[str, str]:
 
         k, v = line.split("=")
         result[k] = v
+
+    return result
