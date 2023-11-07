@@ -1,7 +1,7 @@
 import argparse
 import platform
 import sys
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -17,6 +17,8 @@ from dissect.target.tools.shell import (
     build_pipe,
     build_pipe_stdout,
 )
+from dissect.target.tools.shell import main as target_shell
+from tests._utils import absolute_path
 
 GREP_MATCH = "test1 and test2"
 GREP_MISSING = "test2 alone"
@@ -247,3 +249,28 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
     tree = "|".join(sorted(path_map))
 
     assert tree == expected
+
+
+@pytest.mark.parametrize(
+    "provided_input, expected_output",
+    [
+        ("hello", "world.txt"),  # Latin
+        ("ħēļľŏ", "ŵőřŀđ.txt"),  # Latin Extended-A
+        ("مرحبًا", "عالم.txt"),  # Arabic
+        ("你好", "世界.txt"),  # Chineese Simplified
+        ("привет", "мир.txt"),  # Cyrillic
+        ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
+    ],
+)
+def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input, expected_output):
+    monkeypatch.setattr("sys.stdin", StringIO(f"ls charsets/{provided_input}"))
+
+    with monkeypatch.context() as m:
+        target_file = absolute_path("_data/unicode.tgz")
+        m.setattr("sys.argv", ["target-shell", target_file])
+        target_shell()
+        out, err = capsys.readouterr()
+        out = out.replace("unicode.tgz />", "").strip()
+
+        assert out == expected_output
+        assert "unrecognized arguments" not in err
