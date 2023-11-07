@@ -1,5 +1,6 @@
 import os
 import stat
+from io import BytesIO
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Union
 from unittest.mock import Mock, patch
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 from _pytest.fixtures import FixtureRequest
 
+from dissect.target import filesystem
 from dissect.target.exceptions import (
     FileNotFoundError,
     NotADirectoryError,
@@ -1092,3 +1094,29 @@ def test_mapped_file_lattr(mapped_file: MappedFile) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         mapped_file.lattr()
         fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=False)
+
+
+def test_reset_file_position() -> None:
+    fh = BytesIO(b"\x00" * 8192)
+    fh.seek(512)
+
+    class MockFilesystem(filesystem.Filesystem):
+        def __init__(self, fh):
+            assert fh.tell() == 0
+            fh.seek(1024)
+            self.success = True
+
+        @staticmethod
+        def _detect(fh):
+            assert fh.tell() == 0
+            fh.seek(256)
+            return True
+
+    mock_fs = Mock()
+    mock_fs.MockFilesystem = MockFilesystem
+
+    with patch.object(filesystem, "FILESYSTEMS", [mock_fs.MockFilesystem]):
+        opened_fs = filesystem.open(fh)
+        assert isinstance(opened_fs, mock_fs.MockFilesystem)
+        assert opened_fs.success
+        assert fh.tell() == 512

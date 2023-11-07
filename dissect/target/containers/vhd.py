@@ -17,13 +17,10 @@ class VhdContainer(Container):
         super().__init__(fh, self.vhd.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         try:
-            offset = fh.tell()
             fh.seek(-512, io.SEEK_END)
-            magic = fh.read(9)
-            fh.seek(offset)
-            return b"conectix" in magic
+            return b"conectix" in fh.read(9)
         except OSError:
             return False
 

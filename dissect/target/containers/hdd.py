@@ -17,7 +17,7 @@ class HddContainer(Container):
         super().__init__(fh, self.stream.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return False
 
     @staticmethod

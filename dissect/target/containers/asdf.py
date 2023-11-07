@@ -26,11 +26,8 @@ class AsdfContainer(Container):
         super().__init__(fh, self.asdf.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(4)
-        fh.seek(-4, io.SEEK_CUR)
-
-        return magic == FILE_MAGIC
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(4) == FILE_MAGIC
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
