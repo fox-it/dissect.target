@@ -1452,6 +1452,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
     for filesystem in FILESYSTEMS:
         try:
             if filesystem.detect(fh):
+                fh.seek(0)
                 instance = filesystem(fh, *args, **kwargs)
                 instance.volume = fh
                 return instance
