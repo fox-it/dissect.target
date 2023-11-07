@@ -1,6 +1,7 @@
 from typing import BinaryIO, Iterator, Optional
 
-from dissect.jffs import c_jffs2, jffs2
+from dissect.jffs import jffs2
+from dissect.jffs.c_jffs2 import c_jffs2
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -22,12 +23,9 @@ class JFFSFilesystem(Filesystem):
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        block = fh.read(2)
-        magic = int.from_bytes(block[0:2], "little")
-
-        return magic in (
-            c_jffs2.c_jffs2.JFFS2_MAGIC_BITMASK,
-            c_jffs2.c_jffs2.JFFS2_OLD_MAGIC_BITMASK,
+        return int.from_bytes(fh.read(2), "little") in (
+            c_jffs2.JFFS2_MAGIC_BITMASK,
+            c_jffs2.JFFS2_OLD_MAGIC_BITMASK,
         )
 
     def get(self, path: str) -> FilesystemEntry:
@@ -47,6 +45,9 @@ class JFFSFilesystem(Filesystem):
 
 
 class JFFSFilesystemEntry(FilesystemEntry):
+    fs: JFFSFilesystem
+    entry: jffs2.INode
+
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         entry = self.fs._get_node(path, self.entry)
@@ -67,8 +68,8 @@ class JFFSFilesystemEntry(FilesystemEntry):
             yield from self.entry.iterdir()
 
     def iterdir(self) -> Iterator[str]:
-        for _, entry in self._iterdir():
-            yield entry.name
+        for name, _ in self._iterdir():
+            yield name
 
     def scandir(self) -> Iterator[FilesystemEntry]:
         for name, entry in self._iterdir():
