@@ -65,12 +65,39 @@ class Container(io.IOBase):
 
         return False
 
-    @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    @classmethod
+    def detect_fh(cls, fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         """Detect if this ``Container`` can be used to open the file-like object ``fh``.
 
-        The function checks wether the raw data contains any magic information that corresponds to this
+        The function checks whether the raw data contains any magic information that corresponds to this
         specific container.
+
+        Args:
+            fh: A file-like object that we want to open a ``Container`` on.
+            original: The original argument passed to ``detect()``.
+
+        Returns:
+            ``True`` if this ``Container`` can be used for this file-like object, ``False`` otherwise.
+        """
+        offset = fh.tell()
+        try:
+            fh.seek(0)
+            return cls._detect_fh(fh, original)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            log.warning("Failed to detect %s container", cls.__name__)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return False
+
+    @staticmethod
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        """Detect if this ``Container`` can be used to open the file-like object ``fh``.
+
+        This method should be implemented by subclasses. The position of ``fh`` is guaranteed to be ``0``.
 
         Args:
             fh: A file-like object that we want to open a ``Container`` on.

@@ -1452,17 +1452,19 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
     offset = fh.tell()
     fh.seek(0)
 
-    for filesystem in FILESYSTEMS:
-        try:
-            if filesystem.detect(fh):
-                instance = filesystem(fh, *args, **kwargs)
-                instance.volume = fh
-                return instance
-        except ImportError as e:
-            log.info("Failed to import %s", filesystem)
-            log.debug("", exc_info=e)
-        finally:
-            fh.seek(offset)
+    try:
+        for filesystem in FILESYSTEMS:
+            try:
+                if filesystem.detect(fh):
+                    instance = filesystem(fh, *args, **kwargs)
+                    instance.volume = fh
+
+                    return instance
+            except ImportError as e:
+                log.info("Failed to import %s", filesystem)
+                log.debug("", exc_info=e)
+    finally:
+        fh.seek(offset)
 
     raise FilesystemError(f"Failed to open filesystem for {fh}")
 
