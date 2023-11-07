@@ -18,11 +18,8 @@ class HdsContainer(Container):
         super().__init__(fh, self.hds.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        sig = fh.read(16)
-        fh.seek(-16, io.SEEK_CUR)
-
-        return sig in (c_hdd.SIGNATURE_STRUCTURED_DISK_V1, c_hdd.SIGNATURE_STRUCTURED_DISK_V2)
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(16) in (c_hdd.SIGNATURE_STRUCTURED_DISK_V1, c_hdd.SIGNATURE_STRUCTURED_DISK_V2)
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

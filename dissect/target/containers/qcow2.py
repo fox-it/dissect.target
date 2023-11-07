@@ -17,11 +17,8 @@ class QCow2Container(Container):
         super().__init__(fh, self.qcow2.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(4)
-        fh.seek(-4, io.SEEK_CUR)
-
-        return magic == c_qcow2.QCOW2_MAGIC_BYTES
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(4) == c_qcow2.QCOW2_MAGIC_BYTES
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

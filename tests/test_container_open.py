@@ -1,4 +1,5 @@
 import struct
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -69,3 +70,28 @@ def test_open_fallback_fh(tmp_path):
     tmp_dummy.write_bytes(b"\x00" * 1024)
     assert isinstance(container.open(tmp_dummy), raw.RawContainer)
     assert not vhd.VhdContainer.detect(tmp_dummy)
+
+
+def test_reset_file_position() -> None:
+    fh = BytesIO(b"\x00" * 8192)
+    fh.seek(512)
+
+    class MockContainer(container.Container):
+        def __init__(self, fh):
+            assert fh.tell() == 0
+            fh.seek(1024)
+            self.success = True
+
+        @staticmethod
+        def _detect_fh(fh, *args, **kwargs):
+            assert fh.tell() == 0
+            fh.seek(256)
+            return True
+
+    mock_container = Mock()
+    mock_container.MockContainer = MockContainer
+    with patch.object(container, "CONTAINERS", [mock_container.MockContainer]):
+        opened_container = container.open(fh)
+        assert isinstance(opened_container, mock_container.MockContainer)
+        assert opened_container.success
+        assert fh.tell() == 512

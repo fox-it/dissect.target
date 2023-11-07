@@ -13,7 +13,7 @@ class TestContainer(Container):
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return False
 
     @staticmethod
