@@ -328,6 +328,8 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
         An opened :class:`~dissect.target.volumes.disk.DissectVolumeSystem`.
     """
     offset = fh.tell()
+    fh.seek(0)
+
     try:
         return disk.DissectVolumeSystem(fh)
     except Exception as e:

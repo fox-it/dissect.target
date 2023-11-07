@@ -1450,6 +1450,8 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
 
 def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
     offset = fh.tell()
+    fh.seek(0)
+
     for filesystem in FILESYSTEMS:
         try:
             if filesystem.detect(fh):

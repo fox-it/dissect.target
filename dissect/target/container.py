@@ -190,6 +190,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
 
     if first_fh:
         first_fh_offset = first_fh.tell()
+        first_fh.seek(0)
 
     try:
         for container in CONTAINERS + [RawContainer]:
