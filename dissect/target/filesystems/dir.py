@@ -107,6 +107,12 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         return self.entry.is_symlink()
 
     def readlink(self) -> str:
+        if not self.is_symlink():
+            raise NotASymlinkError()
+
+        if str(self.entry).startswith("/var/lib/docker/overlay2"):
+            return str(self.entry.resolve())
+
         return os.readlink(self.entry)  # Python 3.7 compatibility
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
