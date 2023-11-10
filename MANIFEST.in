@@ -1,3 +1,4 @@
 exclude .gitattributes
 exclude .gitignore
 recursive-exclude .github/ *
+recursive-exclude tests/data/ *
