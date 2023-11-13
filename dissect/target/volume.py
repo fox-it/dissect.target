@@ -327,10 +327,15 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
     Returns:
         An opened :class:`~dissect.target.volumes.disk.DissectVolumeSystem`.
     """
+    offset = fh.tell()
+    fh.seek(0)
+
     try:
         return disk.DissectVolumeSystem(fh)
     except Exception as e:
         raise VolumeSystemError(f"Failed to load volume system for {fh}", cause=e)
+    finally:
+        fh.seek(offset)
 
 
 def is_lvm_volume(volume: BinaryIO) -> bool:

@@ -15,11 +15,8 @@ class VmdkContainer(Container):
         super().__init__(fh, self.vmdk.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(4)
-        fh.seek(-4, io.SEEK_CUR)
-
-        return magic in (b"KDMV", b"COWD", b"# Di")
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(4) in (b"KDMV", b"COWD", b"# Di")
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

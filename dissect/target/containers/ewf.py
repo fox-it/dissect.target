@@ -23,12 +23,9 @@ class EwfContainer(Container):
         super().__init__(fh, self.ewf.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         """Detect file header"""
-        magic = fh.read(3)
-        fh.seek(-3, io.SEEK_CUR)
-
-        return magic == b"EVF" or magic == b"LVF" or magic == b"LEF"
+        return fh.read(3) in (b"EVF", b"LVF", b"LEF")
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

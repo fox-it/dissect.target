@@ -22,6 +22,18 @@ from dissect.target.target import Target
 
 from ._utils import absolute_path
 
+# Test if the data/ directory is present and if not, as is the case in Python
+# source distributions of dissect.target, we give an error
+data_dir = absolute_path("data")
+if not pathlib.Path(data_dir).is_dir():
+    raise pytest.PytestConfigWarning(
+        f"No test data directory {data_dir} found.\n"
+        "This can happen when you have downloaded the source distribution\n"
+        "of dissect.target from pypi.org. If so, retrieve the test data from\n"
+        "the dissect.target GitHub repository at:\n"
+        "https://github.com/fox-it/dissect.target"
+    )
+
 
 def make_mock_target():
     with tempfile.NamedTemporaryFile(prefix="MockTarget-") as tmp_file:

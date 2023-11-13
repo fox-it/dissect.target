@@ -7,7 +7,10 @@ from dissect.target.plugins.browsers.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
 )
-from dissect.target.plugins.browsers.chromium import ChromiumMixin
+from dissect.target.plugins.browsers.chromium import (
+    CHROMIUM_DOWNLOAD_RECORD_FIELDS,
+    ChromiumMixin,
+)
 
 
 class EdgePlugin(ChromiumMixin, BrowserPlugin):
@@ -25,7 +28,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         "Library/Application Support/Microsoft Edge/Default",
     ]
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+        "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/extension", GENERIC_EXTENSION_RECORD_FIELDS

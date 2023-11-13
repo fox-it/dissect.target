@@ -32,7 +32,7 @@ class SplitContainer(Container):
         super().__init__(fh, offset, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return isinstance(original, list) and len(original) > 1
 
     @staticmethod
