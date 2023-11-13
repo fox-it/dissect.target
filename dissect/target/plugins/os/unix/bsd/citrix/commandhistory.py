@@ -1,6 +1,6 @@
 import re
 from functools import cache
-from typing import Any, Iterator, List, Tuple, Union
+from typing import Iterator, List, Optional, Tuple
 
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
@@ -46,8 +46,11 @@ CITRIX_NETSCALER_BASH_HISTORY_RE = re.compile(
 
 class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
     COMMAND_HISTORY_ABSOLUTE_PATHS = (("citrix-netscaler-bash", "/var/log/bash.log*"),)
+    COMMAND_HISTORY_RELATIVE_PATHS = CommandHistoryPlugin.COMMAND_HISTORY_RELATIVE_PATHS + (
+        ("citrix-netscaler-cli", ".nscli_history"),
+    )
 
-    def _find_history_files(self) -> List[Tuple[str, TargetPath, Any]]:
+    def _find_history_files(self) -> List[Tuple[str, TargetPath, Optional[UnixUserRecord]]]:
         """
         Find history files on the target that this plugin can parse.
         """
@@ -57,17 +60,13 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 target_path = self.target.fs.path(path)
                 history_files.append((shell, target_path, None))
 
-        self.COMMAND_HISTORY_RELATIVE_PATHS += (("citrix-netscaler-cli", ".nscli_history"),)
-
-        # Also utilize the _find_history_files function of the parent class.
+        # Also utilize the _find_history_files function of the parent class
         history_files.extend(super()._find_history_files())
         return history_files
 
     @cache
-    def _find_user_by_name(self, username: str) -> Union[UnixUserRecord, None]:
-        """
-        Cached function to return the matching UnixUserRecord for a given username.
-        """
+    def _find_user_by_name(self, username: str) -> Optional[UnixUserRecord]:
+        """Cached function to return the matching UnixUserRecord for a given username."""
         if username is None:
             return None
         user_details = self.target.user_details.find(username=username)
@@ -92,9 +91,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         self,
         path: TargetPath,
     ) -> Iterator[CommandHistoryRecord]:
-        """
-        Parse bash.log* contents.
-        """
+        """Parse bash.log* contents."""
         for ts, line in year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S "):
             line = line.strip()
             if not line:
@@ -122,8 +119,8 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         history_file: TargetPath,
         user: UnixUserRecord,
     ) -> Iterator[CommandHistoryRecord]:
-        """
-        Parses the history file of the Citrix Netscaler CLI.
+        """Parses the history file of the Citrix Netscaler CLI.
+
         The only difference compared to generic bash history files is that the first line will start with
         '_HiStOrY_V2_', which we will skip.
         """
