@@ -112,11 +112,11 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
         ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
     ],
 )
-def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input, expected_output):
-    monkeypatch.setattr("sys.stdin", StringIO(f"ls charsets/{provided_input}"))
-
+def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input: str, expected_output: str) -> None:
     with monkeypatch.context() as m:
         m.setattr("sys.argv", ["target-shell", "tests/data/unicode.tgz"])
+        m.setattr("sys.stdin", StringIO(f"ls charsets/{provided_input}"))
+
         target_shell()
         out, err = capsys.readouterr()
         out = out.replace("unicode.tgz />", "").strip()
