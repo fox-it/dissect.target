@@ -262,7 +262,12 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
         ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
     ],
 )
-def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input: str, expected_output: str) -> None:
+def test_target_cli_unicode_argparse(
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    provided_input: str,
+    expected_output: str,
+) -> None:
     with monkeypatch.context() as m:
         target_file = absolute_path("_data/tools/shell/unicode.tar")
         m.setattr("sys.argv", ["target-shell", target_file])
