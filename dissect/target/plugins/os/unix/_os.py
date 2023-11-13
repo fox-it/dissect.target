@@ -230,9 +230,6 @@ class UnixPlugin(OSPlugin):
         os_release = {}
 
         for path in self.target.fs.glob(glob):
-            if len(os_release) > 1:
-                break
-
             if self.target.fs.path(path).is_file():
                 with self.target.fs.path(path).open("rt") as release_file:
                     for line in release_file:
