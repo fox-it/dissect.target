@@ -9,3 +9,5 @@ tests/_data/plugins/os/windows/notifications/appdb.dat.v3.gz filter=lfs diff=lfs
 tests/_data/plugins/os/windows/notifications/wpndatabase.db filter=lfs diff=lfs merge=lfs -text
 tests/_data/volumes/bde/enc-volume.bin filter=lfs diff=lfs merge=lfs -text
 tests/_data/volumes/md/md-nested.bin.gz filter=lfs diff=lfs merge=lfs -text
+tests/_data/plugins/apps/containers/docker/docker.tgz filter=lfs diff=lfs merge=lfs -text
+tests/_data/plugins/apps/containers/docker/local-log-driver.tgz filter=lfs diff=lfs merge=lfs -text

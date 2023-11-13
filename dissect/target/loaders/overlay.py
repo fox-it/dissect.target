@@ -1,12 +1,14 @@
-from dissect.target.helpers.fsutil import TargetPath
-
-from dissect.target.loader import Loader
-from dissect.target.target import Target
 from dissect.target.filesystem import RootFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.loader import Loader
+from dissect.target.target import Target
+
 
 class OverlayLoader(Loader):
     """Load Docker overlay2 filesystems.
+
+    NOTE: Symlinks are not working correctly yet.
 
     References:
         - https://www.didactic-security.com/resources/docker-forensics.pdf
@@ -21,6 +23,8 @@ class OverlayLoader(Loader):
     @staticmethod
     def detect(path: TargetPath) -> bool:
         return str(path).lower().startswith("/var/lib/docker")
+        # TODO: check if the provided folder (iterdir) contains
+        # files that we need!
 
     def map(self, target: Target) -> None:
         """Attempt to collect all layers and present them as one filesystem."""
@@ -46,6 +50,7 @@ class OverlayLoader(Loader):
             layers.append(docker_root.joinpath(f"overlay2/{layer}/diff"))
 
         # mount every diff directory to root
+        # TODO: subclass RootFilesystem to LayerFilesystem
         rfs = RootFilesystem(Target())
         rfs.mounts["/"] = []
 

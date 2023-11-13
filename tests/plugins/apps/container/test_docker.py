@@ -1,9 +1,8 @@
 import datetime
 
-from dissect.target.plugins.apps.container.docker import (
-    DockerPlugin,
-    _convert_timestamp,
-)
+from dissect.target.helpers.docker import convert_timestamp
+from dissect.target.plugins.apps.container.docker import DockerPlugin
+
 from tests._utils import absolute_path
 
 
@@ -62,10 +61,34 @@ def test_docker_plugin_timestamps():
     """Test the docker convert_timestamp function."""
 
     # Should not alter already correct timestamps
-    assert _convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
-    assert _convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
+    assert convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
 
     # Should convert nanosecond timestamps to microsecond timestamps
-    assert _convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
-    assert _convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
-    assert _convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
+    assert convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
+
+
+def test_docker_plugin_logs(target_linux_docker_logs):
+    target_linux_docker_logs.add_plugin(DockerPlugin)
+    results = list(target_linux_docker_logs.docker.logs())
+
+    assert len(results) == 288
+
+    # json log driver
+    assert results[40].ts == datetime.datetime(2023, 11, 9, 8, 43, 42, 321404, tzinfo=datetime.timezone.utc)
+    assert results[40].container == "f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
+    assert results[40].stream == "stdout"
+    assert (
+        results[40].message
+        == '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'  # noqa
+    )
+
+    # local log driver (protobuf)
+    assert results[-1].ts == datetime.datetime(2023, 11, 9, 9, 52, 52, 587579, tzinfo=datetime.timezone.utc)
+    assert results[-1].container == "0627aa2d32de2478f4a3e8bb3c655ea7baa1a3463d8cee41263655244fe4717c"
+    assert results[-1].stream == "stdout"
+    assert results[-1].message == "\x1b[?2004l\rexit\r"
+
+    # TODO: gz compressed json and local logs

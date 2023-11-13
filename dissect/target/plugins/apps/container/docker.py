@@ -1,8 +1,16 @@
 import json
-import re
 from typing import Iterator
 
+from dissect.util import ts
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.docker import (
+    c_local,
+    convert_ports,
+    convert_timestamp,
+    hash_to_image_id,
+)
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -35,11 +43,21 @@ DockerImageRecord = TargetRecordDescriptor(
     ],
 )
 
-DOCKER_NS_REGEX = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
+
+DockerLogRecord = TargetRecordDescriptor(
+    "apps/containers/docker/log",
+    [
+        ("datetime", "ts"),
+        ("string", "container"),
+        ("string", "stream"),
+        ("string", "message"),
+    ],
+)
 
 
 class DockerPlugin(Plugin):
-    """
+    """Parse Docker Daemon artefacts.
+
     References:
         - https://didactic-security.com/resources/docker-forensics.pdf
         - https://didactic-security.com/resources/docker-forensics-cheatsheet.pdf
@@ -73,12 +91,12 @@ class DockerPlugin(Plugin):
 
                 if (fp := self.target.fs.path(image_metadata_path)).exists():
                     image_metadata = json.loads(fp.read_text())
-                    created = _convert_timestamp(image_metadata.get("created"))
+                    created = convert_timestamp(image_metadata.get("created"))
 
                 yield DockerImageRecord(
                     name=name,
                     tag=tag,
-                    image_id=_hash_to_image_id(hash),
+                    image_id=hash_to_image_id(hash),
                     created=created,
                     hash=hash,
                     _target=self.target,
@@ -110,66 +128,86 @@ class DockerPlugin(Plugin):
                     container_id=config.get("ID"),
                     image=config.get("Config").get("Image"),
                     command=config.get("Config").get("Cmd"),
-                    created=_convert_timestamp(config.get("Created")),
+                    created=convert_timestamp(config.get("Created")),
                     running=config.get("State").get("Running"),
                     pid=pid,
-                    started=_convert_timestamp(config.get("State").get("StartedAt")),
-                    finished=_convert_timestamp(config.get("State").get("FinishedAt")),
-                    ports=_convert_ports(ports),
+                    started=convert_timestamp(config.get("State").get("StartedAt")),
+                    finished=convert_timestamp(config.get("State").get("FinishedAt")),
+                    ports=convert_ports(ports),
                     names=config.get("Name").replace("/", "", 1),
                     volumes=volumes,
                     source=fp,
                     _target=self.target,
                 )
 
+    @export(record=DockerLogRecord)
+    def logs(self) -> Iterator[DockerLogRecord]:
+        """Returns log files (stdout/stderr) from Docker containers.
 
-def _convert_timestamp(timestamp: str) -> str:
-    """
-    Docker sometimes uses (unpadded) 9 digit nanosecond precision
-    in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
+        The default Docker Daemon log driver is ``json-file``, which
+        performs no log rotation. Another log driver is ``local`` and
+        performs log rotation and compresses log files more efficiently.
 
-    Python has no native %n nanosecond strptime directive, so we
-    strip the last three digits from the timestamp to force
-    compatbility with the 6 digit %f microsecond directive.
-    """
+        Eventually ``local`` will likely replace ``json-file`` as the
+        default log driver.
 
-    timestamp_nanoseconds_plus_postfix = timestamp[19:]
-    match = DOCKER_NS_REGEX.match(timestamp_nanoseconds_plus_postfix)
+        Resources:
+            - https://docs.docker.com/config/containers/logging/configure/
+            - https://docs.docker.com/config/containers/logging/json-file/
+            - https://docs.docker.com/config/containers/logging/local/
+        """
 
-    # Timestamp does not have nanoseconds if there is no match.
-    if not match:
-        return timestamp
+        containers_path = f"{self.DOCKER_PATH}/containers"
+        for container in self.target.fs.path(containers_path).iterdir():
+            # json-file log driver
+            #   *-json.log
+            #   *-json.log.1
+            #   *-json.log.2.gz
+            for log_file in container.glob(f"{container.name}-json.log*"):
+                for line in open_decompress(log_file, "rt"):
+                    try:
+                        log_entry = json.loads(line)
+                    except json.JSONDecodeError as e:
+                        self.target.log.warning(f"Could not decode JSON line in file {log_file}")
+                        self.target.log.debug("", exc_info=e)
+                        continue
 
-    # Take the first six digits and reconstruct the timestamp.
-    match = match.groupdict()
-    microseconds = match["nanoseconds"][:6]
-    return f"{timestamp[:19]}.{microseconds}{match['postfix']}"
+                    yield DockerLogRecord(
+                        ts=log_entry.get("time"),
+                        container=container.name,
+                        stream=log_entry.get("stream"),
+                        message=log_entry.get("log"),
+                        _target=self.target,
+                    )
 
+            # local log driver
+            #   local-logs/container.log
+            #   local-logs/container.log.1
+            #   local-logs/container.log.2.gz
+            for log_file in container.glob("local-logs/container.log*"):
+                fh = open_decompress(log_file, "rb")
+                pos = 0
 
-def _convert_ports(ports: dict) -> dict:
-    """
-    Depending on the state of the container (turned on or off) we
-    can salvage forwarded ports for the container in different
-    parts of the config.v2.json file.
+                if not hasattr(fh, "size"):  # for pytest
+                    fh.size = len(fh.read())
+                    fh.seek(0)
 
-    This function attempts to be agnostic and deals with
-    "Ports" lists and "ExposedPorts" dicts.
+                while fh.tell() < fh.size:
+                    fh.seek(pos)
+                    entry = c_local.entry(fh)
 
-    NOTE: This function makes a couple of assumptions and ignores
-    ipv6 assignments. Feel free to improve this helper function.
-    """
+                    if entry.header != entry.footer:
+                        self.target.log.warning(
+                            f"Could not reliably parse log entry at offset {pos}. Entry could be parsed incorrectly."
+                            "Please report this issue as Docker's protobuf could have changed."
+                        )
 
-    fports = {}
-    for key, value in ports.items():
-        if isinstance(value, list):
-            # NOTE: We ignore IPv6 assignments here.
-            fports[key] = f"{value[0]['HostIp']}:{value[0]['HostPort']}"
-        elif isinstance(value, dict):
-            # NOTE: We make the assumption the default broadcast ip 0.0.0.0 was used.
-            fports[key] = f"0.0.0.0:{key.split('/')[0]}"
+                    pos += entry.header + 8
 
-    return fports
-
-
-def _hash_to_image_id(hash: str) -> str:
-    return hash.split(":")[-1][:12]
+                    yield DockerLogRecord(
+                        ts=ts.from_unix_us(entry.ts // 1000),
+                        container=container.name,
+                        stream=entry.source,
+                        message=entry.message,
+                        _target=self.target,
+                    )
