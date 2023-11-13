@@ -13,11 +13,8 @@ class VhdxContainer(Container):
         super().__init__(fh, self.vhdx.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(8)
-        fh.seek(-8, io.SEEK_CUR)
-
-        return magic == b"vhdxfile"
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(8) == b"vhdxfile"
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

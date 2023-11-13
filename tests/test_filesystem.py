@@ -1,6 +1,6 @@
 import os
-import platform
 import stat
+from io import BytesIO
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Union
 from unittest.mock import Mock, patch
@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 from _pytest.fixtures import FixtureRequest
 
+from dissect.target import filesystem
 from dissect.target.exceptions import (
     FileNotFoundError,
     NotADirectoryError,
@@ -33,8 +34,7 @@ except ImportError:
     VmfsFilesystemEntry = None
 
 from dissect.target.helpers import fsutil
-
-from ._utils import absolute_path
+from tests._utils import absolute_path
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def test_get(vfs):
     assert vfs.get("filelink2").stat() == vfs.get("/path/to/some/file").stat()
 
 
-def test_symlink_across_layers(mock_target):
+def test_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -92,18 +92,18 @@ def test_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target").readlink_ext()
 
     assert target_dir.stat() == target_entry.entries[0].stat()
 
 
-def test_symlink_files_across_layers(mock_target):
+def test_symlink_files_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -111,19 +111,19 @@ def test_symlink_files_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target/derp")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/derp")
+    target_entry = target_bare.fs.get("/path/to/symlink/target/derp")
 
     assert len(target_entry.entries) != 0
     assert target_dir.stat() == target_entry.stat()
 
 
-def test_symlink_to_symlink_across_layers(mock_target):
+def test_symlink_to_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     target_dir = vfs1.makedirs("/path/target")
@@ -132,18 +132,18 @@ def test_symlink_to_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("../target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
     assert target_dir.stat() == target_entry.stat()
 
 
-def test_recursive_symlink_across_layers(mock_target):
+def test_recursive_symlink_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -151,17 +151,17 @@ def test_recursive_symlink_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+        target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
 
-def test_symlink_across_3_layers(mock_target):
+def test_symlink_across_3_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -172,24 +172,24 @@ def test_symlink_across_3_layers(mock_target):
     vfs3 = VirtualFilesystem()
     target_dir = vfs3.makedirs("/path/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
-    layer3 = mock_target.fs.add_layer()
+    layer3 = target_bare.fs.add_layer()
     layer3.mount("/", vfs3)
 
-    target_entry = mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+    target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
     assert target_dir.stat() == target_entry.stat()
-    stat_b = mock_target.fs.get("/path/to/symlink/target/").stat()
-    stat_a = mock_target.fs.get("/path/to/target/").stat()
+    stat_b = target_bare.fs.get("/path/to/symlink/target/").stat()
+    stat_a = target_bare.fs.get("/path/to/target/").stat()
     assert stat_a == stat_b
 
 
-def test_recursive_symlink_open_across_layers(mock_target):
+def test_recursive_symlink_open_across_layers(target_bare):
     vfs1 = VirtualFilesystem()
     vfs1.makedirs("/path/to/symlink/")
     vfs1.symlink("../target", "/path/to/symlink/target")
@@ -197,22 +197,22 @@ def test_recursive_symlink_open_across_layers(mock_target):
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = mock_target.fs.add_layer()
+    layer1 = target_bare.fs.add_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = mock_target.fs.add_layer()
+    layer2 = target_bare.fs.add_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").open()
+        target_bare.fs.get("/path/to/symlink/target/").open()
 
 
-def test_recursive_symlink_dev(mock_target):
-    fs1 = ExtFilesystem(fh=open(absolute_path("data/symlink_disk.ext4"), "rb"))
-    mock_target.fs.mount(fs=fs1, path="/")
+def test_recursive_symlink_dev(target_bare):
+    fs1 = ExtFilesystem(fh=open(absolute_path("_data/filesystem/symlink_disk.ext4"), "rb"))
+    target_bare.fs.mount(fs=fs1, path="/")
 
     with pytest.raises(SymlinkRecursionError):
-        mock_target.fs.get("/path/to/symlink/target/").readlink_ext()
+        target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
 
 
 @pytest.mark.parametrize(
@@ -462,40 +462,42 @@ def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
 def test_virtual_filesystem_map_dir():
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
-    with TemporaryDirectory() as tmp_dir:
-        with TemporaryDirectory(dir=tmp_dir) as some_dir:
-            with TemporaryDirectory(dir=tmp_dir) as other_dir:
-                with TemporaryDirectory(dir=other_dir) as second_lvl_dir:
-                    with NamedTemporaryFile(dir=some_dir) as some_file:
-                        some_file.write(b"1337")
-                        some_file.seek(0)
+    with (
+        TemporaryDirectory() as tmp_dir,
+        TemporaryDirectory(dir=tmp_dir) as some_dir,
+        TemporaryDirectory(dir=tmp_dir) as other_dir,
+        TemporaryDirectory(dir=other_dir) as second_lvl_dir,
+        NamedTemporaryFile(dir=some_dir, delete=False) as some_file,
+    ):
+        some_file.write(b"1337")
+        some_file.close()
 
-                        vfs.map_dir(vfs_path, tmp_dir)
+        vfs.map_dir(vfs_path, tmp_dir)
 
-                        rel_path = os.path.relpath(some_dir, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        dir_entry = vfs.get(entry_name)
-                        assert isinstance(dir_entry, VirtualDirectory)
+        rel_path = os.path.relpath(some_dir, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        dir_entry = vfs.get(entry_name)
+        assert isinstance(dir_entry, VirtualDirectory)
 
-                        rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        dir_entry = vfs.get(entry_name)
-                        assert isinstance(dir_entry, VirtualDirectory)
+        rel_path = os.path.relpath(second_lvl_dir, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        dir_entry = vfs.get(entry_name)
+        assert isinstance(dir_entry, VirtualDirectory)
 
-                        rel_path = os.path.relpath(some_file.name, tmp_dir)
-                        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
-                        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
-                        file_entry = vfs.get(entry_name)
-                        assert isinstance(file_entry, MappedFile)
+        rel_path = os.path.relpath(some_file.name, tmp_dir)
+        rel_path = fsutil.normalize(rel_path, alt_separator=os.path.sep)
+        entry_name = fsutil.join(vfs_path, rel_path, alt_separator=vfs.alt_separator)
+        file_entry = vfs.get(entry_name)
+        assert isinstance(file_entry, MappedFile)
 
-                        fp = file_entry.open()
-                        assert fp.read() == b"1337"
+        fp = file_entry.open()
+        assert fp.read() == b"1337"
+        fp.close()
 
 
 @pytest.mark.parametrize(
@@ -1091,3 +1093,29 @@ def test_mapped_file_lattr(mapped_file: MappedFile) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         mapped_file.lattr()
         fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=False)
+
+
+def test_reset_file_position() -> None:
+    fh = BytesIO(b"\x00" * 8192)
+    fh.seek(512)
+
+    class MockFilesystem(filesystem.Filesystem):
+        def __init__(self, fh):
+            assert fh.tell() == 0
+            fh.seek(1024)
+            self.success = True
+
+        @staticmethod
+        def _detect(fh):
+            assert fh.tell() == 0
+            fh.seek(256)
+            return True
+
+    mock_fs = Mock()
+    mock_fs.MockFilesystem = MockFilesystem
+
+    with patch.object(filesystem, "FILESYSTEMS", [mock_fs.MockFilesystem]):
+        opened_fs = filesystem.open(fh)
+        assert isinstance(opened_fs, mock_fs.MockFilesystem)
+        assert opened_fs.success
+        assert fh.tell() == 512

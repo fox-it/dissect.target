@@ -5,15 +5,19 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
     NamespacePlugin,
+    OSPlugin,
+    Plugin,
     environment_variable_paths,
     export,
     find_plugin_functions,
     get_external_module_paths,
+    plugins,
     save_plugin_import_failure,
 )
 from dissect.target.target import Target
@@ -118,14 +122,16 @@ def test_find_plugin_function_windows(target_win: Target) -> None:
     found, _ = find_plugin_functions(target_win, "services")
 
     assert len(found) == 1
-    assert found[0].name == "os.windows.services.services"
+    assert found[0].name == "services"
+    assert found[0].path == "os.windows.services.services"
 
 
 def test_find_plugin_function_unix(target_unix: Target) -> None:
     found, _ = find_plugin_functions(target_unix, "services")
 
     assert len(found) == 1
-    assert found[0].name == "os.unix.services.services"
+    assert found[0].name == "services"
+    assert found[0].path == "os.unix.services.services"
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -175,8 +181,14 @@ def test_find_plugin_function_default(target_default: Target) -> None:
 
     assert len(found) == 2
     names = [item.name for item in found]
-    assert "os.unix.services.services" in names
-    assert "os.windows.services.services" in names
+    assert "services" in names
+    assert "services" in names
+    paths = [item.path for item in found]
+    assert "os.unix.services.services" in paths
+    assert "os.windows.services.services" in paths
+
+    found, _ = find_plugin_functions(target_default, "mcafee.msc")
+    assert found[0].path == "apps.av.mcafee.msc"
 
 
 @pytest.mark.parametrize(
@@ -192,3 +204,47 @@ def test_find_plugin_function_default(target_default: Target) -> None:
 def test_find_plugin_function_order(target_win: Target, pattern: str) -> None:
     found = ",".join(reduce(lambda rs, el: rs + [el.method_name], find_plugin_functions(target_win, pattern)[0], []))
     assert found == pattern
+
+
+class _TestIncompatiblePlugin(Plugin):
+    def check_compatible(self):
+        raise UnsupportedPluginError("My incompatible plugin error")
+
+
+def test_incompatible_plugin(target_bare: Target) -> None:
+    with pytest.raises(UnsupportedPluginError, match="My incompatible plugin error"):
+        target_bare.add_plugin(_TestIncompatiblePlugin)
+
+
+def test_plugins(target_default) -> None:
+    all_plugins = list(plugins())
+    default_plugin_plugins = list(plugins(target_default._os_plugin))
+
+    assert default_plugin_plugins == all_plugins
+
+    # The all_with_home is a sentinel function, which should be loaded for a
+    # target with DefaultPlugin as OS plugin.
+    sentinel_function = "all_with_home"
+    has_sentinel_function = False
+    for plugin in default_plugin_plugins:
+        if sentinel_function in plugin.get("functions", []):
+            has_sentinel_function = True
+            break
+
+    assert has_sentinel_function
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "hostname",
+        "ips",
+        "version",
+        "os",
+        "architecture",
+    ],
+)
+def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> str:
+    os_plugin = OSPlugin(target_bare)
+    with pytest.raises(NotImplementedError):
+        getattr(os_plugin, method_name)
