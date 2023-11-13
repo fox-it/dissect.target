@@ -51,9 +51,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
     )
 
     def _find_history_files(self) -> List[Tuple[str, TargetPath, Optional[UnixUserRecord]]]:
-        """
-        Find history files on the target that this plugin can parse.
-        """
+        """Find history files on the target that this plugin can parse."""
         history_files = []
         for shell, history_absolute_path_glob in self.COMMAND_HISTORY_ABSOLUTE_PATHS:
             for path in self.target.fs.glob(history_absolute_path_glob):
@@ -74,8 +72,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
 
     @export(record=CommandHistoryRecord)
     def commandhistory(self) -> Iterator[CommandHistoryRecord]:
-        """
-        Return shell history for all users.
+        """Return shell history for all users.
 
         When using a shell, history of the used commands is kept on the system.
         """
