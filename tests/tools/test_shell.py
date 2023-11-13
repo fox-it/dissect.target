@@ -264,12 +264,12 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
 )
 def test_target_cli_unicode_argparse(capsys, monkeypatch, provided_input: str, expected_output: str) -> None:
     with monkeypatch.context() as m:
-        target_file = absolute_path("_data/unicode.tgz")
+        target_file = absolute_path("_data/tools/shell/unicode.tar")
         m.setattr("sys.argv", ["target-shell", target_file])
-        m.setattr("sys.stdin", StringIO(f"ls charsets/{provided_input}"))
+        m.setattr("sys.stdin", StringIO(f"ls unicode/charsets/{provided_input}"))
         target_shell()
         out, err = capsys.readouterr()
-        out = out.replace("unicode.tgz />", "").strip()
+        out = out.replace("unicode.tar />", "").strip()
 
         assert out == expected_output
         assert "unrecognized arguments" not in err
