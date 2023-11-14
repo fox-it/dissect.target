@@ -58,7 +58,7 @@ class VolumeSystem:
     """
 
     __type__: str = None
-    """Defines the type of volume system."""
+    """A short string identifying the type of volume system."""
 
     def __init__(
         self, fh: Union[BinaryIO, list[BinaryIO]], dsk: Optional[Container] = None, serial: Optional[str] = None
