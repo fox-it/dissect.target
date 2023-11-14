@@ -76,12 +76,12 @@ def hash_uri_records(target: Target, record: Record) -> Record:
 
 def hash_path_records(target: Target, record: Record) -> Record:
     """Hash files from path fields inside the record."""
-    hashed_paths = []
-
     if target.os == "windows":
         path_type = fieldtypes.windows_path
     else:
         path_type = fieldtypes.posix_path
+
+    hash_records = []
 
     for field_name, field_type in record._field_types.items():
         if not issubclass(field_type, fieldtypes.path):
@@ -98,15 +98,24 @@ def hash_path_records(target: Target, record: Record) -> Record:
             pass
         else:
             resolved_path = path_type(resolved_path)
-            hashed_paths.append((resolved_path, path_hash))
+            _record = RecordDescriptor(
+                "filesystem/file/digest", [
+                    ("path", f"{field_name}_path"),
+                    ("path", f"{field_name}_resolved_path"),
+                    ("digest", f"{field_name}_digest")
+                ]
+            )
 
-    if not hashed_paths:
+            hash_records.append(_record(**{
+                f"{field_name}_path": path,
+                f"{field_name}_resolved_path": resolved_path,
+                f"{field_name}_digest": path_hash
+            }))
+
+    if not hash_records:
         return record
 
-    paths, digests = zip(*hashed_paths)
-    hash_record = HashRecord(paths=paths, digests=digests)
-
-    return GroupedRecord(record._desc.name, [record, hash_record])
+    return GroupedRecord(record._desc.name, [record] + hash_records)
 
 
 def hash_uri(target: Target, path: str) -> tuple[str, str]:
