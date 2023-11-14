@@ -47,7 +47,7 @@ class Container(io.IOBase):
         if self.__type__ is None:
             raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @classmethod
