@@ -493,6 +493,8 @@ def test_vs_offset_0(target_bare: Target) -> None:
         assert len(target_bare.volumes) == 1
 
         target_bare.volumes.apply()
+        # volume.open must still only be called once
+        volume_open.assert_called_once_with(mock_disk)
         filesystem_open.assert_called_once_with(mock_volume)
         assert len(target_bare.volumes) == 1
         assert len(target_bare.filesystems) == 1
