@@ -39,7 +39,7 @@ def test_bde_volume_with_recovery_key(target_win, encrypted_volume):
         keychain.KeyType.RECOVERY_KEY,
         recovery_key,
         identifier=None,
-        provider=BitlockerVolumeSystem.PROVIDER,
+        provider=BitlockerVolumeSystem.__type__,
     )
 
     enc_vol = volume.Volume(encrypted_volume, 1, 0, None, None, None, disk=encrypted_volume)
@@ -67,7 +67,7 @@ def test_bde_volume_with_passphrase(target_win, encrypted_volume):
         keychain.KeyType.PASSPHRASE,
         passphrase,
         identifier=identifier,
-        provider=BitlockerVolumeSystem.PROVIDER,
+        provider=BitlockerVolumeSystem.__type__,
     )
 
     enc_vol = volume.Volume(encrypted_volume, 1, 0, None, None, None, disk=encrypted_volume)

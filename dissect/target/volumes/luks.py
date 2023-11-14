@@ -17,7 +17,7 @@ class LUKSVolumeSystemError(VolumeSystemError):
 
 
 class LUKSVolumeSystem(EncryptedVolumeSystem):
-    PROVIDER = "luks"
+    __type__ = "luks"
 
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)

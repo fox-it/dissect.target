@@ -11,6 +11,8 @@ log = logging.getLogger(__name__)
 
 
 class VmfsVolumeSystem(LogicalVolumeSystem):
+    __type__ = "vmfs"
+
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.lvm = lvm.LVM(fh)
         super().__init__(fh, *args, **kwargs)

@@ -22,6 +22,8 @@ KNOWN_SKIP_TYPES = (
 
 
 class LvmVolumeSystem(LogicalVolumeSystem):
+    __type__ = "lvm"
+
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.lvm = lvm.LVM2(fh)
         super().__init__(fh, *args, **kwargs)
