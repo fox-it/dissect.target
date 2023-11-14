@@ -15,7 +15,7 @@ ExfatFileTree = tuple[exfat.c_exfat.FILE, dict[str, Optional["ExfatFileTree"]]]
 
 
 class ExfatFilesystem(Filesystem):
-    __fstype__ = "exfat"
+    __type__ = "exfat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)

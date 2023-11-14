@@ -10,6 +10,8 @@ from dissect.target.container import Container
 class VdiContainer(Container):
     """VirtualBox hard disks"""
 
+    __type__ = "vdi"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
