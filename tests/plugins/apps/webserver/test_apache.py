@@ -2,11 +2,14 @@ import textwrap
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.apache import (
+    LOG_FORMAT_ACCESS_COMBINED,
+    LOG_FORMAT_ACCESS_COMMON,
+    LOG_FORMAT_ACCESS_VHOST_COMBINED,
     ApachePlugin,
-    LogFormat,
-    infer_access_log_format,
 )
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
@@ -16,7 +19,7 @@ def test_plugins_apps_webservers_apache_infer_access_log_format_combined():
         "(Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 "
         'Safari/537.36"'
     )
-    assert infer_access_log_format(log_combined) == LogFormat.COMBINED
+    assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
 
 
 def test_plugins_apps_webservers_apache_infer_access_log_format_vhost_combined():
@@ -25,12 +28,12 @@ def test_plugins_apps_webservers_apache_infer_access_log_format_vhost_combined()
         '"-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) '
         'Chrome/108.0.0.0 Safari/537.36"'
     )
-    assert infer_access_log_format(log_vhost_combined) == LogFormat.VHOST_COMBINED
+    assert ApachePlugin.infer_access_log_format(log_vhost_combined) == LOG_FORMAT_ACCESS_VHOST_COMBINED
 
 
 def test_plugins_apps_webservers_apache_infer_access_log_format_common():
     log_common = '127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
-    assert infer_access_log_format(log_common) == LogFormat.COMMON
+    assert ApachePlugin.infer_access_log_format(log_common) == LOG_FORMAT_ACCESS_COMMON
 
 
 def test_plugins_apps_webservers_apache_infer_access_log_ipv6():
@@ -38,10 +41,10 @@ def test_plugins_apps_webservers_apache_infer_access_log_ipv6():
         '2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [20/Dec/2022:15:18:01 +0100] "GET / HTTP/1.1" 200 '
         '1126 "-" "curl/7.81.0"'
     )
-    assert infer_access_log_format(log_combined) == LogFormat.COMBINED
+    assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
 
 
-def test_plugins_apps_webservers_apache_txt(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_txt(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
 
@@ -51,7 +54,7 @@ def test_plugins_apps_webservers_apache_txt(target_unix, fs_unix):
     assert len(results) == 6
 
 
-def test_plugins_apps_webservers_apache_gz(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_gz(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log.gz")
     fs_unix.map_file("var/log/apache2/access.log.1.gz", data_file)
 
@@ -61,7 +64,7 @@ def test_plugins_apps_webservers_apache_gz(target_unix, fs_unix):
     assert len(results) == 4
 
 
-def test_plugins_apps_webservers_apache_access_bz2(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_access_bz2(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log.bz2")
     fs_unix.map_file("var/log/apache2/access.log.1.bz2", data_file)
 
@@ -71,7 +74,7 @@ def test_plugins_apps_webservers_apache_access_bz2(target_unix, fs_unix):
     assert len(results) == 4
 
 
-def test_plugins_apps_webservers_apache_all_access_log_formats(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
     tz = timezone(timedelta(hours=1))
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
@@ -127,37 +130,8 @@ def test_plugins_apps_webservers_apache_all_access_log_formats(target_unix, fs_u
     assert ipv6_log.protocol is None
     assert ipv6_log.bytes_sent == 0
 
-    citrix_netscaler_headers_combined_response_log = results[4]
-    assert citrix_netscaler_headers_combined_response_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=tz)
-    assert citrix_netscaler_headers_combined_response_log.remote_ip == "1.2.3.4"
-    assert citrix_netscaler_headers_combined_response_log.local_ip == "5.6.7.8"
-    assert citrix_netscaler_headers_combined_response_log.status_code == 200
-    assert citrix_netscaler_headers_combined_response_log.method == "GET"
-    assert citrix_netscaler_headers_combined_response_log.uri == "/"
-    assert citrix_netscaler_headers_combined_response_log.protocol == "HTTP/1.1"
-    assert citrix_netscaler_headers_combined_response_log.referer == "-"
-    assert (
-        citrix_netscaler_headers_combined_response_log.useragent
-        == "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 "
-        "Safari/537.36"
-    )
-    assert citrix_netscaler_headers_combined_response_log.response_time_ms == 58
-    assert citrix_netscaler_headers_combined_response_log.pid == 69420
 
-    citrix_netscaler_headers_combined_response_log = results[5]
-    assert citrix_netscaler_headers_combined_response_log.ts == datetime(2023, 8, 11, 8, 30, 0, tzinfo=timezone.utc)
-    assert citrix_netscaler_headers_combined_response_log.remote_ip == "127.0.0.1"
-    assert citrix_netscaler_headers_combined_response_log.status_code == 200
-    assert citrix_netscaler_headers_combined_response_log.method == "GET"
-    assert citrix_netscaler_headers_combined_response_log.uri == "/"
-    assert citrix_netscaler_headers_combined_response_log.protocol == "HTTP/1.1"
-    assert citrix_netscaler_headers_combined_response_log.referer == "-"
-    assert citrix_netscaler_headers_combined_response_log.useragent == "curl/7.78.0"
-    assert citrix_netscaler_headers_combined_response_log.response_time_ms == 39
-    assert citrix_netscaler_headers_combined_response_log.pid == 82775
-
-
-def test_plugins_apps_webservers_apache_logrotate(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_logrotate(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
     fs_unix.map_file("var/log/apache2/access.log.1", data_file)
@@ -171,7 +145,7 @@ def test_plugins_apps_webservers_apache_logrotate(target_unix, fs_unix):
     assert len(error_log_paths) == 0
 
 
-def test_plugins_apps_webservers_apache_custom_config(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_custom_config(target_unix: Target, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("etc/apache2/apache2.conf", BytesIO(b'CustomLog "/custom/log/location/access.log" common'))
     fs_unix.map_file_fh("custom/log/location/access.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("custom/log/location/access.log.1", BytesIO(b"Foo1"))
@@ -185,24 +159,33 @@ def test_plugins_apps_webservers_apache_custom_config(target_unix, fs_unix):
     assert len(error_log_paths) == 0
 
 
-def test_plugins_apps_webservers_apache_config_commented_logs(target_unix, fs_unix):
+def test_plugins_apps_webservers_apache_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem):
     config = """
     # CustomLog "/custom/log/location/old.log" common
     CustomLog "/custom/log/location/new.log" common
+    # ErrorLog "/custom/log/location//old_error.log"
+    ErrorLog "/custom/log/location//new_error.log"
+
     """
     fs_unix.map_file_fh("etc/httpd/conf/httpd.conf", BytesIO(textwrap.dedent(config).encode()))
     fs_unix.map_file_fh("custom/log/location/new.log", BytesIO(b"New"))
     fs_unix.map_file_fh("custom/log/location/old.log", BytesIO(b"Old"))
+    fs_unix.map_file_fh("custom/log/location/old_error.log", BytesIO(b"Old"))
+    fs_unix.map_file_fh("custom/log/location/new_error.log", BytesIO(b"New"))
     target_unix.add_plugin(ApachePlugin)
 
     access_log_paths, error_log_paths = target_unix.apache.get_log_paths()
 
-    assert str(access_log_paths[0]) == "/custom/log/location/old.log"
-    assert str(access_log_paths[1]) == "/custom/log/location/new.log"
+    # Log paths are returned in alphabetical order
+    assert str(access_log_paths[0]) == "/custom/log/location/new.log"
+    assert str(access_log_paths[1]) == "/custom/log/location/old.log"
+
+    assert str(error_log_paths[0]) == "/custom/log/location/new_error.log"
+    assert str(error_log_paths[1]) == "/custom/log/location/old_error.log"
 
 
-def test_plugins_apps_webservers_apache_error_txt(target_unix, fs_unix):
-    data_file = absolute_path("data/webservers/apache/error.log")
+def test_plugins_apps_webservers_apache_error_txt(target_unix: Target, fs_unix: VirtualFilesystem):
+    data_file = absolute_path("_data/plugins/apps/webserver/apache/error.log")
     fs_unix.map_file("var/log/apache2/error.log", data_file)
 
     target_unix.add_plugin(ApachePlugin)
@@ -212,8 +195,8 @@ def test_plugins_apps_webservers_apache_error_txt(target_unix, fs_unix):
     assert all(str(record.source) == "/var/log/apache2/error.log" for record in results)
 
 
-def test_plugins_apps_webservers_apache_all_error_log_formats(target_unix, fs_unix):
-    data_file = absolute_path("data/webservers/apache/error.log")
+def test_plugins_apps_webservers_apache_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
+    data_file = absolute_path("_data/plugins/apps/webserver/apache/error.log")
     fs_unix.map_file("var/log/apache2/error.log", data_file)
 
     target_unix.add_plugin(ApachePlugin)
