@@ -1,5 +1,4 @@
-from dissect.target.filesystem import RootFilesystem
-from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.overlay import OverlayFilesystem, OverlayLayerFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
 from dissect.target.target import Target
@@ -50,15 +49,11 @@ class OverlayLoader(Loader):
             layers.append(docker_root.joinpath(f"overlay2/{layer}/diff"))
 
         # mount every diff directory to root
-        # TODO: subclass RootFilesystem to LayerFilesystem
-        rfs = RootFilesystem(Target())
-        rfs.mounts["/"] = []
+        overlay_fs = OverlayFilesystem()
 
         for layer in layers:
-            dfs = DirectoryFilesystem(layer, case_sensitive=True)
-            r = rfs.add_layer()
-            r.map_fs("/", dfs)
-            rfs.mounts["/"].append(dfs)
+            layer_fs = OverlayLayerFilesystem(layer)
+            overlay_fs.mount(layer_fs)
 
-        # add the root filesystem to the target
-        target.filesystems.add(rfs)
+        # add the overlay filesystem to the target
+        target.filesystems.add(overlay_fs)

@@ -2,7 +2,6 @@ import datetime
 
 from dissect.target.helpers.docker import convert_timestamp
 from dissect.target.plugins.apps.container.docker import DockerPlugin
-
 from tests._utils import absolute_path
 
 
