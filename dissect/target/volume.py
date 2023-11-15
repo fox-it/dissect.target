@@ -57,6 +57,8 @@ class VolumeSystem:
         serial: Serial number of the volume system, if any.
     """
 
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
     __type__: str = None
     """A short string identifying the type of volume system."""
 
