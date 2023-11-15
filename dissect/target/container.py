@@ -34,6 +34,8 @@ class Container(io.IOBase):
         vs: An optional shorthand to set the underlying volume system, usually set later.
     """
 
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
     __type__: str = None
     """A short string identifying the type of container."""
 
