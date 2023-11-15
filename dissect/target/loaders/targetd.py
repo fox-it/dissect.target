@@ -191,6 +191,18 @@ if TARGETD_AVAILABLE:
             caller.output = True
             return
 
+        if targetd.command == "select":
+            targetd.rpcs.select(*args)
+            caller.has_output = True
+            caller.output = True
+            return
+
+        if targetd.command == "deselect":
+            targetd.rpcs.deselect()
+            caller.has_output = True
+            caller.output = True
+            return
+
         func = getattr(obj, targetd.command)
         caller.has_output = True
         result = func(*args, **kwargs)
