@@ -199,10 +199,9 @@ class SymantecPlugin(Plugin):
 
     def check_compatible(self) -> None:
         for log_file in self.LOGS:
-            if self.target.fs.glob(log_file):
-                break
-        else:
-            raise UnsupportedPluginError("No Symantec SEP logs found")
+            if list(self.target.fs.glob(log_file)):
+                return
+        raise UnsupportedPluginError("No Symantec SEP logs found")
 
     def _fw_cell(self, line: list, cell_id: int) -> str:
         return line[cell_id].decode("utf-8")
