@@ -723,7 +723,8 @@ class VolumeCollection(Collection[volume.Volume]):
             self.target.log.debug("", exc_info=e)
 
     def apply(self) -> None:
-        todo = self.entries
+        # We don't want later additions to modify the todo, so make a copy
+        todo = self.entries[:]
 
         while todo:
             new_volumes = []
@@ -738,6 +739,21 @@ class VolumeCollection(Collection[volume.Volume]):
                 else:
                     # We could be getting "regular" volume systems out of LVM or encrypted volumes
                     # Try to open each volume as a regular volume system, or add as a filesystem if it fails
+                    # There are a few scenarios were we want to discard the opened volume, though
+                    #
+                    # If the current volume offset is 0 and originates from a "regular" volume system, we're likely
+                    # opening a volume system on the same disk again
+                    # Sometimes BSD systems are configured this way and an FFS volume "starts" at offset 0
+                    #
+                    # If we opened an empty volume system, it might also be the case that a filesystem actually
+                    # "starts" at offset 0
+
+                    if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
+                        # We are going to re-open a volume system on itself, bail out
+                        self.target.log.info("Found volume with offset 0, opening as raw volume instead")
+                        self.open(vol)
+                        continue
+
                     try:
                         vs = volume.open(vol)
                     except Exception:
@@ -746,15 +762,12 @@ class VolumeCollection(Collection[volume.Volume]):
                         continue
 
                     if not len(vs.volumes):
+                        # We opened an empty volume system, discard
                         self.open(vol)
                         continue
 
-                    for new_vol in vs.volumes:
-                        if new_vol.offset == 0:
-                            self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                            self.open(new_vol)
-                            continue
-                        new_volumes.append(new_vol)
+                    self.entries.extend(vs.volumes)
+                    new_volumes.extend(vs.volumes)
 
             self.target.log.debug("LVM volumes found: %s", lvm_volumes)
             self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)

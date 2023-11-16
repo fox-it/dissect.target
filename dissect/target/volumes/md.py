@@ -7,6 +7,8 @@ from dissect.target.volume import LogicalVolumeSystem, Volume
 
 
 class MdVolumeSystem(LogicalVolumeSystem):
+    __type__ = "md"
+
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.md = MD(fh)
         super().__init__(fh, *args, **kwargs)
