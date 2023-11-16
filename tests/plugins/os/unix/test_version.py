@@ -52,6 +52,12 @@ from tests._utils import absolute_path
             "13.0-RELEASE",
             FreeBsdPlugin,
         ),
+        (
+            "_data/plugins/os/unix/linux/alpine/_os/alpine-os-release",
+            "/etc/os-release",
+            "Alpine Linux 3.18.4",
+            LinuxPlugin,
+        ),
     ],
 )
 def test_unix_version_detection(fs_unix, target_unix, data_path, target_path, expected_version, os_plugin):
