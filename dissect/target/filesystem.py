@@ -76,7 +76,8 @@ class Filesystem:
     @property
     def __fstype__(cls) -> str:
         warnings.warn(
-            "The __fstype__ attribute is deprecated and will be removed in dissect.target 3.15. Use __type__ instead"
+            "The __fstype__ attribute is deprecated and will be removed in dissect.target 3.15. Use __type__ instead",
+            category=DeprecationWarning,
         )
         return cls.__type__
 
