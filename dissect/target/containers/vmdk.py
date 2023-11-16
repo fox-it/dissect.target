@@ -10,6 +10,8 @@ from dissect.target.container import Container
 class VmdkContainer(Container):
     """VMWare hard disks"""
 
+    __type__ = "vmdk"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         self.vmdk = vmdk.VMDK(fh)
         super().__init__(fh, self.vmdk.size, *args, **kwargs)

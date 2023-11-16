@@ -5,6 +5,7 @@ import io
 import logging
 import os
 import stat
+import warnings
 from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
@@ -40,8 +41,10 @@ log = logging.getLogger(__name__)
 class Filesystem:
     """Base class for filesystems."""
 
-    __fstype__: str = None
-    """Defines the type of filesystem it is."""
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
+    __type__: str = None
+    """A short string identifying the type of filesystem."""
 
     def __init__(
         self,
@@ -57,16 +60,26 @@ class Filesystem:
             alt_separator: The alternative separator used to distingish between directories in a path.
 
         Raises:
-            NotImplementedError: When the internal ``__fstype__`` of the class is not defined.
+            NotImplementedError: When the internal ``__type__`` of the class is not defined.
         """
         self.volume = volume
         self.case_sensitive = case_sensitive
         self.alt_separator = alt_separator
-        if self.__fstype__ is None:
-            raise NotImplementedError(f"{self.__class__.__name__} must define __fstype__")
+
+        if self.__type__ is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
+
+    @classmethod
+    @property
+    def __fstype__(cls) -> str:
+        warnings.warn(
+            "The __fstype__ attribute is deprecated and will be removed in dissect.target 3.15. Use __type__ instead",
+            category=DeprecationWarning,
+        )
+        return cls.__type__
 
     def path(self, *args) -> fsutil.TargetPath:
         """Get a specific path from the filesystem."""
@@ -91,7 +104,7 @@ class Filesystem:
         except NotImplementedError:
             raise
         except Exception as e:
-            log.warning("Failed to detect %s filesystem", cls.__fstype__)
+            log.warning("Failed to detect %s filesystem", cls.__type__)
             log.debug("", exc_info=e)
         finally:
             fh.seek(offset)
@@ -1028,7 +1041,7 @@ class VirtualSymlink(FilesystemEntry):
 
 
 class VirtualFilesystem(Filesystem):
-    __fstype__ = "virtual"
+    __type__ = "virtual"
 
     def __init__(self, **kwargs):
         super().__init__(None, **kwargs)
@@ -1184,7 +1197,7 @@ class VirtualFilesystem(Filesystem):
 
 
 class RootFilesystem(Filesystem):
-    __fstype__ = "root"
+    __type__ = "root"
 
     def __init__(self, target: Target):
         self.target = target

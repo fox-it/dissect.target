@@ -12,6 +12,8 @@ from dissect.target.container import Container
 class EwfContainer(Container):
     """Expert Witness Disk Image Format"""
 
+    __type__ = "ewf"
+
     def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
         fhs = [fh] if not isinstance(fh, list) else fh
         if hasattr(fhs[0], "read"):
