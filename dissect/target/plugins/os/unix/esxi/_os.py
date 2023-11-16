@@ -25,7 +25,7 @@ from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems import tar
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, arg, export, internal
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.target import Target
 
 VirtualMachineRecord = TargetRecordDescriptor(
@@ -36,7 +36,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
 )
 
 
-class ESXiPlugin(LinuxPlugin):
+class ESXiPlugin(UnixPlugin):
     """ESXi OS plugin
 
     ESXi partitioning varies between versions. Generally, specific partition numbers have special meaning.
