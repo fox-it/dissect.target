@@ -57,6 +57,11 @@ class VolumeSystem:
         serial: Serial number of the volume system, if any.
     """
 
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
+    __type__: str = None
+    """A short string identifying the type of volume system."""
+
     def __init__(
         self, fh: Union[BinaryIO, list[BinaryIO]], dsk: Optional[Container] = None, serial: Optional[str] = None
     ):
@@ -64,6 +69,9 @@ class VolumeSystem:
         self.disk = dsk or fh  # Provide shorthand access to source disk
         self.serial = serial
         self._volumes_list: list[Volume] = None
+
+        if self.__type__ is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} serial={self.serial}>"
@@ -124,20 +132,13 @@ class EncryptedVolumeSystem(VolumeSystem):
     It adds helper functions for interacting with the :attr:`~dissect.target.helpers.keychain.KEYCHAIN`,
     so that subclasses don't have to manually interact with it.
 
-    Subclasses must set the ``PROVIDER`` class attribute to a unique string, e.g. ``bitlocker``.
-
     Args:
         fh: The file-like object on which to open the encrypted volume system.
     """
 
-    PROVIDER: str = None
-
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
-
-        if not self.PROVIDER:
-            raise ValueError("Provider identifier is not set")
-        self.keys = keychain.get_keys_for_provider(self.PROVIDER) + keychain.get_keys_without_provider()
+        self.keys = keychain.get_keys_for_provider(self.__type__) + keychain.get_keys_without_provider()
 
     def get_keys_for_identifier(self, identifier: str) -> list[keychain.Key]:
         """Retrieves a list of keys that match a single ``identifier``.
@@ -399,7 +400,7 @@ def open_encrypted(volume: BinaryIO) -> Iterator[Volume]:
             log.debug("", exc_info=e)
         except Exception as e:
             log.error(
-                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.PROVIDER, e
+                "Failed to open an encrypted volume %s with volume manager %s: %s", volume, manager_cls.__type__, e
             )
             log.debug("", exc_info=e)
     return None
