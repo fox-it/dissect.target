@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -6,6 +7,8 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     RemoteAccessPlugin,
     RemoteAccessRecord,
 )
+
+START_PATTERN = re.compile(r"^(\d{2}|\d{4})/")
 
 
 class TeamviewerPlugin(RemoteAccessPlugin):
@@ -54,30 +57,53 @@ class TeamviewerPlugin(RemoteAccessPlugin):
         for logfile, user in self.logfiles:
             logfile = self.target.fs.path(logfile)
 
-            for line in logfile.open("rt"):
-                line = line.strip()
+            start_date = None
+            with logfile.open("rt") as file:
+                while True:
+                    try:
+                        line = file.readline()
+                    except UnicodeDecodeError:
+                        continue
 
-                # Skip empty lines
-                if not line:
-                    continue
+                    if not line:
+                        break
 
-                # Sometimes there are weird, mult-line/pretty print log messages.
-                try:
-                    # should be year (%Y)
-                    int(line[0])
-                except ValueError:
-                    continue
+                    line = line.strip()
 
-                ts_day, ts_time, description = line.split(" ", 2)
-                ts_time = ts_time.split(".")[0]
+                    # Skip empty lines
+                    if not line:
+                        continue
+                    # Older logs first mention the start time and then leave out the year
+                    if line.startswith("Start:"):
+                        start_date = datetime.strptime(line.split()[1], "%Y/%m/%d")
 
-                timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S")
+                    # Sometimes there are weird, mult-line/pretty print log messages.
+                    # We only parse the start line which starts with year (%Y/) or month (%m/)
+                    if not re.match(START_PATTERN, line):
+                        continue
 
-                yield RemoteAccessRecord(
-                    tool="teamviewer",
-                    ts=timestamp,
-                    logfile=str(logfile),
-                    description=description,
-                    _target=self.target,
-                    _user=user,
-                )
+                    ts_day, ts_time, description = line.split(" ", 2)
+                    ts_time = ts_time.split(".")[0]
+
+                    # Correct for use of : as millisecond separator
+                    if ts_time.count(":") > 2:
+                        ts_time = ":".join(ts_time.split(":")[:3])
+                    # Correct for missing year in date
+                    if ts_day.count("/") == 1:
+                        if not start_date:
+                            continue
+                        ts_day = f"{start_date.year}/{ts_day}"
+                    # Correct for year if short notation for 2000 is used
+                    if ts_day.count("/") == 2 and len(ts_day.split("/")[0]) == 2:
+                        ts_day = "20" + ts_day
+
+                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S")
+
+                    yield RemoteAccessRecord(
+                        tool="teamviewer",
+                        ts=timestamp,
+                        logfile=str(logfile),
+                        description=description,
+                        _target=self.target,
+                        _user=user,
+                    )
