@@ -161,6 +161,7 @@ class LnkPlugin(Plugin):
                     target_mtime=target_mtime,
                     target_atime=target_atime,
                     target_ctime=target_ctime,
+                    _target=self.target,
                 )
 
     def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
