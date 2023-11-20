@@ -760,12 +760,8 @@ class VolumeCollection(Collection[volume.Volume]):
                         fs_volumes.append(vol)
                         continue
 
-                    for new_vol in vs.volumes:
-                        if new_vol.offset == 0:
-                            self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                            fs_volumes.append(new_vol)
-                            continue
-                        new_volumes.append(new_vol)
+                    self.entries.extend(vs.volumes)
+                    new_volumes.extend(vs.volumes)
 
             self.target.log.debug("LVM volumes found: %s", lvm_volumes)
             self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
