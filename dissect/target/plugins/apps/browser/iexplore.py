@@ -199,7 +199,8 @@ class InternetExplorerPlugin(BrowserPlugin):
 
                 try:
                     response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
-                    ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
+                    # Not used here, but [-6:-3] should give: ref_url, mime_type, temp_download_path,
+                    down_url, down_path = response_headers.split("\x00")[-3:-1]
                 except (AttributeError, KeyNotFoundError) as header_error:
                     self.target.log.error(f"Error parsing response headers: {header_error}")
 
