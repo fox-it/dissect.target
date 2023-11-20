@@ -745,7 +745,7 @@ class VolumeCollection(Collection[volume.Volume]):
                     if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
                         # We are going to re-open a volume system on itself, bail out
                         self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                        self.open(vol)
+                        fs_volumes.append(vol)
                         continue
 
                     try:
