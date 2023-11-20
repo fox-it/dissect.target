@@ -45,10 +45,12 @@ class Filesystem:
     # This has the added benefit of having a readily available "pretty name" for each implementation
     __type__: str = None
     """A short string identifying the type of filesystem."""
+    __multi_volume__: bool = False
+    """Whether this filesystem supports multiple volumes (disks)."""
 
     def __init__(
         self,
-        volume: Optional[BinaryIO] = None,
+        volume: Optional[Union[BinaryIO, list[BinaryIO]]] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:
@@ -56,7 +58,7 @@ class Filesystem:
 
         Args:
             volume: A volume or other file-like object associated with the filesystem.
-            case_sensitive: Defines if the paths in the Filesystem are case sensitive or not.
+            case_sensitive: Defines if the paths in the filesystem are case sensitive or not.
             alt_separator: The alternative separator used to distingish between directories in a path.
 
         Raises:
@@ -82,7 +84,7 @@ class Filesystem:
         return cls.__type__
 
     def path(self, *args) -> fsutil.TargetPath:
-        """Get a specific path from the filesystem."""
+        """Instantiate a new path-like object on this filesystem."""
         return fsutil.TargetPath(self, *args)
 
     @classmethod
@@ -124,6 +126,52 @@ class Filesystem:
             ``True`` if ``fh`` is supported, ``False`` otherwise.
         """
         raise NotImplementedError()
+
+    @classmethod
+    def detect_id(cls, fh: BinaryIO) -> Optional[bytes]:
+        """Return a filesystem set identifier.
+
+        Only used in filesystems that support multiple volumes (disks) to find all volumes
+        belonging to a single filesystem.
+
+        Args:
+            fh: A file-like object, usually a disk or partition.
+        """
+        if not cls.__multi_volume__:
+            return None
+
+        offset = fh.tell()
+        try:
+            fh.seek(0)
+            return cls._detect_id(fh)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            log.warning("Failed to detect ID on %s filesystem", cls.__fstype__)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return None
+
+    @staticmethod
+    def _detect_id(fh: BinaryIO) -> Optional[bytes]:
+        """Return a filesystem set identifier.
+
+        This method should be implemented by subclasses of filesystems that support multiple volumes (disks).
+        The position of ``fh`` is guaranteed to be ``0``.
+
+        Args:
+            fh: A file-like object, usually a disk or partition.
+
+        Returns:
+            An identifier that can be used to combine the given ``fh`` with others beloning to the same set.
+        """
+        raise NotImplementedError()
+
+    def iter_subfs(self) -> Iterator[Filesystem]:
+        """Yield possible sub-filesystems."""
+        yield from ()
 
     def get(self, path: str) -> FilesystemEntry:
         """Retrieve a :class:`FilesystemEntry` from the filesystem.
@@ -1461,6 +1509,18 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
     FILESYSTEMS.append(getattr(import_lazy(module), class_name))
 
 
+def is_multi_volume_filesystem(fh: BinaryIO) -> bool:
+    for filesystem in FILESYSTEMS:
+        try:
+            if filesystem.__multi_volume__ and filesystem.detect(fh):
+                return True
+        except ImportError as e:
+            log.info("Failed to import %s", filesystem)
+            log.debug("", exc_info=e)
+
+    return False
+
+
 def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
     offset = fh.tell()
     fh.seek(0)
@@ -1469,10 +1529,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
         for filesystem in FILESYSTEMS:
             try:
                 if filesystem.detect(fh):
-                    instance = filesystem(fh, *args, **kwargs)
-                    instance.volume = fh
-
-                    return instance
+                    return filesystem(fh, *args, **kwargs)
             except ImportError as e:
                 log.info("Failed to import %s", filesystem)
                 log.debug("", exc_info=e)
@@ -1482,12 +1539,35 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
     raise FilesystemError(f"Failed to open filesystem for {fh}")
 
 
+def open_multi_volume(fhs: list[BinaryIO], *args, **kwargs) -> Filesystem:
+    for filesystem in FILESYSTEMS:
+        try:
+            if not filesystem.__multi_volume__:
+                continue
+
+            volumes = defaultdict(list)
+            for fh in fhs:
+                if not filesystem.detect(fh):
+                    continue
+
+                identifier = filesystem.detect_id(fh)
+                volumes[identifier].append(fh)
+
+            for vols in volumes.values():
+                yield filesystem(vols, *args, **kwargs)
+
+        except ImportError as e:
+            log.info("Failed to import %s", filesystem)
+            log.debug("", exc_info=e)
+
+
 register("ntfs", "NtfsFilesystem")
 register("extfs", "ExtFilesystem")
 register("xfs", "XfsFilesystem")
 register("fat", "FatFilesystem")
 register("ffs", "FfsFilesystem")
 register("vmfs", "VmfsFilesystem")
+register("btrfs", "BtrfsFilesystem")
 register("exfat", "ExfatFilesystem")
 register("squashfs", "SquashFSFilesystem")
 register("zip", "ZipFilesystem")
