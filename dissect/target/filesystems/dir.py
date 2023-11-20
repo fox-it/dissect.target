@@ -13,7 +13,7 @@ from dissect.target.helpers import fsutil
 
 
 class DirectoryFilesystem(Filesystem):
-    __fstype__ = "dir"
+    __type__ = "dir"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)

@@ -23,7 +23,7 @@ class OS(IntEnum):
 
 
 class CbFilesystem(Filesystem):
-    __fstype__ = "cb"
+    __type__ = "cb"
 
     def __init__(self, session: LiveResponseSession, prefix: str, *args, **kwargs):
         self.session = session

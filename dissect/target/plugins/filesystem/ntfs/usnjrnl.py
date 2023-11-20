@@ -41,7 +41,7 @@ class UsnjrnlPlugin(Plugin):
         """
         target = self.target
         for fs in self.target.filesystems:
-            if fs.__fstype__ != "ntfs":
+            if fs.__type__ != "ntfs":
                 continue
 
             usnjrnl = fs.ntfs.usnjrnl

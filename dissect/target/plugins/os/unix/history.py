@@ -35,6 +35,7 @@ class CommandHistoryPlugin(Plugin):
         ("python", ".python_history"),
         ("sqlite", ".sqlite_history"),
         ("zsh", ".zsh_history"),
+        ("ash", ".ash_history"),
     )
 
     def __init__(self, target: Target):

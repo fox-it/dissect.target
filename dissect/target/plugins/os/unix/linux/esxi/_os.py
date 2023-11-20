@@ -241,7 +241,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
     osdata_fs = None
     locker_fs = None
     for fs in target.filesystems:
-        if fs.__fstype__ == "fat":
+        if fs.__type__ == "fat":
             fs.volume.seek(512)
             magic, uuid1, uuid2, uuid3, uuid4 = struct.unpack("<16sIIH6s", fs.volume.read(32))
             if magic != b"VMWARE FAT16    ":
@@ -273,7 +273,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
                     target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/store")
                     target.fs.symlink("/store", "/locker")
 
-        elif fs.__fstype__ == "vmfs":
+        elif fs.__type__ == "vmfs":
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
 

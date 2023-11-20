@@ -171,6 +171,7 @@ class TargetCmd(cmd.Cmd):
         if command_args_str is not None:
             lexer = shlex.shlex(command_args_str, posix=True, punctuation_chars=True)
             lexer.wordchars += "$"
+            lexer.whitespace_split = True
             argparts = list(lexer)
 
         try:
@@ -448,7 +449,7 @@ class TargetCli(TargetCmd):
                 # entries has an alternative data stream and also list them.
                 entry = file_.get()
                 if isinstance(entry, RootFilesystemEntry):
-                    if entry.entries.fs.__fstype__ == "ntfs":
+                    if entry.entries.fs.__type__ == "ntfs":
                         attrs = entry.lattr()
                         for data_stream in attrs.DATA:
                             if data_stream.name != "":

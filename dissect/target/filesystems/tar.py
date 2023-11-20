@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 class TarFilesystem(Filesystem):
     """Filesystem implementation for tar files."""
 
-    __fstype__ = "tar"
+    __type__ = "tar"
 
     def __init__(
         self,

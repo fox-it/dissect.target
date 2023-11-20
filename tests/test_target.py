@@ -451,10 +451,14 @@ def test_empty_vs(target_bare: Target) -> None:
 
 def test_nested_vs(target_bare: Target) -> None:
     mock_base_volume = MagicMock()
+    mock_base_volume.offset = 0
+    mock_base_volume.vs = None
+    mock_base_volume.fs = None
     target_bare.volumes.add(mock_base_volume)
 
     mock_volume = MagicMock()
     mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
     mock_volume.fs = None
 
     mock_volume_system = MagicMock()
@@ -465,4 +469,33 @@ def test_nested_vs(target_bare: Target) -> None:
 
         target_bare.volumes.apply()
         filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.volumes) == 2
+        assert len(target_bare.filesystems) == 1
+
+
+def test_vs_offset_0(target_bare: Target) -> None:
+    mock_disk = MagicMock()
+    mock_disk.vs = None
+    target_bare.disks.add(mock_disk)
+
+    mock_volume = MagicMock()
+    mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
+    mock_volume.fs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = [mock_volume]
+
+    with patch("dissect.target.volume.open") as volume_open, patch("dissect.target.filesystem.open") as filesystem_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.disks.apply()
+        volume_open.assert_called_once_with(mock_disk)
+        assert len(target_bare.volumes) == 1
+
+        target_bare.volumes.apply()
+        # volume.open must still only be called once
+        volume_open.assert_called_once_with(mock_disk)
+        filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.volumes) == 1
         assert len(target_bare.filesystems) == 1

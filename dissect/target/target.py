@@ -714,7 +714,8 @@ class DiskCollection(Collection[container.Container]):
 
 class VolumeCollection(Collection[volume.Volume]):
     def apply(self) -> None:
-        todo = self.entries
+        # We don't want later additions to modify the todo, so make a copy
+        todo = self.entries[:]
         fs_volumes = []
         lvm_volumes = []
         encrypted_volumes = []
@@ -732,6 +733,21 @@ class VolumeCollection(Collection[volume.Volume]):
                 else:
                     # We could be getting "regular" volume systems out of LVM or encrypted volumes
                     # Try to open each volume as a regular volume system, or add as a filesystem if it fails
+                    # There are a few scenarios were we want to discard the opened volume, though
+                    #
+                    # If the current volume offset is 0 and originates from a "regular" volume system, we're likely
+                    # opening a volume system on the same disk again
+                    # Sometimes BSD systems are configured this way and an FFS volume "starts" at offset 0
+                    #
+                    # If we opened an empty volume system, it might also be the case that a filesystem actually
+                    # "starts" at offset 0
+
+                    if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
+                        # We are going to re-open a volume system on itself, bail out
+                        self.target.log.info("Found volume with offset 0, opening as raw volume instead")
+                        self.open(vol)
+                        continue
+
                     try:
                         vs = volume.open(vol)
                     except Exception:
@@ -740,6 +756,7 @@ class VolumeCollection(Collection[volume.Volume]):
                         continue
 
                     if not len(vs.volumes):
+                        # We opened an empty volume system, discard
                         fs_volumes.append(vol)
                         continue
 

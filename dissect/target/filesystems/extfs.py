@@ -15,7 +15,7 @@ from dissect.target.helpers import fsutil
 
 
 class ExtFilesystem(Filesystem):
-    __fstype__ = "ext"
+    __type__ = "ext"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
