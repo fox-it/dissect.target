@@ -65,6 +65,7 @@ class TeamviewerPlugin(RemoteAccessPlugin):
                     except UnicodeDecodeError:
                         continue
 
+                    # End of file, quit while loop
                     if not line:
                         break
 
@@ -91,6 +92,7 @@ class TeamviewerPlugin(RemoteAccessPlugin):
                     # Correct for missing year in date
                     if ts_day.count("/") == 1:
                         if not start_date:
+                            self.target.log.debug("Missing year in log line, skipping line.")
                             continue
                         ts_day = f"{start_date.year}/{ts_day}"
                     # Correct for year if short notation for 2000 is used
