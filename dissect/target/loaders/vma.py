@@ -14,7 +14,7 @@ class VmaLoader(Loader):
     def __init__(self, path, **kwargs):
         path = path.resolve()
         super().__init__(path)
-        self.vma = vma.VMA(open(path, "rb"))
+        self.vma = vma.VMA(path.open("rb"))
 
     @staticmethod
     def detect(path):
