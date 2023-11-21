@@ -14,7 +14,7 @@ class XvaLoader(Loader):
     def __init__(self, path, **kwargs):
         path = path.resolve()
         super().__init__(path)
-        self.xva = xva.XVA(open(path, "rb"))
+        self.xva = xva.XVA(path.open("rb"))
 
     @staticmethod
     def detect(path):
