@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class VhdxContainer(Container):
+    __type__ = "vhdx"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         self.vhdx = vhdx.VHDX(fh)
         super().__init__(fh, self.vhdx.size, *args, **kwargs)

@@ -155,6 +155,7 @@ class Target:
         """Resolve all disks, volumes and filesystems and load an operating system on the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
+        self.filesystems.apply()
         self._init_os()
         self._applied = True
 
@@ -712,18 +713,12 @@ class DiskCollection(Collection[container.Container]):
 
 
 class VolumeCollection(Collection[volume.Volume]):
-    def open(self, vol: volume.Volume) -> None:
-        try:
-            if not hasattr(vol, "fs") or vol.fs is None:
-                vol.fs = filesystem.open(vol)
-                self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
-            self.target.filesystems.add(vol.fs)
-        except FilesystemError as e:
-            self.target.log.warning("Can't identify filesystem: %s", vol)
-            self.target.log.debug("", exc_info=e)
-
     def apply(self) -> None:
-        todo = self.entries
+        # We don't want later additions to modify the todo, so make a copy
+        todo = self.entries[:]
+        fs_volumes = []
+        lvm_volumes = []
+        encrypted_volumes = []
 
         while todo:
             new_volumes = []
@@ -738,23 +733,35 @@ class VolumeCollection(Collection[volume.Volume]):
                 else:
                     # We could be getting "regular" volume systems out of LVM or encrypted volumes
                     # Try to open each volume as a regular volume system, or add as a filesystem if it fails
+                    # There are a few scenarios were we want to discard the opened volume, though
+                    #
+                    # If the current volume offset is 0 and originates from a "regular" volume system, we're likely
+                    # opening a volume system on the same disk again
+                    # Sometimes BSD systems are configured this way and an FFS volume "starts" at offset 0
+                    #
+                    # If we opened an empty volume system, it might also be the case that a filesystem actually
+                    # "starts" at offset 0
+
+                    if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
+                        # We are going to re-open a volume system on itself, bail out
+                        self.target.log.info("Found volume with offset 0, opening as raw volume instead")
+                        fs_volumes.append(vol)
+                        continue
+
                     try:
                         vs = volume.open(vol)
                     except Exception:
                         # If opening a volume system fails, there's likely none, so open as a filesystem instead
-                        self.open(vol)
+                        fs_volumes.append(vol)
                         continue
 
                     if not len(vs.volumes):
-                        self.open(vol)
+                        # We opened an empty volume system, discard
+                        fs_volumes.append(vol)
                         continue
 
-                    for new_vol in vs.volumes:
-                        if new_vol.offset == 0:
-                            self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                            self.open(new_vol)
-                            continue
-                        new_volumes.append(new_vol)
+                    self.entries.extend(vs.volumes)
+                    new_volumes.extend(vs.volumes)
 
             self.target.log.debug("LVM volumes found: %s", lvm_volumes)
             self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
@@ -773,20 +780,30 @@ class VolumeCollection(Collection[volume.Volume]):
 
             todo = new_volumes
 
-        # ASDF - getting the correct starting system volume
-        start_fs = None
-        start_vol = None
-        for idx, vol in enumerate(self.entries):
-            if start_fs is None and (vol.name is None):
-                start_fs = idx
+        mv_fs_volumes = []
+        for vol in fs_volumes:
+            try:
+                if getattr(vol, "fs", None) is None:
+                    if filesystem.is_multi_volume_filesystem(vol):
+                        mv_fs_volumes.append(vol)
+                    else:
+                        vol.fs = filesystem.open(vol)
+                        self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
 
-            if start_vol is None and start_fs is not None and (vol.name is not None and vol.fs is None):
-                start_vol = idx
+                if getattr(vol, "fs", None) is not None:
+                    self.target.filesystems.add(vol.fs)
+            except FilesystemError as e:
+                self.target.log.warning("Can't identify filesystem: %s", vol)
+                self.target.log.debug("", exc_info=e)
 
-            if start_fs is not None and start_vol is not None and (vol.name is not None and vol.fs is None):
-                rel_vol = idx - start_vol
-                vol.fs = self.entries[start_fs + rel_vol].fs
+        for fs in filesystem.open_multi_volume(mv_fs_volumes):
+            self.target.filesystems.add(fs)
+            for vol in fs.volume:
+                vol.fs = fs
 
 
 class FilesystemCollection(Collection[filesystem.Filesystem]):
-    pass
+    def apply(self) -> None:
+        for fs in self.entries:
+            for subfs in fs.iter_subfs():
+                self.add(subfs)

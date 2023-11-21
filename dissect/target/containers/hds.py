@@ -9,6 +9,8 @@ from dissect.target.container import Container
 
 
 class HdsContainer(Container):
+    __type__ = "hds"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):

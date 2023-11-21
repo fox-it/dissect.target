@@ -15,7 +15,7 @@ log = getLogger(__name__)
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
-    __fstype__: str = "META:configuration"
+    __type__: str = "META:configuration"
 
     def __init__(self, target: Target, path: str, **kwargs):
         super().__init__(**kwargs)

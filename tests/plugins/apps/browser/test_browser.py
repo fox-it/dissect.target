@@ -27,7 +27,7 @@ def test_iexplore_plugin(target_win, fs_win, tmp_path, target_win_users):
         webcache_dir = str(webcache_dir)[3:]  # drop C:/
         webcache_file = str(webcache_file)[3:]  # drop C:/
 
-        fs_win.map_dir("Users\\John", tmp_path)
+        fs_win.map_dir(webcache_dir, tmp_path)
         fs_win.map_file(webcache_file, tf.name)
 
         target_win.add_plugin(iexplore.InternetExplorerPlugin)
@@ -40,9 +40,13 @@ def test_iexplore_plugin(target_win, fs_win, tmp_path, target_win_users):
 
         records = list(target_win.iexplore.downloads())
         assert len(records) == 1
+        assert records[0].path == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
+        assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
 
         records = list(target_win.browser.downloads())
         assert len(records) == 1
+        assert records[0].path == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
+        assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
 
 
 def test_firefox_plugin(target_win, fs_win, tmp_path, target_win_users):

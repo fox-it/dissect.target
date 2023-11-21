@@ -12,6 +12,8 @@ def find_files(path: Path) -> List[Path]:
 
 
 class SplitContainer(Container):
+    __type__ = "split"
+
     def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
         self._fhs = []
         self.offsets = [0]

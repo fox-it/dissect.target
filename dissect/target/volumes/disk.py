@@ -6,6 +6,8 @@ from dissect.target.volume import Volume, VolumeSystem
 
 
 class DissectVolumeSystem(VolumeSystem):
+    __type__ = "disk"
+
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self._disk = disk.Disk(fh)
         super().__init__(fh, serial=self._disk.serial, *args, **kwargs)

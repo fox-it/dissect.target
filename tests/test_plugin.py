@@ -131,7 +131,7 @@ def test_find_plugin_function_unix(target_unix: Target) -> None:
 
     assert len(found) == 1
     assert found[0].name == "services"
-    assert found[0].path == "os.unix.services.services"
+    assert found[0].path == "os.unix.linux.services.services"
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -184,7 +184,7 @@ def test_find_plugin_function_default(target_default: Target) -> None:
     assert "services" in names
     assert "services" in names
     paths = [item.path for item in found]
-    assert "os.unix.services.services" in paths
+    assert "os.unix.linux.services.services" in paths
     assert "os.windows.services.services" in paths
 
     found, _ = find_plugin_functions(target_default, "mcafee.msc")
