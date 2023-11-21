@@ -5,7 +5,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
-    BrowserPlugin,
+    BrowserPlugin, GENERIC_COOKIE_FIELDS,
 )
 from dissect.target.plugins.apps.browser.chromium import (
     CHROMIUM_DOWNLOAD_RECORD_FIELDS,
@@ -27,6 +27,9 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
     ]
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/edge/cookie", GENERIC_COOKIE_FIELDS,
+    )
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -41,6 +44,10 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     def downloads(self):
         """Return browser download records for Microsoft Edge."""
         yield from super().downloads("edge")
+
+    @export(record=BrowserCookieRecord)
+    def cookies(self):
+        yield from super().cookies("edge")
 
     @export(record=BrowserExtensionRecord)
     def extensions(self):

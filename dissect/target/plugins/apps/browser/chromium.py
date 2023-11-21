@@ -14,11 +14,12 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
-    try_idna,
+    try_idna
 )
 from dissect.target.plugins.general.users import UserDetails
 
@@ -33,6 +34,9 @@ class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+    )
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -50,7 +54,7 @@ class ChromiumMixin:
             hist_paths: A list with browser paths as strings.
 
         Returns:
-            List of tuples containing user and history file path objects.
+            List of tuples containing user and file path objects.
         """
         users_dirs: list[tuple] = []
         for user_details in self.target.user_details.all_with_home():
@@ -63,10 +67,10 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(self, filename: str) -> Iterator[SQLite3]:
-        """Generate a connection to a sqlite history database file.
+        """Generate a connection to a sqlite database file.
 
         Args:
-            filename: The filename as string of the database where the history is stored.
+            filename: The filename as string of the database where the data is stored.
         Yields:
             opened db_file (SQLite3)
         Raises:
@@ -173,6 +177,29 @@ class ChromiumMixin:
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+
+    def cookies(self, browser_name: str = None) -> Iterator[BrowserCookieRecord]:
+        for user, db_file, db in self._iter_db("Cookies"):
+            try:
+                cookies = {row.id: row for row in db.table("cookies").rows()}
+                for cookie in cookies:
+                    yield self.BrowserCookieRecord(
+                        ts_created=webkittimestamp(cookie.creation_utc),
+                        ts_last_accessed=webkittimestamp(cookie.last_access_utc),
+                        browser=browser_name,
+                        name=cookie.name,
+                        value=cookie.value,
+                        host=cookie.host_key,
+                        path=cookie.path,
+                        expiry=int(cookie.has_expires),
+                        is_secure=bool(cookie.is_secure),
+                        is_http_only=bool(cookie.is_httponly),
+                        same_site=bool(cookie.samesite),
+                        _user=user
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
+
 
     def extensions(self, browser_name: str = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.

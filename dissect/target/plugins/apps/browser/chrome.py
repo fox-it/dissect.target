@@ -5,7 +5,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
-    BrowserPlugin,
+    BrowserPlugin, GENERIC_COOKIE_FIELDS,
 )
 from dissect.target.plugins.apps.browser.chromium import (
     CHROMIUM_DOWNLOAD_RECORD_FIELDS,
@@ -29,6 +29,9 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         # Macos
         "Library/Application Support/Google/Chrome/Default",
     ]
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/edge/cookie", GENERIC_COOKIE_FIELDS,
+    )
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
@@ -53,3 +56,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     def history(self):
         """Return browser history records for Google Chrome."""
         yield from super().history("chrome")
+
+    @export(record=BrowserCookieRecord)
+    def cookies(self):
+        yield from super().cookies("chrome")

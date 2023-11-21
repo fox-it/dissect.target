@@ -31,6 +31,20 @@ GENERIC_EXTENSION_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
+GENERIC_COOKIE_FIELDS = [
+    ("datetime", "ts_created"),
+    ("datetime", "ts_last_accessed"),
+    ("string", "browser"),
+    ("string", "name"),
+    ("string", "value"),
+    ("string", "host"),
+    ("string", "path"),
+    ("varint", "expiry"),
+    ("boolean", "is_secure"),
+    ("boolean", "is_http_only"),
+    ("boolean", "same_site"),
+]
+
 GENERIC_HISTORY_RECORD_FIELDS = [
     ("datetime", "ts"),
     ("string", "browser"),
@@ -57,7 +71,9 @@ BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtensi
 BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/history", GENERIC_HISTORY_RECORD_FIELDS
 )
-
+BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/cookie", GENERIC_COOKIE_FIELDS
+)
 
 class BrowserPlugin(NamespacePlugin):
     __namespace__ = "browser"

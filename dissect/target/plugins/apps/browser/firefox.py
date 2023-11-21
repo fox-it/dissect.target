@@ -15,7 +15,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
-    try_idna,
+    try_idna, GENERIC_COOKIE_FIELDS,
 )
 
 
@@ -35,11 +35,14 @@ class FirefoxPlugin(BrowserPlugin):
         # macOS
         "Library/Application Support/Firefox",
     ]
-    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/cookie", GENERIC_COOKIE_FIELDS
     )
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+    )
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     def __init__(self, target):
@@ -74,6 +77,43 @@ class FirefoxPlugin(BrowserPlugin):
                         self.target.log.warning("Could not find %s file: %s", filename, db_file)
                     except SQLError as e:
                         self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
+
+    @export(record=BrowserCookieRecord)
+    def cookie(self) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookie records from Firefox
+
+        Yields BrowserCookieRecord with the following fields:
+            ts_created (datetime): created timestamp.
+            ts_last_accessed: last accessed timestamp.
+            name (string): cookie name.
+            value (string): cookie value.
+            host (string): cookie host.
+            path (string): cookie path.
+            expiry (varint): cookie expiry.
+            is_secure (boolean): whether cookie has secure flag.
+            is_http_only (boolean): whether cookie has http only flag.
+            same_site (boolean): whether cookie has same site flag.
+        """
+        for user, db_file, db in self._iter_db("cookies.sqlite"):
+            try:
+                cookies = {row.id: row for row in db.table("moz_cookies").rows()}
+                for cookie in cookies:
+                    yield self.BrowserCookieRecord(
+                        ts_created=from_unix_us(cookie.creationTime),
+                        ts_last_accessed=from_unix_us(cookie.lastAccessed),
+                        browser="Firefox",
+                        name=cookie.name,
+                        value=cookie.value,
+                        host=cookie.host,
+                        path=cookie.path,
+                        expiry=cookie.expiry,
+                        is_secure=bool(cookie.isSecure),
+                        is_http_only=bool(cookie.isHttpOnly),
+                        same_site=bool(cookie.sameSite),
+                        _user=user
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
 
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
