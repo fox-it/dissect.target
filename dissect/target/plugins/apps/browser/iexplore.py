@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import BinaryIO, Iterator, Tuple
 
 from dissect.esedb import esedb, record, table
+from dissect.esedb.exceptions import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -192,12 +193,21 @@ class InternetExplorerPlugin(BrowserPlugin):
         """
         for user, cache_file, cache in self._iter_cache():
             for container_record in cache.downloads():
-                response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
-                ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
+                down_path = None
+                down_url = None
+                ts_end = wintimestamp(container_record.AccessedTime) if container_record.AccessedTime else None
+
+                try:
+                    response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
+                    # Not used here, but [-6:-3] should give: ref_url, mime_type, temp_download_path
+                    down_url, down_path = response_headers.split("\x00")[-3:-1]
+                except (AttributeError, KeyNotFoundError) as e:
+                    self.target.log.error("Error parsing response headers: %s", e)
+                    self.target.log.debug("", exc_info=e)
 
                 yield self.BrowserDownloadRecord(
                     ts_start=None,
-                    ts_end=wintimestamp(container_record.AccessedTime),
+                    ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
                     path=down_path,

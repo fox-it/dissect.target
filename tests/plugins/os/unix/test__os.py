@@ -58,10 +58,10 @@ def test_parse_fstab():
     # = 6 expected results
 
     assert set(records) == {
-        (UUID("5d1f1508-069b-4274-9bfa-ae2bf7ffb5e0"), None, "ext4", "/home"),
-        (UUID("28a25297-9825-4f87-ac41-f9c20cd5db4f"), None, "ext4", "/boot"),
-        (UUID("af0b9707-0945-499a-a37d-4da23d8dd245"), None, "auto", "/moredata"),
-        ("F631-BECA", None, "vfat", "/boot/efi"),
-        (None, "vg--main-lv--var", "auto", "/var"),
-        (None, "vg--main-lv--data", "auto", "/data"),
+        (UUID("5d1f1508-069b-4274-9bfa-ae2bf7ffb5e0"), None, "/home", "ext4", "defaults"),
+        (UUID("28a25297-9825-4f87-ac41-f9c20cd5db4f"), None, "/boot", "ext4", "defaults"),
+        (UUID("af0b9707-0945-499a-a37d-4da23d8dd245"), None, "/moredata", "auto", "default"),
+        ("F631-BECA", None, "/boot/efi", "vfat", "defaults,discard,umask=0077"),
+        (None, "vg--main-lv--var", "/var", "auto", "default"),
+        (None, "vg--main-lv--data", "/data", "auto", "default"),
     }
