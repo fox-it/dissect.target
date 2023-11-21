@@ -486,6 +486,10 @@ class Target:
     def _mount_others(self) -> None:
         root_fs = self.fs
         index = 0
+
+        if root_fs.path("/$fs$").exists():
+            return
+
         for fs in self.filesystems:
             if fs not in root_fs.mounts.values():
                 root_fs.mount(f"/$fs$/fs{index}", fs)
