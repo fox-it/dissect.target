@@ -19,7 +19,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
-    try_idna
+    try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
 
@@ -195,11 +195,10 @@ class ChromiumMixin:
                         is_secure=bool(cookie.is_secure),
                         is_http_only=bool(cookie.is_httponly),
                         same_site=bool(cookie.samesite),
-                        _user=user
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
-
 
     def extensions(self, browser_name: str = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.

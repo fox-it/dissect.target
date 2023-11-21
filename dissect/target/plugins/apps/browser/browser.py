@@ -75,6 +75,7 @@ BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension]
     "browser/cookie", GENERIC_COOKIE_FIELDS
 )
 
+
 class BrowserPlugin(NamespacePlugin):
     __namespace__ = "browser"
 

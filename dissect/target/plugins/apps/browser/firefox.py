@@ -16,7 +16,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
-    try_idna
+    try_idna,
 )
 
 
@@ -111,7 +111,7 @@ class FirefoxPlugin(BrowserPlugin):
                         is_secure=bool(cookie.isSecure),
                         is_http_only=bool(cookie.isHttpOnly),
                         same_site=bool(cookie.sameSite),
-                        _user=user
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)

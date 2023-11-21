@@ -29,7 +29,8 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         "Library/Application Support/Microsoft Edge/Default",
     ]
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/edge/cookie", GENERIC_COOKIE_FIELDS,
+        "browser/edge/cookie",
+        GENERIC_COOKIE_FIELDS,
     )
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
