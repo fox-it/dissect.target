@@ -3,11 +3,14 @@ from io import StringIO
 
 import pytest
 
-from dissect.target.plugins.os.unix.services import ServicesPlugin, parse_systemd_config
+from dissect.target.plugins.os.unix.linux.services import (
+    ServicesPlugin,
+    parse_systemd_config,
+)
 from tests._utils import absolute_path
 
 
-def test_unix_services(target_unix_users, fs_unix):
+def test_services(target_unix_users, fs_unix):
     systemd_service_1 = absolute_path("_data/plugins/os/unix/services/systemd.service")
     systemd_service_2 = absolute_path("_data/plugins/os/unix/services/systemd2.service")
     initd_service_1 = absolute_path("_data/plugins/os/unix/services/initd.sh")
@@ -57,13 +60,13 @@ def test_unix_services(target_unix_users, fs_unix):
         ("[Unit]\ntest=hello\tme", 'Unit_test="hello\tme"'),
     ],
 )
-def test_unix_systemd_parser(assignment, expected_value):
+def test_systemd(assignment, expected_value):
     data = parse_systemd_config(StringIO(assignment))
     assert data == expected_value
 
 
 @pytest.mark.xfail
-def test_unix_systemd_known_fails():
+def test_systemd_known_fails():
     # While this should return `Hello world test help`,
     # the configparser attempts to append `help` as a value to the list of options
     # belonging to the key before it `test\\`.

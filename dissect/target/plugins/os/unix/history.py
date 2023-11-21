@@ -11,7 +11,7 @@ from dissect.target.helpers.record import UnixUserRecord, create_extended_descri
 from dissect.target.plugin import Plugin, export, internal
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "linux/history",
+    "unix/history",
     [
         ("datetime", "ts"),
         ("string", "command"),
