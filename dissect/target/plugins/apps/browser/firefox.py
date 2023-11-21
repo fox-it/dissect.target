@@ -12,10 +12,11 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
-    try_idna, GENERIC_COOKIE_FIELDS,
+    try_idna
 )
 
 
