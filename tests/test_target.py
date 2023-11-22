@@ -468,9 +468,9 @@ def test_nested_vs(target_bare: Target) -> None:
         volume_open.return_value = mock_volume_system
 
         target_bare.volumes.apply()
-        filesystem_open.assert_called_once_with(mock_volume)
+        filesystem_open.assert_has_calls([call(mock_base_volume), call(mock_volume)])
         assert len(target_bare.volumes) == 2
-        assert len(target_bare.filesystems) == 1
+        assert len(target_bare.filesystems) == 2
 
 
 def test_vs_offset_0(target_bare: Target) -> None:
