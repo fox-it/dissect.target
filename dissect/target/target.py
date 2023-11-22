@@ -485,19 +485,17 @@ class Target:
 
     def _mount_others(self) -> None:
         root_fs = self.fs
-        index = 0
-
-        # determine mount point directory
-        path = "/$fs$"
         counter = 0
-        while root_fs.path(path).exists():
-            path = f"/$fs_{counter}$"
-            counter += 1
+        path = "/$fs$/fs0"
 
         for fs in self.filesystems:
+            # determine mount point
+            while root_fs.path(path).exists():
+                counter += 1
+                path = f"/$fs$/fs{counter}"
+
             if fs not in root_fs.mounts.values():
-                root_fs.mount(f"{path}/fs{index}", fs)
-                index += 1
+                root_fs.mount(path, fs)
 
     def add_plugin(
         self,

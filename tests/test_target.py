@@ -517,11 +517,9 @@ def test_fs_mount_others(target_unix: Target, nr_of_fs: int):
 
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
 def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int):
-    target_unix.fs.mount("/$fs$/", Mock())
-
     for idx in range(nr_of_fs):
         target_unix.filesystems.add(Mock())
         target_unix._mount_others()
 
-        assert f"/$fs_{idx}$/fs0" in target_unix.fs.mounts.keys()
-        assert target_unix.fs.path(f"$fs_{idx}$/fs0").exists()
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
