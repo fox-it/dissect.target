@@ -1074,7 +1074,7 @@ def find_plugin_functions(
                 method_name = index_name.split(".")[-1]
                 try:
                     loaded_plugin_object = load(func)
-                except:
+                except Exception:
                     if ignore_load_errors:
                         continue
                     raise
@@ -1128,7 +1128,7 @@ def find_plugin_functions(
             for description in plugin_descriptions:
                 try:
                     loaded_plugin_object = load(description)
-                except:
+                except Exception:
                     if ignore_load_errors:
                         continue
                     raise
