@@ -489,12 +489,12 @@ class Target:
         path = "/$fs$/fs0"
 
         for fs in self.filesystems:
-            # determine mount point
-            while root_fs.path(path).exists():
-                counter += 1
-                path = f"/$fs$/fs{counter}"
-
             if fs not in root_fs.mounts.values():
+                # determine mount point
+                while root_fs.path(path).exists():
+                    counter += 1
+                    path = f"/$fs$/fs{counter}"
+
                 root_fs.mount(path, fs)
 
     def add_plugin(
