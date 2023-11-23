@@ -502,7 +502,7 @@ def test_vs_offset_0(target_bare: Target) -> None:
 
 
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
-def test_fs_mount_others(target_unix: Target, nr_of_fs: int):
+def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
     for _ in range(nr_of_fs):
         target_unix.filesystems.add(Mock())
 
@@ -516,7 +516,7 @@ def test_fs_mount_others(target_unix: Target, nr_of_fs: int):
 
 
 @pytest.mark.parametrize("nr_of_fs", [1, 2])
-def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int):
+def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
     for idx in range(nr_of_fs):
         target_unix.filesystems.add(Mock())
         target_unix._mount_others()
