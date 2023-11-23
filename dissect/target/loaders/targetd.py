@@ -186,13 +186,23 @@ if TARGETD_AVAILABLE:
         if namespace := kwargs.get("namespace", None):
             obj = getattr(obj, namespace)
 
+        caller.has_output = True
         if targetd.command == "init":
-            caller.has_output = True
+            caller.output = True
+            return
+
+        if targetd.command == "select":
+            targetd.rpcs.select(*args)
+            caller.output = True
+            return
+
+        if targetd.command == "deselect":
+            targetd.rpcs.deselect()
             caller.output = True
             return
 
         func = getattr(obj, targetd.command)
-        caller.has_output = True
+
         result = func(*args, **kwargs)
         if result is not None:
             if targetd.command == "get":
