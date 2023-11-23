@@ -157,6 +157,7 @@ class Target:
         self.volumes.apply()
         self.filesystems.apply()
         self._init_os()
+        self._mount_others()
         self._applied = True
 
     @property
@@ -481,6 +482,20 @@ class Target:
 
         self._os_plugin = os_plugin
         self._os = self.add_plugin(os_plugin.create(self, fs))
+
+    def _mount_others(self) -> None:
+        root_fs = self.fs
+        counter = 0
+        path = "/$fs$/fs0"
+
+        for fs in self.filesystems:
+            if fs not in root_fs.mounts.values():
+                # determine mount point
+                while root_fs.path(path).exists():
+                    counter += 1
+                    path = f"/$fs$/fs{counter}"
+
+                root_fs.mount(path, fs)
 
     def add_plugin(
         self,
