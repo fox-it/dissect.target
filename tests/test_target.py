@@ -499,3 +499,27 @@ def test_vs_offset_0(target_bare: Target) -> None:
         filesystem_open.assert_called_once_with(mock_volume)
         assert len(target_bare.volumes) == 1
         assert len(target_bare.filesystems) == 1
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
+    for _ in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+
+    target_unix._mount_others()
+
+    for idx in range(nr_of_fs):
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
+
+    assert not target_unix.fs.path(f"$fs$/fs{nr_of_fs}").exists()
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
+    for idx in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+        target_unix._mount_others()
+
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
