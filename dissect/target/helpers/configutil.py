@@ -121,6 +121,9 @@ class ConfigurationParser:
         if self.collapse_all or self.collapse:
             self.parsed_data = self._collapse_dict(self.parsed_data)
 
+        if not isinstance(self.parsed_data, dict):
+            self.parsed_data = self._collapse_dict(self.parsed_data, False)
+
     def keys(self) -> KeysView:
         return self.parsed_data.keys()
 
