@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from flow.record import Record
-from flow.record.fieldtypes import path, digest
+from flow.record.fieldtypes import digest, path
 
 import dissect.target.helpers.hashutil as hashutil
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
