@@ -15,13 +15,9 @@ if TYPE_CHECKING:
 
 BUFFER_SIZE = 32768
 
-HashRecord = RecordDescriptor(
-    "filesystem/file/digest",
-    [
-        ("path[]", "paths"),
-        ("digest[]", "digests"),
-    ],
-)
+RECORD_NAME = "filesystem/file/digest"
+NAME_SUFFIXES = ["_path", "_resolved_path", "_digest"]
+RECORD_TYPES = ["path", "path", "digest"]
 
 
 def _hash(fh: BinaryIO, ctx: Union[HASH, list[HASH]]) -> tuple[str]:
@@ -98,19 +94,19 @@ def hash_path_records(target: Target, record: Record) -> Record:
             pass
         else:
             resolved_path = path_type(resolved_path)
-            _record = RecordDescriptor(
-                "filesystem/file/digest", [
-                    ("path", f"{field_name}_path"),
-                    ("path", f"{field_name}_resolved_path"),
-                    ("digest", f"{field_name}_digest")
-                ]
-            )
+            record_kwargs = dict()
+            record_def = list()
 
-            hash_records.append(_record(**{
-                f"{field_name}_path": path,
-                f"{field_name}_resolved_path": resolved_path,
-                f"{field_name}_digest": path_hash
-            }))
+            fields = [path, resolved_path, path_hash]
+
+            for type, name, field in zip(RECORD_TYPES, NAME_SUFFIXES, fields):
+                hashed_field_name = f"{field_name}{name}"
+                record_kwargs.update({hashed_field_name: field})
+                record_def.append((type, hashed_field_name))
+
+            _record = RecordDescriptor(RECORD_NAME, record_def)
+
+            hash_records.append(_record(**record_kwargs))
 
     if not hash_records:
         return record
