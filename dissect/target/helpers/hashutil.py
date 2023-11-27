@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 BUFFER_SIZE = 32768
 
 RECORD_NAME = "filesystem/file/digest"
-NAME_SUFFIXES = ["_resolved_path", "_digest"]
+NAME_SUFFIXES = ["_resolved", "_digest"]
 RECORD_TYPES = ["path", "digest"]
 
 
