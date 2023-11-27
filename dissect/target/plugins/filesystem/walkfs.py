@@ -58,7 +58,7 @@ def generate_record(target, entry, idx):
         mode=stat.st_mode,
         uid=stat.st_uid,
         gid=stat.st_gid,
-        fstype=entry.get().fs.__fstype__,
+        fstype=entry.get().fs.__type__,
         fsidx=idx,
         _target=target,
     )

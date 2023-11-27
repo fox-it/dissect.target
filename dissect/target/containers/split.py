@@ -12,6 +12,8 @@ def find_files(path: Path) -> List[Path]:
 
 
 class SplitContainer(Container):
+    __type__ = "split"
+
     def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
         self._fhs = []
         self.offsets = [0]
@@ -32,7 +34,7 @@ class SplitContainer(Container):
         super().__init__(fh, offset, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return isinstance(original, list) and len(original) > 1
 
     @staticmethod

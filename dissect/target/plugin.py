@@ -4,7 +4,6 @@ See dissect/target/plugins/general/example.py for an example plugin.
 """
 from __future__ import annotations
 
-import enum
 import fnmatch
 import importlib
 import importlib.util
@@ -20,9 +19,11 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Type
 
 from flow.record import Record, RecordDescriptor
 
+import dissect.target.plugins.general as general
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers import cache
 from dissect.target.helpers.record import EmptyRecord
+from dissect.target.helpers.utils import StrEnum
 
 try:
     from dissect.target.plugins._pluginlist import PLUGINS
@@ -53,7 +54,7 @@ OUTPUTS = (
 log = logging.getLogger(__name__)
 
 
-class OperatingSystem(enum.Enum):
+class OperatingSystem(StrEnum):
     LINUX = "linux"
     WINDOWS = "windows"
     ESXI = "esxi"
@@ -376,10 +377,22 @@ class OSPlugin(Plugin):
     def os(self) -> str:
         """Required OS function.
 
-        Implementations must be decorated with ``@export(property=True)``
+        Implementations must be decorated with ``@export(property=True)``.
 
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
+        """
+        raise NotImplementedError
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Required OS function.
+
+        Implementations must be decorated with ``@export(property=True)``.
+
+        Returns:
+            A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or
+            'AMD64-win32', or 'unknown' if the architecture is unknown.
         """
         raise NotImplementedError
 
@@ -527,14 +540,14 @@ def arg(*args, **kwargs) -> Callable:
     return decorator
 
 
-def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
+def plugins(osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Retrieve all plugin descriptors.
 
     Args:
-        osfilter: The OS module path the plugin should be from.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
 
     Returns:
-        An iterator of all plugin descriptors, optionally filtered on OS module path.
+        An iterator of all plugin descriptors, optionally filtered on OS.
     """
 
     def _walk(osfilter: str = None, root: dict = None) -> Iterator[PluginDescriptor]:
@@ -555,16 +568,19 @@ def plugins(osfilter: str = None) -> Iterator[PluginDescriptor]:
         osfilter
         and isinstance(osfilter, type)
         and issubclass(osfilter, OSPlugin)
+        and not issubclass(osfilter, general.default.DefaultPlugin)
         and osfilter.__module__.startswith(MODULE_PATH)
     ):
         osfilter, _, _ = osfilter.__module__.replace(MODULE_PATH, "", 1).strip(".").rpartition(".")
-        # NOTE: A dirty fix to ensure OS plugins are filtered by the top level OS name
-        # As an example, it uses os.unix instead of os.unix.debian
-        osfilter = ".".join(osfilter.split(".")[:2])
-    else:
-        osfilter = None
 
-    yield from _walk(osfilter, _get_plugins())
+        # Continue walking up the OS filter tree until we hit the second level
+        # As an example, it walk os.unix.debian, followed by os.unix, then exit
+        os_parts = osfilter.split(".")
+        while len(os_parts) >= 2:
+            yield from _walk(".".join(os_parts), _get_plugins())
+            os_parts.pop()
+    else:
+        yield from _walk(None, _get_plugins())
 
 
 def _special_plugins(special_key: str) -> Iterator[PluginDescriptor]:
@@ -594,35 +610,35 @@ def child_plugins() -> Iterator[PluginDescriptor]:
     yield from _special_plugins("_child")
 
 
-def lookup(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def lookup(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Lookup a plugin descriptor by function name.
 
     Args:
-        func_name (str): Function name to lookup.
-        osfilter (str): OS path the plugin should be from.
+        func_name: Function name to lookup.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     yield from get_plugins_by_func_name(func_name, osfilter=osfilter)
     yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
 
 
-def get_plugins_by_func_name(func_name: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_func_name(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by function name.
 
     Args:
-        func_name (str): Function name to lookup.
-        osfilter (str): OS path the plugin should be from.
+        func_name: Function name to lookup.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     for plugin_desc in plugins(osfilter):
         if not plugin_desc["namespace"] and func_name in plugin_desc["functions"]:
             yield plugin_desc
 
 
-def get_plugins_by_namespace(namespace: str, osfilter: str = None) -> Iterator[PluginDescriptor]:
+def get_plugins_by_namespace(namespace: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
     """Get a plugin descriptor by namespace.
 
     Args:
         namespace: Plugin namespace to match.
-        osfilter: The OS module path the plugin should be from.
+        osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
     for plugin_desc in plugins(osfilter):
         if namespace == plugin_desc["namespace"]:
@@ -953,6 +969,7 @@ class InternalPlugin(Plugin):
 @dataclass(frozen=True, eq=True)
 class PluginFunction:
     name: str
+    path: str
     output_type: str
     class_object: type[Plugin]
     method_name: str
@@ -1021,6 +1038,7 @@ def find_plugin_functions(
 
     invalid_funcs = set()
     show_hidden = kwargs.get("show_hidden", False)
+    ignore_load_errors = kwargs.get("ignore_load_errors", False)
 
     for pattern in patterns.split(","):
         # backward compatibility fix for namespace-level plugins (i.e. chrome)
@@ -1054,7 +1072,12 @@ def find_plugin_functions(
                 func = functions[index_name]
 
                 method_name = index_name.split(".")[-1]
-                loaded_plugin_object = load(func)
+                try:
+                    loaded_plugin_object = load(func)
+                except Exception:
+                    if ignore_load_errors:
+                        continue
+                    raise
 
                 # Skip plugins that don't want to be found by wildcards
                 if not show_hidden and not loaded_plugin_object.__findable__:
@@ -1072,7 +1095,8 @@ def find_plugin_functions(
                 matches = True
                 add_to_result(
                     PluginFunction(
-                        name=index_name,
+                        name=f"{func['namespace']}.{method_name}" if func["namespace"] else method_name,
+                        path=index_name,
                         class_object=loaded_plugin_object,
                         method_name=method_name,
                         output_type=getattr(fobject, "__output__", "text"),
@@ -1102,7 +1126,13 @@ def find_plugin_functions(
                 invalid_funcs.add(pattern)
 
             for description in plugin_descriptions:
-                loaded_plugin_object = load(description)
+                try:
+                    loaded_plugin_object = load(description)
+                except Exception:
+                    if ignore_load_errors:
+                        continue
+                    raise
+
                 fobject = inspect.getattr_static(loaded_plugin_object, funcname)
 
                 if compatibility and not loaded_plugin_object(target).is_compatible():
@@ -1110,7 +1140,8 @@ def find_plugin_functions(
 
                 add_to_result(
                     PluginFunction(
-                        name=f"{description['module']}.{pattern}",
+                        name=f"{description['namespace']}.{funcname}" if description["namespace"] else funcname,
+                        path=f"{description['module']}.{funcname}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gzip
 import io
 import logging
 import os
 import stat
+import warnings
 from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
@@ -39,12 +41,16 @@ log = logging.getLogger(__name__)
 class Filesystem:
     """Base class for filesystems."""
 
-    __fstype__: str = None
-    """Defines the type of filesystem it is."""
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
+    __type__: str = None
+    """A short string identifying the type of filesystem."""
+    __multi_volume__: bool = False
+    """Whether this filesystem supports multiple volumes (disks)."""
 
     def __init__(
         self,
-        volume: Optional[BinaryIO] = None,
+        volume: Optional[Union[BinaryIO, list[BinaryIO]]] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:
@@ -52,23 +58,33 @@ class Filesystem:
 
         Args:
             volume: A volume or other file-like object associated with the filesystem.
-            case_sensitive: Defines if the paths in the Filesystem are case sensitive or not.
+            case_sensitive: Defines if the paths in the filesystem are case sensitive or not.
             alt_separator: The alternative separator used to distingish between directories in a path.
 
         Raises:
-            NotImplementedError: When the internal ``__fstype__`` of the class is not defined.
+            NotImplementedError: When the internal ``__type__`` of the class is not defined.
         """
         self.volume = volume
         self.case_sensitive = case_sensitive
         self.alt_separator = alt_separator
-        if self.__fstype__ is None:
-            raise NotImplementedError(f"{self.__class__.__name__} must define __fstype__")
+
+        if self.__type__ is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
+    @classmethod
+    @property
+    def __fstype__(cls) -> str:
+        warnings.warn(
+            "The __fstype__ attribute is deprecated and will be removed in dissect.target 3.15. Use __type__ instead",
+            category=DeprecationWarning,
+        )
+        return cls.__type__
+
     def path(self, *args) -> fsutil.TargetPath:
-        """Get a specific path from the filesystem."""
+        """Instantiate a new path-like object on this filesystem."""
         return fsutil.TargetPath(self, *args)
 
     @classmethod
@@ -90,7 +106,7 @@ class Filesystem:
         except NotImplementedError:
             raise
         except Exception as e:
-            log.warning("Failed to detect %s filesystem", cls.__fstype__)
+            log.warning("Failed to detect %s filesystem", cls.__type__)
             log.debug("", exc_info=e)
         finally:
             fh.seek(offset)
@@ -110,6 +126,52 @@ class Filesystem:
             ``True`` if ``fh`` is supported, ``False`` otherwise.
         """
         raise NotImplementedError()
+
+    @classmethod
+    def detect_id(cls, fh: BinaryIO) -> Optional[bytes]:
+        """Return a filesystem set identifier.
+
+        Only used in filesystems that support multiple volumes (disks) to find all volumes
+        belonging to a single filesystem.
+
+        Args:
+            fh: A file-like object, usually a disk or partition.
+        """
+        if not cls.__multi_volume__:
+            return None
+
+        offset = fh.tell()
+        try:
+            fh.seek(0)
+            return cls._detect_id(fh)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            log.warning("Failed to detect ID on %s filesystem", cls.__fstype__)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return None
+
+    @staticmethod
+    def _detect_id(fh: BinaryIO) -> Optional[bytes]:
+        """Return a filesystem set identifier.
+
+        This method should be implemented by subclasses of filesystems that support multiple volumes (disks).
+        The position of ``fh`` is guaranteed to be ``0``.
+
+        Args:
+            fh: A file-like object, usually a disk or partition.
+
+        Returns:
+            An identifier that can be used to combine the given ``fh`` with others beloning to the same set.
+        """
+        raise NotImplementedError()
+
+    def iter_subfs(self) -> Iterator[Filesystem]:
+        """Yield possible sub-filesystems."""
+        yield from ()
 
     def get(self, path: str) -> FilesystemEntry:
         """Retrieve a :class:`FilesystemEntry` from the filesystem.
@@ -960,6 +1022,21 @@ class MappedFile(VirtualFile):
         return fsutil.fs_attrs(self.entry, follow_symlinks=False)
 
 
+class MappedCompressedFile(MappedFile):
+    """Virtual file backed by a compressed file on the host machine."""
+
+    _compressors = {"gzip": gzip}
+
+    def __init__(self, fs: Filesystem, path: str, entry: Any, algo: str = "gzip"):
+        super().__init__(fs, path, entry)
+        self._compressor = self._compressors.get(algo)
+        if self._compressor is None:
+            raise ValueError(f"Unsupported compression algorithm {algo}")
+
+    def open(self) -> BinaryIO:
+        return self._compressor.open(self.entry, "rb")
+
+
 class VirtualSymlink(FilesystemEntry):
     """Virtual symlink implementation."""
 
@@ -1012,7 +1089,7 @@ class VirtualSymlink(FilesystemEntry):
 
 
 class VirtualFilesystem(Filesystem):
-    __fstype__ = "virtual"
+    __type__ = "virtual"
 
     def __init__(self, **kwargs):
         super().__init__(None, **kwargs)
@@ -1022,7 +1099,7 @@ class VirtualFilesystem(Filesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on VirtualFilesystem class")
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         entry = relentry or self.root
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
         full_path = fsutil.join(entry.path, path, alt_separator=self.alt_separator)
@@ -1103,6 +1180,7 @@ class VirtualFilesystem(Filesystem):
             if relroot == ".":
                 relroot = ""
 
+            relroot = fsutil.normalize(relroot, alt_separator=os.path.sep)
             vfsroot = fsutil.join(vfspath, relroot, alt_separator=self.alt_separator)
             directory = self.makedirs(vfsroot)
 
@@ -1115,13 +1193,18 @@ class VirtualFilesystem(Filesystem):
                 real_file_path = os.path.join(root, file_)
                 directory.add(file_, MappedFile(self, vfs_file_path, real_file_path))
 
-    def map_file(self, vfspath: str, realpath: str) -> None:
+    def map_file(self, vfspath: str, realpath: str, compression: Optional[str] = None) -> None:
         """Map a file from the host machine into the VFS."""
         vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         if vfspath[-1] == "/":
             raise AttributeError(f"Can't map a file onto a directory: {vfspath}")
         file_path = vfspath.lstrip("/")
-        self.map_file_entry(vfspath, MappedFile(self, file_path, realpath))
+
+        if compression is not None:
+            mapped_file = MappedCompressedFile(self, file_path, realpath, algo=compression)
+        else:
+            mapped_file = MappedFile(self, file_path, realpath)
+        self.map_file_entry(vfspath, mapped_file)
 
     def map_file_fh(self, vfspath: str, fh: BinaryIO) -> None:
         """Map a file handle into the VFS."""
@@ -1162,7 +1245,7 @@ class VirtualFilesystem(Filesystem):
 
 
 class RootFilesystem(Filesystem):
-    __fstype__ = "root"
+    __type__ = "root"
 
     def __init__(self, target: Target):
         self.target = target
@@ -1426,18 +1509,56 @@ def register(module: str, class_name: str, internal: bool = True) -> None:
     FILESYSTEMS.append(getattr(import_lazy(module), class_name))
 
 
-def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
+def is_multi_volume_filesystem(fh: BinaryIO) -> bool:
     for filesystem in FILESYSTEMS:
         try:
-            if filesystem.detect(fh):
-                instance = filesystem(fh, *args, **kwargs)
-                instance.volume = fh
-                return instance
+            if filesystem.__multi_volume__ and filesystem.detect(fh):
+                return True
         except ImportError as e:
             log.info("Failed to import %s", filesystem)
             log.debug("", exc_info=e)
 
+    return False
+
+
+def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
+    offset = fh.tell()
+    fh.seek(0)
+
+    try:
+        for filesystem in FILESYSTEMS:
+            try:
+                if filesystem.detect(fh):
+                    return filesystem(fh, *args, **kwargs)
+            except ImportError as e:
+                log.info("Failed to import %s", filesystem)
+                log.debug("", exc_info=e)
+    finally:
+        fh.seek(offset)
+
     raise FilesystemError(f"Failed to open filesystem for {fh}")
+
+
+def open_multi_volume(fhs: list[BinaryIO], *args, **kwargs) -> Filesystem:
+    for filesystem in FILESYSTEMS:
+        try:
+            if not filesystem.__multi_volume__:
+                continue
+
+            volumes = defaultdict(list)
+            for fh in fhs:
+                if not filesystem.detect(fh):
+                    continue
+
+                identifier = filesystem.detect_id(fh)
+                volumes[identifier].append(fh)
+
+            for vols in volumes.values():
+                yield filesystem(vols, *args, **kwargs)
+
+        except ImportError as e:
+            log.info("Failed to import %s", filesystem)
+            log.debug("", exc_info=e)
 
 
 register("ntfs", "NtfsFilesystem")
@@ -1446,6 +1567,8 @@ register("xfs", "XfsFilesystem")
 register("fat", "FatFilesystem")
 register("ffs", "FfsFilesystem")
 register("vmfs", "VmfsFilesystem")
+register("btrfs", "BtrfsFilesystem")
 register("exfat", "ExfatFilesystem")
-register("ad1", "AD1Filesystem")
 register("squashfs", "SquashFSFilesystem")
+register("zip", "ZipFilesystem")
+register("ad1", "AD1Filesystem")

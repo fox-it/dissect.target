@@ -982,7 +982,7 @@ def resolve_link(
 def open_decompress(
     path: TargetPath,
     mode: str = "rb",
-    encoding: Optional[str] = None,
+    encoding: Optional[str] = "UTF-8",
     errors: Optional[str] = "backslashreplace",
     newline: Optional[str] = None,
 ) -> Union[BinaryIO, TextIO]:
@@ -991,7 +991,7 @@ def open_decompress(
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
         mode: The mode in which to open the file.
-        encoding: The decoding for text streams.
+        encoding: The decoding for text streams. By default UTF-8 encoding is used.
         errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
         newline: How newlines are handled for text streams.
 
@@ -1009,7 +1009,8 @@ def open_decompress(
     file.seek(0)
 
     if "b" in mode:
-        # Reset the default errors mode in case of a binary stream
+        # Reset the default encoding and errors mode in case of a binary stream
+        encoding = None
         errors = None
 
     if magic[:2] == b"\x1f\x8b":

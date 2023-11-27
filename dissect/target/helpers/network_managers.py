@@ -7,7 +7,7 @@ from typing import Any, Callable, Iterable, Match, Optional, Union
 
 from defusedxml import ElementTree
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
 
@@ -539,7 +539,7 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
                 if ip not in ips:
                     ips.append(ip)
 
-    except UnsupportedPluginError:
+    except PluginError:
         target.log.debug("Can not search for DHCP leases in syslog files as they does not exist.")
 
     # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).

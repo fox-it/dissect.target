@@ -10,16 +10,15 @@ from dissect.target.container import Container
 class VmdkContainer(Container):
     """VMWare hard disks"""
 
+    __type__ = "vmdk"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         self.vmdk = vmdk.VMDK(fh)
         super().__init__(fh, self.vmdk.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(4)
-        fh.seek(-4, io.SEEK_CUR)
-
-        return magic in (b"KDMV", b"COWD", b"# Di")
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(4) in (b"KDMV", b"COWD", b"# Di")
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

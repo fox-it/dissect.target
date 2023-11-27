@@ -10,6 +10,8 @@ from dissect.target.container import Container
 class VdiContainer(Container):
     """VirtualBox hard disks"""
 
+    __type__ = "vdi"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
@@ -19,10 +21,8 @@ class VdiContainer(Container):
         super().__init__(fh, self.vdi.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(68)
-        fh.seek(-68, io.SEEK_CUR)
-        return magic[-4:] == b"\x7f\x10\xda\xbe"
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(68)[-4:] == b"\x7f\x10\xda\xbe"
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
