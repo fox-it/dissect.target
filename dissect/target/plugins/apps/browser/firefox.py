@@ -80,7 +80,7 @@ class FirefoxPlugin(BrowserPlugin):
                         self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
     @export(record=BrowserCookieRecord)
-    def cookie(self) -> Iterator[BrowserCookieRecord]:
+    def cookies(self) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records from Firefox
 
         Yields BrowserCookieRecord with the following fields:
@@ -97,8 +97,7 @@ class FirefoxPlugin(BrowserPlugin):
         """
         for user, db_file, db in self._iter_db("cookies.sqlite"):
             try:
-                cookies = {row.id: row for row in db.table("moz_cookies").rows()}
-                for cookie in cookies:
+                for cookie in db.table("moz_cookies").rows():
                     yield self.BrowserCookieRecord(
                         ts_created=from_unix_us(cookie.creationTime),
                         ts_last_accessed=from_unix_us(cookie.lastAccessed),

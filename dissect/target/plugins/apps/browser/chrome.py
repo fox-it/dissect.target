@@ -61,4 +61,5 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
 
     @export(record=BrowserCookieRecord)
     def cookies(self):
+        """Return browser cookies for Google Chrome."""
         yield from super().cookies("chrome")

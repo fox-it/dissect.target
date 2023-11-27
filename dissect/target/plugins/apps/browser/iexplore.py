@@ -19,6 +19,10 @@ from dissect.target.plugins.general.users import UserDetails
 from dissect.target.target import Target
 
 
+class UnsupportedException(Exception):
+    pass
+
+
 class WebCache:
     """Class for opening and pre-processing IE WebCache file."""
 
@@ -68,6 +72,9 @@ class WebCache:
     def downloads(self) -> Iterator[record.Record]:
         """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
+
+    def cookies(self) -> Iterator[record.Record]:
+        raise UnsupportedException("Cookies function is not implemented for IE yet")
 
 
 class InternetExplorerPlugin(BrowserPlugin):

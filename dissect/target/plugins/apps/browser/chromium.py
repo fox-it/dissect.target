@@ -181,8 +181,7 @@ class ChromiumMixin:
     def cookies(self, browser_name: str = None) -> Iterator[BrowserCookieRecord]:
         for user, db_file, db in self._iter_db("Cookies"):
             try:
-                cookies = {row.id: row for row in db.table("cookies").rows()}
-                for cookie in cookies:
+                for cookie in db.table("cookies").rows():
                     yield self.BrowserCookieRecord(
                         ts_created=webkittimestamp(cookie.creation_utc),
                         ts_last_accessed=webkittimestamp(cookie.last_access_utc),
@@ -385,3 +384,8 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     def history(self):
         """Return browser history records for Chromium browser."""
         yield from super().history("chromium")
+
+    @export(record=ChromiumMixin.BrowserCookieRecord)
+    def cookies(self):
+        """Return browser cookies for Chromium browser."""
+        yield from super().cookies("chromium")
