@@ -116,7 +116,7 @@ class CitrixPlugin(BsdPlugin):
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
         nstmp_users = set()
-        previously_yielded_usernames = set()
+        seen = set()
         nstmp_path = self.target.fs.path("/var/nstmp/")
 
         if nstmp_path.exists():
@@ -138,16 +138,16 @@ class CitrixPlugin(BsdPlugin):
                 # the 'root' user as having '/root' as a home, not in /var/nstmp.
                 user_home = "/root"
 
-            previously_yielded_usernames.add(username)
+            seen.add(username)
             yield UnixUserRecord(name=username, home=user_home)
 
         for username in nstmp_users:
-            previously_yielded_usernames.add(username)
+            seen.add(username)
             yield UnixUserRecord(name=username, home=nstmp_path.joinpath(username))
 
         # Yield users from /etc/shadow if we have not seem them in previous loops
         for user in super().users():
-            if user.name in previously_yielded_usernames:
+            if user.name in seen:
                 continue
             user_home = user.home if user.home != "/" else None
             yield UnixUserRecord(name=user.name, home=user_home)

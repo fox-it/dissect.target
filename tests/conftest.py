@@ -12,7 +12,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
+from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
@@ -261,7 +261,7 @@ def target_osx(fs_osx):
 @pytest.fixture
 def target_citrix(fs_bsd: VirtualFilesystem) -> Target:
     mock_target = next(make_mock_target())
-    mock_target._os_plugin = CitrixBsdPlugin
+    mock_target._os_plugin = CitrixPlugin
 
     mock_target.filesystems.add(fs_bsd)
 
