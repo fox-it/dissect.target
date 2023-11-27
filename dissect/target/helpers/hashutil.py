@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 BUFFER_SIZE = 32768
 
 RECORD_NAME = "filesystem/file/digest"
-NAME_SUFFIXES = ["_path", "_resolved_path", "_digest"]
-RECORD_TYPES = ["path", "path", "digest"]
+NAME_SUFFIXES = ["_resolved_path", "_digest"]
+RECORD_TYPES = ["path", "digest"]
 
 
 def _hash(fh: BinaryIO, ctx: Union[HASH, list[HASH]]) -> tuple[str]:
@@ -97,7 +97,7 @@ def hash_path_records(target: Target, record: Record) -> Record:
             record_kwargs = dict()
             record_def = list()
 
-            fields = [path, resolved_path, path_hash]
+            fields = [resolved_path, path_hash]
 
             for type, name, field in zip(RECORD_TYPES, NAME_SUFFIXES, fields):
                 hashed_field_name = f"{field_name}{name}"

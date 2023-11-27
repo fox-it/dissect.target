@@ -70,7 +70,6 @@ def test_hash_path_records_with_paths(
     _record = hashed_record.records[1]
 
     for name, _record in zip(record_names, hashed_record.records[1:]):
-        assert getattr(_record, f"{name}_path") is not None
         assert getattr(_record, f"{name}_resolved_path") is not None
         assert getattr(_record, f"{name}_digest").__dict__ == digest(HASHES).__dict__
 
@@ -135,7 +134,6 @@ def test_hash_path_records_with_exception(
         assert hashed_record == record
     else:
         for _record, key in zip(hashed_record.records[1:], found_type_names):
-            assert getattr(_record, f"{key}_path") == "test"
             assert getattr(_record, f"{key}_resolved_path") == resolve_func("test")
             assert getattr(_record, f"{key}_digest").__dict__ == digest(HASHES).__dict__
 
