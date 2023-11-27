@@ -54,7 +54,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         """Find history files on the target that this plugin can parse."""
         history_files = []
         for shell, history_absolute_path_glob in self.COMMAND_HISTORY_ABSOLUTE_PATHS:
-            for path in self.target.fs.path().glob(history_absolute_path_glob.lstrip("/")):
+            for path in self.target.fs.path("/").glob(history_absolute_path_glob.lstrip("/")):
                 history_files.append((shell, path, None))
 
         # Also utilize the _find_history_files function of the parent class

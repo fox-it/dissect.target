@@ -30,12 +30,12 @@ def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd
     assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
     assert results[1].command == "find . -name '*ci.php*'"
     assert results[1].shell == "citrix-netscaler-bash"
-    assert results[1].source.as_posix() == "var/log/bash.log"
+    assert results[1].source.as_posix() == "/var/log/bash.log"
 
     assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
     assert results[0].command == 'debug "hello world"'
     assert results[0].shell == "citrix-netscaler-bash"
-    assert results[0].source.as_posix() == "var/log/bash.log"
+    assert results[0].source.as_posix() == "/var/log/bash.log"
 
 
 def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: VirtualFilesystem):
@@ -57,12 +57,12 @@ def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: Virt
     assert results[1].ts == datetime.datetime(1970, 8, 9, 12, 56, 0, tzinfo=datetime.timezone.utc)
     assert results[1].command == "find . -name '*ci.php*'"
     assert results[1].shell == "citrix-netscaler-bash"
-    assert results[1].source.as_posix() == "var/log/bash.log.0.gz"
+    assert results[1].source.as_posix() == "/var/log/bash.log.0.gz"
 
     assert results[0].ts == datetime.datetime(1970, 8, 10, 11, 57, 39, tzinfo=datetime.timezone.utc)
     assert results[0].command == 'debug "hello world"'
     assert results[0].shell == "citrix-netscaler-bash"
-    assert results[0].source.as_posix() == "var/log/bash.log.0.gz"
+    assert results[0].source.as_posix() == "/var/log/bash.log.0.gz"
 
 
 def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem):
