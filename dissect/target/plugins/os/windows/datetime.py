@@ -37,7 +37,10 @@ c_tz = cstruct.cstruct()
 c_tz.load(tz_def)
 
 
-SundayFirstCalendar = calendar.Calendar(calendar.SUNDAY)
+# Althoug calendar.SUNDAY is only officially documented since Python 3.10, it
+# is present in Python 3.9, so we ignore the vermin warnings.
+SUNDAY = calendar.SUNDAY  # novermin
+SundayFirstCalendar = calendar.Calendar(SUNDAY)
 TimezoneInformation = namedtuple(
     "TimezoneInformation",
     (
