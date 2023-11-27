@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -25,7 +25,7 @@ class ConfigurationTreePlugin(Plugin):
         if target_dir_path.is_dir():
             self.config_fs = ConfigurationFilesystem(target, dir_path)
 
-        self.get = lru_cache(128)(self.get)
+        self._get = lru_cache(128)(self._get)
 
     def check_compatible(self) -> None:
         # This should be able to be retrieved, regardless of OS
@@ -37,7 +37,7 @@ class ConfigurationTreePlugin(Plugin):
         self,
         path: Optional[Union[TargetPath, str]] = None,
         hint: Optional[str] = None,
-        collapse: Optional[Union[bool, set]] = None,
+        collapse: Optional[Union[bool, Iterable[str]]] = None,
         collapse_inverse: Optional[bool] = None,
         seperator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
@@ -55,10 +55,26 @@ class ConfigurationTreePlugin(Plugin):
             comment_prefixes: What is specified as a comment.
             as_dict: Returns the dictionary instead of an entry.
         """
-        return self.get(path, as_dict, hint, collapse, collapse_inverse, seperator, comment_prefixes)
+        return self.get(
+            path=path,
+            as_dict=as_dict,
+            hint=hint,
+            collapse=collapse,
+            collapse_inverse=collapse_inverse,
+            seperator=seperator,
+            comment_prefixes=comment_prefixes,
+        )
 
     @internal
     def get(
+        self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
+        if collapse := kwargs.pop("collapse", None):
+            kwargs.update({"collapse": frozenset(collapse)})
+
+        return self._get(path, as_dict, *args, **kwargs)
+
+    def _get(
         self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
         if not path:

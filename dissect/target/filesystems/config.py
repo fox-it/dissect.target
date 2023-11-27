@@ -86,7 +86,7 @@ class ConfigurationEntry(FilesystemEntry):
         fs: Filesystem,
         path: str,
         entry: FilesystemEntry,
-        parser_items: Optional[Union[dict, Any]] = None,
+        parser_items: Optional[Union[dict, ConfigurationParser, Any]] = None,
     ) -> None:
         super().__init__(fs, path, entry)
         self.parser_items = parser_items
@@ -94,7 +94,19 @@ class ConfigurationEntry(FilesystemEntry):
     def __getitem__(self, item: str) -> ConfigurationEntry:
         return self.parser_items[item]
 
-    def get(self, path: Optional[str] = None) -> ConfigurationEntry:
+    def __repr__(self) -> str:
+        output = f"path={self.path}"
+
+        if not isinstance(self.parser_items, dict):
+            output += f" value={self.parser_items}"
+
+        return f"<{self.__class__.__name__} {output}"
+
+    def get(self, path: Optional[str] = None, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any]:
+        """Gets the ``path`` from the configuration entry.
+
+        If ``path`` does not exist, it uses ``default`` instead.
+        """
         # Check for path in config entry
         if not path:
             # Return self if configuration was found.
@@ -107,9 +119,9 @@ class ConfigurationEntry(FilesystemEntry):
                 self.entry,
                 self.parser_items[path],
             )
-        raise NotADirectoryError(f"Cannot open a {path!r} on a value")
+        return default
 
-    def _write_value_mapping(self, values: dict[str, Any], indentation_nr=0) -> str:
+    def _write_value_mapping(self, values: dict[str, Any], indentation_nr: int = 0) -> str:
         """Writes a dictionary to the output, c style."""
         prefix = " " * indentation_nr
         output_buffer = io.StringIO()
@@ -126,6 +138,7 @@ class ConfigurationEntry(FilesystemEntry):
         return output_buffer.getvalue()
 
     def open(self) -> BinaryIO:
+        """Returns the content of the ``parser_items`` dictionary."""
         # Return fh for path if entry is a file
         # Return bytes of value if entry is ConfigurationEntry
 
@@ -141,7 +154,7 @@ class ConfigurationEntry(FilesystemEntry):
             yield entry.name
 
     def scandir(self) -> Iterator[ConfigurationEntry]:
-        # Return dict keys
+        """Return the items inside ``self.parser_items`` as ConfigurationEntries."""
         if self.is_file():
             raise NotADirectoryError()
 
@@ -167,4 +180,7 @@ class ConfigurationEntry(FilesystemEntry):
         return self.entry.lstat()
 
     def as_dict(self) -> dict:
-        return self.parser_items
+        if isinstance(self.parser_items, ConfigurationParser):
+            return self.parser_items.parsed_data
+        else:
+            return self.parser_items

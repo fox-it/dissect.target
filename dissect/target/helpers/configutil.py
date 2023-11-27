@@ -6,7 +6,7 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Any, ItemsView, Iterator, KeysView, Optional, TextIO, Union
+from typing import Any, ItemsView, Iterable, Iterator, KeysView, Optional, TextIO, Union
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -60,13 +60,13 @@ class PeekableIterator:
 class ConfigurationParser:
     def __init__(
         self,
-        collapse: Union[bool, set] = False,
+        collapse: Union[bool, Iterable] = False,
         collapse_inverse: bool = False,
         seperator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
-        self.collapse = collapse if isinstance(collapse, set) else set()
+        self.collapse = set(collapse) if isinstance(collapse, Iterable) else set()
         self._collapse_check = self._key_not_in_collapse if collapse_inverse else self._key_in_collapse
 
         self.seperator = seperator
@@ -335,7 +335,6 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/sysctl.d/*.conf": ParserConfig(Default),
 }
 
-
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
     "xml": ParserConfig(Txt),
@@ -345,6 +344,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "sample": ParserConfig(Txt),
     "template": ParserConfig(Txt),
 }
+
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": ParserConfig(Ini),
     "sshd_config": ParserConfig(Indentation, seperator=(r"\s",)),
