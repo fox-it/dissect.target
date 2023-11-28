@@ -860,6 +860,10 @@ class NamespacePlugin(Plugin):
         # the direct subclass of NamespacePlugin
         cls.__nsplugin__.SUBPLUGINS.add(cls.__namespace__)
 
+        # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
+        # namespaceplugin and all of its superclasses.
+        reserved_cls_names = tuple({_class.__name__ for _class in cls.__nsplugin__.mro() if _class is not object})
+
         # Collect the public attrs of the subplugin
         for subplugin_func_name in cls.__exports__:
             subplugin_func = inspect.getattr_static(cls, subplugin_func_name)
@@ -872,12 +876,15 @@ class NamespacePlugin(Plugin):
             if getattr(subplugin_func, "__output__", None) != "record":
                 continue
 
-            # The method needs to be part of the current subclass and not a parent
-            if not subplugin_func.__qualname__.startswith(cls.__name__):
+            # The method may not be part of a parent class.
+            if subplugin_func.__qualname__.startswith(reserved_cls_names):
                 continue
 
             # If we already have an aggregate method, skip
             if existing_aggregator := getattr(cls.__nsplugin__, subplugin_func_name, None):
+                if not hasattr(existing_aggregator, "__subplugins__"):
+                    # This is not an aggregator, but a re-implementation of a subclass function by the subplugin.
+                    continue
                 existing_aggregator.__subplugins__.append(cls.__namespace__)
                 continue
 
@@ -887,9 +894,8 @@ class NamespacePlugin(Plugin):
                     for entry in aggregator.__subplugins__:
                         try:
                             subplugin = getattr(self.target, entry)
-                            for item in getattr(subplugin, method_name)():
-                                yield item
-                        except Exception:
+                            yield from getattr(subplugin, method_name)()
+                        except UnsupportedPluginError:
                             continue
 
                 # Holds the subplugins that share this method
