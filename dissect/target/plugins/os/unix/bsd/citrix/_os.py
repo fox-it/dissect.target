@@ -23,7 +23,7 @@ class CitrixPlugin(BsdPlugin):
         super().__init__(target)
         self._ips = []
         self._hostname = None
-        self.config_usernames = []
+        self._config_usernames = []
         self._parse_netscaler_configs()
 
     def _parse_netscaler_configs(self) -> None:
