@@ -897,6 +897,9 @@ class NamespacePlugin(Plugin):
                             yield from getattr(subplugin, method_name)()
                         except UnsupportedPluginError:
                             continue
+                        except Exception as e:
+                            self.target.log.error("Subplugin %s raised an exception for %s", entry, method_name)
+                            self.target.log.debug("Exception: %s", e, exc_info=True)
 
                 # Holds the subplugins that share this method
                 aggregator.__subplugins__ = []
