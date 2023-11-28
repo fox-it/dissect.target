@@ -1,9 +1,12 @@
 import textwrap
 from io import StringIO
+from pathlib import Path
 
 import pytest
 
-from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation
+from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation, SystemD
+
+from tests._utils import absolute_path
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs) -> dict:
@@ -151,3 +154,59 @@ def test_change_scope() -> None:
 
     current5 = parser._change_scope("test data", None, "test data", current4)
     assert id(current3) == id(current5)
+
+
+@pytest.mark.parametrize(
+    "string_data, expected_output",
+    [
+        ("[Unit]\n[System]\n", {"Unit": {}, "System": {}}),
+        ("[Unit]\nkey=value;\n[System]", {"Unit": {"key": "value;"}, "System": {}}),
+        (
+            "[Unit]\nkey=value \\\n continued\\\nvalue\nkey2=value2",
+            {
+                "Unit": {
+                    "key": "value continued value",
+                    "key2": "value2",
+                }
+            },
+        ),
+        (
+            "[Unit]\nkey=value \\\n continued\\\n[System]",
+            {
+                "Unit": {
+                    "key": "value continued",
+                },
+                "System": {},
+            },
+        ),
+    ],
+    ids=["scoping changes", "key value extraction", "line continuation", "faulty configuration"],
+)
+def test_systemd_scope(string_data: str, expected_output: dict) -> None:
+    parser = SystemD()
+
+    parser.parse_file(StringIO(string_data))
+
+    assert parser.parsed_data == expected_output
+
+
+def test_systemd_basic_syntax() -> None:
+    data = Path(absolute_path("_data/helpers/configutil/systemd.syntax"))
+    output = {
+        "Section A": {
+            "KeyOne": "value 1",
+            "KeyTwo": "value 2",
+        },
+        "Section B": {
+            "Setting": '"something" "some thing" "…"',
+            "KeyTwo": "value 2 value 2 continued",
+        },
+        "Section C": {
+            "KeyThree": "value 3 value 3 continued",
+        },
+    }
+
+    parser = SystemD()
+    parser.parse_file(StringIO(data.read_text()))
+
+    assert parser.parsed_data == output

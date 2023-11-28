@@ -236,7 +236,6 @@ class Indentation(Default):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._parents = {}
-        self._indentation = 0
 
     def _parse_line(self, line: str) -> tuple[str, str]:
         key, *value = self.SEPERATOR.split(line.strip(), 1)
@@ -252,7 +251,6 @@ class Indentation(Default):
         return child
 
     def _pop_scope(self, current: dict[str, Union[str, dict]]) -> dict[str, Union[str, dict]]:
-        self._indentation = 0
         return self._parents.pop(id(current), current)
 
     def _change_scope(
@@ -271,7 +269,6 @@ class Indentation(Default):
             current = self._pop_scope(current)
 
         if not line.startswith(empty_space) and next_line.startswith(empty_space):
-            self._indentation = len(next_line) - len(next_line.lstrip())
             return self._push_scope(key, current)
         return current
 
@@ -299,7 +296,75 @@ class Indentation(Default):
         self.parsed_data = root
         # Cleanup of internal state
         self._parents = {}
-        self._indentation = 0
+
+
+class SystemD(Indentation):
+    def _change_scope(
+        self,
+        line: str,
+        key: Optional[str],
+        current: dict[str, Union[str, dict]],
+    ) -> dict[str, Union[str, dict]]:
+        scope_char = ("[", "]")
+
+        if line.startswith(scope_char):
+            if id(current) != id(self._parents):
+                current = self._pop_scope(current)
+            stripped_characters = "".join(scope_char)
+            current = self._push_scope(key.strip(stripped_characters), current)
+
+        return current
+
+    def line_reader(self, fh: TextIO) -> Iterator[str]:
+        for line in fh:
+            if line.strip().startswith(self.skip_lines) or not line.strip():
+                continue
+
+            yield line
+
+    def parse_file(self, fh: TextIO) -> None:
+        root = {}
+        current = root
+        prev_dict = current
+        prev_values = []
+        prev_key = ""
+        continued_mode = False
+        for line in self.line_reader(fh):
+            current = self._change_scope(line, line.strip(), current)
+
+            if id(current) != id(prev_dict):
+                if continued_mode:
+                    # Update previous key/value... someone configured it wrong
+                    value = " ".join(prev_values)
+                    _update_dictionary(prev_dict, prev_key, value)
+                    prev_values = []
+                    prev_key = []
+                    continued_mode = False
+                prev_dict = current
+                continue
+
+            key, value = self._parse_line(line)
+
+            condition = value or key
+
+            if condition.endswith("\\"):
+                prev_key = prev_key or key
+                continued_mode = True
+                prev_values.append(condition.strip("\\ "))
+                continue
+            elif continued_mode:
+                value = " ".join(prev_values + [condition])
+                key = prev_key
+                prev_values = []
+                prev_key = ""
+                continued_mode = False
+
+            _update_dictionary(current, key, value)
+            prev_dict = current
+
+        self.parsed_data = root
+        # Cleanup of internal state
+        self._parents = {}
 
 
 @dataclass(frozen=True)

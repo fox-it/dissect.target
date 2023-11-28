@@ -7,6 +7,7 @@ from dissect.target.plugins.os.unix.linux.services import (
     ServicesPlugin,
     parse_systemd_config,
 )
+from dissect.target.helpers.configutil import SystemD
 from tests._utils import absolute_path
 
 
@@ -65,7 +66,7 @@ def test_systemd(assignment, expected_value):
     assert data == expected_value
 
 
-@pytest.mark.xfail
+# @pytest.mark.xfail
 def test_systemd_known_fails():
     # While this should return `Hello world test help`,
     # the configparser attempts to append `help` as a value to the list of options
@@ -79,4 +80,10 @@ def test_systemd_known_fails():
     test\\
      help
     """
-    parse_systemd_config(StringIO(textwrap.dedent(systemd_config)))
+    parser = SystemD()
+    parser.parse_file(StringIO(textwrap.dedent(systemd_config)))
+
+    assert "Unit" in parser.parsed_data
+    unit = parser.parsed_data.get("Unit")
+    new_lines = unit.get("new_lines")
+    assert new_lines == "hello wolrd test help"

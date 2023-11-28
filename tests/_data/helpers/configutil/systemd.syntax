@@ -1,0 +1,16 @@
+[Section A]
+KeyOne=value 1
+KeyTwo=value 2
+
+# a comment
+
+[Section B]
+Setting="something" "some thing" "…"
+KeyTwo=value 2 \
+       value 2 continued
+
+[Section C]
+KeyThree=value 3\
+# this line is ignored
+; this line is ignored too
+       value 3 continued
