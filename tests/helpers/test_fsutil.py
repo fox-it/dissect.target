@@ -374,9 +374,9 @@ def test_fs_attrs_no_os_listxattr():
 
 
 def test_target_path_checks_dirfs(tmp_path, target_win):
-    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
-        tf.flush()
+        tf.close()
         tmpfile_name = os.path.basename(tf.name)
 
         fs = DirectoryFilesystem(path=tmp_path)
@@ -388,9 +388,9 @@ def test_target_path_checks_dirfs(tmp_path, target_win):
 
 
 def test_target_path_checks_mapped_dir(tmp_path, target_win):
-    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
-        tf.flush()
+        tf.close()
         tmpfile_name = os.path.basename(tf.name)
 
         target_win.filesystems.entries[0].map_dir("test-dir", tmp_path)
@@ -408,9 +408,9 @@ def test_target_path_checks_virtual():
 
 
 def test_target_path_backslash_normalisation(target_win, fs_win, tmp_path):
-    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
-        tf.flush()
+        tf.close()
 
         fs_win.map_dir("windows/system32/", tmp_path)
         fs_win.map_file("windows/system32/somefile.txt", tf.name)
