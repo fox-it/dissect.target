@@ -3,13 +3,15 @@ from os import stat
 
 from flow.record.fieldtypes import path
 
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.apps.ssh.putty import PuTTYPlugin
 
 from ._utils import absolute_path
 
 
-def test_putty_plugin_ssh_host_keys_unix(target_unix_users, fs_unix):
+def test_putty_plugin_ssh_host_keys_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     ssh_host_keys = absolute_path("data/plugins/remoteaccess/putty/sshhostkeys")
     fs_unix.map_file("/root/.putty/sshhostkeys", ssh_host_keys)
 
@@ -49,7 +51,9 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users, fs_unix):
     assert records[2].username == "root"
 
 
-def test_putty_plugin_ssh_host_keys_windows(target_win_users, fs_win, hive_hku):
+def test_putty_plugin_ssh_host_keys_windows(
+    target_win_users: Target, fs_win: VirtualFilesystem, hive_hku: VirtualHive
+) -> None:
     key_name = "Software\\SimonTatham\\PuTTY\\SshHostKeys"
     key = VirtualKey(hive_hku, key_name)
     key.add_value(
@@ -74,7 +78,7 @@ def test_putty_plugin_ssh_host_keys_windows(target_win_users, fs_win, hive_hku):
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\SshHostKeys")
 
 
-def test_putty_plugin_saved_sessions_unix(target_unix_users, fs_unix):
+def test_putty_plugin_saved_sessions_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     sessions_folder = absolute_path("data/plugins/remoteaccess/putty/sessions")
     fs_unix.map_dir("/root/.putty/sessions", sessions_folder)
 
@@ -98,7 +102,9 @@ def test_putty_plugin_saved_sessions_unix(target_unix_users, fs_unix):
     assert records[0].username == "root"
 
 
-def test_putty_plugin_saved_sessions_windows(target_win_users, fs_win, hive_hku):
+def test_putty_plugin_saved_sessions_windows(
+    target_win_users: Target, fs_win: VirtualFilesystem, hive_hku: VirtualHive
+) -> None:
     key_name = "Software\\SimonTatham\\PuTTY\\Sessions\\example-saved-session"
     key = VirtualKey(hive_hku, key_name)
     key.add_value("HostName", VirtualValue(hive_hku, "HostName", "example.com"))
