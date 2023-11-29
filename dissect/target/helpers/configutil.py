@@ -6,7 +6,7 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Any, ItemsView, Iterable, Iterator, KeysView, Optional, TextIO, Union
+from typing import Any, ItemsView, Iterable, Iterator, KeysView, Optional, TextIO, Union, Callable
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -239,7 +239,7 @@ class ScopeManager:
             self._previous = self._current
 
     def push(self, name: str, keep_prev: bool = False) -> tuple[bool, dict]:
-        """Push a new key to the current dictionary"""
+        """Push a new key to the current dictionary and return that we did so"""
         child = self._current.get(name, {})
 
         parent = self._current
@@ -250,7 +250,7 @@ class ScopeManager:
         return True
 
     def pop(self, keep_prev: bool = False) -> tuple[bool, dict]:
-        """Pop _current and return the parent dictionary"""
+        """Pop _current and return whether we changed to the parent dict"""
         if new_current := self._parents.pop(id(self._current), None):
             self._set_prev(keep_prev)
             self._current = new_current
@@ -262,6 +262,10 @@ class ScopeManager:
 
     def update_prev(self, key: str, value: str) -> None:
         _update_dictionary(self._previous, key, value)
+
+    def is_root(self) -> bool:
+        """Utility function to see whether we are in the root dict"""
+        return id(self._current) == id(self._root)
 
     def clean(self):
         self._parents = {}
@@ -291,9 +295,9 @@ class Indentation(Default):
     def _change_scope(
         self,
         line: str,
+        manager: ScopeManager(),
         next_line: Optional[str],
         key: Optional[str],
-        manager: ScopeManager(),
     ) -> tuple[bool, dict[str, Union[str, dict]]]:
         empty_space = (" ", "\t")
         changed = False
@@ -314,7 +318,12 @@ class Indentation(Default):
         with ScopeManager() as manager:
             for line in iterator:
                 key, value = self._parse_line(line)
-                changed = self._change_scope(line, iterator.peek(), line.strip(), manager)
+                changed = self._change_scope(
+                    line=line,
+                    manager=manager,
+                    next_line=iterator.peek(),
+                    key=line.strip(),
+                )
 
                 if changed:
                     prev_key = line.strip()
@@ -333,13 +342,13 @@ class SystemD(Indentation):
     def _change_scope(
         self,
         line: str,
-        key: Optional[str],
         manager: ScopeManager,
+        key: Optional[str],
     ) -> tuple[bool, dict[str, Union[str, dict]]]:
         scope_char = ("[", "]")
         changed = False
         if line.startswith(scope_char):
-            if id(manager._current) != id(manager._root):
+            if not manager.is_root():
                 changed = manager.pop()
             stripped_characters = "".join(scope_char)
             changed = manager.push(key.strip(stripped_characters), changed)
@@ -355,39 +364,49 @@ class SystemD(Indentation):
 
     def parse_file(self, fh: TextIO) -> None:
         prev_values = []
-        prev_key = ""
+        prev_key = None
         with ScopeManager() as manager:
             for line in self.line_reader(fh):
-                changed = self._change_scope(line=line, key=line.strip(), manager=manager)
+                changed = self._change_scope(
+                    line=line,
+                    manager=manager,
+                    key=line.strip(),
+                )
 
                 if changed:
+                    # Current part is a section header.
                     if prev_values:
                         # Update previous key/value... someone configured it wrong
-                        value = " ".join(prev_values)
-                        manager.update_prev(prev_key, value)
-                        prev_values = []
-                        prev_key = []
+                        prev_values, prev_key = self._update_continued_values(
+                            func=manager.update_prev,
+                            key=prev_key,
+                            values=prev_values,
+                        )
                     continue
 
                 key, value = self._parse_line(line)
 
-                condition = value or key
-
-                if condition.endswith("\\"):
+                continued_value = value or key
+                if continued_value.endswith("\\"):
                     prev_key = prev_key or key
-                    prev_values.append(condition.strip("\\ "))
+                    prev_values.append(continued_value.strip("\\ "))
                     continue
                 elif prev_values:
-                    value = " ".join(prev_values + [condition])
-                    key = prev_key
-                    prev_values = []
-                    prev_key = ""
+                    prev_values, prev_key = self._update_continued_values(
+                        func=manager.update,
+                        key=prev_key,
+                        values=prev_values + [continued_value],
+                    )
+                    continue
 
                 manager.update(key, value)
 
             self.parsed_data = manager._root
-        # Cleanup of internal state
-        self._parents = {}
+
+    def _update_continued_values(self, func: Callable, key, values: list[str]) -> tuple[list, None]:
+        value = " ".join(values)
+        func(key, value)
+        return [], None
 
 
 @dataclass(frozen=True)
