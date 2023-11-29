@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 class XfsFilesystem(Filesystem):
-    __fstype__ = "xfs"
+    __type__ = "xfs"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)

@@ -1,4 +1,13 @@
  # skip
 # also skip as well as the blank line below
 
+# "Start" is present in older logs, we can deduce the year from it
+Start:          2021/11/11 12:34:56
+
 2021/11/11 12:34:56 Strip the headers, trace the source!
+
+# Here is where the "Start" year is used to fill in the year
+11/11 12:35:55.465 Should be year 2021
+
+2021/11/11 12:36:11:111 Should discard the milliseconds properly
+21/11/11 12:37:00.000 Should be year 2021

@@ -28,7 +28,7 @@ class ZipFilesystem(Filesystem):
     See https://github.com/python/cpython/issues/82102 for more information.
     """
 
-    __fstype__ = "zip"
+    __type__ = "zip"
 
     def __init__(
         self,

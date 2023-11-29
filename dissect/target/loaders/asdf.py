@@ -21,7 +21,7 @@ class AsdfLoader(Loader):
         path = path.resolve()
 
         super().__init__(path)
-        self.asdf = AsdfSnapshot(open(path, "rb"))
+        self.asdf = AsdfSnapshot(path.open("rb"))
 
     @staticmethod
     def detect(path) -> bool:

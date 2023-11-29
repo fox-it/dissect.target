@@ -34,6 +34,11 @@ class Container(io.IOBase):
         vs: An optional shorthand to set the underlying volume system, usually set later.
     """
 
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
+    __type__: str = None
+    """A short string identifying the type of container."""
+
     def __init__(self, fh: Union[BinaryIO, Path], size: int, vs: VolumeSystem = None):
         self.fh = fh
         self.size = size
@@ -41,7 +46,10 @@ class Container(io.IOBase):
         # Shorthand access to vs
         self.vs = vs
 
-    def __repr__(self):
+        if self.__type__ is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
+
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @classmethod

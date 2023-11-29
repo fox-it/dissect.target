@@ -25,7 +25,7 @@ from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems import tar
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, arg, export, internal
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.target import Target
 
 VirtualMachineRecord = TargetRecordDescriptor(
@@ -36,7 +36,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
 )
 
 
-class ESXiPlugin(LinuxPlugin):
+class ESXiPlugin(UnixPlugin):
     """ESXi OS plugin
 
     ESXi partitioning varies between versions. Generally, specific partition numbers have special meaning.
@@ -241,7 +241,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
     osdata_fs = None
     locker_fs = None
     for fs in target.filesystems:
-        if fs.__fstype__ == "fat":
+        if fs.__type__ == "fat":
             fs.volume.seek(512)
             magic, uuid1, uuid2, uuid3, uuid4 = struct.unpack("<16sIIH6s", fs.volume.read(32))
             if magic != b"VMWARE FAT16    ":
@@ -273,7 +273,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
                     target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/store")
                     target.fs.symlink("/store", "/locker")
 
-        elif fs.__fstype__ == "vmfs":
+        elif fs.__type__ == "vmfs":
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)
             target.fs.symlink(f"/vmfs/volumes/{fs.vmfs.uuid}", f"/vmfs/volumes/{fs.vmfs.label}")
 

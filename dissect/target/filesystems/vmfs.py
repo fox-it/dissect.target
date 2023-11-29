@@ -16,7 +16,7 @@ from dissect.target.helpers import fsutil
 
 
 class VmfsFilesystem(Filesystem):
-    __fstype__ = "vmfs"
+    __type__ = "vmfs"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)

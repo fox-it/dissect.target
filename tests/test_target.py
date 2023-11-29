@@ -171,6 +171,7 @@ def mocked_win_volumes_fs():
     mock_good_volume.drive_letter = "W"
 
     mock_good_fs = Mock(name="good-fs")
+    mock_good_fs.iter_subfs.return_value = []
 
     def mock_filesystem_open(volume):
         if volume == mock_good_volume:
@@ -450,10 +451,14 @@ def test_empty_vs(target_bare: Target) -> None:
 
 def test_nested_vs(target_bare: Target) -> None:
     mock_base_volume = MagicMock()
+    mock_base_volume.offset = 0
+    mock_base_volume.vs = None
+    mock_base_volume.fs = None
     target_bare.volumes.add(mock_base_volume)
 
     mock_volume = MagicMock()
     mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
     mock_volume.fs = None
 
     mock_volume_system = MagicMock()
@@ -464,4 +469,57 @@ def test_nested_vs(target_bare: Target) -> None:
 
         target_bare.volumes.apply()
         filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.volumes) == 2
         assert len(target_bare.filesystems) == 1
+
+
+def test_vs_offset_0(target_bare: Target) -> None:
+    mock_disk = MagicMock()
+    mock_disk.vs = None
+    target_bare.disks.add(mock_disk)
+
+    mock_volume = MagicMock()
+    mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
+    mock_volume.fs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = [mock_volume]
+
+    with patch("dissect.target.volume.open") as volume_open, patch("dissect.target.filesystem.open") as filesystem_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.disks.apply()
+        volume_open.assert_called_once_with(mock_disk)
+        assert len(target_bare.volumes) == 1
+
+        target_bare.volumes.apply()
+        # volume.open must still only be called once
+        volume_open.assert_called_once_with(mock_disk)
+        filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.volumes) == 1
+        assert len(target_bare.filesystems) == 1
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
+    for _ in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+
+    target_unix._mount_others()
+
+    for idx in range(nr_of_fs):
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
+
+    assert not target_unix.fs.path(f"$fs$/fs{nr_of_fs}").exists()
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
+    for idx in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+        target_unix._mount_others()
+
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()

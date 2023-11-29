@@ -8,6 +8,8 @@ from dissect.target.volume import LogicalVolumeSystem, Volume
 
 
 class DdfVolumeSystem(LogicalVolumeSystem):
+    __type__ = "ddf"
+
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         self.ddf = DDF(fh)
         super().__init__(fh, *args, **kwargs)

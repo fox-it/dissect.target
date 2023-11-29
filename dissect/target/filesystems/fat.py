@@ -11,7 +11,7 @@ from dissect.target.helpers import fsutil
 
 
 class FatFilesystem(Filesystem):
-    __fstype__ = "fat"
+    __type__ = "fat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
