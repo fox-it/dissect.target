@@ -88,7 +88,7 @@ class CitrixPlugin(BsdPlugin):
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
-        return self._hostname if self._hostname else super().hostname
+        return self._hostname or super().hostname
 
     @export(property=True)
     def version(self) -> Optional[str]:
