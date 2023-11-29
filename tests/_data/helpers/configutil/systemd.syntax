@@ -5,7 +5,7 @@ KeyTwo=value 2
 # a comment
 
 [Section B]
-Setting="something" "some thing" "…"
+Setting="something" "some thing" "..."
 KeyTwo=value 2 \
        value 2 continued
 

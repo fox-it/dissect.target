@@ -215,7 +215,7 @@ def test_systemd_basic_syntax() -> None:
             "KeyTwo": "value 2",
         },
         "Section B": {
-            "Setting": '"something" "some thing" "…"',
+            "Setting": '"something" "some thing" "..."',
             "KeyTwo": "value 2 value 2 continued",
         },
         "Section C": {
