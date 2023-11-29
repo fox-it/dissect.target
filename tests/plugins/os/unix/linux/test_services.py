@@ -4,9 +4,10 @@ import pytest
 
 from dissect.target.plugins.os.unix.linux.services import (
     ServicesPlugin,
-    parse_systemd_config,
+    create_systemd_string,
 )
 from tests._utils import absolute_path
+from dissect.target.helpers.configutil import SystemD
 
 
 def test_services(target_unix_users, fs_unix):
@@ -49,7 +50,7 @@ def test_services(target_unix_users, fs_unix):
         ("[Unit]\nempty_value=", 'Unit_empty_value=""'),
         ("[Unit]\nnew_lines=hello \\\nworld", 'Unit_new_lines="hello world"'),
         ("[Unit]\nnew_lines=hello \\\nworld\\\ntest", 'Unit_new_lines="hello world test"'),
-        ("[Unit]\ntest", 'Unit_test="None"'),
+        ("[Unit]\ntest", 'Unit_test=""'),
         ("[Unit]\nnew_lines=hello \\\n#Comment\n;Comment2\nworld", 'Unit_new_lines="hello world"'),
         ("[Unit]\nlines=hello \\\nworld\\\n\ntest", 'Unit_lines="hello world test"'),
         (
@@ -60,5 +61,7 @@ def test_services(target_unix_users, fs_unix):
     ],
 )
 def test_systemd(assignment, expected_value):
-    data = parse_systemd_config(StringIO(assignment))
+    parser = SystemD()
+    parser.read_file(StringIO(assignment))
+    data = create_systemd_string(parser.parsed_data)
     assert data == expected_value

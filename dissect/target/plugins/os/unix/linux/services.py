@@ -1,8 +1,5 @@
-import io
-import re
-from configparser import ConfigParser
 from itertools import chain
-from typing import Iterator, TextIO
+from typing import Iterator
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -58,8 +55,8 @@ class ServicesPlugin(Plugin):
                     continue
 
                 try:
-                    with service_file.open("rt") as fh:
-                        config = parse_systemd_config(fh)
+                    parsed_file = self.target.config_tree(service_file, as_dict=True)
+                    config = create_systemd_string(parsed_file)
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
@@ -107,45 +104,19 @@ def should_ignore_file(needle: str, haystack: list) -> bool:
     return False
 
 
-def parse_systemd_config(fh: TextIO) -> str:
+def create_systemd_string(parsed_systemd_dict: dict[str, dict]) -> str:
     """Returns a string of key/value pairs from a toml/ini-like string.
 
     This should probably be rewritten to return a proper dict as in
     its current form this is only useful when used in Splunk.
     """
-    parser = ConfigParser(strict=False, delimiters=("=",), allow_no_value=True, interpolation=None)
-    # to preserve casing from configuration.
-    parser.optionxform = str
-    parser.read_file(fh)
 
-    output = io.StringIO()
+    output = []
     try:
-        for segment, configuration in parser.items():
-            original_key = ""
-            previous_value = ""
-            concat_value = False
+        for segment, configuration in parsed_systemd_dict.items():
             for key, value in configuration.items():
-                original_key = original_key or key
-
-                if concat_value:
-                    # A backslash was found at the end of the previous line
-                    # If value is None, it might not contain a backslash
-                    # So we turn it into an empty string.
-                    value = f"{previous_value} {key} {value or ''}".strip()
-
-                concat_value = str(value).endswith("\\")
-                if concat_value:
-                    # Remove any dangling empty space or backslashes
-                    previous_value = value.rstrip("\\ ")
-                else:
-                    output.write(f'{segment}_{original_key or key}="{value}" ')
-                    original_key = ""
-                    previous_value = ""
+                output.append(f'{segment}_{key}="{value}"')
 
     except UnicodeDecodeError:
         pass
-
-    output_data = output.getvalue()
-    # Remove any back slashes or new line characters.
-    output_data = re.sub(r"(\\|\n)", "", output_data)
-    return output_data.strip()
+    return " ".join(output)
