@@ -88,7 +88,7 @@ class CitrixPlugin(BsdPlugin):
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
-        return self._hostname
+        return self._hostname if self._hostname else super().hostname
 
     @export(property=True)
     def version(self) -> Optional[str]:
@@ -119,11 +119,15 @@ class CitrixPlugin(BsdPlugin):
         seen = set()
         nstmp_path = self.target.fs.path("/var/nstmp/")
 
+        # Build a set of nstmp users
         if nstmp_path.exists():
             for entry in nstmp_path.iterdir():
                 if entry.is_dir() and entry.name != "#nsinternal#":
-                    nstmp_users.add(entry.name)
+                    # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
+                    username = "nsmonitor" if entry.name == "monitors" else entry.name
+                    nstmp_users.add(username)
 
+        # Yield users from the config, matching them to their 'home' in /var/nstmp if it exists.
         for username in self._config_usernames:
             nstmp_home = nstmp_path.joinpath(username)
             user_home = nstmp_home if nstmp_home.exists() else None
@@ -135,22 +139,28 @@ class CitrixPlugin(BsdPlugin):
 
             if username == "root" and self.target.fs.exists("/root"):
                 # If we got here, 'root' is present both in /var/nstmp and in /root. In such cases, we yield
-                # the 'root' user as having '/root' as a home, not in /var/nstmp.
-                user_home = "/root"
+                # the 'root' user as having '/root' as a home, not in /var/nstmp, as there is no 'nscli_history'
+                # for the root user in /var/nstmp.
+                user_home = self.target.fs.path("/root")
 
-            seen.add(username)
+            seen.add((username, user_home.as_posix() if user_home else None, None))
             yield UnixUserRecord(name=username, home=user_home)
 
+        # Yield all users in nstmp that were not observed in the config
         for username in nstmp_users:
-            seen.add(username)
-            yield UnixUserRecord(name=username, home=nstmp_path.joinpath(username))
+            # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
+            home = nstmp_path.joinpath(username) if username != "nsmonitor" else nstmp_path.joinpath("monitors")
+            seen.add((username, home.as_posix(), None))
+            yield UnixUserRecord(name=username, home=home)
 
-        # Yield users from /etc/shadow if we have not seem them in previous loops
+        # Yield users from /etc/passwd if we have not seem them in previous loops
         for user in super().users():
-            if user.name in seen:
+            if (user.name, user.home.as_posix(), user.shell) in seen:
                 continue
-            user_home = user.home if user.home != "/" else None
-            yield UnixUserRecord(name=user.name, home=user_home)
+            # To prevent bogus command history for all users without a home whenever a history is located at the root
+            # of the filesystem, we set the user home to None if their home is equivalent to '/'
+            user.home = user.home if user.home != "/" else None
+            yield user
 
     @export(property=True)
     def os(self) -> str:

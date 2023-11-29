@@ -36,7 +36,7 @@ def test_unix_bsd_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem):
 
     assert target_citrix.timezone == "Europe/Amsterdam"
 
-    assert len(users) == 7
+    assert len(users) == 8
 
     assert users[0].name == "alfred"  # Only listed in /var/nstmp
     assert users[0].home == "/var/nstmp/alfred"
@@ -56,5 +56,10 @@ def test_unix_bsd_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem):
     assert users[5].name == "robin"  # Listed in config and /var/nstmp
     assert users[5].home == "/var/nstmp/robin"
 
-    assert users[6].name == "root"  # User entry for /root
+    assert users[6].name == "root"  # User entry for /root, from the config
     assert users[6].home == "/root"
+    assert users[6].shell is None
+
+    assert users[7].name == "root"  # User entry for /root, from /etc/passwd
+    assert users[7].home == "/root"
+    assert users[7].shell == "/usr/bin/bash"
