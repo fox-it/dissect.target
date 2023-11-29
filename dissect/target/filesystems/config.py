@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from dissect.target import Target
-from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
+from dissect.target.exceptions import ConfigurationParsingError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
@@ -74,7 +74,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
                     # the part with entry.path here.
                     config_parser = parse(entry, *args, **kwargs)
                     entry = ConfigurationEntry(self, entry.path, entry, config_parser)
-                except (FileNotFoundError, ConfigurationParsingError):
+                except ConfigurationParsingError:
                     # If a parsing error gets created, it should return the `entry`
                     log.debug(f"Error when parsing {entry.path}/{part}")
         return entry

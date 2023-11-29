@@ -437,7 +437,7 @@ class ParserConfig:
 
 
 MATCH_MAP: dict[str, ParserConfig] = {
-    "*/systemd/*": ParserConfig(Ini),
+    "*/systemd/*": ParserConfig(SystemD),
     "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
     "*/sysctl.d/*.conf": ParserConfig(Default),
 }
@@ -449,6 +449,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, seperator=(r"\s")),
     "sample": ParserConfig(Txt),
+    "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
 }
 
