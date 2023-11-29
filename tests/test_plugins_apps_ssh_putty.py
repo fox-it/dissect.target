@@ -24,6 +24,7 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users, fs_unix):
     assert records[0].key_type == "ssh-ed25519"
     assert records[0].public_key == "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
     assert records[0].path == path.from_posix("/root/.putty/sshhostkeys")
+    assert records[0].username == "root"
 
     assert records[1].mtime_ts is not None
     assert records[1].host == "example.com"
@@ -34,6 +35,7 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users, fs_unix):
         == "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNhJOmUcnvcVIizc67M3bS0/2Gz43YPHYCRaogqAgHvgVUartyfsl5nZBoFR3FiUc9kTJJUPybWbqXaGLEthjfM="  # noqa E501
     )
     assert records[1].path == path.from_posix("/root/.putty/sshhostkeys")
+    assert records[1].username == "root"
 
     assert records[2].mtime_ts is not None
     assert records[2].host == "1.2.3.4"
@@ -44,6 +46,7 @@ def test_putty_plugin_ssh_host_keys_unix(target_unix_users, fs_unix):
         == "AAAAB3NzaC1yc2EAAAADAQABAAABgQCmYvCKueiA3lyhZuW0OAObOZvf0g957H0wGhGi3BruZSDpa9UQhsVNtgPZfuyx/yYWUIhQ4VSz+qw00IhZJt9myRNrXCxIABM/qubTghrdjRU+ydb0J9uTBIRz+ys/0dr0dg2Gc7C5w9+E3EpRit6VCZfTi8mNYZi+/GC12VYIDsqY9/4D4xloHJP+fs1mCNnY12VtJuIWw281fKaTCxm3H95NOBbAE6sAwr8H5lMLU34D4DcA5ZIG5F48yDmYUkILtN4qLAZMl4ZlQ6KpcxMYCN6DPj2NwR8JHzr+mkwjmGqbs8tjYD/KRYL2sYhK6Fdx7wvw5djQeVTEnhjxoeiCYNFAGkzB9BfeP4N0K2rp6F3NktFU4WIc6nLsX5G1LEWuAvAxwg+v6y4YzmpXHP+WrRHKyhS+B64aLpmD7AAJzPwSyqtt5+8SY3z7EMCpYBGz8uhdYzaY0U+qWFHtIfI5GLrl2akYBzH9t/YPAF6wdTuSh4jxVe2IVrd1x7g23Zs="  # noqa E501
     )
     assert records[2].path == path.from_posix("/root/.putty/sshhostkeys")
+    assert records[2].username == "root"
 
 
 def test_putty_plugin_ssh_host_keys_windows(target_win_users, fs_win, hive_hku):
@@ -69,6 +72,7 @@ def test_putty_plugin_ssh_host_keys_windows(target_win_users, fs_win, hive_hku):
     assert records[0].key_type == "ssh-ed25519"
     assert records[0].public_key == "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\SshHostKeys")
+    assert records[0].username == "John"
 
 
 def test_putty_plugin_saved_sessions_unix(target_unix_users, fs_unix):
@@ -92,6 +96,7 @@ def test_putty_plugin_saved_sessions_unix(target_unix_users, fs_unix):
     assert records[0].port_forward == ""
     assert records[0].manual_ssh_host_keys == ""
     assert records[0].path == path.from_posix("/root/.putty/sessions/example-saved-session")
+    assert records[0].username == "root"
 
 
 def test_putty_plugin_saved_sessions_windows(target_win_users, fs_win, hive_hku):
@@ -120,3 +125,4 @@ def test_putty_plugin_saved_sessions_windows(target_win_users, fs_win, hive_hku)
     assert records[0].port_forward == ""
     assert records[0].manual_ssh_host_keys == ""
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\Sessions\\example-saved-session")
+    assert records[0].username == "John"

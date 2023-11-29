@@ -38,9 +38,9 @@ PuTTYSessionRecord = PuTTYUserRecordDescriptor(
 class PuTTYPlugin(Plugin):
     """Extract artifacts from the PuTTY client.
 
-    NOTE:T
-        - Does not parse $HOME/.putty/randomseed (GNU/Linux)
-          and HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile (Windows)
+    NOTE:
+        - Does not parse `$HOME/.putty/randomseed` (GNU/Linux)
+          and `HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile` (Windows)
 
     Resources:
         - http://www.chiark.greenend.org.uk/~sgtatham/putty/0.78/puttydoc.txt
@@ -61,8 +61,9 @@ class PuTTYPlugin(Plugin):
             for key in self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"):
                 user_details = self.target.registry.get_user_details(key)
                 if not user_details:
-                    user = WindowsUserRecord(sid="", name="", home="", _target=self.target)
-                    user_details = UserDetails(user=user, home_path=None)
+                    user_details = UserDetails(
+                        user=WindowsUserRecord(sid=None, name=None, home=None, _target=self.target), home_path=None
+                    )
                 regf_installs.append((key, user_details))
 
         for user_details in self.target.user_details.all_with_home():
@@ -169,6 +170,7 @@ class PuTTYPlugin(Plugin):
 
     def _build_session_record(
         self, ts, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
+        self, ts: float, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
     ) -> PuTTYSessionRecord:
         host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
 

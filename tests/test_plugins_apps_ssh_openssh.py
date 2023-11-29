@@ -144,31 +144,37 @@ def test_known_hosts_plugin(target_and_filesystem):
     assert results[0].key_type == "ssh-rsa"
     assert results[0].comment == "comment with spaces"
     assert results[0].marker is None
+    assert results[0].username == "root"
 
     assert results[1].host == "192.0.2.10"
     assert results[1].key_type == "ssh-rsa"
     assert results[1].comment == "comment with spaces"
     assert results[1].marker is None
+    assert results[1].username == "root"
 
     assert results[2].host == "|1|JfKTdBh7rNbXkVAQCRp4OQoPfmI=|USECr3SWf1JUPsms5AqfD5QfxkM="
     assert results[2].key_type == "ssh-rsa"
     assert results[2].comment == ""
     assert results[2].marker is None
+    assert results[2].username == "root"
 
     assert results[3].host == "*"
     assert results[3].key_type == "ssh-rsa"
     assert results[3].comment == ""
     assert results[3].marker == "@revoked"
+    assert results[3].username == "root"
 
     assert results[4].host == "*.mydomain.org"
     assert results[4].key_type == "ssh-rsa"
     assert results[4].comment == ""
     assert results[4].marker == "@cert-authority"
+    assert results[4].username == "root"
 
     assert results[5].host == "*.mydomain.com"
     assert results[5].key_type == "ssh-rsa"
     assert results[5].comment == ""
     assert results[5].marker == "@cert-authority"
+    assert results[5].username == "root"
 
 
 def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
