@@ -45,8 +45,8 @@ KnownHostRecord = OpenSSHUserRecordDescriptor(
 PrivateKeyRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/private_key",
     [
-        *COMMON_ELLEMENTS,
         ("datetime", "mtime_ts"),
+        *COMMON_ELLEMENTS,
         ("string", "key_format"),
         ("string", "public_key"),
         ("boolean", "encrypted"),
@@ -56,8 +56,8 @@ PrivateKeyRecord = OpenSSHUserRecordDescriptor(
 PublicKeyRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/public_key",
     [
-        *COMMON_ELLEMENTS,
         ("datetime", "mtime_ts"),
+        *COMMON_ELLEMENTS,
         ("string", "public_key"),
     ],
 )
