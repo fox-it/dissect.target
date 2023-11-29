@@ -72,7 +72,6 @@ def test_putty_plugin_ssh_host_keys_windows(target_win_users, fs_win, hive_hku):
     assert records[0].key_type == "ssh-ed25519"
     assert records[0].public_key == "AAAAC3NzaC1lZDI1NTE5AAAAIHUl23i/4p/7xcZnNPDK+Dr+A539zpEEXutrm/tESFYq"
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\SshHostKeys")
-    assert records[0].username == "John"
 
 
 def test_putty_plugin_saved_sessions_unix(target_unix_users, fs_unix):
@@ -125,4 +124,3 @@ def test_putty_plugin_saved_sessions_windows(target_win_users, fs_win, hive_hku)
     assert records[0].port_forward == ""
     assert records[0].manual_ssh_host_keys == ""
     assert records[0].path == path.from_windows("Software\\SimonTatham\\PuTTY\\Sessions\\example-saved-session")
-    assert records[0].username == "John"

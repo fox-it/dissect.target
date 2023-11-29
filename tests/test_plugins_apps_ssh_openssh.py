@@ -144,37 +144,37 @@ def test_known_hosts_plugin(target_and_filesystem):
     assert results[0].key_type == "ssh-rsa"
     assert results[0].comment == "comment with spaces"
     assert results[0].marker is None
-    assert results[0].username == "root"
+    assert results[0].username == target_system.user_name
 
     assert results[1].host == "192.0.2.10"
     assert results[1].key_type == "ssh-rsa"
     assert results[1].comment == "comment with spaces"
     assert results[1].marker is None
-    assert results[1].username == "root"
+    assert results[1].username == target_system.user_name
 
     assert results[2].host == "|1|JfKTdBh7rNbXkVAQCRp4OQoPfmI=|USECr3SWf1JUPsms5AqfD5QfxkM="
     assert results[2].key_type == "ssh-rsa"
     assert results[2].comment == ""
     assert results[2].marker is None
-    assert results[2].username == "root"
+    assert results[2].username == target_system.user_name
 
     assert results[3].host == "*"
     assert results[3].key_type == "ssh-rsa"
     assert results[3].comment == ""
     assert results[3].marker == "@revoked"
-    assert results[3].username == "root"
+    assert results[3].username == target_system.user_name
 
     assert results[4].host == "*.mydomain.org"
     assert results[4].key_type == "ssh-rsa"
     assert results[4].comment == ""
     assert results[4].marker == "@cert-authority"
-    assert results[4].username == "root"
+    assert results[4].username == target_system.user_name
 
     assert results[5].host == "*.mydomain.com"
     assert results[5].key_type == "ssh-rsa"
     assert results[5].comment == ""
     assert results[5].marker == "@cert-authority"
-    assert results[5].username == "root"
+    assert results[5].username == target_system.user_name
 
 
 def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
@@ -214,9 +214,9 @@ def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
     assert private_key.comment == "long comment here"
     assert private_key.public_key == public_key_data
     assert not private_key.encrypted
-    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path("ssh_host_ed25519_key", TargetDir.SSHD).replace(
-        target_system.label, "\\sysvol\\"
-    ).replace("\\", "/")
+    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
+        "ssh_host_ed25519_key", TargetDir.SSHD
+    ).replace(target_system.label, "\\sysvol\\").replace("\\", "/")
 
 
 def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
@@ -289,7 +289,9 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
     assert private_key.public_key == public_key_data
     assert private_key.comment == ""
     assert private_key.encrypted
-    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(".ssh/id_rsa", TargetDir.HOME).replace("\\", "/")
+    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
+        ".ssh/id_rsa", TargetDir.HOME
+    ).replace("\\", "/")
 
 
 def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
@@ -318,7 +320,9 @@ def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
     assert private_key.key_type == "ecdsa"
     assert private_key.username == target_system.user_name
     assert not private_key.encrypted
-    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(".ssh/id_ecdsa", TargetDir.HOME).replace("\\", "/")
+    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
+        ".ssh/id_ecdsa", TargetDir.HOME
+    ).replace("\\", "/")
 
 
 def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
@@ -350,7 +354,9 @@ def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
     assert private_key.key_format == "PKCS8"
     assert private_key.username == target_system.user_name
     assert not private_key.encrypted
-    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(".ssh/id_dsa", TargetDir.HOME).replace("\\", "/")
+    assert str(private_key.path).replace("\\", "/") == target_system.filesystem_path(
+        ".ssh/id_dsa", TargetDir.HOME
+    ).replace("\\", "/")
 
 
 def test_public_keys_plugin(target_and_filesystem):
@@ -392,13 +398,13 @@ def test_public_keys_plugin(target_and_filesystem):
     assert user_public_key.key_type == user_public_key_data.split(" ", 2)[0]
     assert user_public_key.public_key == user_public_key_data.split(" ", 2)[1]
     assert user_public_key.comment == user_public_key_data.split(" ", 2)[2]
-    assert str(user_public_key.path).replace("\\", "/") == target_system.filesystem_path(".ssh/id_ed25519.pub", TargetDir.HOME).replace(
-        "\\", "/"
-    )
+    assert str(user_public_key.path).replace("\\", "/") == target_system.filesystem_path(
+        ".ssh/id_ed25519.pub", TargetDir.HOME
+    ).replace("\\", "/")
 
     assert host_public_key.key_type == host_public_key_data.split(" ", 2)[0]
     assert host_public_key.public_key == host_public_key_data.split(" ", 2)[1]
     assert host_public_key.comment == host_public_key_data.split(" ", 2)[2]
-    assert str(host_public_key.path).replace("\\", "/") == target_system.filesystem_path("ssh_host_rsa_key.pub", TargetDir.SSHD).replace(
-        target_system.label, "\\sysvol\\"
-    ).replace("\\", "/")
+    assert str(host_public_key.path).replace("\\", "/") == target_system.filesystem_path(
+        "ssh_host_rsa_key.pub", TargetDir.SSHD
+    ).replace(target_system.label, "\\sysvol\\").replace("\\", "/")

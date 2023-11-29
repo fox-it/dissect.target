@@ -169,7 +169,6 @@ class PuTTYPlugin(Plugin):
                     )
 
     def _build_session_record(
-        self, ts, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
         self, ts: float, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
     ) -> PuTTYSessionRecord:
         host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
