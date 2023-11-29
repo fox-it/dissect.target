@@ -2,12 +2,12 @@ from io import StringIO
 
 import pytest
 
+from dissect.target.helpers.configutil import SystemD
 from dissect.target.plugins.os.unix.linux.services import (
     ServicesPlugin,
     create_systemd_string,
 )
 from tests._utils import absolute_path
-from dissect.target.helpers.configutil import SystemD
 
 
 def test_services(target_unix_users, fs_unix):

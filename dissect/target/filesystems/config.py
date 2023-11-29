@@ -40,7 +40,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         parts = path.split("/")
 
-        for idx, part in enumerate(parts):
+        for idx, part in enumerate(parts, start=1):
             # Resolve link
             if entry.is_symlink():
                 entry = entry.readlink_ext()
@@ -65,18 +65,27 @@ class ConfigurationFilesystem(VirtualFilesystem):
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
         parts, entry = self._get_till_file(path, relentry)
 
+        if entry.is_dir():
+            return entry
+
+        entry = self._convert_entry(entry, *args, **kwargs)
+
         for part in parts:
-            if isinstance(entry, ConfigurationEntry):
-                entry = entry.get(part)
-            else:
-                try:
-                    # The parts in _get_till_file also includes the filename, so we do not join
-                    # the part with entry.path here.
-                    config_parser = parse(entry, *args, **kwargs)
-                    entry = ConfigurationEntry(self, entry.path, entry, config_parser)
-                except ConfigurationParsingError:
-                    # If a parsing error gets created, it should return the `entry`
-                    log.debug(f"Error when parsing {entry.path}/{part}")
+            entry = entry.get(part)
+
+        return entry
+
+    def _convert_entry(self, file_entry: FilesystemEntry, *args, **kwargs):
+        entry = file_entry
+        try:
+            # The parts in _get_till_file also includes the filename, so we do not join
+            # the part with entry.path here.
+            config_parser = parse(entry, *args, **kwargs)
+            entry = ConfigurationEntry(self, entry.path, entry, config_parser)
+        except ConfigurationParsingError:
+            # If a parsing error gets created, it should return the `entry`
+            log.debug(f"Error when parsing {entry.path}")
+
         return entry
 
 

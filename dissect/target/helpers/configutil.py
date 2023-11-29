@@ -6,7 +6,17 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Any, ItemsView, Iterable, Iterator, KeysView, Optional, TextIO, Union, Callable
+from typing import (
+    Any,
+    Callable,
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    Optional,
+    TextIO,
+    Union,
+)
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
@@ -294,8 +304,8 @@ class Indentation(Default):
 
     def _change_scope(
         self,
-        line: str,
         manager: ScopeManager(),
+        line: str,
         next_line: Optional[str],
         key: Optional[str],
     ) -> tuple[bool, dict[str, Union[str, dict]]]:
@@ -319,8 +329,8 @@ class Indentation(Default):
             for line in iterator:
                 key, value = self._parse_line(line)
                 changed = self._change_scope(
-                    line=line,
                     manager=manager,
+                    line=line,
                     next_line=iterator.peek(),
                     key=line.strip(),
                 )
@@ -341,8 +351,8 @@ class Indentation(Default):
 class SystemD(Indentation):
     def _change_scope(
         self,
-        line: str,
         manager: ScopeManager,
+        line: str,
         key: Optional[str],
     ) -> tuple[bool, dict[str, Union[str, dict]]]:
         scope_char = ("[", "]")
@@ -368,8 +378,8 @@ class SystemD(Indentation):
         with ScopeManager() as manager:
             for line in self.line_reader(fh):
                 changed = self._change_scope(
-                    line=line,
                     manager=manager,
+                    line=line,
                     key=line.strip(),
                 )
 
@@ -478,7 +488,7 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
         FileNotFoundError: If the ``path`` is not a file.
     """
 
-    if not path.is_file():
+    if not path.is_file(follow_symlinks=True):
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     entry = path

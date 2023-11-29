@@ -4,8 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation, SystemD, ScopeManager
-
+from dissect.target.helpers.configutil import (
+    ConfigurationParser,
+    Default,
+    Indentation,
+    ScopeManager,
+    SystemD,
+)
 from tests._utils import absolute_path
 
 
@@ -140,24 +145,24 @@ def test_change_scope() -> None:
     manager = ScopeManager()
 
     # Scoping does not change
-    changed = parser._change_scope("key value", "key2 value2", "key value", manager)
+    changed = parser._change_scope(manager, "key value", "key2 value2", "key value")
     assert id(manager._root) == id(manager._current)
     assert not changed
     old_current = manager._current
 
     # Scoping changes once
-    changed = parser._change_scope("key2 value2", "  value2", "key2 value2", manager)
+    changed = parser._change_scope(manager, "key2 value2", "  value2", "key2 value2")
     assert id(old_current) != id(manager._current)
     assert changed
     assert manager._root == {"key2 value2": {}}
     old_current = manager._current
 
     # If the current line still contains empty space, return the same scope
-    changed = parser._change_scope("  value2", "test_line", "value2", manager)
+    changed = parser._change_scope(manager, "  value2", "test_line", "value2")
     assert id(old_current) == id(manager._current)
     assert not changed
 
-    changed = parser._change_scope("test data", None, "test data", manager)
+    changed = parser._change_scope(manager, "test data", None, "test data")
     assert id(old_current) == id(manager._current)
     assert not changed
 
@@ -186,7 +191,7 @@ def test_change_scope() -> None:
             },
         ),
         (
-            "[Unit]new_lines=hello \\\nworld\\\ntest\\\n help",
+            "[Unit]\nnew_lines=hello \\\nworld\\\ntest\\\n help",
             {
                 "Unit": {"new_lines": "hello world test help"},
             },
