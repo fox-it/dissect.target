@@ -185,8 +185,14 @@ def test_change_scope() -> None:
                 "System": {},
             },
         ),
+        (
+            "[Unit]new_lines=hello \\\nworld\\\ntest\\\n help",
+            {
+                "Unit": {"new_lines": "hello world test help"},
+            },
+        ),
     ],
-    ids=["scoping changes", "key value extraction", "line continuation", "faulty configuration"],
+    ids=["scoping changes", "key value extraction", "line continuation", "faulty configuration", "weird indentation"],
 )
 def test_systemd_scope(string_data: str, expected_output: dict) -> None:
     parser = SystemD()
