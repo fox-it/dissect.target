@@ -13,7 +13,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_plugins_apps_webservers_apache_infer_access_log_format_combined():
+def test_infer_access_log_format_combined():
     log_combined = (
         '127.0.0.1 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0 '
         "(Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 "
@@ -22,7 +22,7 @@ def test_plugins_apps_webservers_apache_infer_access_log_format_combined():
     assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
 
 
-def test_plugins_apps_webservers_apache_infer_access_log_format_vhost_combined():
+def test_infer_access_log_format_vhost_combined():
     log_vhost_combined = (
         'example.com:80 127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 '
         '"-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -31,12 +31,12 @@ def test_plugins_apps_webservers_apache_infer_access_log_format_vhost_combined()
     assert ApachePlugin.infer_access_log_format(log_vhost_combined) == LOG_FORMAT_ACCESS_VHOST_COMBINED
 
 
-def test_plugins_apps_webservers_apache_infer_access_log_format_common():
+def test_infer_access_log_format_common():
     log_common = '127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
     assert ApachePlugin.infer_access_log_format(log_common) == LOG_FORMAT_ACCESS_COMMON
 
 
-def test_plugins_apps_webservers_apache_infer_access_log_ipv6():
+def test_infer_access_log_ipv6():
     log_combined = (
         '2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [20/Dec/2022:15:18:01 +0100] "GET / HTTP/1.1" 200 '
         '1126 "-" "curl/7.81.0"'
@@ -44,7 +44,7 @@ def test_plugins_apps_webservers_apache_infer_access_log_ipv6():
     assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
 
 
-def test_plugins_apps_webservers_apache_txt(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_txt(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
 
@@ -54,7 +54,7 @@ def test_plugins_apps_webservers_apache_txt(target_unix: Target, fs_unix: Virtua
     assert len(results) == 6
 
 
-def test_plugins_apps_webservers_apache_gz(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_gz(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log.gz")
     fs_unix.map_file("var/log/apache2/access.log.1.gz", data_file)
 
@@ -64,7 +64,7 @@ def test_plugins_apps_webservers_apache_gz(target_unix: Target, fs_unix: Virtual
     assert len(results) == 4
 
 
-def test_plugins_apps_webservers_apache_access_bz2(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_access_bz2(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log.bz2")
     fs_unix.map_file("var/log/apache2/access.log.1.bz2", data_file)
 
@@ -74,7 +74,7 @@ def test_plugins_apps_webservers_apache_access_bz2(target_unix: Target, fs_unix:
     assert len(results) == 4
 
 
-def test_plugins_apps_webservers_apache_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
     tz = timezone(timedelta(hours=1))
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
@@ -131,7 +131,7 @@ def test_plugins_apps_webservers_apache_all_access_log_formats(target_unix: Targ
     assert ipv6_log.bytes_sent == 0
 
 
-def test_plugins_apps_webservers_apache_logrotate(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_logrotate(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     fs_unix.map_file("var/log/apache2/access.log", data_file)
     fs_unix.map_file("var/log/apache2/access.log.1", data_file)
@@ -145,7 +145,7 @@ def test_plugins_apps_webservers_apache_logrotate(target_unix: Target, fs_unix: 
     assert len(error_log_paths) == 0
 
 
-def test_plugins_apps_webservers_apache_custom_config(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_custom_config(target_unix: Target, fs_unix: VirtualFilesystem):
     fs_unix.map_file_fh("etc/apache2/apache2.conf", BytesIO(b'CustomLog "/custom/log/location/access.log" common'))
     fs_unix.map_file_fh("custom/log/location/access.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("custom/log/location/access.log.1", BytesIO(b"Foo1"))
@@ -159,7 +159,7 @@ def test_plugins_apps_webservers_apache_custom_config(target_unix: Target, fs_un
     assert len(error_log_paths) == 0
 
 
-def test_plugins_apps_webservers_apache_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem):
     config = """
     # CustomLog "/custom/log/location/old.log" common
     CustomLog "/custom/log/location/new.log" common
@@ -184,7 +184,7 @@ def test_plugins_apps_webservers_apache_config_commented_logs(target_unix: Targe
     assert str(error_log_paths[1]) == "/custom/log/location/old_error.log"
 
 
-def test_plugins_apps_webservers_apache_error_txt(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_error_txt(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/error.log")
     fs_unix.map_file("var/log/apache2/error.log", data_file)
 
@@ -195,7 +195,7 @@ def test_plugins_apps_webservers_apache_error_txt(target_unix: Target, fs_unix: 
     assert all(str(record.source) == "/var/log/apache2/error.log" for record in results)
 
 
-def test_plugins_apps_webservers_apache_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem):
     data_file = absolute_path("_data/plugins/apps/webserver/apache/error.log")
     fs_unix.map_file("var/log/apache2/error.log", data_file)
 

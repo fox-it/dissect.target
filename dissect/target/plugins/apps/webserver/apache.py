@@ -10,6 +10,7 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverErrorLogRecord,
+    WebserverPlugin,
 )
 from dissect.target.target import Target
 
@@ -87,7 +88,7 @@ RE_ACCESS_COMMON_PATTERN = r"""
 
 RE_ERROR_COMMON_PATTERN = r"""
     \[
-        (?P<ts>[^\]]*)                  # Timestamp including miliseconds.
+        (?P<ts>[^\]]*)                  # Timestamp including milliseconds.
     \]
     \s
     \[
@@ -144,26 +145,28 @@ LOG_FORMAT_ERROR_COMMON = LogFormat("error", re.compile(RE_ERROR_COMMON_PATTERN,
 
 
 def apache_response_time_to_ms(time_str: str) -> int:
-    """Convert a string containing amount and measurement (e.g. '10000 microsecs') to miliseconds"""
+    """Convert a string containing amount and measurement (e.g. '10000 microsecs') to milliseconds"""
     amount, _, measurement = time_str.partition(" ")
     amount = int(amount)
     if measurement == "microsecs":
-        return int(amount / 1000)
+        return amount // 1000
     raise ValueError(f"Could not parse {time_str}")
 
 
-class ApachePlugin(plugin.Plugin):
+class ApachePlugin(WebserverPlugin):
     """Apache log parsing plugin.
 
-    Apache has three default access log formats, which this plugin can all parse automatically. These are:
+    Apache has three default access log formats, which this plugin can all parse automatically. These are::
+
         LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
         LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
-        LogFormat "%h %l %u %t \"%r\" %>s %O" common
+        LogFormat "%h %l %u %t \"%r\" %>s %O"`` common
 
     For the definitions of each format string, see https://httpd.apache.org/docs/2.4/mod/mod_log_config.html#formats
 
-    For Apache, the error logs by default follow the following format:
-        ErrorLogFormat "[%{u}t] [%-m:%l] [pid %P:tid %T] %7F: %E: [client\ %a] %M% ,\ referer\ %{Referer}i"
+    For Apache, the error logs by default follow the following format::
+
+        ErrorLogFormat ``"[%{u}t] [%-m:%l] [pid %P:tid %T] %7F: %E: [client\ %a] %M% ,\ referer\ %{Referer}i"``
     """  # noqa: E501, W605
 
     __namespace__ = "apache"
@@ -201,10 +204,10 @@ class ApachePlugin(plugin.Plugin):
 
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
-            access_log_paths.update(self.target.fs.path(log_dir).glob(log_name + "*"))
+            access_log_paths.update(self.target.fs.path(log_dir).glob(f"{log_name}*"))
 
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ERROR_LOG_NAMES):
-            error_log_paths.update(self.target.fs.path(log_dir).glob(log_name + "*"))
+            error_log_paths.update(self.target.fs.path(log_dir).glob(f"{log_name}*"))
 
         # Check default Apache configs for CustomLog or ErrorLog directives
         for config in self.DEFAULT_CONFIG_PATHS:
@@ -235,7 +238,7 @@ class ApachePlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Return contents of Apache access log files in unified WebserverAccessLogRecord format."""
+        """Return contents of Apache access log files in unified ``WebserverAccessLogRecord`` format."""
         for line, path in self._iterate_log_lines(self.access_log_paths):
             try:
                 logformat = self.infer_access_log_format(line)
@@ -278,7 +281,7 @@ class ApachePlugin(plugin.Plugin):
 
     @plugin.export(record=WebserverErrorLogRecord)
     def error(self) -> Iterator[WebserverErrorLogRecord]:
-        """Return contents of Apache error log files in unified WebserverErrorLogRecord format."""
+        """Return contents of Apache error log files in unified ``WebserverErrorLogRecord`` format."""
         for line, path in self._iterate_log_lines(self.error_log_paths):
             try:
                 match = LOG_FORMAT_ERROR_COMMON.pattern.match(line)
@@ -337,17 +340,27 @@ class ApachePlugin(plugin.Plugin):
     def infer_access_log_format(line: str) -> Optional[LogFormat]:
         """Attempt to infer what standard LogFormat is used. Returns None if no known format can be inferred.
 
-        Three default log type examples from Apache (note that the ipv4 could also be ipv6)::
-            combined       = '1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
-                            (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0
-                            Safari/537.36"'
-            common         = '1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
-            vhost_combined = 'example.com:80 1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 "-"
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko)
-                            Chrome/108.0.0.0 Safari/537.36"'
+        Three default log type examples from Apache (note that the ipv4 could also be ipv6)
+
+
+        Combined::
+
+            1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
+                        (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0
+                        Safari/537.36\"
+
+        Common::
+
+            1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312
+
+        vhost_combined::
+
+            example.com:80 1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 "-"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko)
+            Chrome/108.0.0.0 Safari/537.36\"
         """
-        splitted_line = line.split()
-        first_part = splitted_line[0]
+        parts = line.split()
+        first_part = parts[0]
         if ":" in first_part and "." in first_part:
             # does not start with IP, hence it must be a vhost typed log
             return LOG_FORMAT_ACCESS_VHOST_COMBINED
