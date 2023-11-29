@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation, SystemD
+from dissect.target.helpers.configutil import ConfigurationParser, Default, Indentation, SystemD, ScopeManager
 
 from tests._utils import absolute_path
 
@@ -137,23 +137,29 @@ def test_collapse_inversion() -> None:
 
 def test_change_scope() -> None:
     parser = Indentation(seperator=(r"\s",))
-    current = {}
+    manager = ScopeManager()
 
     # Scoping does not change
-    current2 = parser._change_scope("key value", "key2 value2", "key value", current)
-    assert id(current) == id(current2)
+    changed = parser._change_scope("key value", "key2 value2", "key value", manager)
+    assert id(manager._root) == id(manager._current)
+    assert not changed
+    old_current = manager._current
 
     # Scoping changes once
-    current3 = parser._change_scope("key2 value2", "  value2", "key2 value2", current)
-    assert id(current) != id(current3)
-    assert current == {"key2 value2": {}}
+    changed = parser._change_scope("key2 value2", "  value2", "key2 value2", manager)
+    assert id(old_current) != id(manager._current)
+    assert changed
+    assert manager._root == {"key2 value2": {}}
+    old_current = manager._current
 
     # If the current line still contains empty space, return the same scope
-    current4 = parser._change_scope("  value2", "test_line", "value2", current3)
-    assert id(current3) == id(current4)
+    changed = parser._change_scope("  value2", "test_line", "value2", manager)
+    assert id(old_current) == id(manager._current)
+    assert not changed
 
-    current5 = parser._change_scope("test data", None, "test data", current4)
-    assert id(current3) == id(current5)
+    changed = parser._change_scope("test data", None, "test data", manager)
+    assert id(old_current) == id(manager._current)
+    assert not changed
 
 
 @pytest.mark.parametrize(
