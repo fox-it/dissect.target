@@ -23,7 +23,7 @@ def test_yara_plugin(tmp_path, target_default):
     vfs.map_file_fh("test_file", BytesIO(b"test string"))
     vfs.map_file_fh("/test/dir/to/test_file", BytesIO(b"test string"))
 
-    target_default.filesystems.add(vfs)
+    target_default.fs.mount("/", vfs)
 
     with tempfile.NamedTemporaryFile(mode="w+t", dir=tmp_path, delete=False) as tmp_file:
         tmp_file.write(test_rule)

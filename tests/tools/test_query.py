@@ -56,7 +56,7 @@ def test_target_query_invalid_functions(
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive-dot-folder.tgz"],
+            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive.tar.gz"],
         )
 
         with pytest.raises((SystemExit)):
@@ -115,7 +115,7 @@ def test_target_query_invalid_excluded_functions(
                 "hostname",
                 "-xf",
                 ",".join(given_funcs),
-                "tests/_data/loaders/tar/test-archive-dot-folder.tgz",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
             ],
         )
 
@@ -139,7 +139,7 @@ def test_target_query_unsupported_plugin_log(capsys: pytest.CaptureFixture, monk
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive-dot-folder.tgz"],
+            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive.tar.gz"],
         )
 
         target_query()
@@ -188,7 +188,7 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
                 "foo,bar,bla,foo",
                 "-xf",
                 "bla",
-                "tests/_data/loaders/tar/test-archive-dot-folder.tgz",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
             ],
         )
 
@@ -220,9 +220,9 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     if os.sep == "\\":
-        target_file = "tests\\_data\\loaders\\tar\\test-archive-dot-folder.tgz"
+        target_file = "tests\\_data\\loaders\\tar\\test-archive.tar.gz"
     else:
-        target_file = "tests/_data/loaders/tar/test-archive-dot-folder.tgz"
+        target_file = "tests/_data/loaders/tar/test-archive.tar.gz"
 
     with monkeypatch.context() as m:
         m.setattr(
