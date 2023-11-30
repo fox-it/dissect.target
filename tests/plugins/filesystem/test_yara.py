@@ -9,7 +9,7 @@ from dissect.target.filesystem import VirtualFilesystem
 yara = pytest.importorskip("dissect.target.plugins.filesystem.yara", reason="yara-python module unavailable")
 
 
-def test_yara_plugin(target_default):
+def test_yara_plugin(tmp_path, target_default):
     test_rule = """
     rule test_rule_name {
         strings:
@@ -25,9 +25,8 @@ def test_yara_plugin(target_default):
 
     target_default.filesystems.add(vfs)
 
-    with tempfile.NamedTemporaryFile("w+t", delete=False) as tmp_file:
+    with tempfile.NamedTemporaryFile(mode="w+t", dir=tmp_path, delete=False) as tmp_file:
         tmp_file.write(test_rule)
-        tmp_file.flush()
         tmp_file.close()
 
         target_default.add_plugin(yara.YaraPlugin)

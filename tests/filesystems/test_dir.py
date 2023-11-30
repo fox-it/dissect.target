@@ -1,5 +1,4 @@
 import pathlib
-import platform
 import tempfile
 from unittest.mock import Mock, patch
 
@@ -8,11 +7,10 @@ import pytest
 from dissect.target.filesystems.dir import DirectoryFilesystem, DirectoryFilesystemEntry
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Raises permission exception on Windows. Needs to be fixed.")
 def test_filesystem_dir_symlink_to_file(tmp_path):
-    with tempfile.NamedTemporaryFile(dir=tmp_path) as tf:
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
-        tf.flush()
+        tf.close()
 
         tmpfile_path = pathlib.Path(tf.name)
         symlink_path = tmp_path.joinpath("symlink")

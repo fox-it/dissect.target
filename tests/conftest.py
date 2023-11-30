@@ -34,18 +34,20 @@ if not pathlib.Path(data_dir).is_dir():
     )
 
 
-def make_mock_target():
-    with tempfile.NamedTemporaryFile(prefix="MockTarget-") as tmp_file:
+def make_mock_target(tmp_path):
+    with tempfile.NamedTemporaryFile(dir=tmp_path, prefix="MockTarget-", delete=False) as tmp_file:
+        tmp_file.close()
+
         target = Target()
         target.path = pathlib.Path(tmp_file.name)
         yield target
 
 
 @pytest.fixture
-def make_mock_targets(request):
+def make_mock_targets(request, tmp_path):
     def _make_targets(size):
         for _ in range(size):
-            yield from make_mock_target()
+            yield from make_mock_target(tmp_path)
 
     return _make_targets
 
@@ -186,22 +188,22 @@ def hive_hku():
 
 
 @pytest.fixture
-def target_bare():
+def target_bare(tmp_path):
     # A target without any associated OSPlugin
-    yield from make_mock_target()
+    yield from make_mock_target(tmp_path)
 
 
 @pytest.fixture
-def target_default():
-    mock_target = next(make_mock_target())
+def target_default(tmp_path):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = default.DefaultPlugin
     mock_target.apply()
     yield mock_target
 
 
 @pytest.fixture
-def target_win(hive_hklm, fs_win):
-    mock_target = next(make_mock_target())
+def target_win(tmp_path, hive_hklm, fs_win):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = WindowsPlugin
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
@@ -219,8 +221,8 @@ def target_win(hive_hklm, fs_win):
 
 
 @pytest.fixture
-def target_unix(fs_unix):
-    mock_target = next(make_mock_target())
+def target_unix(tmp_path, fs_unix):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = UnixPlugin
 
     mock_target.filesystems.add(fs_unix)
@@ -230,8 +232,8 @@ def target_unix(fs_unix):
 
 
 @pytest.fixture
-def target_linux(fs_linux):
-    mock_target = next(make_mock_target())
+def target_linux(tmp_path, fs_linux):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = LinuxPlugin
 
     mock_target.filesystems.add(fs_linux)
@@ -241,8 +243,8 @@ def target_linux(fs_linux):
 
 
 @pytest.fixture
-def target_osx(fs_osx):
-    mock_target = next(make_mock_target())
+def target_osx(tmp_path, fs_osx):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = MacPlugin
 
     mock_target.filesystems.add(fs_osx)
@@ -259,8 +261,8 @@ def target_osx(fs_osx):
 
 
 @pytest.fixture
-def target_citrix(fs_bsd):
-    mock_target = next(make_mock_target())
+def target_citrix(tmp_path, fs_bsd):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = CitrixBsdPlugin
 
     mock_target.filesystems.add(fs_bsd)
@@ -278,8 +280,8 @@ def target_citrix(fs_bsd):
 
 
 @pytest.fixture
-def target_android(fs_android: VirtualFilesystem) -> Target:
-    mock_target = next(make_mock_target())
+def target_android(tmp_path, fs_android: VirtualFilesystem) -> Target:
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = AndroidPlugin
     mock_target.filesystems.add(fs_android)
     mock_target.apply()
