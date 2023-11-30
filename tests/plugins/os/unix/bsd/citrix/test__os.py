@@ -6,7 +6,7 @@ from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.target import Target
 
 
-def test_unix_bsd_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem):
+def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     example_etc_passwd = """
     # $FreeBSD: releng/11.4/etc/master.passwd 359448 2020-03-30 17:11:21Z brooks $
     #

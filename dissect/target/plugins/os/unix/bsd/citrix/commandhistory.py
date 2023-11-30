@@ -1,11 +1,10 @@
 import re
-from functools import cache
 from typing import Iterator, List, Optional, Tuple
 
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.utils import year_rollover_helper
-from dissect.target.plugin import export, internal
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.history import (
     CommandHistoryPlugin,
     CommandHistoryRecord,
@@ -61,7 +60,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         history_files.extend(super()._find_history_files())
         return history_files
 
-    @cache
     def _find_user_by_name(self, username: str) -> Optional[UnixUserRecord]:
         """Cached function to return the matching UnixUserRecord for a given username."""
         if username is None:
@@ -82,7 +80,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
             elif shell == "citrix-netscaler-bash":
                 yield from self.parse_netscaler_bash_history(history_path)
 
-    @internal
     def parse_netscaler_bash_history(
         self,
         path: TargetPath,
@@ -109,7 +106,6 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
                 _user=user,
             )
 
-    @internal
     def parse_netscaler_cli_history(
         self,
         history_file: TargetPath,
@@ -118,11 +114,10 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         """Parses the history file of the Citrix Netscaler CLI.
 
         The only difference compared to generic bash history files is that the first line will start with
-        '_HiStOrY_V2_', which we will skip.
+        ``_HiStOrY_V2_``, which we will skip.
         """
         for idx, line in enumerate(history_file.open("rt")):
-            line = line.strip()
-            if not line:
+            if not (line := line.strip()):
                 continue
             if idx == 0 and line == "_HiStOrY_V2_":
                 continue

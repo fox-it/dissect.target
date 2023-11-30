@@ -10,7 +10,7 @@ from dissect.target.plugins.os.unix.bsd.citrix.commandhistory import (
 from dissect.target.target import Target
 
 
-def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem):
+def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     commandhistory_data = """\
     Aug  9 12:56:00 <local7.notice> ns bash[23841]: root on /dev/pts/0 shell_command="find . -name '*ci.php*'"
     Aug 10 11:57:39 <local7.notice> ns bash[56440]: (null) on /dev/pts/1 shell_command="debug "hello world""
@@ -38,7 +38,7 @@ def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd
     assert results[0].source.as_posix() == "/var/log/bash.log"
 
 
-def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: VirtualFilesystem):
+def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     commandhistory_data = """\
     Aug  9 12:56:00 <local7.notice> ns bash[23841]: root on /dev/pts/0 shell_command="find . -name '*ci.php*'"
     Aug 10 11:57:39 <local7.notice> ns bash[56440]: (null) on /dev/pts/1 shell_command="debug "hello world""
@@ -65,7 +65,7 @@ def test_netscaler_commandhistory_decompress(target_citrix: Target, fs_bsd: Virt
     assert results[0].source.as_posix() == "/var/log/bash.log.0.gz"
 
 
-def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem):
+def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     commandhistory_data = """\
     _HiStOrY_V2_
     help
