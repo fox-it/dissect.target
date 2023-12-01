@@ -76,12 +76,12 @@ class StartupInfoPlugin(Plugin):
 
                     yield StartupInfoRecord(
                         ts=parse_ts(start_time),
-                        path=path.from_windows(process.get("Name")),
-                        commandline=path.from_windows(process.findtext("CommandLine")),
+                        path=self.target.fs.path(process.get("Name")),
+                        commandline=self.target.fs.path(process.findtext("CommandLine")),
                         pid=process.get("PID"),
                         parent_pid=process.findtext("ParentPID"),
                         parent_start_time=parse_ts(parent_start_time),
-                        parent_name=path.from_windows(process.findtext("ParentName")),
+                        parent_name=self.target.fs.path(process.findtext("ParentName")),
                         disk_usage=process.findtext("DiskUsage"),
                         cpu_usage=process.findtext("CpuUsage"),
                         _target=self.target,

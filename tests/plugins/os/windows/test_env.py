@@ -1,4 +1,3 @@
-import platform
 from collections import OrderedDict, namedtuple
 from unittest import mock
 
