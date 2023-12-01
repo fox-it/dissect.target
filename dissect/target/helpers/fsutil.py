@@ -725,12 +725,15 @@ class TargetPath(Path, PureDissectPath):
 
     def open(self, mode='rb', buffering=0, encoding=None,
              errors=None, newline=None):
-        # CPython >= 3.10
-        if "b" not in mode and hasattr(io, "text_encoding"):
-            # Vermin linting needs to be skipped for this line as this is
-            # guarded by an explicit check for availability.
-            # novermin
-            encoding = io.text_encoding(encoding)
+
+        if "b" not in mode:
+            encoding = encoding or "UTF-8"
+            # CPython >= 3.10
+            if hasattr(io, "text_encoding"):
+                # Vermin linting needs to be skipped for this line as this is
+                # guarded by an explicit check for availability.
+                # novermin
+                encoding = io.text_encoding(encoding)
         return self._accessor.open(self, mode, buffering, encoding, errors,
                                    newline)
 
