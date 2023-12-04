@@ -142,11 +142,9 @@ class Cache:
         elif REWRITE_CACHE:
             read_file_cache = False
 
-        effective_ids = True if os.supports_effective_ids else False
-
         if read_file_cache:
             target.log.debug("Reading from cache file: %s", cache_file)
-            if os.access(cache_file, os.R_OK, effective_ids=effective_ids):
+            if os.access(cache_file, os.R_OK, effective_ids=bool(os.supports_effective_ids)):
                 if os.stat(cache_file).st_size != 0:
                     try:
                         return self.open_reader(cache_file, output)
@@ -175,7 +173,7 @@ class Cache:
                         err,
                     )
 
-            if os.access(temp_dir, os.W_OK | os.R_OK | os.X_OK, effective_ids=effective_ids):
+            if os.access(temp_dir, os.W_OK | os.R_OK | os.X_OK, effective_ids=bool(os.supports_effective_ids)):
                 if os.path.exists(temp_path):
                     try:
                         os.remove(temp_path)
