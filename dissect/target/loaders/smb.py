@@ -220,7 +220,7 @@ class SmbRegistry(RegistryPlugin):
         if hasattr(self, "_svcctl") and self._svcctl is not None:
             self._svcctl.disconnect()
 
-        if hasattr(self, "_winreg") and self._winreg is not None:
+        if getattr(self, "_winreg", None):
             self._winreg.disconnect()
 
     def _check_service_status(self) -> None:
