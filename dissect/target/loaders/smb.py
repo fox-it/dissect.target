@@ -217,7 +217,7 @@ class SmbRegistry(RegistryPlugin):
         if hasattr(self, "_was_disabled") and self._was_disabled:
             scmr.hRChangeServiceConfigW(self._svcctl, self._svc_handle, dwStartType=0x4)
 
-        if hasattr(self, "_svcctl") and self._svcctl is not None:
+        if getattr(self, "_svcctl", None):
             self._svcctl.disconnect()
 
         if getattr(self, "_winreg", None):
