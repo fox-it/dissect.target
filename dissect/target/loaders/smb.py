@@ -204,6 +204,7 @@ class SmbRegistry(RegistryPlugin):
             self._map_hive("HKEY_LOCAL_MACHINE", hklm_hive)
             self._map_hive("HKEY_USERS", hku_hive)
         except SessionError:
+            self.target.log.info("Failed to open remote registry, registry will not be available")
             return  # no registry access, probably no access rights
 
     def _init_users(self) -> None:
