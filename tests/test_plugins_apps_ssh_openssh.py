@@ -65,7 +65,7 @@ class Alternatives:
         return self.seperator.join([mapping.get(target_dir), *file_name.split("/")])
 
 
-def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]):
+def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     authorized_keys_data = """
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw
@@ -114,7 +114,7 @@ def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFile
     assert results[4].comment == "with a comment"
 
 
-def test_known_hosts_plugin(target_and_filesystem):
+def test_known_hosts_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
 
     known_hosts_data = """
@@ -177,7 +177,7 @@ def test_known_hosts_plugin(target_and_filesystem):
     assert results[5].username == target_system.user_name
 
 
-def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
+def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN OPENSSH PRIVATE KEY-----
@@ -219,7 +219,7 @@ def test_private_keys_plugin_rfc4716_ed25519(target_and_filesystem):
     ).replace(target_system.label, "\\sysvol\\").replace("\\", "/")
 
 
-def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
+def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     # Generated using password "password".
     private_key_data = """
@@ -294,7 +294,7 @@ def test_private_keys_plugin_rfc4716_rsa_encrypted(target_and_filesystem):
     ).replace("\\", "/")
 
 
-def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
+def test_private_keys_plugin_pem_ecdsa(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN EC PRIVATE KEY-----
@@ -325,7 +325,7 @@ def test_private_keys_plugin_pem_ecdsa(target_and_filesystem):
     ).replace("\\", "/")
 
 
-def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
+def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     private_key_data = """
     -----BEGIN PRIVATE KEY-----
@@ -359,7 +359,7 @@ def test_private_keys_plugin_pkcs8_dsa(target_and_filesystem):
     ).replace("\\", "/")
 
 
-def test_public_keys_plugin(target_and_filesystem):
+def test_public_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]) -> None:
     target, fs = target_and_filesystem
     user_public_key_data = (
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw long comment here"
