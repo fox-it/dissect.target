@@ -39,8 +39,8 @@ class PuTTYPlugin(Plugin):
     """Extract artifacts from the PuTTY client.
 
     NOTE:
-        - Does not parse `$HOME/.putty/randomseed` (GNU/Linux)
-          and `HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile` (Windows)
+        - Does not parse ``$HOME/.putty/randomseed`` (GNU/Linux)
+          and ``HKCU\\Software\\SimonTatham\\PuTTY\\RandSeedFile`` (Windows)
 
     Resources:
         - http://www.chiark.greenend.org.uk/~sgtatham/putty/0.78/puttydoc.txt
