@@ -1,7 +1,6 @@
 import datetime
 
 from defusedxml import ElementTree
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -65,8 +64,8 @@ class StartupInfoPlugin(Plugin):
         References:
             - https://www.trustedsec.com/blog/who-left-the-backdoor-open-using-startupinfo-for-the-win/
         """
-        for file in self._files:
-            fh = file.open("rb")
+        for path in self._files:
+            fh = path.open("rb")
 
             try:
                 root = ElementTree.fromstring(fh.read().decode("utf-16-le"), forbid_dtd=True)
