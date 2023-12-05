@@ -9,7 +9,7 @@ from flow.record.fieldtypes import posix_path, windows_path
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
-from dissect.target.helpers.record import WindowsUserRecord, create_extended_descriptor
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.apps.ssh.openssh import KnownHostRecord
@@ -54,16 +54,14 @@ class PuTTYPlugin(Plugin):
 
         self.regf_installs, self.path_installs = self._detect_putty()
 
-    def _detect_putty(self) -> list[list[RegistryKey], list[TargetPath]]:
+    def _detect_putty(
+        self,
+    ) -> tuple[list[set[RegistryKey, UserDetails | None]], list[set[TargetPath, UserDetails | None]]]:
         regf_installs, path_installs = [], []
 
         if self.target.has_function("registry"):
             for key in self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"):
                 user_details = self.target.registry.get_user_details(key)
-                if not user_details:
-                    user_details = UserDetails(
-                        user=WindowsUserRecord(sid=None, name=None, home=None, _target=self.target), home_path=None
-                    )
                 regf_installs.append((key, user_details))
 
         for user_details in self.target.user_details.all_with_home():
@@ -108,7 +106,7 @@ class PuTTYPlugin(Plugin):
                 marker=None,
                 path=windows_path(ssh_host_keys.path),
                 _target=self.target,
-                _user=user_details.user,
+                _user=user_details.user if user_details else None,
             )
 
     def _path_known_hosts(self, putty_path: TargetPath, user_details: UserDetails) -> Iterator[KnownHostRecord]:
@@ -133,7 +131,7 @@ class PuTTYPlugin(Plugin):
                     marker=None,
                     path=posix_path(ssh_host_keys_path),
                     _target=self.target,
-                    _user=user_details.user,
+                    _user=user_details.user if user_details else None,
                 )
 
     @export(record=PuTTYSessionRecord)
@@ -185,7 +183,7 @@ class PuTTYPlugin(Plugin):
             manual_ssh_host_keys=cfg.get("SSHManualHostKeys"),
             path=source,
             _target=self.target,
-            _user=user_details.user,
+            _user=user_details.user if user_details else None,
         )
 
 
