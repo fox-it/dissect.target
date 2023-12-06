@@ -1,12 +1,6 @@
-from io import StringIO
-
-import pytest
-
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.helpers.configutil import SystemD
 from dissect.target.plugins.os.unix.linux.services import (
     ServicesPlugin,
-    create_systemd_string,
 )
 from dissect.target.target import Target
 from tests._utils import absolute_path
@@ -42,28 +36,3 @@ def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
     assert results[3].name == "example"
     assert results[3].config is None
     assert str(results[3].source) == "/etc/init.d/example"
-
-
-@pytest.mark.parametrize(
-    "assignment, expected_value",
-    [
-        ("[Unit]\nsystemd = help:me", 'Unit_systemd="help:me"'),
-        ("[Unit]\nhelp:me = systemd", 'Unit_help:me="systemd"'),
-        ("[Unit]\nempty_value=", 'Unit_empty_value=""'),
-        ("[Unit]\nnew_lines=hello \\\nworld", 'Unit_new_lines="hello world"'),
-        ("[Unit]\nnew_lines=hello \\\nworld\\\ntest", 'Unit_new_lines="hello world test"'),
-        ("[Unit]\ntest", 'Unit_test=""'),
-        ("[Unit]\nnew_lines=hello \\\n#Comment\n;Comment2\nworld", 'Unit_new_lines="hello world"'),
-        ("[Unit]\nlines=hello \\\nworld\\\n\ntest", 'Unit_lines="hello world test"'),
-        (
-            "[Unit]\nDescription=Online ext4 Metadata Check for %I",
-            'Unit_Description="Online ext4 Metadata Check for %I"',
-        ),
-        ("[Unit]\ntest=hello\tme", 'Unit_test="hello\tme"'),
-    ],
-)
-def test_systemd(assignment: str, expected_value: str) -> None:
-    parser = SystemD()
-    parser.read_file(StringIO(assignment))
-    data = create_systemd_string(parser.parsed_data)
-    assert data == expected_value

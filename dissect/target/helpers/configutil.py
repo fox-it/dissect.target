@@ -410,7 +410,7 @@ class SystemD(Indentation):
         prev_values = []
         prev_key = None
         with ScopeManager() as manager:
-            for line in self.line_reader(fh, strip_comments=True):
+            for line in self.line_reader(fh, strip_comments=False):
                 changed = self._change_scope(
                     manager=manager,
                     line=line,

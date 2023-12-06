@@ -5,15 +5,16 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
-LinuxServiceRecord = TargetRecordDescriptor(
-    "linux/service",
-    [
-        ("datetime", "ts"),
-        ("string", "name"),
-        ("string", "config"),
-        ("path", "source"),
-    ],
-)
+RECORD_NAME = "linux/service"
+
+DEFAULT_ELEMENTS = [
+    ("datetime", "ts"),
+    ("string", "type"),
+    ("string", "name"),
+    ("path", "source"),
+]
+
+LinuxServiceRecord = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS)
 
 
 class ServicesPlugin(Plugin):
@@ -56,23 +57,32 @@ class ServicesPlugin(Plugin):
 
                 try:
                     parsed_file = self.target.config_tree(service_file, as_dict=True)
-                    config = create_systemd_string(parsed_file)
+                    config = {}
+                    types = []
+                    for segment, configuration in parsed_file.items():
+                        for key, value in configuration.items():
+                            _value = value or None
+                            _key = f"{segment}_{key}"
+                            types.append(("string", _key))
+                            config.update({_key: _value})
                 except FileNotFoundError:
                     # The service is registered but the symlink is broken.
                     yield LinuxServiceRecord(
                         ts=service_file.stat(follow_symlinks=False).st_mtime,
+                        type="systemd",
                         name=service_file.name,
-                        config=None,
                         source=service_file,
                         _target=self.target,
                     )
                     continue
 
-                yield LinuxServiceRecord(
+                record = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS + types)
+                yield record(
                     ts=service_file.stat().st_mtime,
+                    type="systemd",
                     name=service_file.name,
-                    config=config,
                     source=service_file,
+                    **config,
                     _target=self.target,
                 )
 
@@ -83,40 +93,20 @@ class ServicesPlugin(Plugin):
         for initd_path in self.INITD_PATHS:
             path = self.target.fs.path(initd_path)
 
-            if path.exists():
-                for file_ in path.iterdir():
-                    if should_ignore_file(file_.name, ignored_suffixes):
-                        continue
+            if not path.exists():
+                continue
+            for file_ in path.iterdir():
+                if should_ignore_file(file_.name, ignored_suffixes):
+                    continue
 
-                    yield LinuxServiceRecord(
-                        ts=file_.stat().st_mtime,
-                        name=file_.name,
-                        config=None,
-                        source=file_,
-                        _target=self.target,
-                    )
+                yield LinuxServiceRecord(
+                    ts=file_.stat().st_mtime,
+                    type="initd",
+                    name=file_.name,
+                    source=file_,
+                    _target=self.target,
+                )
 
 
 def should_ignore_file(needle: str, haystack: list) -> bool:
-    for stray in haystack:
-        if needle.endswith(stray):
-            return True
-    return False
-
-
-def create_systemd_string(parsed_systemd_dict: dict[str, dict]) -> str:
-    """Returns a string of key/value pairs from a toml/ini-like string.
-
-    This should probably be rewritten to return a proper dict as in
-    its current form this is only useful when used in Splunk.
-    """
-
-    output = []
-    try:
-        for segment, configuration in parsed_systemd_dict.items():
-            for key, value in configuration.items():
-                output.append(f'{segment}_{key}="{value}"')
-
-    except UnicodeDecodeError:
-        pass
-    return " ".join(output)
+    return needle.endswith(tuple(haystack))
