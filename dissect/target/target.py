@@ -488,6 +488,10 @@ class Target:
         counter = 0
         path = "/$fs$/fs0"
 
+        # VirtualFilesystem does not have mounts.
+        if not hasattr(root_fs, "mounts"):
+            return
+
         for fs in self.filesystems:
             if fs not in root_fs.mounts.values():
                 # determine mount point
