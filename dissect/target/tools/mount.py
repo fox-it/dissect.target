@@ -2,6 +2,8 @@ import argparse
 import logging
 from typing import Union
 
+from dissect.util.feature import Feature, feature_enabled
+
 from dissect.target import Target, filesystem
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.tools.utils import (
@@ -11,12 +13,15 @@ from dissect.target.tools.utils import (
 )
 
 try:
-    from fuse import FUSE
+    if feature_enabled(Feature.BETA):
+        from fusepy3.fuse import FUSE3 as FUSE
+    else:
+        from fuse import FUSE
 
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
-except Exception:
+except Exception as e:
     HAS_FUSE = False
 
 log = logging.getLogger(__name__)
@@ -85,7 +90,7 @@ def main():
 
 
 def _format_options(options: dict[str, Union[str, bool]]) -> str:
-    return ",".join([key if value is True else f"{key}={value}" for key, value in options.items()])
+    return ",".join(key if value is True else f"{key}={value}" for key, value in options.items())
 
 
 if __name__ == "__main__":

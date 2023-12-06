@@ -3,7 +3,12 @@ import logging
 from functools import lru_cache
 from typing import BinaryIO, Optional
 
-from fuse import FuseOSError, Operations
+from dissect.util.feature import Feature, feature_enabled
+
+if feature_enabled(Feature.BETA):
+    from fusepy3.fuse import FuseOSError, LoggingMixIn, Operations
+else:
+    from fuse import FuseOSError, LoggingMixIn, Operations
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 
@@ -12,7 +17,7 @@ log = logging.getLogger(__name__)
 CACHE_SIZE = 1024 * 1024
 
 
-class DissectMount(Operations):
+class DissectMount(Operations, LoggingMixIn):
     def __init__(self, fs: Filesystem):
         self.fs = fs
         self.file_handles: dict[int, BinaryIO] = {}
@@ -27,14 +32,23 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    def getattr(self, path: str, fh: Optional[int] = None) -> dict:
+    def getattr(self, path: str, buf, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
         try:
             st = fe.lstat()
             return dict(
                 (key, getattr(st, key))
-                for key in ("st_atime", "st_ctime", "st_gid", "st_mode", "st_mtime", "st_nlink", "st_size", "st_uid")
+                for key in (
+                    "st_atime",
+                    "st_ctime",
+                    "st_gid",
+                    "st_mode",
+                    "st_mtime",
+                    "st_nlink",
+                    "st_size",
+                    "st_uid",
+                )
             )
         except Exception:
             raise FuseOSError(errno.EIO)
@@ -75,7 +89,7 @@ class DissectMount(Operations):
             log.exception("Exception in fuse::read")
             raise FuseOSError(errno.EIO)
 
-    def readdir(self, path: str, fh: int):
+    def readdir(self, path: str, fh: int, flags: int = 0):
         if fh not in self.dir_handles:
             raise FuseOSError(errno.EBADFD)
 
@@ -101,6 +115,17 @@ class DissectMount(Operations):
 
     def release(self, path: str, fh: int) -> int:
         del self.file_handles[fh]
+        return 0
 
     def releasedir(self, path: str, fh: int) -> int:
         del self.dir_handles[fh]
+        return 0
+
+    if feature_enabled(Feature.BETA):
+        # def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
+        #     fih = self._get(path)
+
+        #     return self.file_handles[fh].seek(off, whence)
+        pass
+        # def read_buf(self, path: str, size: int, off: int, fd: int) -> str:
+        #     pass
