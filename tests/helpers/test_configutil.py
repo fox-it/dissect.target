@@ -145,24 +145,24 @@ def test_change_scope() -> None:
     manager = ScopeManager()
 
     # Scoping does not change
-    changed = parser._change_scope(manager, "key value", "key2 value2", "key value")
+    changed = parser._change_scope(manager, line="key value", next_line="key2 value2", key="key value")
     assert id(manager._root) == id(manager._current)
     assert not changed
     old_current = manager._current
 
     # Scoping changes once
-    changed = parser._change_scope(manager, "key2 value2", "  value2", "key2 value2")
+    changed = parser._change_scope(manager, line="key2 value2", next_line="  value2", key="key2 value2")
     assert id(old_current) != id(manager._current)
     assert changed
     assert manager._root == {"key2 value2": {}}
     old_current = manager._current
 
     # If the current line still contains empty space, return the same scope
-    changed = parser._change_scope(manager, "  value2", "test_line", "value2")
+    changed = parser._change_scope(manager, line="  value2", next_line="test_line", key="value2")
     assert id(old_current) == id(manager._current)
     assert not changed
 
-    changed = parser._change_scope(manager, "test data", None, "test data")
+    changed = parser._change_scope(manager, line="test data", next_line=None, key="test data")
     assert id(old_current) == id(manager._current)
     assert not changed
 
