@@ -2,15 +2,17 @@ from io import StringIO
 
 import pytest
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.configutil import SystemD
 from dissect.target.plugins.os.unix.linux.services import (
     ServicesPlugin,
     create_systemd_string,
 )
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_services(target_unix_users, fs_unix):
+def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     systemd_service_1 = absolute_path("_data/plugins/os/unix/services/systemd.service")
     systemd_service_2 = absolute_path("_data/plugins/os/unix/services/systemd2.service")
     initd_service_1 = absolute_path("_data/plugins/os/unix/services/initd.sh")
@@ -60,7 +62,7 @@ def test_services(target_unix_users, fs_unix):
         ("[Unit]\ntest=hello\tme", 'Unit_test="hello\tme"'),
     ],
 )
-def test_systemd(assignment, expected_value):
+def test_systemd(assignment: str, expected_value: str) -> None:
     parser = SystemD()
     parser.read_file(StringIO(assignment))
     data = create_systemd_string(parser.parsed_data)
