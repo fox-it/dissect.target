@@ -68,9 +68,20 @@ class PeekableIterator:
 
 
 class ConfigurationParser:
+    """A configuration parser where you can configure certain aspects of the parsing mechanism.
+
+    Args:
+        collapse: A boolean or an iterator:
+          If ``True``: it will collapse all the resulting dictionary values
+          If an iterable, it will only collapse the keys defined in ``collapse``.
+        collapse_inverse: Inverses the collapsing mechanism. So it will collapse everything that is not inside ``collapse``.
+        separator: Contains what values it should look for as a separator.
+        comment_prefixes: Contains what constitutes as a comment.
+    """
+
     def __init__(
         self,
-        collapse: Union[bool, Iterable] = False,
+        collapse: Union[bool, Iterable[str]] = False,
         collapse_inverse: bool = False,
         seperator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
@@ -111,6 +122,14 @@ class ConfigurationParser:
         return key not in self.collapse
 
     def parse_file(self, fh: TextIO) -> None:
+        """Parse the contents of ``fh`` inside key value pairs.
+
+        This function should **set** ``self.parsed_data`` as a side_effect.
+        Not update, as then the contents would keep changing.
+
+        Args:
+            fh: The text to parse
+        """
         raise NotImplementedError()
 
     def get(self, item: str, default: Optional[Any] = None) -> Any:
@@ -142,19 +161,19 @@ class ConfigurationParser:
 
 
 class Default(ConfigurationParser):
-    """Parse a configuration file specified by ``seperator`` and ``comment_prefixes``.
+    """Parse a configuration file specified by ``separator`` and ``comment_prefixes``.
 
-    This parser splits only on the first ``seperator`` it finds:
+    This parser splits only on the first ``separator`` it finds:
 
-        key<seperator>value     -> {"key": "value"}
+        key<separator>value     -> {"key": "value"}
 
-        key<seperator>value\n
+        key<separator>value\n
           continuation
                                 -> {"key": "value continuation"}
 
         # Unless we collapse values, we add them to a list to not overwrite any values.
-        key<seperator>value1
-        key<seperator>value2
+        key<separator>value1
+        key<separator>value2
                                 -> {key: [value1, value2]}
 
         <empty_space><comment>  -> skip
@@ -231,6 +250,11 @@ class Txt(ConfigurationParser):
 
 
 class ScopeManager:
+    """A manager for dictionary scoping.
+
+    To provide utility function to keep track of scopes inside a dictionary.
+    """
+
     def __init__(self) -> None:
         self._parents = {}
         self._root = {}
@@ -240,7 +264,7 @@ class ScopeManager:
     def __enter__(self) -> ScopeManager:
         return self
 
-    def __exit__(self, type, value, traceback): -> None
+    def __exit__(self, type, value, traceback) -> None:
         self.clean()
 
     def _set_prev(self, keep_prev: bool) -> None:
@@ -267,17 +291,22 @@ class ScopeManager:
             return True
         return False
 
-    def update(self, key: str, value: str): -> None
+    def update(self, key: str, value: str) -> None:
+        """Update the ``self._current`` dictionary with ``key`` and ``value``."""
         _update_dictionary(self._current, key, value)
 
     def update_prev(self, key: str, value: str) -> None:
+        """Update the parent dictionary with ``key`` and ``value``."""
         _update_dictionary(self._previous, key, value)
 
     def is_root(self) -> bool:
         """Utility function to check whether the current dictionary is a root dictionary."""
         return id(self._current) == id(self._root)
 
-    def clean(self): -> None
+    def clean(self) -> None:
+        """Clean up the internal state
+
+        Is done automatically if used as a contextmanager.
         self._parents = {}
         self._root = {}
         self._current = self._root
@@ -306,9 +335,18 @@ class Indentation(Default):
         self,
         manager: ScopeManager(),
         line: str,
-        next_line: Optional[str],
-        key: Optional[str],
+        key: str,
+        next_line: Optional[str] = None,
     ) -> bool:
+        """A function to check whether to create a new scope, or go back to a previous one.
+
+        Args:
+            manager: Contains the logic to push and pop scopes, and keeps the state.
+            line: The current line that gets parsed
+            key: What key should be updated during a ``manager.push``
+            next_line: a peek into the next line of a function.
+
+        Returns whether the scope changed or not."""
         empty_space = (" ", "\t")
         changed = False
 
@@ -331,8 +369,8 @@ class Indentation(Default):
                 changed = self._change_scope(
                     manager=manager,
                     line=line,
-                    next_line=iterator.peek(),
                     key=line.strip(),
+                    next_line=iterator.peek(),
                 )
 
                 if changed:
@@ -353,7 +391,8 @@ class SystemD(Indentation):
         self,
         manager: ScopeManager,
         line: str,
-        key: Optional[str],
+        key: str,
+        next_line: Optional[str] = None,
     ) -> bool:
         scope_char = ("[", "]")
         changed = False
@@ -481,7 +520,7 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
         file_path: An entry or targetpath that with contents to parse
         hint: A hint to what parser should be used.
         collapse:
-        seperator: What seperator to use for key value mapping
+        separator: What separator to use for key value mapping
         comment_prefixes: The characters that determine a comment.
 
     Raises:
