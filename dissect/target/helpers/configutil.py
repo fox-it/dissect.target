@@ -74,7 +74,8 @@ class ConfigurationParser:
         collapse: A boolean or an iterator:
           If ``True``: it will collapse all the resulting dictionary values
           If an iterable, it will only collapse the keys defined in ``collapse``.
-        collapse_inverse: Inverses the collapsing mechanism. So it will collapse everything that is not inside ``collapse``.
+        collapse_inverse: Inverses the collapsing mechanism.
+          So it will collapse everything that is not inside ``collapse``.
         separator: Contains what values it should look for as a separator.
         comment_prefixes: Contains what constitutes as a comment.
     """

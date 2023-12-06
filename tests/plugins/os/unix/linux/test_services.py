@@ -45,7 +45,9 @@ def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
         "Unit_After": "foobar.service",
         "Unit_Requires": "foo.service bar.service",
         "Service_Type": "simple",
-        "Service_ExecStart": "/bin/bash -c 'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; exit 0'",
+        "Service_ExecStart": (
+            "/bin/bash -c 'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; exit 0'"
+        ),
         "Service_SyslogIdentifier": "example-service",
         "Service_TimeoutStopSec": "5",
         "Install_WantedBy": "multi-user.target",
