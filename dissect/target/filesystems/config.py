@@ -15,6 +15,15 @@ log = getLogger(__name__)
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
+    """A special ``Filesystem`` that allows you to browse files as directories by parsing
+    the file into key value pairs.
+
+    The ``key`` are ``files`` if its ``value`` is not a dictionary,
+    where they are ``directories`` if it is.
+
+    This allows you to browse these ``files`` like you'd do on a filesystem.
+    """
+
     __type__: str = "META:configuration"
 
     def __init__(self, target: Target, path: str, **kwargs):
@@ -28,8 +37,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
         the start of the path.
 
         Returns:
-            A list of ``parts``: [filename, keys, into, the, file].
-            And the resolved entry.
+            A list of ``parts`` containing keys: [keys, into, the, file].
+            And the resolved entry: Entry(filename)
         """
         entry = relentry or self.root
 
@@ -63,6 +72,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
     def get(
         self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
+        """Returns an entry pointed to by ``path``."""
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
@@ -75,11 +85,16 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return entry
 
-    def _convert_entry(self, file_entry: FilesystemEntry, *args, **kwargs):
+    def _convert_entry(
+        self, file_entry: FilesystemEntry, *args, **kwargs
+    ) -> Union[ConfigurationEntry, FilesystemEntry]:
+        """Creates a ``ConfigurationEntry`` from a ``file_entry``.
+
+        If an error occurs during the parsing of the file contents,
+        the original ``file_entry`` is returned.
+        """
         entry = file_entry
         try:
-            # The parts in _get_till_file also includes the filename, so we do not join
-            # the part with entry.path here.
             config_parser = parse(entry, *args, **kwargs)
             entry = ConfigurationEntry(self, entry.path, entry, config_parser)
         except ConfigurationParsingError:
@@ -111,27 +126,43 @@ class ConfigurationEntry(FilesystemEntry):
 
         return f"<{self.__class__.__name__} {output}"
 
-    def get(self, path: Optional[str] = None, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any]:
-        """Gets the ``path`` from the configuration entry.
+    def get(self, key: Optional[str] = None, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any]:
+        """Gets the dictionary key that belongs to this entry using ``key``.
 
-        If ``path`` does not exist, it uses ``default`` instead.
+        This get is a bit special as it behaves as a ``dictionary.get``.
+        Which means the ``default`` here is the value  it should return if it coould not find anything.
+
+        Args:
+            ``key``: A dictionary key that is inside ``self.parser_items``.
+            ``default``: The default value to return if ``key`` is not inside this entry.
+
+        Returns:
+            a ``ConfigurationEntry`` if ``key`` was inside this keys contents, otherwise its ``default``.
         """
         # Check for path in config entry
-        if not path:
+        if not key:
             # Return self if configuration was found.
             return self
 
-        if path in self.parser_items:
+        if key in self.parser_items:
             return ConfigurationEntry(
                 self.fs,
-                fsutil.join(self.path, path, alt_separator=self.fs.alt_separator),
+                fsutil.join(self.path, key, alt_separator=self.fs.alt_separator),
                 self.entry,
-                self.parser_items[path],
+                self.parser_items[key],
             )
         return default
 
     def _write_value_mapping(self, values: dict[str, Any], indentation_nr: int = 0) -> str:
-        """Writes a dictionary to the output, c style."""
+        """Recursively write the ``values`` dictionary to an output with indentation for the values.
+
+        Args:
+            values: A dictionary or its contents.
+            indentation_nr: How much indentation this entry should receive.
+
+        Returns:
+            An indented string containing all the information inside ``values``.
+        """
         prefix = " " * indentation_nr
         output_buffer = io.StringIO()
 
@@ -147,10 +178,13 @@ class ConfigurationEntry(FilesystemEntry):
         return output_buffer.getvalue()
 
     def open(self) -> BinaryIO:
-        """Returns the content of the ``parser_items`` dictionary."""
-        # Return fh for path if entry is a file
-        # Return bytes of value if entry is ConfigurationEntry
+        """Returns the a byte representation of the ``self.parser_items``.
 
+        In the case that ``parser_items`` is a ``ConfigurationParser`` it will open the raw entry
+        without any parsing.
+
+        Otherwise it creates a byte representation of the data inside ``parser_items``.
+        """
         if isinstance(self.parser_items, ConfigurationParser):
             # Currently trying to open the underlying entry
             return self.entry.open()
@@ -174,21 +208,34 @@ class ConfigurationEntry(FilesystemEntry):
         return not self.is_dir(follow_symlinks)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
+        """If ``self.parser_items`` has the ``keys``, we see it as a directory."""
         return hasattr(self.parser_items, "keys")
 
     def is_symlink(self) -> bool:
+        """The underlying entry should already be resolved, so we do not consider any of these entries
+        symlinks.
+        """
         return False
 
-    def exists(self, path: str) -> bool:
-        return self.entry.exists() and path in self.parser_items
+    def exists(self, key: str) -> bool:
+        """The underlying entry should exists, an the ``key`` we profide should
+        be a key inside our dictionary.
+
+        Returns: Whether the entry exists or not.
+        """
+        return self.entry.exists() and key in self.parser_items
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        """Returns the stat from the underlying entry."""
         return self.entry.stat(follow_symlinks)
 
     def lstat(self) -> fsutil.stat_result:
+        """Returns the lstat from the underlying entry."""
+
         return self.entry.lstat()
 
     def as_dict(self) -> dict:
+        """Returns the underying dictionary or value that belongs to this Entry."""
         if isinstance(self.parser_items, ConfigurationParser):
             return self.parser_items.parsed_data
         return self.parser_items
