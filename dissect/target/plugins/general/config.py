@@ -50,8 +50,9 @@ class ConfigurationTreePlugin(Plugin):
         Args:
             path: The path to either a directory or file
             hint: What kind of parser it should use
-            collapse: Wether it should collapse all or only certain keys.
-            seperator: What seperator should be used for the parser.
+            collapse: Wether it should collapse everything or only a certain set of keys.
+            collapse_inverse: Invert the collapse function to collapse everything but the keys inside ``collapse``.
+            separator: What separator should be used for the parser.
             comment_prefixes: What is specified as a comment.
             as_dict: Returns the dictionary instead of an entry.
         """
