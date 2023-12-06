@@ -16,7 +16,7 @@ from tests._utils import absolute_path
 
 
 @pytest.fixture
-def config_tree(target_unix: Target):
+def config_tree(target_unix: Target) -> ConfigurationTreePlugin:
     target_unix.add_plugin(ConfigurationTreePlugin)
     return target_unix.config_tree
 

@@ -84,7 +84,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
             entry = ConfigurationEntry(self, entry.path, entry, config_parser)
         except ConfigurationParsingError:
             # If a parsing error gets created, it should return the `entry`
-            log.debug(f"Error when parsing {entry.path}")
+            log.debug("Error when parsing %s", entry.path)
 
         return entry
 
@@ -163,7 +163,7 @@ class ConfigurationEntry(FilesystemEntry):
             yield entry.name
 
     def scandir(self) -> Iterator[ConfigurationEntry]:
-        """Return the items inside ``self.parser_items`` as ConfigurationEntries."""
+        """Return the items inside ``self.parser_items`` as ``ConfigurationEntries``."""
         if self.is_file():
             raise NotADirectoryError()
 
@@ -191,5 +191,4 @@ class ConfigurationEntry(FilesystemEntry):
     def as_dict(self) -> dict:
         if isinstance(self.parser_items, ConfigurationParser):
             return self.parser_items.parsed_data
-        else:
-            return self.parser_items
+        return self.parser_items

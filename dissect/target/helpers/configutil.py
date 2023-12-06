@@ -240,16 +240,16 @@ class ScopeManager:
     def __enter__(self) -> ScopeManager:
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type, value, traceback): -> None
         self.clean()
 
     def _set_prev(self, keep_prev: bool) -> None:
-        """Set self._previous before _current changes"""
+        """Set ``self._previous`` before ``_current`` changes."""
         if not keep_prev:
             self._previous = self._current
 
-    def push(self, name: str, keep_prev: bool = False) -> tuple[bool, dict]:
-        """Push a new key to the current dictionary and return that we did so"""
+    def push(self, name: str, keep_prev: bool = False) -> bool:
+        """Push a new key to the current dictionary and return that we did."""
         child = self._current.get(name, {})
 
         parent = self._current
@@ -259,25 +259,25 @@ class ScopeManager:
         self._current = child
         return True
 
-    def pop(self, keep_prev: bool = False) -> tuple[bool, dict]:
-        """Pop _current and return whether we changed to the parent dict"""
+    def pop(self, keep_prev: bool = False) -> bool:
+        """Pop ``_current`` and return whether we changed to the parent dictionary."""
         if new_current := self._parents.pop(id(self._current), None):
             self._set_prev(keep_prev)
             self._current = new_current
             return True
         return False
 
-    def update(self, key: str, value: str):
+    def update(self, key: str, value: str): -> None
         _update_dictionary(self._current, key, value)
 
     def update_prev(self, key: str, value: str) -> None:
         _update_dictionary(self._previous, key, value)
 
     def is_root(self) -> bool:
-        """Utility function to see whether we are in the root dict"""
+        """Utility function to check whether the current dictionary is a root dictionary."""
         return id(self._current) == id(self._root)
 
-    def clean(self):
+    def clean(self): -> None
         self._parents = {}
         self._root = {}
         self._current = self._root
@@ -308,7 +308,7 @@ class Indentation(Default):
         line: str,
         next_line: Optional[str],
         key: Optional[str],
-    ) -> tuple[bool, dict[str, Union[str, dict]]]:
+    ) -> bool:
         empty_space = (" ", "\t")
         changed = False
 
@@ -354,7 +354,7 @@ class SystemD(Indentation):
         manager: ScopeManager,
         line: str,
         key: Optional[str],
-    ) -> tuple[bool, dict[str, Union[str, dict]]]:
+    ) -> bool:
         scope_char = ("[", "]")
         changed = False
         if line.startswith(scope_char):
@@ -401,7 +401,7 @@ class SystemD(Indentation):
                     prev_key = prev_key or key
                     prev_values.append(continued_value.strip("\\ "))
                     continue
-                elif prev_values:
+                if prev_values:
                     prev_values, prev_key = self._update_continued_values(
                         func=manager.update,
                         key=prev_key,
@@ -457,7 +457,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "xml": ParserConfig(Txt),
     "json": ParserConfig(Txt),
     "cnf": ParserConfig(Default),
-    "conf": ParserConfig(Default, seperator=(r"\s")),
+    "conf": ParserConfig(Default, seperator=(r"\s",)),
     "sample": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
