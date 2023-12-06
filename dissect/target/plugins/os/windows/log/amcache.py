@@ -4,8 +4,6 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Iterator, Union
 
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -78,9 +76,9 @@ def create_record(
         modified=_to_log_timestamp(install_properties.get("modified")),
         access=_to_log_timestamp(install_properties.get("lastaccessed")),
         link_date=_to_log_timestamp(install_properties.get("linkdate")),
-        path=path.from_windows(install_properties.get("path")),
-        filename=path.from_windows(filename),
-        create=path.from_windows(create),
+        path=target.fs.path(install_properties.get("path")),
+        filename=target.fs.path(filename),
+        create=target.fs.path(create),
         size_of_image=install_properties.get("sizeofimage"),
         file_description=install_properties.get("filedescription"),
         size=install_properties.get("size"),

@@ -1,6 +1,5 @@
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -329,7 +328,6 @@ def transform_app_id(value):
             value = value.decode()
         else:
             value = str(value)
-        value = path.from_windows(value)
     return value
 
 
@@ -355,7 +353,7 @@ class SRUPlugin(Plugin):
         super().__init__(target)
         self._sru = None
 
-        srupath = self.target.fs.path("sysvol/Windows/System32/sru/SRUDB.dat")
+        srupath = target.fs.path("sysvol/Windows/System32/sru/SRUDB.dat")
         if srupath.exists():
             try:
                 self._sru = sru.SRU(srupath.open())
@@ -382,7 +380,9 @@ class SRUPlugin(Plugin):
 
             record_values = {}
             for column, value in column_values:
-                new_value = TRANSFORMS[column](value) if column in TRANSFORMS else value
+                new_value = value
+                if new_value and (transform := TRANSFORMS.get(column)):
+                    new_value = self.target.fs.path(transform(new_value))
                 new_column = FIELD_MAPPINGS.get(column, column)
                 record_values[new_column] = new_value
 

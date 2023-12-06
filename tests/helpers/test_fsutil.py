@@ -2,7 +2,6 @@ import bz2
 import gzip
 import io
 import os
-import platform
 import tempfile
 from contextlib import contextmanager
 from unittest.mock import Mock, patch
@@ -290,7 +289,6 @@ def test_helpers_fsutil_open_decompress_text_modes():
     assert fh.errors == "backslashreplace"
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Encoding error. Needs to be fixed.")
 def test_helpers_fsutil_reverse_readlines():
     vfs = VirtualFilesystem()
 

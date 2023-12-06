@@ -72,10 +72,6 @@ def hash_uri_records(target: Target, record: Record) -> Record:
 
 def hash_path_records(target: Target, record: Record) -> Record:
     """Hash files from path fields inside the record."""
-    if target.os == "windows":
-        path_type = fieldtypes.windows_path
-    else:
-        path_type = fieldtypes.posix_path
 
     hash_records = []
 
@@ -93,7 +89,7 @@ def hash_path_records(target: Target, record: Record) -> Record:
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
-            resolved_path = path_type(resolved_path)
+            resolved_path = target.fs.path(resolved_path)
             record_kwargs = dict()
             record_def = list()
 

@@ -12,12 +12,10 @@ HASHES = ("CAFEF00D" * 4, "F4CEF001" * 5, "DEADBEEF" * 8)
 
 
 @pytest.fixture
-def mock_target() -> Mock:
-    target = Mock()
-    target.os = "windows"
-    target.fs.hash = lambda path: HASHES
-    target.resolve = lambda path: path
-    return target
+def mock_target(target_win) -> Mock:
+    target_win.fs.hash = lambda path: HASHES
+    target_win.resolve = lambda path: path
+    return target_win
 
 
 def resolve_func(path: str) -> str:

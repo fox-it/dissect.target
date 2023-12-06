@@ -2,7 +2,6 @@ from datetime import datetime
 from typing import Optional
 
 from dissect.util.ts import from_unix
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -250,7 +249,7 @@ class GenericPlugin(Plugin):
                     value = r.value(name)
                     yield AppInitRecord(
                         ts=r.ts,
-                        path=path.from_windows(value.value),
+                        path=self.target.fs.path(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -279,7 +278,7 @@ class GenericPlugin(Plugin):
                 for value in r.values():
                     yield KnownDllRecord(
                         ts=r.ts,
-                        path=path.from_windows(value.value),
+                        path=self.target.fs.path(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -325,7 +324,7 @@ class GenericPlugin(Plugin):
 
                         yield SessionManagerRecord(
                             ts=r.ts,
-                            path=path.from_windows(d),
+                            path=self.target.fs.path(d),
                             _target=self.target,
                             _user=user,
                             _key=r,
@@ -333,7 +332,7 @@ class GenericPlugin(Plugin):
                 else:
                     yield SessionManagerRecord(
                         ts=r.ts,
-                        path=path.from_windows(data.split(" ")[0]),
+                        path=self.target.fs.path(data.split(" ")[0]),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -427,7 +426,7 @@ class GenericPlugin(Plugin):
                     value = r.value(name)
                     yield CommandProcAutoRunRecord(
                         ts=r.ts,
-                        path=path.from_windows(value.value),
+                        path=self.target.fs.path(value.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -453,7 +452,7 @@ class GenericPlugin(Plugin):
             value = r.value("AlternateShell")
             yield AlternateShellRecord(
                 ts=r.ts,
-                path=path.from_windows(value.value),
+                path=self.target.fs.path(value.value),
                 _target=self.target,
                 _user=user,
                 _key=r,
@@ -477,7 +476,7 @@ class GenericPlugin(Plugin):
 
             yield BootShellRecord(
                 ts=r.ts,
-                path=path.from_windows(value.value),
+                path=self.target.fs.path(value.value),
                 _target=self.target,
                 _user=user,
                 _key=r,
@@ -500,7 +499,7 @@ class GenericPlugin(Plugin):
             user = self.target.registry.get_user(r)
             try:
                 value = r.value("PendingFileRenameOperations")
-                paths = map(path.from_windows, value.value)
+                paths = map(self.target.fs.path, value.value)
             except RegistryError:
                 continue
 
@@ -528,7 +527,7 @@ class GenericPlugin(Plugin):
                 for v in r.values():
                     yield WinRarRecord(
                         ts=r.ts,
-                        path=path.from_windows(v.value),
+                        path=self.target.fs.path(v.value),
                         _target=self.target,
                         _user=user,
                         _key=r,
@@ -552,7 +551,7 @@ class GenericPlugin(Plugin):
                 for s in r.subkeys():
                     yield WinSockNamespaceProviderRecord(
                         ts=r.ts,
-                        librarypath=path.from_windows(s.value("LibraryPath").value),
+                        librarypath=self.target.fs.path(s.value("LibraryPath").value),
                         displaystring=s.value("DisplayString").value,
                         providerid=s.value("ProviderID").value,
                         enabled=s.value("Enabled").value,
