@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
 
@@ -364,10 +366,13 @@ class SRUPlugin(Plugin):
         if not self._sru:
             raise UnsupportedPluginError("No SRUDB found")
 
-    def read_records(self, table_name, record_type):
+    def read_records(
+        self, table_name: str, record_type: TargetRecordDescriptor
+    ) -> Iterator[TargetRecordDescriptor | None]:
         table = self._sru.get_table(table_name=table_name)
         if not table:
-            raise ValueError(f"Table not found: {table_name}")
+            self.target.log.warning(f"Table not found: {table_name}")
+            return iter(())
 
         columns = [c.name for c in table.columns]
         if columns[:4] != ["AutoIncId", "TimeStamp", "AppId", "UserId"]:
