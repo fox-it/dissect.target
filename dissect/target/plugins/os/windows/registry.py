@@ -329,7 +329,7 @@ class RegistryPlugin(Plugin):
     @internal
     def get_user_details(self, key: RegistryKey) -> UserDetails:
         """Return user details for the user who owns a registry hive that contains the provided key"""
-        if not key.hive or not hasattr(key.hive, "filepath") or not key.hive.filepath:
+        if not key.hive or not getattr(key.hive, "filepath", None):
             return
 
         return self._hives_to_users.get(key.hive)
