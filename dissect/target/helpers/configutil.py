@@ -83,14 +83,14 @@ class ConfigurationParser:
         self,
         collapse: Union[bool, Iterable[str]] = False,
         collapse_inverse: bool = False,
-        seperator: tuple[str] = ("=",),
+        separator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
     ) -> None:
         self.collapse_all = collapse is True
         self.collapse = set(collapse) if isinstance(collapse, Iterable) else set()
         self._collapse_check = self._key_not_in_collapse if collapse_inverse else self._key_in_collapse
 
-        self.seperator = seperator
+        self.separator = separator
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
 
@@ -181,17 +181,18 @@ class Default(ConfigurationParser):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.SEPERATOR = re.compile(rf"\s*[{''.join(self.seperator)}]\s*")
+        self.SEPARATOR = re.compile(rf"\s*[{''.join(self.separator)}]\s*")
         self.COMMENTS = re.compile(rf"\s*[{''.join(self.comment_prefixes)}]")
         self.skip_lines = self.comment_prefixes + ("\n",)
 
-    def line_reader(self, fh: TextIO) -> Iterator[str]:
+    def line_reader(self, fh: TextIO, strip_comments: bool = True) -> Iterator[str]:
         for line in fh:
             if line.strip().startswith(self.skip_lines) or not line.strip():
                 continue
 
-            # Strip the comments first
-            line, *_ = self.COMMENTS.split(line, 1)
+            if strip_comments:
+                line, *_ = self.COMMENTS.split(line, 1)
+
             yield line
 
     def parse_file(self, fh: TextIO) -> None:
@@ -205,7 +206,7 @@ class Default(ConfigurationParser):
                 information_dict[prev_key] = " ".join([prev_value, line.strip()])
                 continue
 
-            prev_key, *value = self.SEPERATOR.split(line, 1)
+            prev_key, *value = self.SEPARATOR.split(line, 1)
             value = value[0].strip() if value else ""
 
             _update_dictionary(information_dict, prev_key, value)
@@ -221,7 +222,7 @@ class Ini(ConfigurationParser):
 
         self.parsed_data = ConfigParser(
             strict=False,
-            delimiters=self.seperator,
+            delimiters=self.separator,
             comment_prefixes=self.comment_prefixes,
             allow_no_value=True,
             interpolation=None,
@@ -307,6 +308,7 @@ class ScopeManager:
         """Clean up the internal state
 
         Is done automatically if used as a contextmanager.
+        """
         self._parents = {}
         self._root = {}
         self._current = self._root
@@ -327,7 +329,7 @@ class Indentation(Default):
     """
 
     def _parse_line(self, line: str) -> tuple[str, str]:
-        key, *value = self.SEPERATOR.split(line.strip(), 1)
+        key, *value = self.SEPARATOR.split(line.strip(), 1)
         value = value[0].strip() if value else ""
         return key, value
 
@@ -404,18 +406,11 @@ class SystemD(Indentation):
 
         return changed
 
-    def line_reader(self, fh: TextIO) -> Iterator[str]:
-        for line in fh:
-            if line.strip().startswith(self.skip_lines) or not line.strip():
-                continue
-
-            yield line
-
     def parse_file(self, fh: TextIO) -> None:
         prev_values = []
         prev_key = None
         with ScopeManager() as manager:
-            for line in self.line_reader(fh):
+            for line in self.line_reader(fh, strip_comments=True):
                 changed = self._change_scope(
                     manager=manager,
                     line=line,
@@ -462,7 +457,7 @@ class SystemD(Indentation):
 class ParserOptions:
     collapse: Optional[Union[bool, set]] = None
     collapse_inverse: Optional[bool] = None
-    seperator: Optional[tuple[str]] = None
+    separator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
 
@@ -471,13 +466,13 @@ class ParserConfig:
     parser: type[ConfigurationParser] = Default
     collapse: Optional[Union[bool, set]] = None
     collapse_inverse: Optional[bool] = None
-    seperator: Optional[tuple[str]] = None
+    separator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
 
     def create_parser(self, options: Optional[ParserOptions] = None) -> ConfigurationParser:
         kwargs = {}
 
-        for field_name in ["collapse", "collapse_inverse", "seperator", "comment_prefixes"]:
+        for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes"]:
             value = getattr(options, field_name, None) or getattr(self, field_name)
             if value:
                 kwargs.update({field_name: value})
@@ -496,7 +491,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "xml": ParserConfig(Txt),
     "json": ParserConfig(Txt),
     "cnf": ParserConfig(Default),
-    "conf": ParserConfig(Default, seperator=(r"\s",)),
+    "conf": ParserConfig(Default, separator=(r"\s",)),
     "sample": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
@@ -504,11 +499,11 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
 
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": ParserConfig(Ini),
-    "sshd_config": ParserConfig(Indentation, seperator=(r"\s",)),
-    "hosts.allow": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
-    "hosts.deny": ParserConfig(Default, seperator=(":",), comment_prefixes=("#",)),
-    "hosts": ParserConfig(Default, seperator=(r"\s")),
-    "nsswitch.conf": ParserConfig(Default, seperator=(":",)),
+    "sshd_config": ParserConfig(Indentation, separator=(r"\s",)),
+    "hosts.allow": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
+    "hosts.deny": ParserConfig(Default, separator=(":",), comment_prefixes=("#",)),
+    "hosts": ParserConfig(Default, separator=(r"\s",)),
+    "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
 }
 

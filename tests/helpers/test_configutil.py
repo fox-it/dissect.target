@@ -29,12 +29,12 @@ def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args,
     ],
 )
 def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
-    parsed_data = parse_data(Default, parser_string, seperator=(r"\s",))
+    parsed_data = parse_data(Default, parser_string, separator=(r"\s",))
     assert parsed_data[key] == value
 
 
 @pytest.mark.parametrize(
-    "parser_string, seperator, expected_output",
+    "parser_string, separator, expected_output",
     [
         ("hello=world", "=", {"hello": "world"}),
         ("hello = world", "=", {"hello": "world"}),
@@ -43,8 +43,8 @@ def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
         ("hello-world;20;20;20;20", ";", {"hello-world": "20;20;20;20"}),
     ],
 )
-def test_custom_seperators(parser_string: str, seperator: tuple, expected_output: dict[str, str]) -> None:
-    parsed_data = parse_data(Default, parser_string, seperator=seperator, comment_prefixes=("#",))
+def test_custom_separators(parser_string: str, separator: tuple, expected_output: dict[str, str]) -> None:
+    parsed_data = parse_data(Default, parser_string, separator=separator, comment_prefixes=("#",))
     assert parsed_data == expected_output
 
 
@@ -60,7 +60,7 @@ def test_custom_seperators(parser_string: str, seperator: tuple, expected_output
 )
 def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...]) -> None:
     parsed_data = parse_data(
-        Default, f"hello world {comment_string}", seperator=(r"\s",), comment_prefixes=comment_prefixes
+        Default, f"hello world {comment_string}", separator=(r"\s",), comment_prefixes=comment_prefixes
     )
     assert parsed_data == {"hello": "world"}
 
@@ -125,7 +125,7 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
     ],
 )
 def test_indented_parser(indented_string: str, expected_output: dict[str, dict]) -> None:
-    parsed_data = parse_data(Indentation, textwrap.dedent(indented_string), seperator=(r"\s",))
+    parsed_data = parse_data(Indentation, textwrap.dedent(indented_string), separator=(r"\s",))
     assert parsed_data == expected_output
 
 
@@ -134,14 +134,14 @@ def test_collapse_inversion() -> None:
     assert parse_data(
         Default,
         input_data,
-        seperator=(r"\s",),
+        separator=(r"\s",),
         collapse={"hello"},
         collapse_inverse=True,
     ) == {"hello": ["world", "test"], "world": "test"}
 
 
 def test_change_scope() -> None:
-    parser = Indentation(seperator=(r"\s",))
+    parser = Indentation(separator=(r"\s",))
     manager = ScopeManager()
 
     # Scoping does not change

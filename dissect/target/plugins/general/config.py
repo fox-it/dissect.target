@@ -39,7 +39,7 @@ class ConfigurationTreePlugin(Plugin):
         hint: Optional[str] = None,
         collapse: Optional[Union[bool, Iterable[str]]] = None,
         collapse_inverse: Optional[bool] = None,
-        seperator: Optional[tuple[str]] = None,
+        separator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
         as_dict: bool = False,
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
@@ -62,7 +62,7 @@ class ConfigurationTreePlugin(Plugin):
             hint=hint,
             collapse=collapse,
             collapse_inverse=collapse_inverse,
-            seperator=seperator,
+            separator=separator,
             comment_prefixes=comment_prefixes,
         )
 

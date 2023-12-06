@@ -27,7 +27,7 @@ def test_config_tree_plugin(config_tree: ConfigurationTreePlugin, fs_unix: Virtu
     fs_unix.map_dir("/etc", tmp_path)
     fs_unix.map_file("/etc/new/path/config", absolute_path("_data/helpers/configutil/config"))
 
-    options = {"seperator": (r"\s",)}
+    options = {"separator": (r"\s",)}
 
     assert isinstance(config_tree("/etc/new/path/config").get(""), ConfigurationEntry)
     assert isinstance(config_tree("/etc/new/path/config", **options).get("help"), ConfigurationEntry)
