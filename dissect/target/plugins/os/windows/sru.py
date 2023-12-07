@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, TypeAlias, Union
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
@@ -225,6 +225,22 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     ],
 )
 
+SRURecord: TypeAlias = Union[
+    NetworkDataRecord,
+    NetworkConnectivityRecord,
+    EnergyEstimatorRecord,
+    EnergyUsageRecord,
+    EnergyUsageLTRecord,
+    ApplicationRecord,
+    PushNotificationRecord,
+    ApplicationTimelineRecord,
+    VfuRecord,
+    SdpVolumeProviderRecord,
+    SdpPhysicalDiskProviderRecord,
+    SdpCpuProviderRecord,
+    SdpNetworkProviderRecord,
+]
+
 FIELD_MAPPINGS = {
     "ActiveAcTime": "active_ac_time",
     "ActiveDcTime": "active_dc_time",
@@ -324,7 +340,7 @@ FIELD_MAPPINGS = {
 }
 
 
-def transform_app_id(value):
+def transform_app_id(value: bytes | str | None) -> Union[bytes, str, None]:
     if value is not None:
         if isinstance(value, bytes):
             value = value.decode()
@@ -366,9 +382,7 @@ class SRUPlugin(Plugin):
         if not self._sru:
             raise UnsupportedPluginError("No SRUDB found")
 
-    def read_records(
-        self, table_name: str, record_type: TargetRecordDescriptor
-    ) -> Iterator[TargetRecordDescriptor | None]:
+    def read_records(self, table_name: str, record_type: SRURecord) -> Iterator[SRURecord]:
         table = self._sru.get_table(table_name=table_name)
         if not table:
             self.target.log.warning("Table not found: %s", table_name)
@@ -397,90 +411,84 @@ class SRUPlugin(Plugin):
             )
 
     @export(record=NetworkDataRecord)
-    def network_data(self):
-        """
-        Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
+    def network_data(self) -> Iterator[NetworkDataRecord]:
+        """Return the contents of Windows Network Data Usage Monitor table from the SRUDB.dat file.
 
         Gives insight into the network usage of the system.
         """
         yield from self.read_records("network_data", NetworkDataRecord)
 
     @export(record=NetworkConnectivityRecord)
-    def network_connectivity(self):
-        """
-        Return the contents of Windows Network Connectivity Usage Monitor table from the SRUDB.dat file.
+    def network_connectivity(self) -> Iterator[NetworkConnectivityRecord]:
+        """Return the contents of Windows Network Connectivity Usage Monitor table from the SRUDB.dat file.
 
         Gives insight into the network connectivity usage of the system.
         """
         yield from self.read_records("network_connectivity", NetworkConnectivityRecord)
 
     @export(record=EnergyEstimatorRecord)
-    def energy_estimator(self):
+    def energy_estimator(self) -> Iterator[EnergyEstimatorRecord]:
         """Return the contents of Energy Estimator table from the SRUDB.dat file."""
         yield from self.read_records("energy_estimator", EnergyEstimatorRecord)
 
     @export(record=EnergyUsageRecord)
-    def energy_usage(self):
-        """
-        Return the contents of Energy Usage Provider table from the SRUDB.dat file.
+    def energy_usage(self) -> Iterator[EnergyUsageRecord]:
+        """Return the contents of Energy Usage Provider table from the SRUDB.dat file.
 
         Gives insight into the energy usage of the system.
         """
         yield from self.read_records("energy_usage", EnergyUsageRecord)
 
     @export(record=EnergyUsageLTRecord)
-    def energy_usage_lt(self):
-        """
-        Return the contents of Energy Usage Provider Long Term table from the SRUDB.dat file.
+    def energy_usage_lt(self) -> Iterator[EnergyUsageLTRecord]:
+        """Return the contents of Energy Usage Provider Long Term table from the SRUDB.dat file.
 
         Gives insight into the energy usage of the system looking over the long term.
         """
         yield from self.read_records("energy_usage_lt", EnergyUsageLTRecord)
 
     @export(record=ApplicationRecord)
-    def application(self):
-        """
-        Return the contents of Application Resource Usage table from the SRUDB.dat file.
+    def application(self) -> Iterator[ApplicationRecord]:
+        """Return the contents of Application Resource Usage table from the SRUDB.dat file.
 
         Gives insights into the resource usage of applications on the system.
         """
         yield from self.read_records("application", ApplicationRecord)
 
     @export(record=PushNotificationRecord)
-    def push_notification(self):
-        """
-        Return the contents of Windows Push Notification Data table from the SRUDB.dat file.
+    def push_notification(self) -> Iterator[PushNotificationRecord]:
+        """Return the contents of Windows Push Notification Data table from the SRUDB.dat file.
 
         Gives insight into the notification usage of the system.
         """
         yield from self.read_records("push_notifications", PushNotificationRecord)
 
     @export(record=ApplicationTimelineRecord)
-    def application_timeline(self):
+    def application_timeline(self) -> Iterator[ApplicationTimelineRecord]:
         """Return the contents of App Timeline Provider table from the SRUDB.dat file."""
         yield from self.read_records("application_timeline", ApplicationTimelineRecord)
 
     @export(record=VfuRecord)
-    def vfu(self):
+    def vfu(self) -> Iterator[VfuRecord]:
         """Return the contents of vfuprov table from the SRUDB.dat file."""
         yield from self.read_records("vfu", VfuRecord)
 
     @export(record=SdpVolumeProviderRecord)
-    def sdp_volume_provider(self):
+    def sdp_volume_provider(self) -> Iterator[SdpVolumeProviderRecord]:
         """Return the contents of SDP Volume Provider table from the SRUDB.dat file."""
         yield from self.read_records("sdp_volume_provider", SdpVolumeProviderRecord)
 
     @export(record=SdpPhysicalDiskProviderRecord)
-    def sdp_physical_disk_provider(self):
+    def sdp_physical_disk_provider(self) -> Iterator[SdpPhysicalDiskProviderRecord]:
         """Return the contents of SDP Physical Disk Provider table from the SRUDB.dat file."""
         yield from self.read_records("sdp_physical_disk_provider", SdpPhysicalDiskProviderRecord)
 
     @export(record=SdpCpuProviderRecord)
-    def sdp_cpu_provider(self):
+    def sdp_cpu_provider(self) -> Iterator[SdpCpuProviderRecord]:
         """Return the contents of SDP CPU Provider table from the SRUDB.dat file."""
         yield from self.read_records("sdp_cpu_provider", SdpCpuProviderRecord)
 
     @export(record=SdpNetworkProviderRecord)
-    def sdp_network_provider(self):
+    def sdp_network_provider(self) -> Iterator[SdpNetworkProviderRecord]:
         """Return the contents of SDP Network Provider table from the SRUDB.dat file."""
         yield from self.read_records("sdp_network_provider", SdpNetworkProviderRecord)
