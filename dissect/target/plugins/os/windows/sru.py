@@ -371,7 +371,7 @@ class SRUPlugin(Plugin):
     ) -> Iterator[TargetRecordDescriptor | None]:
         table = self._sru.get_table(table_name=table_name)
         if not table:
-            self.target.log.warning(f"Table not found: {table_name}")
+            self.target.log.warning("Table not found: %s", table_name)
             return iter(())
 
         columns = [c.name for c in table.columns]
