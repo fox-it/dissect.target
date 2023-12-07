@@ -20,7 +20,7 @@ class GenericPlugin(Plugin):
 
         last_seen = 0
         for f in var_log.iterdir():
-            if f.is_symlink() or not f.exists():
+            if not f.exists():
                 continue
             if f.stat().st_mtime > last_seen:
                 last_seen = f.stat().st_mtime
