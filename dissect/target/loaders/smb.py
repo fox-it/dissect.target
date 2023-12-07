@@ -196,7 +196,9 @@ class SmbRegistry(RegistryPlugin):
 
             self._winreg = _connect_rpc(self.conn, "ncacn_np:445[\\pipe\\winreg]", rrp.MSRPC_UUID_RRP)
 
-            hklm_hive = SmbRegistryHive(self._winreg, "HKEY_LOCAL_MACHINE", rrp.hOpenLocalMachine(self._winreg)["phKey"])
+            hklm_hive = SmbRegistryHive(
+                self._winreg, "HKEY_LOCAL_MACHINE", rrp.hOpenLocalMachine(self._winreg)["phKey"]
+            )
             hku_hive = SmbRegistryHive(self._winreg, "HKEY_USERS", rrp.hOpenUsers(self._winreg)["phKey"])
 
             self._add_hive("HKLM", hklm_hive, TargetPath(self.target.fs, "HKLM"))
@@ -227,7 +229,7 @@ class SmbRegistry(RegistryPlugin):
         try:
             manager_handle = scmr.hROpenSCManagerW(self._svcctl)["lpScHandle"]
             self._svc_handle = scmr.hROpenServiceW(self._svcctl, manager_handle, "RemoteRegistry")["lpServiceHandle"]
-        except DCERPCException as e:
+        except DCERPCException:
             return
 
         current_state = scmr.hRQueryServiceStatus(self._svcctl, self._svc_handle)["lpServiceStatus"]["dwCurrentState"]
