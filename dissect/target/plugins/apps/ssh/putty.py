@@ -11,8 +11,8 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
-from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.apps.ssh.openssh import KnownHostRecord
+from dissect.target.plugin import export
+from dissect.target.plugins.apps.ssh.ssh import KnownHostRecord, SSHPlugin
 from dissect.target.plugins.general.users import UserDetails
 
 log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ PuTTYSessionRecord = PuTTYUserRecordDescriptor(
 )
 
 
-class PuTTYPlugin(Plugin):
+class PuTTYPlugin(SSHPlugin):
     """Extract artifacts from the PuTTY client.
 
     NOTE:
