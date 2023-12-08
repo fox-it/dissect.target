@@ -6,6 +6,7 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from types import TracebackType
 from typing import (
     Any,
     Callable,
@@ -13,6 +14,7 @@ from typing import (
     Iterable,
     Iterator,
     KeysView,
+    Literal,
     Optional,
     TextIO,
     Union,
@@ -70,10 +72,13 @@ class PeekableIterator:
 class ConfigurationParser:
     """A configuration parser where you can configure certain aspects of the parsing mechanism.
 
+    Attributes:
+        parsed_data: The resulting dictionary after parsing
+
     Args:
-        collapse: A boolean or an iterator:
+        collapse: A ``bool`` or an ``Iterator``:
           If ``True``: it will collapse all the resulting dictionary values
-          If an iterable, it will only collapse the keys defined in ``collapse``.
+          If an ``Iterable`` it will collapse on the keys defined in ``collapse``.
         collapse_inverse: Inverses the collapsing mechanism.
           So it will collapse everything that is not inside ``collapse``.
         separator: Contains what values it should look for as a separator.
@@ -123,13 +128,13 @@ class ConfigurationParser:
         return key not in self.collapse
 
     def parse_file(self, fh: TextIO) -> None:
-        """Parse the contents of ``fh`` inside key value pairs.
+        """Parse the contents of ``fh`` inside key/value pairs.
 
-        This function should **set** ``self.parsed_data`` as a side_effect.
+        This function should **set** :attr:`parsed_data` as a side_effect.
         Not update, as then the contents would keep changing.
 
         Args:
-            fh: The text to parse
+            fh: The text to parse.
         """
         raise NotImplementedError()
 
@@ -140,7 +145,7 @@ class ConfigurationParser:
         """Parse a configuration file.
 
         Raises:
-            ConfigurationParsingError: If any exception occurs during during the parsing process
+            ConfigurationParsingError: If any exception occurs during during the parsing process.
         """
 
         try:
@@ -252,9 +257,15 @@ class Txt(ConfigurationParser):
 
 
 class ScopeManager:
-    """A manager for dictionary scoping.
+    """A (context)manager for dictionary scoping.
 
-    To provide utility function to keep track of scopes inside a dictionary.
+    This class provides utility functions to keep track of scopes inside a dictionary.
+
+    Attributes:
+        _parents: A dictionary accounting what child belongs to which parent dictionary.
+        _root: The initial dictionary.
+        _current: The current dictionary.
+        _previous: The node before the current gets changed
     """
 
     def __init__(self) -> None:
@@ -266,7 +277,12 @@ class ScopeManager:
     def __enter__(self) -> ScopeManager:
         return self
 
-    def __exit__(self, type, value, traceback) -> None:
+    def __exit__(
+        self,
+        type: Optional[type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         self.clean()
 
     def _set_prev(self, keep_prev: bool) -> None:
@@ -274,8 +290,8 @@ class ScopeManager:
         if not keep_prev:
             self._previous = self._current
 
-    def push(self, name: str, keep_prev: bool = False) -> bool:
-        """Push a new key to the current dictionary and return that we did."""
+    def push(self, name: str, keep_prev: bool = False) -> Literal[True]:
+        """Push a new key to the :attr:`_current` dictionary and return that we did."""
         child = self._current.get(name, {})
 
         parent = self._current
@@ -286,7 +302,7 @@ class ScopeManager:
         return True
 
     def pop(self, keep_prev: bool = False) -> bool:
-        """Pop ``_current`` and return whether we changed to the parent dictionary."""
+        """Pop :attr:`_current` and return whether we changed to the parent dictionary."""
         if new_current := self._parents.pop(id(self._current), None):
             self._set_prev(keep_prev)
             self._current = new_current
@@ -294,11 +310,11 @@ class ScopeManager:
         return False
 
     def update(self, key: str, value: str) -> None:
-        """Update the ``self._current`` dictionary with ``key`` and ``value``."""
+        """Update the :attr:`_current` dictionary with ``key`` and ``value``."""
         _update_dictionary(self._current, key, value)
 
     def update_prev(self, key: str, value: str) -> None:
-        """Update the parent dictionary with ``key`` and ``value``."""
+        """Update the :attr:`_previous` dictionary with ``key`` and ``value``."""
         _update_dictionary(self._previous, key, value)
 
     def is_root(self) -> bool:
@@ -306,9 +322,8 @@ class ScopeManager:
         return id(self._current) == id(self._root)
 
     def clean(self) -> None:
-        """Clean up the internal state
-
-        Is done automatically if used as a contextmanager.
+        """Clean up the internal state.
+        This is called automatically when :class:`ScopeManager` is used as a contextmanager.
         """
         self._parents = {}
         self._root = {}
@@ -317,7 +332,7 @@ class ScopeManager:
 
 
 class Indentation(Default):
-    """This parser is used for the files that use a single level of indentation to specify a different scope.
+    """This parser is used for files that use a single level of indentation to specify a different scope.
 
     Examples of these files are for example the sshd_config file.
     Where "Match" statments use a single layer of indentaiton to specify a scope for the key value pairs.
@@ -336,7 +351,7 @@ class Indentation(Default):
 
     def _change_scope(
         self,
-        manager: ScopeManager(),
+        manager: ScopeManager,
         line: str,
         key: str,
         next_line: Optional[str] = None,
@@ -344,12 +359,14 @@ class Indentation(Default):
         """A function to check whether to create a new scope, or go back to a previous one.
 
         Args:
-            manager: Contains the logic to push and pop scopes, and keeps the state.
-            line: The current line that gets parsed
-            key: What key should be updated during a ``manager.push``
-            next_line: a peek into the next line of a function.
+            manager: A :class:`ScopeManager` that contains the logic to ``push`` and ``pop`` scopes. And keeps state.
+            line: The line to be parsed.
+            key: The key that should be updated during a :method:`ScopeManager.push``.
+            next_line: The next line to be parsed.
 
-        Returns whether the scope changed or not."""
+        Returns:
+            Whether the scope changed or not.
+        """
         empty_space = (" ", "\t")
         changed = False
 
@@ -366,6 +383,7 @@ class Indentation(Default):
     def parse_file(self, fh: TextIO) -> None:
         iterator = PeekableIterator(self.line_reader(fh))
         prev_key = None
+
         with ScopeManager() as manager:
             for line in iterator:
                 key, value = self._parse_line(line)
@@ -390,6 +408,31 @@ class Indentation(Default):
 
 
 class SystemD(Indentation):
+    """A :class:`ConfigurationParser` that specifically parses systemd configuration files.
+
+    Examples:
+        >>> systemd_data = textwrap.dedent(
+                '''
+                [Section1]
+                Key=Value
+                [Section2]
+                Key2=Value 2\\
+                    Value 2 continued
+                '''
+            )
+        >>> parser = SystemD(io.StringIO(systemd_data))
+        >>> parser.parser_items
+        {
+            "Section1": {
+                "Key": "Value
+            },
+            "Section2": {
+                "Key2": "Value2 Value 2 continued
+            }
+        }
+
+    """
+
     def _change_scope(
         self,
         manager: ScopeManager,
@@ -410,6 +453,7 @@ class SystemD(Indentation):
     def parse_file(self, fh: TextIO) -> None:
         prev_values = []
         prev_key = None
+
         with ScopeManager() as manager:
             for line in self.line_reader(fh, strip_comments=False):
                 changed = self._change_scope(
@@ -436,6 +480,7 @@ class SystemD(Indentation):
                     prev_key = prev_key or key
                     prev_values.append(continued_value.strip("\\ "))
                     continue
+
                 if prev_values:
                     prev_values, prev_key = self._update_continued_values(
                         func=manager.update,
@@ -513,11 +558,12 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
-        file_path: An entry or targetpath that with contents to parse
-        hint: A hint to what parser should be used.
-        collapse:
-        separator: What separator to use for key value mapping
-        comment_prefixes: The characters that determine a comment.
+        path: The path to either a directory or file.
+        hint: What kind of parser it should use.
+        collapse: Whether it should collapse everything or just a certain set of keys.
+        collapse_inverse: Invert the collapse function to collapse everything but the keys inside ``collapse``.
+        separator: The separator that should be used for parsing.
+        comment_prefixes: What is specified as a comment.
 
     Raises:
         FileNotFoundError: If the ``path`` is not a file.

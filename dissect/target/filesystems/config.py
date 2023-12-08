@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import Any, BinaryIO, Iterator, Optional, Union
 
 from dissect.target import Target
-from dissect.target.exceptions import ConfigurationParsingError
+from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
@@ -15,13 +15,29 @@ log = getLogger(__name__)
 
 
 class ConfigurationFilesystem(VirtualFilesystem):
-    """A special ``Filesystem`` that allows you to browse files as directories by parsing
-    the file into key value pairs.
+    """A special :class:`.Filesystem` class that allows you to browse and interact with configuration files
+    as ``directories`` and ``files`` by parsing the file into key/value pairs.
 
-    The ``key`` are ``files`` if its ``value`` is not a dictionary,
-    where they are ``directories`` if it is.
+    Depending on the ``value`` of a configuration file's ``key``, it will act like a ``directory`` or ``file``:
+        * When the ``key`` contains sub-values (dictionary), it will act like a ``directory``.
+        * Otherwise it will act like a ``file``.
 
-    This allows you to browse these ``files`` like you'd do on a filesystem.
+    Examples:
+        >>> fs = ConfigurationFilesystem(target, "/etc")
+        >>> entry = fs.get("xattr.conf")
+        <ConfigurationEntry path=/etc/xattr.conf value=<dissect.target.helpers.configutil.Default object at 0x115683280>
+        >>> entry.listdir() # listed entries are the keys in the configuration file
+        [...
+        'system.posix_acl_access',
+        'system.posix_acl_default',
+        'trusted.SGI_ACL_DEFAULT',
+        'trusted.SGI_ACL_FILE',
+        ...]
+        >>> entry.get("system.posix_acl_access") # returns the value of the key
+        <ConfigurationEntry path=/etc/xattr.conf/system.posix_acl_access value=permissions>
+        >>> entry.get("system.posix_acl_access").open().read() # returns the raw value of the key
+        b'permissions\\n'
+
     """
 
     __type__: str = "META:configuration"
@@ -72,7 +88,11 @@ class ConfigurationFilesystem(VirtualFilesystem):
     def get(
         self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs
     ) -> Union[FilesystemEntry, ConfigurationEntry]:
-        """Returns an entry pointed to by ``path``."""
+        """Retrieve a :class:`ConfigurationEntry` or :class:`.FilesystemEntry` relative to the root or ``relentry``.
+
+        Raises:
+            FileNotFoundError: if it could not find the entry.
+        """
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
@@ -82,13 +102,15 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         for part in parts:
             entry = entry.get(part)
+            if entry is None:
+                raise FileNotFoundError(f"{part!r} not found in {entry}.")
 
         return entry
 
     def _convert_entry(
         self, file_entry: FilesystemEntry, *args, **kwargs
     ) -> Union[ConfigurationEntry, FilesystemEntry]:
-        """Creates a ``ConfigurationEntry`` from a ``file_entry``.
+        """Creates a :class:`ConfigurationEntry` from a ``file_entry``.
 
         If an error occurs during the parsing of the file contents,
         the original ``file_entry`` is returned.
@@ -105,12 +127,45 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
 
 class ConfigurationEntry(FilesystemEntry):
+    """A Special filesystem entry.
+
+    Acts like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a dict and
+    like a ``file`` otherwise.
+
+    Attributes:
+        parser_items: A dict-like object containing all configuration entries and values.
+            In most cases this is either a :class:`.ConfigurationParser` or `dict`.
+            Otherwise, its the values
+
+    Examples:
+        >>> fs = ConfigurationFilesystem(target, "/etc")
+        >>> entry = fs.get("xattr.conf")
+        <ConfigurationEntry path=/etc/xattr.conf value=<dissect.target.helpers.configutil.Default object at 0x115683280>
+        >>> entry.listdir() # listed entries are the keys in the configuration file
+        [...
+        'system.posix_acl_access',
+        'system.posix_acl_default',
+        'trusted.SGI_ACL_DEFAULT',
+        'trusted.SGI_ACL_FILE',
+        ...]
+        >>> entry.as_dict()
+        {
+            ...
+            "system.posix_acl_access" : "...",
+            ...
+        }
+        >>> entry.get("system.posix_acl_access") # returns the value of the key
+        <ConfigurationEntry path=/etc/xattr.conf/system.posix_acl_access value=permissions>
+        >>> entry.get("system.posix_acl_access").open().read() # returns the raw value of the key
+        b'permissions\\n'
+    """
+
     def __init__(
         self,
         fs: Filesystem,
         path: str,
         entry: FilesystemEntry,
-        parser_items: Optional[Union[dict, ConfigurationParser, Any]] = None,
+        parser_items: Optional[Union[dict, ConfigurationParser, str, list]] = None,
     ) -> None:
         super().__init__(fs, path, entry)
         self.parser_items = parser_items
@@ -126,23 +181,20 @@ class ConfigurationEntry(FilesystemEntry):
 
         return f"<{self.__class__.__name__} {output}"
 
-    def get(self, key: Optional[str] = None, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any]:
+    def get(self, key, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any, None]:
         """Gets the dictionary key that belongs to this entry using ``key``.
-
-        This get is a bit special as it behaves as a ``dictionary.get``.
-        Which means the ``default`` here is the value  it should return if it coould not find anything.
+        Behaves like ``dictionary.get()``.
 
         Args:
-            ``key``: A dictionary key that is inside ``self.parser_items``.
+            ``key``: A dictionary key that is inside :attr:`parser_items`.
             ``default``: The default value to return if ``key`` is not inside this entry.
 
         Returns:
-            a ``ConfigurationEntry`` if ``key`` was inside this keys contents, otherwise its ``default``.
+            a :class:`ConfigurationEntry` when ``key`` is present, otherwise its ``default``.
         """
         # Check for path in config entry
         if not key:
-            # Return self if configuration was found.
-            return self
+            raise TypeError("key should be defined")
 
         if key in self.parser_items:
             return ConfigurationEntry(
@@ -154,7 +206,7 @@ class ConfigurationEntry(FilesystemEntry):
         return default
 
     def _write_value_mapping(self, values: dict[str, Any], indentation_nr: int = 0) -> str:
-        """Recursively write the ``values`` dictionary to an output with indentation for the values.
+        """Internal function to transform the ``values`` dictionary to a string representation.
 
         Args:
             values: A dictionary or its contents.
@@ -178,12 +230,13 @@ class ConfigurationEntry(FilesystemEntry):
         return output_buffer.getvalue()
 
     def open(self) -> BinaryIO:
-        """Returns the a byte representation of the ``self.parser_items``.
+        """Open this :class:`ConfigurationEntry`.
 
-        In the case that ``parser_items`` is a ``ConfigurationParser`` it will open the raw entry
-        without any parsing.
+        If :attr:`parser_items` is a :class:`.ConfigurationParser`,
+        it will ``open`` the underlying entry.
 
-        Otherwise it creates a byte representation of the data inside ``parser_items``.
+        Returns:
+            A file-like object holding a byte representation of :attr:`parser_items`.
         """
         if isinstance(self.parser_items, ConfigurationParser):
             # Currently trying to open the underlying entry
@@ -197,7 +250,7 @@ class ConfigurationEntry(FilesystemEntry):
             yield entry.name
 
     def scandir(self) -> Iterator[ConfigurationEntry]:
-        """Return the items inside ``self.parser_items`` as ``ConfigurationEntries``."""
+        """Return the items inside :attr:`parser_items` as ``ConfigurationEntries``."""
         if self.is_file():
             raise NotADirectoryError()
 
@@ -208,34 +261,38 @@ class ConfigurationEntry(FilesystemEntry):
         return not self.is_dir(follow_symlinks)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
-        """If ``self.parser_items`` has the ``keys``, we see it as a directory."""
+        """Returns whether this :class:`ConfigurationEntry` can be considered a directory."""
+        # if self.parser_items has keys (thus sub-values), we can consider it a directory.
         return hasattr(self.parser_items, "keys")
 
     def is_symlink(self) -> bool:
-        """The underlying entry should already be resolved, so we do not consider any of these entries
-        symlinks.
+        """Return whether this :class:`ConfigurationEntry` is a symlink or not.
+
+        Returns:
+            False, as ``ConfigurationEntries`` are never symlinks.
         """
+        # ConfigurationEntries are already resolved, so are never symlinks.
         return False
 
     def exists(self, key: str) -> bool:
-        """The underlying entry should exists, an the ``key`` we profide should
-        be a key inside our dictionary.
+        """Return whether the underunderlying entry and supplied ``key`` exists inside this :class:`ConfigurationEntry`.
 
-        Returns: Whether the entry exists or not.
+        Returns:
+            Whether the ``entry`` and ``key`` exists
         """
         return self.entry.exists() and key in self.parser_items
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        """Returns the stat from the underlying entry."""
+        """Returns the stat from the underlying :class:`.FilesystemEntry` :attr:`entry`."""
         return self.entry.stat(follow_symlinks)
 
     def lstat(self) -> fsutil.stat_result:
-        """Returns the lstat from the underlying entry."""
+        """Returns the lstat from the underlying :class:`.FilesystemEntry` :attr:`entry`."""
 
         return self.entry.lstat()
 
     def as_dict(self) -> dict:
-        """Returns the underying dictionary or value that belongs to this Entry."""
+        """Returns :attr:`parser_items` as a dictionary."""
         if isinstance(self.parser_items, ConfigurationParser):
             return self.parser_items.parsed_data
         return self.parser_items

@@ -29,7 +29,7 @@ def test_config_tree_plugin(config_tree: ConfigurationTreePlugin, fs_unix: Virtu
 
     options = {"separator": (r"\s",)}
 
-    assert isinstance(config_tree("/etc/new/path/config").get(""), ConfigurationEntry)
+    assert isinstance(config_tree("/etc/new/path/config"), ConfigurationEntry)
     assert isinstance(config_tree("/etc/new/path/config", **options).get("help"), ConfigurationEntry)
     assert isinstance(config_tree("/etc/new/path/config/help", **options), ConfigurationEntry)
     assert isinstance(config_tree.get(), ConfigurationFilesystem)

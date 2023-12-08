@@ -43,18 +43,18 @@ class ConfigurationTreePlugin(Plugin):
         comment_prefixes: Optional[tuple[str]] = None,
         as_dict: bool = False,
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
-        """Create a configuration entry from a file, or a ConfigurationFilesystem from a directory.
+        """Create a configuration entry from a file, or a :class:`.ConfigurationFilesystem` from a directory.
 
         If a directory is specified in ``path``, the other arguments should be provided in the ``get`` call if needed.
 
         Args:
-            path: The path to either a directory or file
-            hint: What kind of parser it should use
-            collapse: Wether it should collapse everything or only a certain set of keys.
+            path: The path to either a directory or file.
+            hint: What kind of parser it should use.
+            collapse: Whether it should collapse everything or just a certain set of keys.
             collapse_inverse: Invert the collapse function to collapse everything but the keys inside ``collapse``.
-            separator: What separator should be used for the parser.
+            separator: The separator that should be used for parsing.
             comment_prefixes: What is specified as a comment.
-            as_dict: Returns the dictionary instead of an entry.
+            as_dict: Return a dictionary instead of an entry.
         """
         return self.get(
             path=path,
