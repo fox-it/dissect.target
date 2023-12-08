@@ -426,7 +426,8 @@ class Target:
             if isinstance(os_plugin, plugin.OSPlugin):
                 self._os_plugin = os_plugin.__class__
             elif issubclass(os_plugin, plugin.OSPlugin):
-                os_plugin = os_plugin.create(self, os_plugin.detect(self))
+                if fs := os_plugin.detect(self):
+                    os_plugin = os_plugin.create(self, fs)
 
             self._os = self.add_plugin(os_plugin)
             return
