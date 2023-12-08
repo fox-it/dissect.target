@@ -1,7 +1,6 @@
 import datetime
 
 from defusedxml import ElementTree
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -65,8 +64,8 @@ class StartupInfoPlugin(Plugin):
         References:
             - https://www.trustedsec.com/blog/who-left-the-backdoor-open-using-startupinfo-for-the-win/
         """
-        for file in self._files:
-            fh = file.open("rb")
+        for path in self._files:
+            fh = path.open("rb")
 
             try:
                 root = ElementTree.fromstring(fh.read().decode("utf-16-le"), forbid_dtd=True)
@@ -76,12 +75,12 @@ class StartupInfoPlugin(Plugin):
 
                     yield StartupInfoRecord(
                         ts=parse_ts(start_time),
-                        path=path.from_windows(process.get("Name")),
-                        commandline=path.from_windows(process.findtext("CommandLine")),
+                        path=self.target.fs.path(process.get("Name")),
+                        commandline=self.target.fs.path(process.findtext("CommandLine")),
                         pid=process.get("PID"),
                         parent_pid=process.findtext("ParentPID"),
                         parent_start_time=parse_ts(parent_start_time),
-                        parent_name=path.from_windows(process.findtext("ParentName")),
+                        parent_name=self.target.fs.path(process.findtext("ParentName")),
                         disk_usage=process.findtext("DiskUsage"),
                         cpu_usage=process.findtext("CpuUsage"),
                         _target=self.target,

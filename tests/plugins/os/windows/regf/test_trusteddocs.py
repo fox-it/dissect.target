@@ -1,12 +1,7 @@
-import platform
-
-import pytest
-
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.trusteddocs import TrustedDocumentsPlugin
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Path comparison error. Needs to be fixed.")
 def test_trusteddocs_plugin(target_win_users, hive_hku):
     trusteddocs_key_name = "Software\\Microsoft\\Office\\16.0\\Word\\Security\\Trusted Documents"
     trusteddocs_key = VirtualKey(hive_hku, trusteddocs_key_name)
@@ -28,4 +23,4 @@ def test_trusteddocs_plugin(target_win_users, hive_hku):
 
     assert result.value == b"test"
     assert result.application == "Word"
-    assert str(result.document_path) == "c:/Users/John/test"
+    assert result.document_path == "c:\\Users\\John\\test"

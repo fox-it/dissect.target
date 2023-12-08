@@ -1,6 +1,5 @@
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -57,6 +56,6 @@ class BamDamPlugin(Plugin):
                         data = c_bam.entry(entry.value)
                         yield BamDamRecord(
                             ts=wintimestamp(data.ts),
-                            path=path.from_windows(entry.name),
+                            path=self.target.fs.path(entry.name),
                             _target=self.target,
                         )

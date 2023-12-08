@@ -3,7 +3,6 @@ from io import BytesIO
 from dissect import cstruct
 from dissect.util import lzxpress_huffman
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -212,7 +211,7 @@ class Prefetch:
                 self.fn.filename_strings_offset + entry.filename_string_offset,
                 entry.filename_string_number_of_characters,
             )
-            metrics.append(path.from_windows(filename.decode("utf-16-le")))
+            metrics.append(filename.decode("utf-16-le"))
         return metrics
 
     def read_filename(self, off, size):
@@ -290,15 +289,15 @@ class PrefetchPlugin(Plugin):
                 self.target.log.warning("Failed to parse prefetch file: %s", entry, exc_info=e)
                 continue
 
-            filename = path.from_windows(scca.header.name.decode("utf-16-le", errors="ignore").split("\x00")[0])
-            entry_name = path.from_windows(entry.name)
+            filename = self.target.fs.path(scca.header.name.decode("utf-16-le", errors="ignore").split("\x00")[0])
+            entry_name = self.target.fs.path(entry.name)
 
             if grouped:
                 yield GroupedPrefetchRecord(
                     ts=scca.latest_timestamp,
                     filename=filename,
                     prefetch=entry_name,
-                    linkedfiles=list(map(path.from_windows, scca.metrics)),
+                    linkedfiles=list(map(self.target.fs.path, scca.metrics)),
                     runcount=scca.fn.run_count,
                     previousruns=scca.previous_timestamps,
                     _target=self.target,
@@ -311,7 +310,7 @@ class PrefetchPlugin(Plugin):
                             ts=date,
                             filename=filename,
                             prefetch=entry_name,
-                            linkedfile=path.from_windows(linked_file),
+                            linkedfile=self.target.fs.path(linked_file),
                             runcount=scca.fn.run_count,
                             _target=self.target,
                         )

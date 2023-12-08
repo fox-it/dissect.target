@@ -61,8 +61,10 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
 
 @pytest.mark.skipif(
-    platform.system() == "Windows", reason="Path error? OSError: [Errno 22] Invalid argument. Needs to be fixed."
+    platform.system() == "Windows",
+    reason="Windows Defender cleans up the restored quarentine files when you try to open it.",
 )
+# TODO: Create a more sane quarentine file for this.
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("_data/plugins/os/windows/defender/quarantine")

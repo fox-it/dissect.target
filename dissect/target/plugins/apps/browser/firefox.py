@@ -5,7 +5,6 @@ from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -197,12 +196,9 @@ class FirefoxPlugin(BrowserPlugin):
                         state = content.get("state")
 
                     dest_file_info = annotation.get("downloads/destinationFileURI", {})
-                    download_path = dest_file_info.get("content")
 
-                    if download_path and self.target.os == "windows":
-                        download_path = path.from_windows(download_path)
-                    elif download_path:
-                        download_path = path.from_posix(download_path)
+                    if download_path := dest_file_info.get("content"):
+                        download_path = self.target.fs.path(download_path)
 
                     place = places.get(place_id)
                     url = place.get("url")

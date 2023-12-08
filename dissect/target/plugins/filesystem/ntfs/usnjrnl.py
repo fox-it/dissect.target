@@ -1,7 +1,6 @@
 from typing import Iterator
 
 from dissect.ntfs.c_ntfs import segment_reference
-from flow.record.fieldtypes import path as rpath
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -64,7 +63,7 @@ class UsnjrnlPlugin(Plugin):
                     yield UsnjrnlRecord(
                         ts=ts,
                         segment=f"{segment}#{record.FileReferenceNumber.SequenceNumber}",
-                        path=rpath.from_windows(path),
+                        path=self.target.fs.path(path),
                         usn=record.Usn,
                         reason=str(record.Reason).replace("USN_REASON.", ""),
                         attr=str(record.FileAttributes).replace("FILE_ATTRIBUTE.", ""),

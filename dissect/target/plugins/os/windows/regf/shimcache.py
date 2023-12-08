@@ -6,7 +6,6 @@ from typing import Callable, Generator, Optional, Tuple, Union
 
 from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -358,6 +357,6 @@ class ShimcachePlugin(Plugin):
                 last_modified=ts,
                 name=name,
                 index=index,
-                path=path.from_windows(self.target.resolve(file_path)),
+                path=self.target.fs.path(self.target.resolve(file_path)),
                 _target=self.target,
             )
