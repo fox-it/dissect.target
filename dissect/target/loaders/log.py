@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Union
 
 from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import RootFilesystem, VirtualFilesystem
 from dissect.target.loader import Loader
 
 logloader_option_hint = "hint"
@@ -34,12 +34,15 @@ class LogLoader(Loader):
 
     def map(self, target: Target) -> None:
         self.target = target
-        vfs = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
+        vfs = RootFilesystem(self.target)
+        mnt = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
+        target.filesystems.add(mnt)
+        vfs.mount("/", mnt)
         for entry in self.path.parent.glob(self.path.name):
             ext = self.options.get(logloader_option_hint, entry.suffix.lower()).strip(".")
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
-            mapping = str(vfs.path(mapping).joinpath(entry.name))
-            vfs.map_file(mapping, str(entry))
+            mapping = str(mnt.path(mapping).joinpath(entry.name))
+            mnt.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
         target.fs = vfs
