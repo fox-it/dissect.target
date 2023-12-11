@@ -155,7 +155,7 @@ class OpenVPNPlugin(Plugin):
                     server=config.get("server"),
                     ifconfig_pool_persist=config.get("ifconfig-pool-persist"),
                     pushed_options=pushed_options,
-                    client_to_client=config.get("client-to-client", False),
+                    client_to_client=(False if config.get("client-to-client", False) == "" else config.get("client-to-client", False)),
                     duplicate_cn=config.get("duplicate-cn", False),
                     source=config_path,
                     _target=self.target,
