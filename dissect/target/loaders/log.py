@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import urllib
 from pathlib import Path
 from typing import Union
@@ -6,8 +8,14 @@ from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 
+logloader_option_hint = "hint"
+
 
 class LogLoader(Loader):
+    __loader_args__ = {
+        logloader_option_hint: {"help": "Hint for file type"},
+    }
+
     LOGS_DIRS = {
         "evtx": "sysvol/windows/system32/winevt/logs",
         "evt": "sysvol/windows/system32/config",
@@ -28,7 +36,7 @@ class LogLoader(Loader):
         self.target = target
         vfs = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
         for entry in self.path.parent.glob(self.path.name):
-            ext = self.options.get("hint", entry.suffix.lower()).strip(".")
+            ext = self.options.get(logloader_option_hint, entry.suffix.lower()).strip(".")
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
             mapping = str(vfs.path(mapping).joinpath(entry.name))
