@@ -12,6 +12,8 @@ logloader_option_hint = "hint"
 
 
 class LogLoader(Loader):
+    """Load separate log files without a target. Usage: target-query /evtx/* -L log -f evtx (-L log -h for options)"""
+
     __loader_args__ = {
         logloader_option_hint: {"help": "Hint for file type"},
     }
