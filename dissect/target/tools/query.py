@@ -21,7 +21,7 @@ from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
-    args2uri,
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -121,7 +121,7 @@ def main():
     args, rest = parser.parse_known_args()
 
     # If loader is specified then map to uri
-    targets = args2uri(args.targets, args.loader, rest) if args.loader else args.targets
+    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):

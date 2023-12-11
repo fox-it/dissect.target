@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.tools.utils import args2uri, persist_execution_report
+from dissect.target.plugin import arg
+from dissect.target.tools.utils import args_to_uri, persist_execution_report
 
 
 def test_persist_execution_report():
@@ -44,8 +45,9 @@ def test_persist_execution_report():
     ],
 )
 def test_args2uri(targets, loader_name, rest, uris):
+    @arg("--loader-option", dest="option")
     class FakeLoader:
-        __loader_args__ = {"option": {}}
+        pass
 
     with patch("dissect.target.tools.utils.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
-        assert args2uri(targets, loader_name, rest) == uris
+        assert args_to_uri(targets, loader_name, rest) == uris

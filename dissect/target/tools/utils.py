@@ -265,32 +265,21 @@ def catch_sigpipe(func: Callable) -> Callable:
     return wrapper
 
 
-def args2uri(targets: list[str], loader_name: str, rest: list[str]) -> list[str]:
-    """Converts argument-style -L to URI-style
+def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[str]:
+    """Converts argument-style ``-L`` to URI-style.
 
     Turns:
-        target-query /evtxs/* -L log --log-hint="evtx" -f evtx
+        ``target-query /evtxs/* -L log --log-hint="evtx" -f evtx``
     into:
-        target-query "log:///evtxs/?hint=evtx" -f evtx
+        ``target-query "log:///evtxs/*?hint=evtx" -f evtx``
 
-    For classes providing a __loader_args__ dict with
-    argparse values.
+    For classes providing a __args__ dict with argparse values.
     """
-    arg_config_tpl = {
-        "action": "store",
-    }
     loader = LOADERS_BY_SCHEME.get(loader_name, None)
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    for load_arg, config in getattr(loader, "__loader_args__", {}).items():
-        arg_config = arg_config_tpl
-        arg_config.update(config)
-        parser.add_argument(f"--{loader_name}-{load_arg}", **arg_config_tpl)
-    args = dict(
-        map(
-            lambda key_value: (key_value[0].split(f"{loader_name}_")[1], key_value[1]),
-            vars(parser.parse_known_args(rest)[0]).items(),
-        )
-    )
+    for load_arg in getattr(loader, "__args__", []):
+        parser.add_argument(*load_arg[0], **load_arg[1])
+    args = vars(parser.parse_known_args(rest)[0])
     uris = []
     for target in targets:
         uris.append(f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else ""))

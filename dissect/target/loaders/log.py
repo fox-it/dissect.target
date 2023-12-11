@@ -7,16 +7,14 @@ from typing import Union
 from dissect.target import Target
 from dissect.target.filesystem import RootFilesystem, VirtualFilesystem
 from dissect.target.loader import Loader
+from dissect.target.plugin import arg
 
 logloader_option_hint = "hint"
 
 
+@arg("--log-hint", dest=logloader_option_hint, help="Hint for file type")
 class LogLoader(Loader):
     """Load separate log files without a target. Usage: target-query /evtx/* -L log -f evtx (-L log -h for options)"""
-
-    __loader_args__ = {
-        logloader_option_hint: {"help": "Hint for file type"},
-    }
 
     LOGS_DIRS = {
         "evtx": "sysvol/windows/system32/winevt/logs",

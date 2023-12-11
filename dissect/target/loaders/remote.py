@@ -15,9 +15,19 @@ from dissect.util.stream import AlignedStream
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
+from dissect.target.plugin import arg
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
+
+option_client_key = "key"
+option_client_crt = "crt"
+option_server_ca = "ca"
+option_noverify = "noverify"
+option_reconnects = "reconnects"
+option_shortreads = "shortreads"
+option_reconnectwait = "reconnectwait"
+option_sockettimeout = "sockettimeout"
 
 
 class RemoteStream(AlignedStream):
@@ -31,15 +41,6 @@ class RemoteStream(AlignedStream):
 
 
 class RemoteStreamConnection:
-    option_client_key = "key"
-    option_client_crt = "crt"
-    option_server_ca = "ca"
-    option_noverify = "noverify"
-    option_reconnects = "reconnects"
-    option_shortreads = "shortreads"
-    option_reconnectwait = "reconnectwait"
-    option_sockettimeout = "sockettimeout"
-
     # Max. number of times we try to reconnect (still tweaking this)
     MAX_RECONNECTS = 30
 
@@ -91,10 +92,10 @@ class RemoteStreamConnection:
         flag_verify_locations_loaded = False
 
         if options := kwargs.get("options"):
-            client_key = options.get(self.option_client_key)
-            client_crt = options.get(self.option_client_crt)
-            server_ca = options.get(self.option_server_ca)
-            noverify = options.get(self.option_noverify)
+            client_key = options.get(option_client_key)
+            client_crt = options.get(option_client_crt)
+            server_ca = options.get(option_server_ca)
+            noverify = options.get(option_noverify)
 
             if client_key and client_crt:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
@@ -104,10 +105,10 @@ class RemoteStreamConnection:
             if server_ca:
                 self._context.load_verify_locations(server_ca)
                 flag_verify_locations_loaded = True
-            self._max_reconnects = options.get(self.option_reconnects, max(0, self._max_reconnects))
-            self._max_shortreads = options.get(self.option_shortreads, max(0, self._max_shortreads))
-            self._reconnect_wait = options.get(self.option_reconnectwait, max(0, self._reconnect_wait))
-            self._socket_timeout = options.get(self.option_sockettimeout, max(0, self._socket_timeout))
+            self._max_reconnects = options.get(option_reconnects, max(0, self._max_reconnects))
+            self._max_shortreads = options.get(option_shortreads, max(0, self._max_shortreads))
+            self._reconnect_wait = options.get(option_reconnectwait, max(0, self._reconnect_wait))
+            self._socket_timeout = options.get(option_sockettimeout, max(0, self._socket_timeout))
 
         if flag_cert_chain_loaded is False and self.CONFIG_KEY is not None and self.CONFIG_CRT is not None:
             self._context.load_cert_chain_str(certfile=self.CONFIG_CRT, keyfile=self.CONFIG_KEY)
@@ -213,18 +214,15 @@ class RemoteStreamConnection:
         return disks
 
 
+@arg(f"--remote-{option_client_key}", dest=option_client_key, help="Private key")
+@arg(f"--remote-{option_client_crt}", dest=option_client_crt, help="Client certificate")
+@arg(f"--remote-{option_server_ca}", dest=option_server_ca, help="Certificate Authority")
+@arg(f"--remote-{option_noverify}", dest=option_noverify, help="No certificate verification")
+@arg(f"--remote-{option_reconnects}", dest=option_reconnects, help="Max number of reconnects")
+@arg(f"--remote-{option_shortreads}", dest=option_shortreads, help="Max limit shortreads")
+@arg(f"--remote-{option_reconnectwait}", dest=option_reconnectwait, help="Max time before reconnection attempt")
+@arg(f"--remote-{option_sockettimeout}", dest=option_sockettimeout, help="Sockettimeout")
 class RemoteLoader(Loader):
-    __loader_args__ = {
-        RemoteStreamConnection.option_noverify: {"help": "No certificate verification", "action": "store_true"},
-        RemoteStreamConnection.option_client_key: {"help": "Private key"},
-        RemoteStreamConnection.option_client_crt: {"help": "Client certificate"},
-        RemoteStreamConnection.option_server_ca: {"help": "Certificate Authority"},
-        RemoteStreamConnection.option_reconnects: {"help": "Max number of reconnects"},
-        RemoteStreamConnection.option_reconnectwait: {"help": "Max time before reconnection attempt"},
-        RemoteStreamConnection.option_sockettimeout: {"help": "Sockettimeout"},
-        RemoteStreamConnection.option_shortreads: {"help": "Max limit shortreads"},
-    }
-
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         uri = kwargs.get("parsed_path")
