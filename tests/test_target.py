@@ -521,3 +521,9 @@ def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
 
         assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
         assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
+
+
+def test_target_fs_restriction() -> None:
+    target = Target()
+    with pytest.raises(ValueError):
+        target.fs = VirtualFilesystem()

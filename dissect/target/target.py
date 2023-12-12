@@ -17,6 +17,7 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
     VolumeSystemError,
 )
+from dissect.target.filesystem import RootFilesystem
 from dissect.target.helpers import config
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.record import ChildTargetRecord
@@ -108,7 +109,7 @@ class Target:
         # A collection of instances of Filesystem() subclasses
         self.filesystems = FilesystemCollection(self)
 
-        self.fs = filesystem.RootFilesystem(self)
+        self._fs = filesystem.RootFilesystem(self)
 
     @classmethod
     def set_event_callback(cls, *, event_type: Optional[Event] = None, event_callback: Callable) -> None:
@@ -209,6 +210,16 @@ class Target:
             self._name = target_name
 
         return target_name
+
+    @property
+    def fs(self):
+        return self._fs
+
+    @fs.setter
+    def fs(self, fs: RootFilesystem):
+        if fs is not RootFilesystem:
+            raise ValueError("FileSystem is not a RootFilesystem instance")
+        self._fs = fs
 
     @classmethod
     def open(cls, path: Union[str, Path]) -> Target:
