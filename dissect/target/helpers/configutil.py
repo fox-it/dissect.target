@@ -73,14 +73,13 @@ class ConfigurationParser:
     """A configuration parser where you can configure certain aspects of the parsing mechanism.
 
     Attributes:
-        parsed_data: The resulting dictionary after parsing
+        parsed_data: The resulting dictionary after parsing.
 
     Args:
         collapse: A ``bool`` or an ``Iterator``:
-          If ``True``: it will collapse all the resulting dictionary values
+          If ``True``: it will collapse all the resulting dictionary values.
           If an ``Iterable`` it will collapse on the keys defined in ``collapse``.
-        collapse_inverse: Inverses the collapsing mechanism.
-          So it will collapse everything that is not inside ``collapse``.
+        collapse_inverse: Inverses the collapsing mechanism. Collapse on everything that is not inside ``collapse``.
         separator: Contains what values it should look for as a separator.
         comment_prefixes: Contains what constitutes as a comment.
     """
@@ -128,10 +127,9 @@ class ConfigurationParser:
         return key not in self.collapse
 
     def parse_file(self, fh: TextIO) -> None:
-        """Parse the contents of ``fh`` inside key/value pairs.
+        """Parse the contents of ``fh`` into key/value pairs.
 
         This function should **set** :attr:`parsed_data` as a side_effect.
-        Not update, as then the contents would keep changing.
 
         Args:
             fh: The text to parse.
@@ -265,7 +263,7 @@ class ScopeManager:
         _parents: A dictionary accounting what child belongs to which parent dictionary.
         _root: The initial dictionary.
         _current: The current dictionary.
-        _previous: The node before the current gets changed
+        _previous: The node before the current (changed) node.
     """
 
     def __init__(self) -> None:
@@ -286,7 +284,7 @@ class ScopeManager:
         self.clean()
 
     def _set_prev(self, keep_prev: bool) -> None:
-        """Set ``self._previous`` before ``_current`` changes."""
+        """Set :attr:`_previous` before :attr:`_current` changes."""
         if not keep_prev:
             self._previous = self._current
 
@@ -302,7 +300,7 @@ class ScopeManager:
         return True
 
     def pop(self, keep_prev: bool = False) -> bool:
-        """Pop :attr:`_current` and return whether we changed to the parent dictionary."""
+        """Pop :attr:`_current` and return whether we changed the :attr:`_parents` dictionary."""
         if new_current := self._parents.pop(id(self._current), None):
             self._set_prev(keep_prev)
             self._current = new_current
@@ -334,8 +332,8 @@ class ScopeManager:
 class Indentation(Default):
     """This parser is used for files that use a single level of indentation to specify a different scope.
 
-    Examples of these files are for example the sshd_config file.
-    Where "Match" statments use a single layer of indentaiton to specify a scope for the key value pairs.
+    Examples of these files are the ``sshd_config`` file.
+    Where "Match" statements use a single layer of indentation to specify a scope for the key value pairs.
 
     The parser parses this as the following:
 
@@ -559,7 +557,7 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
 
     Args:
         path: The path to either a directory or file.
-        hint: What kind of parser it should use.
+        hint: What kind of parser should be used.
         collapse: Whether it should collapse everything or just a certain set of keys.
         collapse_inverse: Invert the collapse function to collapse everything but the keys inside ``collapse``.
         separator: The separator that should be used for parsing.

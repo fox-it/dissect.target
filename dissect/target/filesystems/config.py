@@ -129,13 +129,13 @@ class ConfigurationFilesystem(VirtualFilesystem):
 class ConfigurationEntry(FilesystemEntry):
     """A Special filesystem entry.
 
-    Acts like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a dict and
-    like a ``file`` otherwise.
+    Behaves like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a ``dict``.
+    Behaves like a ``file`` otherwise.
 
     Attributes:
         parser_items: A dict-like object containing all configuration entries and values.
-            In most cases this is either a :class:`.ConfigurationParser` or `dict`.
-            Otherwise, its the values
+            In most cases this is either a :class:`.ConfigurationParser` or ``dict``.
+            Otherwise, its the entry's value
 
     Examples:
         >>> fs = ConfigurationFilesystem(target, "/etc")
@@ -275,7 +275,7 @@ class ConfigurationEntry(FilesystemEntry):
         return False
 
     def exists(self, key: str) -> bool:
-        """Return whether the underunderlying entry and supplied ``key`` exists inside this :class:`ConfigurationEntry`.
+        """Return whether the underlying :class:`.FilesystemEntry` :attr:`entry` and supplied ``key`` exists inside this :class:`ConfigurationEntry`.
 
         Returns:
             Whether the ``entry`` and ``key`` exists
