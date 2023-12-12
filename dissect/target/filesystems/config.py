@@ -276,7 +276,8 @@ class ConfigurationEntry(FilesystemEntry):
         return False
 
     def exists(self, key: str) -> bool:
-        """Return whether the underlying :class:`.FilesystemEntry` :attr:`entry` and supplied ``key`` exists inside this :class:`ConfigurationEntry`.
+        """Return whether the underlying :class:`.FilesystemEntry` :attr:`entry` and
+        supplied ``key`` exists inside this :class:`ConfigurationEntry`.
 
         Returns:
             Whether the ``entry`` and ``key`` exists
