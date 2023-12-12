@@ -1,8 +1,13 @@
+from typing import Iterable
+
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.filesystem import RootFilesystemEntry
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import Plugin, export
+from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
     "filesystem/entry",
@@ -17,8 +22,7 @@ FilesystemRecord = TargetRecordDescriptor(
         ("uint32", "mode"),
         ("uint32", "uid"),
         ("uint32", "gid"),
-        ("string", "fstype"),
-        ("uint32", "fsidx"),
+        ("string[]", "fstypes"),
     ],
 )
 
@@ -29,36 +33,36 @@ class WalkFSPlugin(Plugin):
             raise UnsupportedPluginError("No filesystems found")
 
     @export(record=FilesystemRecord)
-    def walkfs(self):
+    def walkfs(self) -> Iterable[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
-        for _, record in self.walkfs_ext():
-            yield record
-
-    @internal
-    def walkfs_ext(self, root="/", pattern="*"):
-        for idx, fs in enumerate(self.target.filesystems):
-            for entry in fs.path(root).rglob(pattern):
+        for path_entries, _, files in self.target.fs.walk_ext("/"):
+            entries = [path_entries[-1]] + files
+            for entry in entries:
+                path = self.target.fs.path(entry.path)
                 try:
-                    yield entry, generate_record(self.target, entry, idx)
+                    record = generate_record(self.target, path)
                 except FileNotFoundError:
                     continue
-                except Exception:
-                    self.target.log.exception("Failed to generate record from entry %s", entry)
+                yield record
 
 
-def generate_record(target, entry, idx):
-    stat = entry.lstat()
+def generate_record(target: Target, path: TargetPath) -> FilesystemRecord:
+    stat = path.lstat()
+    entry = path.get()
+    if isinstance(entry, RootFilesystemEntry):
+        fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
+    else:
+        fs_types = [entry.fs.__type__]
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
         mtime=from_unix(stat.st_mtime),
         ctime=from_unix(stat.st_ctime),
         ino=stat.st_ino,
-        path=entry,
+        path=path,
         size=stat.st_size,
         mode=stat.st_mode,
         uid=stat.st_uid,
         gid=stat.st_gid,
-        fstype=entry.get().fs.__type__,
-        fsidx=idx,
+        fstypes=fs_types,
         _target=target,
     )

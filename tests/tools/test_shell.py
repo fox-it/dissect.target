@@ -233,19 +233,22 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
     ],
 )
 def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
+    output_dir = tmp_path / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     cli = TargetCli(target_win)
     for folder in folders.split("|"):
         target_win.fs.root.makedirs(folder)
     for _file in files.split("|"):
         target_win.fs.root.map_file_fh(_file, BytesIO(_file.encode("utf-8")))
-    args = argparse.Namespace(path=[save], out=tmp_path, verbose=False)
+    args = argparse.Namespace(path=[save], out=output_dir, verbose=False)
     cli.cmd_save(args, sys.stdout)
 
     def _map_function(path: Path) -> str:
-        relative_path = str(path.relative_to(tmp_path))
+        relative_path = str(path.relative_to(output_dir))
         return normalize(relative_path, alt_separator=target_win.fs.alt_separator)
 
-    path_map = map(lambda path: _map_function(path), tmp_path.rglob("*"))
+    path_map = map(lambda path: _map_function(path), output_dir.rglob("*"))
     tree = "|".join(sorted(path_map))
 
     assert tree == expected

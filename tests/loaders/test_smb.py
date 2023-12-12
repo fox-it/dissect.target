@@ -19,6 +19,7 @@ def mock_impacket(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
         m.setitem(sys.modules, "impacket", mock_impacket)
         m.setitem(sys.modules, "impacket.dcerpc", mock_impacket.dcerpc)
         m.setitem(sys.modules, "impacket.dcerpc.v5", mock_impacket.dcerpc.v5)
+        m.setitem(sys.modules, "impacket.dcerpc.v5.rpcrt", mock_impacket.dcerpc.v5.rpcrt)
         m.setitem(sys.modules, "impacket.nt_errors", mock_impacket.nt_errors)
         m.setitem(sys.modules, "impacket.smb", mock_impacket.smb)
         m.setitem(sys.modules, "impacket.smb3structs", mock_impacket.smb3structs)

@@ -98,7 +98,7 @@ class ResolverPlugin(Plugin):
                     return lookup_ext
 
                 for search_path in search_paths:
-                    lookup_path = "/".join([search_path, lookup_ext])
+                    lookup_path = fsutil.join(search_path, lookup_ext, alt_separator=self.target.fs.alt_separator)
                     if self.target.fs.exists(lookup_path):
                         return lookup_path
 

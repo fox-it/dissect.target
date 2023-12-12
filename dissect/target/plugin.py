@@ -1038,6 +1038,7 @@ def find_plugin_functions(
 
     invalid_funcs = set()
     show_hidden = kwargs.get("show_hidden", False)
+    ignore_load_errors = kwargs.get("ignore_load_errors", False)
 
     for pattern in patterns.split(","):
         # backward compatibility fix for namespace-level plugins (i.e. chrome)
@@ -1071,7 +1072,12 @@ def find_plugin_functions(
                 func = functions[index_name]
 
                 method_name = index_name.split(".")[-1]
-                loaded_plugin_object = load(func)
+                try:
+                    loaded_plugin_object = load(func)
+                except Exception:
+                    if ignore_load_errors:
+                        continue
+                    raise
 
                 # Skip plugins that don't want to be found by wildcards
                 if not show_hidden and not loaded_plugin_object.__findable__:
@@ -1120,7 +1126,13 @@ def find_plugin_functions(
                 invalid_funcs.add(pattern)
 
             for description in plugin_descriptions:
-                loaded_plugin_object = load(description)
+                try:
+                    loaded_plugin_object = load(description)
+                except Exception:
+                    if ignore_load_errors:
+                        continue
+                    raise
+
                 fobject = inspect.getattr_static(loaded_plugin_object, funcname)
 
                 if compatibility and not loaded_plugin_object(target).is_compatible():
