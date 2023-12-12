@@ -292,17 +292,42 @@ class OSPlugin(Plugin):
     This provides a base class for certain common functions of OS's, which each OS plugin has to implement separately.
 
     For example, it provides an interface for retrieving the hostname and users of a target.
+
+    All derived classes MUST implement ALL the classmethods and exported
+    methods with the same ``@classmethod`` or ``@export(...)`` annotation.
     """
 
+    def __init_subclass__(cls, **kwargs):
+        # Note that cls is the subclass
+        super().__init_subclass__(**kwargs)
+
+        for os_method in get_nonprivate_attributes(OSPlugin):
+            if isinstance(os_method, property):
+                os_method = os_method.fget
+            os_docstring = os_method.__doc__
+
+            method = getattr(cls, os_method.__name__, None)
+            if isinstance(method, property):
+                method = method.fget
+            # This works as None has a __doc__ property (which is None).
+            docstring = method.__doc__
+
+            if method and not docstring:
+                if hasattr(method, "__func__"):
+                    method = method.__func__
+                method.__doc__ = os_docstring
+
     def check_compatible(self) -> bool:
-        """OSPlugin's use a different compatibility check, override the default one."""
+        """OSPlugin's use a different compatibility check, override the one from the :class:`Plugin` class.
+
+        Returns:
+            This function always returns ``True``.
+        """
         return True
 
     @classmethod
     def detect(cls, fs: Filesystem) -> Optional[Filesystem]:
         """Provide detection of this OSPlugin on a given filesystem.
-
-        Note: must be implemented as a classmethod.
 
         Args:
             fs: :class:`~dissect.target.filesystem.Filesystem` to detect the OS on.
@@ -316,11 +341,9 @@ class OSPlugin(Plugin):
     def create(cls, target: Target, sysvol: Filesystem) -> OSPlugin:
         """Initiate this OSPlugin with the given target and detected filesystem.
 
-        Note: must be implemented as a classmethod.
-
         Args:
-            target: The Target object.
-            sysvol: The filesystem that was detected in the detect() function.
+            target: The :class:`~dissect.target.target.Target` object.
+            sysvol: The filesystem that was detected in the ``detect()`` function.
 
         Returns:
             An instantiated version of the OSPlugin.
@@ -329,9 +352,7 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
-        """Required OS function.
-
-        Implementations must be decorated with ``@export(property=True)``.
+        """Return the target's hostname.
 
         Returns:
             The hostname as string.
@@ -340,9 +361,7 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        """Required OS function.
-
-        Implementations must be decorated with ``@export(property=True)``.
+        """Return the IP addresses configured in the target.
 
         Returns:
             The IPs as list.
@@ -351,9 +370,7 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def version(self) -> Optional[str]:
-        """Required OS function.
-
-        Implementations must be decorated with ``@export(property=True)``.
+        """Return the target's OS version.
 
         Returns:
             The OS version as string.
@@ -362,9 +379,7 @@ class OSPlugin(Plugin):
 
     @export(record=EmptyRecord)
     def users(self) -> list[Record]:
-        """Required OS function.
-
-        Implementations must be decorated with @export.
+        """Return the users available in the target.
 
         Returns:
             A list of user records.
@@ -373,9 +388,7 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def os(self) -> str:
-        """Required OS function.
-
-        Implementations must be decorated with ``@export(property=True)``.
+        """Return a slug of the target's OS name.
 
         Returns:
             A slug of the OS name, e.g. 'windows' or 'linux'.
@@ -384,9 +397,7 @@ class OSPlugin(Plugin):
 
     @export(property=True)
     def architecture(self) -> Optional[str]:
-        """Required OS function.
-
-        Implementations must be decorated with ``@export(property=True)``.
+        """Return a slug of the target's OS architecture.
 
         Returns:
             A slug of the OS architecture, e.g. 'x86_32-unix', 'MIPS-linux' or

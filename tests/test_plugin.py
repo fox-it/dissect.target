@@ -1,13 +1,15 @@
 import os
 from functools import reduce
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from flow.record import Record
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import EmptyRecord, create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
     NamespacePlugin,
@@ -393,7 +395,98 @@ def test_plugins_default_plugin(target_default: Target) -> None:
         "architecture",
     ],
 )
-def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> str:
+def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> None:
     os_plugin = OSPlugin(target_bare)
     with pytest.raises(NotImplementedError):
         getattr(os_plugin, method_name)
+
+
+class TestOS1(OSPlugin):
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
+        pass
+
+    @export(property=True)
+    def ips(self) -> list[str]:
+        pass
+
+    @export(property=True)
+    def version(self) -> Optional[str]:
+        pass
+
+    @export(record=EmptyRecord)
+    def users(self) -> list[Record]:
+        pass
+
+    @export(property=True)
+    def os(self) -> str:
+        pass
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        pass
+
+
+class TestOS2(OSPlugin):
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
+        """Test docstring hostname"""
+        pass
+
+    @export(property=True)
+    def ips(self) -> list[str]:
+        """Test docstring ips"""
+        pass
+
+    @export(property=True)
+    def version(self) -> Optional[str]:
+        """Test docstring version"""
+        pass
+
+    @export(record=EmptyRecord)
+    def users(self) -> list[Record]:
+        """Test docstring users"""
+        pass
+
+    @export(property=True)
+    def os(self) -> str:
+        """Test docstring os"""
+        pass
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Test docstring architecture"""
+        pass
+
+
+@pytest.mark.parametrize(
+    "subclass, replaced",
+    [
+        (TestOS1, True),
+        (TestOS2, False),
+    ],
+)
+def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -> None:
+    exported_methods = {
+        "hostname",
+        "ips",
+        "version",
+        "users",
+        "os",
+        "architecture",
+    }
+
+    for method_name in exported_methods:
+        os_method = getattr(OSPlugin, method_name)
+        if isinstance(os_method, property):
+            os_method = os_method.fget
+        os_docstring = os_method.__doc__
+
+        subclass_method = getattr(subclass, method_name)
+        if isinstance(subclass_method, property):
+            subclass_method = subclass_method.fget
+        subclass_docstring = subclass_method.__doc__
+
+        assert (os_docstring == subclass_docstring) is replaced
+        if not replaced:
+            assert subclass_docstring == f"Test docstring {method_name}"
