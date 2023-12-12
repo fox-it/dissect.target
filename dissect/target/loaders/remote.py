@@ -214,14 +214,14 @@ class RemoteStreamConnection:
         return disks
 
 
-@arg(f"--remote-{option_client_key}", dest=option_client_key, help="Private key")
-@arg(f"--remote-{option_client_crt}", dest=option_client_crt, help="Client certificate")
-@arg(f"--remote-{option_server_ca}", dest=option_server_ca, help="Certificate Authority")
-@arg(f"--remote-{option_noverify}", dest=option_noverify, help="No certificate verification")
-@arg(f"--remote-{option_reconnects}", dest=option_reconnects, help="Max number of reconnects")
-@arg(f"--remote-{option_shortreads}", dest=option_shortreads, help="Max limit shortreads")
-@arg(f"--remote-{option_reconnectwait}", dest=option_reconnectwait, help="Max time before reconnection attempt")
-@arg(f"--remote-{option_sockettimeout}", dest=option_sockettimeout, help="Sockettimeout")
+@arg(f"--remote-{option_client_key}", dest=option_client_key, help="private key")
+@arg(f"--remote-{option_client_crt}", dest=option_client_crt, help="client certificate")
+@arg(f"--remote-{option_server_ca}", dest=option_server_ca, help="certificate Authority")
+@arg(f"--remote-{option_noverify}", dest=option_noverify, help="no certificate verification")
+@arg(f"--remote-{option_reconnects}", dest=option_reconnects, help="max number of reconnects")
+@arg(f"--remote-{option_shortreads}", dest=option_shortreads, help="max limit shortreads")
+@arg(f"--remote-{option_reconnectwait}", dest=option_reconnectwait, help="max time before reconnection attempt")
+@arg(f"--remote-{option_sockettimeout}", dest=option_sockettimeout, help="socket timeout")
 class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
