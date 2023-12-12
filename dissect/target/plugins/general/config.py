@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -25,7 +25,7 @@ class ConfigurationTreePlugin(Plugin):
         if target_dir_path.is_dir():
             self.config_fs = ConfigurationFilesystem(target, dir_path)
 
-        self.get = lru_cache(128)(self.get)
+        self._get = lru_cache(128)(self._get)
 
     def check_compatible(self) -> None:
         # This should be able to be retrieved, regardless of OS
@@ -37,28 +37,45 @@ class ConfigurationTreePlugin(Plugin):
         self,
         path: Optional[Union[TargetPath, str]] = None,
         hint: Optional[str] = None,
-        collapse: Optional[Union[bool, set]] = None,
+        collapse: Optional[Union[bool, Iterable[str]]] = None,
         collapse_inverse: Optional[bool] = None,
-        seperator: Optional[tuple[str]] = None,
+        separator: Optional[tuple[str]] = None,
         comment_prefixes: Optional[tuple[str]] = None,
         as_dict: bool = False,
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
-        """Create a configuration entry from a file, or a ConfigurationFilesystem from a directory.
+        """Create a configuration entry from a file, or a :class:`.ConfigurationFilesystem` from a directory.
 
         If a directory is specified in ``path``, the other arguments should be provided in the ``get`` call if needed.
 
         Args:
-            path: The path to either a directory or file
-            hint: What kind of parser it should use
-            collapse: Wether it should collapse all or only certain keys.
-            seperator: What seperator should be used for the parser.
+            path: The path to either a directory or file.
+            hint: What kind of parser it should use.
+            collapse: Whether it should collapse everything or just a certain set of keys.
+            collapse_inverse: Invert the collapse function to collapse everything but the keys inside ``collapse``.
+            separator: The separator that should be used for parsing.
             comment_prefixes: What is specified as a comment.
-            as_dict: Returns the dictionary instead of an entry.
+            as_dict: Return a dictionary instead of an entry.
         """
-        return self.get(path, as_dict, hint, collapse, collapse_inverse, seperator, comment_prefixes)
+        return self.get(
+            path=path,
+            as_dict=as_dict,
+            hint=hint,
+            collapse=collapse,
+            collapse_inverse=collapse_inverse,
+            separator=separator,
+            comment_prefixes=comment_prefixes,
+        )
 
     @internal
     def get(
+        self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
+    ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
+        if collapse := kwargs.pop("collapse", None):
+            kwargs.update({"collapse": frozenset(collapse)})
+
+        return self._get(path, as_dict, *args, **kwargs)
+
+    def _get(
         self, path: Optional[Union[TargetPath, str]] = None, as_dict: bool = False, *args, **kwargs
     ) -> Union[ConfigurationFilesystem, ConfigurationEntry, dict]:
         if not path:
