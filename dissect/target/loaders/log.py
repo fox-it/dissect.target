@@ -12,7 +12,7 @@ from dissect.target.plugin import arg
 logloader_option_hint = "hint"
 
 
-@arg("--log-hint", dest=logloader_option_hint, help="Hint for file type")
+@arg("--log-hint", dest=logloader_option_hint, help="hint for file type")
 class LogLoader(Loader):
     """Load separate log files without a target. Usage: target-query /evtx/* -L log -f evtx (-L log -h for options)."""
 
