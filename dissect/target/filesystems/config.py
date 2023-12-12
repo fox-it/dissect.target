@@ -101,9 +101,10 @@ class ConfigurationFilesystem(VirtualFilesystem):
         entry = self._convert_entry(entry, *args, **kwargs)
 
         for part in parts:
+            _prev_entry = entry
             entry = entry.get(part)
             if entry is None:
-                raise FileNotFoundError(f"{part!r} not found in {entry}.")
+                raise FileNotFoundError(f"{part!r} not found in {_prev_entry}.")
 
         return entry
 
