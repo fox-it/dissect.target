@@ -273,7 +273,7 @@ def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[s
     into:
         ``target-query "log:///evtxs/*?hint=evtx" -f evtx``
 
-    For classes providing a __args__ dict with argparse values.
+    For loaders providing ``@arg()`` arguments.
     """
     loader = LOADERS_BY_SCHEME.get(loader_name, None)
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
