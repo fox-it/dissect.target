@@ -155,7 +155,7 @@ class OpenVPNPlugin(Plugin):
                     server=config.get("server"),
                     ifconfig_pool_persist=config.get("ifconfig-pool-persist"),
                     pushed_options=pushed_options,
-                    client_to_client=(False if config.get("client-to-client", False) == "" else config.get("client-to-client", False)),
+                    client_to_client=config.get("client-to-client", False),
                     duplicate_cn=config.get("duplicate-cn", False),
                     source=config_path,
                     _target=self.target,
@@ -166,14 +166,18 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
     """Parses Openvpn config  files"""
     lines = content.splitlines()
     res = {}
+    boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
 
     for line in lines:
         # As per man (8) openvpn, lines starting with ; or # are comments
         if line and not line.startswith((";", "#")):
             key, *value = line.split(" ", 1)
-            value = value[0] if value else ""
-            # This removes all text after the first comment
-            value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
+            if any(key == boolean_field.name for boolean_field in boolean_fields):
+                value = value[0] if value else True
+            else:
+                value = value[0] if value else ""
+                # This removes all text after the first comment
+                value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
             if old_value := res.get(key):
                 if not isinstance(old_value, list):
                     old_value = [old_value]
