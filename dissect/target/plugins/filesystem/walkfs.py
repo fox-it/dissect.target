@@ -48,6 +48,7 @@ class WalkFSPlugin(Plugin):
 
 def generate_record(target: Target, path: TargetPath) -> FilesystemRecord:
     stat = path.lstat()
+    btime = from_unix(stat.st_birthtime) if stat.st_birthtime else None
     entry = path.get()
     if isinstance(entry, RootFilesystemEntry):
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
@@ -57,6 +58,7 @@ def generate_record(target: Target, path: TargetPath) -> FilesystemRecord:
         atime=from_unix(stat.st_atime),
         mtime=from_unix(stat.st_mtime),
         ctime=from_unix(stat.st_ctime),
+        btime=btime,
         ino=stat.st_ino,
         path=path,
         size=stat.st_size,
