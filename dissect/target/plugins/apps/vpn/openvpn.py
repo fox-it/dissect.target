@@ -167,7 +167,7 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
     lines = content.splitlines()
     res = {}
     boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
-    boolean_field_names = (field.name for field in boolean_fields)
+    boolean_field_names = set(field.name for field in boolean_fields)
 
     for line in lines:
         # As per man (8) openvpn, lines starting with ; or # are comments
