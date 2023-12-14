@@ -20,16 +20,6 @@ from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
-option_client_key = "key"
-option_client_crt = "crt"
-option_server_ca = "ca"
-option_noverify = "noverify"
-option_reconnects = "reconnects"
-option_shortreads = "shortreads"
-option_reconnectwait = "reconnectwait"
-option_sockettimeout = "sockettimeout"
-
-
 class RemoteStream(AlignedStream):
     def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: Optional[int] = None):
         self.stream = stream
@@ -92,10 +82,10 @@ class RemoteStreamConnection:
         flag_verify_locations_loaded = False
 
         if options := kwargs.get("options"):
-            client_key = options.get(option_client_key)
-            client_crt = options.get(option_client_crt)
-            server_ca = options.get(option_server_ca)
-            noverify = options.get(option_noverify)
+            client_key = options.get("key")
+            client_crt = options.get("crt")
+            server_ca = options.get("ca")
+            noverify = options.get("noverify")
 
             if client_key and client_crt:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
@@ -105,10 +95,10 @@ class RemoteStreamConnection:
             if server_ca:
                 self._context.load_verify_locations(server_ca)
                 flag_verify_locations_loaded = True
-            self._max_reconnects = options.get(option_reconnects, max(0, self._max_reconnects))
-            self._max_shortreads = options.get(option_shortreads, max(0, self._max_shortreads))
-            self._reconnect_wait = options.get(option_reconnectwait, max(0, self._reconnect_wait))
-            self._socket_timeout = options.get(option_sockettimeout, max(0, self._socket_timeout))
+            self._max_reconnects = options.get("reconnects", max(0, self._max_reconnects))
+            self._max_shortreads = options.get("shortreads", max(0, self._max_shortreads))
+            self._reconnect_wait = options.get("reconnectwait", max(0, self._reconnect_wait))
+            self._socket_timeout = options.get("sockettimeout", max(0, self._socket_timeout))
 
         if flag_cert_chain_loaded is False and self.CONFIG_KEY is not None and self.CONFIG_CRT is not None:
             self._context.load_cert_chain_str(certfile=self.CONFIG_CRT, keyfile=self.CONFIG_KEY)
@@ -214,14 +204,14 @@ class RemoteStreamConnection:
         return disks
 
 
-@arg(f"--remote-{option_client_key}", dest=option_client_key, help="private key")
-@arg(f"--remote-{option_client_crt}", dest=option_client_crt, help="client certificate")
-@arg(f"--remote-{option_server_ca}", dest=option_server_ca, help="certificate Authority")
-@arg(f"--remote-{option_noverify}", dest=option_noverify, help="no certificate verification")
-@arg(f"--remote-{option_reconnects}", dest=option_reconnects, help="max number of reconnects")
-@arg(f"--remote-{option_shortreads}", dest=option_shortreads, help="max limit shortreads")
-@arg(f"--remote-{option_reconnectwait}", dest=option_reconnectwait, help="max time before reconnection attempt")
-@arg(f"--remote-{option_sockettimeout}", dest=option_sockettimeout, help="socket timeout")
+@arg(f"--remote-key", dest="key", help="private key")
+@arg(f"--remote-crt", dest="crt", help="client certificate")
+@arg(f"--remote-ca", dest="ca", help="certificate Authority")
+@arg(f"--remote-noverify", dest="noverify", help="no certificate verification")
+@arg(f"--remote-reconnects", dest="reconnects", help="max number of reconnects")
+@arg(f"--remote-shortreads", dest="shortreads", help="max limit shortreads")
+@arg(f"--remote-reconnectwait", dest="reconnectwait", help="max time before reconnection attempt")
+@arg(f"--remote-sockettimeout", dest="sockettimeout", help="socket timeout")
 class RemoteLoader(Loader):
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)

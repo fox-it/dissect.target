@@ -34,7 +34,7 @@ class LogLoader(Loader):
 
     def map(self, target: Target) -> None:
         self.target = target
-        vfs = RootFilesystem(self.target)
+        vfs = self.target.fs
         mnt = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
         target.filesystems.add(mnt)
         vfs.mount("/", mnt)
@@ -45,4 +45,4 @@ class LogLoader(Loader):
             mapping = str(mnt.path(mapping).joinpath(entry.name))
             mnt.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
-        target.fs = vfs
+
