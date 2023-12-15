@@ -833,11 +833,9 @@ class FilesystemEntry:
         Returns:
             The various digests of this entry.
         """
-        with self.open() as fd:
-            if algos:
-                return hashutil.custom(fd, algos)
-            return hashutil.common(fd)
-
+        if algos:
+            return hashutil.custom(fd, algos)
+        return hashutil.common(fd)
 
 
 class VirtualDirectory(FilesystemEntry):
