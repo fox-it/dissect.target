@@ -44,7 +44,7 @@ def test_persist_execution_report():
         (["/path/to/somewhere"], "invalid", [], ["invalid:///path/to/somewhere"]),
     ],
 )
-def test_args_to_uri(targets, loader_name, rest, uris):
+def test_args_to_uri(targets: list[str], loader_name: str, rest: list[str], uris: list[str]) -> None:
     @arg("--loader-option", dest="option")
     class FakeLoader:
         pass

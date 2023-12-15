@@ -10,7 +10,6 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
 
-
 @arg("--log-hint", dest="hint", help="hint for file type")
 class LogLoader(Loader):
     """Load separate log files without a target.
