@@ -33,6 +33,8 @@ except Exception:
 
 
 class TargetdLoader(ProxyLoader):
+    """Load remote targets through a broker."""
+
     instance = None
 
     def __init__(self, path: Union[Path, str], **kwargs):

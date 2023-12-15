@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 
 class AsdfLoader(Loader):
+    """Load an ASDF target"""
+
     METADATA_PREFIX = "$asdf$"
 
     def __init__(self, path: Path, **kwargs):

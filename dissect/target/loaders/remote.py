@@ -20,6 +20,7 @@ from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
+
 class RemoteStream(AlignedStream):
     def __init__(self, stream: RemoteStreamConnection, disk_id: int, size: Optional[int] = None):
         self.stream = stream
@@ -204,15 +205,17 @@ class RemoteStreamConnection:
         return disks
 
 
-@arg(f"--remote-key", dest="key", help="private key")
-@arg(f"--remote-crt", dest="crt", help="client certificate")
-@arg(f"--remote-ca", dest="ca", help="certificate Authority")
-@arg(f"--remote-noverify", dest="noverify", help="no certificate verification")
-@arg(f"--remote-reconnects", dest="reconnects", help="max number of reconnects")
-@arg(f"--remote-shortreads", dest="shortreads", help="max limit shortreads")
-@arg(f"--remote-reconnectwait", dest="reconnectwait", help="max time before reconnection attempt")
-@arg(f"--remote-sockettimeout", dest="sockettimeout", help="socket timeout")
+@arg("--remote-key", dest="key", help="private key")
+@arg("--remote-crt", dest="crt", help="client certificate")
+@arg("--remote-ca", dest="ca", help="certificate Authority")
+@arg("--remote-noverify", dest="noverify", help="no certificate verification")
+@arg("--remote-reconnects", dest="reconnects", help="max number of reconnects")
+@arg("--remote-shortreads", dest="shortreads", help="max limit shortreads")
+@arg("--remote-reconnectwait", dest="reconnectwait", help="max time before reconnection attempt")
+@arg("--remote-sockettimeout", dest="sockettimeout", help="socket timeout")
 class RemoteLoader(Loader):
+    """Load a remote target that runs a compatible Dissect agent."""
+
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         uri = kwargs.get("parsed_path")

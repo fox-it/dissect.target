@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Union
 
 from dissect.target import Target
-from dissect.target.filesystem import RootFilesystem, VirtualFilesystem
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
@@ -14,7 +14,13 @@ logloader_option_hint = "hint"
 
 @arg("--log-hint", dest=logloader_option_hint, help="hint for file type")
 class LogLoader(Loader):
-    """Load separate log files without a target. Usage: target-query /evtx/* -L log -f evtx (-L log -h for options)."""
+    """Load separate log files without a target.
+
+    Usage:
+
+    ``target-query /evtx/* -L log -f evtx``
+
+    """
 
     LOGS_DIRS = {
         "evtx": "sysvol/windows/system32/winevt/logs",
@@ -45,4 +51,3 @@ class LogLoader(Loader):
             mapping = str(mnt.path(mapping).joinpath(entry.name))
             mnt.map_file(mapping, str(entry))
         target.filesystems.add(vfs)
-

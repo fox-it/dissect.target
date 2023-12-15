@@ -6,6 +6,8 @@ from dissect.target.target import Target
 
 
 class RawLoader(Loader):
+    """Load raw binary dumps."""
+
     @staticmethod
     def detect(path: Path) -> bool:
         return not path.is_dir()
