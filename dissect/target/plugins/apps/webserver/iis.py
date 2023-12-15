@@ -63,11 +63,11 @@ class IISLogsPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No ApplicationHost config file found")
 
     @plugin.internal
-    def get_log_dirs(self) -> list[tuple[str, str]]:
+    def get_log_dirs(self) -> list[tuple[str, Path]]:
         log_paths = []
 
-        if self.target.fs.path("sysvol/files").exists():
-            log_paths.append(("auto", "sysvol/files"))
+        if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
+            log_paths.append(("auto", sysvol_files))
 
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
@@ -85,7 +85,7 @@ class IISLogsPlugin(plugin.Plugin):
     @plugin.internal
     def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
         for log_format, log_dir_path in self.get_log_dirs():
-            for log_file in self.iter_log_paths(log_dir_path):
+            for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
 
     @plugin.internal
@@ -270,11 +270,6 @@ class IISLogsPlugin(plugin.Plugin):
                 _target=self.target,
                 **{normalise_field_name(field): raw.get(field) for field in extra_fields},
             )
-
-    @plugin.internal
-    def iter_log_paths(self, log_dir: str) -> Iterator[Path]:
-        log_dir = fsutil.normalize(log_dir, alt_separator=self.target.fs.alt_separator)
-        yield from self.target.fs.path(log_dir).glob("*/*.log")
 
     @plugin.export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:

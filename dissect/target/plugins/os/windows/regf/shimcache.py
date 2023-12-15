@@ -357,6 +357,6 @@ class ShimcachePlugin(Plugin):
                 last_modified=ts,
                 name=name,
                 index=index,
-                path=self.target.fs.path(self.target.resolve(file_path)),
+                path=self.target.resolve(file_path),
                 _target=self.target,
             )

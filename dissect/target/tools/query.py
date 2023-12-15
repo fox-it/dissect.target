@@ -110,7 +110,8 @@ def main():
         ),
     )
     parser.add_argument("--cmdb", action="store_true")
-    parser.add_argument("--hash", action="store_true", help="hash all uri paths in records")
+    parser.add_argument("--hash", action="store_true", help="hash all paths in records")
+    parser.add_argument("--resolve", action="store_true", help="resolve all paths in records")
     parser.add_argument(
         "--report-dir",
         type=pathlib.Path,
@@ -362,29 +363,40 @@ def main():
         # Write records
         count = 0
         break_out = False
-        if len(record_entries):
-            rs = record_output(args.strings, args.json)
-            for entry in record_entries:
-                try:
-                    for record_entries in entry:
-                        if args.hash:
-                            rs.write(hashutil.hash_path_records(target, record_entries))
-                        else:
-                            rs.write(record_entries)
-                        count += 1
-                        if args.limit is not None and count >= args.limit:
-                            break_out = True
-                            break
-                except Exception as e:
-                    # Ignore errors if multiple functions
-                    if len(funcs) > 1:
-                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
-                        pass
-                    else:
-                        raise e
 
-                if break_out:
-                    break
+        outputer = None
+
+        if args.resolve:
+            outputer = hashutil.resolve_path_records
+
+        if args.hash:
+            outputer = hashutil.hash_path_records
+
+        if not len(record_entries):
+            continue
+
+        rs = record_output(args.strings, args.json)
+        for entry in record_entries:
+            try:
+                for record_entries in entry:
+                    if outputer:
+                        rs.write(outputer(target, record_entries))
+                    else:
+                        rs.write(record_entries)
+                    count += 1
+                    if args.limit is not None and count >= args.limit:
+                        break_out = True
+                        break
+            except Exception as e:
+                # Ignore errors if multiple functions
+                if len(funcs) > 1:
+                    target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    pass
+                else:
+                    raise e
+
+            if break_out:
+                break
 
     timestamp = datetime.utcnow()
 

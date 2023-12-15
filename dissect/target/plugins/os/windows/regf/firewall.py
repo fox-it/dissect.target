@@ -67,7 +67,7 @@ class FirewallPlugin(Plugin):
                     data[fname] = value
 
                 if "app" in data:
-                    data["app"] = self.target.resolve(data["app"])
+                    data["app"] = str(self.target.resolve(data["app"]))
 
                 yield TargetRecordDescriptor("windows/registry/firewall", r)(
                     key=entry.name,
