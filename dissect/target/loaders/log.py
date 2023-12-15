@@ -9,10 +9,9 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
-logloader_option_hint = "hint"
 
 
-@arg("--log-hint", dest=logloader_option_hint, help="hint for file type")
+@arg("--log-hint", dest="hint", help="hint for file type")
 class LogLoader(Loader):
     """Load separate log files without a target.
 
@@ -45,7 +44,7 @@ class LogLoader(Loader):
         target.filesystems.add(mnt)
         vfs.mount("/", mnt)
         for entry in self.path.parent.glob(self.path.name):
-            ext = self.options.get(logloader_option_hint, entry.suffix.lower()).strip(".")
+            ext = self.options.get("hint", entry.suffix.lower()).strip(".")
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
             mapping = str(mnt.path(mapping).joinpath(entry.name))
