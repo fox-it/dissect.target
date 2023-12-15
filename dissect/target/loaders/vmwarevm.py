@@ -4,7 +4,7 @@ from dissect.target.loaders.vmx import VmxLoader
 
 
 class VmwarevmLoader(VmxLoader):
-    """Load vmwarevm folders"""
+    """Load ``*.vmwarevm`` folders from VMware Fusion."""
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(next(path.glob("*.vmx")))
