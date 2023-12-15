@@ -6,7 +6,7 @@ from dissect.target.target import Target
 
 
 class RawLoader(Loader):
-    """Load raw binary dumps."""
+    """Load raw container files such as disk images."""
 
     @staticmethod
     def detect(path: Path) -> bool:
