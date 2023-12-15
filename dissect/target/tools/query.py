@@ -16,7 +16,7 @@ from dissect.target.exceptions import (
     PluginNotFoundError,
     UnsupportedPluginError,
 )
-from dissect.target.helpers import cache, hashutil
+from dissect.target.helpers import cache, modifier
 from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
@@ -364,13 +364,15 @@ def main():
         count = 0
         break_out = False
 
-        outputer = None
+        modifier = None
 
         if args.resolve:
-            outputer = hashutil.resolve_path_records
+            modifier = modifier.Modifier.RESOLVE
 
         if args.hash:
-            outputer = hashutil.hash_path_records
+            modifier = modifier.Modifier.HASH
+
+        modifier_func = modifier.get_modify_function(modifier)
 
         if not len(record_entries):
             continue
@@ -379,10 +381,7 @@ def main():
         for entry in record_entries:
             try:
                 for record_entries in entry:
-                    if outputer:
-                        rs.write(outputer(target, record_entries))
-                    else:
-                        rs.write(record_entries)
+                    rs.write(modifier_func(target, record_entries))
                     count += 1
                     if args.limit is not None and count >= args.limit:
                         break_out = True
