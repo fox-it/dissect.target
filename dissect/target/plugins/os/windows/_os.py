@@ -338,22 +338,5 @@ class WindowsPlugin(OSPlugin):
                 )
 
     @export(property=True)
-    def sid(self) -> Optional[str]:
-        key = "HKLM\\SAM\\SAM\\Domains\\Account"
-        for k in self.target.registry.keys(key):
-            try:
-                value = k.value('V').value
-
-                group_1 = int.from_bytes(value[-12:-8], byteorder='little')
-                group_2 = int.from_bytes(value[-8:-4], byteorder='little')
-                group_3 = int.from_bytes(value[-4:], byteorder='little')
-
-                sid = f'S-1-5-21-{group_1}-{group_2}-{group_3}'
-
-                return sid
-            except RegistryValueNotFoundError:
-                continue
-
-    @export(property=True)
     def os(self) -> str:
         return OperatingSystem.WINDOWS.value
