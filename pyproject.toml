@@ -55,6 +55,7 @@ full = [
     "dissect.extfs>=3.0.dev,<4.0.dev",
     "dissect.fat>=3.0.dev,<4.0.dev",
     "dissect.ffs>=3.0.dev,<4.0.dev",
+    "dissect.qnxfs>=1.0.dev,<2.0.dev",
     "dissect.shellitem>=3.0.dev,<4.0.dev",
     "dissect.squashfs>=1.0.dev,<2.0.dev",
     "dissect.sql>=3.0.dev,<4.0.dev",
