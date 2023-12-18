@@ -1,22 +1,29 @@
 from typing import Callable, Union
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 from flow.record import Record
-from flow.record.fieldtypes import path
+from flow.record.fieldtypes import digest, path
 
 from dissect.target import Target
+from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.modifier import (
     MODIFIER_TYPE,
     Modifier,
     get_modifier_function,
 )
-from tests.helpers.test_hashutil import HASHES, mock_target, resolve_func
+from tests.helpers.test_hashutil import HASHES
 
 
 @pytest.fixture
 def hash_function() -> MODIFIER_TYPE:
     return get_modifier_function(Modifier.HASH)
+
+
+@pytest.fixture
+def resolve_function() -> MODIFIER_TYPE:
+    return get_modifier_function(Modifier.RESOLVE)
 
 
 @pytest.mark.parametrize(
@@ -31,7 +38,7 @@ def hash_function() -> MODIFIER_TYPE:
 def test_hash_path_records_with_paths(
     record: Record,
     hash_function: MODIFIER_TYPE,
-    mock_target: Mock,
+    target_win: Mock,
     test_input: dict[str, Union[type[path], type[str]]],
     expected_records: int,
 ) -> None:
@@ -40,7 +47,12 @@ def test_hash_path_records_with_paths(
 
     record_names = [key for key, value in test_input.items() if value is path]
 
-    hashed_record = hash_function(mock_target, record)
+    with (
+        patch.object(TargetPath, "open", mock_open(read_data=b"")),
+        patch("dissect.target.helpers.modifier.common", return_value=HASHES),
+    ):
+        hashed_record = hash_function(target_win, record)
+
     assert hashed_record.name == "test"
     assert len(hashed_record.records) == expected_records
     assert hashed_record.records[0] == record
@@ -91,7 +103,7 @@ def test_hash_path_records_without_paths(
 def test_hash_path_records_with_exception(
     record: Record,
     hash_function: MODIFIER_TYPE,
-    mock_target: Mock,
+    target_win: Target,
     side_effects: list[Union[type[Exception], tuple[str]]],
     expected: int,
 ) -> None:
@@ -107,15 +119,30 @@ def test_hash_path_records_with_exception(
 
     record._field_types = field_types
 
+    mocked_open = mock_open()
+    mocked_open.configure_mock(**{"return_value.__enter__.side_effect": side_effects})
+
     with (
-        patch.object(mock_target.fs, "hash", side_effect=side_effects),
-        patch.object(mock_target, "resolve", side_effect=resolve_func),
+        patch.object(TargetPath, "open", mocked_open),
+        patch("dissect.target.helpers.modifier.common", return_value=HASHES),
     ):
-        hashed_record = hash_function(mock_target, record)
+        hashed_record = hash_function(target_win, record)
 
     if not expected:
         assert hashed_record == record
     else:
         for _record, key in zip(hashed_record.records[1:], found_type_names):
-            assert getattr(_record, f"{key}_resolved") == resolve_func("test")
+            assert getattr(_record, f"{key}_resolved") == "test"
             assert getattr(_record, f"{key}_digest").__dict__ == digest(HASHES).__dict__
+
+
+@patch("flow.record.Record")
+def test_resolved_modifier(record: Record, target_win: Target, resolve_function: MODIFIER_TYPE) -> None:
+    record._desc.name = "test"
+    record._field_types = {"name": path}
+
+    resolved_record = resolve_function(target_win, record)
+
+    for _record in resolved_record.records[1:]:
+        assert getattr(_record, f"name_resolved") is not None
+        assert not hasattr(_record, f"name_digest")

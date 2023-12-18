@@ -48,7 +48,7 @@ def _noop(_target: Target, record: Record):
     return record
 
 
-MODIFIER_TYPE = Callable[[Target, Record], Record]
+MODIFIER_TYPE = Callable[[Target, Record], GroupedRecord]
 
 
 def get_modifier_function(modifier_type: Modifier) -> MODIFIER_TYPE:
@@ -58,7 +58,7 @@ def get_modifier_function(modifier_type: Modifier) -> MODIFIER_TYPE:
     return _noop
 
 
-def modify_record(target: Target, record: Record, modifier_function: MODIFIER_TYPE) -> Record:
+def modify_record(target: Target, record: Record, modifier_function: MODIFIER_TYPE) -> GroupedRecord:
     additional_record = []
 
     for resolved_path, field_name in _resolve_path_types(target, record):
@@ -72,16 +72,16 @@ def modify_record(target: Target, record: Record, modifier_function: MODIFIER_TY
     if not additional_record:
         return record
 
-    return GroupedRecord(record._desc.name, [record] + hash_records)
+    return GroupedRecord(record._desc.name, [record] + additional_record)
 
 
-def _resolve_path_records(field_name: str, resolved_path: TargetPath) -> Record:
+def _resolve_path_records(resolved_path: TargetPath, field_name: str) -> Record:
     """Resolve files from path fields inside the record."""
     type_info = [("path", "_resolved", resolved_path)]
     return _create_modified_record("filesystem/file/resolved", field_name, type_info)
 
 
-def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
+def _hash_path_records(resolved_path: TargetPath, field_name: str) -> Record:
     """Hash files from path fields inside the record."""
 
     with resolved_path.open() as fh:

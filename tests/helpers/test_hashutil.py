@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Union
 from unittest.mock import Mock, patch
 
@@ -16,12 +17,12 @@ HASHES = ("CAFEF00D" * 4, "F4CEF001" * 5, "DEADBEEF" * 8)
 @pytest.fixture
 def mock_target(target_win) -> Mock:
     target_win.fs.hash = lambda path: HASHES
-    target_win.resolve = lambda path: path
+    target_win.resolve = lambda path: Path(path)
     return target_win
 
 
-def resolve_func(mock_target: Target, resolvable_path: str) -> str:
-    return mock_target.fs.path(f"/resolved{resolvable_path}")
+def resolve_func(resolvable_path: str) -> str:
+    return Path(f"/resolved{resolvable_path}")
 
 
 def test_common() -> None:
