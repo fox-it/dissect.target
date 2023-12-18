@@ -372,7 +372,7 @@ def main():
         if args.hash:
             modifier_type = modifier.Modifier.HASH
 
-        modifier_func = modifier.get_modify_function(modifier_type)
+        modifier_func = modifier.get_modifier_function(modifier_type)
 
         if not len(record_entries):
             continue

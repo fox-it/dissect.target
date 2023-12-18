@@ -11,7 +11,7 @@ class FirewallPlugin(Plugin):
     """Plugin that parses firewall rules from the registry."""
 
     KEY = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules"
-    FIELD_MAP = {"app": "uri"}
+    FIELD_MAP = {"app": "path"}
     VALUE_MAP = {"active": lambda val: val == "TRUE"}
 
     def check_compatible(self) -> None:
@@ -67,7 +67,7 @@ class FirewallPlugin(Plugin):
                     data[fname] = value
 
                 if "app" in data:
-                    data["app"] = str(self.target.resolve(data["app"]))
+                    data["app"] = self.target.resolve(data["app"])
 
                 yield TargetRecordDescriptor("windows/registry/firewall", r)(
                     key=entry.name,
