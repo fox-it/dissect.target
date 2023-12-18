@@ -15,7 +15,7 @@ from dissect.target.helpers import fsutil
 
 
 class JFFSFilesystem(Filesystem):
-    __fstype__ = "jffs"
+    __type__ = "jffs"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
