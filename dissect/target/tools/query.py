@@ -364,15 +364,15 @@ def main():
         count = 0
         break_out = False
 
-        modifier = None
+        modifier_type = None
 
         if args.resolve:
-            modifier = modifier.Modifier.RESOLVE
+            modifier_type = modifier.Modifier.RESOLVE
 
         if args.hash:
-            modifier = modifier.Modifier.HASH
+            modifier_type = modifier.Modifier.HASH
 
-        modifier_func = modifier.get_modify_function(modifier)
+        modifier_func = modifier.get_modify_function(modifier_type)
 
         if not len(record_entries):
             continue
