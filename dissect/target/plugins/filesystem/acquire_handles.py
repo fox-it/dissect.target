@@ -43,4 +43,6 @@ class OpenHandlesPlugin(Plugin):
         """
         with self.open_handles_file.open() as fh:
             for row in csv.DictReader(gzip.open(fh, "rt")):
+                if name := row.get("name"):
+                    row.update({"name": self.target.fs.path(name)})
                 yield AcquireOpenHandlesRecord(_target=self.target, **row)

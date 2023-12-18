@@ -17,7 +17,7 @@ class BitlockerVolumeSystemError(VolumeSystemError):
 
 
 class BitlockerVolumeSystem(EncryptedVolumeSystem):
-    PROVIDER = "bitlocker"
+    __type__ = "bitlocker"
 
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)

@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class QCow2Container(Container):
+    __type__ = "qcow2"
+
     def __init__(self, fh: Union[BinaryIO, Path], data_file=None, backing_file=None, *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):

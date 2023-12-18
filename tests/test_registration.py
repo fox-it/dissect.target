@@ -18,7 +18,7 @@ def environment_path(tmp_path: Path):
 
 
 def registry_file(path: str):
-    return Path(__file__).parent / f"data/plugin_register/{path}"
+    return Path(__file__).parent / f"_data/registration/{path}"
 
 
 def copy_different_plugin_files(path: Path, file_name: str):

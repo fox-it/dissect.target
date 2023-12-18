@@ -11,7 +11,7 @@ class AD1Loader(Loader):
         path = path.resolve()
 
         super().__init__(path)
-        self.ad1 = ad1.AD1(open(path, "rb"))
+        self.ad1 = ad1.AD1(path.open("rb"))
 
     @staticmethod
     def detect(path):

@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class VhdContainer(Container):
+    __type__ = "vhd"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):

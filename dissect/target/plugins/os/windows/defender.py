@@ -203,9 +203,9 @@ struct QuarantineEntryFileHeader {
     CHAR        _Padding[32];
     DWORD       Section1Size;
     DWORD       Section2Size;
-    DWORD       Section1CrC;
-    DWORD       Section2CrC;
-    char        MagicFooter[4];
+    DWORD       Section1CRC;
+    DWORD       Section2CRC;
+    CHAR        MagicFooter[4];
 };
 
 struct QuarantineEntrySection1 {

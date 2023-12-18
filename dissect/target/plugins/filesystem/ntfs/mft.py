@@ -105,7 +105,7 @@ COMPACT_RECORD_TYPES = {
 
 class MftPlugin(Plugin):
     def check_compatible(self) -> None:
-        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
+        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
         if not len(ntfs_filesystems):
             raise UnsupportedPluginError("No NTFS filesystems found")
 
@@ -133,7 +133,7 @@ class MftPlugin(Plugin):
             record_formatter = formatter
 
         for fs in self.target.filesystems:
-            if fs.__fstype__ != "ntfs":
+            if fs.__type__ != "ntfs":
                 continue
 
             drive_letter = get_drive_letter(self.target, fs)

@@ -69,12 +69,19 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
     @export(property=True)
     def version(self) -> str:
-        if distrib_description := self._os_release.get("DISTRIB_DESCRIPTION"):
-            return distrib_description
+        distrib_description = self._os_release.get("DISTRIB_DESCRIPTION", "")
+        name = self._os_release.get("NAME", "") or self._os_release.get("DISTRIB_ID", "")
+        version = (
+            self._os_release.get("VERSION", "")
+            or self._os_release.get("VERSION_ID", "")
+            or self._os_release.get("DISTRIB_RELEASE", "")
+        )
 
-        name = self._os_release.get("NAME") or self._os_release.get("DISTRIB_ID")
-        version = self._os_release.get("VERSION") or self._os_release.get("DISTRIB_RELEASE")
-        return f"{name} {version}"
+        if len(f"{name} {version}") > len(distrib_description):
+            return f"{name} {version}"
+
+        else:
+            return distrib_description
 
     @export(property=True)
     def os(self) -> str:

@@ -19,22 +19,35 @@ from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
+from tests._utils import absolute_path
 
-from ._utils import absolute_path
+# Test if the data/ directory is present and if not, as is the case in Python
+# source distributions of dissect.target, we give an error
+data_dir = absolute_path("_data")
+if not pathlib.Path(data_dir).is_dir():
+    raise pytest.PytestConfigWarning(
+        f"No test data directory {data_dir} found.\n"
+        "This can happen when you have downloaded the source distribution\n"
+        "of dissect.target from pypi.org. If so, retrieve the test data from\n"
+        "the dissect.target GitHub repository at:\n"
+        "https://github.com/fox-it/dissect.target"
+    )
 
 
-def make_mock_target():
-    with tempfile.NamedTemporaryFile(prefix="MockTarget-") as tmp_file:
+def make_mock_target(tmp_path):
+    with tempfile.NamedTemporaryFile(dir=tmp_path, prefix="MockTarget-", delete=False) as tmp_file:
+        tmp_file.close()
+
         target = Target()
         target.path = pathlib.Path(tmp_file.name)
         yield target
 
 
 @pytest.fixture
-def make_mock_targets(request):
+def make_mock_targets(request, tmp_path):
     def _make_targets(size):
         for _ in range(size):
-            yield from make_mock_target()
+            yield from make_mock_target(tmp_path)
 
     return _make_targets
 
@@ -125,7 +138,7 @@ def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> VirtualFilesystem
     fs = fs_linux_proc
 
     for filename in ("unix", "packet", "raw6", "raw", "udp6", "udp", "tcp6", "tcp"):
-        fs.map_file(f"/proc/net/{filename}", absolute_path(f"data/unix/linux/proc/net/{filename}"))
+        fs.map_file(f"/proc/net/{filename}", absolute_path(f"_data/plugins/os/unix/linux/proc/net/{filename}"))
 
     yield fs
 
@@ -141,14 +154,14 @@ def fs_osx():
 @pytest.fixture
 def fs_bsd():
     fs = VirtualFilesystem()
-    fs.map_file("/bin/freebsd-version", absolute_path("data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
+    fs.map_file("/bin/freebsd-version", absolute_path("_data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
     yield fs
 
 
 @pytest.fixture
 def fs_android() -> VirtualFilesystem:
     fs = VirtualFilesystem()
-    fs.map_file("/build.prop", absolute_path("data/plugins/os/unix/linux/android/build.prop"))
+    fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
     yield fs
 
 
@@ -175,22 +188,22 @@ def hive_hku():
 
 
 @pytest.fixture
-def target_bare():
+def target_bare(tmp_path):
     # A target without any associated OSPlugin
-    yield from make_mock_target()
+    yield from make_mock_target(tmp_path)
 
 
 @pytest.fixture
-def target_default():
-    mock_target = next(make_mock_target())
+def target_default(tmp_path):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = default.DefaultPlugin
     mock_target.apply()
     yield mock_target
 
 
 @pytest.fixture
-def target_win(hive_hklm, fs_win):
-    mock_target = next(make_mock_target())
+def target_win(tmp_path, hive_hklm, fs_win):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = WindowsPlugin
 
     mock_target.add_plugin(registry.RegistryPlugin, check_compatible=False)
@@ -208,8 +221,8 @@ def target_win(hive_hklm, fs_win):
 
 
 @pytest.fixture
-def target_unix(fs_unix):
-    mock_target = next(make_mock_target())
+def target_unix(tmp_path, fs_unix):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = UnixPlugin
 
     mock_target.filesystems.add(fs_unix)
@@ -219,8 +232,8 @@ def target_unix(fs_unix):
 
 
 @pytest.fixture
-def target_linux(fs_linux):
-    mock_target = next(make_mock_target())
+def target_linux(tmp_path, fs_linux):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = LinuxPlugin
 
     mock_target.filesystems.add(fs_linux)
@@ -230,26 +243,26 @@ def target_linux(fs_linux):
 
 
 @pytest.fixture
-def target_osx(fs_osx):
-    mock_target = next(make_mock_target())
+def target_osx(tmp_path, fs_osx):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = MacPlugin
 
     mock_target.filesystems.add(fs_osx)
     mock_target.fs.mount("/", fs_osx)
     mock_target.apply()
 
-    version = absolute_path("data/plugins/os/unix/bsd/osx/os/SystemVersion.plist")
+    version = absolute_path("_data/plugins/os/unix/bsd/osx/_os/SystemVersion.plist")
     fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
 
-    system = absolute_path("data/plugins/os/unix/bsd/osx/os/preferences.plist")
+    system = absolute_path("_data/plugins/os/unix/bsd/osx/_os/preferences.plist")
     fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
 
     yield mock_target
 
 
 @pytest.fixture
-def target_citrix(fs_bsd):
-    mock_target = next(make_mock_target())
+def target_citrix(tmp_path, fs_bsd):
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = CitrixBsdPlugin
 
     mock_target.filesystems.add(fs_bsd)
@@ -259,7 +272,7 @@ def target_citrix(fs_bsd):
     mock_target.filesystems.add(var_filesystem)
 
     flash_filesystem = VirtualFilesystem()
-    flash_filesystem.map_dir("/", absolute_path("data/plugins/os/unix/bsd/citrix/flash"))
+    flash_filesystem.map_dir("/", absolute_path("_data/plugins/os/unix/bsd/citrix/_os/flash"))
     mock_target.filesystems.add(flash_filesystem)
 
     mock_target.apply()
@@ -267,8 +280,8 @@ def target_citrix(fs_bsd):
 
 
 @pytest.fixture
-def target_android(fs_android: VirtualFilesystem) -> Target:
-    mock_target = next(make_mock_target())
+def target_android(tmp_path, fs_android: VirtualFilesystem) -> Target:
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = AndroidPlugin
     mock_target.filesystems.add(fs_android)
     mock_target.apply()
@@ -378,10 +391,10 @@ def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Tar
 
 @pytest.fixture
 def target_osx_users(target_osx, fs_osx):
-    dissect = absolute_path("data/plugins/os/unix/bsd/osx/os/dissect.plist")
+    dissect = absolute_path("_data/plugins/os/unix/bsd/osx/_os/dissect.plist")
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
 
-    test = absolute_path("data/plugins/os/unix/bsd/osx/os/test.plist")
+    test = absolute_path("_data/plugins/os/unix/bsd/osx/_os/test.plist")
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
     yield target_osx

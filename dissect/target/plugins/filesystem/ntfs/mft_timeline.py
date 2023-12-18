@@ -94,7 +94,7 @@ def format_info(
 
 class MftTimelinePlugin(Plugin):
     def check_compatible(self) -> None:
-        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__fstype__ == "ntfs"]
+        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
         if not len(ntfs_filesystems):
             raise UnsupportedPluginError("No MFT timelines found")
 
@@ -109,7 +109,7 @@ class MftTimelinePlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
         for fs in self.target.filesystems:
-            if fs.__fstype__ != "ntfs":
+            if fs.__type__ != "ntfs":
                 continue
 
             drive_letter = get_drive_letter(self.target, fs)

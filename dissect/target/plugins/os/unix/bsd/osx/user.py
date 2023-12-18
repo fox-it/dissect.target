@@ -1,8 +1,6 @@
 import plistlib
 from typing import Iterator
 
-from flow.record.fieldtypes import posix_path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -49,7 +47,7 @@ class UserPlugin(Plugin):
                         password_last_time=account_policy.get("passwordLastSetTime"),
                         failed_login_count=account_policy.get("failedLoginCount"),
                         failed_login_time=account_policy.get("failedLoginTimestamp"),
-                        source=posix_path(user_details.user.source),
+                        source=self.target.fs.path(user_details.user.source),
                         _user=user_details.user,
                         _target=self.target,
                     )

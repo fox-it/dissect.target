@@ -34,8 +34,7 @@ except ImportError:
     VmfsFilesystemEntry = None
 
 from dissect.target.helpers import fsutil
-
-from ._utils import absolute_path
+from tests._utils import absolute_path
 
 
 @pytest.fixture
@@ -209,7 +208,7 @@ def test_recursive_symlink_open_across_layers(target_bare):
 
 
 def test_recursive_symlink_dev(target_bare):
-    fs1 = ExtFilesystem(fh=open(absolute_path("data/symlink_disk.ext4"), "rb"))
+    fs1 = ExtFilesystem(fh=open(absolute_path("_data/filesystem/symlink_disk.ext4"), "rb"))
     target_bare.fs.mount(fs=fs1, path="/")
 
     with pytest.raises(SymlinkRecursionError):
@@ -463,11 +462,11 @@ def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
-def test_virtual_filesystem_map_dir():
+def test_virtual_filesystem_map_dir(tmp_path):
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
     with (
-        TemporaryDirectory() as tmp_dir,
+        TemporaryDirectory(dir=tmp_path) as tmp_dir,
         TemporaryDirectory(dir=tmp_dir) as some_dir,
         TemporaryDirectory(dir=tmp_dir) as other_dir,
         TemporaryDirectory(dir=other_dir) as second_lvl_dir,

@@ -20,6 +20,8 @@ class GenericPlugin(Plugin):
 
         last_seen = 0
         for f in var_log.iterdir():
+            if not f.exists():
+                continue
             if f.stat().st_mtime > last_seen:
                 last_seen = f.stat().st_mtime
 
@@ -30,16 +32,18 @@ class GenericPlugin(Plugin):
     def install_date(self) -> Optional[datetime]:
         """Return the likely install date of the operating system."""
 
+        # Although this purports to be a generic function for Unix targets,
+        # these paths are Linux specific.
         files = [
             # Debian
             "/var/log/installer/install-journal.txt",
             "/var/log/installer/syslog",
+            "/var/lib/dpkg/arch",
             # RedHat
             "/root/anaconda-ks.cfg",
             # Generic
             "/etc/hostname",
             "/etc/machine-id",
-            "/var/lib/dpkg/arch",
         ]
         dates = []
 

@@ -2,7 +2,6 @@ from typing import Iterator, Optional
 
 from dissect.shellitem.lnk import Lnk
 from dissect.util import ts
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
@@ -88,17 +87,17 @@ class LnkPlugin(Plugin):
                 lnk_ctime = ts.from_unix(entry.stat().st_ctime)
 
                 lnk_relativepath = (
-                    path.from_windows(lnk_file.stringdata.relative_path.string)
+                    self.target.fs.path(lnk_file.stringdata.relative_path.string)
                     if lnk_file.flag("has_relative_path")
                     else None
                 )
                 lnk_workdir = (
-                    path.from_windows(lnk_file.stringdata.working_dir.string)
+                    self.target.fs.path(lnk_file.stringdata.working_dir.string)
                     if lnk_file.flag("has_working_dir")
                     else None
                 )
                 lnk_iconlocation = (
-                    path.from_windows(lnk_file.stringdata.icon_location.string)
+                    self.target.fs.path(lnk_file.stringdata.icon_location.string)
                     if lnk_file.flag("has_icon_location")
                     else None
                 )
@@ -115,9 +114,9 @@ class LnkPlugin(Plugin):
                 )
 
                 if local_base_path and common_path_suffix:
-                    lnk_full_path = path.from_windows(local_base_path + common_path_suffix)
+                    lnk_full_path = self.target.fs.path(local_base_path + common_path_suffix)
                 elif local_base_path and not common_path_suffix:
-                    lnk_full_path = path.from_windows(local_base_path)
+                    lnk_full_path = self.target.fs.path(local_base_path)
                 else:
                     lnk_full_path = None
 
@@ -161,6 +160,7 @@ class LnkPlugin(Plugin):
                     target_mtime=target_mtime,
                     target_atime=target_atime,
                     target_ctime=target_ctime,
+                    _target=self.target,
                 )
 
     def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
