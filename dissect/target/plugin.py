@@ -1128,29 +1128,45 @@ def find_plugin_functions(
     ignore_load_errors = kwargs.get("ignore_load_errors", False)
 
     for pattern in patterns.split(","):
-        # backward compatibility fix for namespace-level plugins (i.e. chrome)
+        # Backward compatibility fix for namespace-level plugins (i.e. chrome)
+        # If an exact namespace match is found, the pattern is changed to the tree to that namespace.
+        # Examples:
+        #     -f browser -> apps.browser.browser
+        #     -f iexplore -> apps.browser.iexplore
+        namespace_match = False
         for index_name, func in functions.items():
             if func["namespace"] == pattern:
-                pattern = func["module"] + "*"
+                pattern = func["module"]
+                namespace_match = True
+                break
 
         wildcard = any(char in pattern for char in ["*", "!", "?", "[", "]"])
         treematch = pattern.split(".")[0] in rootset and pattern != "os"
         exact_match = pattern in functions
 
-        # Allow for exact matches, otherwise you cannot reach documented namespace plugins like
-        # browsers.browser.downloads. You can *always* run these using the namespace/classic-style like:
-        # browser.downloads (but -l lists them in the tree for documentation purposes so it would be misleading
-        # not to allow tree access as well). Note that these tree items will never respond to wildcards though
-        # (browsers.browser.* won't work) to avoid duplicate results.
-        if exact_match:
+        # Allow for exact and namespace matches even if the plugin does not want to be found, otherwise you cannot
+        # reach documented namespace plugins like apps.browser.browser.downloads.
+        # You can *always* run these using the namespace/classic-style like: browser.downloads (but -l lists them
+        # in the tree for documentation purposes so it would be misleading not to allow tree access as well).
+        #
+        # Note that these tree items will never respond to wildcards though to avoid duplicate results, e.g. when
+        # querying apps.browser.*, this also means apps.browser.browser.* won't work.
+        if exact_match or namespace_match:
             show_hidden = True
 
-        if treematch and not wildcard and not exact_match:
-            # Examples:
-            #     -f browsers -> browsers* (the whole package)
-            #     -f apps.webservers.iis -> apps.webservers.iis* (logs etc)
-            # We do not include  a dot because that does not work if the full path is given:
-            #     -f apps.webservers.iis.logs != apps.webservers.iis.logs.* (does not work)
+        # Change the treematch pattern into an fnmatch-able pattern to give back all functions from the sub-tree
+        # (if there is a subtree).
+        #
+        # Examples:
+        #     -f browser -> apps.browser.browser* (the whole package, due to a namespace match)
+        #     -f apps.webservers.iis -> apps.webservers.iis* (logs etc)
+        #     -f apps.webservers.iis.logs -> apps.webservers.iis.logs* (only the logs, there is no subtree)
+        # We do not include a dot because that does not work if the full path is given:
+        #     -f apps.webservers.iis.logs != apps.webservers.iis.logs.* (does not work)
+        #
+        # In practice a namespace_match would almost always also be a treematch, except when the namespace plugin
+        # is in the root of the plugin tree.
+        if (treematch or namespace_match) and not wildcard and not exact_match:
             pattern += "*"
 
         if wildcard or treematch:
