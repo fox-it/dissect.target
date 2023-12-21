@@ -9,7 +9,7 @@ from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record_modifier import (
-    MODIFIER_TYPE,
+    ModifierFunc,
     Modifier,
     get_modifier_function,
 )
@@ -17,12 +17,12 @@ from tests.helpers.test_hashutil import HASHES
 
 
 @pytest.fixture
-def hash_function() -> MODIFIER_TYPE:
+def hash_function() -> ModifierFunc:
     return get_modifier_function(Modifier.HASH)
 
 
 @pytest.fixture
-def resolve_function() -> MODIFIER_TYPE:
+def resolve_function() -> ModifierFunc:
     return get_modifier_function(Modifier.RESOLVE)
 
 
@@ -37,7 +37,7 @@ def resolve_function() -> MODIFIER_TYPE:
 @patch("flow.record.Record")
 def test_hash_path_records_with_paths(
     record: Record,
-    hash_function: MODIFIER_TYPE,
+    hash_function: ModifierFunc,
     target_win: Mock,
     test_input: dict[str, Union[type[path], type[str]]],
     expected_records: int,
@@ -75,7 +75,7 @@ def test_hash_path_records_with_paths(
 @patch("flow.record.Record")
 def test_hash_path_records_without_paths(
     record: Record,
-    hash_function: MODIFIER_TYPE,
+    hash_function: ModifierFunc,
     test_input: dict[str, type[str]],
 ) -> None:
     record._desc.name = "test"
@@ -102,7 +102,7 @@ def test_hash_path_records_without_paths(
 @patch("flow.record.Record")
 def test_hash_path_records_with_exception(
     record: Record,
-    hash_function: MODIFIER_TYPE,
+    hash_function: ModifierFunc,
     target_win: Target,
     side_effects: list[Union[type[Exception], tuple[str]]],
     expected: int,
@@ -137,7 +137,7 @@ def test_hash_path_records_with_exception(
 
 
 @patch("flow.record.Record")
-def test_resolved_modifier(record: Record, target_win: Target, resolve_function: MODIFIER_TYPE) -> None:
+def test_resolved_modifier(record: Record, target_win: Target, resolve_function: ModifierFunc) -> None:
     record._desc.name = "test"
     record._field_types = {"name": path}
 

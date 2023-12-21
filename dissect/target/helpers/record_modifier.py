@@ -1,6 +1,6 @@
 import warnings
 from functools import partial
-from typing import BinaryIO, Callable, Iterator
+from typing import BinaryIO, Callable, Iterable
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
@@ -24,16 +24,16 @@ def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[Target
         if path is None:
             continue
 
-        yield target.resolve(str(path)), field_name
+        yield field_name, target.resolve(str(path))
 
 
-def _create_modified_record(record_name: str, field_name: str, type_info: Iterator[tuple[str, str, str]]):
+def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, str]]):
     record_kwargs = dict()
     record_def = list()
-    for type, name, field in type_info:
-        hashed_field_name = f"{field_name}{name}"
-        record_kwargs.update({hashed_field_name: field})
-        record_def.append((type, hashed_field_name))
+    for type, name, data in field_info:
+        extended_field_name = f"{field_name}{name}"
+        record_kwargs.update({extended_field_name: data})
+        record_def.append((type, extended_field_name))
 
     _record = RecordDescriptor(record_name, record_def)
     return _record(**record_kwargs)
@@ -48,22 +48,22 @@ def _noop(_target: Target, record: Record):
     return record
 
 
-MODIFIER_TYPE = Callable[[Target, Record], GroupedRecord]
+ModifierFunc = Callable[[Target, Record], GroupedRecord]
 
 
-def get_modifier_function(modifier_type: Modifier) -> MODIFIER_TYPE:
+def get_modifier_function(modifier_type: Modifier) -> ModifierFunc:
     if func := MODIFIER_MAPPING.get(modifier_type):
         return partial(modify_record, modifier_function=func)
 
     return _noop
 
 
-def modify_record(target: Target, record: Record, modifier_function: MODIFIER_TYPE) -> GroupedRecord:
+def modify_record(target: Target, record: Record, modifier_function: ModifierFunc) -> GroupedRecord:
     additional_record = []
 
-    for resolved_path, field_name in _resolve_path_types(target, record):
+    for field_name, resolved_path  in _resolve_path_types(target, record):
         try:
-            _record = modifier_function(resolved_path, field_name)
+            _record = modifier_function(field_name, resolved_path)
         except FilesystemError:
             pass
         else:
@@ -75,13 +75,13 @@ def modify_record(target: Target, record: Record, modifier_function: MODIFIER_TY
     return GroupedRecord(record._desc.name, [record] + additional_record)
 
 
-def _resolve_path_records(resolved_path: TargetPath, field_name: str) -> Record:
+def _resolve_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     """Resolve files from path fields inside the record."""
     type_info = [("path", "_resolved", resolved_path)]
     return _create_modified_record("filesystem/file/resolved", field_name, type_info)
 
 
-def _hash_path_records(resolved_path: TargetPath, field_name: str) -> Record:
+def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     """Hash files from path fields inside the record."""
 
     with resolved_path.open() as fh:
