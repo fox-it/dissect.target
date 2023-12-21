@@ -14,17 +14,12 @@ RECORD_NAME = "filesystem/file/digest"
 NAME_SUFFIXES = ["_resolved", "_digest"]
 RECORD_TYPES = ["path", "digest"]
 
+ModifierFunc = Callable[[Target, Record], GroupedRecord]
 
-def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[TargetPath, str]]:
-    for field_name, field_type in record._field_types.items():
-        if not issubclass(field_type, fieldtypes.path):
-            continue
 
-        path = getattr(record, field_name, None)
-        if path is None:
-            continue
-
-        yield field_name, target.resolve(str(path))
+class Modifier(StrEnum):
+    RESOLVE = "resolve"
+    HASH = "hash"
 
 
 def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, str]]):
@@ -37,42 +32,6 @@ def _create_modified_record(record_name: str, field_name: str, field_info: Itera
 
     _record = RecordDescriptor(record_name, record_def)
     return _record(**record_kwargs)
-
-
-class Modifier(StrEnum):
-    RESOLVE = "resolve"
-    HASH = "hash"
-
-
-def _noop(_target: Target, record: Record):
-    return record
-
-
-ModifierFunc = Callable[[Target, Record], GroupedRecord]
-
-
-def get_modifier_function(modifier_type: Modifier) -> ModifierFunc:
-    if func := MODIFIER_MAPPING.get(modifier_type):
-        return partial(modify_record, modifier_function=func)
-
-    return _noop
-
-
-def modify_record(target: Target, record: Record, modifier_function: ModifierFunc) -> GroupedRecord:
-    additional_record = []
-
-    for field_name, resolved_path  in _resolve_path_types(target, record):
-        try:
-            _record = modifier_function(field_name, resolved_path)
-        except FilesystemError:
-            pass
-        else:
-            additional_record.append(_record)
-
-    if not additional_record:
-        return record
-
-    return GroupedRecord(record._desc.name, [record] + additional_record)
 
 
 def _resolve_path_records(field_name: str, resolved_path: TargetPath) -> Record:
@@ -96,3 +55,43 @@ MODIFIER_MAPPING = {
     Modifier.RESOLVE: _resolve_path_records,
     Modifier.HASH: _hash_path_records,
 }
+
+
+def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[TargetPath, str]]:
+    for field_name, field_type in record._field_types.items():
+        if not issubclass(field_type, fieldtypes.path):
+            continue
+
+        path = getattr(record, field_name, None)
+        if path is None:
+            continue
+
+        yield field_name, target.resolve(str(path))
+
+
+def modify_record(target: Target, record: Record, modifier_function: ModifierFunc) -> GroupedRecord:
+    additional_record = []
+
+    for field_name, resolved_path in _resolve_path_types(target, record):
+        try:
+            _record = modifier_function(field_name, resolved_path)
+        except FilesystemError:
+            pass
+        else:
+            additional_record.append(_record)
+
+    if not additional_record:
+        return record
+
+    return GroupedRecord(record._desc.name, [record] + additional_record)
+
+
+def _noop(_target: Target, record: Record):
+    return record
+
+
+def get_modifier_function(modifier_type: Modifier) -> ModifierFunc:
+    if func := MODIFIER_MAPPING.get(modifier_type):
+        return partial(modify_record, modifier_function=func)
+
+    return _noop

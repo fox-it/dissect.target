@@ -9,8 +9,8 @@ from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record_modifier import (
-    ModifierFunc,
     Modifier,
+    ModifierFunc,
     get_modifier_function,
 )
 from tests.helpers.test_hashutil import HASHES
