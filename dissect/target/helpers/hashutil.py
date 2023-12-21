@@ -72,7 +72,7 @@ def hash_uri(target: Target, path: str) -> tuple[str, str]:
 def hash_uri_records(target: Target, record: Record) -> Record:
     """Hash uri paths inside the record."""
 
-    from dissect.target.helpers.modifier import Modifier, get_modifier_function
+    from dissect.target.helpers.record_modifier import Modifier, get_modifier_function
 
     warnings.warn(
         (

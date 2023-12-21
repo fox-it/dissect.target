@@ -36,7 +36,7 @@ def test_common() -> None:
 
 def test_hash_uri_records() -> None:
     with pytest.deprecated_call():
-        with patch("dissect.target.helpers.modifier.get_modifier_function", autospec=True) as modifier_func:
+        with patch("dissect.target.helpers.record_modifier.get_modifier_function", autospec=True) as modifier_func:
             target = Mock()
             record = Mock()
             hashutil.hash_uri_records(target, record)

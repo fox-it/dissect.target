@@ -16,7 +16,7 @@ from dissect.target.exceptions import (
     PluginNotFoundError,
     UnsupportedPluginError,
 )
-from dissect.target.helpers import cache, modifier
+from dissect.target.helpers import cache, record_modifier
 from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
@@ -367,12 +367,12 @@ def main():
         modifier_type = None
 
         if args.resolve:
-            modifier_type = modifier.Modifier.RESOLVE
+            modifier_type = record_modifier.Modifier.RESOLVE
 
         if args.hash:
-            modifier_type = modifier.Modifier.HASH
+            modifier_type = record_modifier.Modifier.HASH
 
-        modifier_func = modifier.get_modifier_function(modifier_type)
+        modifier_func = record_modifier.get_modifier_function(modifier_type)
 
         if not len(record_entries):
             continue

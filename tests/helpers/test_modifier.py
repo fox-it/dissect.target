@@ -8,7 +8,7 @@ from flow.record.fieldtypes import digest, path
 from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.modifier import (
+from dissect.target.helpers.record_modifier import (
     MODIFIER_TYPE,
     Modifier,
     get_modifier_function,
@@ -49,7 +49,7 @@ def test_hash_path_records_with_paths(
 
     with (
         patch.object(TargetPath, "open", mock_open(read_data=b"")),
-        patch("dissect.target.helpers.modifier.common", return_value=HASHES),
+        patch("dissect.target.helpers.record_modifier.common", return_value=HASHES),
     ):
         hashed_record = hash_function(target_win, record)
 
@@ -124,7 +124,7 @@ def test_hash_path_records_with_exception(
 
     with (
         patch.object(TargetPath, "open", mocked_open),
-        patch("dissect.target.helpers.modifier.common", return_value=HASHES),
+        patch("dissect.target.helpers.record_modifier.common", return_value=HASHES),
     ):
         hashed_record = hash_function(target_win, record)
 
