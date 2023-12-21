@@ -46,4 +46,3 @@ class LogLoader(Loader):
                 continue
             mapping = str(mnt.path(mapping).joinpath(entry.name))
             mnt.map_file(mapping, str(entry))
-        target.filesystems.add(vfs)
