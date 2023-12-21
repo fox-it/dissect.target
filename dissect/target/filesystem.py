@@ -13,6 +13,7 @@ from typing import (
     BinaryIO,
     Callable,
     Iterator,
+    List,
     Optional,
     Type,
     Union,
@@ -216,7 +217,7 @@ class Filesystem:
         """
         return self.get(path).scandir()
 
-    def listdir(self, path: str) -> list[str]:
+    def listdir(self, path: str) -> List[str]:
         """List the contents of a directory as strings.
 
         Args:
@@ -227,7 +228,7 @@ class Filesystem:
         """
         return list(self.iterdir(path))
 
-    def listdir_ext(self, path: str) -> list[FilesystemEntry]:
+    def listdir_ext(self, path: str) -> List[FilesystemEntry]:
         """List the contents of a directory as FilesystemEntry's.
 
         Args:
@@ -486,7 +487,7 @@ class Filesystem:
         """
         return self.get(path).sha256()
 
-    def hash(self, path: str, algos: Optional[Union[list[str], list[Callable]]] = None) -> tuple[str]:
+    def hash(self, path: str, algos: Optional[Union[List[str], List[Callable]]] = None) -> tuple[str]:
         """Calculate the digest of the contents of ``path``, using the ``algos`` algorithms.
 
         Args:
@@ -573,7 +574,7 @@ class FilesystemEntry:
         """
         raise NotImplementedError()
 
-    def listdir(self) -> list[str]:
+    def listdir(self) -> List[str]:
         """List the contents of a directory as strings.
 
         Returns:
@@ -581,7 +582,7 @@ class FilesystemEntry:
         """
         return list(self.iterdir())
 
-    def listdir_ext(self) -> list[FilesystemEntry]:
+    def listdir_ext(self) -> List[FilesystemEntry]:
         """List the contents of a directory as FilesystemEntry's.
 
         Returns:
