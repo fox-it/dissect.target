@@ -64,7 +64,7 @@ MODIFIER_MAPPING = {
 }
 
 
-def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[TargetPath, str]]:
+def _resolve_path_types(target: Target, record: Record) -> Iterable[tuple[TargetPath, str]]:
     for field_name, field_type in record._field_types.items():
         if not issubclass(field_type, fieldtypes.path):
             continue
