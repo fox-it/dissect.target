@@ -21,6 +21,7 @@ from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -80,6 +81,15 @@ def main():
         default=None,
         help="list (matching) available plugins and loaders",
     )
+
+    parser.add_argument(
+        "-L",
+        "--loader",
+        action="store",
+        default=None,
+        help="select a specific loader (i.e. vmx, raw)",
+    )
+
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -109,6 +119,9 @@ def main():
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
+
+    # If loader is specified then map to uri
+    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
@@ -156,8 +169,8 @@ def main():
     if args.list:
         collected_plugins = {}
 
-        if args.targets:
-            for target in args.targets:
+        if targets:
+            for target in targets:
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
@@ -178,13 +191,13 @@ def main():
             target.plugins(list(collected_plugins.values()))
 
         # No real targets specified, show the available loaders
-        if not args.targets:
+        if not targets:
             fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
             fargs, rest = fparser.parse_known_args(rest)
             target.loaders(**vars(fargs))
         parser.exit()
 
-    if not args.targets:
+    if not targets:
         parser.error("too few arguments")
 
     if not args.function:
@@ -240,7 +253,7 @@ def main():
     execution_report.set_cli_args(args)
     execution_report.set_event_callbacks(Target)
 
-    for target in Target.open_all(args.targets, args.children):
+    for target in Target.open_all(targets, args.children):
         if args.child:
             try:
                 target = target.open_child(args.child)
