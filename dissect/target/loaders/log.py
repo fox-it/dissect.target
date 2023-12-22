@@ -44,5 +44,5 @@ class LogLoader(Loader):
             ext = self.options.get("hint", entry.suffix.lower()).strip(".")
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
                 continue
-            mapping = str(mnt.path(mapping).joinpath(entry.name))
-            mnt.map_file(mapping, str(entry))
+            mapping = str(vfs(mapping).joinpath(entry.name))
+            vfs(mapping, str(entry))
