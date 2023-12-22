@@ -42,7 +42,6 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "run_level"),
         ("string", "process_token_sid_type"),
         ("string", "required_privileges"),
-        ("boolean", "allow_start_on_demand"),
         ("string", "restart_on_failure_interval"),
         ("string", "restart_on_failure_count"),
         ("string", "mutiple_instances_policy"),

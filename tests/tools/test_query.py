@@ -160,7 +160,7 @@ def mock_find_plugin_function(
             PluginFunction(
                 name=pattern,
                 output_type="record",
-                path="",
+                path=pattern,
                 class_object=MagicMock(),
                 method_name=pattern,
                 plugin_desc={},
@@ -233,4 +233,8 @@ def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest
         target_query()
         out, _ = capsys.readouterr()
 
-        assert out == f"Dry run on: <Target {target_file}>\n  execute: osinfo (general.osinfo.osinfo)\n"
+        assert out == (
+            f"Dry run on: <Target {target_file}>\n"
+            "  execute: users (general.default.users)\n"
+            "  execute: osinfo (general.osinfo.osinfo)\n"
+        )

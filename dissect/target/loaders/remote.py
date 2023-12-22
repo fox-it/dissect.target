@@ -15,6 +15,7 @@ from dissect.util.stream import AlignedStream
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
+from dissect.target.plugin import arg
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ class RemoteStreamConnection:
             client_crt = options.get("crt")
             server_ca = options.get("ca")
             noverify = options.get("noverify")
+
             if client_key and client_crt:
                 self._context.load_cert_chain(certfile=client_crt, keyfile=client_key)
                 flag_cert_chain_loaded = True
@@ -203,7 +205,17 @@ class RemoteStreamConnection:
         return disks
 
 
+@arg("--remote-key", dest="key", help="private key")
+@arg("--remote-crt", dest="crt", help="client certificate")
+@arg("--remote-ca", dest="ca", help="certificate Authority")
+@arg("--remote-noverify", dest="noverify", help="no certificate verification")
+@arg("--remote-reconnects", dest="reconnects", help="max number of reconnects")
+@arg("--remote-shortreads", dest="shortreads", help="max limit shortreads")
+@arg("--remote-reconnectwait", dest="reconnectwait", help="max time before reconnection attempt")
+@arg("--remote-sockettimeout", dest="sockettimeout", help="socket timeout")
 class RemoteLoader(Loader):
+    """Load a remote target that runs a compatible Dissect agent."""
+
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         uri = kwargs.get("parsed_path")
