@@ -10,12 +10,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.hashutil import common
 from dissect.target.helpers.utils import StrEnum
 
-
-__all__ = (
-    "get_modifier_function",
-    "Modifier",
-    "ModifierFunc"
-)
+__all__ = ("get_modifier_function", "Modifier", "ModifierFunc")
 
 RECORD_NAME = "filesystem/file/digest"
 NAME_SUFFIXES = ["_resolved", "_digest"]
