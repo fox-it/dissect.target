@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Union
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -144,5 +144,5 @@ def test_resolved_modifier(record: Record, target_win: Target, resolve_function:
     resolved_record = resolve_function(target_win, record)
 
     for _record in resolved_record.records[1:]:
-        assert getattr(_record, f"name_resolved") is not None
-        assert not hasattr(_record, f"name_digest")
+        assert getattr(_record, "name_resolved") is not None
+        assert not hasattr(_record, "name_digest")

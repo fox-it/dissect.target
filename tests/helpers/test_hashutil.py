@@ -1,21 +1,17 @@
 from pathlib import Path
-from typing import Union
 from unittest.mock import Mock, patch
 
 import pytest
-from flow.record import Record
-from flow.record.fieldtypes import digest, path
 
 import dissect.target.helpers.hashutil as hashutil
 from dissect.target import Target
-from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.exceptions import FileNotFoundError
 
 HASHES = ("CAFEF00D" * 4, "F4CEF001" * 5, "DEADBEEF" * 8)
 
 
 @pytest.fixture
-def mock_target(target_win) -> Mock:
+def mock_target(target_win) -> Target:
     target_win.fs.hash = lambda path: HASHES
     target_win.resolve = lambda path: Path(path)
     return target_win
@@ -44,7 +40,7 @@ def test_hash_uri_records() -> None:
             modifier_func.return_value(target, record)
 
 
-def test_hash_uri(mock_target: Mock) -> None:
+def test_hash_uri(mock_target: Target) -> None:
     """Determine hash functions"""
     path = "/test/path"
     with (

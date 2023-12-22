@@ -10,7 +10,6 @@ from flow.record.base import RE_VALID_FIELD_NAME
 from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
-from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugins.apps.webserver.webserver import WebserverAccessLogRecord
 

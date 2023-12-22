@@ -4,6 +4,8 @@ import hashlib
 import warnings
 from typing import TYPE_CHECKING, BinaryIO, Union
 
+from flow.record import Record
+
 from dissect.target.exceptions import FileNotFoundError
 
 if TYPE_CHECKING:

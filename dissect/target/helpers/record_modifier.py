@@ -1,6 +1,5 @@
-import warnings
 from functools import partial
-from typing import BinaryIO, Callable, Iterable
+from typing import Callable, Iterable
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
