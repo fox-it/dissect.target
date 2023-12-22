@@ -37,9 +37,9 @@ class LogLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        mnt = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
-        target.filesystems.add(mnt)
-        target.fs.mount("/", mnt)
+        vfs = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
+        target.filesystems.add(vfs)
+        target.fs.mount("/", vfs)
         for entry in self.path.parent.glob(self.path.name):
             ext = self.options.get("hint", entry.suffix.lower()).strip(".")
             if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
