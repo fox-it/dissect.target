@@ -3,10 +3,8 @@ import io
 import posixpath
 import shutil
 import struct
-import sys
-import zlib
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 try:
     from Crypto.Cipher import AES
@@ -15,7 +13,7 @@ try:
 except ImportError:
     HAS_PYCRYPTODOME = False
 
-from dissect.util.stream import AlignedStream, RelativeStream
+from dissect.util.stream import AlignedStream, RelativeStream, ZlibStream
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystem import VirtualFilesystem
@@ -193,86 +191,6 @@ class AndroidBackup:
             fh = ZlibStream(fh)
 
         return fh
-
-
-class ZlibStream(AlignedStream):
-    def __init__(self, fh: BinaryIO, size: Optional[int] = None, **kwargs):
-        self._fh = fh
-
-        self._zlib = None
-        self._zlib_args = kwargs
-        self._zlib_offset = 0
-        self._zlib_prepend = b""
-        self._zlib_prepend_offset = None
-        self._rewind()
-
-        super().__init__(size)
-
-    def _rewind(self) -> None:
-        self._fh.seek(0)
-        self._zlib = zlib.decompressobj(**self._zlib_args)
-        self._zlib_offset = 0
-        self._zlib_prepend = b""
-        self._zlib_prepend_offset = None
-
-    def _seek_zlib(self, offset: int) -> None:
-        if offset < self._zlib_offset:
-            self._rewind()
-
-        while self._zlib_offset < offset:
-            read_size = min(offset - self._zlib_offset, self.align)
-            if self._read_zlib(read_size) == b"":
-                break
-
-    def _read_fh(self, length: int) -> bytes:
-        if self._zlib_prepend_offset is None:
-            return self._fh.read(length)
-
-        if self._zlib_prepend_offset + length <= len(self._zlib_prepend):
-            offset = self._zlib_prepend_offset
-            self._zlib_prepend_offset += length
-            return self._zlib_prepend_offset[offset : self._zlib_prepend_offset]
-        else:
-            offset = self._zlib_prepend_offset
-            self._zlib_prepend_offset = None
-            return self._zlib_prepend[offset:] + self._fh.read(length - len(self._zlib_prepend) + offset)
-
-    def _read_zlib(self, length: int) -> bytes:
-        if length < 0:
-            return self.readall()
-
-        result = []
-        while length > 0:
-            buf = self._read_fh(io.DEFAULT_BUFFER_SIZE)
-            decompressed = self._zlib.decompress(buf, length)
-
-            if self._zlib.unconsumed_tail != b"":
-                self._zlib_prepend = self._zlib.unconsumed_tail
-                self._zlib_prepend_offset = 0
-
-            if buf == b"":
-                break
-
-            result.append(decompressed)
-            length -= len(decompressed)
-
-        buf = b"".join(result)
-        self._zlib_offset += len(buf)
-        return buf
-
-    def _read(self, offset: int, length: int) -> bytes:
-        self._seek_zlib(offset)
-        return self._read_zlib(length)
-
-    def readall(self) -> bytes:
-        chunks = []
-        # sys.maxsize means the max length of output buffer is unlimited,
-        # so that the whole input buffer can be decompressed within one
-        # .decompress() call.
-        while data := self._read_zlib(sys.maxsize):
-            chunks.append(data)
-
-        return b"".join(chunks)
 
 
 class CipherStream(AlignedStream):
