@@ -22,8 +22,11 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
     mkdirs(root, paths)
 
     (root / "uploads.json").write_bytes(b"{}")
+    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/C-DRIVE.txt").write_bytes(b"{}")
 
-    mft = open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb").read(10 * 1025)
+    with open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb") as fh:
+        mft = fh.read(10 * 1025)
+
     root.joinpath(paths[0]).joinpath("$MFT").write_bytes(mft)
     root.joinpath(paths[3]).joinpath("$MFT").write_bytes(mft)
 
@@ -50,6 +53,7 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp
 
     loader = VelociraptorLoader(root)
     loader.map(target_bare)
+    target_bare.apply()
 
     usnjrnl_records = 0
     for fs in target_bare.filesystems:
@@ -57,6 +61,7 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
+    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists() is True
 
 
 @pytest.mark.parametrize(
@@ -73,6 +78,7 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target,
 
     loader = VelociraptorLoader(zip_path)
     loader.map(target_bare)
+    target_bare.apply()
 
     usnjrnl_records = 0
     for fs in target_bare.filesystems:
@@ -80,6 +86,7 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target,
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
+    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists() is True
 
 
 @pytest.mark.parametrize(
