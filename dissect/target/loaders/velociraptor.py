@@ -22,7 +22,8 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
     # As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     # Generic.Collectors.File (Unix) uses the accessors file and auto.
     # Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors
-    # mft, ntfs, lazy_ntfs, ntfs_vss and auto.
+    # mft, ntfs, lazy_ntfs, ntfs_vss and auto. The loader only supports a collection where a single accessor is used.
+    # For Windows usage of the ntfs_vss accessor can be forced by configuring VSSAnalysisAge to be greater than 0.
 
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
 
