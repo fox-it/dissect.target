@@ -36,14 +36,22 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
 
     # Windows
     volumes = set()
+    vss_volumes = set()
     for accessor in WINDOWS_ACCESSORS:
         accessor_root = fs_root.joinpath(accessor)
         if accessor_root.exists():
             # If the accessor directory exists, assume all the subdirectories are volumes
-            volumes.update(accessor_root.iterdir())
+            for volume in accessor_root.iterdir():
+                # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
+                if "HarddiskVolumeShadowCopy" in volume.name:
+                    vss_volumes.add(volume)
+                else:
+                    volumes.add(volume)
 
     if volumes:
-        return OperatingSystem.WINDOWS, list(volumes)
+        # The volumes that represent drives (C, D) are mounted first,
+        # otherwise one of the volume shadow copies could be detected as the root filesystem which results in errors.
+        return OperatingSystem.WINDOWS, list(volumes) + list(vss_volumes)
 
     return None, None
 
