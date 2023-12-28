@@ -61,7 +61,7 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
-    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists() is True
+    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
 
 
 @pytest.mark.parametrize(
@@ -86,7 +86,7 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target,
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
-    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists() is True
+    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
 
 
 @pytest.mark.parametrize(
