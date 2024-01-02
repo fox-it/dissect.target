@@ -1,8 +1,12 @@
+from pathlib import Path
+
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import chrome
 from tests._utils import absolute_path
 
 
-def test_chrome(target_win, fs_win, tmp_path, target_win_users):
+def test_chrome(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users):
     chrome_db = absolute_path("_data/plugins/apps/browser/chrome/History.sqlite")
     chrome_prefs = absolute_path("_data/plugins/apps/browser/chrome/windows/Preferences")
     chrome_sec_prefs = absolute_path("_data/plugins/apps/browser/chrome/windows/Secure Preferences")

@@ -175,6 +175,25 @@ class ChromiumMixin:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
     def cookies(self, browser_name: str = None) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookies records from supported Chromium-based browsers.
+        Args:
+            browser_name: The name of the browser as a string.
+        Yields:
+            Records with the following fields:
+                ts_created (datetime): Download start timestamp.
+                ts_last_accessed (datetime): Download end timestamp.
+                browser (string): The browser from which the records are generated from.
+                name (string): The cookie name.
+                value (string): The cookie value.
+                host (string): Cookie host key.
+                path (string): Cookie path
+                expiry (varint): Cookie expiry.
+                is_secure (bool): Cookie secury flag.
+                is_http_only (bool): Cookie http only flag.
+                same_site (bool): Cookie same site flag.
+        Raises:
+            SQLError: If the cookie file could not be processed.
+        """
         for user, db_file, db in self._iter_db("Cookies"):
             try:
                 for cookie in db.table("cookies").rows():

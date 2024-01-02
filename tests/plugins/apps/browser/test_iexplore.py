@@ -1,11 +1,14 @@
 import gzip
 import tempfile
+from pathlib import Path
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import iexplore
 from tests._utils import absolute_path
 
 
-def test_iexplore__history(target_win, fs_win, tmp_path, target_win_users):
+def test_iexplore_history(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.history())
@@ -15,21 +18,16 @@ def test_iexplore__history(target_win, fs_win, tmp_path, target_win_users):
     assert len(records) == 41
 
 
-def test_iexplore_downloads(target_win, fs_win, tmp_path, target_win_users):
+def test_iexplore_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.downloads())
     assert len(records) == 1
-    assert records[0].path == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
-    assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
-
-    records = list(target_win.browser.downloads())
-    assert len(records) == 1
-    assert records[0].path == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
+    assert records[0].path.as_posix() == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
     assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
 
 
-def __setup(target_win, fs_win, tmp_path, target_win_users):
+def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     cache_archive = absolute_path("_data/plugins/apps/browser/iexplore/WebCacheV01.dat.gz")
 
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:

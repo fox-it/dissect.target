@@ -80,19 +80,24 @@ class FirefoxPlugin(BrowserPlugin):
 
     @export(record=BrowserCookieRecord)
     def cookies(self) -> Iterator[BrowserCookieRecord]:
-        """Return browser cookie records from Firefox
-
-        Yields BrowserCookieRecord with the following fields:
-            ts_created (datetime): created timestamp.
-            ts_last_accessed: last accessed timestamp.
-            name (string): cookie name.
-            value (string): cookie value.
-            host (string): cookie host.
-            path (string): cookie path.
-            expiry (varint): cookie expiry.
-            is_secure (boolean): whether cookie has secure flag.
-            is_http_only (boolean): whether cookie has http only flag.
-            same_site (boolean): whether cookie has same site flag.
+        """Return browser cookies records from Firefox.
+        Args:
+            browser_name: The name of the browser as a string.
+        Yields:
+            Records with the following fields:
+                ts_created (datetime): Download start timestamp.
+                ts_last_accessed (datetime): Download end timestamp.
+                browser (string): The browser from which the records are generated from.
+                name (string): The cookie name.
+                value (string): The cookie value.
+                host (string): Cookie host key.
+                path (string): Cookie path
+                expiry (varint): Cookie expiry.
+                is_secure (bool): Cookie secury flag.
+                is_http_only (bool): Cookie http only flag.
+                same_site (bool): Cookie same site flag.
+        Raises:
+            SQLError: If the cookie file could not be processed.
         """
         for user, db_file, db in self._iter_db("cookies.sqlite"):
             try:

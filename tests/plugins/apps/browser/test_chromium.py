@@ -1,33 +1,37 @@
+from pathlib import Path
+
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import chromium
 from tests._utils import absolute_path
 
 
-def test_chromium_downloads(target_win, fs_win, tmp_path, target_win_users):
+def test_chromium_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "History")
     records = list(target_win.chromium.downloads())
     assert len(records) == 1
 
 
-def test_chromium_extensions(target_win, fs_win, tmp_path, target_win_users):
+def test_chromium_extensions(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "History")
     records = list(target_win.chromium.extensions())
     assert len(records) == 4
 
 
-def test_chromium_history(target_win, fs_win, tmp_path, target_win_users):
+def test_chromium_history(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "History")
     records = list(target_win.chromium.history())
     assert len(records) == 5
 
 
-def test_chromium_cookies(target_win, fs_win, tmp_path, target_win_users):
+def test_chromium_cookies(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "Cookies")
     records = list(target_win.chromium.cookies())
     record_names = sorted([*map(lambda c: c.name, records)])
     assert record_names == ["pl", "ssa-did", "ssa-sid", "tbb", "twk-theme"]
 
 
-def __setup(target_win, fs_win, tmp_path, target_win_users, db) -> None:
+def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target, db: str) -> None:
     chromium_db = absolute_path(f"_data/plugins/apps/browser/chromium/{db}.sqlite")
     chromium_prefs = absolute_path("_data/plugins/apps/browser/chromium/windows/Preferences")
     chromium_sec_prefs = absolute_path("_data/plugins/apps/browser/chromium/windows/Secure Preferences")
