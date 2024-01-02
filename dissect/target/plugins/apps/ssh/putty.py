@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Union
+from typing import Iterator, Optional, Union
 
 from Crypto.PublicKey import ECC, RSA
 from flow.record.fieldtypes import posix_path, windows_path
@@ -56,7 +56,7 @@ class PuTTYPlugin(SSHPlugin):
 
     def _detect_putty(
         self,
-    ) -> tuple[list[set[RegistryKey, UserDetails | None]], list[set[TargetPath, UserDetails | None]]]:
+    ) -> tuple[list[set[RegistryKey, Optional[UserDetails]]], list[set[TargetPath, Optional[UserDetails]]]]:
         regf_installs, path_installs = [], []
 
         if self.target.has_function("registry"):
