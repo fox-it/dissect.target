@@ -1,4 +1,4 @@
-from typing import Iterator, TypeAlias, Union
+from typing import Iterator, Optional, Union
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
@@ -225,7 +225,7 @@ SdpNetworkProviderRecord = TargetRecordDescriptor(
     ],
 )
 
-SRURecord: TypeAlias = Union[
+SRURecord = Union[
     NetworkDataRecord,
     NetworkConnectivityRecord,
     EnergyEstimatorRecord,
@@ -340,7 +340,7 @@ FIELD_MAPPINGS = {
 }
 
 
-def transform_app_id(value: Union[bytes, str, None]) -> Union[str, None]:
+def transform_app_id(value: Optional[Union[bytes, str]]) -> Optional[str]:
     if value is not None:
         if isinstance(value, bytes):
             value = value.decode()
