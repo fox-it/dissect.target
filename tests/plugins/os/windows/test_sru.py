@@ -8,7 +8,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture):
+def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
     srudb = absolute_path("_data/plugins/os/windows/sru/SRUDB.dat")
 
     fs_win.map_file("Windows/System32/sru/SRUDB.dat", srudb)
