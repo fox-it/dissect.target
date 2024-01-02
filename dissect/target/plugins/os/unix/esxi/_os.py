@@ -12,7 +12,6 @@ from typing import Any, BinaryIO, Iterator, Optional, TextIO
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
-from flow.record.fieldtypes import path
 
 try:
     from dissect.hypervisor.util.envelope import Envelope, KeyStore
@@ -159,7 +158,7 @@ class ESXiPlugin(UnixPlugin):
         root = ElementTree.fromstring(inv_file.read_text("utf-8"))
         for entry in root.iter("ConfigEntry"):
             yield VirtualMachineRecord(
-                path=path.from_posix(entry.findtext("vmxCfgPath")),
+                path=self.target.fs.path(entry.findtext("vmxCfgPath")),
                 _target=self.target,
             )
 

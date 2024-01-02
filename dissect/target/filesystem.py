@@ -147,7 +147,7 @@ class Filesystem:
         except NotImplementedError:
             raise
         except Exception as e:
-            log.warning("Failed to detect ID on %s filesystem", cls.__fstype__)
+            log.warning("Failed to detect ID on %s filesystem", cls.__type__)
             log.debug("", exc_info=e)
         finally:
             fh.seek(offset)
@@ -1572,3 +1572,4 @@ register("exfat", "ExfatFilesystem")
 register("squashfs", "SquashFSFilesystem")
 register("zip", "ZipFilesystem")
 register("ad1", "AD1Filesystem")
+register("jffs", "JFFSFilesystem")

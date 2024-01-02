@@ -1,13 +1,15 @@
 import os
 from functools import reduce
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from flow.record import Record
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import EmptyRecord, create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
     NamespacePlugin,
@@ -59,23 +61,38 @@ def test_load_paths_with_env():
         assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
 
 
+class MockOSWarpPlugin(OSPlugin):
+    __exports__ = ["f6"]  # OS exports f6
+    __findable__ = True
+    __name__ = "warp"
+
+    def __init__(self):
+        pass
+
+    def get_all_records():
+        return []
+
+    def f3(self):
+        return "F3"
+
+    def f6(self):
+        return "F6"
+
+
 @patch(
     "dissect.target.plugin.plugins",
     return_value=[
-        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13"},
-        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3"},
+        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "cls": MagicMock},
+        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "cls": MagicMock},
+        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "cls": MockOSWarpPlugin},
     ],
-)
-@patch(
-    "dissect.target.plugin.os_plugins",
-    return_value=[{"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp"}],
 )
 @patch("dissect.target.Target", create=True)
 @patch("dissect.target.plugin.load")
 @pytest.mark.parametrize(
     "search, findable, assert_num_found",
     [
-        ("*", True, 4),  # Found with tree search using wildcard, OS plugin also registered without ns
+        ("*", True, 3),  # Found with tree search using wildcard
         ("*", False, 0),  # Unfindable plugins are not found...
         ("test.x13.*", True, 1),  # Found with tree search using wildcard, expands to test.x13.f3
         ("test.x13.*", False, 0),  # Unfindable plugins are not found...
@@ -96,24 +113,12 @@ def test_load_paths_with_env():
         ("os", True, 0),  # Exception for os, because it can be a 'special' plugin (tree match ignored)
     ],
 )
-def test_find_plugin_functions(plugin_loader, target, os_plugins, plugins, search, findable, assert_num_found):
-    class MockPlugin(MagicMock):
-        __exports__ = ["f6"]  # OS exports f6
-        __findable__ = findable
-        __skip__ = False
+def test_find_plugin_functions(plugin_loader, target, plugins, search, findable, assert_num_found):
+    os_plugin = MockOSWarpPlugin
+    os_plugin.__findable__ = findable
+    target._os_plugin = os_plugin
+    plugin_loader.return_value = os_plugin()
 
-        def get_all_records():
-            return []
-
-        def f3(self):
-            return "F3"
-
-        def f6(self):
-            return "F6"
-
-    plugin_loader.return_value = MockPlugin()
-    target._os = MagicMock()
-    target._os.__class__.__name__ = "warp"
     found, _ = find_plugin_functions(target, search)
     assert len(found) == assert_num_found
 
@@ -126,8 +131,8 @@ def test_find_plugin_function_windows(target_win: Target) -> None:
     assert found[0].path == "os.windows.services.services"
 
 
-def test_find_plugin_function_unix(target_unix: Target) -> None:
-    found, _ = find_plugin_functions(target_unix, "services")
+def test_find_plugin_function_linux(target_linux: Target) -> None:
+    found, _ = find_plugin_functions(target_linux, "services")
 
     assert len(found) == 1
     assert found[0].name == "services"
@@ -259,9 +264,147 @@ def test_incompatible_plugin(target_bare: Target) -> None:
         target_bare.add_plugin(_TestIncompatiblePlugin)
 
 
-def test_plugins(target_default) -> None:
+MOCK_PLUGINS = {
+    "apps": {  # Plugin descriptors in this branch should be returned for any osfilter
+        "mail": {"functions": "mail"},
+    },
+    "os": {
+        # The OSPlugin for Generic OS, plugins in this branch should only be
+        # returned when the osfilter starts with "os." or is None.
+        # The _os plugin itself should only be returned if special_keys
+        # contains the "_os" key.
+        "_os": {"functions": "GenericOS"},
+        "apps": {
+            "app1": {"functions": "app1"},
+            "app2": {"functions": "app2"},
+        },
+        "fooos": {
+            # The OSPlugin for FooOS, plugins in this branch should only be
+            # returned when the osfilter is "os.fooos" or "os.fooos._os" or
+            # None.
+            "_os": {"functions": "FooOS"},
+            "foobar": {"functions": "foobar"},
+            # The plugins under _misc should only be returned if special_keys
+            # contains the "_misc" key.
+            "_misc": {
+                "bar": {"functions": "bar"},
+                "tender": {"functions": "tender"},
+            },
+            "apps": {
+                "foo_app": {"functions": "foo_app"},
+                "bar_app": {"functions": "bar_app"},
+            },
+        },
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "osfilter, special_keys, only_special_keys, expected_plugin_functions",
+    [
+        (
+            None,
+            set(["_os", "_misc"]),
+            False,
+            [
+                "mail",
+                "GenericOS",
+                "app1",
+                "app2",
+                "FooOS",
+                "foobar",
+                "bar",
+                "tender",
+                "foo_app",
+                "bar_app",
+            ],
+        ),
+        (
+            "os._os",
+            set(["_os"]),
+            False,
+            [
+                "mail",
+                "GenericOS",
+                "app1",
+                "app2",
+            ],
+        ),
+        (
+            "os.fooos._os",
+            set(),
+            False,
+            [
+                "mail",
+                "app1",
+                "app2",
+                "foobar",
+                "foo_app",
+                "bar_app",
+            ],
+        ),
+        (
+            "os.fooos",
+            set(["_os"]),
+            False,
+            [
+                "mail",
+                "app1",
+                "app2",
+                "FooOS",
+                "foobar",
+                "foo_app",
+                "bar_app",
+            ],
+        ),
+        (
+            "os.fooos._os",
+            set(["_os", "_misc"]),
+            True,
+            [
+                "FooOS",
+                "bar",
+                "tender",
+            ],
+        ),
+        (
+            "bar",
+            set(["_os"]),
+            False,
+            [
+                "mail",
+            ],
+        ),
+    ],
+)
+def test_plugins(
+    osfilter: str,
+    special_keys: set[str],
+    only_special_keys: bool,
+    expected_plugin_functions: list[str],
+) -> None:
+    with (
+        patch("dissect.target.plugin.PLUGINS", MOCK_PLUGINS),
+        patch("dissect.target.plugin._modulepath", return_value=osfilter),
+    ):
+        if osfilter is not None:
+            # osfilter must be a class or None
+            osfilter = Mock
+
+        plugin_descriptors = plugins(
+            osfilter=osfilter,
+            special_keys=special_keys,
+            only_special_keys=only_special_keys,
+        )
+
+        plugin_functions = [descriptor["functions"] for descriptor in plugin_descriptors]
+
+        assert sorted(plugin_functions) == sorted(expected_plugin_functions)
+
+
+def test_plugins_default_plugin(target_default: Target) -> None:
     all_plugins = list(plugins())
-    default_plugin_plugins = list(plugins(target_default._os_plugin))
+    default_plugin_plugins = list(plugins(osfilter=target_default._os_plugin))
 
     assert default_plugin_plugins == all_plugins
 
@@ -276,6 +419,14 @@ def test_plugins(target_default) -> None:
 
     assert has_sentinel_function
 
+    default_os_plugin_desc = plugins(
+        osfilter=target_default._os_plugin,
+        special_keys=set(["_os"]),
+        only_special_keys=True,
+    )
+
+    assert len(list(default_os_plugin_desc)) == 1
+
 
 @pytest.mark.parametrize(
     "method_name",
@@ -287,7 +438,98 @@ def test_plugins(target_default) -> None:
         "architecture",
     ],
 )
-def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> str:
+def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> None:
     os_plugin = OSPlugin(target_bare)
     with pytest.raises(NotImplementedError):
         getattr(os_plugin, method_name)
+
+
+class TestOS1(OSPlugin):
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
+        pass
+
+    @export(property=True)
+    def ips(self) -> list[str]:
+        pass
+
+    @export(property=True)
+    def version(self) -> Optional[str]:
+        pass
+
+    @export(record=EmptyRecord)
+    def users(self) -> list[Record]:
+        pass
+
+    @export(property=True)
+    def os(self) -> str:
+        pass
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        pass
+
+
+class TestOS2(OSPlugin):
+    @export(property=True)
+    def hostname(self) -> Optional[str]:
+        """Test docstring hostname"""
+        pass
+
+    @export(property=True)
+    def ips(self) -> list[str]:
+        """Test docstring ips"""
+        pass
+
+    @export(property=True)
+    def version(self) -> Optional[str]:
+        """Test docstring version"""
+        pass
+
+    @export(record=EmptyRecord)
+    def users(self) -> list[Record]:
+        """Test docstring users"""
+        pass
+
+    @export(property=True)
+    def os(self) -> str:
+        """Test docstring os"""
+        pass
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Test docstring architecture"""
+        pass
+
+
+@pytest.mark.parametrize(
+    "subclass, replaced",
+    [
+        (TestOS1, True),
+        (TestOS2, False),
+    ],
+)
+def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -> None:
+    exported_methods = {
+        "hostname",
+        "ips",
+        "version",
+        "users",
+        "os",
+        "architecture",
+    }
+
+    for method_name in exported_methods:
+        os_method = getattr(OSPlugin, method_name)
+        if isinstance(os_method, property):
+            os_method = os_method.fget
+        os_docstring = os_method.__doc__
+
+        subclass_method = getattr(subclass, method_name)
+        if isinstance(subclass_method, property):
+            subclass_method = subclass_method.fget
+        subclass_docstring = subclass_method.__doc__
+
+        assert (os_docstring == subclass_docstring) is replaced
+        if not replaced:
+            assert subclass_docstring == f"Test docstring {method_name}"

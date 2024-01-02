@@ -77,7 +77,8 @@ class WindowsPlugin(OSPlugin):
                                             self.target.fs.mount(drive, volume.fs)
                                             break
         except Exception as e:
-            self.target.log.warning("Failed to map drive letters", exc_info=e)
+            self.target.log.warning("Failed to map drive letters")
+            self.target.log.debug("", exc_info=e)
 
     @export(property=True)
     def hostname(self) -> Optional[str]:

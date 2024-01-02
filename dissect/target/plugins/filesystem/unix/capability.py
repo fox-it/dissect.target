@@ -2,9 +2,10 @@ import struct
 from enum import IntEnum
 from io import BytesIO
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+from dissect.target.plugins.filesystem.walkfs import generate_record
 
 CapabilityRecord = TargetRecordDescriptor(
     "filesystem/unix/capability",
@@ -87,72 +88,82 @@ class CapabilityPlugin(Plugin):
     @export(record=CapabilityRecord)
     def capability_binaries(self):
         """Find all files that have capabilities set."""
-        for entry, record in self.target.walkfs_ext():
-            try:
-                attrs = entry.get().lattr()
-            except Exception:
-                self.target.log.exception("Failed to get attrs for entry %s", entry)
-                continue
-
-            for attr in attrs:
-                if attr.name != "security.capability":
+        for path_entries, _, files in self.target.fs.walk_ext("/"):
+            entries = [path_entries[-1]] + files
+            for entry in entries:
+                path = self.target.fs.path(entry.path)
+                try:
+                    record = generate_record(self.target, path)
+                except FileNotFoundError:
+                    continue
+                try:
+                    attrs = path.get().lattr()
+                except TypeError:
+                    # Virtual(File|Directory|Symlink) instances don't have a functional lattr()
+                    continue
+                except Exception:
+                    self.target.log.exception("Failed to get attrs for entry %s", entry)
                     continue
 
-                buf = BytesIO(attr.value)
+                for attr in attrs:
+                    if attr.name != "security.capability":
+                        continue
 
-                # Reference: https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
-                # The struct is small enough we can just use struct
-                magic_etc = struct.unpack("<I", buf.read(4))[0]
-                cap_revision = magic_etc & VFS_CAP_REVISION_MASK
+                    buf = BytesIO(attr.value)
 
-                permitted_caps = []
-                inheritable_caps = []
-                rootid = None
+                    # Reference: https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
+                    # The struct is small enough we can just use struct
+                    magic_etc = struct.unpack("<I", buf.read(4))[0]
+                    cap_revision = magic_etc & VFS_CAP_REVISION_MASK
 
-                if cap_revision == VFS_CAP_REVISION_1:
-                    num_caps = VFS_CAP_U32_1
-                    data_len = (1 + 2 * VFS_CAP_U32_1) * 4
-                elif cap_revision == VFS_CAP_REVISION_2:
-                    num_caps = VFS_CAP_U32_2
-                    data_len = (1 + 2 * VFS_CAP_U32_2) * 4
-                elif cap_revision == VFS_CAP_REVISION_3:
-                    num_caps = VFS_CAP_U32_3
-                    data_len = (2 + 2 * VFS_CAP_U32_2) * 4
-                else:
-                    self.target.log.error("Unexpected capability revision: %s", entry)
-                    continue
+                    permitted_caps = []
+                    inheritable_caps = []
+                    rootid = None
 
-                if data_len != len(attr.value):
-                    self.target.log.error("Unexpected capability length: %s", entry)
-                    continue
+                    if cap_revision == VFS_CAP_REVISION_1:
+                        num_caps = VFS_CAP_U32_1
+                        data_len = (1 + 2 * VFS_CAP_U32_1) * 4
+                    elif cap_revision == VFS_CAP_REVISION_2:
+                        num_caps = VFS_CAP_U32_2
+                        data_len = (1 + 2 * VFS_CAP_U32_2) * 4
+                    elif cap_revision == VFS_CAP_REVISION_3:
+                        num_caps = VFS_CAP_U32_3
+                        data_len = (2 + 2 * VFS_CAP_U32_2) * 4
+                    else:
+                        self.target.log.error("Unexpected capability revision: %s", entry)
+                        continue
 
-                for _ in range(num_caps):
-                    permitted_val, inheritable_val = struct.unpack("<2I", buf.read(8))
-                    permitted_caps.append(permitted_val)
-                    inheritable_caps.append(inheritable_val)
+                    if data_len != len(attr.value):
+                        self.target.log.error("Unexpected capability length: %s", entry)
+                        continue
 
-                if cap_revision == VFS_CAP_REVISION_3:
-                    rootid = struct.unpack("<I", buf.read(4))[0]
+                    for _ in range(num_caps):
+                        permitted_val, inheritable_val = struct.unpack("<2I", buf.read(8))
+                        permitted_caps.append(permitted_val)
+                        inheritable_caps.append(inheritable_val)
 
-                permitted = []
-                inheritable = []
+                    if cap_revision == VFS_CAP_REVISION_3:
+                        rootid = struct.unpack("<I", buf.read(4))[0]
 
-                for capability in Capabilities:
-                    for caps, results in [(permitted_caps, permitted), (inheritable_caps, inheritable)]:
-                        # CAP_TO_INDEX
-                        cap_index = capability.value >> 5
-                        if cap_index >= len(caps):
-                            # We loop over all capabilities, but might only have a version 1 caps list
-                            continue
+                    permitted = []
+                    inheritable = []
 
-                        if caps[cap_index] & (1 << (capability.value & 31)) != 0:
-                            results.append(capability.name)
+                    for capability in Capabilities:
+                        for caps, results in [(permitted_caps, permitted), (inheritable_caps, inheritable)]:
+                            # CAP_TO_INDEX
+                            cap_index = capability.value >> 5
+                            if cap_index >= len(caps):
+                                # We loop over all capabilities, but might only have a version 1 caps list
+                                continue
 
-                yield CapabilityRecord(
-                    record=record,
-                    permitted=permitted,
-                    inheritable=inheritable,
-                    effective=magic_etc & VFS_CAP_FLAGS_EFFECTIVE != 0,
-                    rootid=rootid,
-                    _target=self.target,
-                )
+                            if caps[cap_index] & (1 << (capability.value & 31)) != 0:
+                                results.append(capability.name)
+
+                    yield CapabilityRecord(
+                        record=record,
+                        permitted=permitted,
+                        inheritable=inheritable,
+                        effective=magic_etc & VFS_CAP_FLAGS_EFFECTIVE != 0,
+                        rootid=rootid,
+                        _target=self.target,
+                    )

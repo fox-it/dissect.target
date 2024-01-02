@@ -1,16 +1,10 @@
-import textwrap
-from io import StringIO
-
-import pytest
-
-from dissect.target.plugins.os.unix.linux.services import (
-    ServicesPlugin,
-    parse_systemd_config,
-)
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.os.unix.linux.services import ServicesPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_services(target_unix_users, fs_unix):
+def test_services(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     systemd_service_1 = absolute_path("_data/plugins/os/unix/services/systemd.service")
     systemd_service_2 = absolute_path("_data/plugins/os/unix/services/systemd2.service")
     initd_service_1 = absolute_path("_data/plugins/os/unix/services/initd.sh")
@@ -23,60 +17,46 @@ def test_services(target_unix_users, fs_unix):
     results = list(target_unix_users.services())
     assert len(results) == 4
 
-    assert results[0].name == "example.service"
-    expected_config_1 = 'Unit_Description="an example systemd service" Unit_After="foobar.service" Unit_Requires="foo.service bar.service" Service_Type="simple" Service_ExecStart="/usr/sbin/simple-command --key value" Service_SyslogIdentifier="" Service_TimeoutStopSec="5" Install_WantedBy="multi-user.target" Install_Alias="example.service"'  # noqa E501
-    assert results[0].config == expected_config_1
-    assert str(results[0].source) == "/lib/systemd/system/example.service"
+    result_0 = results[0]
+    assert result_0.name == "example.service"
+    expected_config = {
+        "Unit_Description": "an example systemd service",
+        "Unit_After": "foobar.service",
+        "Unit_Requires": "foo.service bar.service",
+        "Service_Type": "simple",
+        "Service_ExecStart": "/usr/sbin/simple-command --key value",
+        "Service_SyslogIdentifier": None,
+        "Service_TimeoutStopSec": "5",
+        "Install_WantedBy": "multi-user.target",
+        "Install_Alias": "example.service",
+    }
+    for key, value in expected_config.items():
+        assert getattr(result_0, key) == value
+
+    assert str(result_0.source) == "/lib/systemd/system/example.service"
 
     assert results[1].name == "broken_sym_example.service"
-    assert results[1].config is None
     assert str(results[1].source) == "/lib/systemd/system/broken_sym_example.service"
 
-    assert results[2].name == "example2.service"
-    expected_config_2 = 'Unit_Description="an example systemd service" Unit_After="foobar.service" Unit_Requires="foo.service bar.service" Service_Type="simple" Service_ExecStart="/bin/bash -c \'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; exit 0\'" Service_SyslogIdentifier="example-service" Service_TimeoutStopSec="5" Install_WantedBy="multi-user.target" Install_Alias="example.service"'  # noqa E501
-    assert results[2].config == expected_config_2
-    assert str(results[2].source) == "/usr/lib/systemd/system/example2.service"
+    result_2 = results[2]
+    assert result_2.name == "example2.service"
+    expected_config_2 = {
+        "Unit_Description": "an example systemd service",
+        "Unit_After": "foobar.service",
+        "Unit_Requires": "foo.service bar.service",
+        "Service_Type": "simple",
+        "Service_ExecStart": (
+            "/bin/bash -c 'exec /usr/bin/example param1 --param2=value2 -P3value3 -param4 value4; exit 0'"
+        ),
+        "Service_SyslogIdentifier": "example-service",
+        "Service_TimeoutStopSec": "5",
+        "Install_WantedBy": "multi-user.target",
+        "Install_Alias": "example.service",
+    }
+
+    for key, value in expected_config_2.items():
+        assert getattr(result_2, key) == value
+    assert str(result_2.source) == "/usr/lib/systemd/system/example2.service"
 
     assert results[3].name == "example"
-    assert results[3].config is None
     assert str(results[3].source) == "/etc/init.d/example"
-
-
-@pytest.mark.parametrize(
-    "assignment, expected_value",
-    [
-        ("[Unit]\nsystemd = help:me", 'Unit_systemd="help:me"'),
-        ("[Unit]\nhelp:me = systemd", 'Unit_help:me="systemd"'),
-        ("[Unit]\nempty_value=", 'Unit_empty_value=""'),
-        ("[Unit]\nnew_lines=hello \\\nworld", 'Unit_new_lines="hello world"'),
-        ("[Unit]\nnew_lines=hello \\\nworld\\\ntest", 'Unit_new_lines="hello world test"'),
-        ("[Unit]\ntest", 'Unit_test="None"'),
-        ("[Unit]\nnew_lines=hello \\\n#Comment\n;Comment2\nworld", 'Unit_new_lines="hello world"'),
-        ("[Unit]\nlines=hello \\\nworld\\\n\ntest", 'Unit_lines="hello world test"'),
-        (
-            "[Unit]\nDescription=Online ext4 Metadata Check for %I",
-            'Unit_Description="Online ext4 Metadata Check for %I"',
-        ),
-        ("[Unit]\ntest=hello\tme", 'Unit_test="hello\tme"'),
-    ],
-)
-def test_systemd(assignment, expected_value):
-    data = parse_systemd_config(StringIO(assignment))
-    assert data == expected_value
-
-
-@pytest.mark.xfail
-def test_systemd_known_fails():
-    # While this should return `Hello world test help`,
-    # the configparser attempts to append `help` as a value to the list of options
-    # belonging to the key before it `test\\`.
-    # However, `test\\` is `None` or empty in this case it attempts to append on a NoneType object.
-    # The future fix would to create a custom Systemd ConfigParser
-    systemd_config = """
-    [Unit]
-    new_lines=hello \\
-    world\\
-    test\\
-     help
-    """
-    parse_systemd_config(StringIO(textwrap.dedent(systemd_config)))
