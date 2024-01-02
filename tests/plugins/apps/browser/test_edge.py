@@ -6,13 +6,17 @@ from dissect.target.plugins.apps.browser import edge
 from tests._utils import absolute_path
 
 
-def test_edge_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_edge_downloads(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.edge.downloads())
     assert len(records) == 2
 
 
-def test_edge_extensions(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_edge_extensions(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.edge.extensions())
     assert len(records) == 39

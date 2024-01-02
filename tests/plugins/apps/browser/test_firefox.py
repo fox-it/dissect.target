@@ -6,19 +6,25 @@ from dissect.target.plugins.apps.browser import firefox
 from tests._utils import absolute_path
 
 
-def test_firefox_history(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_firefox_history(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "places.sqlite")
     records = list(target_win.firefox.history())
     assert len(records) == 24
 
 
-def test_firefox_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_firefox_downloads(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "places.sqlite")
     records = list(target_win.firefox.downloads())
     assert len(records) == 3
 
 
-def test_firefox_cookies(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_firefox_cookies(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "cookies.sqlite")
     records = list(target_win.firefox.cookies())
     record_names = sorted([*map(lambda c: c.name, records)])

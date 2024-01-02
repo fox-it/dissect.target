@@ -8,7 +8,9 @@ from dissect.target.plugins.apps.browser import iexplore
 from tests._utils import absolute_path
 
 
-def test_iexplore_history(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_iexplore_history(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.history())
@@ -18,7 +20,9 @@ def test_iexplore_history(target_win: Target, fs_win: VirtualFilesystem, tmp_pat
     assert len(records) == 41
 
 
-def test_iexplore_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target) -> None:
+def test_iexplore_downloads(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.downloads())
