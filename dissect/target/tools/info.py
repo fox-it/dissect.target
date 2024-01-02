@@ -86,7 +86,8 @@ def main():
                     print("-" * 70)
                 print_target_info(target)
         except Exception as e:
-            target.log.error("Exception in retrieving information for target: `%s`", target, exc_info=e)
+            target.log.error("Exception in retrieving information for target: `%s`. Use `-vv` for details.", target)
+            target.log.debug("", exc_info=e)
 
 
 def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:

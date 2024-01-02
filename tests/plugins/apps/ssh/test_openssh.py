@@ -34,18 +34,18 @@ class Alternatives:
     home_dir: str
     sshd_dir: str
     os_type: str
-    seperator: str
+    separator: str
     label: str
 
     @classmethod
     def from_target(cls, target: Target) -> Alternatives:
         alternative = cls()
         alternative.os_type = target._os.os
-        alternative.seperator = "/"
+        alternative.separator = "/"
         alternative.label = "NO_LABEL"
 
         if alternative.os_type == "windows":
-            alternative.seperator = target.fs.alt_separator
+            alternative.separator = target.fs.alt_separator
             alternative.home_dir = "C:\\Users\\John"
             alternative.sshd_dir = "C:\\ProgramData\\ssh"
             alternative.user_name = "John"
@@ -62,7 +62,7 @@ class Alternatives:
 
     def filesystem_path(self, file_name: str, target_dir: TargetDir) -> str:
         mapping = {TargetDir.HOME: self.home_dir, TargetDir.SSHD: self.sshd_dir}
-        return self.seperator.join([mapping.get(target_dir), *file_name.split("/")])
+        return self.separator.join([mapping.get(target_dir), *file_name.split("/")])
 
 
 def test_authorized_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesystem]):

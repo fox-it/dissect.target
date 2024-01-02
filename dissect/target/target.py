@@ -426,7 +426,8 @@ class Target:
             if isinstance(os_plugin, plugin.OSPlugin):
                 self._os_plugin = os_plugin.__class__
             elif issubclass(os_plugin, plugin.OSPlugin):
-                os_plugin = os_plugin.create(self, os_plugin.detect(self))
+                if fs := os_plugin.detect(self):
+                    os_plugin = os_plugin.create(self, fs)
 
             self._os = self.add_plugin(os_plugin)
             return
@@ -757,22 +758,22 @@ class VolumeCollection(Collection[volume.Volume]):
                     # If we opened an empty volume system, it might also be the case that a filesystem actually
                     # "starts" at offset 0
 
+                    # Regardless of what happens, we want to try to open it as a filesystem later on
+                    fs_volumes.append(vol)
+
                     if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
                         # We are going to re-open a volume system on itself, bail out
                         self.target.log.info("Found volume with offset 0, opening as raw volume instead")
-                        fs_volumes.append(vol)
                         continue
 
                     try:
                         vs = volume.open(vol)
                     except Exception:
                         # If opening a volume system fails, there's likely none, so open as a filesystem instead
-                        fs_volumes.append(vol)
                         continue
 
                     if not len(vs.volumes):
                         # We opened an empty volume system, discard
-                        fs_volumes.append(vol)
                         continue
 
                     self.entries.extend(vs.volumes)
