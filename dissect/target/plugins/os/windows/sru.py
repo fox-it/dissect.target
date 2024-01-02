@@ -340,7 +340,7 @@ FIELD_MAPPINGS = {
 }
 
 
-def transform_app_id(value: bytes | str | None) -> Union[bytes, str, None]:
+def transform_app_id(value: Union[bytes, str, None]) -> Union[str, None]:
     if value is not None:
         if isinstance(value, bytes):
             value = value.decode()
