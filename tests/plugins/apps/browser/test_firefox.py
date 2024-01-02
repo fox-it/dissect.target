@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import firefox
@@ -7,7 +5,7 @@ from tests._utils import absolute_path
 
 
 def test_firefox_history(
-    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "places.sqlite")
     records = list(target_win.firefox.history())
@@ -15,7 +13,7 @@ def test_firefox_history(
 
 
 def test_firefox_downloads(
-    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "places.sqlite")
     records = list(target_win.firefox.downloads())
@@ -23,7 +21,7 @@ def test_firefox_downloads(
 
 
 def test_firefox_cookies(
-    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
     __setup(target_win, fs_win, tmp_path, target_win_users, "cookies.sqlite")
     records = list(target_win.firefox.cookies())
@@ -31,7 +29,7 @@ def test_firefox_cookies(
     assert record_names == ["_lr_env_src_ats", "_lr_retry_request", "_uc_referrer", "_uc_referrer"]
 
 
-def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, target_win_users: Target, db: str) -> None:
+def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target, db: str) -> None:
     firefox_db = absolute_path(f"_data/plugins/apps/browser/firefox/{db}")
 
     user = target_win_users.user_details.find(username="John")
