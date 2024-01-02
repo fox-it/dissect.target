@@ -22,7 +22,9 @@ def test_yum_logs(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
     data_file = absolute_path(f"_data/plugins/os/unix/linux/redhat/yum/{test_file}")
     fs_unix.map_file(f"/var/log/{test_file}", data_file)
 
-    # Mock the modified timestamp to be in 2023
+    # The yum plugin uses a year rollover helper which uses the modification time of a file to determine
+    # the starting year
+    # A new source checkout would result in different modification timestamps, so mock it to be in 2023
     entry = fs_unix.get(f"/var/log/{test_file}")
     stat_result = entry.stat()
     stat_result.st_mtime = 1704067199
