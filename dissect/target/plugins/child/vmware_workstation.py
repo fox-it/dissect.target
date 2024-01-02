@@ -1,5 +1,3 @@
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -42,6 +40,6 @@ class WorkstationChildTargetPlugin(ChildTargetPlugin):
 
                 yield ChildTargetRecord(
                     type=self.__type__,
-                    path=path.from_windows(value.strip('"')),
+                    path=self.target.fs.path(value.strip('"')),
                     _target=self.target,
                 )

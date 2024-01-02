@@ -462,11 +462,11 @@ def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
-def test_virtual_filesystem_map_dir():
+def test_virtual_filesystem_map_dir(tmp_path):
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
     with (
-        TemporaryDirectory() as tmp_dir,
+        TemporaryDirectory(dir=tmp_path) as tmp_dir,
         TemporaryDirectory(dir=tmp_dir) as some_dir,
         TemporaryDirectory(dir=tmp_dir) as other_dir,
         TemporaryDirectory(dir=other_dir) as second_lvl_dir,

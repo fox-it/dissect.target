@@ -6,7 +6,6 @@ from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -146,11 +145,8 @@ class ChromiumMixin:
                     chain.sort(key=lambda row: row.chain_index)
 
                 for row in db.table("downloads").rows():
-                    download_path = row.target_path
-                    if download_path and self.target.os == "windows":
-                        download_path = path.from_windows(download_path)
-                    elif download_path:
-                        download_path = path.from_posix(download_path)
+                    if download_path := row.target_path:
+                        download_path = self.target.fs.path(download_path)
 
                     url = None
                     download_chain = download_chains.get(row.id)
@@ -241,11 +237,8 @@ class ChromiumMixin:
                         if ts_update:
                             ts_update = webkittimestamp(ts_update)
 
-                        ext_path = extension_data.get("path")
-                        if ext_path and self.target.os == "windows":
-                            ext_path = path.from_windows(ext_path)
-                        elif ext_path:
-                            ext_path = path.from_posix(ext_path)
+                        if ext_path := extension_data.get("path"):
+                            ext_path = self.target.fs.path(ext_path)
 
                         manifest = extension_data.get("manifest")
                         if manifest:

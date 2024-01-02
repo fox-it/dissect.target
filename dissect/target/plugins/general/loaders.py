@@ -1,7 +1,5 @@
-import itertools
-
 from dissect.target.helpers.docs import INDENT_STEP, get_docstring
-from dissect.target.loader import LOADERS, DirLoader
+from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import Plugin, export
 
 
@@ -16,10 +14,10 @@ class LoaderListPlugin(Plugin):
         """List the available loaders."""
 
         loaders_info = {}
-        for loader in itertools.chain(LOADERS, [DirLoader]):
+        for key, loader in LOADERS_BY_SCHEME.items():
             try:
                 docstring = get_docstring(loader, "No documentation.").splitlines()[0].strip()
-                loaders_info[loader.__name__] = docstring
+                loaders_info[key] = docstring
             except ImportError:
                 continue
 

@@ -15,13 +15,9 @@ if TYPE_CHECKING:
 
 BUFFER_SIZE = 32768
 
-HashRecord = RecordDescriptor(
-    "filesystem/file/digest",
-    [
-        ("path[]", "paths"),
-        ("digest[]", "digests"),
-    ],
-)
+RECORD_NAME = "filesystem/file/digest"
+NAME_SUFFIXES = ["_resolved", "_digest"]
+RECORD_TYPES = ["path", "digest"]
 
 
 def _hash(fh: BinaryIO, ctx: Union[HASH, list[HASH]]) -> tuple[str]:
@@ -76,12 +72,8 @@ def hash_uri_records(target: Target, record: Record) -> Record:
 
 def hash_path_records(target: Target, record: Record) -> Record:
     """Hash files from path fields inside the record."""
-    hashed_paths = []
 
-    if target.os == "windows":
-        path_type = fieldtypes.windows_path
-    else:
-        path_type = fieldtypes.posix_path
+    hash_records = []
 
     for field_name, field_type in record._field_types.items():
         if not issubclass(field_type, fieldtypes.path):
@@ -97,16 +89,25 @@ def hash_path_records(target: Target, record: Record) -> Record:
         except (FileNotFoundError, IsADirectoryError):
             pass
         else:
-            resolved_path = path_type(resolved_path)
-            hashed_paths.append((resolved_path, path_hash))
+            resolved_path = target.fs.path(resolved_path)
+            record_kwargs = dict()
+            record_def = list()
 
-    if not hashed_paths:
+            fields = [resolved_path, path_hash]
+
+            for type, name, field in zip(RECORD_TYPES, NAME_SUFFIXES, fields):
+                hashed_field_name = f"{field_name}{name}"
+                record_kwargs.update({hashed_field_name: field})
+                record_def.append((type, hashed_field_name))
+
+            _record = RecordDescriptor(RECORD_NAME, record_def)
+
+            hash_records.append(_record(**record_kwargs))
+
+    if not hash_records:
         return record
 
-    paths, digests = zip(*hashed_paths)
-    hash_record = HashRecord(paths=paths, digests=digests)
-
-    return GroupedRecord(record._desc.name, [record, hash_record])
+    return GroupedRecord(record._desc.name, [record] + hash_records)
 
 
 def hash_uri(target: Target, path: str) -> tuple[str, str]:

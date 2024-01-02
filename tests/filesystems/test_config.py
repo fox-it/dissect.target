@@ -17,10 +17,11 @@ from tests._utils import absolute_path
 
 @pytest.fixture
 def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem) -> VirtualFilesystem:
-    tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("_data/helpers/configutil/config")).read_text())
-    fs_unix.map_dir("/etc", tmp_path)
+    etc_path = tmp_path.joinpath("etc/")
+    etc_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
+    etc_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
+    etc_path.joinpath("new/path/config").write_text(Path(absolute_path("_data/helpers/configutil/config")).read_text())
+    fs_unix.map_dir("/etc", etc_path)
 
     return fs_unix
 
@@ -143,12 +144,12 @@ def test_config_entry() -> None:
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
     config_fs = ConfigurationFilesystem(target_unix, "/etc")
-    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, seperator=(r"\s",))
+    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == "you"
 
-    entry = config_fs.get("/new/path/config", collapse={"help"}, seperator=(r"\s",))
+    entry = config_fs.get("/new/path/config", collapse={"help"}, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == ["me", "you"]

@@ -252,6 +252,9 @@ def rid_to_key(rid: int) -> tuple[bytes, bytes]:
 
 
 def decrypt_single_hash(rid: int, samkey: bytes, enc_hash: bytes, apwd: bytes) -> bytes:
+    if not enc_hash:
+        return b""
+
     sh = c_sam.SAM_HASH(enc_hash)
 
     if sh.revision not in [0x01, 0x02]:
