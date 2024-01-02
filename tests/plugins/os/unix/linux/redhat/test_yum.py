@@ -21,11 +21,13 @@ def test_yum_logs(test_file: str, target_unix: Target, fs_unix: VirtualFilesyste
     tz = timezone.utc
     data_file = absolute_path(f"_data/plugins/os/unix/linux/redhat/yum/{test_file}")
     fs_unix.map_file(f"/var/log/{test_file}", data_file)
+
+    # Mock the modified timestamp to be in 2023
     entry = fs_unix.get(f"/var/log/{test_file}")
+    stat_result = entry.stat()
+    stat_result.st_mtime = 1704067199
 
     with patch.object(entry, "stat") as mock_stat:
-        stat_result = entry.stat()
-        stat_result.st_mtime = 1704067199
         mock_stat.return_value = stat_result
 
         target_unix.add_plugin(YumPlugin)
