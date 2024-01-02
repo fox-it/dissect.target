@@ -322,13 +322,17 @@ class MRUPlugin(Plugin):
 
 def parse_mru_key(target, key, record):
     user = target.registry.get_user(key)
-    mrulist = key.value("MRUList").value
+
+    try:
+        mrulist = key.value("MRUList").value
+    except RegistryError:
+        mrulist = None
 
     for value in key.values():
         if value.name == "MRUList":
             continue
 
-        entry_index = mrulist.index(value.name)
+        entry_index = mrulist.index(value.name) if mrulist else None
         entry_value = value.value
 
         yield record(

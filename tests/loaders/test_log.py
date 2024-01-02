@@ -20,10 +20,7 @@ from dissect.target.loaders.log import LogLoader
 def test_log_loader(target_default: Target, path: str, uri: str, input_file: str, expected_mapping: str) -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh(input_file, io.BytesIO(b"\x00"))
-
-    target_default.fs.mount("/", vfs)
-
-    log_loader = LogLoader(target_default.fs.path(path), parsed_path=urlparse(uri))
+    log_loader = LogLoader(vfs.path(path), parsed_path=urlparse(uri))
     log_loader.map(target_default)
     # TODO: RGLOB does not take into account the seperator of the target, so maybe an issue with the flavour?
     observed_mapping = next(target_default.fs.path("/").rglob("*.*"))

@@ -889,7 +889,7 @@ class UnixConfigTreeCli(TargetCli):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        # It uses the alt seperator of the underlying fs
+        # It uses the alt separator of the underlying fs
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
