@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Iterator
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
@@ -23,11 +23,11 @@ class Modifier(StrEnum):
     HASH = "hash"
 
 
-def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, str]]):
+def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, TargetPath]]):
     record_kwargs = dict()
     record_def = list()
-    for type, name, data in field_info:
-        extended_field_name = f"{field_name}{name}"
+    for type, name_suffix, data in field_info:
+        extended_field_name = f"{field_name}{name_suffix}"
         record_kwargs.update({extended_field_name: data})
         record_def.append((type, extended_field_name))
 
@@ -58,7 +58,7 @@ MODIFIER_MAPPING = {
 }
 
 
-def _resolve_path_types(target: Target, record: Record) -> Iterable[tuple[TargetPath, str]]:
+def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[str, TargetPath]]:
     for field_name, field_type in record._field_types.items():
         if not issubclass(field_type, fieldtypes.path):
             continue
@@ -71,7 +71,7 @@ def _resolve_path_types(target: Target, record: Record) -> Iterable[tuple[Target
 
 
 def modify_record(target: Target, record: Record, modifier_function: ModifierFunc) -> GroupedRecord:
-    additional_record = []
+    additional_records = []
 
     for field_name, resolved_path in _resolve_path_types(target, record):
         try:
@@ -79,12 +79,12 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
         except FilesystemError:
             pass
         else:
-            additional_record.append(_record)
+            additional_records.append(_record)
 
-    if not additional_record:
+    if not additional_records:
         return record
 
-    return GroupedRecord(record._desc.name, [record] + additional_record)
+    return GroupedRecord(record._desc.name, [record] + additional_records)
 
 
 def _noop(_target: Target, record: Record):

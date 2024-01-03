@@ -45,7 +45,7 @@ def test_hash_path_records_with_paths(
     record._desc.name = "test"
     record._field_types = test_input
 
-    record_names = [key for key, value in test_input.items() if value is path]
+    path_field_names = [key for key, value in test_input.items() if value is path]
 
     with (
         patch.object(TargetPath, "open", mock_open(read_data=b"")),
@@ -57,9 +57,7 @@ def test_hash_path_records_with_paths(
     assert len(hashed_record.records) == expected_records
     assert hashed_record.records[0] == record
 
-    _record = hashed_record.records[1]
-
-    for name, _record in zip(record_names, hashed_record.records[1:]):
+    for name, _record in zip(path_field_names, hashed_record.records[1:]):
         assert getattr(_record, f"{name}_resolved") is not None
         assert getattr(_record, f"{name}_digest").__dict__ == digest(HASHES).__dict__
 

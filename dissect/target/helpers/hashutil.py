@@ -58,7 +58,7 @@ def hash_uri(target: Target, path: str) -> tuple[str, str]:
     """Hash the target path."""
     warnings.warn(
         (
-            "The hash_uri() function is deprecated, and will be removed in dissect.target 3.15."
+            "The hash_uri() function is deprecated, and will be removed in dissect.target 3.15. "
             "Use target.fs.hash() instead"
         ),
         DeprecationWarning,
@@ -67,7 +67,7 @@ def hash_uri(target: Target, path: str) -> tuple[str, str]:
     if path is None:
         raise FileNotFoundError()
 
-    path = target.resolve(path)
+    path = str(target.resolve(path))
     return (path, target.fs.hash(path))
 
 
