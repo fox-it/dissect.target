@@ -21,7 +21,7 @@ try:
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
-except Exception as e:
+except Exception:
     HAS_FUSE = False
 
 log = logging.getLogger(__name__)
@@ -81,7 +81,6 @@ def main():
     options["nothreads"] = True
     options["allow_other"] = True
     options["ro"] = True
-    options["foreground"] = True
 
     print(f"Mounting to {args.mount} with options: {_format_options(options)}")
     try:

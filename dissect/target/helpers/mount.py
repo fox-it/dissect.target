@@ -6,9 +6,9 @@ from typing import BinaryIO, Optional
 from dissect.util.feature import Feature, feature_enabled
 
 if feature_enabled(Feature.BETA):
-    from fusepy3.fuse import FuseOSError, LoggingMixIn, Operations
+    from fusepy3.fuse import FuseOSError, Operations
 else:
-    from fuse import FuseOSError, LoggingMixIn, Operations
+    from fuse import FuseOSError, Operations
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 
@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 CACHE_SIZE = 1024 * 1024
 
 
-class DissectMount(Operations, LoggingMixIn):
+class DissectMount(Operations):
     def __init__(self, fs: Filesystem):
         self.fs = fs
         self.file_handles: dict[int, BinaryIO] = {}
@@ -37,11 +37,13 @@ class DissectMount(Operations, LoggingMixIn):
 
         try:
             st = fe.lstat()
-            data = dict(
+            
+            return dict(
                 (key, getattr(st, key))
                 for key in (
                     "st_atime",
                     "st_ctime",
+                    # Trying to use the ino of the entry..., however the one made by fuse3 remains the result.
                     "st_ino",
                     "st_gid",
                     "st_mode",
@@ -51,8 +53,6 @@ class DissectMount(Operations, LoggingMixIn):
                     "st_uid",
                 )
             )
-            print(path, data, st)
-            return data
 
         except Exception:
             raise FuseOSError(errno.EIO)
@@ -133,5 +133,3 @@ class DissectMount(Operations, LoggingMixIn):
         def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
             if file := self.file_handles.get(fh):
                 return file.seek(off, whence)
-        # def read_buf(self, path: str, size: int, off: int, fd: int) -> str:
-        #     pass
