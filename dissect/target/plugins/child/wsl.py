@@ -26,7 +26,7 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
                     continue
                 base_path = target.resolve(distribution_key.value("BasePath").value)
                 # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
-                yield from target.fs.path(base_path).glob("*.vhdx")
+                yield from base_path.glob("*.vhdx")
     except PluginError:
         pass
 
