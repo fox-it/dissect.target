@@ -906,7 +906,7 @@ class VirtualDirectory(FilesystemEntry):
 
     def _stat(self) -> fsutil.stat_result:
         path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
-        return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 0, 0, 0, 0, 0, 0, 0])
+        return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 1, 0, 0, 0, 0, 0, 0])
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if self.top:
@@ -928,10 +928,10 @@ class VirtualDirectory(FilesystemEntry):
         return False
 
     def readlink(self) -> str:
-        raise NotASymlinkError()
+        raise NotASymlinkError(self.path)
 
     def readlink_ext(self) -> FilesystemEntry:
-        raise NotASymlinkError()
+        raise NotASymlinkError(self.path)
 
 
 class VirtualFileHandle(io.RawIOBase):
@@ -994,10 +994,10 @@ class VirtualFile(FilesystemEntry):
         return False
 
     def readlink(self) -> str:
-        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
+        raise NotASymlinkError(self.path)
 
     def readlink_ext(self) -> FilesystemEntry:
-        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
+        raise NotASymlinkError(self.path)
 
 
 class MappedFile(VirtualFile):
@@ -1073,13 +1073,19 @@ class VirtualSymlink(FilesystemEntry):
         if not follow_symlinks:
             return False
 
-        return self.readlink_ext().is_dir()
+        try:
+            return self.readlink_ext().is_dir()
+        except FileNotFoundError:
+            return False
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         if not follow_symlinks:
             return False
 
-        return self.readlink_ext().is_file()
+        try:
+            return self.readlink_ext().is_file()
+        except FileNotFoundError:
+            return False
 
     def is_symlink(self) -> bool:
         return True
@@ -1471,7 +1477,7 @@ class RootFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         self.fs.target.log.debug("%r::readlink()", self)
         if not self.is_symlink():
-            raise FilesystemError(f"Not a link: {self}")
+            raise NotASymlinkError(f"Not a link: {self}")
         return self._exec("readlink")
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:

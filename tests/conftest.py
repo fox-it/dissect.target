@@ -1,9 +1,8 @@
-import os
 import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import Any, Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 import pytest
 
@@ -432,49 +431,3 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
     yield target_osx
-
-
-@pytest.fixture
-def xattrs() -> dict[str, str]:
-    return {"some_key": b"some_value"}
-
-
-@pytest.fixture
-def listxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
-    # listxattr() is only available on Linux
-    attr_names = list(xattrs.keys())
-
-    if hasattr(os, "listxattr"):
-        spec = {
-            "create": False,
-            "autospec": True,
-            "return_value": attr_names,
-        }
-    else:
-        spec = {
-            "create": True,
-            "return_value": attr_names,
-        }
-
-    return spec
-
-
-@pytest.fixture
-def getxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
-    # getxattr() is only available on Linux
-    attr_name = list(xattrs.keys())[0]
-    attr_value = xattrs.get(attr_name)
-
-    if hasattr(os, "getxattr"):
-        spec = {
-            "create": False,
-            "autospec": True,
-            "return_value": attr_value,
-        }
-    else:
-        spec = {
-            "create": True,
-            "return_value": attr_value,
-        }
-
-    return spec
