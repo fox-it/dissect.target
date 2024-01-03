@@ -23,7 +23,7 @@ class Modifier(StrEnum):
     HASH = "hash"
 
 
-def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, TargetPath]]):
+def _create_modified_record(record_name: str, field_name: str, field_info: Iterable[tuple[str, str, TargetPath]]) -> Record:
     record_kwargs = dict()
     record_def = list()
     for type, name_suffix, data in field_info:
