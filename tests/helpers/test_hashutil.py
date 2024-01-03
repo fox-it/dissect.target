@@ -49,7 +49,7 @@ def test_hash_uri(mock_target: Target) -> None:
     ):
         output = hashutil.hash_uri(mock_target, path)
 
-    assert output[0] == resolve_func(path)
+    assert output[0] == str(resolve_func(path))
     assert output[1] == HASHES
 
 
