@@ -37,7 +37,7 @@ class DissectMount(Operations):
 
         try:
             st = fe.lstat()
-            
+
             return dict(
                 (key, getattr(st, key))
                 for key in (
