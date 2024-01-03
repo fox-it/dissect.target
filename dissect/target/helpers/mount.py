@@ -37,11 +37,12 @@ class DissectMount(Operations, LoggingMixIn):
 
         try:
             st = fe.lstat()
-            return dict(
+            data = dict(
                 (key, getattr(st, key))
                 for key in (
                     "st_atime",
                     "st_ctime",
+                    "st_ino",
                     "st_gid",
                     "st_mode",
                     "st_mtime",
@@ -50,6 +51,9 @@ class DissectMount(Operations, LoggingMixIn):
                     "st_uid",
                 )
             )
+            print(path, data, st)
+            return data
+
         except Exception:
             raise FuseOSError(errno.EIO)
 
@@ -114,6 +118,9 @@ class DissectMount(Operations, LoggingMixIn):
             raise FuseOSError(errno.EIO)
 
     def release(self, path: str, fh: int) -> int:
+        if file := self.file_handles.get(fh):
+            file.close()
+
         del self.file_handles[fh]
         return 0
 
@@ -122,10 +129,9 @@ class DissectMount(Operations, LoggingMixIn):
         return 0
 
     if feature_enabled(Feature.BETA):
-        # def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
-        #     fih = self._get(path)
 
-        #     return self.file_handles[fh].seek(off, whence)
-        pass
+        def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
+            if file := self.file_handles.get(fh):
+                return file.seek(off, whence)
         # def read_buf(self, path: str, size: int, off: int, fd: int) -> str:
         #     pass

@@ -119,6 +119,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
 
     def lstat(self) -> fsutil.stat_result:
+        import ipdb; ipdb.set_trace()
         return fsutil.stat_result.copy(self.entry.lstat())
 
     def attr(self) -> dict[str, bytes]:

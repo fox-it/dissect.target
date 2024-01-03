@@ -307,6 +307,7 @@ def parse_fstab(
     if not fstab.exists():
         return
 
+    # import ipdb; ipdb.set_trace()
     for entry in fstab.open("rt"):
         entry = entry.strip()
         if entry.startswith("#"):

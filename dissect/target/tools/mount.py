@@ -81,6 +81,7 @@ def main():
     options["nothreads"] = True
     options["allow_other"] = True
     options["ro"] = True
+    options["foreground"] = True
 
     print(f"Mounting to {args.mount} with options: {_format_options(options)}")
     try:
