@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 re_normalize_path = re.compile(r"[/]+")
 re_normalize_sbs_path = re.compile(r"[\\/]+")
 re_glob_magic = re.compile(r"[*?[]")
-re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]\/?")
+re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]")
 
 
 def normalize(path: str, alt_separator: str = "") -> str:
@@ -857,7 +857,17 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
         yield [path_entry], dirs, files
 
 
-def glob_split(pattern: str, alt_separator: str = "") -> str:
+def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
+    """Split a pattern on path part boundaries on the first path part with a glob pattern.
+
+    Args:
+        pattern: A glob pattern to match names of filesystem entries against.
+        alt_separator: An optional alternative path separator in use by the filesystem being matched.
+
+    Returns:
+        A tuple of a string with path parts up to the first path part that has a glob pattern and a string of
+        the remaining path parts.
+    """
     # re_glob_index expects a normalized pattern
     pattern = normalize(pattern, alt_separator=alt_separator)
 
@@ -870,75 +880,110 @@ def glob_split(pattern: str, alt_separator: str = "") -> str:
     return pattern[:pos], pattern[pos:]
 
 
-def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> filesystem.FilesystemEntry:
+def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[filesystem.FilesystemEntry]:
+    """Recursively search and return filesystem entries matching a given glob pattern.
+
+    Args:
+        direntry: The filesystem entry relative to which to search.
+        pattern: A glob pattern to match names of filesystem entries against.
+
+    Yields:
+        Matching filesystem entries (files and/or directories).
+    """
+
+    # Split the pattern on the last path part. base_name will contain the last path part (which is
+    # '' if pattern ends with a /) and dir_name will contain the other parts.
     dir_name, base_name = split(pattern, alt_separator=direntry.fs.alt_separator)
 
+    # The simple case where there are no globs.
     if not has_glob_magic(pattern):
         try:
             entry = direntry.get(pattern)
         except FileNotFoundError:
             pass
         else:
+            # Patterns ending with a slash, so without a base_name, should match only directories.
             if base_name:
                 yield entry
-            # Patterns ending with a slash should match only directories
             elif entry.is_dir():
                 yield entry
         return
 
+    # The pattern has only one path part, so we can match directly against the files in direntry.
     if not dir_name:
         for entry in glob_ext1(direntry, base_name):
             yield entry
         return
 
-    if dir_name != pattern and has_glob_magic(dir_name):
-        dirs = glob_ext(direntry, dir_name)
-    else:
-        dirs = [dir_name]
-
-    if has_glob_magic(base_name):
-        glob_in_dir = glob_ext1
+    # If the pattern has more than one path part and these parts (dir_name) contain globs, we
+    # recursively go over all the path parts and match them (glob_ext).
+    # If these path parts have no globs, we get the path directly by name (glob_ext0).
+    if has_glob_magic(dir_name):
+        glob_in_dir = glob_ext
     else:
         glob_in_dir = glob_ext0
 
-    for direntry in dirs:
-        for entry in glob_in_dir(direntry, base_name):
+    # If the pattern's last path part (base_name) has globs, we fnmatch it against the entries in
+    # direntry (glob_ext1), otherwise we get the part directly by name (glob_ext0).
+    if has_glob_magic(base_name):
+        glob_in_base = glob_ext1
+    else:
+        glob_in_base = glob_ext0
+
+    for direntry in glob_in_dir(direntry, dir_name):
+        for entry in glob_in_base(direntry, base_name):
             yield entry
 
 
 # These 2 helper functions non-recursively glob inside a literal directory.
-# They return a list of basenames. `glob1` accepts a pattern while `glob0`
-# takes a literal base_name (so it only has to check for its existence).
+def glob_ext1(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[filesystem.FilesystemEntry]:
+    """Match and return filesystem entries in a given filesystem entry based on pattern.
 
+    Args:
+        direntry: The filesystem entry relative to which to match the entries.
+        pattern: A glob pattern to match names of filesystem entries against.
 
-def glob_ext1(direntry: filesystem.FilesystemEntry, pattern: str) -> filesystem.FilesystemEntry:
+    Yields:
+        Matching filesystem entries (files and/or directories).
+    """
     if not direntry.is_dir():
         return
 
     entries = direntry.scandir()
 
     if pattern[0] != ".":
+        # Do not return dot-files, unless they are explicitly searched for.
         entries = filter(lambda x: x.name[0] != ".", entries)
 
-    for e in entries:
-        name = e.name if e.fs.case_sensitive else e.name.lower()
-        pattern = pattern if e.fs.case_sensitive else pattern.lower()
+    for entry in entries:
+        case_sensitive = entry.fs.case_sensitive
+        name = entry.name if case_sensitive else entry.name.lower()
+        pattern = pattern if case_sensitive else pattern.lower()
         if fnmatch.fnmatch(name, pattern):
-            yield e
+            yield entry
 
 
-def glob_ext0(direntry: filesystem.FilesystemEntry, base_name: str) -> list[filesystem.FilesystemEntry]:
-    if base_name == "":
-        # `os.path.split()` returns an empty base_name for paths ending with a
-        # directory separator.  'q*x/' should match only directories.
+def glob_ext0(direntry: filesystem.FilesystemEntry, path: str) -> Iterator[filesystem.FilesystemEntry]:
+    """Return the filesystem entry equal to the given path relative to direntry.
+
+    Args:
+        direntry: The filesystem entry relative to which to return the path.
+        path: The path to the filesystem entry to return (if present). If path
+              is an empty string (``''``) the ``direntry`` itself is returned.
+
+    Yields:
+        The matching filesystem entry (file or directory).
+    """
+    if path == "":
+        # os.path.split() returns an empty path for paths ending with a directory separator.
+        # E.g. 'q*x/' should match only directories.
         if direntry.is_dir():
-            return [direntry]
+            yield direntry
     elif direntry.is_dir():
         try:
-            return [direntry.get(base_name)]
+            yield direntry.get(path)
         except FileNotFoundError:
             pass
-    return []
 
 
 def has_glob_magic(s) -> bool:
