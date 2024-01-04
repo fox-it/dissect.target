@@ -1240,12 +1240,22 @@ class VirtualFilesystem(Filesystem):
             directory.add(entry_name, entry)
 
     def link(self, src: str, dst: str) -> None:
-        """Hard link a FilesystemEntry to another location."""
+        """Hard link a FilesystemEntry to another location.
+
+        Args:
+            src: The path to the target of the link.
+            dst: The path to the link.
+        """
         self.map_file_entry(dst, self.get(src))
 
     def symlink(self, src: str, dst: str) -> None:
-        """Create a symlink to another location."""
-        src = fsutil.normalize(src, alt_separator=self.alt_separator).strip("/")
+        """Create a symlink to another location.
+
+        Args:
+            src: The path to the target of the symlink.
+            dst: The path to the symlink.
+        """
+        src = fsutil.normalize(src, alt_separator=self.alt_separator).rstrip("/")
         dst = fsutil.normalize(dst, alt_separator=self.alt_separator).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
