@@ -418,3 +418,53 @@ def test_target_path_backslash_normalisation(target_win, fs_win, tmp_path):
 
         results = list(target_win.fs.path("/").glob("sysvol/windows/system32/some*.txt"))
         assert len(results) == 1
+
+
+@pytest.fixture
+def glob_fs() -> VirtualFilesystem:
+    vfs = VirtualFilesystem()
+    paths = [
+        "foo/bar/bla",
+        "moo/bar/bla",
+        "bar/bla",
+    ]
+    files = [
+        "file.txt",
+        "file.ini",
+        "other.txt",
+    ]
+    special_files = [
+        "lololo",
+        "system.dat",
+        "data.tgz",
+    ]
+
+    for idx, path in enumerate(paths):
+        vfs.makedirs(path)
+        for file in files:
+            vfs.map_file_entry(f"/{path}/{file}", VirtualFile(vfs, f"{path}/{file}", None))
+        special_file = special_files[idx]
+        vfs.map_file_entry(f"/{path}/{special_file}", VirtualFile(vfs, f"{path}/{special_file}", None))
+
+    return vfs
+
+
+@pytest.mark.parametrize(
+    ("start_path, pattern, results"),
+    [
+        ("/", "foo/bar/bla/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"]),
+        ("/", "foo/bar/*/file.ini", ["foo/bar/bla/file.ini"]),
+        ("/", "foo/bar/*/file.*", ["foo/bar/bla/file.ini", "foo/bar/bla/file.txt"]),
+        ("/", "*/bar/bla/file.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"]),
+        ("/", "*/bar/bla/*.ini", ["foo/bar/bla/file.ini", "moo/bar/bla/file.ini"]),
+        ("/foo", "*/bla/file.ini", ["foo/bar/bla/file.ini"]),
+        ("/foo", "*/bla/*.ini", ["foo/bar/bla/file.ini"]),
+        ("/", "boo/bla/*", []),
+    ],
+)
+def test_glob_ext(glob_fs: VirtualFilesystem, start_path: str, pattern: str, results: list[str]) -> None:
+    start_entry = glob_fs.get(start_path)
+    entries = fsutil.glob_ext(start_entry, pattern)
+
+    entries = sorted([entry.path for entry in entries])
+    assert entries == sorted(results)
