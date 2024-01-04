@@ -1,7 +1,7 @@
 import errno
 import logging
 from functools import lru_cache
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.feature import Feature, feature_enabled
 
@@ -32,7 +32,7 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    def getattr(self, path: str, buf, fh: Optional[int] = None) -> dict:
+    def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
         try:
@@ -93,7 +93,7 @@ class DissectMount(Operations):
             log.exception("Exception in fuse::read")
             raise FuseOSError(errno.EIO)
 
-    def readdir(self, path: str, fh: int, flags: int = 0):
+    def readdir(self, path: str, fh: int, flags: int = 0) -> Iterator[str]:
         if fh not in self.dir_handles:
             raise FuseOSError(errno.EBADFD)
 
@@ -133,3 +133,4 @@ class DissectMount(Operations):
         def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
             if file := self.file_handles.get(fh):
                 return file.seek(off, whence)
+
