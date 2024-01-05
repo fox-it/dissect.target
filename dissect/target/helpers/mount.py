@@ -5,8 +5,10 @@ from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.feature import Feature, feature_enabled
 
+HAS_FUSE3 = False
 if feature_enabled(Feature.BETA):
-    from fusepy3.fuse import FuseOSError, Operations
+    from fusepy3 import FuseOSError, Operations
+    HAS_FUSE3 = True
 else:
     from fuse import FuseOSError, Operations
 
@@ -128,7 +130,8 @@ class DissectMount(Operations):
         del self.dir_handles[fh]
         return 0
 
-    if feature_enabled(Feature.BETA):
+    if HAS_FUSE3:
+        # Define the fuse3 bindings here
 
         def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
             if file := self.file_handles.get(fh):
