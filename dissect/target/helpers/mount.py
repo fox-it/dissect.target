@@ -5,14 +5,16 @@ from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.feature import Feature, feature_enabled
 
+from dissect.target.filesystem import Filesystem, FilesystemEntry
+
 HAS_FUSE3 = False
 if feature_enabled(Feature.BETA):
     from fusepy3 import FuseOSError, Operations
+
     HAS_FUSE3 = True
 else:
     from fuse import FuseOSError, Operations
 
-from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 log = logging.getLogger(__name__)
 
@@ -136,4 +138,3 @@ class DissectMount(Operations):
         def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
             if file := self.file_handles.get(fh):
                 return file.seek(off, whence)
-
