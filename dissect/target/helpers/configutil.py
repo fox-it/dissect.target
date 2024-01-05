@@ -280,7 +280,7 @@ class Xml(ConfigurationParser):
         return result
 
     def _fix(self, content: str, position: tuple(int, int)) -> str:
-        """Quick heuritsic fix. If there is an invalid token, just remove it"""
+        """Quick heuristic fix. If there is an invalid token, just remove it."""
         lineno, offset = position
         lines = content.split("\n")
         line = lines[lineno - 1]
