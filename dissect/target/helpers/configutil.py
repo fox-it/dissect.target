@@ -20,6 +20,8 @@ from typing import (
     Union,
 )
 
+from defusedxml import ElementTree
+
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
@@ -252,6 +254,59 @@ class Txt(ConfigurationParser):
     def parse_file(self, fh: TextIO) -> None:
         # Cast the size to a string, to print it out later.
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
+
+
+class Xml(ConfigurationParser):
+    def _tree(self, tree: ElementTree) -> dict:
+        nodes = {}
+        counter = {}
+        for node in tree.findall("*"):
+            if node.tag in counter:
+                counter[node.tag] += 1
+                nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
+            else:
+                counter[node.tag] = 1
+                nodes[f"{node.tag}"] = self._tree(node)
+        result = {"tag": tree.tag}
+        if tree.attrib:
+            result["attributes"] = tree.attrib
+        if nodes:
+            result["nodes"] = nodes
+
+        text = str(tree.text).strip(" \n\r")
+        if text:
+            result["text"] = text
+
+        return result
+
+    def _fix(self, content: str, position: tuple(int, int)) -> str:
+        """Quick heuritsic fix. If there is an invalid token, just remove it"""
+        lineno, offset = position
+        lines = content.split("\n")
+        line = lines[lineno - 1]
+        line = line[: offset - 1] + "" + line[offset + 1 :]
+        lines[lineno - 1] = line
+        return "\n".join(lines)
+
+    def parse_file(self, fh: TextIO) -> None:
+        content = fh.read()
+        document = content
+        errors = 0
+        limit = 20
+        tree = None
+        while not tree and errors < limit:
+            try:
+                tree = self._tree(ElementTree.fromstring(document))
+                break
+            except ElementTree.ParseError as err:
+                errors += 1
+                document = self._fix(document, err.position)
+
+        if not tree:
+            # Document could not be parsed, we give up
+            self.parsed_data = {"nodes": tree, "errors": errors, "text": content}
+        else:
+            self.parsed_data = {"nodes": tree, "errors": errors}
 
 
 class ScopeManager:
@@ -528,11 +583,12 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/systemd/*": ParserConfig(SystemD),
     "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
     "*/sysctl.d/*.conf": ParserConfig(Default),
+    "*/xml/*": ParserConfig(Xml),
 }
 
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
-    "xml": ParserConfig(Txt),
+    "xml": ParserConfig(Xml),
     "json": ParserConfig(Txt),
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
@@ -549,6 +605,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "hosts": ParserConfig(Default, separator=(r"\s",)),
     "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
+    "catalog": ParserConfig(Xml),
 }
 
 
