@@ -16,7 +16,7 @@ class ICatPlugin(Plugin):
 
     def check_compatible(self) -> None:
         filesystems = self.target.filesystems
-        if not any(fs.__fstype__ in self.FS_SUPPORTED for fs in filesystems):
+        if not any(fs.__type__ in self.FS_SUPPORTED for fs in filesystems):
             raise UnsupportedPluginError("No supported filesystems found")
 
     @arg("--segment", "--inode", "-i", dest="inum", required=True, type=int, help="MFT segment or inode number")
@@ -72,14 +72,14 @@ class ICatPlugin(Plugin):
                     )
                     return
 
-            if filesystem.__fstype__ == "ntfs" or open_as == "ntfs":
+            if filesystem.__type__ == "ntfs" or open_as == "ntfs":
                 fh = filesystem.ntfs.mft(inum).open(ads)
-            elif filesystem.__fstype__ == "ext":
+            elif filesystem.__type__ == "ext":
                 fh = filesystem.extfs.get_inode(inum).open()
-            elif filesystem.__fstype__ == "xfs":
+            elif filesystem.__type__ == "xfs":
                 fh = filesystem.xfs.get_inode(inum).open()
             else:
-                self.target.log.exception('Unsupported FS type "%s"', filesystem.__fstype__)
+                self.target.log.exception('Unsupported FS type "%s"', filesystem.__type__)
                 return
 
             shutil.copyfileobj(fh, sys.stdout.buffer)

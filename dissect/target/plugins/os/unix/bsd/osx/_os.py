@@ -40,20 +40,23 @@ class MacPlugin(BsdPlugin):
     @export(property=True)
     def ips(self) -> Optional[list[str]]:
         ips = set()
-        network = plistlib.load(self.target.fs.path(self.SYSTEM).open()).get("NetworkServices")
 
         # Static configured IP-addresses
-        for interface in network.values():
-            for addresses in [interface.get("IPv4"), interface.get("IPv6")]:
-                ips.update(addresses.get("Addresses", []))
+        if (preferences := self.target.fs.path(self.SYSTEM)).exists():
+            network = plistlib.load(preferences.open()).get("NetworkServices")
+
+            for interface in network.values():
+                for addresses in [interface.get("IPv4"), interface.get("IPv6")]:
+                    ips.update(addresses.get("Addresses", []))
 
         # IP-addresses configured by DHCP
-        for lease in self.target.fs.path("/private/var/db/dhcpclient/leases").iterdir():
-            if lease.is_file():
-                lease = plistlib.load(lease.open())
+        if (dhcp := self.target.fs.path("/private/var/db/dhcpclient/leases")).exists():
+            for lease in dhcp.iterdir():
+                if lease.is_file():
+                    lease = plistlib.load(lease.open())
 
-                if ip := lease.get("IPAddress"):
-                    ips.add(ip)
+                    if ip := lease.get("IPAddress"):
+                        ips.add(ip)
 
         return list(ips)
 
@@ -70,24 +73,33 @@ class MacPlugin(BsdPlugin):
 
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
-        for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
-            user = plistlib.load(path.open())
+        try:
+            for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
+                user = plistlib.load(path.open())
 
-            # The home directory of a user account can be null,
-            # but a user account can also have multiply home directories e.g. the root account.
-            # https://developer.apple.com/documentation/foundation/filemanager/1642853-homedirectory/
-            for home_dir in user.get("home", [None]):
-                yield UnixUserRecord(
-                    name=user.get("name", [None])[0],
-                    passwd=user.get("passwd", [None])[0],
-                    uid=user.get("uid", [None])[0],
-                    gid=user.get("gid", [None])[0],
-                    gecos=user.get("realname", [None])[0],
-                    home=home_dir,
-                    shell=user.get("shell", [None])[0],
-                    source=path,
-                )
+                # The home directory of a user account can be null,
+                # but a user account can also have multiply home directories e.g. the root account.
+                # https://developer.apple.com/documentation/foundation/filemanager/1642853-homedirectory/
+                for home_dir in user.get("home", [None]):
+                    yield UnixUserRecord(
+                        name=user.get("name", [None])[0],
+                        passwd=user.get("passwd", [None])[0],
+                        uid=user.get("uid", [None])[0],
+                        gid=user.get("gid", [None])[0],
+                        gecos=user.get("realname", [None])[0],
+                        home=home_dir,
+                        shell=user.get("shell", [None])[0],
+                        source=path,
+                    )
+        except FileNotFoundError:
+            pass
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.OSX.value
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        # OS-X uses Mach-O binary format. We should implement something similar
+        # to the Unix architecture() function but for Mach-O libraries.
+        pass

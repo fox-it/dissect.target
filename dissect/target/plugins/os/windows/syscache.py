@@ -1,5 +1,4 @@
 from dissect.ntfs import ntfs
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
@@ -48,7 +47,7 @@ class SyscachePlugin(Plugin):
         # Try to get the system volume
         mft = None
         sysvol = self.target.fs.mounts["sysvol"]
-        if sysvol.__fstype__ == "ntfs" or hasattr(sysvol, "ntfs"):  # Nasty TarLoader hack
+        if sysvol.__type__ == "ntfs" or hasattr(sysvol, "ntfs"):  # Nasty TarLoader hack
             mft = sysvol.ntfs.mft
 
         # There's some other stuff here like an IndexTable and LruList
@@ -76,7 +75,7 @@ class SyscachePlugin(Plugin):
                 full_path = None
                 if mft:
                     try:
-                        full_path = path.from_windows("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
+                        full_path = self.target.fs.path("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
                     except ntfs.Error:
                         pass
 

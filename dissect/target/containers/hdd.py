@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class HddContainer(Container):
+    __type__ = "hdd"
+
     def __init__(self, fh: Path, *args, **kwargs):
         if hasattr(fh, "read"):
             raise TypeError("HddContainer can only be opened by path")
@@ -17,7 +19,7 @@ class HddContainer(Container):
         super().__init__(fh, self.stream.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return False
 
     @staticmethod

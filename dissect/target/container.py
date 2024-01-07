@@ -34,6 +34,11 @@ class Container(io.IOBase):
         vs: An optional shorthand to set the underlying volume system, usually set later.
     """
 
+    # Due to lazy importing we generally can't use isinstance(), so we add a short identifying string to each class
+    # This has the added benefit of having a readily available "pretty name" for each implementation
+    __type__: str = None
+    """A short string identifying the type of container."""
+
     def __init__(self, fh: Union[BinaryIO, Path], size: int, vs: VolumeSystem = None):
         self.fh = fh
         self.size = size
@@ -41,7 +46,10 @@ class Container(io.IOBase):
         # Shorthand access to vs
         self.vs = vs
 
-    def __repr__(self):
+        if self.__type__ is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must define __type__")
+
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @classmethod
@@ -65,12 +73,39 @@ class Container(io.IOBase):
 
         return False
 
-    @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    @classmethod
+    def detect_fh(cls, fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         """Detect if this ``Container`` can be used to open the file-like object ``fh``.
 
-        The function checks wether the raw data contains any magic information that corresponds to this
+        The function checks whether the raw data contains any magic information that corresponds to this
         specific container.
+
+        Args:
+            fh: A file-like object that we want to open a ``Container`` on.
+            original: The original argument passed to ``detect()``.
+
+        Returns:
+            ``True`` if this ``Container`` can be used for this file-like object, ``False`` otherwise.
+        """
+        offset = fh.tell()
+        try:
+            fh.seek(0)
+            return cls._detect_fh(fh, original)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            log.warning("Failed to detect %s container", cls.__name__)
+            log.debug("", exc_info=e)
+        finally:
+            fh.seek(offset)
+
+        return False
+
+    @staticmethod
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        """Detect if this ``Container`` can be used to open the file-like object ``fh``.
+
+        This method should be implemented by subclasses. The position of ``fh`` is guaranteed to be ``0``.
 
         Args:
             fh: A file-like object that we want to open a ``Container`` on.
@@ -98,7 +133,7 @@ class Container(io.IOBase):
         """
         raise NotImplementedError()
 
-    def read(self, length: int) -> bytes:
+    def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Container``."""
         raise NotImplementedError()
 
@@ -177,6 +212,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     first = item[0] if isinstance(item, list) else item
     first_fh = None
     first_fh_opened = False
+    first_fh_offset = None
     first_path = None
 
     if hasattr(first, "read"):
@@ -186,6 +222,10 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         if first_path.is_file():
             first_fh = first.open("rb")
             first_fh_opened = True
+
+    if first_fh:
+        first_fh_offset = first_fh.tell()
+        first_fh.seek(0)
 
     try:
         for container in CONTAINERS + [RawContainer]:
@@ -203,6 +243,8 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
     finally:
         if first_fh_opened:
             first_fh.close()
+        elif first_fh:
+            first_fh.seek(first_fh_offset)
 
     raise ContainerError(f"Failed to detect container for {item}")
 

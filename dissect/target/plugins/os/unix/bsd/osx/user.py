@@ -47,7 +47,7 @@ class UserPlugin(Plugin):
                         password_last_time=account_policy.get("passwordLastSetTime"),
                         failed_login_count=account_policy.get("failedLoginCount"),
                         failed_login_time=account_policy.get("failedLoginTimestamp"),
-                        source=user_details.user.source,
+                        source=self.target.fs.path(user_details.user.source),
                         _user=user_details.user,
                         _target=self.target,
                     )

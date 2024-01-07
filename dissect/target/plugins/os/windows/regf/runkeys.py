@@ -1,5 +1,3 @@
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
@@ -13,7 +11,7 @@ RunKeyRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, Us
     [
         ("datetime", "ts"),
         ("wstring", "name"),
-        ("path", "path"),
+        ("string", "path"),
         ("string", "key"),
     ],
 )
@@ -75,7 +73,7 @@ class RunKeysPlugin(Plugin):
                     yield RunKeyRecord(
                         ts=r.ts,
                         name=entry.name,
-                        path=path.from_windows(entry.value),
+                        path=entry.value,
                         key=key,
                         _target=self.target,
                         _key=r,

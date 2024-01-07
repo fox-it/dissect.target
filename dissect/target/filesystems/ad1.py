@@ -13,7 +13,7 @@ from dissect.target.helpers import fsutil
 
 
 class AD1Filesystem(Filesystem):
-    __fstype__ = "ad1"
+    __type__ = "ad1"
 
     def __init__(self, fh, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)

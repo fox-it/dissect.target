@@ -27,5 +27,5 @@ class VmxLoader(Loader):
             path = self.base_dir.joinpath(disk)
             try:
                 target.disks.add(VmdkContainer(path))
-            except Exception:  # noqa
+            except Exception:
                 target.log.exception("Failed to load VMDK: %s", disk)

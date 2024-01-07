@@ -1,5 +1,4 @@
 import io
-import platform
 import urllib.parse
 from pathlib import Path
 from typing import Iterator
@@ -46,14 +45,14 @@ class ErrorCounter(TargetLogAdapter):
         (
             ["/dir/raw.img", "/dir/raw2.tst", "/dir/info.txt"],
             "/dir",
-            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')," " RawLoader('/dir/info.txt')]",
+            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst'), RawLoader('/dir/info.txt')]",
             0,
         ),
         # Scenario 3: dir contains 1 loadable dir as well as 2 loadable targets
         (
             ["/dir/unix/etc", "/dir/unix/var", "/dir/raw.img", "/dir/raw2.tst"],
             "/dir",
-            "[DirLoader('/dir/unix'), " "RawLoader('/dir/raw.img'), " "TestLoader('/dir/raw2.tst')]",
+            "[DirLoader('/dir/unix'), " "RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
         ),
         # Scenario 3b: dir contains 2 loadable dirs as well as 2 loadable targets
@@ -110,7 +109,6 @@ class ErrorCounter(TargetLogAdapter):
     ],
 )
 @patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
-@pytest.mark.skipif(platform.system() == "Windows", reason="Path issues. Needs to be fixed.")
 def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
     # TestLoader to mix Raw Targets with Test Targets without depending on
     # specific implementations.
@@ -129,7 +127,7 @@ def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
 
         @staticmethod
         def find_all(path: Path) -> Iterator[Path]:
-            return [Path("/dir/raw1.img"), Path("/dir/raw3.img")]
+            return [Path("/dir/raw1.img").as_posix(), Path("/dir/raw3.img").as_posix()]
 
         def map(self, target: Target):
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
@@ -171,6 +169,7 @@ def mocked_win_volumes_fs():
     mock_good_volume.drive_letter = "W"
 
     mock_good_fs = Mock(name="good-fs")
+    mock_good_fs.iter_subfs.return_value = []
 
     def mock_filesystem_open(volume):
         if volume == mock_good_volume:
@@ -323,30 +322,30 @@ def test_target_fallback_dirfs_linux(mocked_lin_volumes_fs):
 
 
 def test_target__generic_name_no_path_no_os():
-    mock_target = Target()
+    target_bare = Target()
 
-    assert mock_target._generic_name == "Unknown"
+    assert target_bare._generic_name == "Unknown"
 
 
 def test_target__generic_name_no_path_with_os():
-    mock_target = Target()
-    mock_target.os = "test"
+    target_bare = Target()
+    target_bare.os = "test"
 
-    assert mock_target._generic_name == "Unknown-test"
+    assert target_bare._generic_name == "Unknown-test"
 
 
-def test_target__generic_name_with_path(mock_target):
-    assert mock_target._generic_name == mock_target.path.name
+def test_target__generic_name_with_path(target_bare):
+    assert target_bare._generic_name == target_bare.path.name
 
 
 def test_target_name_no_hostname():
     test_name = "test-target"
 
     with patch("dissect.target.target.Target._generic_name", PropertyMock(return_value=test_name)):
-        mock_target = Target()
-        mock_target.hostname = None
+        target_bare = Target()
+        target_bare.hostname = None
 
-        assert mock_target.name == test_name
+        assert target_bare.name == test_name
 
 
 def test_target_name_hostname_raises():
@@ -354,29 +353,29 @@ def test_target_name_hostname_raises():
 
     with patch("dissect.target.target.Target._generic_name", PropertyMock(return_value=test_name)):
         with patch("dissect.target.target.Target.hostname", PropertyMock(side_effect=Exception("ERROR")), create=True):
-            mock_target = Target()
+            target_bare = Target()
 
-            assert mock_target.name == test_name
+            assert target_bare.name == test_name
 
 
 def test_target_name_set():
     test_name = "test-target"
-    mock_target = Target()
-    mock_target._name = test_name
+    target_bare = Target()
+    target_bare._name = test_name
 
-    assert mock_target.name == test_name
+    assert target_bare.name == test_name
 
 
 def test_target_name_target_applied():
     test_name = "test-target"
 
     with patch("dissect.target.target.Target._generic_name", PropertyMock(return_value=test_name)):
-        mock_target = Target()
-        mock_target.hostname = None
-        mock_target._applied = True
+        target_bare = Target()
+        target_bare.hostname = None
+        target_bare._applied = True
 
-        assert mock_target.name == test_name
-        assert mock_target._name == test_name
+        assert target_bare.name == test_name
+        assert target_bare._name == test_name
 
 
 def test_target_set_event_callback():
@@ -417,13 +416,108 @@ def test_target_send_event():
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback1)
     MockTarget.set_event_callback(event_type=Event.FUNC_EXEC, event_callback=mock_callback2)
 
-    mock_target = MockTarget()
-    mock_target.send_event(None, test="None")
-    mock_target.send_event(Event.FUNC_EXEC, test="FUNC_EXEC")
+    target_bare = MockTarget()
+    target_bare.send_event(None, test="None")
+    target_bare.send_event(Event.FUNC_EXEC, test="FUNC_EXEC")
 
     calls = [
-        call(mock_target, None, test="None"),
-        call(mock_target, Event.FUNC_EXEC, test="FUNC_EXEC"),
+        call(target_bare, None, test="None"),
+        call(target_bare, Event.FUNC_EXEC, test="FUNC_EXEC"),
     ]
     mock_callback1.assert_has_calls(calls)
-    mock_callback2.assert_called_once_with(mock_target, Event.FUNC_EXEC, test="FUNC_EXEC")
+    mock_callback2.assert_called_once_with(target_bare, Event.FUNC_EXEC, test="FUNC_EXEC")
+
+
+def test_empty_vs(target_bare: Target) -> None:
+    mock_disk = MagicMock()
+    mock_disk.vs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = []
+
+    target_bare.disks.add(mock_disk)
+
+    with patch("dissect.target.volume.open") as volume_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.disks.apply()
+
+        assert len(target_bare.volumes) == 1
+        assert target_bare.volumes[0].disk is mock_disk
+        assert target_bare.volumes[0].offset == 0
+
+
+def test_nested_vs(target_bare: Target) -> None:
+    mock_base_volume = MagicMock()
+    mock_base_volume.offset = 0
+    mock_base_volume.vs = None
+    mock_base_volume.fs = None
+    target_bare.volumes.add(mock_base_volume)
+
+    mock_volume = MagicMock()
+    mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
+    mock_volume.fs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = [mock_volume]
+
+    with patch("dissect.target.volume.open") as volume_open, patch("dissect.target.filesystem.open") as filesystem_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.volumes.apply()
+        filesystem_open.assert_has_calls([call(mock_base_volume), call(mock_volume)])
+        assert len(target_bare.volumes) == 2
+        assert len(target_bare.filesystems) == 2
+
+
+def test_vs_offset_0(target_bare: Target) -> None:
+    mock_disk = MagicMock()
+    mock_disk.vs = None
+    target_bare.disks.add(mock_disk)
+
+    mock_volume = MagicMock()
+    mock_volume.offset = 0
+    mock_volume.vs.__type__ = "disk"
+    mock_volume.fs = None
+
+    mock_volume_system = MagicMock()
+    mock_volume_system.volumes = [mock_volume]
+
+    with patch("dissect.target.volume.open") as volume_open, patch("dissect.target.filesystem.open") as filesystem_open:
+        volume_open.return_value = mock_volume_system
+
+        target_bare.disks.apply()
+        volume_open.assert_called_once_with(mock_disk)
+        assert len(target_bare.volumes) == 1
+
+        target_bare.volumes.apply()
+        # volume.open must still only be called once
+        volume_open.assert_called_once_with(mock_disk)
+        filesystem_open.assert_called_once_with(mock_volume)
+        assert len(target_bare.volumes) == 1
+        assert len(target_bare.filesystems) == 1
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
+    for _ in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+
+    target_unix._mount_others()
+
+    for idx in range(nr_of_fs):
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
+
+    assert not target_unix.fs.path(f"$fs$/fs{nr_of_fs}").exists()
+
+
+@pytest.mark.parametrize("nr_of_fs", [1, 2])
+def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
+    for idx in range(nr_of_fs):
+        target_unix.filesystems.add(Mock())
+        target_unix._mount_others()
+
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert target_unix.fs.path(f"$fs$/fs{idx}").exists()

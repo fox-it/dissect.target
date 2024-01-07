@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class RawContainer(Container):
+    __type__ = "raw"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         if not hasattr(fh, "read"):
             fh = fh.open("rb")
@@ -32,7 +34,7 @@ class RawContainer(Container):
         super().__init__(fh, size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
         return True
 
     @staticmethod

@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class QCow2Container(Container):
+    __type__ = "qcow2"
+
     def __init__(self, fh: Union[BinaryIO, Path], data_file=None, backing_file=None, *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
@@ -17,11 +19,8 @@ class QCow2Container(Container):
         super().__init__(fh, self.qcow2.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        magic = fh.read(4)
-        fh.seek(-4, io.SEEK_CUR)
-
-        return magic == c_qcow2.QCOW2_MAGIC_BYTES
+    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+        return fh.read(4) == c_qcow2.QCOW2_MAGIC_BYTES
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

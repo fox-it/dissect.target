@@ -9,7 +9,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 PackageManagerLogRecord = TargetRecordDescriptor(
-    "linux/log/packagemanager",
+    "unix/log/packagemanager",
     [
         ("datetime", "ts"),
         ("string", "package_manager"),
@@ -61,7 +61,7 @@ class PackageManagerPlugin(Plugin):
         for entry in self.TOOLS:
             try:
                 self._plugins.append(getattr(self.target, entry))
-            except Exception:  # noqa
+            except Exception:
                 target.log.exception(f"Failed to load tool plugin: {entry}")
 
     def check_compatible(self) -> None:
@@ -77,5 +77,5 @@ class PackageManagerPlugin(Plugin):
 
     @export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:
-        """Returns logs from apt, yum and zypper package managers."""
+        """Returns logs from all available Unix package managers."""
         yield from self._func("logs")

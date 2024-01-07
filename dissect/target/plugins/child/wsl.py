@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Iterator
 
-from dissect.target.exceptions import PluginNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 from dissect.target.target import Target
@@ -26,8 +26,8 @@ def find_wsl_installs(target: Target) -> Iterator[Path]:
                     continue
                 base_path = target.resolve(distribution_key.value("BasePath").value)
                 # WSL needs diskname to be ext4.vhdx, but they can be renamed when WSL is not active
-                yield from target.fs.path(base_path).glob("*.vhdx")
-    except PluginNotFoundError:
+                yield from base_path.glob("*.vhdx")
+    except PluginError:
         pass
 
 

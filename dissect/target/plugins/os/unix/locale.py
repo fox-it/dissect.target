@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 UnixKeyboardRecord = TargetRecordDescriptor(
-    "linux/keyboard",
+    "unix/keyboard",
     [
         ("string", "layout"),
         ("string", "model"),
@@ -64,6 +64,8 @@ class LocalePlugin(Plugin):
     @export(property=True)
     def language(self):
         """Get the configured locale(s) of the system."""
+        # Although this purports to be a generic function for Unix targets,
+        # these paths are Linux specific.
         locale_paths = ["/etc/default/locale", "/etc/locale.conf"]
 
         found_languages = []

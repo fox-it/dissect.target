@@ -2,7 +2,7 @@ import re
 from typing import Optional
 
 from dissect.target.helpers import fsutil
-from dissect.target.plugin import Plugin, internal
+from dissect.target.plugin import OperatingSystem, Plugin, internal
 
 re_quoted = re.compile(r"\"(.+?)\"")
 
@@ -25,7 +25,7 @@ class ResolverPlugin(Plugin):
         pass
 
     @internal
-    def resolve(self, path: str, user: Optional[str] = None):
+    def resolve(self, path: str, user: Optional[str] = None) -> str:
         """Resolve a partial path string to a file or directory present in the target.
 
         For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
@@ -34,12 +34,14 @@ class ResolverPlugin(Plugin):
         if not path:
             return path
 
-        if self.target.os == "windows":
-            return self.resolve_windows(path, user_sid=user)
+        if self.target.os == OperatingSystem.WINDOWS:
+            resolved_path = self.resolve_windows(path, user_sid=user)
         else:
-            return self.resolve_default(path, user_id=user)
+            resolved_path = self.resolve_default(path, user_id=user)
 
-    def resolve_windows(self, path: str, user_sid: Optional[str] = None):
+        return self.target.fs.path(resolved_path)
+
+    def resolve_windows(self, path: str, user_sid: Optional[str] = None) -> str:
         # Normalize first so the replacements are easier
         path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
@@ -98,11 +100,11 @@ class ResolverPlugin(Plugin):
                     return lookup_ext
 
                 for search_path in search_paths:
-                    lookup_path = "/".join([search_path, lookup_ext])
+                    lookup_path = fsutil.join(search_path, lookup_ext, alt_separator=self.target.fs.alt_separator)
                     if self.target.fs.exists(lookup_path):
                         return lookup_path
 
         return path
 
-    def resolve_default(self, path: str, user_id: Optional[str] = None):
+    def resolve_default(self, path: str, user_id: Optional[str] = None) -> str:
         return fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)

@@ -3,7 +3,6 @@ from typing import Iterator
 
 from dissect.sql import sqlite3
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -105,7 +104,7 @@ class SophosPlugin(Plugin):
                     yield SophosLogRecord(
                         ts=ts,
                         description=details.get("threat_name", details),
-                        path=path.from_windows(path_to_infected_file),
+                        path=self.target.fs.path(path_to_infected_file),
                         _target=self.target,
                     )
                 except Exception as error:

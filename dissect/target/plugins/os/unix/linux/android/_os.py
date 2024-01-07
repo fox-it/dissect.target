@@ -4,7 +4,8 @@ from typing import Iterator, Optional, TextIO
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.plugin import OperatingSystem, OSPlugin, export
+from dissect.target.plugin import OperatingSystem, export
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
 
 
@@ -22,11 +23,11 @@ class BuildProp:
             self.props[k] = v
 
 
-class AndroidPlugin(OSPlugin):
+class AndroidPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
-        self.props = BuildProp(self.target.path("/build.prop").open("rt"))
+        self.props = BuildProp(self.target.fs.path("/build.prop").open("rt"))
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
@@ -50,9 +51,16 @@ class AndroidPlugin(OSPlugin):
 
     @export(property=True)
     def version(self) -> str:
-        release_version = self.props.props["ro.build.version.release"]
-        security_patch_version = self.props.props["ro.build.version.security_patch"]
-        return f"Android {release_version} ({security_patch_version})"
+        full_version = "Android"
+
+        release_version = self.props.props.get("ro.build.version.release")
+        if release_version := self.props.props.get("ro.build.version.release"):
+            full_version += f" {release_version}"
+
+        if security_patch_version := self.props.props.get("ro.build.version.security_patch"):
+            full_version += f" ({security_patch_version})"
+
+        return full_version
 
     @export(property=True)
     def os(self) -> str:

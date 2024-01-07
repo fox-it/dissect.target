@@ -6,15 +6,16 @@ import traceback
 import urllib
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar, Union
 
-from dissect.target import filesystem, loader, plugin, volume
+from dissect.target import container, filesystem, loader, plugin, volume
 from dissect.target.exceptions import (
     FilesystemError,
     PluginError,
     PluginNotFoundError,
     TargetError,
     UnsupportedPluginError,
+    VolumeSystemError,
 )
 from dissect.target.helpers import config
 from dissect.target.helpers.loaderutil import extract_path_info
@@ -154,7 +155,9 @@ class Target:
         """Resolve all disks, volumes and filesystems and load an operating system on the current ``Target``."""
         self.disks.apply()
         self.volumes.apply()
+        self.filesystems.apply()
         self._init_os()
+        self._mount_others()
         self._applied = True
 
     @property
@@ -329,8 +332,7 @@ class Target:
                 continue
 
             try:
-                if not child_plugin.is_compatible():
-                    continue
+                child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
                 self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
@@ -424,7 +426,8 @@ class Target:
             if isinstance(os_plugin, plugin.OSPlugin):
                 self._os_plugin = os_plugin.__class__
             elif issubclass(os_plugin, plugin.OSPlugin):
-                os_plugin = os_plugin.create(self, os_plugin.detect(self))
+                if fs := os_plugin.detect(self):
+                    os_plugin = os_plugin.create(self, fs)
 
             self._os = self.add_plugin(os_plugin)
             return
@@ -481,6 +484,20 @@ class Target:
         self._os_plugin = os_plugin
         self._os = self.add_plugin(os_plugin.create(self, fs))
 
+    def _mount_others(self) -> None:
+        root_fs = self.fs
+        counter = 0
+        path = "/$fs$/fs0"
+
+        for fs in self.filesystems:
+            if fs not in root_fs.mounts.values():
+                # determine mount point
+                while root_fs.path(path).exists():
+                    counter += 1
+                    path = f"/$fs$/fs{counter}"
+
+                root_fs.mount(path, fs)
+
     def add_plugin(
         self,
         plugin_cls: Union[plugin.Plugin, type[plugin.Plugin]],
@@ -517,10 +534,9 @@ class Target:
 
         if check_compatible:
             try:
-                if not p.is_compatible():
-                    self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
-                    raise UnsupportedPluginError(f"Plugin reported itself as incompatible: {plugin_cls}")
+                p.check_compatible()
             except PluginError:
+                self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_cls=plugin_cls)
                 raise
             except Exception as e:
                 raise UnsupportedPluginError(
@@ -659,96 +675,151 @@ class Target:
         return f"<Target {self.path}>"
 
 
-class Collection:
-    def __init__(self, target):
-        self.target = target
-        self.entries = []
+T = TypeVar("T")
 
-    def add(self, entry):
+
+class Collection(Generic[T]):
+    def __init__(self, target: Target):
+        self.target = target
+        self.entries: list[T] = []
+
+    def add(self, entry: T) -> None:
         self.entries.append(entry)
 
-    def __getitem__(self, k):
+    def __getitem__(self, k: str) -> T:
         return self.entries[k]
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return iter(self.entries)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.entries)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.entries!r}>"
 
 
-class DiskCollection(Collection):
-    def apply(self):
+class DiskCollection(Collection[container.Container]):
+    def apply(self) -> None:
         for disk in self.entries:
-            try:
-                if not hasattr(disk, "vs") or disk.vs is None:
-                    disk.vs = volume.open(disk)
-                    self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
+            # Some LVM configurations (i.e. RAID with the metadata at the end of the disk)
+            # may be misidentified as having a valid MBR/GPT on some of the disks
+            # To counter this, first check if the disk is part of any LVM configurations that we support
+            if not volume.is_lvm_volume(disk):
+                try:
+                    if not hasattr(disk, "vs") or disk.vs is None:
+                        disk.vs = volume.open(disk)
+                        self.target.log.debug("Opened volume system: %s on %s", disk.vs, disk)
 
-                for vol in disk.vs.volumes:
-                    self.target.volumes.add(vol)
-            except Exception as e:
-                self.target.log.warning("Can't identify volume system, adding as raw volume instead: %s", disk)
-                self.target.log.debug("", exc_info=e)
-                vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
-                self.target.volumes.add(vol)
+                    if not len(disk.vs.volumes):
+                        raise VolumeSystemError("Volume system has no volumes")
+
+                    for vol in disk.vs.volumes:
+                        self.target.volumes.add(vol)
+                    continue
+                except Exception as e:
+                    self.target.log.warning(
+                        "Can't identify volume system or no volumes found, adding as raw volume instead: %s", disk
+                    )
+                    self.target.log.debug("", exc_info=e)
+
+            # Fallthrough case for error and if we're part of a logical volume set
+            vol = volume.Volume(disk, 1, 0, disk.size, None, None, disk=disk)
+            self.target.volumes.add(vol)
 
 
-class VolumeCollection(Collection):
-    def open(self, vol):
-        try:
-            if not hasattr(vol, "fs") or vol.fs is None:
-                vol.fs = filesystem.open(vol)
-                self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
-            self.target.filesystems.add(vol.fs)
-        except FilesystemError as e:
-            self.target.log.warning("Can't identify filesystem: %s", vol)
-            self.target.log.debug("", exc_info=e)
-
-    def apply(self):
+class VolumeCollection(Collection[volume.Volume]):
+    def apply(self) -> None:
+        # We don't want later additions to modify the todo, so make a copy
+        todo = self.entries[:]
+        fs_volumes = []
         lvm_volumes = []
         encrypted_volumes = []
-        for vol in self.entries:
-            if volume.is_lvm_volume(vol):
-                lvm_volumes.append(vol)
 
-            if volume.is_encrypted(vol):
-                encrypted_volumes.append(vol)
+        while todo:
+            new_volumes = []
+            lvm_volumes = []
+            encrypted_volumes = []
 
-            self.open(vol)
+            for vol in todo:
+                if volume.is_lvm_volume(vol):
+                    lvm_volumes.append(vol)
+                elif volume.is_encrypted(vol):
+                    encrypted_volumes.append(vol)
+                else:
+                    # We could be getting "regular" volume systems out of LVM or encrypted volumes
+                    # Try to open each volume as a regular volume system, or add as a filesystem if it fails
+                    # There are a few scenarios were we want to discard the opened volume, though
+                    #
+                    # If the current volume offset is 0 and originates from a "regular" volume system, we're likely
+                    # opening a volume system on the same disk again
+                    # Sometimes BSD systems are configured this way and an FFS volume "starts" at offset 0
+                    #
+                    # If we opened an empty volume system, it might also be the case that a filesystem actually
+                    # "starts" at offset 0
 
-        self.target.log.debug("LVM volumes found: %s", lvm_volumes)
-        self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
+                    # Regardless of what happens, we want to try to open it as a filesystem later on
+                    fs_volumes.append(vol)
 
-        for lvm in volume.open_lvm(lvm_volumes):
-            self.target.log.debug("Opened LVM: %s", lvm)
-            for lv in lvm.volumes:
-                self.add(lv)
-                self.open(lv)
+                    if vol.offset == 0 and vol.vs and vol.vs.__type__ == "disk":
+                        # We are going to re-open a volume system on itself, bail out
+                        self.target.log.info("Found volume with offset 0, opening as raw volume instead")
+                        continue
 
-        for enc_volume in encrypted_volumes:
-            for dec_volume in volume.open_encrypted(enc_volume):
-                self.add(dec_volume)
-                self.open(dec_volume)
-                self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+                    try:
+                        vs = volume.open(vol)
+                    except Exception:
+                        # If opening a volume system fails, there's likely none, so open as a filesystem instead
+                        continue
 
-        # ASDF - getting the correct starting system volume
-        start_fs = None
-        start_vol = None
-        for idx, vol in enumerate(self.entries):
-            if start_fs is None and (vol.name is None):
-                start_fs = idx
+                    if not len(vs.volumes):
+                        # We opened an empty volume system, discard
+                        continue
 
-            if start_vol is None and start_fs is not None and (vol.name is not None and vol.fs is None):
-                start_vol = idx
+                    self.entries.extend(vs.volumes)
+                    new_volumes.extend(vs.volumes)
 
-            if start_fs is not None and start_vol is not None and (vol.name is not None and vol.fs is None):
-                rel_vol = idx - start_vol
-                vol.fs = self.entries[start_fs + rel_vol].fs
+            self.target.log.debug("LVM volumes found: %s", lvm_volumes)
+            self.target.log.debug("Encrypted volumes found: %s", encrypted_volumes)
+
+            for lvm in volume.open_lvm(lvm_volumes):
+                self.target.log.debug("Opened LVM: %s", lvm)
+                for lv in lvm.volumes:
+                    self.add(lv)
+                    new_volumes.append(lv)
+
+            for enc_volume in encrypted_volumes:
+                for dec_volume in volume.open_encrypted(enc_volume):
+                    self.target.log.debug("Encrypted volume opened: %s", enc_volume)
+                    self.add(dec_volume)
+                    new_volumes.append(dec_volume)
+
+            todo = new_volumes
+
+        mv_fs_volumes = []
+        for vol in fs_volumes:
+            try:
+                if getattr(vol, "fs", None) is None:
+                    if filesystem.is_multi_volume_filesystem(vol):
+                        mv_fs_volumes.append(vol)
+                    else:
+                        vol.fs = filesystem.open(vol)
+                        self.target.log.debug("Opened filesystem: %s on %s", vol.fs, vol)
+
+                if getattr(vol, "fs", None) is not None:
+                    self.target.filesystems.add(vol.fs)
+            except FilesystemError as e:
+                self.target.log.warning("Can't identify filesystem: %s", vol)
+                self.target.log.debug("", exc_info=e)
+
+        for fs in filesystem.open_multi_volume(mv_fs_volumes):
+            self.target.filesystems.add(fs)
+            for vol in fs.volume:
+                vol.fs = fs
 
 
-class FilesystemCollection(Collection):
-    pass
+class FilesystemCollection(Collection[filesystem.Filesystem]):
+    def apply(self) -> None:
+        for fs in self.entries:
+            for subfs in fs.iter_subfs():
+                self.add(subfs)
