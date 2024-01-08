@@ -48,7 +48,7 @@ class DissectMount(Operations):
                     "st_atime",
                     "st_ctime",
                     # Using st_ino from the entry
-                    # However, when stating the entry through fuse(2|3)
+                    # However, when stat'ing the entry through fuse(2|3)
                     # The fuse(2|3) inode number is returned instead.
                     # Why this occurs still needs to be figured out.
                     "st_ino",
