@@ -32,7 +32,6 @@ class WindowsPlugin(OSPlugin):
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
-        target.fs.mount("c:", sysvol)
 
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
@@ -58,8 +57,6 @@ class WindowsPlugin(OSPlugin):
                     p = name.lower()[1:].split("\\")
                     if p[0] == "dosdevices":
                         drive = p[1]
-                        if drive == "c:":
-                            continue
 
                         if value.startswith(b"DMIO:ID:"):
                             guid = value[8:]

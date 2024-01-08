@@ -64,6 +64,8 @@ class TarLoader(Loader):
                     parts = member.name.lstrip("/").split("/")
                 volume_name = parts[0]
 
+                # NOTE: a future version of acquire will normalize the system volume to sysvol instead of a drive letter
+                # However, for backwards compatibility we're forced to keep this check for now
                 if volume_name.lower() == "c:":
                     volume_name = "sysvol"
 
@@ -100,5 +102,8 @@ class TarLoader(Loader):
             )
 
             target.fs.mount(vol_name, vol)
+
+            # NOTE: a future version of acquire will normalize the system volume to sysvol instead of a drive letter
+            # However, for backwards compatibility we're forced to keep this check for now
             if vol_name == "sysvol":
                 target.fs.mount("c:", vol)
