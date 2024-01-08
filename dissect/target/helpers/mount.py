@@ -9,7 +9,7 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 HAS_FUSE3 = False
 if feature_enabled(Feature.BETA):
-    from fusepy3 import FuseOSError, Operations
+    from fuse3 import FuseOSError, Operations
 
     HAS_FUSE3 = True
 else:

@@ -14,7 +14,7 @@ from dissect.target.tools.utils import (
 
 try:
     if feature_enabled(Feature.BETA):
-        from fusepy3.fuse import FUSE3 as FUSE
+        from fuse3 import FUSE3 as FUSE
     else:
         from fuse import FUSE
 
