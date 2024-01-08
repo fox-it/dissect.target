@@ -47,7 +47,10 @@ class DissectMount(Operations):
                 for key in (
                     "st_atime",
                     "st_ctime",
-                    # Trying to use the ino of the entry..., however the one made by fuse3 remains the result.
+                    # Using st_ino from the entry
+                    # However, when stating the entry through fuse(2|3)
+                    # The fuse(2|3) inode number is returned instead.
+                    # Why this occurs still needs to be figured out.
                     "st_ino",
                     "st_gid",
                     "st_mode",
