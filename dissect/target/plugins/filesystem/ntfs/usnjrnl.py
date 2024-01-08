@@ -34,6 +34,12 @@ class UsnjrnlPlugin(Plugin):
         The Update Sequence Number Journal (UsnJrnl) is a feature of an NTFS file system and contains information about
         filesystem activities. Each volume has its own UsnJrnl.
 
+        If the filesystem is part of a virtual NTFS filesystem (a ``VirtualFilesystem`` with the UsnJrnl
+        properties added to it through a "fake" ``NtfsFilesystem``), the paths returned in the UsnJrnl records
+        are based on the mount point of the ``VirtualFilesystem``. This ensures that the proper original drive
+        letter is used when available.
+        When no drive letter can be determined, the path will show as e.g. ``\\$fs$\\fs0``.
+
         References:
             - https://en.wikipedia.org/wiki/USN_Journal
             - https://velociraptor.velocidex.com/the-windows-usn-journal-f0c55c9010e
@@ -47,6 +53,10 @@ class UsnjrnlPlugin(Plugin):
             if not usnjrnl:
                 continue
 
+            # If this filesystem is a "fake" NTFS filesystem, used to enhance a
+            # VirtualFilesystem, The driveletter (more accurate mount point)
+            # returned will be that of the VirtualFilesystem. This makes sure
+            # the paths returned in the records are actually reachable.
             drive_letter = get_drive_letter(self.target, fs)
             for record in usnjrnl.records():
                 try:
