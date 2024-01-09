@@ -19,7 +19,7 @@ class EwfContainer(Container):
         if hasattr(fhs[0], "read"):
             self.ewf = EWF(fhs)
         else:
-            self.ewf = EWF([path.open("rb") for path in find_files(fhs[0])])
+            self.ewf = EWF([path for path in find_files(fhs[0])])
 
         self._stream = self.ewf.open()
         super().__init__(fh, self.ewf.size, *args, **kwargs)
