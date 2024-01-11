@@ -119,7 +119,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
 
         try:
             # Write initial mask
-            for i, (char, has_ansi, end_ansi) in enumerate(characters):
+            for char, has_ansi, end_ansi in characters:
                 # Initialize the character state with a mask and reveal time
                 if end_ansi:
                     reveal_time = random.randint(0, 100)
@@ -198,16 +198,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
             _cursor_show()
 
             if remaining:
-                time.sleep(0.5)
-
-                if color and "\033" not in remaining:
-                    _bold()
-                    _foreground_color(color)
-
-                sys.__stdout__.write(remaining)
-
-                if color and "\033" not in remaining:
-                    _clear_attr()
+                _write_remaining(remaining, color)
         except KeyboardInterrupt:
             _clear_screen()
         finally:
@@ -280,9 +271,9 @@ def matrix(buf: str, color: Optional[Color] = None, mask_space: bool = False) ->
                                     remaining_columns.discard(col)
                         break
                 elif remaining_columns:
-                    for col in remaining_columns:
+                    while remaining_columns:
+                        col = remaining_columns.pop()
                         cascading.add(_cascade(col, max_rows, reveal_cols[col - 1]))
-                        remaining_columns.discard(col)
 
                 stopped = set()
                 for c in cascading:
@@ -302,16 +293,7 @@ def matrix(buf: str, color: Optional[Color] = None, mask_space: bool = False) ->
 
             _cursor_move(end_row - orig_row + 1, 0)
             if remaining:
-                time.sleep(0.5)
-
-                if color and "\033" not in remaining:
-                    _bold()
-                    _foreground_color(color)
-
-                sys.__stdout__.write(remaining)
-
-                if color and "\033" not in remaining:
-                    _clear_attr()
+                _write_remaining(remaining, color)
         except KeyboardInterrupt:
             _clear_screen()
         finally:
@@ -428,6 +410,19 @@ def _get_character_info(
     remaining = buf[i:]
 
     return characters, remaining, (orig_row, orig_col), (cur_row, cur_col)
+
+
+def _write_remaining(remaining: str, color: Optional[Color]) -> None:
+    time.sleep(0.5)
+
+    if color and "\033" not in remaining:
+        _bold()
+        _foreground_color(color)
+
+    sys.__stdout__.write(remaining)
+
+    if color and "\033" not in remaining:
+        _clear_attr()
 
 
 @contextmanager
