@@ -78,7 +78,7 @@ full = [
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "yara-python"
+    "yara-python-wheel"
 ]
 smb = [
     # Grab the dependencies for dissect.target
