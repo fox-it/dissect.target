@@ -36,6 +36,11 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
+    def init(self, path: str, conn=None, cfg=None):
+        if cfg:
+            # Enables the use of inodes in getattr
+            cfg.contents.use_ino = 1
+
     def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
@@ -47,10 +52,6 @@ class DissectMount(Operations):
                 for key in (
                     "st_atime",
                     "st_ctime",
-                    # Using st_ino from the entry
-                    # However, when stat'ing the entry through fuse(2|3)
-                    # The fuse(2|3) inode number is returned instead.
-                    # Why this occurs still needs to be figured out.
                     "st_ino",
                     "st_gid",
                     "st_mode",
