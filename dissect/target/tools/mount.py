@@ -12,21 +12,25 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
 )
 
+log = logging.getLogger(__name__)
+logging.lastResort = None
+logging.raiseExceptions = False
+
 try:
     if feature_enabled(Feature.BETA):
         from fuse3 import FUSE3 as FUSE
+
+        log.debug("Using fuse3 library")
     else:
         from fuse import FUSE
+
+        log.debug("Using fuse2 library")
 
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
 except Exception:
     HAS_FUSE = False
-
-log = logging.getLogger(__name__)
-logging.lastResort = None
-logging.raiseExceptions = False
 
 
 @catch_sigpipe
