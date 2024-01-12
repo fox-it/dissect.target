@@ -1,5 +1,6 @@
 import errno
 import logging
+from ctypes import c_void_p
 from functools import lru_cache
 from typing import BinaryIO, Iterator, Optional
 
@@ -10,10 +11,14 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry
 HAS_FUSE3 = False
 if feature_enabled(Feature.BETA):
     from fuse3 import FuseOSError, Operations
+    from fuse3.c_fuse import fuse_config_p, fuse_conn_info_p
 
     HAS_FUSE3 = True
 else:
     from fuse import FuseOSError, Operations
+
+    fuse_config_p = c_void_p
+    fuse_conn_info_p = c_void_p
 
 
 log = logging.getLogger(__name__)
@@ -36,7 +41,7 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    def init(self, path: str, conn=None, cfg=None):
+    def init(self, path: str, conn: Optional[fuse_conn_info_p] = None, cfg: Optional[fuse_config_p] = None):
         if cfg:
             # Enables the use of inodes in getattr
             cfg.contents.use_ino = 1
