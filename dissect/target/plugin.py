@@ -952,7 +952,7 @@ class NamespacePlugin(Plugin):
         cls.__nsplugin__.SUBPLUGINS.add(cls.__namespace__)
 
         # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
-        # namespaceplugin and all of its superclasses.
+        # namespaceplugin and all of its superclasses (minus the base object).
         reserved_cls_names = tuple({_class.__name__ for _class in cls.__nsplugin__.mro() if _class is not object})
 
         # Collect the public attrs of the subplugin
@@ -989,8 +989,8 @@ class NamespacePlugin(Plugin):
                         except UnsupportedPluginError:
                             continue
                         except Exception as e:
-                            self.target.log.error("Subplugin %s raised an exception for %s", entry, method_name)
-                            self.target.log.debug("Exception: %s", e, exc_info=True)
+                            self.target.log.error("Subplugin: %s raised an exception for: %s", entry, method_name)
+                            self.target.log.debug("Exception: %s", e, exc_info=e)
 
                 # Holds the subplugins that share this method
                 aggregator.__subplugins__ = []
