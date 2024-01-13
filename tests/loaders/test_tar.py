@@ -61,3 +61,18 @@ def test_tar_loader_windows_sysvol_formats(target_default, archive):
     loader = TarLoader(absolute_path(archive))
     loader.map(target_default)
     assert WindowsPlugin(target_default).detect(target_default)
+
+
+def test_tar_anonymous_filesystems(target_default: Target):
+    tar_file = absolute_path("_data/loaders/tar/test-anon-filesystems.tar")
+
+    loader = TarLoader(tar_file)
+    loader.map(target_default)
+
+    # mounts = $fs$/fs0, $fs$/fs1 and /
+    assert len(target_default.fs.mounts) == 3
+    assert "$fs$/fs0" in target_default.fs.mounts.keys()
+    assert "$fs$/fs1" in target_default.fs.mounts.keys()
+    assert "/" in target_default.fs.mounts.keys()
+    assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
+    assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"

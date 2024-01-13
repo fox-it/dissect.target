@@ -73,7 +73,7 @@ class TrustedDocumentsPlugin(Plugin):
                     ts=key.ts,
                     type=value.type,
                     application=application,
-                    document_path=self.target.fs.path(self.target.resolve(value.name)),
+                    document_path=self.target.resolve(value.name),
                     value=value.value,
                     _key=key,
                     _user=user,
