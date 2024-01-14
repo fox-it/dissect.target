@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator
 
 from dissect.hypervisor import hyperv
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
@@ -47,7 +46,7 @@ class HyperVChildTargetPlugin(ChildTargetPlugin):
                 for vm_path in virtual_machines.values():
                     yield ChildTargetRecord(
                         type=self.__type__,
-                        path=path.from_windows(vm_path),
+                        path=self.target.fs.path(vm_path),
                         _target=self.target,
                     )
 

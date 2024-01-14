@@ -1,5 +1,3 @@
-from flow.record.fieldtypes import path
-
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -66,7 +64,7 @@ class SevenZipPlugin(Plugin):
 
                 yield record(
                     ts=subkey.ts,
-                    path=path.from_windows(file_path),
+                    path=self.target.fs.path(file_path),
                     _target=self.target,
                 )
         except RegistryError:
@@ -90,7 +88,7 @@ class SevenZipPlugin(Plugin):
                 value = subkey.value("PanelPath0").value
                 yield PanelPathRecord(
                     ts=subkey.ts,
-                    path=path.from_windows(value),
+                    path=self.target.fs.path(value),
                     _target=self.target,
                 )
             except RegistryError:

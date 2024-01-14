@@ -34,7 +34,7 @@ dependencies = [
     "dissect.regf>=3.3.dev,<4.0.dev",
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.volume>=3.0.dev,<4.0.dev",
-    "flow.record~=3.13.0",
+    "flow.record~=3.14.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -55,6 +55,7 @@ full = [
     "dissect.extfs>=3.0.dev,<4.0.dev",
     "dissect.fat>=3.0.dev,<4.0.dev",
     "dissect.ffs>=3.0.dev,<4.0.dev",
+    "dissect.jffs>=1.0.dev,<2.0.dev",
     "dissect.shellitem>=3.0.dev,<4.0.dev",
     "dissect.squashfs>=1.0.dev,<2.0.dev",
     "dissect.sql>=3.0.dev,<4.0.dev",
@@ -77,7 +78,7 @@ full = [
 yara = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "yara-python"
+    "yara-python-wheel"
 ]
 smb = [
     # Grab the dependencies for dissect.target

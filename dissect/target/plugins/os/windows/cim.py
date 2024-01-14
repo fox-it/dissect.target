@@ -64,10 +64,11 @@ class CimPlugin(Plugin):
         try:
             for binding in subscription_ns.class_("__filtertoconsumerbinding").instances:
                 consumer = subscription_ns.query(binding.properties["Consumer"].value)
-                yield ConsumerBindingRecord(
-                    query=consumer.properties["CommandLineTemplate"].value,
-                    _target=self.target,
-                )
+                if query := consumer.properties.get("CommandLineTemplate"):
+                    yield ConsumerBindingRecord(
+                        query=query.value,
+                        _target=self.target,
+                    )
         except Exception as e:  # noqa
             self.target.log.warning("Error during consumerbindings execution", exc_info=e)
             pass

@@ -16,11 +16,12 @@ from dissect.target.exceptions import (
     PluginNotFoundError,
     UnsupportedPluginError,
 )
-from dissect.target.helpers import cache, hashutil
+from dissect.target.helpers import cache, record_modifier
 from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -80,6 +81,15 @@ def main():
         default=None,
         help="list (matching) available plugins and loaders",
     )
+
+    parser.add_argument(
+        "-L",
+        "--loader",
+        action="store",
+        default=None,
+        help="select a specific loader (i.e. vmx, raw)",
+    )
+
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -100,7 +110,8 @@ def main():
         ),
     )
     parser.add_argument("--cmdb", action="store_true")
-    parser.add_argument("--hash", action="store_true", help="hash all uri paths in records")
+    parser.add_argument("--hash", action="store_true", help="hash all paths in records")
+    parser.add_argument("--resolve", action="store_true", help="resolve all paths in records")
     parser.add_argument(
         "--report-dir",
         type=pathlib.Path,
@@ -109,6 +120,9 @@ def main():
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
+
+    # If loader is specified then map to uri
+    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
@@ -134,7 +148,7 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions, _ = find_plugin_functions(Target(), args.function, False)
+        found_functions, _ = find_plugin_functions(None, args.function, compatibility=False)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
         func = found_functions[0]
@@ -156,16 +170,16 @@ def main():
     if args.list:
         collected_plugins = {}
 
-        if args.targets:
-            for target in args.targets:
+        if targets:
+            for target in targets:
                 plugin_target = Target.open(target)
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
-                funcs, _ = find_plugin_functions(plugin_target, args.list, True, show_hidden=True)
+                funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
                 for func in funcs:
                     collected_plugins[func.path] = func.plugin_desc
         else:
-            funcs, _ = find_plugin_functions(Target(), args.list, False, show_hidden=True)
+            funcs, _ = find_plugin_functions(Target(), args.list, compatibility=False, show_hidden=True)
             for func in funcs:
                 collected_plugins[func.path] = func.plugin_desc
 
@@ -178,13 +192,13 @@ def main():
             target.plugins(list(collected_plugins.values()))
 
         # No real targets specified, show the available loaders
-        if not args.targets:
+        if not targets:
             fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
             fargs, rest = fparser.parse_known_args(rest)
             target.loaders(**vars(fargs))
         parser.exit()
 
-    if not args.targets:
+    if not targets:
         parser.error("too few arguments")
 
     if not args.function:
@@ -203,13 +217,13 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    funcs, invalid_funcs = find_plugin_functions(Target(), args.function, compatibility=False)
+    funcs, invalid_funcs = find_plugin_functions(None, args.function, compatibility=False)
 
     if any(invalid_funcs):
         parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
 
     excluded_funcs, invalid_excluded_funcs = find_plugin_functions(
-        Target(),
+        None,
         args.excluded_functions,
         compatibility=False,
     )
@@ -219,10 +233,10 @@ def main():
             f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
         )
 
-    excluded_func_names = {excluded_func.name for excluded_func in excluded_funcs}
+    excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
     for func in funcs:
-        if func.name in excluded_func_names:
+        if func.path in excluded_func_paths:
             continue
         output_types.add(func.output_type)
 
@@ -240,7 +254,7 @@ def main():
     execution_report.set_cli_args(args)
     execution_report.set_event_callbacks(Target)
 
-    for target in Target.open_all(args.targets, args.children):
+    for target in Target.open_all(targets, args.children):
         if args.child:
             try:
                 target = target.open_child(args.child)
@@ -262,10 +276,10 @@ def main():
 
         func_defs, _ = find_plugin_functions(target, args.function, compatibility=False)
         excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
-        excluded_func_names = {excluded_func.name for excluded_func in excluded_funcs}
+        excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
         for func_def in func_defs:
-            if func_def.name in excluded_func_names:
+            if func_def.path in excluded_func_paths:
                 continue
 
             # Avoid executing same plugin for multiple OSes (like hostname)
@@ -349,29 +363,39 @@ def main():
         # Write records
         count = 0
         break_out = False
-        if len(record_entries):
-            rs = record_output(args.strings, args.json)
-            for entry in record_entries:
-                try:
-                    for record_entries in entry:
-                        if args.hash:
-                            rs.write(hashutil.hash_path_records(target, record_entries))
-                        else:
-                            rs.write(record_entries)
-                        count += 1
-                        if args.limit is not None and count >= args.limit:
-                            break_out = True
-                            break
-                except Exception as e:
-                    # Ignore errors if multiple functions
-                    if len(funcs) > 1:
-                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
-                        pass
-                    else:
-                        raise e
 
-                if break_out:
-                    break
+        modifier_type = None
+
+        if args.resolve:
+            modifier_type = record_modifier.Modifier.RESOLVE
+
+        if args.hash:
+            modifier_type = record_modifier.Modifier.HASH
+
+        modifier_func = record_modifier.get_modifier_function(modifier_type)
+
+        if not len(record_entries):
+            continue
+
+        rs = record_output(args.strings, args.json)
+        for entry in record_entries:
+            try:
+                for record_entries in entry:
+                    rs.write(modifier_func(target, record_entries))
+                    count += 1
+                    if args.limit is not None and count >= args.limit:
+                        break_out = True
+                        break
+            except Exception as e:
+                # Ignore errors if multiple functions
+                if len(funcs) > 1:
+                    target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    pass
+                else:
+                    raise e
+
+            if break_out:
+                break
 
     timestamp = datetime.utcnow()
 

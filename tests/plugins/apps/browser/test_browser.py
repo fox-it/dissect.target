@@ -17,7 +17,6 @@ def test_iexplore_plugin(target_win, fs_win, tmp_path, target_win_users):
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         with gzip.GzipFile(cache_archive, "rb") as f:
             tf.write(f.read())
-        tf.flush()
         tf.close()
 
         user = target_win_users.user_details.find(username="John")

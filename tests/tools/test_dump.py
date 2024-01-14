@@ -57,7 +57,7 @@ def test_execute_pipeline(
     with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
         "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
     ):
-        output_dir = tmp_path
+        output_dir = tmp_path / "output"
 
         serialization = utils.Serialization(serialization_name)
         compression = utils.Compression(compression_name)
@@ -148,7 +148,7 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
     with patch("dissect.target.tools.dump.run.get_targets", new=mock_get_targets), patch(
         "dissect.target.tools.dump.run.log_progress", new=mock_log_progress
     ):
-        output_dir = tmp_path
+        output_dir = tmp_path / "output"
 
         functions = ["iis.logs", "amcache.applications"]
 

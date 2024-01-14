@@ -462,11 +462,11 @@ def test_virtual_filesystem_mount(vfs):
     assert vfs.mount == vfs.map_fs
 
 
-def test_virtual_filesystem_map_dir():
+def test_virtual_filesystem_map_dir(tmp_path):
     vfs = VirtualFilesystem()
     vfs_path = "/map/point/"
     with (
-        TemporaryDirectory() as tmp_dir,
+        TemporaryDirectory(dir=tmp_path) as tmp_dir,
         TemporaryDirectory(dir=tmp_dir) as some_dir,
         TemporaryDirectory(dir=tmp_dir) as other_dir,
         TemporaryDirectory(dir=other_dir) as second_lvl_dir,
@@ -659,12 +659,12 @@ def test_virtual_filesystem_link(vfs_path, link_path):
         ),
     ],
 )
-def test_virtual_filesystem_symlink(vfs_path, link_path):
+def test_virtual_filesystem_symlink(vfs_path: str, link_path: str) -> None:
     vfs = VirtualFilesystem()
 
     vfs.symlink(vfs_path, link_path)
 
-    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).strip("/")
+    vfs_path = fsutil.normalize(vfs_path, alt_separator=vfs.alt_separator).rstrip("/")
     link_path = fsutil.normalize(link_path, alt_separator=vfs.alt_separator).strip("/")
     link_entry = vfs.get(link_path)
 
@@ -913,8 +913,8 @@ def rootfs(
     vfs2.map_file_entry("/shared_entry", vfs2_shared_entry)
 
     vfs1.map_file_entry("/path/to/some/file", VirtualFile(vfs1, "path/to/some/file", Mock()))
-    vfs1.symlink("/path/to/some/", "dirlink")
-    vfs1.symlink("/path/to/some/file", "filelink")
+    vfs1.symlink("path/to/some/", "dirlink")
+    vfs1.symlink("path/to/some/file", "filelink")
 
     target = Mock()
     rootfs = RootFilesystem(target)
