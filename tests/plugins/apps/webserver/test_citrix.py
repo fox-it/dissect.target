@@ -11,7 +11,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_infer_access_log_citrix_netscaler_combined_response_time():
+def test_infer_access_log_citrix_netscaler_combined_response_time() -> None:
     log_combined = (
         '127.0.0.1 - - [11/Aug/2023:08:30:00 +0000] [82775] "GET / HTTP/1.1" 200 18705 "-" "curl/7.78.0" "Time: 39770 '
         'microsecs"'
@@ -20,7 +20,7 @@ def test_infer_access_log_citrix_netscaler_combined_response_time():
     assert logformat == LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME
 
 
-def test_infer_access_log_citrix_netscaler_combined_response_time_with_headers():
+def test_infer_access_log_citrix_netscaler_combined_response_time_with_headers() -> None:
     log_combined_with_headers = (
         '1.2.3.4 -> 5.6.7.8 - - [19/Dec/2022:17:25:48 +0100] [69420] "GET / HTTP/1.1" 200 1436 "-" "Mozilla/5.0 '
         '(Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36" '
@@ -30,9 +30,9 @@ def test_infer_access_log_citrix_netscaler_combined_response_time_with_headers()
     assert logformat == LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME_WITH_HEADERS
 
 
-def test_access_logs(target_citrix: Target):
+def test_access_logs(target_citrix: Target) -> None:
     tz = timezone(timedelta(hours=1))
-    data_file = absolute_path("_data/plugins/os/unix/bsd/citrix/webserver/httpaccess.log")
+    data_file = absolute_path("_data/plugins/apps/webserver/citrix/httpaccess.log")
     target_citrix.fs.mounts["/"].map_file("var/log/httpaccess.log", data_file)
 
     target_citrix.add_plugin(CitrixWebserverPlugin)
@@ -69,7 +69,7 @@ def test_access_logs(target_citrix: Target):
     assert citrix_netscaler_headers_combined_response_log.pid == 82775
 
 
-def test_error_logs(target_citrix: Target):
+def test_error_logs(target_citrix: Target) -> None:
     target_citrix.fs.mounts["/"].map_file("var/log/httperror-vpn.log", BytesIO(b"Foo"))
     target_citrix.fs.mounts["/"].map_file("var/log/httperror.log", BytesIO(b"Bar"))
 
@@ -79,8 +79,8 @@ def test_error_logs(target_citrix: Target):
     assert len(error_log_paths) == 2
 
 
-def test_access_logs_webserver_namespace(target_citrix: Target):
-    data_file = absolute_path("_data/plugins/os/unix/bsd/citrix/webserver/httpaccess.log")
+def test_access_logs_webserver_namespace(target_citrix: Target) -> None:
+    data_file = absolute_path("_data/plugins/apps/webserver/citrix/httpaccess.log")
     target_citrix.fs.mounts["/"].map_file("var/log/httpaccess.log", data_file)
 
     target_citrix.add_plugin(CitrixWebserverPlugin)

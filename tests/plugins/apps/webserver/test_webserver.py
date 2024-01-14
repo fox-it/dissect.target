@@ -4,7 +4,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_access_logs_webserver_namespace_unix(target_unix: Target, fs_unix: VirtualFilesystem):
+def test_access_logs_webserver_namespace_unix(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     apache_access_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
     apache_error_file = absolute_path("_data/plugins/apps/webserver/apache/error.log")
     nginx_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log")
@@ -37,7 +37,7 @@ def test_access_logs_webserver_namespace_unix(target_unix: Target, fs_unix: Virt
     assert len(list(target_unix.webserver.logs())) == 13
 
 
-def test_access_logs_webserver_namespace_windows(target_win: Target, fs_win: VirtualFilesystem):
+def test_access_logs_webserver_namespace_windows(target_win: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 

@@ -145,7 +145,7 @@ LOG_FORMAT_ERROR_COMMON = LogFormat("error", re.compile(RE_ERROR_COMMON_PATTERN,
 
 
 def apache_response_time_to_ms(time_str: str) -> int:
-    """Convert a string containing amount and measurement (e.g. '10000 microsecs') to milliseconds"""
+    """Convert a string containing amount and measurement (e.g. '10000 microsecs') to milliseconds."""
     amount, _, measurement = time_str.partition(" ")
     amount = int(amount)
     if measurement == "microsecs":
