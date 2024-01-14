@@ -5,59 +5,15 @@ from typing import Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.ssh import SSHPrivateKey
-from dissect.target.plugin import Plugin, export
-
-OpenSSHUserRecordDescriptor = create_extended_descriptor([UserRecordDescriptorExtension])
-
-COMMON_ELLEMENTS = [
-    ("string", "key_type"),
-    ("string", "comment"),
-    ("path", "path"),
-]
-
-AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/authorized_keys",
-    [
-        *COMMON_ELLEMENTS,
-        ("string", "public_key"),
-        ("string", "options"),
-    ],
-)
-
-
-KnownHostRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/known_host",
-    [
-        *COMMON_ELLEMENTS,
-        ("string", "hostname_pattern"),
-        ("string", "public_key"),
-        ("string", "marker"),
-    ],
-)
-
-
-PrivateKeyRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/private_key",
-    [
-        *COMMON_ELLEMENTS,
-        ("datetime", "mtime_ts"),
-        ("string", "key_format"),
-        ("string", "public_key"),
-        ("boolean", "encrypted"),
-    ],
-)
-
-PublicKeyRecord = OpenSSHUserRecordDescriptor(
-    "application/openssh/public_key",
-    [
-        *COMMON_ELLEMENTS,
-        ("datetime", "mtime_ts"),
-        ("string", "public_key"),
-    ],
+from dissect.target.plugin import export
+from dissect.target.plugins.apps.ssh.ssh import (
+    AuthorizedKeysRecord,
+    KnownHostRecord,
+    PrivateKeyRecord,
+    PublicKeyRecord,
+    SSHPlugin,
 )
 
 
@@ -72,8 +28,8 @@ def find_sshd_directory(target: Target) -> TargetPath:
     return target.fs.path("/etc/ssh/")
 
 
-class OpenSSHPlugin(Plugin):
-    __namespace__ = "ssh"
+class OpenSSHPlugin(SSHPlugin):
+    __namespace__ = "openssh"
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
 
@@ -136,7 +92,8 @@ class OpenSSHPlugin(Plugin):
 
                 for hostname in hostnames:
                     yield KnownHostRecord(
-                        hostname_pattern=hostname,
+                        host=hostname,
+                        port=None,
                         key_type=keytype,
                         public_key=public_key,
                         comment=comment,

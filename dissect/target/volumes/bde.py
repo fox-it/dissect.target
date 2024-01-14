@@ -52,23 +52,26 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
             **volume_details,
         )
 
-    def unlock_with_passphrase(self, passphrase: str) -> None:
+    def unlock_with_passphrase(self, passphrase: str, is_wildcard: bool = False) -> None:
         try:
             self.bde.unlock_with_passphrase(passphrase)
             log.debug("Unlocked BDE volume with provided passphrase")
         except ValueError:
-            log.exception("Failed to unlock BDE volume with provided passphrase")
+            if not is_wildcard:
+                log.exception("Failed to unlock BDE volume with provided passphrase")
 
-    def unlock_with_recovery_key(self, recovery_key: str) -> None:
+    def unlock_with_recovery_key(self, recovery_key: str, is_wildcard: bool = False) -> None:
         try:
             self.bde.unlock_with_recovery_password(recovery_key)
             log.debug("Unlocked BDE volume with recovery key")
         except ValueError:
-            log.exception("Failed to unlock BDE volume with recovery password")
+            if not is_wildcard:
+                log.exception("Failed to unlock BDE volume with recovery password")
 
-    def unlock_with_bek_file(self, bek_file: pathlib.Path) -> None:
+    def unlock_with_bek_file(self, bek_file: pathlib.Path, is_wildcard: bool = False) -> None:
         if not bek_file.exists():
-            log.error("Provided BEK file does not exist: %s", bek_file)
+            if not is_wildcard:
+                log.error("Provided BEK file does not exist: %s", bek_file)
             return
 
         with bek_file.open(mode="rb") as fh:
@@ -76,7 +79,8 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
                 self.bde.unlock_with_bek(fh)
                 log.debug("Unlocked BDE volume with BEK file %s", bek_file)
             except ValueError:
-                log.exception("Failed to unlock BDE volume with BEK file %s", bek_file)
+                if not is_wildcard:
+                    log.exception("Failed to unlock BDE volume with BEK file %s", bek_file)
 
     def unlock_volume(self) -> AlignedStream:
         if self.bde.has_clear_key():
@@ -87,12 +91,12 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
 
             for key in keys:
                 if key.key_type == KeyType.PASSPHRASE and self.bde.has_passphrase():
-                    self.unlock_with_passphrase(key.value)
+                    self.unlock_with_passphrase(key.value, key.is_wildcard)
                 elif key.key_type == KeyType.RECOVERY_KEY and self.bde.has_recovery_password():
-                    self.unlock_with_recovery_key(key.value)
+                    self.unlock_with_recovery_key(key.value, key.is_wildcard)
                 elif key.key_type == KeyType.FILE:
                     bek_file = pathlib.Path(key.value)
-                    self.unlock_with_bek_file(bek_file)
+                    self.unlock_with_bek_file(bek_file, key.is_wildcard)
 
                 if self.bde.unlocked:
                     log.info("Volume %s with identifiers %s unlocked with %s", self.fh, identifiers, key)

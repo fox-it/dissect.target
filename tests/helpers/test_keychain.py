@@ -34,3 +34,7 @@ def test_keychain_register_wildcard_value(guarded_keychain):
 
     # Valid raw key now included
     assert len(keychain.get_keys_without_provider()) == len(keychain.KeyType)
+
+    keychain.KEYCHAIN.clear()
+    keychain.register_wildcard_value("'312268-409816-583517-486695-627121-599511-664389-145640'")
+    keychain.get_all_keys()[0].value == "312268-409816-583517-486695-627121-599511-664389-145640"

@@ -1,4 +1,5 @@
 import logging
+import re
 import tarfile
 from pathlib import Path
 from typing import Union
@@ -12,6 +13,9 @@ from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
 
 log = logging.getLogger(__name__)
+
+
+ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
 
 class TarLoader(Loader):
@@ -62,6 +66,15 @@ class TarLoader(Loader):
 
                 if volume_name.lower() == "c:":
                     volume_name = "sysvol"
+
+                if volume_name == "$fs$":
+                    if len(parts) == 1:
+                        # The fs/$fs$ entry is ignored, only the directories below it are processed.
+                        continue
+                    fs_name = parts[1]
+                    if ANON_FS_RE.match(fs_name):
+                        parts.pop(0)
+                        volume_name = f"{volume_name}/{fs_name}"
 
                 if volume_name not in volumes:
                     vol = filesystem.VirtualFilesystem(case_sensitive=False)

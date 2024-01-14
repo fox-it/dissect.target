@@ -10,9 +10,11 @@ from flow.record.base import RE_VALID_FIELD_NAME
 from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
-from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugins.apps.webserver.webserver import WebserverAccessLogRecord
+from dissect.target.plugins.apps.webserver.webserver import (
+    WebserverAccessLogRecord,
+    WebserverPlugin,
+)
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
@@ -42,7 +44,7 @@ BasicRecordDescriptor = TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIE
 FIELD_NAME_INVALID_CHARS_RE = re.compile(r"[^a-zA-Z0-9]")
 
 
-class IISLogsPlugin(plugin.Plugin):
+class IISLogsPlugin(WebserverPlugin):
     """IIS 7 (and above) logs plugin.
 
     References:
@@ -63,11 +65,11 @@ class IISLogsPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No ApplicationHost config file found")
 
     @plugin.internal
-    def get_log_dirs(self) -> list[tuple[str, str]]:
+    def get_log_dirs(self) -> list[tuple[str, Path]]:
         log_paths = []
 
-        if self.target.fs.path("sysvol/files").exists():
-            log_paths.append(("auto", "sysvol/files"))
+        if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
+            log_paths.append(("auto", sysvol_files))
 
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
@@ -85,7 +87,7 @@ class IISLogsPlugin(plugin.Plugin):
     @plugin.internal
     def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
         for log_format, log_dir_path in self.get_log_dirs():
-            for log_file in self.iter_log_paths(log_dir_path):
+            for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
 
     @plugin.internal
@@ -270,11 +272,6 @@ class IISLogsPlugin(plugin.Plugin):
                 _target=self.target,
                 **{normalise_field_name(field): raw.get(field) for field in extra_fields},
             )
-
-    @plugin.internal
-    def iter_log_paths(self, log_dir: str) -> Iterator[Path]:
-        log_dir = fsutil.normalize(log_dir, alt_separator=self.target.fs.alt_separator)
-        yield from self.target.fs.path(log_dir).glob("*/*.log")
 
     @plugin.export(record=BasicRecordDescriptor)
     def logs(self) -> Iterator[TargetRecordDescriptor]:

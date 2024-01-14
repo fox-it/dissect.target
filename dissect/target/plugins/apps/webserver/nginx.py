@@ -6,7 +6,10 @@ from typing import Iterator
 from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.apps.webserver.webserver import WebserverAccessLogRecord
+from dissect.target.plugins.apps.webserver.webserver import (
+    WebserverAccessLogRecord,
+    WebserverPlugin,
+)
 from dissect.target.target import Target
 
 LOG_REGEX = re.compile(
@@ -14,7 +17,7 @@ LOG_REGEX = re.compile(
 )
 
 
-class NginxPlugin(plugin.Plugin):
+class NginxPlugin(WebserverPlugin):
     __namespace__ = "nginx"
 
     def __init__(self, target: Target):

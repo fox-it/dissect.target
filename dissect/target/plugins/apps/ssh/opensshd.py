@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Union
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
+from dissect.target.plugins.apps.ssh.ssh import SSHPlugin
 
 if TYPE_CHECKING:
     from dissect.target.plugins.general.config import ConfigurationTreePlugin
@@ -72,8 +73,8 @@ SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS = (
 )
 
 
-class SSHServerPlugin(Plugin):
-    __namespace__ = "sshd"
+class SSHServerPlugin(SSHPlugin):
+    __namespace__ = "opensshd"
 
     def __init__(self, target: Target):
         super().__init__(target)

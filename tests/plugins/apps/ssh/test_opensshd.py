@@ -13,7 +13,7 @@ def test_sshd_config_plugin(target_unix_users: Target, fs_unix: VirtualFilesyste
     fs_unix.map_file(str(plugin.sshd_config_path), config_file)
 
     target_unix_users.add_plugin(SSHServerPlugin)
-    results = list(target_unix_users.sshd.config())
+    results = list(target_unix_users.opensshd.config())
 
     assert len(results) == 1
     result = results[0]
@@ -43,7 +43,7 @@ def test_sshd_config_plugin_multiple_definitions(target_unix_users: Target, fs_u
     )
 
     target_unix_users.add_plugin(SSHServerPlugin)
-    results = list(target_unix_users.sshd.config())
+    results = list(target_unix_users.opensshd.config())
 
     assert len(results) == 1
     result = results[0]

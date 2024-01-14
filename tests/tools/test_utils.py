@@ -28,7 +28,7 @@ def test_persist_execution_report():
             assert full_path.suffix == ".json"
             assert "2000-01-01-000000" in full_path.name
 
-            mocked_json_dumps.called_once_with(report_data)
+            mocked_json_dumps.assert_called_once_with(report_data, sort_keys=True, indent=4)
 
             mocked_write_text.assert_called_once_with(test_output)
 
