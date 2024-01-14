@@ -1,5 +1,4 @@
 import io
-import platform
 import urllib.parse
 from pathlib import Path
 from typing import Iterator
@@ -46,14 +45,14 @@ class ErrorCounter(TargetLogAdapter):
         (
             ["/dir/raw.img", "/dir/raw2.tst", "/dir/info.txt"],
             "/dir",
-            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')," " RawLoader('/dir/info.txt')]",
+            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst'), RawLoader('/dir/info.txt')]",
             0,
         ),
         # Scenario 3: dir contains 1 loadable dir as well as 2 loadable targets
         (
             ["/dir/unix/etc", "/dir/unix/var", "/dir/raw.img", "/dir/raw2.tst"],
             "/dir",
-            "[DirLoader('/dir/unix'), " "RawLoader('/dir/raw.img'), " "TestLoader('/dir/raw2.tst')]",
+            "[DirLoader('/dir/unix'), " "RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
         ),
         # Scenario 3b: dir contains 2 loadable dirs as well as 2 loadable targets
@@ -110,7 +109,6 @@ class ErrorCounter(TargetLogAdapter):
     ],
 )
 @patch("dissect.target.target.getlogger", new=lambda t: ErrorCounter(log, {"target": t}))
-@pytest.mark.skipif(platform.system() == "Windows", reason="Path issues. Needs to be fixed.")
 def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
     # TestLoader to mix Raw Targets with Test Targets without depending on
     # specific implementations.
@@ -129,7 +127,7 @@ def test_target_open_dirs(topo, entry_point, expected_result, expected_errors):
 
         @staticmethod
         def find_all(path: Path) -> Iterator[Path]:
-            return [Path("/dir/raw1.img"), Path("/dir/raw3.img")]
+            return [Path("/dir/raw1.img").as_posix(), Path("/dir/raw3.img").as_posix()]
 
         def map(self, target: Target):
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
@@ -468,9 +466,9 @@ def test_nested_vs(target_bare: Target) -> None:
         volume_open.return_value = mock_volume_system
 
         target_bare.volumes.apply()
-        filesystem_open.assert_called_once_with(mock_volume)
+        filesystem_open.assert_has_calls([call(mock_base_volume), call(mock_volume)])
         assert len(target_bare.volumes) == 2
-        assert len(target_bare.filesystems) == 1
+        assert len(target_bare.filesystems) == 2
 
 
 def test_vs_offset_0(target_bare: Target) -> None:

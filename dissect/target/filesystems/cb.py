@@ -97,14 +97,14 @@ class CbFilesystemEntry(FilesystemEntry):
         if not self.is_dir():
             raise NotADirectoryError(f"'{self.path}' is not a directory")
 
-        seperator = self.fs.alt_separator or "/"
-        for entry in self.fs.session.list_directory(self.cbpath + seperator):
+        separator = self.fs.alt_separator or "/"
+        for entry in self.fs.session.list_directory(self.cbpath + separator):
             filename = entry["filename"]
             if filename in (".", ".."):
                 continue
 
             path = fsutil.join(self.path, filename, alt_separator=self.fs.alt_separator)
-            cbpath = seperator.join([self.cbpath, filename])
+            cbpath = separator.join([self.cbpath, filename])
             yield CbFilesystemEntry(self.fs, path, entry, cbpath)
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:

@@ -11,6 +11,7 @@ from urllib.parse import ParseResult, parse_qsl
 from dissect.regf import regf
 from dissect.util import ts
 from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
+from impacket.dcerpc.v5.rpcrt import DCERPCException
 from impacket.smbconnection import SessionError, SMBConnection
 
 from dissect.target import Target
@@ -189,18 +190,24 @@ class SmbRegistry(RegistryPlugin):
         return False
 
     def _init_registry(self) -> None:
-        self._svcctl = _connect_rpc(self.conn, "ncacn_np:445[\\pipe\\svcctl]", scmr.MSRPC_UUID_SCMR)
-        self._check_service_status()
+        try:
+            self._svcctl = _connect_rpc(self.conn, "ncacn_np:445[\\pipe\\svcctl]", scmr.MSRPC_UUID_SCMR)
+            self._check_service_status()
 
-        self._winreg = _connect_rpc(self.conn, "ncacn_np:445[\\pipe\\winreg]", rrp.MSRPC_UUID_RRP)
+            self._winreg = _connect_rpc(self.conn, "ncacn_np:445[\\pipe\\winreg]", rrp.MSRPC_UUID_RRP)
 
-        hklm_hive = SmbRegistryHive(self._winreg, "HKEY_LOCAL_MACHINE", rrp.hOpenLocalMachine(self._winreg)["phKey"])
-        hku_hive = SmbRegistryHive(self._winreg, "HKEY_USERS", rrp.hOpenUsers(self._winreg)["phKey"])
+            hklm_hive = SmbRegistryHive(
+                self._winreg, "HKEY_LOCAL_MACHINE", rrp.hOpenLocalMachine(self._winreg)["phKey"]
+            )
+            hku_hive = SmbRegistryHive(self._winreg, "HKEY_USERS", rrp.hOpenUsers(self._winreg)["phKey"])
 
-        self._add_hive("HKLM", hklm_hive, TargetPath(self.target.fs, "HKLM"))
-        self._add_hive("HKU", hku_hive, TargetPath(self.target.fs, "HKU"))
-        self._map_hive("HKEY_LOCAL_MACHINE", hklm_hive)
-        self._map_hive("HKEY_USERS", hku_hive)
+            self._add_hive("HKLM", hklm_hive, TargetPath(self.target.fs, "HKLM"))
+            self._add_hive("HKU", hku_hive, TargetPath(self.target.fs, "HKU"))
+            self._map_hive("HKEY_LOCAL_MACHINE", hklm_hive)
+            self._map_hive("HKEY_USERS", hku_hive)
+        except SessionError:
+            self.target.log.info("Failed to open remote registry, registry will not be available")
+            return  # no registry access, probably no access rights
 
     def _init_users(self) -> None:
         pass
@@ -212,15 +219,18 @@ class SmbRegistry(RegistryPlugin):
         if hasattr(self, "_was_disabled") and self._was_disabled:
             scmr.hRChangeServiceConfigW(self._svcctl, self._svc_handle, dwStartType=0x4)
 
-        if hasattr(self, "_svcctl"):
+        if getattr(self, "_svcctl", None):
             self._svcctl.disconnect()
 
-        if hasattr(self, "_winreg"):
+        if getattr(self, "_winreg", None):
             self._winreg.disconnect()
 
     def _check_service_status(self) -> None:
-        manager_handle = scmr.hROpenSCManagerW(self._svcctl)["lpScHandle"]
-        self._svc_handle = scmr.hROpenServiceW(self._svcctl, manager_handle, "RemoteRegistry")["lpServiceHandle"]
+        try:
+            manager_handle = scmr.hROpenSCManagerW(self._svcctl)["lpScHandle"]
+            self._svc_handle = scmr.hROpenServiceW(self._svcctl, manager_handle, "RemoteRegistry")["lpServiceHandle"]
+        except DCERPCException:
+            return
 
         current_state = scmr.hRQueryServiceStatus(self._svcctl, self._svc_handle)["lpServiceStatus"]["dwCurrentState"]
         if current_state == scmr.SERVICE_STOPPED:

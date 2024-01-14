@@ -1,5 +1,4 @@
 from dissect import cstruct
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -59,7 +58,7 @@ class RecentFileCachePlugin(Plugin):
                 entry.path = entry.path.rstrip("\x00")
 
                 yield RecentFileCacheRecord(
-                    path=path.from_windows(entry.path),
+                    path=self.target.fs.path(entry.path),
                     _target=self.target,
                 )
             except EOFError:

@@ -1,7 +1,7 @@
 import textwrap
 from io import BytesIO
 
-from flow.record.fieldtypes import datetime, path
+from flow.record.fieldtypes import datetime
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
@@ -143,7 +143,7 @@ def test_iptables_plugin_ufw(target_unix_users, fs_unix):
     # 5 policies, 3 rules
     assert len(results) == 5 + 3
 
-    assert results[-1].source == path.from_posix(ufw_rules_path)
+    assert results[-1].source == ufw_rules_path
     assert results[-1].rule == "-A ufw-user-limit-accept -j ACCEPT"
     assert results[-1].table == "filter"
     assert results[-1].chain == "ufw-user-limit-accept"

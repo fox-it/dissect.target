@@ -17,7 +17,7 @@ from dissect.target.helpers import fsutil
 
 
 class BtrfsFilesystem(Filesystem):
-    __fstype__ = "btrfs"
+    __type__ = "btrfs"
     __multi_volume__ = True
 
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
@@ -55,7 +55,7 @@ class BtrfsFilesystem(Filesystem):
 
 
 class BtrfsSubvolumeFilesystem(Filesystem):
-    __fstype__ = "btrfs"
+    __type__ = "btrfs"
 
     def __init__(self, fs: BtrfsFilesystem, subvol: Optional[str] = None, subvolid: Optional[int] = None):
         super().__init__(fs.volume, alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)

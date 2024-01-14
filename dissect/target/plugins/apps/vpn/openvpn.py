@@ -166,6 +166,8 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
     """Parses Openvpn config  files"""
     lines = content.splitlines()
     res = {}
+    boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
+    boolean_field_names = set(field.name for field in boolean_fields)
 
     for line in lines:
         # As per man (8) openvpn, lines starting with ; or # are comments
@@ -174,6 +176,10 @@ def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
             value = value[0] if value else ""
             # This removes all text after the first comment
             value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
+
+            if key in boolean_field_names and value == "":
+                value = True
+
             if old_value := res.get(key):
                 if not isinstance(old_value, list):
                     old_value = [old_value]
