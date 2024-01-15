@@ -1549,6 +1549,8 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
             except ImportError as e:
                 log.info("Failed to import %s", filesystem)
                 log.debug("", exc_info=e)
+            except Exception as e:
+                raise FilesystemError(f"Failed to open filesystem for {fh}", cause=e)
     finally:
         fh.seek(offset)
 
