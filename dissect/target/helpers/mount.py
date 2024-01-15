@@ -41,7 +41,7 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
-    def init(self, path: str, conn: Optional[fuse_conn_info_p] = None, cfg: Optional[fuse_config_p] = None):
+    def init(self, path: str, conn: Optional[fuse_conn_info_p] = None, cfg: Optional[fuse_config_p] = None) -> None:
         if cfg:
             # Enables the use of inodes in getattr
             cfg.contents.use_ino = 1
