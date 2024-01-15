@@ -11,7 +11,10 @@ from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugins.apps.webserver.webserver import WebserverAccessLogRecord
+from dissect.target.plugins.apps.webserver.webserver import (
+    WebserverAccessLogRecord,
+    WebserverPlugin,
+)
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
@@ -41,7 +44,7 @@ BasicRecordDescriptor = TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIE
 FIELD_NAME_INVALID_CHARS_RE = re.compile(r"[^a-zA-Z0-9]")
 
 
-class IISLogsPlugin(plugin.Plugin):
+class IISLogsPlugin(WebserverPlugin):
     """IIS 7 (and above) logs plugin.
 
     References:
