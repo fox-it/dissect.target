@@ -225,7 +225,10 @@ class Target:
 
         loader_cls = loader.find_loader(path, parsed_path=parsed_path)
         if loader_cls:
-            loader_instance = loader_cls(path, parsed_path=parsed_path)
+            try:
+                loader_instance = loader_cls(path, parsed_path=parsed_path)
+            except Exception as e:
+                raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {path}: {e}", cause=e)
             return cls._load(path, loader_instance)
         return cls.open_raw(path)
 
@@ -281,7 +284,8 @@ class Target:
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
                     except Exception as e:
-                        getlogger(sub_entry).error("Failed to initiate loader", exc_info=e)
+                        getlogger(sub_entry).error("Failed to initiate loader: %s", e)
+                        getlogger(sub_entry).debug("", exc_info=e)
                         continue
 
                     try:

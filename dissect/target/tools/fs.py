@@ -10,6 +10,7 @@ import shutil
 import sys
 
 from dissect.target import Target
+from dissect.target.exceptions import TargetError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -113,7 +114,13 @@ def main():
 
     process_generic_arguments(args)
 
-    target = Target.open(args.target)
+    try:
+        target = Target.open(args.target)
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
+
     path = target.fs.path(args.path)
 
     if not path.exists():
