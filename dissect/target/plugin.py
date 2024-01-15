@@ -819,7 +819,7 @@ def load_module_from_name(module_path: str) -> None:
         # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
         importlib.import_module(module_path)
     except Exception as e:
-        log.error("Unable to import %s", module_path)
+        log.info("Unable to import %s", module_path)
         log.debug("Error while trying to import module %s", module_path, exc_info=e)
         save_plugin_import_failure(module_path)
 
