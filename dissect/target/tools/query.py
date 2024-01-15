@@ -376,7 +376,7 @@ def main():
 
             modifier_func = record_modifier.get_modifier_function(modifier_type)
 
-            if not len(record_entries):
+            if not record_entries:
                 continue
 
             rs = record_output(args.strings, args.json)
@@ -392,7 +392,6 @@ def main():
                     # Ignore errors if multiple functions
                     if len(funcs) > 1:
                         target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
-                        pass
                     else:
                         raise e
 
