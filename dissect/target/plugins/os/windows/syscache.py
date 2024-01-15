@@ -1,5 +1,4 @@
 from dissect.ntfs import ntfs
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
@@ -76,7 +75,7 @@ class SyscachePlugin(Plugin):
                 full_path = None
                 if mft:
                     try:
-                        full_path = path.from_windows("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
+                        full_path = self.target.fs.path("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
                     except ntfs.Error:
                         pass
 

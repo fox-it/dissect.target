@@ -1,5 +1,6 @@
 import argparse
 import cmd
+import contextlib
 import datetime
 import fnmatch
 import io
@@ -28,9 +29,10 @@ from dissect.target.exceptions import (
     RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
+    TargetError,
 )
 from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
-from dissect.target.helpers import fsutil, regutil
+from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
@@ -164,7 +166,9 @@ class TargetCmd(cmd.Cmd):
         """
         pass
 
-    def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str) -> Optional[bool]:
+    def _exec(
+        self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False
+    ) -> Optional[bool]:
         """Command execution helper that chains initial command and piped subprocesses (if any) together."""
 
         argparts = []
@@ -185,7 +189,12 @@ class TargetCmd(cmd.Cmd):
                     # in case of a failure in a subprocess
                     print(e)
             else:
-                return func(argparts, sys.stdout)
+                ctx = contextlib.nullcontext()
+                if self.target.props.get("cyber") and not no_cyber:
+                    ctx = cyber.cyber(color=None, run_at_end=True)
+
+                with ctx:
+                    return func(argparts, sys.stdout)
         except IOError:
             pass
 
@@ -201,7 +210,9 @@ class TargetCmd(cmd.Cmd):
                 return
             return cmdfunc(args, stdout)
 
-        return self._exec(_exec_, command_args_str)
+        # These commands enter a subshell, which doesn't work well with cyber
+        no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
+        return self._exec(_exec_, command_args_str, no_cyber)
 
     def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
@@ -253,6 +264,15 @@ class TargetCmd(cmd.Cmd):
     def do_clear(self, line: str) -> Optional[bool]:
         """clear the terminal screen"""
         os.system("cls||clear")
+
+    def do_cyber(self, line: str) -> Optional[bool]:
+        """cyber"""
+        self.target.props["cyber"] = not bool(self.target.props.get("cyber"))
+        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[
+            self.target.props["cyber"]
+        ]
+        with cyber.cyber(color=color):
+            print(f"C Y B E R - M O D E - {word} G A G E D")
 
     def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
@@ -491,7 +511,7 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
-    def cmd_ls(self, args: argparse.Namespace, stdout) -> Optional[bool]:
+    def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """list directory contents"""
 
         path = self.resolve_path(args.path)
@@ -889,7 +909,7 @@ class UnixConfigTreeCli(TargetCli):
         if isinstance(path, fsutil.TargetPath):
             return path
 
-        # It uses the alt seperator of the underlying fs
+        # It uses the alt separator of the underlying fs
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
@@ -1214,7 +1234,11 @@ def main() -> None:
     if args.quiet:
         logging.getLogger("dissect").setLevel(level=logging.ERROR)
 
-    open_shell(args.targets, args.python, args.registry)
+    try:
+        open_shell(args.targets, args.python, args.registry)
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
 
 
 if __name__ == "__main__":

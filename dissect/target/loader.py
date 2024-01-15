@@ -154,7 +154,7 @@ def find_loader(
             log.debug("", exc_info=exception)
 
 
-def open(item: Union[str, Path], *args, **kwargs):
+def open(item: Union[str, Path], *args, **kwargs) -> Loader:
     """Opens a :class:`Loader` for a specific ``item``.
 
     This instantiates a :class:`Loader` for a specific ``item``.
@@ -202,4 +202,5 @@ register("phobos", "PhobosLoader")
 register("velociraptor", "VelociraptorLoader")
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
+register("cyber", "CyberLoader")
 register("multiraw", "MultiRawLoader")  # Should be last

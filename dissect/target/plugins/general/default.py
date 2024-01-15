@@ -13,8 +13,6 @@ from dissect.target.plugin import OSPlugin, export
 
 
 class DefaultPlugin(OSPlugin):
-    __skip__ = True
-
     def __init__(self, target: Target):
         super().__init__(target)
         if len(target.filesystems) == 1:

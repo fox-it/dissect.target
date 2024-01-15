@@ -4,7 +4,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
@@ -69,9 +68,7 @@ def test_amcache_windows_11_applaunches(target_win, fs_win):
 
     assert len(applaunches) == 55
     assert applaunches[0].ts == datetime.datetime(2022, 12, 17, 13, 27, 53, 96000, tzinfo=datetime.timezone.utc)
-    assert applaunches[0].path == path.from_windows(
-        "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
-    )
+    assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
 
 
 def new_read_key_subkeys(self, key):

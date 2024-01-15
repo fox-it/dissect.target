@@ -1,4 +1,3 @@
-import platform
 from collections import OrderedDict, namedtuple
 from unittest import mock
 
@@ -179,10 +178,6 @@ def test_env(env_plugin):
         assert env_vars == env_plugin._get_system_env_vars.return_value
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="NotImplementedError: access: effective_ids unavailable on this platform. Needs to be fixed.",
-)
 def test_environment_variables(env_plugin):
     with mock.patch.object(env_plugin, "_get_system_env_vars", side_effect=lambda: {"sys-name": "sys-value"}):
         with mock.patch.object(env_plugin, "_get_user_env_vars", side_effect=lambda _: {"usr-name": "usr-value"}):
@@ -211,10 +206,6 @@ def test_pathext(env_plugin):
         env_plugin._get_pathext.assert_called_once()
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="NotImplementedError: access: effective_ids unavailable on this platform. Needs to be fixed.",
-)
 def test_path_extensions(env_plugin):
     pathext_records = env_plugin.path_extensions()
     pathext_records = sorted(pathext_records, key=lambda record: record.pathext)

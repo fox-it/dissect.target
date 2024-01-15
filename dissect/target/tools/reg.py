@@ -6,7 +6,7 @@ import argparse
 import logging
 
 from dissect.target import Target
-from dissect.target.exceptions import RegistryError
+from dissect.target.exceptions import RegistryError, TargetError
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -36,23 +36,28 @@ def main():
 
     process_generic_arguments(args)
 
-    for target in Target.open_all(args.targets):
-        try:
-            if args.value:
-                for key in target.registry.keys(args.key):
-                    try:
-                        print(key.value(args.value))
-                    except RegistryError:
-                        continue
-            else:
-                try:
-                    print(target)
+    try:
+        for target in Target.open_all(args.targets):
+            try:
+                if args.value:
                     for key in target.registry.keys(args.key):
-                        recursor(key, args.depth, 0)
-                except RegistryError:
-                    log.exception("Failed to find registry value")
-        except Exception:
-            log.exception("Failed to iterate key")
+                        try:
+                            print(key.value(args.value))
+                        except RegistryError:
+                            continue
+                else:
+                    try:
+                        print(target)
+                        for key in target.registry.keys(args.key):
+                            recursor(key, args.depth, 0)
+                    except RegistryError:
+                        log.exception("Failed to find registry value")
+            except Exception:
+                log.exception("Failed to iterate key")
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
 
 
 def recursor(key, depth, indent):

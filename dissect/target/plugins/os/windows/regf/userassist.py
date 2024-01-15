@@ -2,7 +2,6 @@ import codecs
 
 from dissect import cstruct
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -128,7 +127,7 @@ class UserAssistPlugin(Plugin):
 
                         yield UserAssistRecord(
                             ts=wintimestamp(timestamp),
-                            path=path.from_windows(value),
+                            path=self.target.fs.path(value),
                             number_of_executions=number_of_executions,
                             application_focus_count=application_focus_count,
                             application_focus_duration=application_focus_duration,
