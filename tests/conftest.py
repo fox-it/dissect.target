@@ -4,8 +4,6 @@ import textwrap
 from io import BytesIO
 from typing import Callable, Iterator, Optional
 
-import pytest
-
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue

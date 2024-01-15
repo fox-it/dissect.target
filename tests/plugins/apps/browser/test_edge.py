@@ -1,3 +1,5 @@
+import pytest
+
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import edge
@@ -5,7 +7,7 @@ from tests._utils import absolute_path
 
 
 def test_edge_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_edge(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.edge.downloads())
     assert len(records) == 2
 
@@ -13,18 +15,19 @@ def test_edge_downloads(target_win: Target, fs_win: VirtualFilesystem, tmp_path:
 def test_edge_extensions(
     target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_edge(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.edge.extensions())
     assert len(records) == 39
 
 
 def test_edge_history(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_edge(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.edge.history())
     assert len(records) == 45
 
 
-def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
+@pytest.fixture
+def setup_edge(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
     edge_db = absolute_path("_data/plugins/apps/browser/edge/History.sqlite")
     edge_prefs = absolute_path("_data/plugins/apps/browser/edge/windows/Preferences")
     edge_sec_prefs = absolute_path("_data/plugins/apps/browser/edge/windows/Secure Preferences")

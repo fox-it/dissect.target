@@ -1,3 +1,5 @@
+import pytest
+
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import chrome
@@ -5,7 +7,7 @@ from tests._utils import absolute_path
 
 
 def test_chrome(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target):
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_chrome(target_win, fs_win, tmp_path, target_win_users)
     records = list(target_win.chrome.downloads())
     assert len(records) == 1
     records = list(target_win.chrome.extensions())
@@ -14,7 +16,8 @@ def test_chrome(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, ta
     assert len(records) == 5
 
 
-def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
+@pytest.fixture
+def setup_chrome(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
     chrome_db = absolute_path("_data/plugins/apps/browser/chrome/History.sqlite")
     chrome_prefs = absolute_path("_data/plugins/apps/browser/chrome/windows/Preferences")
     chrome_sec_prefs = absolute_path("_data/plugins/apps/browser/chrome/windows/Secure Preferences")

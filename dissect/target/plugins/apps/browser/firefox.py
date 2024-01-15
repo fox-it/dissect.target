@@ -80,13 +80,13 @@ class FirefoxPlugin(BrowserPlugin):
 
     @export(record=BrowserCookieRecord)
     def cookies(self) -> Iterator[BrowserCookieRecord]:
-        """Return browser cookies records from Firefox.
+        """Return browser cookie records from Firefox.
         Args:
             browser_name: The name of the browser as a string.
         Yields:
             Records with the following fields:
-                ts_created (datetime): Download start timestamp.
-                ts_last_accessed (datetime): Download end timestamp.
+                ts_created (datetime): Cookie created timestamp.
+                ts_last_accessed (datetime): Cookie last accessed timestamp.
                 browser (string): The browser from which the records are generated from.
                 name (string): The cookie name.
                 value (string): The cookie value.

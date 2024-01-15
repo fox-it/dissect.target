@@ -1,6 +1,8 @@
 import gzip
 import tempfile
 
+import pytest
+
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import iexplore
@@ -10,7 +12,7 @@ from tests._utils import absolute_path
 def test_iexplore_history(
     target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_iexplore(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.history())
     assert len(records) == 41
@@ -22,7 +24,7 @@ def test_iexplore_history(
 def test_iexplore_downloads(
     target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target
 ) -> None:
-    __setup(target_win, fs_win, tmp_path, target_win_users)
+    setup_iexplore(target_win, fs_win, tmp_path, target_win_users)
 
     records = list(target_win.iexplore.downloads())
     assert len(records) == 1
@@ -30,7 +32,8 @@ def test_iexplore_downloads(
     assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
 
 
-def __setup(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
+@pytest.fixture
+def setup_iexplore(target_win: Target, fs_win: VirtualFilesystem, tmp_path: str, target_win_users: Target) -> None:
     cache_archive = absolute_path("_data/plugins/apps/browser/iexplore/WebCacheV01.dat.gz")
 
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:

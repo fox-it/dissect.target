@@ -69,8 +69,8 @@ class WebCache:
         """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
 
-    def cookies(self) -> Iterator[record.Record]:
-        raise NotImplementedError("Cookies function is not implemented for Internet Explorer yet")
+    def cookies(self) -> None:
+        raise NotImplementedError("Cookies plugin is not implemented for Internet Explorer yet")
 
 
 class InternetExplorerPlugin(BrowserPlugin):
