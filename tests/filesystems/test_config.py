@@ -144,12 +144,12 @@ def test_config_entry() -> None:
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
     config_fs = ConfigurationFilesystem(target_unix, "/etc")
-    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, seperator=(r"\s",))
+    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == "you"
 
-    entry = config_fs.get("/new/path/config", collapse={"help"}, seperator=(r"\s",))
+    entry = config_fs.get("/new/path/config", collapse={"help"}, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == ["me", "you"]

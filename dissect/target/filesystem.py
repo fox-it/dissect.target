@@ -906,7 +906,7 @@ class VirtualDirectory(FilesystemEntry):
 
     def _stat(self) -> fsutil.stat_result:
         path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
-        return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 0, 0, 0, 0, 0, 0, 0])
+        return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 1, 0, 0, 0, 0, 0, 0])
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if self.top:
@@ -928,10 +928,10 @@ class VirtualDirectory(FilesystemEntry):
         return False
 
     def readlink(self) -> str:
-        raise NotASymlinkError()
+        raise NotASymlinkError(self.path)
 
     def readlink_ext(self) -> FilesystemEntry:
-        raise NotASymlinkError()
+        raise NotASymlinkError(self.path)
 
 
 class VirtualFileHandle(io.RawIOBase):
@@ -994,10 +994,10 @@ class VirtualFile(FilesystemEntry):
         return False
 
     def readlink(self) -> str:
-        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
+        raise NotASymlinkError(self.path)
 
     def readlink_ext(self) -> FilesystemEntry:
-        raise FilesystemError(f"{self.__class__.__name__} does not support symlinks.")
+        raise NotASymlinkError(self.path)
 
 
 class MappedFile(VirtualFile):
@@ -1073,13 +1073,19 @@ class VirtualSymlink(FilesystemEntry):
         if not follow_symlinks:
             return False
 
-        return self.readlink_ext().is_dir()
+        try:
+            return self.readlink_ext().is_dir()
+        except FileNotFoundError:
+            return False
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         if not follow_symlinks:
             return False
 
-        return self.readlink_ext().is_file()
+        try:
+            return self.readlink_ext().is_file()
+        except FileNotFoundError:
+            return False
 
     def is_symlink(self) -> bool:
         return True
@@ -1234,12 +1240,22 @@ class VirtualFilesystem(Filesystem):
             directory.add(entry_name, entry)
 
     def link(self, src: str, dst: str) -> None:
-        """Hard link a FilesystemEntry to another location."""
+        """Hard link a FilesystemEntry to another location.
+
+        Args:
+            src: The path to the target of the link.
+            dst: The path to the link.
+        """
         self.map_file_entry(dst, self.get(src))
 
     def symlink(self, src: str, dst: str) -> None:
-        """Create a symlink to another location."""
-        src = fsutil.normalize(src, alt_separator=self.alt_separator).strip("/")
+        """Create a symlink to another location.
+
+        Args:
+            src: The path to the target of the symlink.
+            dst: The path to the symlink.
+        """
+        src = fsutil.normalize(src, alt_separator=self.alt_separator).rstrip("/")
         dst = fsutil.normalize(dst, alt_separator=self.alt_separator).strip("/")
         self.map_file_entry(dst, VirtualSymlink(self, dst, src))
 
@@ -1471,7 +1487,7 @@ class RootFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         self.fs.target.log.debug("%r::readlink()", self)
         if not self.is_symlink():
-            raise FilesystemError(f"Not a link: {self}")
+            raise NotASymlinkError(f"Not a link: {self}")
         return self._exec("readlink")
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
@@ -1574,3 +1590,4 @@ register("exfat", "ExfatFilesystem")
 register("squashfs", "SquashFSFilesystem")
 register("zip", "ZipFilesystem")
 register("ad1", "AD1Filesystem")
+register("jffs", "JFFSFilesystem")

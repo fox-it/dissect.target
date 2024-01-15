@@ -37,11 +37,26 @@ def load_mft_plugin(target_win):
     target_win.add_plugin(MftPlugin)
 
 
-def test_driveletter():
+@pytest.mark.parametrize(
+    "drive_letters, expected",
+    [
+        (("z:", "c:", "a:"), "a:\\"),
+        (("foo", "bar", "bla"), "bar\\"),
+        (("$fs$\\fs2", "$fs$\\fs1", "$fs$\\fs0"), "$fs$\\fs0\\"),
+        (("sysvol", "c:"), "c:\\"),
+        (("sysvol", "c:", "a:"), "a:\\"),
+        (("$fs$\\fs0", "sysvol", "c:"), "c:\\"),
+        (("$fs$\\fs0", "sysvol"), "sysvol\\"),
+        (("$fs$\\fs0",), "$fs$\\fs0\\"),
+    ],
+)
+def test_driveletter(drive_letters, expected):
     mocked_target = Mock()
-    mocked_cdisk = Mock()
-    mocked_target.fs.mounts = {"sysvol": mocked_cdisk, "c:": mocked_cdisk}
-    assert get_drive_letter(mocked_target, mocked_cdisk) == "c:\\"
+    mocked_disk = Mock()
+    num_drives = len(drive_letters)
+    mocked_target.fs.mounts = dict(zip(drive_letters, [mocked_disk] * num_drives))
+
+    assert get_drive_letter(mocked_target, mocked_disk) == expected
 
 
 def test_driveletter_unknown():
