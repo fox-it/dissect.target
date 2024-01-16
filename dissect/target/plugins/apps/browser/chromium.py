@@ -186,7 +186,7 @@ class ChromiumMixin:
                 name (string): The cookie name.
                 value (string): The cookie value.
                 host (string): Cookie host key.
-                path (string): Cookie path
+                path (string): Cookie path.
                 expiry (varint): Cookie expiry.
                 is_secure (bool): Cookie secury flag.
                 is_http_only (bool): Cookie http only flag.
