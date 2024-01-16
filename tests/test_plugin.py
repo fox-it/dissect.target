@@ -2,7 +2,7 @@ import os
 from functools import reduce
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from flow.record import Record
@@ -82,9 +82,9 @@ class MockOSWarpPlugin(OSPlugin):
 @patch(
     "dissect.target.plugin.plugins",
     return_value=[
-        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "cls": MagicMock},
-        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "cls": MagicMock},
-        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "cls": MockOSWarpPlugin},
+        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "is_osplugin": False},
+        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "is_osplugin": False},
+        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "is_osplugin": True},
     ],
 )
 @patch("dissect.target.Target", create=True)
