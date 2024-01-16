@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import re
-from collections import deque
+from collections import defaultdict, deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -257,6 +257,8 @@ class Txt(ConfigurationParser):
 
 
 class Xml(ConfigurationParser):
+    """Parses XML-files, ignores any constructor parameters."""
+
     def _tree(self, tree: ElementTree) -> dict:
         root = {tree.tag: {} if tree.attrib else None}
 
@@ -306,8 +308,6 @@ class Xml(ConfigurationParser):
                 errors += 1
                 document = self._fix(document, err.position)
 
-        if not tree:
-            # Document could not be parsed, we give up
         if not tree:
             # Document could not be parsed, we give up
             raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")

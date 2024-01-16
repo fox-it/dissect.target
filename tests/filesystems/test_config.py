@@ -76,59 +76,37 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
         (
             "_data/helpers/configutil/test.xml",
             {
-                "nodes": {
-                    "tag": "Server",
-                    "attributes": {"port": "8005", "shutdown": "SHUTDOWN"},
-                    "nodes": {
-                        "Listener": {
-                            "tag": "Listener",
-                            "attributes": {"className": "org.apache.catalina.core.JasperListener"},
+                "Server": {
+                    "Listener": ["a", "b"], # @todo add attributes on list items
+                    "Service": {
+                        "Connector": {
+                            "port": "8080",
+                            "protocol": "HTTP/1.1",
+                            "connectionTimeout": "20000",
+                            "redirectPort": "8443",
                         },
-                        "Service": {
-                            "tag": "Service",
-                            "attributes": {"name": "Catalina"},
-                            "nodes": {
-                                "Connector": {
-                                    "tag": "Connector",
-                                    "attributes": {
-                                        "port": "8080",
-                                        "protocol": "HTTP/1.1",
-                                        "connectionTimeout": "20000",
-                                        "redirectPort": "8443",
-                                    },
+                        "Engine": {
+                            "Host": {
+                                "Valve": {
+                                    "className": "org.apache.catalina.valves.AccessLogValve",
+                                    "directory": "logs",
+                                    "prefix": "localhost_access_log.",
+                                    "suffix": ".txt",
+                                    "pattern": "%h %l %u %t s",
                                 },
-                                "Engine": {
-                                    "tag": "Engine",
-                                    "attributes": {"name": "Catalina", "defaultHost": "localhost"},
-                                    "nodes": {
-                                        "Host": {
-                                            "tag": "Host",
-                                            "attributes": {
-                                                "name": "localhost",
-                                                "appBase": "webapps",
-                                                "unpackWARs": "true",
-                                                "autoDeploy": "true",
-                                            },
-                                            "nodes": {
-                                                "Valve": {
-                                                    "tag": "Valve",
-                                                    "attributes": {
-                                                        "className": "org.apache.catalina.valves.AccessLogValve",
-                                                        "directory": "logs",
-                                                        "prefix": "localhost_access_log.",
-                                                        "suffix": ".txt",
-                                                        "pattern": "%h %l %u %t s",
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
+                                "name": "localhost",
+                                "appBase": "webapps",
+                                "unpackWARs": "true",
+                                "autoDeploy": "true",
                             },
+                            "name": "Catalina",
+                            "defaultHost": "localhost",
                         },
+                        "name": "Catalina",
                     },
-                },
-                "errors": 3,
+                    "port": "8005",
+                    "shutdown": "SHUTDOWN",
+                }
             },
         ),
     ],
