@@ -258,26 +258,30 @@ class Txt(ConfigurationParser):
 
 class Xml(ConfigurationParser):
     def _tree(self, tree: ElementTree) -> dict:
-        nodes = {}
-        counter = {}
-        for node in tree.findall("*"):
-            if node.tag in counter:
-                counter[node.tag] += 1
-                nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
-            else:
-                counter[node.tag] = 1
-                nodes[f"{node.tag}"] = self._tree(node)
-        result = {"tag": tree.tag}
+        root = {tree.tag: {} if tree.attrib else None}
+
+        children = list(tree)
+
+        if children:
+            childs = defaultdict(list)
+            for child in map(self._tree, children):
+                for key, value in child.items():
+                    childs[key].append(value)
+
+            root = {tree.tag: {key: value[0] if len(value) == 1 else value for key, value in childs.items()}}
+
         if tree.attrib:
-            result["attributes"] = tree.attrib
-        if nodes:
-            result["nodes"] = nodes
+            root[tree.tag].update((key, value) for key, value in tree.attrib.items())
 
-        text = str(tree.text).strip(" \n\r")
-        if text:
-            result["text"] = text
+        if tree.text:
+            text = tree.text.strip()
+            if children or tree.attrib:
+                if text:
+                    root[tree.tag] = text
+            else:
+                root[tree.tag] = text
 
-        return result
+        return root
 
     def _fix(self, content: str, position: tuple(int, int)) -> str:
         """Quick heuristic fix. If there is an invalid token, just remove it."""
