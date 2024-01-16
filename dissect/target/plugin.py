@@ -495,7 +495,7 @@ def register(plugincls: Type[Plugin]) -> None:
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
-    root["cls"] = plugincls
+    root["is_osplugin"] = issubclass(plugincls, OSPlugin)
 
 
 def internal(*args, **kwargs) -> Callable:
@@ -1117,7 +1117,7 @@ def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDes
             available["exports"].remove("get_all_records")
 
         for exported in available["exports"]:
-            if issubclass(available["cls"], OSPlugin) and os_type == general.default.DefaultPlugin:
+            if available["is_osplugin"] and os_type == general.default.DefaultPlugin:
                 # This makes the os plugin exports listed under the special
                 # "OS plugins" header by the 'plugins' plugin.
                 available["module"] = ""
