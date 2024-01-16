@@ -33,17 +33,21 @@ class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
+
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
     )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
+
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
-    )
-    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
@@ -70,8 +74,10 @@ class ChromiumMixin:
 
         Args:
             filename: The filename as string of the database where the data is stored.
+
         Yields:
             opened db_file (SQLite3)
+
         Raises:
             FileNotFoundError: If the history file could not be found.
             SQLError: If the history file could not be opened.
@@ -116,10 +122,9 @@ class ChromiumMixin:
 
         Args:
             browser_name: The name of the browser as a string.
+
         Yields:
             Records with the following fields:
-                hostname (string): The target hostname.
-                domain (string): The target domain.
                 ts_start (datetime): Download start timestamp.
                 ts_end (datetime): Download end timestamp.
                 browser (string): The browser from which the records are generated from.
@@ -132,8 +137,6 @@ class ChromiumMixin:
                 mime_type (string): MIME type.
                 state (varint): Download state number.
                 source: (path): The source file of the download record.
-        Raises:
-            SQLError: If the history file could not be processed.
         """
         for user, db_file, db in self._iter_db("History"):
             try:
@@ -176,8 +179,10 @@ class ChromiumMixin:
 
     def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records from supported Chromium-based browsers.
+
         Args:
             browser_name: The name of the browser as a string.
+
         Yields:
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
@@ -191,8 +196,6 @@ class ChromiumMixin:
                 is_secure (bool): Cookie secury flag.
                 is_http_only (bool): Cookie http only flag.
                 same_site (bool): Cookie same site flag.
-        Raises:
-            SQLError: If the cookie file could not be processed.
         """
         for user, db_file, db in self._iter_db("Cookies"):
             try:
@@ -217,28 +220,25 @@ class ChromiumMixin:
     def extensions(self, browser_name: Optional[str] = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.
 
-        Parameters:
-            - browser_name (str): Name of the browser to scan for extensions.
+        Args:
+            browser_name (str): Name of the browser to scan for extensions.
 
         Yields:
-            - Iterator[BrowserExtensionRecord]: A generator that yields `BrowserExtensionRecord`
-                with the following fields:
-                    hostname (string): The target hostname.
-                    domain (string): The target domain.
-                    ts_install (datetime): Extension install timestamp.
-                    ts_update (datetime): Extension update timestamp.
-                    browser (string): The browser from which the records are generated.
-                    id (string): Extension unique identifier.
-                    name (string): Name of the extension.
-                    short_name (string): Short name of the extension.
-                    default_title (string): Default title of the extension.
-                    description (string): Description of the extension.
-                    version (string): Version of the extension.
-                    ext_path (path): Relative path of the extension.
-                    from_webstore (boolean): Extension from webstore.
-                    permissions (string[]): Permissions of the extension.
-                    manifest (varint): Version of the extensions' manifest.
-                    source: (path): The source file of the download record.
+            Records with the following fields:
+                ts_install (datetime): Extension install timestamp.
+                ts_update (datetime): Extension update timestamp.
+                browser (string): The browser from which the records are generated.
+                id (string): Extension unique identifier.
+                name (string): Name of the extension.
+                short_name (string): Short name of the extension.
+                default_title (string): Default title of the extension.
+                description (string): Description of the extension.
+                version (string): Version of the extension.
+                ext_path (path): Relative path of the extension.
+                from_webstore (boolean): Extension from webstore.
+                permissions (string[]): Permissions of the extension.
+                manifest (varint): Version of the extensions' manifest.
+                source: (path): The source file of the download record.
         """
         ext_files = ["Preferences", "Secure Preferences"]
         for filename in ext_files:
@@ -308,10 +308,9 @@ class ChromiumMixin:
 
         Args:
             browser_name: The name of the browser as a string.
+
         Yields:
             Records with the following fields:
-                hostname (string): The target hostname.
-                domain (string): The target domain.
                 ts (datetime): Visit timestamp.
                 browser (string): The browser from which the records are generated from.
                 id (string): Record ID.
@@ -327,8 +326,6 @@ class ChromiumMixin:
                 from_visit (varint): Record ID of the "from" visit.
                 from_url (uri): URL of the "from" visit.
                 source: (path): The source file of the history record.
-        Raises:
-            SQLError: If the history file could not be processed.
         """
         for user, db_file, db in self._iter_db("History"):
             try:
@@ -382,22 +379,22 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
         "AppData/Local/Chromium/User Data/Default",
     ]
 
-    @export(record=ChromiumMixin.BrowserDownloadRecord)
-    def downloads(self):
-        """Return browser download records for Chromium browser."""
-        yield from super().downloads("chromium")
-
-    @export(record=ChromiumMixin.BrowserExtensionRecord)
-    def extensions(self):
-        """Return browser extension records for Chromium browser."""
-        yield from super().extensions("chromium")
-
     @export(record=ChromiumMixin.BrowserHistoryRecord)
-    def history(self):
+    def history(self) -> Iterator[ChromiumMixin.BrowserHistoryRecord]:
         """Return browser history records for Chromium browser."""
         yield from super().history("chromium")
 
     @export(record=ChromiumMixin.BrowserCookieRecord)
-    def cookies(self):
-        """Return browser cookies for Chromium browser."""
+    def cookies(self) -> Iterator[ChromiumMixin.BrowserCookieRecord]:
+        """Return browser cookie records for Chromium browser."""
         yield from super().cookies("chromium")
+
+    @export(record=ChromiumMixin.BrowserDownloadRecord)
+    def downloads(self) -> Iterator[ChromiumMixin.BrowserDownloadRecord]:
+        """Return browser download records for Chromium browser."""
+        yield from super().downloads("chromium")
+
+    @export(record=ChromiumMixin.BrowserExtensionRecord)
+    def extensions(self) -> Iterator[ChromiumMixin.BrowserExtensionRecord]:
+        """Return browser extension records for Chromium browser."""
+        yield from super().extensions("chromium")
