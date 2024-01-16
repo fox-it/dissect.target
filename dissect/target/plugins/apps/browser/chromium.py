@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-from typing import Iterator
+from typing import Iterator, Optional
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
@@ -111,7 +111,7 @@ class ChromiumMixin:
         if not len(self._build_userdirs(self.DIRS)):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
-    def downloads(self, browser_name: str = None) -> Iterator[BrowserDownloadRecord]:
+    def downloads(self, browser_name: Optional[str] = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
 
         Args:
@@ -174,7 +174,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    def cookies(self, browser_name: str = None) -> Iterator[BrowserCookieRecord]:
+    def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
         """Return browser cookie records from supported Chromium-based browsers.
         Args:
             browser_name: The name of the browser as a string.
@@ -214,7 +214,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
 
-    def extensions(self, browser_name: str = None) -> Iterator[BrowserExtensionRecord]:
+    def extensions(self, browser_name: Optional[str] = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.
 
         Parameters:
@@ -303,7 +303,7 @@ class ChromiumMixin:
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
-    def history(self, browser_name: str = None) -> Iterator[BrowserHistoryRecord]:
+    def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
