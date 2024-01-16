@@ -12,8 +12,9 @@ from dissect.target.tools.utils import (
 )
 
 try:
-    from dissect.target.helpers.mount import DissectMount
     from fuse import FUSE
+
+    from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
 except Exception:

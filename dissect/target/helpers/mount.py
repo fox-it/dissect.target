@@ -3,8 +3,9 @@ import logging
 from functools import lru_cache
 from typing import BinaryIO, Optional
 
-from dissect.target.filesystem import Filesystem, FilesystemEntry
 from fuse import FuseOSError, Operations
+
+from dissect.target.filesystem import Filesystem, FilesystemEntry
 
 log = logging.getLogger(__name__)
 
