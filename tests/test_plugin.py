@@ -2,7 +2,7 @@ import os
 from functools import reduce
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from flow.record import Record
