@@ -495,7 +495,7 @@ def register(plugincls: Type[Plugin]) -> None:
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
-    root["cls"] = plugincls
+    root["is_osplugin"] = issubclass(plugincls, OSPlugin)
 
 
 def internal(*args, **kwargs) -> Callable:
@@ -819,7 +819,7 @@ def load_module_from_name(module_path: str) -> None:
         # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
         importlib.import_module(module_path)
     except Exception as e:
-        log.error("Unable to import %s", module_path)
+        log.info("Unable to import %s", module_path)
         log.debug("Error while trying to import module %s", module_path, exc_info=e)
         save_plugin_import_failure(module_path)
 
@@ -1117,7 +1117,7 @@ def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDes
             available["exports"].remove("get_all_records")
 
         for exported in available["exports"]:
-            if issubclass(available["cls"], OSPlugin) and os_type == general.default.DefaultPlugin:
+            if available["is_osplugin"] and os_type == general.default.DefaultPlugin:
                 # This makes the os plugin exports listed under the special
                 # "OS plugins" header by the 'plugins' plugin.
                 available["module"] = ""

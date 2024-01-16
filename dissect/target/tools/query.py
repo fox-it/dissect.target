@@ -14,6 +14,7 @@ from dissect.target import Target
 from dissect.target.exceptions import (
     FatalError,
     PluginNotFoundError,
+    TargetError,
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
@@ -254,148 +255,152 @@ def main():
     execution_report.set_cli_args(args)
     execution_report.set_event_callbacks(Target)
 
-    for target in Target.open_all(targets, args.children):
-        if args.child:
-            try:
-                target = target.open_child(args.child)
-            except Exception:
-                target.log.exception("Exception while opening child '%s'", args.child)
-
-        if args.dry_run:
-            print(f"Dry run on: {target}")
-
-        record_entries = []
-        basic_entries = []
-        yield_entries = []
-
-        # Keep a set of plugins that were already executed on the target.
-        executed_plugins = set()
-
-        first_seen_output_type = default_output_type
-        cli_params_unparsed = rest
-
-        func_defs, _ = find_plugin_functions(target, args.function, compatibility=False)
-        excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
-        excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
-
-        for func_def in func_defs:
-            if func_def.path in excluded_func_paths:
-                continue
-
-            # Avoid executing same plugin for multiple OSes (like hostname)
-            if func_def.name in executed_plugins:
-                continue
-            executed_plugins.add(func_def.name)
-
-            # If the default type is record (meaning we skip everything else)
-            # and actual output type is not record, continue.
-            # We perform this check here because plugins that require output files/dirs
-            # will exit if we attempt to exec them without (because they are implied by the wildcard).
-            # Also this saves cycles of course.
-            if default_output_type == "record" and func_def.output_type != "record":
-                continue
+    try:
+        for target in Target.open_all(targets, args.children):
+            if args.child:
+                try:
+                    target = target.open_child(args.child)
+                except Exception:
+                    target.log.exception("Exception while opening child '%s'", args.child)
 
             if args.dry_run:
-                print(f"  execute: {func_def.name} ({func_def.path})")
-                continue
+                print(f"Dry run on: {target}")
 
-            try:
-                output_type, result, cli_params_unparsed = execute_function_on_target(
-                    target, func_def, cli_params_unparsed
-                )
-            except UnsupportedPluginError as e:
-                target.log.error(
-                    "Unsupported plugin for %s: %s",
-                    func_def.name,
-                    e.root_cause_str(),
-                )
+            record_entries = []
+            basic_entries = []
+            yield_entries = []
 
-                target.log.debug("%s", func_def, exc_info=e)
-                continue
-            except PluginNotFoundError:
-                target.log.error("Cannot find plugin `%s`", func_def)
-                continue
-            except FatalError as fatal:
-                fatal.emit_last_message(target.log.error)
-                parser.exit(1)
-            except Exception:
-                target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
-                continue
+            # Keep a set of plugins that were already executed on the target.
+            executed_plugins = set()
 
-            if first_seen_output_type and output_type != first_seen_output_type:
-                target.log.error(
-                    (
-                        "Can't mix functions that generate different outputs: output type `%s` from `%s` "
-                        "does not match first seen output `%s`."
-                    ),
-                    output_type,
-                    func_def,
-                    first_seen_output_type,
-                )
-                parser.exit()
+            first_seen_output_type = default_output_type
+            cli_params_unparsed = rest
 
-            if not first_seen_output_type:
-                first_seen_output_type = output_type
+            func_defs, _ = find_plugin_functions(target, args.function, compatibility=False)
+            excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
+            excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
-            if output_type == "record":
-                record_entries.append(result)
-            elif output_type == "yield":
-                yield_entries.append(result)
-            elif output_type == "none":
-                target.log.info("No result for function `%s` (output type is set to 'none')", func_def)
-                continue
-            else:
-                basic_entries.append(result)
+            for func_def in func_defs:
+                if func_def.path in excluded_func_paths:
+                    continue
 
-        # Write basic functions
-        if len(basic_entries) > 0:
-            basic_entries_delim = args.delimiter.join(map(str, basic_entries))
-            if not args.cmdb:
-                print(f"{target} {basic_entries_delim}")
-            else:
-                print(f"{target.path}{args.delimiter}{basic_entries_delim}")
+                # Avoid executing same plugin for multiple OSes (like hostname)
+                if func_def.name in executed_plugins:
+                    continue
+                executed_plugins.add(func_def.name)
 
-        # Write yield functions
-        for entry in yield_entries:
-            for e in entry:
-                print(e)
+                # If the default type is record (meaning we skip everything else)
+                # and actual output type is not record, continue.
+                # We perform this check here because plugins that require output files/dirs
+                # will exit if we attempt to exec them without (because they are implied by the wildcard).
+                # Also this saves cycles of course.
+                if default_output_type == "record" and func_def.output_type != "record":
+                    continue
 
-        # Write records
-        count = 0
-        break_out = False
+                if args.dry_run:
+                    print(f"  execute: {func_def.name} ({func_def.path})")
+                    continue
 
-        modifier_type = None
+                try:
+                    output_type, result, cli_params_unparsed = execute_function_on_target(
+                        target, func_def, cli_params_unparsed
+                    )
+                except UnsupportedPluginError as e:
+                    target.log.error(
+                        "Unsupported plugin for %s: %s",
+                        func_def.name,
+                        e.root_cause_str(),
+                    )
 
-        if args.resolve:
-            modifier_type = record_modifier.Modifier.RESOLVE
+                    target.log.debug("%s", func_def, exc_info=e)
+                    continue
+                except PluginNotFoundError:
+                    target.log.error("Cannot find plugin `%s`", func_def)
+                    continue
+                except FatalError as fatal:
+                    fatal.emit_last_message(target.log.error)
+                    parser.exit(1)
+                except Exception:
+                    target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
+                    continue
 
-        if args.hash:
-            modifier_type = record_modifier.Modifier.HASH
+                if first_seen_output_type and output_type != first_seen_output_type:
+                    target.log.error(
+                        (
+                            "Can't mix functions that generate different outputs: output type `%s` from `%s` "
+                            "does not match first seen output `%s`."
+                        ),
+                        output_type,
+                        func_def,
+                        first_seen_output_type,
+                    )
+                    parser.exit()
 
-        modifier_func = record_modifier.get_modifier_function(modifier_type)
+                if not first_seen_output_type:
+                    first_seen_output_type = output_type
 
-        if not len(record_entries):
-            continue
-
-        rs = record_output(args.strings, args.json)
-        for entry in record_entries:
-            try:
-                for record_entries in entry:
-                    rs.write(modifier_func(target, record_entries))
-                    count += 1
-                    if args.limit is not None and count >= args.limit:
-                        break_out = True
-                        break
-            except Exception as e:
-                # Ignore errors if multiple functions
-                if len(funcs) > 1:
-                    target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
-                    pass
+                if output_type == "record":
+                    record_entries.append(result)
+                elif output_type == "yield":
+                    yield_entries.append(result)
+                elif output_type == "none":
+                    target.log.info("No result for function `%s` (output type is set to 'none')", func_def)
+                    continue
                 else:
-                    raise e
+                    basic_entries.append(result)
 
-            if break_out:
-                break
+            # Write basic functions
+            if len(basic_entries) > 0:
+                basic_entries_delim = args.delimiter.join(map(str, basic_entries))
+                if not args.cmdb:
+                    print(f"{target} {basic_entries_delim}")
+                else:
+                    print(f"{target.path}{args.delimiter}{basic_entries_delim}")
+
+            # Write yield functions
+            for entry in yield_entries:
+                for e in entry:
+                    print(e)
+
+            # Write records
+            count = 0
+            break_out = False
+
+            modifier_type = None
+
+            if args.resolve:
+                modifier_type = record_modifier.Modifier.RESOLVE
+
+            if args.hash:
+                modifier_type = record_modifier.Modifier.HASH
+
+            modifier_func = record_modifier.get_modifier_function(modifier_type)
+
+            if not record_entries:
+                continue
+
+            rs = record_output(args.strings, args.json)
+            for entry in record_entries:
+                try:
+                    for record_entries in entry:
+                        rs.write(modifier_func(target, record_entries))
+                        count += 1
+                        if args.limit is not None and count >= args.limit:
+                            break_out = True
+                            break
+                except Exception as e:
+                    # Ignore errors if multiple functions
+                    if len(funcs) > 1:
+                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    else:
+                        raise e
+
+                if break_out:
+                    break
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
 
     timestamp = datetime.utcnow()
 

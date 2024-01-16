@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Iterator, Optional
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
@@ -18,12 +18,12 @@ RE_CONFIG_USER = re.compile(r"bind system user (?P<user>[^ ]+) ")
 RE_LOADER_CONFIG_KERNEL_VERSION = re.compile(r'kernel="/(?P<version>.*)"')
 
 
-class CitrixBsdPlugin(BsdPlugin):
+class CitrixPlugin(BsdPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._ips = []
         self._hostname = None
-        self.config_usernames = []
+        self._config_usernames = []
         self._parse_netscaler_configs()
 
     def _parse_netscaler_configs(self) -> None:
@@ -49,26 +49,46 @@ class CitrixBsdPlugin(BsdPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
-        newfilesystem = VirtualFilesystem()
-        is_citrix = False
+        ramdisk = None
+        for fs in target.filesystems:
+            # /netscaler can be present on both the ramdisk and the harddisk. Therefore we also check for the /log
+            # folder, which is not present on the ramdisk. We regard the harddisk as the system volume, as it is
+            # possible to only have a disk image of a Netscaler. However, in the case where we only have the ramdisk,
+            # we want to fall back on that as the system volume. Thus we store that filesystem in a fallback variable.
+            if fs.exists("/netscaler"):
+                if fs.exists("/log"):
+                    return fs
+                ramdisk = fs
+
+        # At this point, we could not find the filesystem for '/var'. Thus, we fall back to the ramdisk variable, which
+        # is either 'None' (in which case this isn't a Citrix netscaler), or points to the filesystem of the ramdisk.
+        return ramdisk
+
+    @classmethod
+    def create(cls, target: Target, sysvol: Filesystem) -> CitrixPlugin:
+        # A disk image of a Citrix Netscaler contains two partitions, that after boot are mounted to /var and /flash.
+        # The rest of the filesystem is recreated at runtime into a 'ramdisk'. Currently, this plugin does not
+        # yet support recreating the ramdisk from a 'clean' state. This might be possible in a future iteration but
+        # requires further research.
+
+        # When the ramdisk is present within the target's filesystems, mount it accordingly,
         for fs in target.filesystems:
             if fs.exists("/bin/freebsd-version"):
-                newfilesystem.map_fs("/", fs)
-                break
+                # If available, mount the ramdisk first.
+                target.fs.mount("/", fs)
+        # The 'disk' filesystem is mounted at '/var'.
+        target.fs.mount("/var", sysvol)
+
+        # Enumerate filesystems for flash partition
         for fs in target.filesystems:
             if fs.exists("/nsconfig") and fs.exists("/boot"):
-                newfilesystem.map_fs("/flash", fs)
-                is_citrix = True
-            elif fs.exists("/netscaler"):
-                newfilesystem.map_fs("/var", fs)
-                is_citrix = True
-        if is_citrix:
-            return newfilesystem
-        return None
+                target.fs.mount("/flash", fs)
+
+        return cls(target)
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
-        return self._hostname
+        return self._hostname or super().hostname
 
     @export(property=True)
     def version(self) -> Optional[str]:
@@ -96,16 +116,21 @@ class CitrixBsdPlugin(BsdPlugin):
     @export(record=UnixUserRecord)
     def users(self) -> Iterator[UnixUserRecord]:
         nstmp_users = set()
-        nstmp_path = "/var/nstmp/"
+        seen = set()
+        nstmp_path = self.target.fs.path("/var/nstmp/")
 
-        nstmp_user_path = nstmp_path + "{username}"
+        # Build a set of nstmp users
+        if nstmp_path.exists():
+            for entry in nstmp_path.iterdir():
+                if entry.is_dir() and entry.name != "#nsinternal#":
+                    # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
+                    username = "nsmonitor" if entry.name == "monitors" else entry.name
+                    nstmp_users.add(username)
 
-        for entry in self.target.fs.scandir(nstmp_path):
-            if entry.is_dir() and entry.name != "#nsinternal#":
-                nstmp_users.add(entry.name)
+        # Yield users from the config, matching them to their 'home' in /var/nstmp if it exists.
         for username in self._config_usernames:
-            nstmp_home = nstmp_user_path.format(username=username)
-            user_home = nstmp_home if self.target.fs.exists(nstmp_home) else None
+            nstmp_home = nstmp_path.joinpath(username)
+            user_home = nstmp_home if nstmp_home.exists() else None
 
             if user_home:
                 # After this loop we will yield all users who are not in the config, but are listed in /var/nstmp/
@@ -114,13 +139,28 @@ class CitrixBsdPlugin(BsdPlugin):
 
             if username == "root" and self.target.fs.exists("/root"):
                 # If we got here, 'root' is present both in /var/nstmp and in /root. In such cases, we yield
-                # the 'root' user as having '/root' as a home, not in /var/nstmp.
-                user_home = "/root"
+                # the 'root' user as having '/root' as a home, not in /var/nstmp, as there is no 'nscli_history'
+                # for the root user in /var/nstmp.
+                user_home = self.target.fs.path("/root")
 
+            seen.add((username, user_home.as_posix() if user_home else None, None))
             yield UnixUserRecord(name=username, home=user_home)
 
+        # Yield all users in nstmp that were not observed in the config
         for username in nstmp_users:
-            yield UnixUserRecord(name=username, home=nstmp_user_path.format(username=username))
+            # The nsmonitor user has a home directory of /var/nstmp/monitors rather than /var/nstmp/nsmonitor
+            home = nstmp_path.joinpath(username) if username != "nsmonitor" else nstmp_path.joinpath("monitors")
+            seen.add((username, home.as_posix(), None))
+            yield UnixUserRecord(name=username, home=home)
+
+        # Yield users from /etc/passwd if we have not seem them in previous loops
+        for user in super().users():
+            if (user.name, user.home.as_posix(), user.shell) in seen:
+                continue
+            # To prevent bogus command history for all users without a home whenever a history is located at the root
+            # of the filesystem, we set the user home to None if their home is equivalent to '/'
+            user.home = user.home if user.home != "/" else None
+            yield user
 
     @export(property=True)
     def os(self) -> str:
