@@ -308,9 +308,11 @@ class Xml(ConfigurationParser):
 
         if not tree:
             # Document could not be parsed, we give up
-            self.parsed_data = {"nodes": tree, "errors": errors, "text": content}
-        else:
-            self.parsed_data = {"nodes": tree, "errors": errors}
+        if not tree:
+            # Document could not be parsed, we give up
+            raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")
+
+        self.parsed_data = {**tree, "errors": errors}
 
 
 class ScopeManager:
