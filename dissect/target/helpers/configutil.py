@@ -297,7 +297,7 @@ class Xml(ConfigurationParser):
         document = content
         errors = 0
         limit = 20
-        tree = None
+        tree = {}
         while not tree and errors < limit:
             try:
                 tree = self._tree(ElementTree.fromstring(document))
