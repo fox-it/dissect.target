@@ -77,7 +77,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
             "_data/helpers/configutil/test.xml",
             {
                 "Server": {
-                    "Listener": ["a", "b"], # @todo add attributes on list items
+                    "Listener": ["a", "b"],  # @todo add attributes on list items
                     "Service": {
                         "Connector": {
                             "port": "8080",
