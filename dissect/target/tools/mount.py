@@ -13,25 +13,34 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
 )
 
-log = logging.getLogger(__name__)
-logging.lastResort = None
-logging.raiseExceptions = False
+# Setting logging level to info for startup information.
+logging.basicConfig(level=logging.INFO)
 
 try:
     if feature_enabled(Feature.BETA):
         from fuse3 import FUSE3 as FUSE
+        from fuse3 import util
 
-        log.debug("Using fuse3 library")
+        FUSE_VERSION = "3"
+        FUSE_LIB_PATH = util.libfuse._name
     else:
-        from fuse import FUSE
+        from fuse import FUSE, _libfuse
 
-        log.debug("Using fuse2 library")
+        FUSE_VERSION = "2"
+        FUSE_LIB_PATH = _libfuse._name
+
+    logging.info(f"Using fuse{FUSE_VERSION} library: {FUSE_LIB_PATH}")
 
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
 except Exception:
     HAS_FUSE = False
+
+
+log = logging.getLogger(__name__)
+logging.lastResort = None
+logging.raiseExceptions = False
 
 
 @catch_sigpipe
