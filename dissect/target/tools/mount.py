@@ -29,7 +29,7 @@ try:
         FUSE_VERSION = "2"
         FUSE_LIB_PATH = _libfuse._name
 
-    logging.info(f"Using fuse{FUSE_VERSION} library: {FUSE_LIB_PATH}")
+    logging.info("Using fuse%s library: %s", FUSE_VERSION, FUSE_LIB_PATH)
 
     from dissect.target.helpers.mount import DissectMount
 
