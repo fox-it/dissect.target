@@ -4,9 +4,7 @@ import textwrap
 from io import BytesIO
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.bsd.citrix.commandhistory import (
-    CitrixCommandHistoryPlugin,
-)
+from dissect.target.plugins.os.unix.bsd.citrix.history import CitrixCommandHistoryPlugin
 from dissect.target.target import Target
 
 
@@ -72,10 +70,7 @@ def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem)
     shell
     """
 
-    fs_bsd.map_file_fh(
-        "/var/nstmp/user/.nscli_history",
-        BytesIO(textwrap.dedent(commandhistory_data).encode()),
-    )
+    fs_bsd.map_file_fh("/var/nstmp/user/.nscli_history", BytesIO(textwrap.dedent(commandhistory_data).encode()))
 
     target_citrix.add_plugin(CitrixCommandHistoryPlugin)
 
