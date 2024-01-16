@@ -2,6 +2,8 @@ import argparse
 import logging
 from typing import Union
 
+from dissect.util.feature import Feature, feature_enabled
+
 from dissect.target import Target, filesystem
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.utils import parse_options_string
@@ -11,14 +13,30 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
 )
 
+# Setting logging level to info for startup information.
+logging.basicConfig(level=logging.INFO)
+
 try:
-    from fuse import FUSE
+    if feature_enabled(Feature.BETA):
+        from fuse3 import FUSE3 as FUSE
+        from fuse3 import util
+
+        FUSE_VERSION = "3"
+        FUSE_LIB_PATH = util.libfuse._name
+    else:
+        from fuse import FUSE, _libfuse
+
+        FUSE_VERSION = "2"
+        FUSE_LIB_PATH = _libfuse._name
+
+    logging.info("Using fuse%s library: %s", FUSE_VERSION, FUSE_LIB_PATH)
 
     from dissect.target.helpers.mount import DissectMount
 
     HAS_FUSE = True
 except Exception:
     HAS_FUSE = False
+
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -92,7 +110,7 @@ def main():
 
 
 def _format_options(options: dict[str, Union[str, bool]]) -> str:
-    return ",".join([key if value is True else f"{key}={value}" for key, value in options.items()])
+    return ",".join(key if value is True else f"{key}={value}" for key, value in options.items())
 
 
 if __name__ == "__main__":
