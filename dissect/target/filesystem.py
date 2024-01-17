@@ -4,6 +4,7 @@ import gzip
 import io
 import logging
 import os
+import pathlib
 import stat
 import warnings
 from collections import defaultdict
@@ -954,6 +955,10 @@ class VirtualFileHandle(io.RawIOBase):
 class VirtualFile(FilesystemEntry):
     """Virtual file backed by a file-like object."""
 
+    def __init__(self, fs: Filesystem, path: str, entry: Any, stat=None) -> None:
+        super().__init__(fs, path, entry)
+        self._stat = stat
+
     def attr(self) -> Any:
         raise TypeError(f"attr is not allowed on {self.__class__.__name__}: {self.path}")
 
@@ -979,6 +984,9 @@ class VirtualFile(FilesystemEntry):
         return self.lstat()
 
     def lstat(self) -> fsutil.stat_result:
+        if self._stat:
+            return self._stat
+
         size = getattr(self.entry, "size", 0)
         file_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFREG, file_addr, id(self.fs), 1, 0, 0, size, 0, 0, 0])
@@ -1237,6 +1245,32 @@ class VirtualFilesystem(Filesystem):
 
             entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
             directory.add(entry_name, entry)
+
+    def map_dir_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path], custom_path=None) -> None:
+        """Map files in a tar onto the VFS."""
+        from dissect.target.filesystems.tar import TarFilesystem
+
+        if not isinstance(tar_file, pathlib.Path):
+            try:
+                tar_file = pathlib.Path(tar_file)
+            except TypeError:
+                raise ValueError("tar_file should be a string or Path instance")
+
+        tfs = TarFilesystem(tar_file.open("rb"))
+        for _, _, files in tfs.walk_ext("/"):
+            for file in files:
+                vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
+                if custom_path:
+                    file_path = vfspath.lstrip("/")
+                else:
+                    file_path = vfspath.lstrip("/") + "/" + file.path
+                self.map_file_entry(file_path, VirtualFile(self, file_path, file.open(), stat=file.stat()))
+
+    def map_file_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path]) -> None:
+        """Map a single file in a tar archive to the given path in the VFS.
+
+        NOTE: The provided tar archive should contain *one* file."""
+        return self.map_dir_from_tar(vfspath, tar_file, custom_path=True)
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location.
