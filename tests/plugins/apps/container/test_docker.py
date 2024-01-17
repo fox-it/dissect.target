@@ -1,15 +1,28 @@
 import datetime
+from io import BytesIO
 
-from dissect.target.plugins.apps.container.docker import (
-    DockerPlugin,
-    _convert_timestamp,
-)
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers.docker import convert_timestamp, strip_log
+from dissect.target.plugins.apps.container.docker import DockerPlugin, find_installs
 from tests._utils import absolute_path
 
 
-def test_docker_plugin_images(target_unix_users, fs_unix):
-    """Test docker image listing."""
+def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    fs_unix.makedirs("var/lib/docker")
+    fs_unix.makedirs("tmp/foo/bar")
+    fs_unix.makedirs("tmp/another/docker")
+    fs_unix.map_file_fh("/etc/docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
+    fs_unix.map_file_fh("/root/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/another/docker"}'))
 
+    assert [str(p) for p in find_installs(target_unix_users)] == [
+        "/var/lib/docker",
+        "/tmp/foo/bar",
+        "/tmp/another/docker",
+    ]
+
+
+def test_docker_plugin_images(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file(
         "/var/lib/docker/image/overlay2/repositories.json",
         absolute_path("_data/plugins/apps/container/docker/repositories.json"),
@@ -30,9 +43,7 @@ def test_docker_plugin_images(target_unix_users, fs_unix):
     assert results[0].created == datetime.datetime(2022, 12, 9, 1, 20, 31, 321639, tzinfo=datetime.timezone.utc)
 
 
-def test_docker_plugin_containers(target_unix_users, fs_unix):
-    """Test docker container config.v2.json example."""
-
+def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     id = "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f"
 
     fs_unix.map_file(
@@ -58,14 +69,52 @@ def test_docker_plugin_containers(target_unix_users, fs_unix):
     assert result.volumes == ["/tmp/test:/test"]
 
 
-def test_docker_plugin_timestamps():
-    """Test the docker convert_timestamp function."""
+def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
+    target_linux_docker_logs.add_plugin(DockerPlugin)
+    results = list(target_linux_docker_logs.docker.logs())
 
+    assert len(results) == 288
+
+    # json log driver
+    assert results[40].ts == datetime.datetime(2023, 11, 9, 8, 43, 42, 321404, tzinfo=datetime.timezone.utc)
+    assert results[40].container == "f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
+    assert results[40].stream == "stdout"
+    assert results[40].message == '~ # echo \'[BS]"ths [BS][BS]s [BS][BS]is is a secret!" > secret.txt'
+
+    # local log driver (protobuf)
+    assert results[-1].ts == datetime.datetime(2023, 11, 9, 9, 52, 52, 587579, tzinfo=datetime.timezone.utc)
+    assert results[-1].container == "0627aa2d32de2478f4a3e8bb3c655ea7baa1a3463d8cee41263655244fe4717c"
+    assert results[-1].stream == "stdout"
+    assert results[-1].message == "exit"
+
+
+def test_docker_plugin_logs_raw(target_linux_docker_logs: Target) -> None:
+    target_linux_docker_logs.add_plugin(DockerPlugin)
+    results = list(target_linux_docker_logs.docker.logs(raw_messages=True))
+
+    assert len(results) == 288
+
+    assert (
+        results[40].message
+        == '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'
+    )  # noqa
+    assert results[-1].message == "\x1b[?2004l\rexit\r"
+
+
+def test_docker_plugin_timestamps() -> None:
     # Should not alter already correct timestamps
-    assert _convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
-    assert _convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
+    assert convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
 
     # Should convert nanosecond timestamps to microsecond timestamps
-    assert _convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
-    assert _convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
-    assert _convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
+    assert convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
+    assert convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
+
+
+def test_backspace_interpretation() -> None:
+    # Should 'execute' backspaces found in input
+    input = (
+        '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'
+    )
+    assert strip_log(input, exc_backspace=True) == '~ # echo "this is a secret!" > secret.txt'
