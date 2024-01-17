@@ -254,7 +254,7 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix") -> Optional[str]:
+    def _get_architecture(self, os: str = "unix", custom_file: str = None) -> Optional[str]:
         arch_strings = {
             0x00: "Unknown",
             0x02: "SPARC",
@@ -270,9 +270,10 @@ class UnixPlugin(OSPlugin):
             0xF3: "RISC-V",
         }
 
+        bin_file = custom_file if custom_file is not None else "/bin/ls"
         for fs in self.target.filesystems:
-            if fs.exists("/bin/ls"):
-                fh = fs.open("/bin/ls")
+            if fs.exists(bin_file):
+                fh = fs.open(bin_file)
                 fh.seek(4)
                 # ELF - e_ident[EI_CLASS]
                 bits = unpack("B", fh.read(1))[0]

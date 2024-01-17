@@ -14,7 +14,15 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def activity(self) -> Optional[datetime]:
         """Return last seen activity based on filesystem timestamps."""
-        var_log = self.target.fs.path("/var/log")
+
+        if self.target.os == "fortios":
+            log_dirs = ["/var/log/log/root", "/var/log/root"]
+            for ld in log_dirs:
+                if (var_log := self.target.fs.path(ld)).exists():
+                    break
+        else:
+            var_log = self.target.fs.path("/var/log")
+
         if not var_log.exists():
             return
 

@@ -64,7 +64,7 @@ class OperatingSystem(StrEnum):
     ANDROID = "android"
     VYOS = "vyos"
     IOS = "ios"
-    FORTIGATE = "fortigate"
+    FORTIOS = "fortios"
     CITRIX = "citrix-netscaler"
 
 
