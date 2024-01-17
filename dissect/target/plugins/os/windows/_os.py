@@ -38,11 +38,6 @@ class WindowsPlugin(OSPlugin):
                 if fs.exists("boot") and fs.exists("boot/BCD"):
                     target.fs.mount("efi", fs)
 
-        if target.fs.exists("sysvol/windows"):
-            target.windir = target.fs.get("sysvol/windows")
-        else:
-            target.windir = target.fs.get("sysvol/winnt")
-
         return cls(target)
 
     def add_mounts(self) -> None:
