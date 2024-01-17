@@ -1,37 +1,15 @@
 import datetime
-from io import BytesIO
 
-from dissect.target.helpers.docker import convert_timestamp
-from dissect.target.plugins.apps.container.docker import DockerPlugin, find_installs
+from dissect.target.plugins.apps.container.docker import (
+    DockerPlugin,
+    _convert_timestamp,
+)
 from tests._utils import absolute_path
 
 
-def test_docker_plugin_data_roots(target_unix_users, fs_unix):
-    fs_unix.makedirs("var/lib/docker")
-    fs_unix.makedirs("tmp/foo/bar")
-    fs_unix.makedirs("tmp/another/docker")
-    fs_unix.map_file_fh("/etc/docker/daemon.json", BytesIO(b'{"data-root": "/tmp/foo/bar"}'))
-    fs_unix.map_file_fh("/root/.docker/daemon.json", BytesIO(b'{"data-root": "/tmp/another/docker"}'))
-
-    assert [str(p) for p in find_installs(target_unix_users)] == [
-        "/var/lib/docker",
-        "/tmp/foo/bar",
-        "/tmp/another/docker",
-    ]
-
-
-def test_docker_plugin_timestamps():
-    # Should not alter already correct timestamps
-    assert convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
-    assert convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
-
-    # Should convert nanosecond timestamps to microsecond timestamps
-    assert convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
-    assert convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
-    assert convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
-
-
 def test_docker_plugin_images(target_unix_users, fs_unix):
+    """Test docker image listing."""
+
     fs_unix.map_file(
         "/var/lib/docker/image/overlay2/repositories.json",
         absolute_path("_data/plugins/apps/container/docker/repositories.json"),
@@ -53,6 +31,8 @@ def test_docker_plugin_images(target_unix_users, fs_unix):
 
 
 def test_docker_plugin_containers(target_unix_users, fs_unix):
+    """Test docker container config.v2.json example."""
+
     id = "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f"
 
     fs_unix.map_file(
@@ -78,31 +58,14 @@ def test_docker_plugin_containers(target_unix_users, fs_unix):
     assert result.volumes == ["/tmp/test:/test"]
 
 
-def test_docker_plugin_logs(target_linux_docker_logs):
-    target_linux_docker_logs.add_plugin(DockerPlugin)
-    results = list(target_linux_docker_logs.docker.logs())
+def test_docker_plugin_timestamps():
+    """Test the docker convert_timestamp function."""
 
-    assert len(results) == 288
+    # Should not alter already correct timestamps
+    assert _convert_timestamp("2022-12-19T13:37:00.123456") == "2022-12-19T13:37:00.123456"
+    assert _convert_timestamp("2022-12-19T13:37:00.123456Z") == "2022-12-19T13:37:00.123456Z"
 
-    # json log driver
-    assert results[40].ts == datetime.datetime(2023, 11, 9, 8, 43, 42, 321404, tzinfo=datetime.timezone.utc)
-    assert results[40].container == "f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
-    assert results[40].stream == "stdout"
-    assert (
-        results[40].message
-        == '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'  # noqa
-    )
-
-    # local log driver (protobuf)
-    assert results[-1].ts == datetime.datetime(2023, 11, 9, 9, 52, 52, 587579, tzinfo=datetime.timezone.utc)
-    assert results[-1].container == "0627aa2d32de2478f4a3e8bb3c655ea7baa1a3463d8cee41263655244fe4717c"
-    assert results[-1].stream == "stdout"
-    assert results[-1].message == "\x1b[?2004l\rexit\r"
-
-    # TODO: gz compressed json and local logs
-    #   *-json.log
-    #   *-json.log.1
-    #   *-json.log.2.gz
-    #   local-logs/container.log
-    #   local-logs/container.log.1
-    #   local-logs/container.log.2.gz
+    # Should convert nanosecond timestamps to microsecond timestamps
+    assert _convert_timestamp("2022-12-19T13:37:00.123456789Z") == "2022-12-19T13:37:00.123456Z"
+    assert _convert_timestamp("2022-12-19T13:37:00.12345678Z") == "2022-12-19T13:37:00.123456Z"
+    assert _convert_timestamp("2022-12-19T13:37:00.123456789+01:00") == "2022-12-19T13:37:00.123456+01:00"
