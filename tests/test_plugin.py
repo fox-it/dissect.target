@@ -2,7 +2,7 @@ import os
 from functools import reduce
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from flow.record import Record
@@ -82,9 +82,9 @@ class MockOSWarpPlugin(OSPlugin):
 @patch(
     "dissect.target.plugin.plugins",
     return_value=[
-        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "cls": MagicMock},
-        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "cls": MagicMock},
-        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "cls": MockOSWarpPlugin},
+        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "is_osplugin": False},
+        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "is_osplugin": False},
+        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "is_osplugin": True},
     ],
 )
 @patch("dissect.target.Target", create=True)
@@ -142,7 +142,7 @@ def test_find_plugin_function_linux(target_linux: Target) -> None:
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/test",
     [
-        ("string", "test"),
+        ("string", "value"),
     ],
 )
 
@@ -150,13 +150,18 @@ TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
 class _TestNSPlugin(NamespacePlugin):
     __namespace__ = "NS"
 
+    @export(record=TestRecord)
+    def test_all(self):
+        # Iterate all functions of all subclasses
+        yield from self.test()
+
 
 class _TestSubPlugin1(_TestNSPlugin):
     __namespace__ = "t1"
 
     @export(record=TestRecord)
     def test(self):
-        yield TestRecord(test="test1")
+        yield TestRecord(value="test1")
 
 
 class _TestSubPlugin2(_TestNSPlugin):
@@ -164,7 +169,31 @@ class _TestSubPlugin2(_TestNSPlugin):
 
     @export(record=TestRecord)
     def test(self):
-        yield TestRecord(test="test2")
+        yield TestRecord(value="test2")
+
+
+class _TestSubPlugin3(_TestSubPlugin2):
+    __namespace__ = "t3"
+
+    # Override the test() function of t2
+    @export(record=TestRecord)
+    def test(self):
+        yield TestRecord(value=self._value())
+
+    def _value(self):
+        return "test3"
+
+
+class _TestSubPlugin4(_TestSubPlugin3):
+    __namespace__ = "t4"
+
+    # Do not override the test() function of t3, but change the _value function instead.
+    def _value(self):
+        return "test4"
+
+    @export(record=TestRecord)
+    def test_all(self):
+        yield TestRecord(value="overridden")
 
 
 def test_namespace_plugin(target_win: Target) -> None:
@@ -173,9 +202,23 @@ def test_namespace_plugin(target_win: Target) -> None:
 
     target_win._register_plugin_functions(_TestSubPlugin1(target_win))
     target_win._register_plugin_functions(_TestSubPlugin2(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin3(target_win))
+    target_win._register_plugin_functions(_TestSubPlugin4(target_win))
     target_win._register_plugin_functions(_TestNSPlugin(target_win))
-    assert len(list(target_win.NS.test())) == 2
-    assert len(target_win.NS.SUBPLUGINS) == 2
+    assert len(list(target_win.NS.test())) == 4
+    assert len(target_win.NS.SUBPLUGINS) == 4
+
+    assert sorted([item.value for item in target_win.NS.test()]) == ["test1", "test2", "test3", "test4"]
+    assert sorted([item.value for item in target_win.t1.test()]) == ["test1"]
+    assert sorted([item.value for item in target_win.t2.test()]) == ["test2"]
+    assert sorted([item.value for item in target_win.t3.test()]) == ["test3"]
+    assert sorted([item.value for item in target_win.t4.test()]) == ["test4"]
+
+    # Check whether we can access all subclass functions from the superclass
+    assert sorted([item.value for item in target_win.NS.test_all()]) == ["test1", "test2", "test3", "test4"]
+
+    # Check whether we can access the overridden function when explicitly accessing the subplugin
+    assert next(target_win.t4.test_all()).value == "overridden"
 
     # Remove test plugin from list afterwards to avoid order effects
     del PLUGINS["tests"]

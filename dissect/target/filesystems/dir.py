@@ -60,9 +60,12 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         return self.fs.get(path)
 
     def open(self) -> BinaryIO:
-        if self.is_dir():
-            raise IsADirectoryError(self.path)
-        return self._resolve().entry.open("rb")
+        try:
+            if self.is_dir():
+                raise IsADirectoryError(self.path)
+            return self._resolve().entry.open("rb")
+        except (PermissionError, OSError) as e:
+            raise FilesystemError from e
 
     def iterdir(self) -> Iterator[str]:
         if not self.is_dir():
@@ -104,7 +107,10 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             return False
 
     def is_symlink(self) -> bool:
-        return self.entry.is_symlink()
+        try:
+            return self.entry.is_symlink()
+        except (FilesystemError, OSError):
+            return False
 
     def readlink(self) -> str:
         return os.readlink(self.entry)  # Python 3.7 compatibility

@@ -23,6 +23,11 @@ from dissect.target.helpers.loaderutil import extract_path_info
             "tar:///folder/file.tar.gz",
             (Path("/folder/file.tar.gz"), urllib.parse.urlparse("tar:///folder/file.tar.gz")),
         ),
+        (
+            "tar://relative/folder/file.tar.gz",
+            (Path("relative/folder/file.tar.gz"), urllib.parse.urlparse("tar://relative/folder/file.tar.gz")),
+        ),
+        ("tar://~/file.tar.gz", (Path("~/file.tar.gz"), urllib.parse.urlparse("tar://~/file.tar.gz"))),
         # But not if the URI has a faux scheme
         ("C:\\path\\to\\file", (Path("C:\\path\\to\\file"), None)),
     ],
