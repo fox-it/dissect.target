@@ -1,20 +1,16 @@
-"""Pathlib like abstraction helpers for target filesystem.
-
-Also contains some other filesystem related utilities.
-"""
+"""Filesystem and path related utilities."""
 
 from __future__ import annotations
 
-import errno
 import fnmatch
 import gzip
 import hashlib
 import io
 import logging
 import os
-import posixpath
 import re
-from pathlib import Path, PurePath, _PathParents, _PosixFlavour
+import sys
+from pathlib import Path
 from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
 
 try:
@@ -25,66 +21,67 @@ except ImportError:
     HAVE_BZ2 = False
 
 import dissect.target.filesystem as filesystem
-from dissect.target.exceptions import (
-    FileNotFoundError,
-    NotADirectoryError,
-    NotASymlinkError,
-    SymlinkRecursionError,
+from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
+from dissect.target.helpers.polypath import (
+    abspath,
+    basename,
+    commonpath,
+    dirname,
+    isabs,
+    join,
+    normalize,
+    normpath,
+    relpath,
+    split,
+    splitdrive,
+    splitext,
+    splitroot,
 )
+
+if sys.version_info >= (3, 12):
+    from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 11):
+    from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 10):
+    from dissect.target.helpers.compat.path_310 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 9):
+    from dissect.target.helpers.compat.path_39 import PureDissectPath, TargetPath
+else:
+    raise RuntimeError("dissect.target requires at least Python 3.9")
+
 
 log = logging.getLogger(__name__)
 
-re_normalize_path = re.compile(r"[/]+")
-re_normalize_sbs_path = re.compile(r"[\\/]+")
 re_glob_magic = re.compile(r"[*?[]")
 re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]")
 
-
-def normalize(path: str, alt_separator: str = "") -> str:
-    if alt_separator == "\\":
-        return re_normalize_sbs_path.sub("/", path)
-    else:
-        return re_normalize_path.sub("/", path)
-
-
-def join(*args, alt_separator: str = "") -> str:
-    return posixpath.join(*[normalize(part, alt_separator=alt_separator) for part in args])
-
-
-def dirname(path: str, alt_separator: str = "") -> str:
-    return posixpath.dirname(normalize(path, alt_separator=alt_separator))
-
-
-def basename(path: str, alt_separator: str = "") -> str:
-    return posixpath.basename(normalize(path, alt_separator=alt_separator))
-
-
-def split(path: str, alt_separator: str = "") -> str:
-    return posixpath.split(normalize(path, alt_separator=alt_separator))
-
-
-def isabs(path: str, alt_separator: str = "") -> str:
-    return posixpath.isabs(normalize(path, alt_separator=alt_separator))
-
-
-def normpath(path: str, alt_separator: str = "") -> str:
-    return posixpath.normpath(normalize(path, alt_separator=alt_separator))
-
-
-def abspath(path: str, cwd: str = "", alt_separator: str = "") -> str:
-    cwd = cwd or "/"
-    cwd = normalize(cwd, alt_separator=alt_separator)
-    path = normalize(path, alt_separator=alt_separator)
-    if not isabs(path):
-        path = join(cwd, path)
-    return posixpath.normpath(path)
-
-
-def relpath(path: str, start: str, alt_separator: str = "") -> str:
-    return posixpath.relpath(
-        normalize(path, alt_separator=alt_separator),
-        normalize(start, alt_separator=alt_separator),
-    )
+__all__ = [
+    "abspath",
+    "basename",
+    "commonpath",
+    "dirname",
+    "fs_attrs",
+    "generate_addr",
+    "glob_ext",
+    "glob_split",
+    "isabs",
+    "join",
+    "normalize",
+    "normpath",
+    "open_decompress",
+    "PureDissectPath",
+    "relpath",
+    "resolve_link",
+    "reverse_readlines",
+    "split",
+    "splitdrive",
+    "splitext",
+    "splitroot",
+    "stat_result",
+    "TargetPath",
+    "walk_ext",
+    "walk",
+]
 
 
 def generate_addr(path: Union[str, Path], alt_separator: str = "") -> int:
@@ -92,9 +89,6 @@ def generate_addr(path: Union[str, Path], alt_separator: str = "") -> int:
         alt_separator = path._flavour.altsep
     path = normalize(str(path), alt_separator=alt_separator)
     return int(hashlib.sha256(path.encode()).hexdigest()[:8], 16)
-
-
-splitext = posixpath.splitext
 
 
 class stat_result:  # noqa
@@ -238,583 +232,6 @@ class stat_result:  # noqa
             except AttributeError:
                 pass
         return st
-
-
-# fmt: off
-"""
-A pathlib.Path compatible implementation for dissect.target starts here. This allows for the
-majority of the pathlib.Path API to "just work" on dissect.target filesystems.
-
-Most of this consists of subclassed internal classes with dissect.target specific patches,
-but sometimes the change to a function is small, so the entire internal function is copied
-and only a small part changed. To ease updating this code, the order of functions, comments
-and code style is kept exactly the same as the original pathlib.py.
-
-Yes, we know, this is playing with fire and it can break on new CPython releases.
-
-Commit hash of CPython we're currently in sync with: 9f101c23a41e739f5f80cf38419df1281835d452
-
-Notes:
-- CPython 3.11 ditched the _Accessor class, so we override the methods that should use it
-"""
-
-
-class _DissectFlavour(_PosixFlavour):
-    is_supported = True
-
-    __variant_instances = {}
-
-    def __new__(cls, case_sensitive=False, alt_separator=None):
-        idx = (case_sensitive, alt_separator)
-        instance = cls.__variant_instances.get(idx, None)
-        if instance is None:
-            instance = _PosixFlavour.__new__(cls)
-            cls.__variant_instances[idx] = instance
-
-        return instance
-
-    def __init__(self, case_sensitive=False, alt_separator=""):
-        super().__init__()
-        self.altsep = alt_separator
-        self.case_sensitive = case_sensitive
-
-    def casefold(self, s):
-        return s if self.case_sensitive else s.lower()
-
-    def casefold_parts(self, parts):
-        return parts if self.case_sensitive else [p.lower() for p in parts]
-
-    def compile_pattern(self, pattern):
-        return re.compile(fnmatch.translate(pattern), 0 if self.case_sensitive else re.IGNORECASE).fullmatch
-
-    # CPython <= 3.9
-    def resolve(self, path, strict=False):
-        sep = self.sep
-        accessor = path._accessor
-        seen = {}
-
-        def _resolve(fs, path, rest):
-            if rest.startswith(sep):
-                path = ''
-
-            for name in rest.split(sep):
-                if not name or name == '.':
-                    # current dir
-                    continue
-                if name == '..':
-                    # parent dir
-                    path, _, _ = path.rpartition(sep)
-                    continue
-                if path.endswith(sep):
-                    newpath = path + name
-                else:
-                    newpath = path + sep + name
-                if newpath in seen:
-                    # Already seen this path
-                    path = seen[newpath]
-                    if path is not None:
-                        # use cached value
-                        continue
-                    # The symlink is not resolved, so we must have a symlink loop.
-                    raise RuntimeError("Symlink loop from %r" % newpath)
-                # Resolve the symbolic link
-                try:
-                    target = accessor.readlink(fs.path(newpath))
-                except OSError as e:
-                    if e.errno != errno.EINVAL and strict:
-                        raise
-                    # Not a symlink, or non-strict mode. We just leave the path
-                    # untouched.
-                    path = newpath
-                else:
-                    seen[newpath] = None  # not resolved symlink
-                    path = _resolve(fs, path, target)
-                    seen[newpath] = path  # resolved symlink
-
-            return path
-
-        return _resolve(path._fs, '', str(path)) or sep
-
-    # CPython <= 3.9
-    def gethomedir(self, username):
-        raise NotImplementedError()
-
-
-def _get_oserror(path):
-    # We emulate some OSError exceptions to play nice with pathlib
-    try:
-        return path.get()
-    except FileNotFoundError:
-        e = OSError(errno.ENOENT)
-        e.errno = errno.ENOENT
-        raise e
-    except NotADirectoryError:
-        e = OSError(errno.ENOTDIR)
-        e.errno = errno.ENOTDIR
-        raise e
-
-
-class _DissectScandirIterator:
-    """This class implements a ScandirIterator for dissect's scandir()
-
-    The _DissectScandirIterator provides a context manager, so scandir can be called as:
-
-    ```
-    with scandir(path) as it:
-        for entry in it
-            print(entry.name)
-    ```
-
-    similar to os.scandir() behaviour since Python 3.6.
-    """
-
-    def __init__(self, iterator):
-        self._iterator = iterator
-
-    def __del__(self):
-        self.close()
-
-    def __enter__(self):
-        return self._iterator
-
-    def __exit__(self, *args, **kwargs):
-        return False
-
-    def __iter__(self):
-        return self._iterator
-
-    def __next__(self, *args):
-        return next(self._iterator, *args)
-
-    def close(self):
-        # close() is not defined in the various filesystem implementations. The
-        # python ScandirIterator does define the interface however.
-        pass
-
-
-class _DissectAccessor:
-    # CPython >= 3.10
-    @staticmethod
-    def stat(path, follow_symlinks=True):
-        if follow_symlinks:
-            return path.get().stat()
-        else:
-            return path.get().lstat()
-
-    # CPython <= 3.9
-    @staticmethod
-    def lstat(path):
-        return path.get().lstat()
-
-    @staticmethod
-    def open(path, mode='rb', buffering=0, encoding=None,
-             errors=None, newline=None, *args, **kwargs):
-        """Open file and return a stream.
-
-        Supports a subset of features of the real pathlib.open/io.open.
-
-        Note: in contrast to regular Python, the mode is binary by default. Text mode
-        has to be explicitly specified. Buffering is also disabled by default.
-        """
-        modes = set(mode)
-        if modes - set('rbt') or len(mode) > len(modes):
-            raise ValueError("invalid mode: %r" % mode)
-
-        reading = 'r' in modes
-        binary = 'b' in modes
-        text = 't' in modes or 'b' not in modes
-
-        if not reading:
-            raise ValueError("must be reading mode")
-        if text and binary:
-            raise ValueError("can't have text and binary mode at once")
-        if binary and encoding is not None:
-            raise ValueError("binary mode doesn't take an encoding argument")
-        if binary and errors is not None:
-            raise ValueError("binary mode doesn't take an errors argument")
-        if binary and newline is not None:
-            raise ValueError("binary mode doesn't take a newline argument")
-
-        raw = path.get().open()
-        result = raw
-
-        line_buffering = False
-        if buffering == 1 or buffering < 0 and raw.isatty():
-            buffering = -1
-            line_buffering = True
-        if buffering < 0 or text and buffering == 0:
-            buffering = io.DEFAULT_BUFFER_SIZE
-        if buffering == 0:
-            if binary:
-                return result
-            raise ValueError("can't have unbuffered text I/O")
-
-        buffer = io.BufferedReader(raw, buffering)
-        result = buffer
-        if binary:
-            return result
-
-        result = io.TextIOWrapper(buffer, encoding, errors, newline, line_buffering)
-        result.mode = mode
-
-        return result
-
-    @staticmethod
-    def listdir(path):
-        return path.get().listdir()
-
-    @staticmethod
-    def scandir(path):
-        return _DissectScandirIterator(path.get().scandir())
-
-    @staticmethod
-    def chmod(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def lchmod(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def mkdir(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def unlink(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython >= 3.10
-    @staticmethod
-    def link(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython <= 3.9
-    @staticmethod
-    def link_to(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def rmdir(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def rename(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def replace(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def symlink(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython >= 3.10
-    @staticmethod
-    def touch(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython <= 3.9
-    @staticmethod
-    def utime(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def readlink(path):
-        entry = _get_oserror(path)
-        if not entry.is_symlink():
-            e = OSError(errno.EINVAL)
-            e.errno = errno.EINVAL
-            raise e
-        return entry.readlink()
-
-    @staticmethod
-    def owner(*args, **kwargs):
-        raise NotImplementedError()
-
-    @staticmethod
-    def group(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython >= 3.10
-    @staticmethod
-    def getcwd(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython >= 3.10
-    @staticmethod
-    def expanduser(*args, **kwargs):
-        raise NotImplementedError()
-
-    # CPython >= 3.10
-    @staticmethod
-    def realpath(*args, **kwargs):
-        raise NotImplementedError()
-
-
-_dissect_accessor = _DissectAccessor()
-
-
-class _DissectPathParents(_PathParents):
-    __slots__ = ('_fs')
-
-    def __init__(self, path):
-        super().__init__(path)
-        self._fs = path._fs
-        self._flavour = path._flavour
-
-    def __getitem__(self, idx):
-        result = super().__getitem__(idx)
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-
-class PureDissectPath(PurePath):
-    _flavour = _DissectFlavour(case_sensitive=False)
-
-    def __reduce__(self):
-        raise TypeError("pickling is currently not supported")
-
-    @classmethod
-    def _from_parts(cls, args, *_args, **_kwargs):
-        fs = args[0]
-
-        if not isinstance(fs, filesystem.Filesystem):
-            raise TypeError(
-                "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)"
-                % args
-            )
-
-        alt_separator = fs.alt_separator
-        path_args = []
-        for arg in args[1:]:
-            if isinstance(arg, str):
-                arg = normalize(arg, alt_separator=alt_separator)
-            path_args.append(arg)
-
-        self = super()._from_parts(path_args, *_args, **_kwargs)
-        self._fs = fs
-
-        self._flavour = _DissectFlavour(
-            alt_separator=fs.alt_separator,
-            case_sensitive=fs.case_sensitive
-        )
-
-        return self
-
-    def _make_child(self, args):
-        child = super()._make_child(args)
-        child._fs = self._fs
-        child._flavour = self._flavour
-        return child
-
-    def with_name(self, name):
-        result = super().with_name(name)
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-    def with_stem(self, stem):
-        result = super().with_stem(stem)
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-    def with_suffix(self, suffix):
-        result = super().with_suffix(suffix)
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-    def relative_to(self, *other):
-        result = super().relative_to(*other)
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-    def __rtruediv__(self, key):
-        try:
-            return self._from_parts([self._fs, key] + self._parts)
-        except TypeError:
-            return NotImplemented
-
-    @property
-    def parent(self):
-        result = super().parent
-        result._fs = self._fs
-        result._flavour = self._flavour
-        return result
-
-    @property
-    def parents(self):
-        return _DissectPathParents(self)
-
-
-class TargetPath(Path, PureDissectPath):
-    # CPython >= 3.10
-    _accessor = _dissect_accessor
-    __slots__ = '_entry'
-
-    # CPython <= 3.9
-    def _init(self, template=None):
-        self._accessor = _dissect_accessor
-
-    def _make_child_relpath(self, part):
-        child = super()._make_child_relpath(part)
-        child._fs = self._fs
-        child._flavour = self._flavour
-        return child
-
-    def get(self):
-        try:
-            return self._entry
-        except AttributeError:
-            self._entry = self._fs.get(str(self))
-            return self._entry
-
-    @classmethod
-    def cwd(cls):
-        raise NotImplementedError()
-
-    @classmethod
-    def home(cls):
-        raise NotImplementedError()
-
-    def iterdir(self):
-        for entry in self._accessor.scandir(self):
-            if entry.name in {'.', '..'}:
-                # Yielding a path object for these makes little sense
-                continue
-            child_path = self._make_child_relpath(entry.name)
-            child_path._entry = entry
-            yield child_path
-
-    def _scandir(self):
-        return self._accessor.scandir(self)
-
-    def absolute(self):
-        raise NotImplementedError()
-
-    def resolve(self, strict=False):
-        s = self._flavour.resolve(self)
-        if s is None:
-            # No symlink resolution => for consistency, raise an error if
-            # the path doesn't exist or is forbidden
-            self.stat()
-            s = str(self.absolute())
-        # Now we have no symlinks in the path, it's safe to normalize it.
-        normed = self._flavour.pathmod.normpath(s)
-        obj = self._from_parts((self._fs, normed,))
-        return obj
-
-    # CPython >= 3.11
-    def stat(self, *, follow_symlinks=True):
-        """
-        Return the result of the stat() system call on this path, like
-        os.stat() does.
-        """
-        return self._accessor.stat(self, follow_symlinks=follow_symlinks)
-
-    def owner(self):
-        raise NotImplementedError()
-
-    def group(self):
-        raise NotImplementedError()
-
-    def open(self, mode='rb', buffering=0, encoding=None,
-             errors=None, newline=None):
-
-        if "b" not in mode:
-            encoding = encoding or "UTF-8"
-            # CPython >= 3.10
-            if hasattr(io, "text_encoding"):
-                # Vermin linting needs to be skipped for this line as this is
-                # guarded by an explicit check for availability.
-                # novermin
-                encoding = io.text_encoding(encoding)
-        return self._accessor.open(self, mode, buffering, encoding, errors,
-                                   newline)
-
-    def write_bytes(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def write_text(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def readlink(self):
-        """
-        Return the path to which the symbolic link points.
-        """
-        path = self._accessor.readlink(self)
-        obj = self._from_parts((self._fs, path,))
-        return obj
-
-    def touch(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def mkdir(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def chmod(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def lchmod(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def unlink(self):
-        raise NotImplementedError()
-
-    def rmdir(self):
-        raise NotImplementedError()
-
-    def rename(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def replace(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def symlink_to(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def hardlink_to(self, target):
-        raise NotImplementedError()
-
-    def link_to(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    def exists(self):
-        try:
-            # .exists() must resolve possible symlinks
-            self.get().stat()
-            return True
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def is_dir(self):
-        try:
-            return self.get().is_dir()
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def is_file(self):
-        try:
-            return self.get().is_file()
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def is_symlink(self):
-        try:
-            return self.get().is_symlink()
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def expanduser(self):
-        raise NotImplementedError()
-
-
-# fmt: on
 
 
 def walk(path_entry, topdown=True, onerror=None, followlinks=False):

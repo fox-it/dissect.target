@@ -9,6 +9,7 @@ import sys
 from dissect.util.stream import RangeStream
 
 from dissect.target import Target
+from dissect.target.exceptions import TargetError
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -39,7 +40,12 @@ def main():
 
     process_generic_arguments(args)
 
-    t = Target.open(args.target)
+    try:
+        t = Target.open(args.target)
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
 
     if len(t.disks) > 1:
         parser.exit("Target has more than one disk")

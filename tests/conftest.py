@@ -1,9 +1,8 @@
-import os
 import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import Any, Callable, Iterator, Optional
+from typing import Callable, Iterator, Optional
 
 import pytest
 
@@ -13,7 +12,7 @@ from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
+from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
@@ -302,11 +301,15 @@ def target_osx(tmp_path: pathlib.Path, fs_osx: Filesystem) -> Iterator[Target]:
 
 
 @pytest.fixture
-def target_citrix(tmp_path: pathlib.Path, fs_bsd: Filesystem) -> Iterator[Target]:
-    mock_target = make_os_target(tmp_path, CitrixBsdPlugin, root_fs=fs_bsd, apply_target=False)
+def target_citrix(tmp_path: pathlib.Path, fs_bsd: VirtualFilesystem) -> Target:
+    mock_target = next(make_mock_target(tmp_path))
+    mock_target._os_plugin = CitrixPlugin
+
+    mock_target.filesystems.add(fs_bsd)
 
     var_filesystem = VirtualFilesystem()
     var_filesystem.makedirs("/netscaler")
+    var_filesystem.makedirs("/log")
     mock_target.filesystems.add(var_filesystem)
 
     flash_filesystem = VirtualFilesystem()
@@ -432,49 +435,3 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
     yield target_osx
-
-
-@pytest.fixture
-def xattrs() -> dict[str, str]:
-    return {"some_key": b"some_value"}
-
-
-@pytest.fixture
-def listxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
-    # listxattr() is only available on Linux
-    attr_names = list(xattrs.keys())
-
-    if hasattr(os, "listxattr"):
-        spec = {
-            "create": False,
-            "autospec": True,
-            "return_value": attr_names,
-        }
-    else:
-        spec = {
-            "create": True,
-            "return_value": attr_names,
-        }
-
-    return spec
-
-
-@pytest.fixture
-def getxattr_spec(xattrs: dict[str, str]) -> dict[str, Any]:
-    # getxattr() is only available on Linux
-    attr_name = list(xattrs.keys())[0]
-    attr_value = xattrs.get(attr_name)
-
-    if hasattr(os, "getxattr"):
-        spec = {
-            "create": False,
-            "autospec": True,
-            "return_value": attr_value,
-        }
-    else:
-        spec = {
-            "create": True,
-            "return_value": attr_value,
-        }
-
-    return spec

@@ -495,7 +495,7 @@ def register(plugincls: Type[Plugin]) -> None:
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
-    root["cls"] = plugincls
+    root["is_osplugin"] = issubclass(plugincls, OSPlugin)
 
 
 def internal(*args, **kwargs) -> Callable:
@@ -819,7 +819,7 @@ def load_module_from_name(module_path: str) -> None:
         # This will trigger the __init__subclass__() of the Plugin subclasses in the module.
         importlib.import_module(module_path)
     except Exception as e:
-        log.error("Unable to import %s", module_path)
+        log.info("Unable to import %s", module_path)
         log.debug("Error while trying to import module %s", module_path, exc_info=e)
         save_plugin_import_failure(module_path)
 
@@ -951,6 +951,10 @@ class NamespacePlugin(Plugin):
         # the direct subclass of NamespacePlugin
         cls.__nsplugin__.SUBPLUGINS.add(cls.__namespace__)
 
+        # Generate a tuple of class names for which we do not want to add subplugin functions, which is the
+        # namespaceplugin and all of its superclasses (minus the base object).
+        reserved_cls_names = tuple({_class.__name__ for _class in cls.__nsplugin__.mro() if _class is not object})
+
         # Collect the public attrs of the subplugin
         for subplugin_func_name in cls.__exports__:
             subplugin_func = inspect.getattr_static(cls, subplugin_func_name)
@@ -963,12 +967,15 @@ class NamespacePlugin(Plugin):
             if getattr(subplugin_func, "__output__", None) != "record":
                 continue
 
-            # The method needs to be part of the current subclass and not a parent
-            if not subplugin_func.__qualname__.startswith(cls.__name__):
+            # The method may not be part of a parent class.
+            if subplugin_func.__qualname__.startswith(reserved_cls_names):
                 continue
 
             # If we already have an aggregate method, skip
             if existing_aggregator := getattr(cls.__nsplugin__, subplugin_func_name, None):
+                if not hasattr(existing_aggregator, "__subplugins__"):
+                    # This is not an aggregator, but a re-implementation of a subclass function by the subplugin.
+                    continue
                 existing_aggregator.__subplugins__.append(cls.__namespace__)
                 continue
 
@@ -978,10 +985,12 @@ class NamespacePlugin(Plugin):
                     for entry in aggregator.__subplugins__:
                         try:
                             subplugin = getattr(self.target, entry)
-                            for item in getattr(subplugin, method_name)():
-                                yield item
-                        except Exception:
+                            yield from getattr(subplugin, method_name)()
+                        except UnsupportedPluginError:
                             continue
+                        except Exception as e:
+                            self.target.log.error("Subplugin: %s raised an exception for: %s", entry, method_name)
+                            self.target.log.debug("Exception: %s", e, exc_info=e)
 
                 # Holds the subplugins that share this method
                 aggregator.__subplugins__ = []
@@ -1108,7 +1117,7 @@ def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDes
             available["exports"].remove("get_all_records")
 
         for exported in available["exports"]:
-            if issubclass(available["cls"], OSPlugin) and os_type == general.default.DefaultPlugin:
+            if available["is_osplugin"] and os_type == general.default.DefaultPlugin:
                 # This makes the os plugin exports listed under the special
                 # "OS plugins" header by the 'plugins' plugin.
                 available["module"] = ""

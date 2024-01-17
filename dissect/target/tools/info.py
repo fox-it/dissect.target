@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Union
 
 from dissect.target import Target
+from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
@@ -72,22 +73,27 @@ def main():
             targets = targets[:-1]
         args.targets = targets
 
-    for i, target in enumerate(Target.open_all(args.targets)):
-        try:
-            if args.jsonlines:
-                print(json.dumps(get_target_info(target), default=str))
-            elif args.json:
-                print(json.dumps(get_target_info(target), indent=4, default=str))
-            elif args.record:
-                rs = record_output(args.strings)
-                rs.write(InfoRecord(**get_target_info(target), _target=target))
-            else:
-                if i > 0:
-                    print("-" * 70)
-                print_target_info(target)
-        except Exception as e:
-            target.log.error("Exception in retrieving information for target: `%s`. Use `-vv` for details.", target)
-            target.log.debug("", exc_info=e)
+    try:
+        for i, target in enumerate(Target.open_all(args.targets)):
+            try:
+                if args.jsonlines:
+                    print(json.dumps(get_target_info(target), default=str))
+                elif args.json:
+                    print(json.dumps(get_target_info(target), indent=4, default=str))
+                elif args.record:
+                    rs = record_output(args.strings)
+                    rs.write(InfoRecord(**get_target_info(target), _target=target))
+                else:
+                    if i > 0:
+                        print("-" * 70)
+                    print_target_info(target)
+            except Exception as e:
+                target.log.error("Exception in retrieving information for target: `%s`. Use `-vv` for details.", target)
+                target.log.debug("", exc_info=e)
+    except TargetError as e:
+        log.error(e)
+        log.debug("", exc_info=e)
+        parser.exit(1)
 
 
 def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
