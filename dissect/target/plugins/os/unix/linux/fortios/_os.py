@@ -32,7 +32,7 @@ FortiOSUserRecord = TargetRecordDescriptor(
 
 
 class FortiOSPlugin(LinuxPlugin):
-    """FortiOS Dissect Plugin"""
+    """FortiOS plugin for various Fortinet appliances."""
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -126,7 +126,7 @@ class FortiOSPlugin(LinuxPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        """Return configured hostname"""
+        """Return configured hostname."""
         try:
             return self._config["global-config"]["system"]["global"]["hostname"][0]
         except KeyError:
@@ -134,7 +134,7 @@ class FortiOSPlugin(LinuxPlugin):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        """Return ip addresses of configured interfaces"""
+        """Return IP addresses of configured interfaces."""
         result = []
 
         try:
@@ -155,19 +155,18 @@ class FortiOSPlugin(LinuxPlugin):
 
     @export(property=True)
     def version(self) -> str:
-        """Return FortiOS version"""
+        """Return FortiOS version."""
         if self._version:
             return parse_version(self._version)
         return "FortiOS Unknown"
 
     @export(property=True)
     def os(self) -> str:
-        """Return `fortios`"""
         return OperatingSystem.FORTIOS.value
 
     @export(record=FortiOSUserRecord)
     def users(self) -> Iterator[FortiOSUserRecord]:
-        """Return local users of the FortiOS system"""
+        """Return local users of the FortiOS system."""
 
         # Administrative users
         for username, entry in self._config["global-config"]["system"]["admin"].items():
@@ -212,7 +211,7 @@ class FortiOSPlugin(LinuxPlugin):
 
     @export(property=True)
     def dns(self) -> list[str]:
-        """Return configured WAN DNS servers"""
+        """Return configured WAN DNS servers."""
         entries = []
         for _, entry in self._config["global-config"]["system"]["dns"].items():
             entries.append(entry[0])
@@ -247,9 +246,9 @@ class FortiOSPlugin(LinuxPlugin):
         return LANG_MAP.get(lang_str, lang_str)
 
     @export(property=True)
-    def architecture(self):
-        """Return architecture FortiOS runs on"""
-        return self._get_architecture(custom_file="/lib/libav.so")
+    def architecture(self) -> Optional[str]:
+        """Return architecture FortiOS runs on."""
+        return self._get_architecture(path="/lib/libav.so")
 
 
 def repair_lzma_stream(fh: BinaryIO) -> BinaryIO:
@@ -424,7 +423,7 @@ def _parse_config(fh: TextIO) -> Iterator[list[str]]:
 
 
 def parse_version(input: str) -> str:
-    """Attempt to parse the config FortiOS version to a readable format
+    """Attempt to parse the config FortiOS version to a readable format.
 
     The input ``FGVM64-7.4.1-FW-build2463-230830:opmode=0:vdom=0`` would
     return the following output: ``FortiGate VM 7.4.1 (build 2463, 2023-08-30)``.
@@ -469,7 +468,7 @@ def local_groups_to_users(config_groups: dict) -> dict:
     return user_groups
 
 
-def decrypt_password(b64_ciphertext: str) -> str:
+def decrypt_password(ciphertext: str) -> str:
     """Decrypt FortiOS version 6 and 7 encrypted secrets"""
 
     if b64_ciphertext[0:3] in ["SH2", "AK1"]:
@@ -484,7 +483,7 @@ def decrypt_password(b64_ciphertext: str) -> str:
 
 
 def translate_timezone(timezone_num: str) -> str:
-    """Translate a FortiOS timezone number to IANA TZ
+    """Translate a FortiOS timezone number to IANA TZ.
 
     Resources:
         - https://<fortios>/ng/system/settings
