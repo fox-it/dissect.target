@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.apps.webserver.apache import ApachePlugin
 from dissect.target.plugins.apps.webserver.citrix import (
     LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME,
     LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME_WITH_HEADERS,
@@ -30,10 +32,10 @@ def test_infer_access_log_citrix_netscaler_combined_response_time_with_headers()
     assert logformat == LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME_WITH_HEADERS
 
 
-def test_access_logs(target_citrix: Target) -> None:
+def test_access_logs(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=1))
     data_file = absolute_path("_data/plugins/apps/webserver/citrix/httpaccess.log")
-    target_citrix.fs.mounts["/"].map_file("var/log/httpaccess.log", data_file)
+    fs_bsd.map_file("var/log/httpaccess.log", data_file)
 
     target_citrix.add_plugin(CitrixWebserverPlugin)
 
@@ -69,9 +71,9 @@ def test_access_logs(target_citrix: Target) -> None:
     assert citrix_netscaler_headers_combined_response_log.pid == 82775
 
 
-def test_error_logs(target_citrix: Target) -> None:
-    target_citrix.fs.mounts["/"].map_file("var/log/httperror-vpn.log", BytesIO(b"Foo"))
-    target_citrix.fs.mounts["/"].map_file("var/log/httperror.log", BytesIO(b"Bar"))
+def test_error_logs(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
+    fs_bsd.map_file("var/log/httperror-vpn.log", BytesIO(b"Foo"))
+    fs_bsd.map_file("var/log/httperror.log", BytesIO(b"Bar"))
 
     target_citrix.add_plugin(CitrixWebserverPlugin)
     access_log_paths, error_log_paths = target_citrix.citrix.get_log_paths()
@@ -79,10 +81,11 @@ def test_error_logs(target_citrix: Target) -> None:
     assert len(error_log_paths) == 2
 
 
-def test_access_logs_webserver_namespace(target_citrix: Target) -> None:
+def test_access_logs_webserver_namespace(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/citrix/httpaccess.log")
-    target_citrix.fs.mounts["/"].map_file("var/log/httpaccess.log", data_file)
+    fs_bsd.map_file("var/log/httpaccess.log", data_file)
 
+    target_citrix.add_plugin(ApachePlugin, check_compatible=False)
     target_citrix.add_plugin(CitrixWebserverPlugin)
     target_citrix.add_plugin(WebserverPlugin)
 
