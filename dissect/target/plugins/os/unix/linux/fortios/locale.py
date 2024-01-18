@@ -1,5 +1,3 @@
-from zoneinfo import ZoneInfo
-
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 
