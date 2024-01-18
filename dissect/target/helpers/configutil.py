@@ -309,9 +309,6 @@ class Xml(ConfigurationParser):
         while not tree and errors < limit:
             try:
                 tree = self._tree(ElementTree.fromstring(document))
-                import ipdb
-
-                ipdb.set_trace()
                 break
             except ElementTree.ParseError as err:
                 errors += 1
