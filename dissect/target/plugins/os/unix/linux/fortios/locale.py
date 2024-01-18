@@ -16,10 +16,6 @@ class LocalePlugin(Plugin):
         return translate_timezone(timezone_num)
 
     @export(property=True)
-    def tz(self) -> ZoneInfo:
-        return ZoneInfo(self.timezone)
-
-    @export(property=True)
     def language(self) -> str:
         """Return configured UI language."""
         LANG_MAP = {
