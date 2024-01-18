@@ -683,10 +683,14 @@ def plugins(
                             prev_module_path=module_path,
                         )
 
-    yield from _walk(
-        _get_plugins(),
-        special_keys=special_keys,
-        only_special_keys=only_special_keys,
+    yield from sorted(
+        _walk(
+            _get_plugins(),
+            special_keys=special_keys,
+            only_special_keys=only_special_keys,
+        ),
+        key=lambda el: len(el["module"]),
+        reverse=True,
     )
 
 
@@ -707,8 +711,8 @@ def lookup(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterato
         func_name: Function name to lookup.
         osfilter: The ``OSPlugin`` to use as template to find os specific plugins for.
     """
-    yield from reversed(list(get_plugins_by_func_name(func_name, osfilter=osfilter)))
-    yield from reversed(list(get_plugins_by_namespace(func_name, osfilter=osfilter)))
+    yield from get_plugins_by_func_name(func_name, osfilter=osfilter)
+    yield from get_plugins_by_namespace(func_name, osfilter=osfilter)
 
 
 def get_plugins_by_func_name(func_name: str, osfilter: Optional[type[OSPlugin]] = None) -> Iterator[PluginDescriptor]:
