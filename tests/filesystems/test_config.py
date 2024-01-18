@@ -76,40 +76,62 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
         (
             "_data/helpers/configutil/test.xml",
             {
-                "Server": {
-                    "Listener": [
-                        {"className": "org.apache.catalina.core.JasperListener1", "$element_text": "a"},
-                        {"className": "org.apache.catalina.core.JasperListener2", "$element_text": "b"},
-                    ],
-                    "Service": {
-                        "Connector": {
-                            "port": "8080",
-                            "protocol": "HTTP/1.1",
-                            "connectionTimeout": "20000",
-                            "redirectPort": "8443",
-                        },
-                        "Engine": {
-                            "Host": {
-                                "Valve": {
-                                    "className": "org.apache.catalina.valves.AccessLogValve",
-                                    "directory": "logs",
-                                    "prefix": "localhost_access_log.",
-                                    "suffix": ".txt",
-                                    "pattern": "%h %l %u %t s",
-                                },
-                                "name": "localhost",
-                                "appBase": "webapps",
-                                "unpackWARs": "true",
-                                "autoDeploy": "true",
-                            },
-                            "name": "Catalina",
-                            "defaultHost": "localhost",
-                        },
-                        "name": "Catalina",
+                "tag": "Server",
+                "attributes": {"port": "8005", "shutdown": "SHUTDOWN"},
+                "nodes": {
+                    "Listener": {
+                        "tag": "Listener",
+                        "attributes": {"className": "org.apache.catalina.core.JasperListener1"},
+                        "text": "a",
                     },
-                    "port": "8005",
-                    "shutdown": "SHUTDOWN",
-                }
+                    "Listener-2": {
+                        "tag": "Listener",
+                        "attributes": {"className": "org.apache.catalina.core.JasperListener2"},
+                        "text": "b",
+                    },
+                    "Service": {
+                        "tag": "Service",
+                        "attributes": {"name": "Catalina"},
+                        "nodes": {
+                            "Connector": {
+                                "tag": "Connector",
+                                "attributes": {
+                                    "port": "8080",
+                                    "protocol": "HTTP/1.1",
+                                    "connectionTimeout": "20000",
+                                    "redirectPort": "8443",
+                                },
+                            },
+                            "Engine": {
+                                "tag": "Engine",
+                                "attributes": {"name": "Catalina", "defaultHost": "localhost"},
+                                "nodes": {
+                                    "Host": {
+                                        "tag": "Host",
+                                        "attributes": {
+                                            "name": "localhost",
+                                            "appBase": "webapps",
+                                            "unpackWARs": "true",
+                                            "autoDeploy": "true",
+                                        },
+                                        "nodes": {
+                                            "Valve": {
+                                                "tag": "Valve",
+                                                "attributes": {
+                                                    "className": "org.apache.catalina.valves.AccessLogValve",
+                                                    "directory": "logs",
+                                                    "prefix": "localhost_access_log.",
+                                                    "suffix": ".txt",
+                                                    "pattern": "%h %l %u %t s",
+                                                },
+                                            }
+                                        },
+                                    }
+                                },
+                            },
+                        },
+                    },
+                },
             },
         ),
     ],

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import re
-from collections import defaultdict, deque
+from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
@@ -260,32 +260,42 @@ class Xml(ConfigurationParser):
     """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser`."""
 
     def _tree(self, tree: ElementTree) -> dict:
-        root = {tree.tag: {} if tree.attrib else None}
+        """Very simple but robust xml -> dict implementation, see comments."""
+        nodes = {}
+        counter = {}
 
-        children = list(tree)
-
-        if children:
-            childs = defaultdict(list)
-            for child in map(self._tree, children):
-                for key, value in child.items():
-                    childs[key].append(value)
-
-            root = {tree.tag: {key: value[0] if len(value) == 1 else value for key, value in childs.items()}}
-
-        if tree.attrib:
-            root[tree.tag].update((key, value) for key, value in tree.attrib.items())
-
-        if tree.text:
-            text = tree.text.strip()
-            if children or tree.attrib:
-                if text:
-                    # Case where a xml tag has an attribute and text value. E.g. <host id="x">a</host>
-                    # We add a sentinel value, which we can use to unpack later.
-                    root[tree.tag]["$element_text"] = text
+        # each node is a folder (so the structure is always the same! [1])
+        for node in tree.findall("*"):
+            # if a node contains multiple nodes with the same name, number them
+            if node.tag in counter:
+                counter[node.tag] += 1
+                nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
             else:
-                root[tree.tag] = text
+                counter[node.tag] = 1
+                nodes[f"{node.tag}"] = self._tree(node)
 
-        return root
+        result = {"tag": tree.tag}
+
+        # all attribs go in the attribute folder
+        # (i.e. stable, does not change depending on xml structure! [2]
+        # Also, this way we "know" they have been attributes, i.e. we don't lose information! [3]
+        if tree.attrib:
+            result["attributes"] = tree.attrib
+
+        # all subnodes go in the nodes folder
+        if nodes:
+            result["nodes"] = nodes
+
+        # content goes into the text folder
+        # we don't use special prefixes ($) because XML docs may use them anyway (even though they are forbidden)
+        if tree.text:
+            text = str(tree.text).strip(" \n\r")
+            if text != "":
+                result["text"] = text
+
+        # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
+
+        return result
 
     def _fix(self, content: str, position: tuple(int, int)) -> str:
         """Quick heuristic fix. If there is an invalid token, just remove it."""
