@@ -123,36 +123,12 @@ class FortiOSPlugin(LinuxPlugin):
         return cls(target)
 
     @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.FORTIOS.value
-
-    @export(property=True)
-    def version(self) -> str:
-        """Return FortiOS version."""
-        if self._version:
-            return parse_version(self._version)
-        return "FortiOS Unknown"
-
-    @export(property=True)
-    def architecture(self) -> Optional[str]:
-        """Return architecture FortiOS runs on."""
-        return self._get_architecture(path="/lib/libav.so")
-
-    @export(property=True)
     def hostname(self) -> str | None:
         """Return configured hostname."""
         try:
             return self._config["global-config"]["system"]["global"]["hostname"][0]
         except KeyError:
             return None
-
-    @export(property=True)
-    def dns(self) -> list[str]:
-        """Return configured WAN DNS servers."""
-        entries = []
-        for _, entry in self._config["global-config"]["system"]["dns"].items():
-            entries.append(entry[0])
-        return entries
 
     @export(property=True)
     def ips(self) -> list[str]:
@@ -177,6 +153,21 @@ class FortiOSPlugin(LinuxPlugin):
             self.target.log.debug("Exception while parsing FortiOS system interfaces", exc_info=e)
 
         return result
+
+    @export(property=True)
+    def dns(self) -> list[str]:
+        """Return configured WAN DNS servers."""
+        entries = []
+        for _, entry in self._config["global-config"]["system"]["dns"].items():
+            entries.append(entry[0])
+        return entries
+
+    @export(property=True)
+    def version(self) -> str:
+        """Return FortiOS version."""
+        if self._version:
+            return parse_version(self._version)
+        return "FortiOS Unknown"
 
     @export(record=FortiOSUserRecord)
     def users(self) -> Iterator[Union[FortiOSUserRecord, UnixUserRecord]]:
@@ -237,6 +228,15 @@ class FortiOSPlugin(LinuxPlugin):
         except KeyError as e:
             self.target.log.warning("Exception while parsing FortiOS temporary guest users")
             self.target.log.debug("", exc_info=e)
+
+    @export(property=True)
+    def os(self) -> str:
+        return OperatingSystem.FORTIOS.value
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Return architecture FortiOS runs on."""
+        return self._get_architecture(path="/lib/libav.so")
 
 
 class ConfigNode(dict):
