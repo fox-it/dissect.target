@@ -257,7 +257,7 @@ class Txt(ConfigurationParser):
 
 
 class Xml(ConfigurationParser):
-    """Parses XML-files, ignores any constructor parameters."""
+    """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser`."""
 
     def _tree(self, tree: ElementTree) -> dict:
         root = {tree.tag: {} if tree.attrib else None}
@@ -279,7 +279,9 @@ class Xml(ConfigurationParser):
             text = tree.text.strip()
             if children or tree.attrib:
                 if text:
-                    root[tree.tag] = text
+                    # Case where a xml tag has an attribute and text value. E.g. <host id="x">a</host>
+                    # We add a sentinel value, which we can use to unpack later.
+                    root[tree.tag]["$element_text"] = text
             else:
                 root[tree.tag] = text
 
@@ -289,9 +291,12 @@ class Xml(ConfigurationParser):
         """Quick heuristic fix. If there is an invalid token, just remove it."""
         lineno, offset = position
         lines = content.split("\n")
+
         line = lines[lineno - 1]
         line = line[: offset - 1] + "" + line[offset + 1 :]
+
         lines[lineno - 1] = line
+
         return "\n".join(lines)
 
     def parse_file(self, fh: TextIO) -> None:
@@ -300,19 +305,23 @@ class Xml(ConfigurationParser):
         errors = 0
         limit = 20
         tree = {}
+
         while not tree and errors < limit:
             try:
                 tree = self._tree(ElementTree.fromstring(document))
+                import ipdb
+
+                ipdb.set_trace()
                 break
             except ElementTree.ParseError as err:
                 errors += 1
                 document = self._fix(document, err.position)
 
         if not tree:
-            # Document could not be parsed, we give up
+            # Error limit reached. Thus we consider the document not parseable.
             raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")
 
-        self.parsed_data = {**tree, "errors": errors}
+        self.parsed_data = tree
 
 
 class ScopeManager:

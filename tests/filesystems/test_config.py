@@ -77,7 +77,10 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
             "_data/helpers/configutil/test.xml",
             {
                 "Server": {
-                    "Listener": ["a", "b"],  # @todo add attributes on list items
+                    "Listener": [
+                        {"className": "org.apache.catalina.core.JasperListener1", "$element_text": "a"},
+                        {"className": "org.apache.catalina.core.JasperListener2", "$element_text": "b"},
+                    ],
                     "Service": {
                         "Connector": {
                             "port": "8080",
