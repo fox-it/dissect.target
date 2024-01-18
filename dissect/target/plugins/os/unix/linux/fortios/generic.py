@@ -3,13 +3,15 @@ from typing import Optional
 
 from dissect.util import ts
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.generic import calculate_last_activity
 
 
 class GenericPlugin(Plugin):
     def check_compatible(self) -> None:
-        pass
+        if self.target.os != "fortios":
+            raise UnsupportedPluginError("FortiOS specific plugin loaded on non-FortiOS target")
 
     @export(property=True)
     def install_date(self) -> Optional[datetime]:

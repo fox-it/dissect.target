@@ -1,11 +1,13 @@
 from zoneinfo import ZoneInfo
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 
 
 class LocalePlugin(Plugin):
     def check_compatible(self) -> None:
-        pass
+        if self.target.os != "fortios":
+            raise UnsupportedPluginError("FortiOS specific plugin loaded on non-FortiOS target")
 
     @export(property=True)
     def timezone(self) -> str:
