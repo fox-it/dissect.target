@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from statistics import median
 from typing import Optional
 
@@ -14,27 +15,8 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def activity(self) -> Optional[datetime]:
         """Return last seen activity based on filesystem timestamps."""
-
-        if self.target.os == "fortios":
-            log_dirs = ["/var/log/log/root", "/var/log/root"]
-            for ld in log_dirs:
-                if (var_log := self.target.fs.path(ld)).exists():
-                    break
-        else:
-            var_log = self.target.fs.path("/var/log")
-
-        if not var_log.exists():
-            return
-
-        last_seen = 0
-        for f in var_log.iterdir():
-            if not f.exists():
-                continue
-            if f.stat().st_mtime > last_seen:
-                last_seen = f.stat().st_mtime
-
-        if last_seen != 0:
-            return ts.from_unix(last_seen)
+        var_log = self.target.fs.path("/var/log")
+        return calculate_last_activity(var_log)
 
     @export(property=True)
     def install_date(self) -> Optional[datetime]:
@@ -71,3 +53,18 @@ class GenericPlugin(Plugin):
         root_stat = self.target.fs.stat("/")
         if root_stat.st_ctime == root_stat.st_mtime:
             return ts.from_unix(root_stat.st_ctime)
+
+
+def calculate_last_activity(folder: Path) -> Optional[datetime]:
+    if not folder.exists():
+        return
+
+    last_seen = 0
+    for file in folder.iterdir():
+        if not file.exists():
+            continue
+        if file.stat().st_mtime > last_seen:
+            last_seen = file.stat().st_mtime
+
+    if last_seen != 0:
+        return ts.from_unix(last_seen)
