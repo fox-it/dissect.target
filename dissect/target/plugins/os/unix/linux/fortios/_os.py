@@ -8,12 +8,12 @@ from typing import Iterator, Optional, TextIO, Union
 
 from Crypto.Cipher import AES
 from dissect.util import cpio
+from dissect.util.compression import xz
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
-from dissect.target.helpers.xz import repair_lzma_stream
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
@@ -96,7 +96,7 @@ class FortiOSPlugin(LinuxPlugin):
         # Additional FortiGate tars with corrupt XZ streams
         for path in ("bin.tar.xz", "usr.tar.xz", "migadmin.tar.xz", "node-scripts.tar.xz"):
             if (tar := target.fs.path(path)).exists():
-                fh = repair_lzma_stream(tar.open("rb"))
+                fh = xz.repair_checksum(tar.open("rb"))
                 target.fs.add_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer
