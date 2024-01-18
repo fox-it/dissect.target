@@ -1,57 +1,96 @@
 from __future__ import annotations
 
 import gzip
-import io
-from binascii import crc32
-from typing import BinaryIO, Iterator, Optional, TextIO
+from base64 import b64decode
+from datetime import datetime
+from tarfile import ReadError
+from typing import Iterator, Optional, TextIO, Union
 
+from Crypto.Cipher import AES
 from dissect.util import cpio
-from dissect.util.stream import OverlayStream
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
+from dissect.target.helpers.xz import repair_lzma_stream
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
 
+FortiOSUserRecord = TargetRecordDescriptor(
+    "fortios/user",
+    [
+        ("string", "name"),
+        ("string[]", "groups"),
+        ("string", "password"),
+        ("path", "home"),
+    ],
+)
 
-class FortigatePlugin(LinuxPlugin):
+
+class FortiOSPlugin(LinuxPlugin):
+    """FortiOS plugin for various Fortinet appliances."""
+
     def __init__(self, target: Target):
         super().__init__(target)
+        self._version = None
+        self._config = self._load_config()
 
-        self._config = None
-        if config_file := self._find_config_file():
-            with config_file as fh:
-                self._config = FortigateConfig.from_fh(fh)
+    def _load_config(self) -> dict:
+        CONFIG_FILES = {
+            "/data/system.conf": None,
+            "/data/config/daemon.conf.gz": "daemon",  # FortiOS 4.x
+            "/data/config/sys_global.conf.gz": "global-config",  # Seen in FortiOS 5.x - 7.x
+            "/data/config/sys_vd_root.conf.gz": "root-config",  # FortiOS 4.x
+            "/data/config/sys_vd_root+root.conf.gz": "root-config",  # Seen in FortiOS 6.x - 7.x
+            "/data/config/global_system_interface.gz": "interfaces",  # Seen in FortiOS 5.x - 7.x
+        }
 
-    def _find_config_file(self) -> Optional[TextIO]:
-        fh = None
+        config = {}
+        for conf_file, section in CONFIG_FILES.items():
+            if (conf_path := self.target.fs.path(conf_file)).exists():
+                if conf_file.endswith("gz"):
+                    fh = gzip.open(conf_path.open("rb"), "rt")
+                else:
+                    fh = conf_path.open("rt")
 
-        if (conf := self.target.fs.path("/data/system.conf")).exists():
-            fh = conf.open("rt")
-        elif (conf := self.target.fs.path("/data/config/sys_global.conf.gz")).exists():
-            fh = gzip.open(conf.open("rb"), "rt")
+                if not self._version and section in [None, "global-config", "root-config"]:
+                    self._version = fh.readline().split("=", 1)[1]
 
-        return fh
+                parsed = FortiOSConfig.from_fh(fh)
+                config |= {section: parsed} if section else parsed
+
+        return config
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
-            # Tested on FortiGate and FortiAnalyzer, other Fortinet devices look different
-            if fs.exists("/rootfs.gz") and (fs.exists("/.fgtsum") or fs.exists("/.fmg_sign")):
+            # Tested on FortiGate and FortiAnalyzer, other Fortinet devices may look different.
+            if fs.exists("/rootfs.gz") and (fs.exists("/.fgtsum") or fs.exists("/.fmg_sign") or fs.exists("/flatkc")):
                 return fs
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> FortigatePlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> FortiOSPlugin:
         rootfs = sysvol.path("/rootfs.gz")
-        vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
 
-        target.fs.mount("/", vfs)
+        try:
+            target.log.warning("Attempting to load compressed rootfs.gz, this can take a while.")
+            rfs_fh = open_decompress(rootfs)
+            if rfs_fh.read(4) == b"07" * 2:
+                vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
+            else:
+                vfs = TarFilesystem(rootfs.open())
+            target.fs.mount("/", vfs)
+        except ReadError as e:
+            # Since FortiOS version ~7.4.1 the rootfs.gz file is encrypted.
+            target.log.warning("Could not mount FortiOS `/rootfs.gz`. It could be encrypted or corrupt.")
+            target.log.debug("", exc_info=e)
+
         target.fs.mount("/data", sysvol)
 
         # FortiGate
-        if (datafs_tar := sysvol.path("datafs.tar.gz")).exists():
+        if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
             target.fs.add_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
 
         # Additional FortiGate tars with corrupt XZ streams
@@ -64,138 +103,140 @@ class FortigatePlugin(LinuxPlugin):
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.add_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
 
+        # Filesystem mounts can be discovered in the FortiCare debug report
+        # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
         for fs in target.filesystems:
-            # TODO: Figure out the other partitions
-            # TODO: How to determine /data2?
-            if fs.__type__ == "ext" and fs.extfs.volume_name.startswith("LOGUSEDX"):
+            # log partition
+            if fs.__type__ == "ext" and (
+                fs.extfs.volume_name.startswith("LOGUSEDX") or fs.path("/root/clog").is_symlink()
+            ):
                 target.fs.mount("/var/log", fs)
+
+            # EFI partition
+            if fs.__type__ == "fat" and fs.path("/EFI").exists():
+                target.fs.mount("/boot", fs)
+
+            # data2 partition
+            if fs.__type__ == "ext" and fs.path("/new_alert_msg").exists() and fs.path("/template").exists():
+                target.fs.mount("/data2", fs)
 
         return cls(target)
 
     @export(property=True)
+    def os(self) -> str:
+        return OperatingSystem.FORTIOS.value
+
+    @export(property=True)
+    def version(self) -> str:
+        """Return FortiOS version."""
+        if self._version:
+            return parse_version(self._version)
+        return "FortiOS Unknown"
+
+    @export(property=True)
+    def architecture(self) -> Optional[str]:
+        """Return architecture FortiOS runs on."""
+        return self._get_architecture(path="/lib/libav.so")
+
+    @export(property=True)
     def hostname(self) -> str | None:
+        """Return configured hostname."""
         try:
-            return self.config["system"]["global"]["hostname"][0]
+            return self._config["global-config"]["system"]["global"]["hostname"][0]
         except KeyError:
             return None
 
     @export(property=True)
+    def dns(self) -> list[str]:
+        """Return configured WAN DNS servers."""
+        entries = []
+        for _, entry in self._config["global-config"]["system"]["dns"].items():
+            entries.append(entry[0])
+        return entries
+
+    @export(property=True)
     def ips(self) -> list[str]:
+        """Return IP addresses of configured interfaces."""
         result = []
 
         try:
-            for conf in self.config.system.interface.values():
+            # FortiOS 6 and 7 (from global_system_interface.gz)
+            for key, iface in self._config["interfaces"].items():
+                if not key.startswith("port"):
+                    continue
+                result += [ip for ip in iface["ip"] if not ip.startswith("255")]
+        except KeyError as e:
+            self.target.log.debug("Exception while parsing FortiOS interfaces", exc_info=e)
+
+        try:
+            # Other versions
+            for conf in self._config["global-config"]["system"]["interface"].values():
                 if "ip" in conf:
                     result.append(conf.ip[0])
-        except KeyError:
-            pass
+        except KeyError as e:
+            self.target.log.debug("Exception while parsing FortiOS system interfaces", exc_info=e)
 
         return result
 
-    @export(property=True)
-    def version(self) -> str:
-        if config_fh := self._find_config_file():
-            with config_fh:
-                return config_fh.readline().split("=")[1]
+    @export(record=FortiOSUserRecord)
+    def users(self) -> Iterator[Union[FortiOSUserRecord, UnixUserRecord]]:
+        """Return local users of the FortiOS system."""
 
-        return "FortiOS Unknown"
+        # Possible unix-like users
+        yield from super().users()
 
-    @export(property=True)
-    def os(self) -> str:
-        return OperatingSystem.FORTIGATE.value
+        # Administrative users
+        try:
+            for username, entry in self._config["global-config"]["system"]["admin"].items():
+                yield FortiOSUserRecord(
+                    name=username,
+                    password=":".join(entry.get("password", [])),
+                    groups=[entry["accprofile"][0]],
+                    home="/root",
+                    _target=self.target,
+                )
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing FortiOS admin users")
+            self.target.log.debug("", exc_info=e)
 
-    @export(record=UnixUserRecord)
-    def users(self) -> Iterator[UnixUserRecord]:
-        # TODO: Add FortiOS specific users
-        return super().users()
+        # Local users
+        try:
+            local_groups = local_groups_to_users(self._config["root-config"]["user"]["group"])
+            for username, entry in self._config["root-config"]["user"].get("local", {}).items():
+                try:
+                    password = decrypt_password(entry["passwd"][-1])
+                except ValueError:
+                    password = ":".join(entry.get("passwd", []))
 
+                yield FortiOSUserRecord(
+                    name=username,
+                    password=password,
+                    groups=local_groups.get(username, []),
+                    home=None,
+                    _target=self.target,
+                )
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing FortiOS local users")
+            self.target.log.debug("", exc_info=e)
 
-def repair_lzma_stream(fh: BinaryIO) -> BinaryIO:
-    """Repair CRC32 checksums for all headers in an XZ stream.
+        # Temporary guest users
+        try:
+            for _, entry in self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).items():
+                try:
+                    password = decrypt_password(entry.get("password")[-1])
+                except ValueError:
+                    password = ":".join(entry.get("password"))
 
-    Fortinet XZ files have (on purpose) corrupt streams which they read using a modified ``xz`` binary.
-    The only thing changed are the CRC32 checksums, so partially parse the XZ file and fix all of them.
-
-    References:
-        - https://tukaani.org/xz/xz-file-format-1.1.0.txt
-        - https://github.com/Rogdham/python-xz
-
-    Args:
-        fh: A file-like object of an LZMA stream to repair.
-    """
-    size = fh.seek(0, io.SEEK_END)
-    repaired = OverlayStream(fh, size)
-    fh.seek(0)
-
-    header = fh.read(12)
-    # Check header magic
-    if header[:6] != b"\xfd7zXZ\x00":
-        raise ValueError("Not an XZ file")
-    # Add correct header CRC32
-    repaired.add(8, _crc32(header[6:8]))
-
-    fh.seek(-12, io.SEEK_END)
-    footer = fh.read(12)
-    # Check footer magic
-    if footer[10:12] != b"YZ":
-        raise ValueError("Not an XZ file")
-    # Add correct footer CRC32
-    repaired.add(fh.tell() - 12, _crc32(footer[4:10]))
-
-    backward_size = (int.from_bytes(footer[4:8], "little") + 1) * 4
-    fh.seek(-12 - backward_size, io.SEEK_END)
-    index = fh.read(backward_size)
-    # Add correct index CRC32
-    repaired.add(fh.tell() - 4, _crc32(index[:-4]))
-
-    # Parse the index
-    isize, nb_records = _mbi(index[1:])
-    index = index[1 + isize : -4]
-    records = []
-    for _ in range(nb_records):
-        if not index:
-            raise ValueError("index size")
-        isize, unpadded_size = _mbi(index)
-        if not unpadded_size:
-            raise ValueError("index record unpadded size")
-        index = index[isize:]
-        if not index:
-            raise ValueError("index size")
-        isize, uncompressed_size = _mbi(index)
-        if not uncompressed_size:
-            raise ValueError("index record uncompressed size")
-        index = index[isize:]
-        records.append((unpadded_size, uncompressed_size))
-
-    block_start = size - 12 - backward_size
-    blocks_len = sum((unpadded_size + 3) & ~3 for unpadded_size, _ in records)
-    block_start -= blocks_len
-
-    # Iterate over all blocks and add the correct block header CRC32
-    for unpadded_size, _ in records:
-        fh.seek(block_start)
-
-        block_header = fh.read(1)
-        block_header_size = (block_header[0] + 1) * 4
-        block_header += fh.read(block_header_size - 1)
-        repaired.add(fh.tell() - 4, _crc32(block_header[:-4]))
-
-        block_start += (unpadded_size + 3) & ~3
-
-    return repaired
-
-
-def _mbi(data: bytes) -> tuple[int, int]:
-    value = 0
-    for size, byte in enumerate(data):
-        value |= (byte & 0x7F) << (size * 7)
-        if not byte & 0x80:
-            return size + 1, value
-    raise ValueError("Invalid mbi")
-
-
-def _crc32(data: bytes) -> bytes:
-    return int.to_bytes(crc32(data), 4, "little")
+                yield FortiOSUserRecord(
+                    name=entry["user-id"][0],
+                    password=password,
+                    groups=["guestgroup"],
+                    home=None,
+                    _target=self.target,
+                )
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing FortiOS temporary guest users")
+            self.target.log.debug("", exc_info=e)
 
 
 class ConfigNode(dict):
@@ -213,9 +254,9 @@ class ConfigNode(dict):
         return self[attr]
 
 
-class FortigateConfig(ConfigNode):
+class FortiOSConfig(ConfigNode):
     @classmethod
-    def from_fh(cls, fh: TextIO) -> FortigateConfig:
+    def from_fh(cls, fh: TextIO) -> FortiOSConfig:
         root = cls()
 
         stack = []
@@ -232,10 +273,12 @@ class FortigateConfig(ConfigNode):
                 stack.append(parts[1:])
 
             elif cmd == "end":
-                stack.pop()
+                if stack:
+                    stack.pop()
 
             elif cmd == "next":
-                stack.pop()
+                if stack:
+                    stack.pop()
 
             elif cmd == "set":
                 path = []
@@ -277,3 +320,63 @@ def _parse_config(fh: TextIO) -> Iterator[list[str]]:
         if parts and not string:
             yield parts
             parts = []
+
+
+def parse_version(input: str) -> str:
+    """Attempt to parse the config FortiOS version to a readable format.
+
+    The input ``FGVM64-7.4.1-FW-build2463-230830:opmode=0:vdom=0`` would
+    return the following output: ``FortiGate VM 7.4.1 (build 2463, 2023-08-30)``.
+
+    Resources:
+        - https://support.fortinet.com/Download/VMImages.aspx
+    """
+
+    PREFIXES = {
+        "FGV": "FortiGate VM",  # FGVM64
+        "FGT": "FortiGate",  # can also be FGT-VM in 4.x/5.x
+        "FMG": "FortiManager",
+        "FAZ": "FortiAnalyzer",
+        "FFW": "FortiFirewall",
+        "FOS": "FortiOS",
+        "FWB": "FortiWeb",
+        "FAD": "FortiADC",
+    }
+
+    try:
+        version_str = input.split(":", 1)[0]
+        type, version, _, build_num, build_date = version_str.rsplit("-", 4)
+
+        build_num = build_num.replace("build", "build ", 1)
+        build_date = datetime.strptime(build_date, "%y%m%d").strftime("%Y-%m-%d")
+        type = PREFIXES.get(type[:3], type)
+
+        return f"{type} {version} ({build_num}, {build_date})"
+    except ValueError:
+        return input
+
+
+def local_groups_to_users(config_groups: dict) -> dict:
+    """Map FortiOS groups to a dict with usernames as key."""
+    user_groups = {}
+    for group, items in config_groups.items():
+        for user in items.get("member", []):
+            if user in user_groups:
+                user_groups[user].append(group)
+            else:
+                user_groups[user] = [group]
+    return user_groups
+
+
+def decrypt_password(ciphertext: str) -> str:
+    """Decrypt FortiOS version 6 and 7 encrypted secrets."""
+
+    if ciphertext[:3] in ["SH2", "AK1"]:
+        raise ValueError("Password is a hash (SHA-256 or SHA-1) and cannot be decrypted.")
+
+    ciphertext = b64decode(ciphertext)
+    iv = ciphertext[:4] + b"\x00" * 12
+    key = b"Mary had a littl"
+    cipher = AES.new(key, iv=iv, mode=AES.MODE_CBC)
+    plaintext = cipher.decrypt(ciphertext[4:])
+    return plaintext.split(b"\x00", 1)[0].decode()
