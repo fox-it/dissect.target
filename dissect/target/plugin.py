@@ -689,7 +689,7 @@ def plugins(
             special_keys=special_keys,
             only_special_keys=only_special_keys,
         ),
-        key=lambda el: len(el["module"]),
+        key=lambda plugin: len(plugin["module"]),
         reverse=True,
     )
 
