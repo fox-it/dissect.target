@@ -1,6 +1,5 @@
 coverage.xml
 .coverage
-.idea
 dist/
 .eggs/
 *.egg-info/
