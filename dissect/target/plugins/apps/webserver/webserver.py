@@ -1,16 +1,16 @@
-from typing import Iterator
+from typing import Iterator, Union
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+from dissect.target.plugin import NamespacePlugin, export
 
 WebserverAccessLogRecord = TargetRecordDescriptor(
-    "application/log/webserver",
+    "application/log/webserver/access",
     [
         ("datetime", "ts"),
         ("string", "remote_user"),
         ("net.ipaddress", "remote_ip"),
+        ("net.ipaddress", "local_ip"),
+        ("varint", "pid"),
         ("string", "method"),
         ("uri", "uri"),
         ("string", "protocol"),
@@ -18,49 +18,33 @@ WebserverAccessLogRecord = TargetRecordDescriptor(
         ("varint", "bytes_sent"),
         ("uri", "referer"),
         ("string", "useragent"),
+        ("varint", "response_time_ms"),
+        ("path", "source"),
+    ],
+)
+
+WebserverErrorLogRecord = TargetRecordDescriptor(
+    "application/log/webserver/error",
+    [
+        ("datetime", "ts"),
+        ("net.ipaddress", "remote_ip"),
+        ("varint", "pid"),
+        ("string", "module"),
+        ("string", "level"),
+        ("string", "error_source"),
+        ("string", "error_code"),
+        ("string", "message"),
         ("path", "source"),
     ],
 )
 
 
-class WebserverPlugin(Plugin):
+class WebserverPlugin(NamespacePlugin):
     __namespace__ = "webserver"
     __findable__ = False
 
-    WEBSERVERS = [
-        "apache",
-        "nginx",
-        "iis",
-        "caddy",
-    ]
-
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self._plugins = []
-        for entry in self.WEBSERVERS:
-            try:
-                self._plugins.append(getattr(self.target, entry))
-            except Exception:  # noqa
-                target.log.exception("Failed to load webserver plugin: %s", entry)
-
-    def check_compatible(self) -> None:
-        if not len(self._plugins):
-            raise UnsupportedPluginError("No compatible webserver plugins found")
-
-    def _func(self, f: str) -> Iterator[WebserverAccessLogRecord]:
-        for p in self._plugins:
-            try:
-                yield from getattr(p, f)()
-            except Exception:
-                self.target.log.exception("Failed to execute webserver plugin: %s.%s", p._name, f)
-
-    @export(record=WebserverAccessLogRecord)
-    def logs(self) -> Iterator[WebserverAccessLogRecord]:
+    @export(record=[WebserverAccessLogRecord, WebserverErrorLogRecord])
+    def logs(self) -> Iterator[Union[WebserverAccessLogRecord, WebserverErrorLogRecord]]:
         """Returns log file records from installed webservers."""
         yield from self.access()
-        # TODO: In the future we should add error logs too.
-
-    @export(record=WebserverAccessLogRecord)
-    def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Returns WebserverAccessLogRecord records from installed webservers."""
-        yield from self._func("access")
+        yield from self.error()
