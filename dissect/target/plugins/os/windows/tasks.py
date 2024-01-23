@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 import re
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator, Union
+from typing import Iterator, Optional, Union
 
 from flow.record import GroupedRecord
 
@@ -16,6 +17,7 @@ from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
 from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
+log = logging.getLogger(__name__)
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
@@ -88,6 +90,9 @@ SchedLgURecord = TargetRecordDescriptor(
     ],
 )
 
+JOB_REGEX_PATTERN = re.compile(r"\"(.*?)\" \((.*?)\)")
+SCHEDLGU_REGEX_PATTERN = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILINE)
+
 
 @dataclass(order=True)
 class SchedLgU:
@@ -102,7 +107,6 @@ class SchedLgU:
     def _sanitize_ts(ts: str) -> datetime:
         # sometimes "at" exists before the timestamp
         ts = ts.strip("at ")
-
         try:
             ts = datetime.strptime(ts, "%m/%d/%Y %I:%M:%S %p")
         except ValueError:
@@ -111,12 +115,13 @@ class SchedLgU:
         return ts
 
     @staticmethod
-    def _parse_job(line: str) -> tuple[str, str]:
-        job, command = line.split("(", maxsplit=1)
-        command = command.rstrip(")")
-        job = job.strip('"').rstrip('" ')
+    def _parse_job(line: str) -> tuple[str, Optional[str]]:
+        matches = JOB_REGEX_PATTERN.match(line)
+        if matches:
+            return matches.groups()
 
-        return job, command
+        log.warning("SchedLgU failed to parse job and command from line: '%s'. Returning line.", line)
+        return line, None
 
     @classmethod
     def from_line(cls, line: str) -> SchedLgU:
@@ -149,7 +154,7 @@ class SchedLgU:
         elif len(lines) == 2:
             event.job = lines[0].strip('"')
 
-            if lines[1].startswith("\t") or lines[1].startswith("    "):
+            if lines[1].startswith("\t") or lines[1].startswith(" "):
                 event.status, event.ts = lines[1].split(maxsplit=1)
             else:
                 event.version = lines[1]
@@ -249,8 +254,6 @@ class SchedLgUPlugin(Plugin):
         "sysvol/winnt/tasks/SchedLgU.txt",
     }
 
-    PATTERN = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILINE)
-
     def __init__(self, target: Target) -> None:
         self.target = target
         self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
@@ -280,7 +283,7 @@ class SchedLgUPlugin(Plugin):
         for path in self.paths:
             content = path.read_text(encoding="UTF-16", errors="surrogateescape")
 
-            for match in re.findall(self.PATTERN, content):
+            for match in re.findall(SCHEDLGU_REGEX_PATTERN, content):
                 event = SchedLgU.from_line(match)
 
                 yield SchedLgURecord(
