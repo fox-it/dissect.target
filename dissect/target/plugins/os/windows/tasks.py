@@ -124,15 +124,28 @@ class SchedLgU:
         event = cls()
         lines = line.splitlines()
 
+        # Events can have 2 or 3 lines as a group in total. An example of a complete task job event is:
+        # "Symantec NetDetect.job" (NDETECT.EXE)
+        #     Finished 14-9-2003 13:21:01
+        #     Result: The task completed with an exit code of (65).
         if len(lines) == 3:
             event.job, event.command = cls._parse_job(lines[0])
             event.status, event.ts = lines[1].split(maxsplit=1)
             event.exit_code = int(lines[2].split("(")[1].rstrip(")."))
 
+        # Events that have 2 lines as a group can be started task job event or the Task Scheduler Service. Examples:
+        #   "Symantec NetDetect.job" (NDETECT.EXE)
+        #        Started at 14-9-2003 13:26:00
         elif len(lines) == 2 and ".job" in lines[0]:
             event.job, event.command = cls._parse_job(lines[0])
             event.status, event.ts = lines[1].split(maxsplit=1)
 
+        # Events without a task job event are the Task Scheduler Service events. Which can look like this:
+        # "Task Scheduler Service"
+        #      Exited at 14-9-2003 13:40:24
+        # OR
+        # "Task Scheduler Service"
+        # 6.0.6000.16386 (vista_rtm.061101-2205)
         elif len(lines) == 2:
             event.job = lines[0].strip('"')
 
@@ -236,6 +249,8 @@ class SchedLgUPlugin(Plugin):
         "sysvol/winnt/tasks/SchedLgU.txt",
     }
 
+    PATTERN = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILINE)
+
     def __init__(self, target: Target) -> None:
         self.target = target
         self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
@@ -246,27 +261,26 @@ class SchedLgUPlugin(Plugin):
 
     @export(record=SchedLgURecord)
     def schedlgu(self) -> Iterator[SchedLgURecord]:
-        """Return all evnets in the Task Scheduler Service transaction log file (SchedLgU.txt).
+        """Return all events in the Task Scheduler Service transaction log file (SchedLgU.txt).
 
         Older Windows systems may log ``.job`` tasks that get started remotely in the SchedLgU.txt file.
-        In addition this log file records when the Task Scheduler service starts and stops.
+        In addition, this log file records when the Task Scheduler service starts and stops.
 
-        Adversaries may use malious ``.job`` files to gain persistence on a system.
+        Adversaries may use malicious ``.job`` files to gain persistence on a system.
 
         Yield:
             ts (datetime): The timestamp of the event.
             job (str): The name of the ``.job`` file.
             command (str): The command executed.
-            status (str): The status of the event (Finished, completed, exited, stopped).
+            status (str): The status of the event (finished, completed, exited, stopped).
             exit_code (int): The exit code of the event.
             version (str): The version of the Task Scheduler service.
         """
 
         for path in self.paths:
             content = path.read_text(encoding="UTF-16", errors="surrogateescape")
-            pattern = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILINE)
 
-            for match in re.findall(pattern, content):
+            for match in re.findall(self.PATTERN, content):
                 event = SchedLgU.from_line(match)
 
                 yield SchedLgURecord(
