@@ -72,8 +72,10 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
     fs = TarFilesystem(bio)
     target.filesystems.add(fs)
     target.fs.mount("/", fs)
-    target.add_plugin(default.DefaultPlugin)
+    target._os_plugin = default.DefaultPlugin
+    target.apply()
     target.add_plugin(MessagesPlugin)
+
     results = list(target.messages())
     results.reverse()
 
