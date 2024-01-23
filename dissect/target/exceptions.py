@@ -114,3 +114,7 @@ class RegistryCorruptError(RegistryError):
 
 class ConfigurationParsingError(Error):
     """An error occurred during configuration parsing."""
+
+
+class CRCMismatchException(Error):
+    """A mismatch between CRC checksums has occurred."""
