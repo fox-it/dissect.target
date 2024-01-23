@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator, Union
 
-from dateutil import parser as dateutil
 from flow.record import GroupedRecord
 
 from dissect.target import Target
@@ -103,7 +102,13 @@ class SchedLgU:
     def _sanitize_ts(ts: str) -> datetime:
         # sometimes "at" exists before the timestamp
         ts = ts.strip("at ")
-        return dateutil.parse(ts)
+
+        try:
+            ts = datetime.strptime(ts, "%m/%d/%Y %I:%M:%S %p")
+        except ValueError:
+            ts = datetime.strptime(ts, "%d-%m-%Y %H:%M:%S")
+
+        return ts
 
     @staticmethod
     def _parse_job(line: str) -> tuple[str, str]:
