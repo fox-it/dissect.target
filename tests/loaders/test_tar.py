@@ -71,7 +71,7 @@ def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str,
     loader = TarLoader(absolute_path(archive))
     loader.map(target_default)
 
-    assert WindowsPlugin(target_default).detect(target_default)
+    assert WindowsPlugin.detect(target_default)
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(target_default.fs.mounts.keys()) == [expected_drive_letter]
 
