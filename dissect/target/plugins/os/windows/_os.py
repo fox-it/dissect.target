@@ -19,6 +19,11 @@ class WindowsPlugin(OSPlugin):
         # Just run this here for now
         self.add_mounts()
 
+        target.props["sysvol_drive"] = next(
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts["sysvol"] and mnt != "sysvol"),
+            None,
+        )
+
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
