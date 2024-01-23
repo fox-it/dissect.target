@@ -1,14 +1,20 @@
+from __future__ import annotations
+
+import re
 import warnings
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Iterator, Union
 
+from dateutil import parser as dateutil
 from flow.record import GroupedRecord
 
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
 from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
-from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -70,6 +76,70 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "raw_data"),
     ],
 )
+
+SchedLgURecord = TargetRecordDescriptor(
+    "windows/tasks/log/schedlgu",
+    [
+        ("datetime", "ts"),
+        ("string", "job"),
+        ("string", "command"),
+        ("string", "status"),
+        ("uint32", "exit_code"),
+        ("string", "version"),
+    ],
+)
+
+
+@dataclass(order=True)
+class SchedLgU:
+    ts: datetime = None
+    job: str = None
+    status: str = None
+    command: str = None
+    exit_code: int = None
+    version: str = None
+
+    @staticmethod
+    def _sanitize_ts(ts: str) -> datetime:
+        # sometimes "at" exists before the timestamp
+        ts = ts.strip("at ")
+        return dateutil.parse(ts)
+
+    @staticmethod
+    def _parse_job(line: str) -> tuple[str, str]:
+        job, command = line.split("(", maxsplit=1)
+        command = command.rstrip(")")
+        job = job.strip('"').rstrip('" ')
+
+        return job, command
+
+    @classmethod
+    def from_line(cls, line: str) -> SchedLgU:
+        """Parse a group of SchedLgU.txt lines."""
+        event = cls()
+        lines = line.splitlines()
+
+        if len(lines) == 3:
+            event.job, event.command = cls._parse_job(lines[0])
+            event.status, event.ts = lines[1].split(maxsplit=1)
+            event.exit_code = int(lines[2].split("(")[1].rstrip(")."))
+
+        elif len(lines) == 2 and ".job" in lines[0]:
+            event.job, event.command = cls._parse_job(lines[0])
+            event.status, event.ts = lines[1].split(maxsplit=1)
+
+        elif len(lines) == 2:
+            event.job = lines[0].strip('"')
+
+            if lines[1].startswith("\t") or lines[1].startswith("    "):
+                event.status, event.ts = lines[1].split(maxsplit=1)
+            else:
+                event.version = lines[1]
+
+        if event.ts:
+            event.ts = cls._sanitize_ts(event.ts)
+
+        return event
 
 
 class TasksPlugin(Plugin):
@@ -149,3 +219,57 @@ class TasksPlugin(Plugin):
                 for trigger in task_object.get_triggers():
                     grouped = GroupedRecord("filesystem/windows/task/grouped", [record, trigger])
                     yield grouped
+
+
+class SchedLgUPlugin(Plugin):
+    """Plugin for parsing the Task Scheduler Service transaction log file (SchedLgU.txt)."""
+
+    PATHS = {
+        "sysvol/SchedLgU.txt",
+        "sysvol/windows/SchedLgU.txt",
+        "sysvol/windows/tasks/SchedLgU.txt",
+        "sysvol/winnt/tasks/SchedLgU.txt",
+    }
+
+    def __init__(self, target: Target) -> None:
+        self.target = target
+        self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
+
+    def check_compatible(self) -> None:
+        if len(self.paths) == 0:
+            raise UnsupportedPluginError("No SchedLgU.txt file found.")
+
+    @export(record=SchedLgURecord)
+    def schedlgu(self) -> Iterator[SchedLgURecord]:
+        """Return all evnets in the Task Scheduler Service transaction log file (SchedLgU.txt).
+
+        Older Windows systems may log ``.job`` tasks that get started remotely in the SchedLgU.txt file.
+        In addition this log file records when the Task Scheduler service starts and stops.
+
+        Adversaries may use malious ``.job`` files to gain persistence on a system.
+
+        Yield:
+            ts (datetime): The timestamp of the event.
+            job (str): The name of the ``.job`` file.
+            command (str): The command executed.
+            status (str): The status of the event (Finished, completed, exited, stopped).
+            exit_code (int): The exit code of the event.
+            version (str): The version of the Task Scheduler service.
+        """
+
+        for path in self.paths:
+            content = path.read_text(encoding="UTF-16", errors="surrogateescape")
+            pattern = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILINE)
+
+            for match in re.findall(pattern, content):
+                event = SchedLgU.from_line(match)
+
+                yield SchedLgURecord(
+                    ts=event.ts,
+                    job=event.job,
+                    command=event.command,
+                    status=event.status,
+                    exit_code=event.exit_code,
+                    version=event.version,
+                    _target=self.target,
+                )
