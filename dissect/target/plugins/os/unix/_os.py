@@ -139,21 +139,29 @@ class UnixPlugin(OSPlugin):
         Args:
             paths (list): list of paths
         """
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME"]
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/etc/sysconfig/network"]
         hostname_string = None
 
         for path in paths:
             for fs in self.target.filesystems:
-                if fs.exists(path):
+                if not fs.exists(path):
+                    continue
+                if path == "/etc/sysconfig/network":
+                    file_contents = fs.path(path).open("rt").readlines()
+                    for line in file_contents:
+                        if not line.startswith("HOSTNAME"):
+                            continue
+                        hostname_string = line.rstrip().split("=", maxsplit=1)[1]   
+                else:
                     hostname_string = fs.path(path).open("rt").read().rstrip()
 
-            if hostname_string and "." in hostname_string:
-                hostname_string = hostname_string.split(".", maxsplit=1)
-                hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-            else:
-                hostname_dict = {"hostname": hostname_string, "domain": None}
+        if hostname_string and "." in hostname_string:
+            hostname_string = hostname_string.split(".", maxsplit=1)
+            hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
+        else:
+            hostname_dict = {"hostname": hostname_string, "domain": None}
 
-            return hostname_dict
+        return hostname_dict
 
     def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
