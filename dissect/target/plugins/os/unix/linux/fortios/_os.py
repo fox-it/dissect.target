@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 from base64 import b64decode
 from datetime import datetime
+from io import BytesIO
 from tarfile import ReadError
-from typing import Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, Optional, TextIO, Union
 
-from Crypto.Cipher import AES
 from dissect.util import cpio
 from dissect.util.compression import xz
 
@@ -17,6 +18,13 @@ from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
+
+try:
+    from Crypto.Cipher import AES, ChaCha20
+
+    HAS_PYCRYPTODOME = True
+except ImportError:
+    HAS_PYCRYPTODOME = False
 
 FortiOSUserRecord = TargetRecordDescriptor(
     "fortios/user",
@@ -72,20 +80,31 @@ class FortiOSPlugin(LinuxPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> FortiOSPlugin:
+        target.log.warning("Attempting to load rootfs.gz, this can take a while.")
         rootfs = sysvol.path("/rootfs.gz")
+        vfs = None
 
         try:
-            target.log.warning("Attempting to load compressed rootfs.gz, this can take a while.")
-            rfs_fh = open_decompress(rootfs)
-            if rfs_fh.read(4) == b"07" * 2:
+            if open_decompress(rootfs).read(4) == b"0707":
                 vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
             else:
                 vfs = TarFilesystem(rootfs.open())
+        except ReadError:
+            # The rootfs.gz file could be encrypted.
+            try:
+                rfs_fh = decrypt_rootfs(rootfs.open(), get_kernel_hash(sysvol))
+                vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
+            except RuntimeError:
+                target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
+            except ValueError as e:
+                target.log.warning("Could not decrypt rootfs.gz. Unsupported kernel version.")
+                target.log.debug("", exc_info=e)
+            except ReadError as e:
+                target.log.warning("Could not mount rootfs.gz. It could be corrupt.")
+                target.log.debug("", exc_info=e)
+
+        if vfs:
             target.fs.mount("/", vfs)
-        except ReadError as e:
-            # Since FortiOS version ~7.4.1 the rootfs.gz file is encrypted.
-            target.log.warning("Could not mount FortiOS `/rootfs.gz`. It could be encrypted or corrupt.")
-            target.log.debug("", exc_info=e)
 
         target.fs.mount("/data", sysvol)
 
@@ -436,3 +455,80 @@ def decrypt_password(input: str) -> str:
         return plaintext.split(b"\x00", 1)[0].decode()
     except UnicodeDecodeError:
         return "ENC:" + input
+
+
+def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
+    """Attempt to decrypt an encrypted ``rootfs.gz`` file.
+
+    FortiOS releases as of 7.4.1 / 2023-08-31, have ChaCha20 encrypted ``rootfs.gz`` files.
+    This function attempts to decrypt a ``rootfs.gz`` file using a static key and IV
+    which can be found in the kernel.
+
+    Currently supported versions (each release has a new key):
+        - FortiGate VM 7.0.13
+        - FortiGate VM 7.4.1
+        - FortiGate VM 7.4.2
+
+    Resources:
+        - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
+        - Reversing kernel (fgt_verifier_iv, fgt_verifier_decrypt, fgt_verifier_initrd)
+    """
+
+    if not HAS_PYCRYPTODOME:
+        raise RuntimeError("PyCryptodome module not available")
+
+    # SHA256 hashes of kernel files
+    KERNEL_KEY_MAP = {
+        # FortiGate VM 7.0.13
+        "25cb2c8a419cde1f42d38fc6cbc95cf8b53db41096d0648015674d8220eba6bf": (
+            bytes.fromhex("c87e13e1f7d21c1aca81dc13329c3a948d6e420d3a859f3958bd098747873d08"),
+            bytes.fromhex("87486a24637e9a66f09ec182eee25594"),
+        ),
+        # FortiGate VM 7.4.1
+        "a008b47327293e48502a121ee8709f243ad5da4e63d6f663c253db27bd01ea28": _kdf_7_4_x(
+            "366486c0f2c6322ec23e4f33a98caa1b19d41c74bb4f25f6e8e2087b0655b30f"
+        ),
+        # FortiGate VM 7.4.2
+        "c392cf83ab484e0b2419b2711b02cdc88a73db35634c10340037243394a586eb": _kdf_7_4_x(
+            "480767be539de28ee773497fa731dd6368adc9946df61da8e1253fa402ba0302"
+        ),
+    }
+
+    if not (key_data := KERNEL_KEY_MAP.get(kernel_hash)):
+        raise ValueError("Failed to decrypt: Unknown kernel hash.")
+
+    key, iv = key_data
+    # First 8 bytes = counter, last 8 bytes = nonce
+    # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
+    # We're interested in updating the position in the ChaCha20 internal state, so to make
+    # PyCryptodome "OpenSSL-compatible" we have to multiply the counter by 64
+    cipher = ChaCha20.new(key=key, nonce=iv[8:])
+    cipher.seek(int.from_bytes(iv[:8], "little") * 64)
+    result = cipher.decrypt(fh.read())
+
+    if result[0:2] != b"\x1f\x8b":
+        raise ValueError("Failed to decrypt: No gzip magic header found.")
+
+    return BytesIO(result)
+
+
+def _kdf_7_4_x(key_data: Union[str, bytes]) -> tuple[bytes, bytes]:
+    """Derive 32 byte key and 16 byte IV from 32 byte seed.
+
+    As the IV needs to be 16 bytes, we return the first 16 bytes of the sha256 hash.
+    """
+
+    if isinstance(key_data, str):
+        key_data = bytes.fromhex(key_data)
+
+    key = hashlib.sha256(key_data[4:32] + key_data[:4]).digest()
+    iv = hashlib.sha256(key_data[5:32] + key_data[:5]).digest()[:16]
+    return key, iv
+
+
+def get_kernel_hash(sysvol: Filesystem) -> Optional[str]:
+    """Return the SHA256 hash of the (compressed) kernel."""
+    kernel_files = ["flatkc", "vmlinuz", "vmlinux"]
+    for k in kernel_files:
+        if sysvol.path(k).exists():
+            return sysvol.sha256(k)
