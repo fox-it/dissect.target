@@ -39,7 +39,7 @@ class FortiOSPlugin(LinuxPlugin):
 
     def _load_config(self) -> dict:
         CONFIG_FILES = {
-            "/data/system.conf": None,
+            "/data/system.conf": "global-config",  # FortiManager
             "/data/config/daemon.conf.gz": "daemon",  # FortiOS 4.x
             "/data/config/sys_global.conf.gz": "global-config",  # Seen in FortiOS 5.x - 7.x
             "/data/config/sys_vd_root.conf.gz": "root-config",  # FortiOS 4.x
@@ -55,7 +55,7 @@ class FortiOSPlugin(LinuxPlugin):
                 else:
                     fh = conf_path.open("rt")
 
-                if not self._version and section in [None, "global-config", "root-config"]:
+                if not self._version and section in ["global-config", "root-config"]:
                     self._version = fh.readline().split("=", 1)[1]
 
                 parsed = FortiOSConfig.from_fh(fh)
@@ -93,13 +93,21 @@ class FortiOSPlugin(LinuxPlugin):
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
             target.fs.add_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
 
-        # Additional FortiGate tars with corrupt XZ streams
-        for path in ("bin.tar.xz", "usr.tar.xz", "migadmin.tar.xz", "node-scripts.tar.xz"):
-            if (tar := target.fs.path(path)).exists():
+        # Additional FortiGate or FortiManager tars with corrupt XZ streams
+        target.log.warning("Attempting to load XZ files, this can take a while.")
+        for path in (
+            "bin.tar.xz",
+            "usr.tar.xz",
+            "migadmin.tar.xz",
+            "node-scripts.tar.xz",
+            "docker.tar.xz",
+            "syntax.tar.xz",
+        ):
+            if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
                 fh = xz.repair_checksum(tar.open("rb"))
                 target.fs.add_layer().mount("/", TarFilesystem(fh))
 
-        # FortiAnalyzer
+        # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.add_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
 
@@ -117,8 +125,17 @@ class FortiOSPlugin(LinuxPlugin):
                 target.fs.mount("/boot", fs)
 
             # data2 partition
-            if fs.__type__ == "ext" and fs.path("/new_alert_msg").exists() and fs.path("/template").exists():
+            if fs.__type__ == "ext" and (
+                (fs.path("/new_alert_msg").exists() and fs.path("/template").exists())  # FortiGate
+                or (fs.path("/swapfile").exists() and fs.path("/old_fmversion").exists())  # FortiManager
+            ):
                 target.fs.mount("/data2", fs)
+
+        # Symlink unix-like paths
+        unix_paths = [("/data/passwd", "/etc/passwd")]
+        for src, dst in unix_paths:
+            if target.fs.path(src).exists() and not target.fs.path(dst).exists():
+                target.fs.symlink(src, dst)
 
         return cls(target)
 
@@ -158,8 +175,11 @@ class FortiOSPlugin(LinuxPlugin):
     def dns(self) -> list[str]:
         """Return configured WAN DNS servers."""
         entries = []
-        for _, entry in self._config["global-config"]["system"]["dns"].items():
-            entries.append(entry[0])
+        try:
+            for entry in self._config["global-config"]["system"]["dns"].values():
+                entries.append(entry[0])
+        except KeyError:
+            pass
         return entries
 
     @export(property=True)
@@ -176,7 +196,7 @@ class FortiOSPlugin(LinuxPlugin):
         # Possible unix-like users
         yield from super().users()
 
-        # Administrative users
+        # FortiGate administrative users
         try:
             for username, entry in self._config["global-config"]["system"]["admin"].items():
                 yield FortiOSUserRecord(
@@ -190,13 +210,27 @@ class FortiOSPlugin(LinuxPlugin):
             self.target.log.warning("Exception while parsing FortiOS admin users")
             self.target.log.debug("", exc_info=e)
 
+        # FortiManager administrative users
+        try:
+            for username, entry in self._config["global-config"]["system"]["admin"]["user"].items():
+                yield FortiOSUserRecord(
+                    name=username,
+                    password=":".join(entry.get("password", [])),
+                    groups=[entry["profileid"][0]],
+                    home="/root",
+                    _target=self.target,
+                )
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing FortiManager admin users")
+            self.target.log.debug("", exc_info=e)
+
         # Local users
         try:
             local_groups = local_groups_to_users(self._config["root-config"]["user"]["group"])
             for username, entry in self._config["root-config"]["user"].get("local", {}).items():
                 try:
                     password = decrypt_password(entry["passwd"][-1])
-                except ValueError:
+                except (ValueError, RuntimeError):
                     password = ":".join(entry.get("passwd", []))
 
                 yield FortiOSUserRecord(
@@ -215,7 +249,7 @@ class FortiOSPlugin(LinuxPlugin):
             for _, entry in self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).items():
                 try:
                     password = decrypt_password(entry.get("password")[-1])
-                except ValueError:
+                except (ValueError, RuntimeError):
                     password = ":".join(entry.get("password"))
 
                 yield FortiOSUserRecord(
@@ -236,7 +270,10 @@ class FortiOSPlugin(LinuxPlugin):
     @export(property=True)
     def architecture(self) -> Optional[str]:
         """Return architecture FortiOS runs on."""
-        return self._get_architecture(path="/lib/libav.so")
+        paths = ["/lib/libav.so", "/bin/ctr"]
+        for path in paths:
+            if self.target.fs.path(path).exists():
+                return self._get_architecture(path=path)
 
 
 class ConfigNode(dict):
@@ -344,7 +381,7 @@ def parse_version(input: str) -> str:
     }
 
     try:
-        version_str = input.split(":", 1)[0]
+        version_str = input.split(":", 1)[0].strip()
         type, version, _, build_num, build_date = version_str.rsplit("-", 4)
 
         build_num = build_num.replace("build", "build ", 1)
@@ -368,15 +405,34 @@ def local_groups_to_users(config_groups: dict) -> dict:
     return user_groups
 
 
-def decrypt_password(ciphertext: str) -> str:
-    """Decrypt FortiOS version 6 and 7 encrypted secrets."""
+def decrypt_password(input: str) -> str:
+    """Decrypt FortiOS encrypted secrets.
 
-    if ciphertext[:3] in ["SH2", "AK1"]:
+    Works for FortiGate 5.x, 6.x and 7.x (CVE-2019-6693).
+
+    NOTE:
+        - FortiManager uses a 16-byte IV and is not supported (CVE-2020-9289).
+        - FortiGate 4.x uses DES and a static 8-byte key and is not supported.
+
+    Returns decoded plaintext or original input ciphertext when decryption failed.
+
+    Resources:
+        - https://www.fortiguard.com/psirt/FG-IR-19-007
+    """
+
+    if not HAS_PYCRYPTODOME:
+        raise RuntimeError("PyCryptodome module not available")
+
+    if input[:3] in ["SH2", "AK1"]:
         raise ValueError("Password is a hash (SHA-256 or SHA-1) and cannot be decrypted.")
 
-    ciphertext = b64decode(ciphertext)
+    ciphertext = b64decode(input)
     iv = ciphertext[:4] + b"\x00" * 12
     key = b"Mary had a littl"
     cipher = AES.new(key, iv=iv, mode=AES.MODE_CBC)
     plaintext = cipher.decrypt(ciphertext[4:])
-    return plaintext.split(b"\x00", 1)[0].decode()
+
+    try:
+        return plaintext.split(b"\x00", 1)[0].decode()
+    except UnicodeDecodeError:
+        return "ENC:" + input
