@@ -272,7 +272,7 @@ class Xml(ConfigurationParser):
                 nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
             else:
                 counter[node.tag] = 1
-                nodes[f"{node.tag}"] = self._tree(node)
+                nodes[node.tag] = self._tree(node)
 
         result = {"tag": tree.tag}
 
