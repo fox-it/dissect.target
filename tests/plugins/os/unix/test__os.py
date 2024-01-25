@@ -1,8 +1,14 @@
 import tempfile
+from io import BytesIO
+from pathlib import Path
+from textwrap import dedent
 from uuid import UUID
+
+import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import parse_fstab
+from dissect.target.target import Target
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -61,3 +67,44 @@ def test_parse_fstab(tmp_path):
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
     }
+
+
+@pytest.mark.parametrize(
+    "path, is_domain_joined, expected_hostname, expected_domain",
+    [
+        ("/etc/hostname", True, "myhost", "mydomain.com"),
+        ("/etc/HOSTNAME", True, "myhost", "mydomain.com"),
+        ("/etc/sysconfig/network", True, "myhost", "mydomain.com"),
+        ("/etc/hostname", False, "myhost", None),
+    ],
+)
+def test__parse_hostname_string(
+    target_redhat: Target,
+    fs_redhat: VirtualFilesystem,
+    path: Path,
+    is_domain_joined: bool,
+    expected_hostname: str,
+    expected_domain: str,
+):
+    if is_domain_joined:
+        hostname = "myhost.mydomain.com"
+    else:
+        hostname = "myhost"
+
+    if path == "/etc/sysconfig/network":
+        hostname_file_content = dedent(
+            f"""
+        NETWORKING=NO
+        HOSTNAME={hostname}
+        GATEWAY=192.168.1.1"""
+        )
+        hostname_file_content = f"HOSTNAME={hostname}"
+    else:
+        hostname_file_content = hostname
+
+    fs_redhat.map_file_fh(path, BytesIO(hostname_file_content.encode("ascii")))
+
+    hostname_dict = target_redhat._os._parse_hostname_string()
+
+    assert hostname_dict["hostname"] == expected_hostname
+    assert hostname_dict["domain"] == expected_domain
