@@ -289,8 +289,7 @@ class Xml(ConfigurationParser):
         # content goes into the text folder
         # we don't use special prefixes ($) because XML docs may use them anyway (even though they are forbidden)
         if tree.text:
-            text = str(tree.text).strip(" \n\r")
-            if text != "":
+            if text := tree.text.strip(" \n\r"):
                 result["text"] = text
 
         # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
