@@ -262,6 +262,7 @@ class Xml(ConfigurationParser):
     def _tree(self, tree: ElementTree, root: bool = False) -> dict:
         """Very simple but robust xml -> dict implementation, see comments."""
         nodes = {}
+        result = {}
         counter = {}
 
         # each node is a folder (so the structure is always the same! [1])
