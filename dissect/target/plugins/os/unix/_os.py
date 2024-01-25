@@ -132,35 +132,43 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
+    def _parse_rh_legacy(self, path):
+        file_contents = path.open("rt").readlines()
+        for line in file_contents:
+            if not line.startswith("HOSTNAME"):
+                continue
+            _, _, hostname = line.rstrip().partition("=")
+        return hostname
+
     def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
         """
-        Returns a dict with containing the hostname and domain name portion of the path(s) specified
+        Returns a dict containing the hostname and domain name portion of the path(s) specified
 
         Args:
             paths (list): list of paths
         """
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/etc/sysconfig/network"]
+        REDHAT_LEGACY_PATH = self.target.fs.path("/etc/sysconfig/network")
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", REDHAT_LEGACY_PATH]
         hostname_string = None
+        hostname_dict = {"hostname": None, "domain": None}
 
         for path in paths:
-            for fs in self.target.filesystems:
-                if not fs.exists(path):
-                    continue
-                if path == "/etc/sysconfig/network":
-                    file_contents = fs.path(path).open("rt").readlines()
-                    for line in file_contents:
-                        if not line.startswith("HOSTNAME"):
-                            continue
-                        hostname_string = line.rstrip().split("=", maxsplit=1)[1]   
-                else:
-                    hostname_string = fs.path(path).open("rt").read().rstrip()
+            path = self.target.fs.path(path)
 
-        if hostname_string and "." in hostname_string:
-            hostname_string = hostname_string.split(".", maxsplit=1)
-            hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-        else:
-            hostname_dict = {"hostname": hostname_string, "domain": None}
+            if not path.exists():
+                continue
 
+            if path == REDHAT_LEGACY_PATH:
+                hostname_string = self._parse_rh_legacy(path)
+            else:
+                hostname_string = path.open("rt").read().rstrip()
+
+            if hostname_string and "." in hostname_string:
+                hostname_string = hostname_string.split(".", maxsplit=1)
+                hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
+            else:
+                hostname_dict = {"hostname": hostname_string, "domain": None}
+            break
         return hostname_dict
 
     def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
