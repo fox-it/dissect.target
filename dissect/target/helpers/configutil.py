@@ -293,7 +293,7 @@ class Xml(ConfigurationParser):
                 result["text"] = text
 
         # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
-
+        result = {tree.tag: result} if root else result
         return result
 
     def _fix(self, content: str, position: tuple(int, int)) -> str:
