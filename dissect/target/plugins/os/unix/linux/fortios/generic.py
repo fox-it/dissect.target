@@ -16,13 +16,15 @@ class GenericPlugin(Plugin):
     @export(property=True)
     def install_date(self) -> Optional[datetime]:
         """Return the likely install date of FortiOS."""
-        if (init_log := self.target.fs.path("/data/etc/cloudinit.log")).exists():
-            return ts.from_unix(init_log.stat().st_mtime)
+        files = ["/data/etc/cloudinit.log", "/data/.vm_provisioned", "/data/etc/ssh/ssh_host_dsa_key"]
+        for file in files:
+            if (fp := self.target.fs.path(file)).exists():
+                return ts.from_unix(fp.stat().st_mtime)
 
     @export(property=True)
     def activity(self) -> Optional[datetime]:
         """Return last seen activity based on filesystem timestamps."""
-        log_dirs = ["/var/log/log/root", "/var/log/root"]
+        log_dirs = ["/var/log/log/root", "/var/log/root", "/data"]
         for log_dir in log_dirs:
             if (var_log := self.target.fs.path(log_dir)).exists():
                 return calculate_last_activity(var_log)
