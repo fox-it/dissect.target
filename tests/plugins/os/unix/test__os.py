@@ -79,8 +79,8 @@ def test_parse_fstab(tmp_path):
     ],
 )
 def test__parse_hostname_string(
-    target_redhat: Target,
-    fs_redhat: VirtualFilesystem,
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
     path: Path,
     is_domain_joined: bool,
     expected_hostname: str,
@@ -102,9 +102,9 @@ def test__parse_hostname_string(
     else:
         hostname_file_content = hostname
 
-    fs_redhat.map_file_fh(path, BytesIO(hostname_file_content.encode("ascii")))
+    fs_unix.map_file_fh(path, BytesIO(hostname_file_content.encode("ascii")))
 
-    hostname_dict = target_redhat._os._parse_hostname_string()
+    hostname_dict = target_unix._os._parse_hostname_string()
 
     assert hostname_dict["hostname"] == expected_hostname
     assert hostname_dict["domain"] == expected_domain
