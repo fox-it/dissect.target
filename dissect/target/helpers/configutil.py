@@ -275,7 +275,6 @@ class Xml(ConfigurationParser):
                 counter[node.tag] = 1
                 nodes[node.tag] = self._tree(node)
 
-
         # all attribs go in the attribute folder
         # (i.e. stable, does not change depending on xml structure! [2]
         # Also, this way we "know" they have been attributes, i.e. we don't lose information! [3]
