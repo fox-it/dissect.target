@@ -147,8 +147,8 @@ class UnixPlugin(OSPlugin):
         Args:
             paths (list): list of paths
         """
-        REDHAT_LEGACY_PATH = self.target.fs.path("/etc/sysconfig/network")
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", REDHAT_LEGACY_PATH]
+        redhat_legacy_path = "/etc/sysconfig/network"
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", redhat_legacy_path]
         hostname_string = None
         hostname_dict = {"hostname": None, "domain": None}
 
@@ -158,7 +158,7 @@ class UnixPlugin(OSPlugin):
             if not path.exists():
                 continue
 
-            if path == REDHAT_LEGACY_PATH:
+            if path.as_posix() == redhat_legacy_path:
                 hostname_string = self._parse_rh_legacy(path)
             else:
                 hostname_string = path.open("rt").read().rstrip()
