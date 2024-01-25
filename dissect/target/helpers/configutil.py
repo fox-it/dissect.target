@@ -259,7 +259,7 @@ class Txt(ConfigurationParser):
 class Xml(ConfigurationParser):
     """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser`."""
 
-    def _tree(self, tree: ElementTree) -> dict:
+    def _tree(self, tree: ElementTree, root: bool = False) -> dict:
         """Very simple but robust xml -> dict implementation, see comments."""
         nodes = {}
         counter = {}
