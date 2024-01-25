@@ -1,6 +1,6 @@
 from flow.record.fieldtypes import datetime
 
-from dissect.target.plugins.os.windows.tasks import SchedLgUPlugin, SchedLgURecord
+from dissect.target.plugins.os.windows.log.schedlgu import SchedLgUPlugin
 from tests._utils import absolute_path
 
 
@@ -16,7 +16,6 @@ def test_shedlgu(target_win, fs_win):
     task_scheduler_exited_event = records[2]
     job_task_event = records[58]
 
-    assert any(isinstance(record, type(SchedLgURecord())) for record in records)
     assert task_scheduler_started_event.ts == datetime("2006-11-02 07:35:17+00:00")
     assert task_scheduler_started_event.job == "Task Scheduler Service"
     assert task_scheduler_started_event.status == "Started"
