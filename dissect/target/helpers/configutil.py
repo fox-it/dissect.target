@@ -317,7 +317,7 @@ class Xml(ConfigurationParser):
 
         while not tree and errors < limit:
             try:
-                tree = self._tree(ElementTree.fromstring(document))
+                tree = self._tree(ElementTree.fromstring(document), root=True)
                 break
             except ElementTree.ParseError as err:
                 errors += 1
