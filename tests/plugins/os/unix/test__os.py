@@ -70,39 +70,32 @@ def test_parse_fstab(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "path, is_domain_joined, expected_hostname, expected_domain",
+    "path, expected_hostname, expected_domain, file_content",
     [
-        ("/etc/hostname", True, "myhost", "mydomain.com"),
-        ("/etc/HOSTNAME", True, "myhost", "mydomain.com"),
-        ("/etc/sysconfig/network", True, "myhost", "mydomain.com"),
-        ("/etc/hostname", False, "myhost", None),
+        ("/etc/hostname", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        ("/etc/HOSTNAME", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        (
+            "/etc/sysconfig/network",
+            "myhost",
+            "mydomain.com",
+            "NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+        ),
+        ("/etc/hostname", "myhost", None, "myhost"),
+        ("/etc/sysconfig/network", "myhost", None, "NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
+        ("/not_a_valid_hostname_path", None, None, ""),
+        ("/etc/hostname", None, None, ""),
+        ("/etc/sysconfig/network", None, None, ""),
     ],
 )
 def test__parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
-    is_domain_joined: bool,
     expected_hostname: str,
     expected_domain: str,
-):
-    if is_domain_joined:
-        hostname = "myhost.mydomain.com"
-    else:
-        hostname = "myhost"
-
-    if path == "/etc/sysconfig/network":
-        hostname_file_content = dedent(
-            f"""
-        NETWORKING=NO
-        HOSTNAME={hostname}
-        GATEWAY=192.168.1.1"""
-        )
-        hostname_file_content = f"HOSTNAME={hostname}"
-    else:
-        hostname_file_content = hostname
-
-    fs_unix.map_file_fh(path, BytesIO(hostname_file_content.encode("ascii")))
+    file_content: str,
+) -> None:
+    fs_unix.map_file_fh(path, BytesIO(file_content.encode("ascii")))
 
     hostname_dict = target_unix._os._parse_hostname_string()
 

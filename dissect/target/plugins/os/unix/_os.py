@@ -133,6 +133,7 @@ class UnixPlugin(OSPlugin):
         return OperatingSystem.UNIX.value
 
     def _parse_rh_legacy(self, path):
+        hostname = None
         file_contents = path.open("rt").readlines()
         for line in file_contents:
             if not line.startswith("HOSTNAME"):
@@ -149,7 +150,6 @@ class UnixPlugin(OSPlugin):
         """
         redhat_legacy_path = "/etc/sysconfig/network"
         paths = paths or ["/etc/hostname", "/etc/HOSTNAME", redhat_legacy_path]
-        hostname_string = None
         hostname_dict = {"hostname": None, "domain": None}
 
         for path in paths:
@@ -166,9 +166,11 @@ class UnixPlugin(OSPlugin):
             if hostname_string and "." in hostname_string:
                 hostname_string = hostname_string.split(".", maxsplit=1)
                 hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-            else:
+            elif hostname_string != "":
                 hostname_dict = {"hostname": hostname_string, "domain": None}
-            break
+            else:
+                hostname_dict = {"hostname": None, "domain": None}
+            break  # break whenever a valid hostname is found
         return hostname_dict
 
     def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
