@@ -254,7 +254,7 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix") -> Optional[str]:
+    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> Optional[str]:
         arch_strings = {
             0x00: "Unknown",
             0x02: "SPARC",
@@ -271,8 +271,8 @@ class UnixPlugin(OSPlugin):
         }
 
         for fs in self.target.filesystems:
-            if fs.exists("/bin/ls"):
-                fh = fs.open("/bin/ls")
+            if fs.exists(path):
+                fh = fs.open(path)
                 fh.seek(4)
                 # ELF - e_ident[EI_CLASS]
                 bits = unpack("B", fh.read(1))[0]
