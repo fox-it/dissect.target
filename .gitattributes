@@ -1,7 +1,7 @@
 tests/_data/loaders/tar/uppercase_driveletter.tar filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/apps/browser/iexplore/WebCacheV01.dat.gz filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/apps/browser/firefox/places.sqlite filter=lfs diff=lfs merge=lfs -text
-# tests/_data/plugins/apps/browser/firefox/cookies.sqlite filter=lfs diff=lfs merge=lfs -text
+tests/_data/plugins/apps/browser/firefox/cookies.sqlite filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/apps/browser/chrome/History.sqlite filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/apps/browser/edge/History.sqlite filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/apps/browser/chromium/Cookies.sqlite filter=lfs diff=lfs merge=lfs -text
@@ -12,3 +12,4 @@ tests/_data/plugins/os/windows/notifications/wpndatabase.db filter=lfs diff=lfs 
 tests/_data/volumes/bde/enc-volume.bin filter=lfs diff=lfs merge=lfs -text
 tests/_data/volumes/md/md-nested.bin.gz filter=lfs diff=lfs merge=lfs -text
 tests/_data/loaders/tar/test-anon-filesystems.tar filter=lfs diff=lfs merge=lfs -text
+tests/_data/plugins/apps/browser/firefox/cookies.sqlite filter=lfs diff=lfs merge=lfs -text
