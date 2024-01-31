@@ -1,6 +1,6 @@
 import datetime
 
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.datetime import DateTimePlugin
 from dissect.target.plugins.os.windows.locale import LocalePlugin as WindowsLocalePlugin
 from dissect.target.target import Target
