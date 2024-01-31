@@ -9,7 +9,7 @@ from dissect.util.ts import from_unix_ms, from_unix_us
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
@@ -23,7 +23,7 @@ class FirefoxPlugin(BrowserPlugin):
 
     __namespace__ = "firefox"
 
-    DIRS = [
+    USER_DIRS = [
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
@@ -34,25 +34,36 @@ class FirefoxPlugin(BrowserPlugin):
         # macOS
         "Library/Application Support/Firefox",
     ]
+
+    SYSTEM_DIRS = [
+        "/data/data/org.mozilla.vrbrowser/files/mozilla",
+    ]
+
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     def __init__(self, target):
         super().__init__(target)
-        self.users_dirs = []
+        self.dirs = []
+
         for user_details in self.target.user_details.all_with_home():
-            for directory in self.DIRS:
+            for directory in self.USER_DIRS:
                 cur_dir = user_details.home_path.joinpath(directory)
                 if not cur_dir.exists():
                     continue
-                self.users_dirs.append((user_details.user, cur_dir))
+                self.dirs.append((user_details.user, cur_dir))
+
+        for directory in self.SYSTEM_DIRS:
+            if (cur_dir := target.fs.path(directory)).exists():
+                self.dirs.append((None, cur_dir))
 
     def check_compatible(self) -> None:
-        if not len(self.users_dirs):
+        if not len(self.dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 
     def _iter_db(self, filename: str) -> Iterator[SQLite3]:
@@ -60,19 +71,20 @@ class FirefoxPlugin(BrowserPlugin):
 
         Args:
             filename: The filename of the database.
-        Yields:
-            Opened SQLite3 databases.
         """
-        for user, cur_dir in self.users_dirs:
+        for user, cur_dir in self.dirs:
+            if (db_file := cur_dir.parent.joinpath(filename)).is_file():
+                yield user, db_file, sqlite3.SQLite3(db_file.open())
+
             for profile_dir in cur_dir.iterdir():
                 if profile_dir.is_dir():
                     db_file = profile_dir.joinpath(filename)
                     try:
                         yield user, db_file, sqlite3.SQLite3(db_file.open())
                     except FileNotFoundError:
-                        self.target.log.warning("Could not find %s file: %s", filename, db_file)
+                        self.target.log.info("Could not find %s file: %s", filename, db_file)
                     except SQLError as e:
-                        self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
+                        self.target.log.info("Could not open %s file: %s", filename, db_file, exc_info=e)
 
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
@@ -112,8 +124,13 @@ class FirefoxPlugin(BrowserPlugin):
                     else:
                         from_visit, from_place = None, None
 
+                    if self.target.os == OperatingSystem.ANDROID:
+                        visit_date = from_unix_ms(row.visit_date)
+                    else:
+                        visit_date = from_unix_us(row.visit_date)
+
                     yield self.BrowserHistoryRecord(
-                        ts=from_unix_us(row.visit_date),
+                        ts=visit_date,
                         browser="firefox",
                         id=row.id,
                         url=try_idna(place.url),
@@ -168,13 +185,20 @@ class FirefoxPlugin(BrowserPlugin):
                     if row.place_id not in annotations:
                         annotations[row.place_id] = {"id": row.id}
 
+                    if self.target.os == OperatingSystem.ANDROID:
+                        date_added = from_unix_ms(row.dateAdded)
+                        last_modified = from_unix_ms(row.lastModified)
+                    else:
+                        date_added = from_unix_us(row.dateAdded)
+                        last_modified = from_unix_us(row.lastModified)
+
                     annotations[row.place_id][attribute_name] = {
                         "content": content,
                         "flags": row.flags,
                         "expiration": row.expiration,
                         "type": row.type,
-                        "date_added": from_unix_us(row.dateAdded),
-                        "last_modified": from_unix_us(row.lastModified),
+                        "date_added": date_added,
+                        "last_modified": last_modified,
                     }
 
                 for place_id, annotation in annotations.items():
