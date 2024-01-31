@@ -254,7 +254,7 @@ class DateTimePlugin(Plugin):
 
 
 def translate_tz(key: RegistryKey, name: str) -> str:
-    """Translate a timezone resource string to English
+    """Translate a timezone resource string to English.
 
     Non-English distributions of Windows contain a local translation in the "Display", "Dlt" and "Std" keys.
     The ``MUI_*`` keys contain a reference to the English timezone name we want, e.g. "@tzres.dll,-1337".
@@ -263,7 +263,6 @@ def translate_tz(key: RegistryKey, name: str) -> str:
         string_id = int(key.value("MUI_" + name).value.replace("@tzres.dll,-", ""))
         if translation := MUI_TZ_MAP.get(string_id):
             return translation
-
     except (RegistryValueNotFoundError, ValueError):
         pass
 

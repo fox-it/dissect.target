@@ -61,7 +61,7 @@ def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
     assert target_win_tzinfo_legacy.datetime.tzinfo.display == "(UTC-06:00) Easter Island"
 
 
-def test_windows_datetime_foreign(target_win_users, hive_hku, hive_hklm) -> None:
+def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHive, hive_hklm: RegistryHive) -> None:
     # add keyboards
     preload_key_name = "Keyboard Layout\\Preload"
     preload_key = VirtualKey(hive_hku, preload_key_name)
