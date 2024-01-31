@@ -1,8 +1,13 @@
 import tempfile
+from io import BytesIO
+from pathlib import Path
 from uuid import UUID
+
+import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import parse_fstab
+from dissect.target.target import Target
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -61,3 +66,37 @@ def test_parse_fstab(tmp_path):
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
     }
+
+
+@pytest.mark.parametrize(
+    "path, expected_hostname, expected_domain, file_content",
+    [
+        ("/etc/hostname", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        ("/etc/HOSTNAME", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        (
+            "/etc/sysconfig/network",
+            "myhost",
+            "mydomain.com",
+            "NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+        ),
+        ("/etc/hostname", "myhost", None, "myhost"),
+        ("/etc/sysconfig/network", "myhost", None, "NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
+        ("/not_a_valid_hostname_path", None, None, ""),
+        ("/etc/hostname", None, None, ""),
+        ("/etc/sysconfig/network", None, None, ""),
+    ],
+)
+def test__parse_hostname_string(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    path: Path,
+    expected_hostname: str,
+    expected_domain: str,
+    file_content: str,
+) -> None:
+    fs_unix.map_file_fh(path, BytesIO(file_content.encode("ascii")))
+
+    hostname_dict = target_unix._os._parse_hostname_string()
+
+    assert hostname_dict["hostname"] == expected_hostname
+    assert hostname_dict["domain"] == expected_domain
