@@ -20,6 +20,8 @@ from typing import (
     Union,
 )
 
+from defusedxml import ElementTree
+
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
@@ -252,6 +254,79 @@ class Txt(ConfigurationParser):
     def parse_file(self, fh: TextIO) -> None:
         # Cast the size to a string, to print it out later.
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
+
+
+class Xml(ConfigurationParser):
+    """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser`."""
+
+    def _tree(self, tree: ElementTree, root: bool = False) -> dict:
+        """Very simple but robust xml -> dict implementation, see comments."""
+        nodes = {}
+        result = {}
+        counter = {}
+
+        # each node is a folder (so the structure is always the same! [1])
+        for node in tree.findall("*"):
+            # if a node contains multiple nodes with the same name, number them
+            if node.tag in counter:
+                counter[node.tag] += 1
+                nodes[f"{node.tag}-{counter[node.tag]}"] = self._tree(node)
+            else:
+                counter[node.tag] = 1
+                nodes[node.tag] = self._tree(node)
+
+        # all attribs go in the attribute folder
+        # (i.e. stable, does not change depending on xml structure! [2]
+        # Also, this way we "know" they have been attributes, i.e. we don't lose information! [3]
+        if tree.attrib:
+            result["attributes"] = tree.attrib
+
+        # all subnodes go in the nodes folder
+        if nodes:
+            result["nodes"] = nodes
+
+        # content goes into the text folder
+        # we don't use special prefixes ($) because XML docs may use them anyway (even though they are forbidden)
+        if tree.text:
+            if text := tree.text.strip(" \n\r"):
+                result["text"] = text
+
+        # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
+        result = {tree.tag: result} if root else result
+        return result
+
+    def _fix(self, content: str, position: tuple(int, int)) -> str:
+        """Quick heuristic fix. If there is an invalid token, just remove it."""
+        lineno, offset = position
+        lines = content.split("\n")
+
+        line = lines[lineno - 1]
+        line = line[: offset - 1] + "" + line[offset + 1 :]
+
+        lines[lineno - 1] = line
+
+        return "\n".join(lines)
+
+    def parse_file(self, fh: TextIO) -> None:
+        content = fh.read()
+        document = content
+        errors = 0
+        limit = 20
+        tree = {}
+
+        while not tree and errors < limit:
+            try:
+                tree = self._tree(ElementTree.fromstring(document), root=True)
+                break
+            except ElementTree.ParseError as err:
+                errors += 1
+                document = self._fix(document, err.position)
+
+        if not tree:
+            # Error limit reached. Thus we consider the document not parseable.
+            raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")
+
+        self.parsed_data = tree
 
 
 class ScopeManager:
@@ -528,11 +603,12 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/systemd/*": ParserConfig(SystemD),
     "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
     "*/sysctl.d/*.conf": ParserConfig(Default),
+    "*/xml/*": ParserConfig(Xml),
 }
 
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
-    "xml": ParserConfig(Txt),
+    "xml": ParserConfig(Xml),
     "json": ParserConfig(Txt),
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
@@ -549,6 +625,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "hosts": ParserConfig(Default, separator=(r"\s",)),
     "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
+    "catalog": ParserConfig(Xml),
 }
 
 

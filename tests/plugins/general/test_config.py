@@ -68,7 +68,7 @@ def test_collapse_types(
     "hint, data_bytes",
     [
         ("ini", b"[DEFAULT]\nkey=value"),
-        ("xml", b"currently_just_text"),
+        ("xml", b"<a>currently_just_text</a>"),
         ("json", b"currently_just_text"),
         ("cnf", b"key=value"),
         ("conf", b"key value"),
