@@ -4,6 +4,7 @@ from typing import BinaryIO, Iterator, Tuple
 from dissect.esedb import esedb, record, table
 from dissect.esedb.exceptions import KeyNotFoundError
 from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -212,7 +213,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
-                    path=down_path,
+                    path=windows_path(down_path),
                     url=down_url,
                     size=None,
                     state=None,

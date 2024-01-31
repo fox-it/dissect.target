@@ -2,6 +2,46 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import NamespacePlugin
 
+GENERIC_HISTORY_RECORD_FIELDS = [
+    ("datetime", "ts"),
+    ("string", "browser"),
+    ("string", "id"),
+    ("uri", "url"),
+    ("string", "title"),
+    ("string", "description"),
+    ("string", "rev_host"),
+    ("varint", "visit_type"),
+    ("varint", "visit_count"),
+    ("string", "hidden"),
+    ("string", "typed"),
+    ("varint", "session"),
+    ("varint", "from_visit"),
+    ("uri", "from_url"),
+    ("path", "source"),
+]
+
+BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
+)
+
+GENERIC_COOKIE_FIELDS = [
+    ("datetime", "ts_created"),
+    ("datetime", "ts_last_accessed"),
+    ("string", "browser"),
+    ("string", "name"),
+    ("string", "value"),
+    ("string", "host"),
+    ("string", "path"),
+    ("varint", "expiry"),
+    ("boolean", "is_secure"),
+    ("boolean", "is_http_only"),
+    ("boolean", "same_site"),
+]
+
+BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/cookie", GENERIC_COOKIE_FIELDS
+)
+
 GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("datetime", "ts_start"),
     ("datetime", "ts_end"),
@@ -13,6 +53,10 @@ GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("varint", "state"),
     ("path", "source"),
 ]
+
+BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
+)
 
 GENERIC_EXTENSION_RECORD_FIELDS = [
     ("datetime", "ts_install"),
@@ -31,48 +75,8 @@ GENERIC_EXTENSION_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
-GENERIC_COOKIE_FIELDS = [
-    ("datetime", "ts_created"),
-    ("datetime", "ts_last_accessed"),
-    ("string", "browser"),
-    ("string", "name"),
-    ("string", "value"),
-    ("string", "host"),
-    ("string", "path"),
-    ("varint", "expiry"),
-    ("boolean", "is_secure"),
-    ("boolean", "is_http_only"),
-    ("boolean", "same_site"),
-]
-
-GENERIC_HISTORY_RECORD_FIELDS = [
-    ("datetime", "ts"),
-    ("string", "browser"),
-    ("string", "id"),
-    ("uri", "url"),
-    ("string", "title"),
-    ("string", "description"),
-    ("string", "rev_host"),
-    ("varint", "visit_type"),
-    ("varint", "visit_count"),
-    ("string", "hidden"),
-    ("string", "typed"),
-    ("varint", "session"),
-    ("varint", "from_visit"),
-    ("uri", "from_url"),
-    ("path", "source"),
-]
-BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
-)
 BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/extension", GENERIC_EXTENSION_RECORD_FIELDS
-)
-BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/history", GENERIC_HISTORY_RECORD_FIELDS
-)
-BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "browser/cookie", GENERIC_COOKIE_FIELDS
 )
 
 

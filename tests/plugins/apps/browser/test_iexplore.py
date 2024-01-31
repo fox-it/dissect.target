@@ -34,5 +34,5 @@ def test_iexplore_history(target_iexplore: Target) -> None:
 def test_iexplore_downloads(target_iexplore: Target) -> None:
     records = list(target_iexplore.iexplore.downloads())
     assert len(records) == 1
-    assert records[0].path.as_posix() == "C:\\Users\\John\\Downloads\\archlinux-2023.02.01-x86_64.iso"
+    assert records[0].path.as_posix() == "C:/Users/John/Downloads/archlinux-2023.02.01-x86_64.iso"
     assert records[0].url == "https://mirror.cj2.nl/archlinux/iso/2023.02.01/archlinux-2023.02.01-x86_64.iso"
