@@ -64,7 +64,7 @@ class OperatingSystem(StrEnum):
     ANDROID = "android"
     VYOS = "vyos"
     IOS = "ios"
-    FORTIGATE = "fortigate"
+    FORTIOS = "fortios"
     CITRIX = "citrix-netscaler"
 
 
@@ -683,10 +683,14 @@ def plugins(
                             prev_module_path=module_path,
                         )
 
-    yield from _walk(
-        _get_plugins(),
-        special_keys=special_keys,
-        only_special_keys=only_special_keys,
+    yield from sorted(
+        _walk(
+            _get_plugins(),
+            special_keys=special_keys,
+            only_special_keys=only_special_keys,
+        ),
+        key=lambda plugin: len(plugin["module"]),
+        reverse=True,
     )
 
 

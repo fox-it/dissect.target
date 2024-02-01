@@ -73,6 +73,61 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
                 },
             },
         ),
+        (
+            "_data/helpers/configutil/test.xml",
+            {
+                "Server": {
+                    "attributes": {"port": "8005", "shutdown": "SHUTDOWN"},
+                    "nodes": {
+                        "Listener": {
+                            "attributes": {"className": "org.apache.catalina.core.JasperListener1"},
+                            "text": "a",
+                        },
+                        "Listener-2": {
+                            "attributes": {"className": "org.apache.catalina.core.JasperListener2"},
+                            "text": "b",
+                        },
+                        "Service": {
+                            "attributes": {"name": "Catalina"},
+                            "nodes": {
+                                "Connector": {
+                                    "attributes": {
+                                        "port": "8080",
+                                        "protocol": "HTTP/1.1",
+                                        "connectionTimeout": "20000",
+                                        "redirectPort": "8443",
+                                    },
+                                },
+                                "Engine": {
+                                    "attributes": {"name": "Catalina", "defaultHost": "localhost"},
+                                    "nodes": {
+                                        "Host": {
+                                            "attributes": {
+                                                "name": "localhost",
+                                                "appBase": "webapps",
+                                                "unpackWARs": "true",
+                                                "autoDeploy": "true",
+                                            },
+                                            "nodes": {
+                                                "Valve": {
+                                                    "attributes": {
+                                                        "className": "org.apache.catalina.valves.AccessLogValve",
+                                                        "directory": "logs",
+                                                        "prefix": "localhost_access_log.",
+                                                        "suffix": ".txt",
+                                                        "pattern": "%h %l %u %t s",
+                                                    },
+                                                }
+                                            },
+                                        }
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        ),
     ],
 )
 def test_parse_file_input(target_unix: Target, mapped_file: str, expected_output: dict) -> None:

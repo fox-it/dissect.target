@@ -1,6 +1,6 @@
 import json
 from collections import defaultdict
-from typing import Iterator
+from typing import Iterator, Optional
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
@@ -13,6 +13,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
@@ -32,14 +33,21 @@ class ChromiumMixin:
     """Mixin class with methods for Chromium-based browsers."""
 
     DIRS = []
+
+    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/cookie", GENERIC_COOKIE_FIELDS
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
     )
+
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
-    )
-    BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chromium/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
     def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
@@ -49,7 +57,7 @@ class ChromiumMixin:
             hist_paths: A list with browser paths as strings.
 
         Returns:
-            List of tuples containing user and history file path objects.
+            List of tuples containing user and file path objects.
         """
         users_dirs: list[tuple] = []
         for user_details in self.target.user_details.all_with_home():
@@ -62,12 +70,14 @@ class ChromiumMixin:
         return users_dirs
 
     def _iter_db(self, filename: str) -> Iterator[SQLite3]:
-        """Generate a connection to a sqlite history database file.
+        """Generate a connection to a sqlite database file.
 
         Args:
-            filename: The filename as string of the database where the history is stored.
+            filename: The filename as string of the database where the data is stored.
+
         Yields:
             opened db_file (SQLite3)
+
         Raises:
             FileNotFoundError: If the history file could not be found.
             SQLError: If the history file could not be opened.
@@ -107,15 +117,14 @@ class ChromiumMixin:
         if not len(self._build_userdirs(self.DIRS)):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
-    def downloads(self, browser_name: str = None) -> Iterator[BrowserDownloadRecord]:
+    def downloads(self, browser_name: Optional[str] = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
 
         Args:
             browser_name: The name of the browser as a string.
+
         Yields:
             Records with the following fields:
-                hostname (string): The target hostname.
-                domain (string): The target domain.
                 ts_start (datetime): Download start timestamp.
                 ts_end (datetime): Download end timestamp.
                 browser (string): The browser from which the records are generated from.
@@ -128,8 +137,6 @@ class ChromiumMixin:
                 mime_type (string): MIME type.
                 state (varint): Download state number.
                 source: (path): The source file of the download record.
-        Raises:
-            SQLError: If the history file could not be processed.
         """
         for user, db_file, db in self._iter_db("History"):
             try:
@@ -170,31 +177,68 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
-    def extensions(self, browser_name: str = None) -> Iterator[BrowserExtensionRecord]:
-        """Iterates over all installed extensions for a given browser.
+    def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookie records from supported Chromium-based browsers.
 
-        Parameters:
-            - browser_name (str): Name of the browser to scan for extensions.
+        Args:
+            browser_name: The name of the browser as a string.
 
         Yields:
-            - Iterator[BrowserExtensionRecord]: A generator that yields `BrowserExtensionRecord`
-                with the following fields:
-                    hostname (string): The target hostname.
-                    domain (string): The target domain.
-                    ts_install (datetime): Extension install timestamp.
-                    ts_update (datetime): Extension update timestamp.
-                    browser (string): The browser from which the records are generated.
-                    id (string): Extension unique identifier.
-                    name (string): Name of the extension.
-                    short_name (string): Short name of the extension.
-                    default_title (string): Default title of the extension.
-                    description (string): Description of the extension.
-                    version (string): Version of the extension.
-                    ext_path (path): Relative path of the extension.
-                    from_webstore (boolean): Extension from webstore.
-                    permissions (string[]): Permissions of the extension.
-                    manifest (varint): Version of the extensions' manifest.
-                    source: (path): The source file of the download record.
+            Records with the following fields:
+                ts_created (datetime): Cookie created timestamp.
+                ts_last_accessed (datetime): Cookie last accessed timestamp.
+                browser (string): The browser from which the records are generated from.
+                name (string): The cookie name.
+                value (string): The cookie value.
+                host (string): Cookie host key.
+                path (string): Cookie path.
+                expiry (varint): Cookie expiry.
+                is_secure (bool): Cookie secury flag.
+                is_http_only (bool): Cookie http only flag.
+                same_site (bool): Cookie same site flag.
+        """
+        for user, db_file, db in self._iter_db("Cookies"):
+            try:
+                for cookie in db.table("cookies").rows():
+                    yield self.BrowserCookieRecord(
+                        ts_created=webkittimestamp(cookie.creation_utc),
+                        ts_last_accessed=webkittimestamp(cookie.last_access_utc),
+                        browser=browser_name,
+                        name=cookie.name,
+                        value=cookie.value,
+                        host=cookie.host_key,
+                        path=cookie.path,
+                        expiry=int(cookie.has_expires),
+                        is_secure=bool(cookie.is_secure),
+                        is_http_only=bool(cookie.is_httponly),
+                        same_site=bool(cookie.samesite),
+                        _user=user,
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
+
+    def extensions(self, browser_name: Optional[str] = None) -> Iterator[BrowserExtensionRecord]:
+        """Iterates over all installed extensions for a given browser.
+
+        Args:
+            browser_name (str): Name of the browser to scan for extensions.
+
+        Yields:
+            Records with the following fields:
+                ts_install (datetime): Extension install timestamp.
+                ts_update (datetime): Extension update timestamp.
+                browser (string): The browser from which the records are generated.
+                id (string): Extension unique identifier.
+                name (string): Name of the extension.
+                short_name (string): Short name of the extension.
+                default_title (string): Default title of the extension.
+                description (string): Description of the extension.
+                version (string): Version of the extension.
+                ext_path (path): Relative path of the extension.
+                from_webstore (boolean): Extension from webstore.
+                permissions (string[]): Permissions of the extension.
+                manifest (varint): Version of the extensions' manifest.
+                source: (path): The source file of the download record.
         """
         ext_files = ["Preferences", "Secure Preferences"]
         for filename in ext_files:
@@ -259,15 +303,14 @@ class ChromiumMixin:
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
-    def history(self, browser_name: str = None) -> Iterator[BrowserHistoryRecord]:
+    def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from supported Chromium-based browsers.
 
         Args:
             browser_name: The name of the browser as a string.
+
         Yields:
             Records with the following fields:
-                hostname (string): The target hostname.
-                domain (string): The target domain.
                 ts (datetime): Visit timestamp.
                 browser (string): The browser from which the records are generated from.
                 id (string): Record ID.
@@ -283,8 +326,6 @@ class ChromiumMixin:
                 from_visit (varint): Record ID of the "from" visit.
                 from_url (uri): URL of the "from" visit.
                 source: (path): The source file of the history record.
-        Raises:
-            SQLError: If the history file could not be processed.
         """
         for user, db_file, db in self._iter_db("History"):
             try:
@@ -338,17 +379,22 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
         "AppData/Local/Chromium/User Data/Default",
     ]
 
+    @export(record=ChromiumMixin.BrowserHistoryRecord)
+    def history(self) -> Iterator[ChromiumMixin.BrowserHistoryRecord]:
+        """Return browser history records for Chromium browser."""
+        yield from super().history("chromium")
+
+    @export(record=ChromiumMixin.BrowserCookieRecord)
+    def cookies(self) -> Iterator[ChromiumMixin.BrowserCookieRecord]:
+        """Return browser cookie records for Chromium browser."""
+        yield from super().cookies("chromium")
+
     @export(record=ChromiumMixin.BrowserDownloadRecord)
-    def downloads(self):
+    def downloads(self) -> Iterator[ChromiumMixin.BrowserDownloadRecord]:
         """Return browser download records for Chromium browser."""
         yield from super().downloads("chromium")
 
     @export(record=ChromiumMixin.BrowserExtensionRecord)
-    def extensions(self):
+    def extensions(self) -> Iterator[ChromiumMixin.BrowserExtensionRecord]:
         """Return browser extension records for Chromium browser."""
         yield from super().extensions("chromium")
-
-    @export(record=ChromiumMixin.BrowserHistoryRecord)
-    def history(self):
-        """Return browser history records for Chromium browser."""
-        yield from super().history("chromium")
