@@ -1,7 +1,8 @@
+import io
 import json
 import logging
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
 from dissect.util import ts
 
@@ -61,6 +62,17 @@ DockerLogRecord = TargetRecordDescriptor(
 )
 
 
+def get_data_path(path: Path) -> Optional[str]:
+    """Returns the configured Docker daemon data-root path."""
+    try:
+        config = json.loads(path.open("rt").read())
+    except json.JSONDecodeError as e:
+        log.warning("Could not read JSON file '%s'", path)
+        log.debug(exc_info=e)
+
+    return config.get("data-root")
+
+
 def find_installs(target: Target) -> Iterator[Path]:
     """Attempt to find additional configured and existing Docker daemon data-root folders.
 
@@ -74,31 +86,25 @@ def find_installs(target: Target) -> Iterator[Path]:
         "/var/snap/docker/current/config/daemon.json",
         # Windows
         "sysvol/ProgramData/docker/config/daemon.json",
+    ]
+
+    user_config_paths = [
         # Docker Desktop (macOS/Windows/Linux)
-        "$HOME/.docker/daemon.json",
+        ".docker/daemon.json",
     ]
 
     if (default_root := target.fs.path("/var/lib/docker")).exists():
         yield default_root
 
-    for config_path in default_config_paths:
-        config_file = target.fs.path(config_path)
+    for path in default_config_paths:
+        if (config_file := target.fs.path(path)).exists():
+            if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
+                yield data_root_path
 
-        if config_path.startswith("$HOME"):
-            for user_details in target.user_details.all_with_home():
-                user_config = user_details.home_path.joinpath(config_path.replace("$HOME/", ""))
-                if user_config.exists():
-                    default_config_paths.append(str(user_config))
-
-        elif config_file.exists():
-            try:
-                config = json.loads(config_file.read_text())
-            except json.JSONDecodeError as e:
-                target.log.warning("Could not read JSON file %s", config_file)
-                target.log.debug("", exc_info=e)
-
-            if data_root := config.get("data-root"):
-                if (data_root_path := target.fs.path(data_root)).exists():
+    for path in user_config_paths:
+        for user_details in target.user_details.all_with_home():
+            if (config_file := user_details.home_path.joinpath(path)).exists():
+                if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
                     yield data_root_path
 
 
@@ -118,7 +124,7 @@ class DockerPlugin(Plugin):
         self.installs = set(find_installs(target))
 
     def check_compatible(self) -> None:
-        if not any(self.installs):
+        if not self.installs:
             raise UnsupportedPluginError("No Docker install(s) found")
 
     @export(record=DockerImageRecord)
@@ -159,40 +165,35 @@ class DockerPlugin(Plugin):
         """Returns any docker containers present on the target system."""
 
         for data_root in self.installs:
-            containers_path = self.target.fs.path(data_root.joinpath("containers"))
-
-            for container in containers_path.iterdir():
-                if (config_path := container.joinpath("config.v2.json")).exists():
-                    config = json.loads(config_path.read_text())
-
-                    if config.get("State").get("Running"):
-                        ports = config.get("NetworkSettings").get("Ports", {})
-                        pid = config.get("Pid")
-                    else:
-                        ports = config.get("Config").get("ExposedPorts", {})
-                        pid = False
-
-                    volumes = []
-                    if mount_points := config.get("MountPoints"):
-                        for mp in mount_points:
-                            mount_point = mount_points[mp]
-                            volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
-
-                    yield DockerContainerRecord(
-                        container_id=config.get("ID"),
-                        image=config.get("Config").get("Image"),
-                        command=config.get("Config").get("Cmd"),
-                        created=convert_timestamp(config.get("Created")),
-                        running=config.get("State").get("Running"),
-                        pid=pid,
-                        started=convert_timestamp(config.get("State").get("StartedAt")),
-                        finished=convert_timestamp(config.get("State").get("FinishedAt")),
-                        ports=convert_ports(ports),
-                        names=config.get("Name").replace("/", "", 1),
-                        volumes=volumes,
-                        source=config_path,
-                        _target=self.target,
-                    )
+            for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
+                config = json.loads(config_path.read_text())
+                running = config.get("State").get("Running")
+                if running:
+                    ports = config.get("NetworkSettings").get("Ports", {})
+                    pid = config.get("Pid")
+                else:
+                    ports = config.get("Config").get("ExposedPorts", {})
+                    pid = False
+                volumes = []
+                if mount_points := config.get("MountPoints"):
+                    for mp in mount_points:
+                        mount_point = mount_points[mp]
+                        volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
+                yield DockerContainerRecord(
+                    container_id=config.get("ID"),
+                    image=config.get("Config").get("Image"),
+                    command=config.get("Config").get("Cmd"),
+                    created=convert_timestamp(config.get("Created")),
+                    running=running,
+                    pid=pid,
+                    started=convert_timestamp(config.get("State").get("StartedAt")),
+                    finished=convert_timestamp(config.get("State").get("FinishedAt")),
+                    ports=convert_ports(ports),
+                    names=config.get("Name").replace("/", "", 1),
+                    volumes=volumes,
+                    source=config_path,
+                    _target=self.target,
+                )
 
     @export(record=DockerLogRecord)
     @arg(
@@ -222,22 +223,17 @@ class DockerPlugin(Plugin):
         """
 
         for data_root in self.installs:
-            containers_path = f"{data_root}/containers"
+            containers_path = data_root.joinpath("containers")
 
-            for container in self.target.fs.path(containers_path).iterdir():
-                # json-file log driver
-                for log_file in container.glob(f"{container.name}-json.log*"):
-                    for line in open_decompress(log_file, "rt"):
-                        try:
-                            log_entry = json.loads(line)
-                        except json.JSONDecodeError as e:
-                            self.target.log.warning(f"Could not decode JSON line in file {log_file}")
-                            self.target.log.debug("", exc_info=e)
-                            continue
+            for log_file in containers_path.glob(("**/*.log*")):
+                container = log_file.parent
 
+                # json log driver
+                if "-json.log" in log_file.name:
+                    for log_entry in self._parse_json_log(log_file):
                         yield DockerLogRecord(
                             ts=log_entry.get("time"),
-                            container=container.name,
+                            container=container.name,  # container hash
                             stream=log_entry.get("stream"),
                             message=log_entry.get("log")
                             if raw_messages
@@ -246,31 +242,40 @@ class DockerPlugin(Plugin):
                         )
 
                 # local log driver
-                for log_file in container.glob("local-logs/container.log*"):
-                    fh = open_decompress(log_file, "rb")
-                    pos = 0
-
-                    if not hasattr(fh, "size"):  # for pytest
-                        fh.size = len(fh.read())
-                        fh.seek(0)
-
-                    while fh.tell() < fh.size:
-                        fh.seek(pos)
-                        entry = c_local.entry(fh)
-
-                        if entry.header != entry.footer:
-                            self.target.log.warning(
-                                f"Could not reliably parse log entry at offset {pos}."
-                                "Entry could be parsed incorrectly. Please report this "
-                                "issue as Docker's protobuf could have changed."
-                            )
-
-                        pos += entry.header + 8
-
+                else:
+                    for log_entry in self._parse_local_log(log_file):
                         yield DockerLogRecord(
-                            ts=ts.from_unix_us(entry.ts // 1000),
-                            container=container.name,
-                            stream=entry.source,
-                            message=entry.message if raw_messages else strip_log(entry.message, remove_backspaces),
+                            ts=ts.from_unix_us(log_entry.ts // 1000),
+                            container=container.parent.name,  # container hash
+                            stream=log_entry.source,
+                            message=log_entry.message
+                            if raw_messages
+                            else strip_log(log_entry.message, remove_backspaces),
                             _target=self.target,
                         )
+
+    def _parse_local_log(self, fh):
+        fh = open_decompress(fh, "rb")  # can be a .gz file
+        if not hasattr(fh, "size"):  # for pytest
+            fh.size = fh.seek(0, io.SEEK_END)
+            fh.seek(0)
+        while fh.tell() < fh.size:
+            entry = c_local.entry(fh)
+            if entry.header != entry.footer:
+                self.target.log.warning(
+                    "Could not reliably parse log entry at offset %i."
+                    "Entry could be parsed incorrectly. Please report this "
+                    "issue as Docker's protobuf could have changed.",
+                    fh.tell(),
+                )
+            yield entry
+
+    def _parse_json_log(self, fh):
+        for line in open_decompress(fh, "rt"):
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError as e:
+                self.target.log.warning("Could not decode JSON line in file %s", fh)
+                self.target.log.debug("", exc_info=e)
+                continue
+            yield entry
