@@ -17,7 +17,7 @@ try:
     import bz2
 
     HAVE_BZ2 = True
-except ImportError:
+except (AttributeError, ImportError):
     HAVE_BZ2 = False
 
 import dissect.target.filesystem as filesystem

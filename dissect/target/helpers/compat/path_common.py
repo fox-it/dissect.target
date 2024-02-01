@@ -33,7 +33,7 @@ try:
             result._flavour = self._flavour
             return result
 
-except ImportError:
+except (AttributeError, ImportError):
     pass
 
 
@@ -90,7 +90,7 @@ def isjunction(path: TargetPath) -> bool:
     """Return True if the path is a junction."""
     try:
         from dissect.target.filesystems.ntfs import NtfsFilesystemEntry
-    except ImportError:
+    except (AttributeError, ImportError):
         return False
 
     entry = path.get()

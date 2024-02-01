@@ -1,6 +1,6 @@
 try:
     import yaml
-except ImportError:
+except (AttributeError, ImportError):
     raise ImportError("Missing PyYAML dependency")
 
 from dissect.target import container

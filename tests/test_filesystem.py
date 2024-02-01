@@ -30,7 +30,7 @@ from dissect.target.filesystems.xfs import XfsFilesystemEntry
 
 try:
     from dissect.target.filesystems.vmfs import VmfsFilesystemEntry
-except ImportError:
+except (AttributeError, ImportError):
     VmfsFilesystemEntry = None
 
 from dissect.target.helpers import fsutil

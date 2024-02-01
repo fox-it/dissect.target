@@ -15,7 +15,7 @@ try:
     import lz4.frame
 
     HAS_LZ4 = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_LZ4 = False
 
 
@@ -23,7 +23,7 @@ try:
     import zstandard
 
     HAS_ZSTD = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_ZSTD = False
 
 

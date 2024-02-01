@@ -2,7 +2,7 @@ from pathlib import Path
 
 try:
     import yara
-except ImportError:
+except (AttributeError, ImportError):
     raise ImportError("Please install 'yara-python' to use 'target-query -f yara'.")
 
 from dissect.target.exceptions import FileNotFoundError

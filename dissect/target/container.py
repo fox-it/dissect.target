@@ -235,7 +235,7 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
                     first_fh and container.detect_fh(first_fh, item)
                 ):
                     return container(item, *args, **kwargs)
-            except ImportError as e:
+            except (AttributeError, ImportError) as e:
                 log.info("Failed to import %s", container)
                 log.debug("", exc_info=e)
             except Exception as e:

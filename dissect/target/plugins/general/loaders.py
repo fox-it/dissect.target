@@ -18,7 +18,7 @@ class LoaderListPlugin(Plugin):
             try:
                 docstring = get_docstring(loader, "No documentation.").splitlines()[0].strip()
                 loaders_info[key] = docstring
-            except ImportError:
+            except (AttributeError, ImportError):
                 continue
 
         print("Available loaders:")

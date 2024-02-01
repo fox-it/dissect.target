@@ -15,7 +15,7 @@ try:
     import yaml
 
     PY_YAML = True
-except ImportError:
+except (AttributeError, ImportError):
     PY_YAML = False
 
 IGNORED_IPS = [

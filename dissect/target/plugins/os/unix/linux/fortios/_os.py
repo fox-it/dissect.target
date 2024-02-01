@@ -23,7 +23,7 @@ try:
     from Crypto.Cipher import AES, ChaCha20
 
     HAS_PYCRYPTODOME = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_PYCRYPTODOME = False
 
 FortiOSUserRecord = TargetRecordDescriptor(

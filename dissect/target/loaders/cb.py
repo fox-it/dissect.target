@@ -12,7 +12,7 @@ try:
     from cbc_sdk.live_response_api import LiveResponseSession
     from cbc_sdk.platform import Device
     from cbc_sdk.rest_api import CBCloudAPI
-except ImportError:
+except (AttributeError, ImportError):
     raise ImportError("Please install 'carbon-black-cloud-sdk-python' to use the 'cb://' target.")
 
 from dissect.util import ts

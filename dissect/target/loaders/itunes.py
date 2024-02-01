@@ -22,14 +22,14 @@ try:
     import _pystandalone
 
     HAS_PYSTANDALONE = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_PYSTANDALONE = False
 
 try:
     from Crypto.Cipher import AES
 
     HAS_PYCRYPTODOME = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_PYCRYPTODOME = False
 
 

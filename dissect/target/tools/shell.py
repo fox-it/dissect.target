@@ -53,7 +53,7 @@ try:
     # remove `-` as an autocomplete delimeter on Linux
     # https://stackoverflow.com/questions/27288340/python-cmd-on-linux-does-not-autocomplete-special-characters-or-symbols
     readline.set_completer_delims(readline.get_completer_delims().replace("-", "").replace("$", ""))
-except ImportError:
+except (AttributeError, ImportError):
     # Readline is not available on Windows
     log.warning("Readline module is not available")
 
@@ -1166,7 +1166,7 @@ def python_shell(targets: list[Target]) -> None:
         IPython.embed(header=banner, user_ns=ns, colors="linux")
 
         # IPython already prints an empty newline
-    except ImportError:
+    except (AttributeError, ImportError):
         import code
 
         shell = code.InteractiveConsole(ns)

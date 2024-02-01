@@ -17,7 +17,7 @@ try:
     from dissect.hypervisor.util.envelope import Envelope, KeyStore
 
     HAS_ENVELOPE = True
-except ImportError:
+except (AttributeError, ImportError):
     HAS_ENVELOPE = False
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem

@@ -15,7 +15,7 @@ try:
     import termios
 
     CAN_CYBER = True
-except ImportError:
+except (AttributeError, ImportError):
     CAN_CYBER = False
 
 # fmt: off

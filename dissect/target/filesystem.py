@@ -1529,7 +1529,7 @@ def is_multi_volume_filesystem(fh: BinaryIO) -> bool:
         try:
             if filesystem.__multi_volume__ and filesystem.detect(fh):
                 return True
-        except ImportError as e:
+        except (AttributeError, ImportError) as e:
             log.info("Failed to import %s", filesystem)
             log.debug("", exc_info=e)
 
@@ -1545,7 +1545,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
             try:
                 if filesystem.detect(fh):
                     return filesystem(fh, *args, **kwargs)
-            except ImportError as e:
+            except (AttributeError, ImportError) as e:
                 log.info("Failed to import %s", filesystem)
                 log.debug("", exc_info=e)
             except Exception as e:
@@ -1573,7 +1573,7 @@ def open_multi_volume(fhs: list[BinaryIO], *args, **kwargs) -> Filesystem:
             for vols in volumes.values():
                 yield filesystem(vols, *args, **kwargs)
 
-        except ImportError as e:
+        except (AttributeError, ImportError) as e:
             log.info("Failed to import %s", filesystem)
             log.debug("", exc_info=e)
 

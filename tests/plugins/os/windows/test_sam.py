@@ -9,7 +9,7 @@ try:
     from dissect.target.plugins.os.windows.sam import SamPlugin
 
     HAVE_CRYPTO = True
-except ImportError:
+except (AttributeError, ImportError):
     HAVE_CRYPTO = False
 
 SAM_KEY_PATH = "SAM\\SAM\\Domains\\Account"
