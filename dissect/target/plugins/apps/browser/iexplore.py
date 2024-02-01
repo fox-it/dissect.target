@@ -212,7 +212,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
-                    path=down_path,
+                    path=self.target.fs.path(down_path),
                     url=down_url,
                     size=None,
                     state=None,
