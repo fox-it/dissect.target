@@ -254,8 +254,8 @@ class DockerPlugin(Plugin):
                             _target=self.target,
                         )
 
-    def _parse_local_log(self, fh):
-        fh = open_decompress(fh, "rb")  # can be a .gz file
+    def _parse_local_log(self, path: Path) -> Iterator[io.BytesIO]:
+        fh = open_decompress(path, "rb")  # can be a .gz file
         if not hasattr(fh, "size"):  # for pytest
             fh.size = fh.seek(0, io.SEEK_END)
             fh.seek(0)
@@ -270,8 +270,8 @@ class DockerPlugin(Plugin):
                 )
             yield entry
 
-    def _parse_json_log(self, fh):
-        for line in open_decompress(fh, "rt"):
+    def _parse_json_log(self, path: Path) -> Iterator[io.BytesIO]:
+        for line in open_decompress(path, "rt"):
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError as e:
