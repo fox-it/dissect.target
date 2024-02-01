@@ -37,7 +37,15 @@ c_local = cstruct(endian=">")
 c_local.addtype("varint", ProtobufVarint(cstruct=c_local, name="varint", size=1, signed=False, alignment=1))
 c_local.load(local_def, compiled=False)
 
-DOCKER_NS_REGEX = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
+RE_DOCKER_NS = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
+RE_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+ASCII_MAP = {
+    "\x08": "[BS]",
+    "\x09": "[TAB]",
+    "\x0A": "",  # \n
+    "\x0D": "",  # \r
+}
 
 
 def convert_timestamp(timestamp: str) -> str:
@@ -50,7 +58,7 @@ def convert_timestamp(timestamp: str) -> str:
     """
 
     timestamp_nanoseconds_plus_postfix = timestamp[19:]
-    match = DOCKER_NS_REGEX.match(timestamp_nanoseconds_plus_postfix)
+    match = RE_DOCKER_NS.match(timestamp_nanoseconds_plus_postfix)
 
     # Timestamp does not have nanoseconds if there is no match.
     if not match:
@@ -91,16 +99,6 @@ def hash_to_image_id(hash: str) -> str:
     return hash.split(":")[-1][:12]
 
 
-RE_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-
-ASCII_MAP = {
-    "\x08": "[BS]",
-    "\x09": "[TAB]",
-    "\x0A": "",  # \n
-    "\x0D": "",  # \r
-}
-
-
 def strip_log(input: Union[str, bytes], exc_backspace: bool = False) -> str:
     """Remove ANSI escape sequences from a given input string.
 
@@ -116,7 +114,7 @@ def strip_log(input: Union[str, bytes], exc_backspace: bool = False) -> str:
     out = RE_ANSI_ESCAPE.sub("", input)
 
     if exc_backspace:
-        out = replace_backspace(out)
+        out = _replace_backspace(out)
 
     for hex, name in ASCII_MAP.items():
         out = out.replace(hex, name)
@@ -124,7 +122,11 @@ def strip_log(input: Union[str, bytes], exc_backspace: bool = False) -> str:
     return out
 
 
-def replace_backspace(input: str) -> str:
+def _replace_backspace(input: str) -> str:
+    """Remove ANSI backspace characters (``\x08``) and 'replay' their effect on the rest of the string.
+
+    For example, with the input ``123\x084``, the output would be ``124``.
+    """
     out = ""
     for char in input:
         if char == "\x08":

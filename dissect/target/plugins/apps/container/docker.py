@@ -159,10 +159,10 @@ class DockerPlugin(Plugin):
         """Returns any docker containers present on the target system."""
 
         for data_root in self.installs:
-            containers_path = self.target.fs.path(data_root.joinpath("/containers"))
+            containers_path = self.target.fs.path(data_root.joinpath("containers"))
 
             for container in containers_path.iterdir():
-                if (config_path := containers_path.joinpath("config.v2.json")).exists():
+                if (config_path := container.joinpath("config.v2.json")).exists():
                     config = json.loads(config_path.read_text())
 
                     if config.get("State").get("Running"):
@@ -190,7 +190,7 @@ class DockerPlugin(Plugin):
                         ports=convert_ports(ports),
                         names=config.get("Name").replace("/", "", 1),
                         volumes=volumes,
-                        source=fp,
+                        source=config_path,
                         _target=self.target,
                     )
 
