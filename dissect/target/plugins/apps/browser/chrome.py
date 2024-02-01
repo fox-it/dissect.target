@@ -1,7 +1,10 @@
+from typing import Iterator
+
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
@@ -29,27 +32,40 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         # Macos
         "Library/Application Support/Google/Chrome/Default",
     ]
-    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
-    )
-    BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/extension", GENERIC_EXTENSION_RECORD_FIELDS
-    )
+
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chrome/history", GENERIC_HISTORY_RECORD_FIELDS
     )
 
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/cookie",
+        GENERIC_COOKIE_FIELDS,
+    )
+
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/download", GENERIC_DOWNLOAD_RECORD_FIELDS + CHROMIUM_DOWNLOAD_RECORD_FIELDS
+    )
+
+    BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/extension", GENERIC_EXTENSION_RECORD_FIELDS
+    )
+
+    @export(record=BrowserHistoryRecord)
+    def history(self) -> Iterator[BrowserHistoryRecord]:
+        """Return browser history records for Google Chrome."""
+        yield from super().history("chrome")
+
+    @export(record=BrowserCookieRecord)
+    def cookies(self) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookie records for Google Chrome."""
+        yield from super().cookies("chrome")
+
     @export(record=BrowserDownloadRecord)
-    def downloads(self):
+    def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records for Google Chrome."""
         yield from super().downloads("chrome")
 
     @export(record=BrowserExtensionRecord)
-    def extensions(self):
+    def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Google Chrome."""
         yield from super().extensions("chrome")
-
-    @export(record=BrowserHistoryRecord)
-    def history(self):
-        """Return browser history records for Google Chrome."""
-        yield from super().history("chrome")

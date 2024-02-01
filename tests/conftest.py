@@ -257,6 +257,7 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
         hive_hklm,
         TargetPath(mock_target.fs, ""),
     )
+    mock_target.fs.mount("c:", fs_win)
 
     mock_target.apply()
 

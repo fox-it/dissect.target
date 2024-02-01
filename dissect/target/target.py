@@ -79,7 +79,7 @@ class Target:
         self._functions: dict[str, FunctionTuple] = {}
         self._loader = None
         self._os = None
-        self._os_plugin: plugin.OSPlugin = None
+        self._os_plugin: type[plugin.OSPlugin] = None
         self._child_plugins: dict[str, plugin.ChildTargetPlugin] = {}
         self._cache = dict()
         self._errors = []
