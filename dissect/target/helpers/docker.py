@@ -41,8 +41,7 @@ DOCKER_NS_REGEX = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d
 
 
 def convert_timestamp(timestamp: str) -> str:
-    """
-    Docker sometimes uses (unpadded) 9 digit nanosecond precision
+    """Docker sometimes uses (unpadded) 9 digit nanosecond precision
     in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
 
     Python has no native %n nanosecond strptime directive, so we
@@ -64,8 +63,7 @@ def convert_timestamp(timestamp: str) -> str:
 
 
 def convert_ports(ports: dict) -> dict:
-    """
-    Depending on the state of the container (turned on or off) we
+    """Depending on the state of the container (turned on or off) we
     can salvage forwarded ports for the container in different
     parts of the config.v2.json file.
 

@@ -92,10 +92,10 @@ def find_installs(target: Target) -> Iterator[Path]:
 
         elif config_file.exists():
             try:
-                config = json.loads(config_file.open("rt").read())
+                config = json.loads(config_file.read_text())
             except json.JSONDecodeError as e:
-                log.warning(f"Could not read JSON file '{config_file}'")
-                log.debug(exc_info=e)
+                target.log.warning("Could not read JSON file %s", config_file)
+                target.log.debug("", exc_info=e)
 
             if data_root := config.get("data-root"):
                 if (data_root_path := target.fs.path(data_root)).exists():
@@ -113,34 +113,36 @@ class DockerPlugin(Plugin):
 
     __namespace__ = "docker"
 
-    def __init__(self, target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.installs = set(find_installs(target))
 
     def check_compatible(self) -> None:
         if not any(self.installs):
-            raise UnsupportedPluginError("No Docker install(s) found.")
+            raise UnsupportedPluginError("No Docker install(s) found")
 
     @export(record=DockerImageRecord)
     def images(self) -> Iterator[DockerImageRecord]:
         """Returns any pulled docker images on the target system."""
 
         for data_root in self.installs:
-            images_path = f"{data_root}/image/overlay2/repositories.json"
+            images_path = data_root.joinpath("image/overlay2/repositories.json")
 
-            if (fp := self.target.fs.path(images_path)).exists():
-                repositories = json.loads(fp.read_text()).get("Repositories")
+            if images_path.exists():
+                repositories = json.loads(images_path.read_text()).get("Repositories")
             else:
-                self.target.log.debug(f"No docker images found, file {images_path} does not exist.")
+                self.target.log.debug("No docker images found, file %s does not exist.", images_path)
                 return
 
             for name, tags in repositories.items():
                 for tag, hash in tags.items():
-                    image_metadata_path = f"{data_root}/image/overlay2/imagedb/content/sha256/{hash.split(':')[-1]}"
+                    image_metadata_path = data_root.joinpath(
+                        "image/overlay2/imagedb/content/sha256/", hash.split(":")[-1]
+                    )
                     created = None
 
-                    if (fp := self.target.fs.path(image_metadata_path)).exists():
-                        image_metadata = json.loads(fp.read_text())
+                    if image_metadata_path.exists():
+                        image_metadata = json.loads(image_metadata_path.read_text())
                         created = convert_timestamp(image_metadata.get("created"))
 
                     yield DockerImageRecord(
@@ -157,11 +159,11 @@ class DockerPlugin(Plugin):
         """Returns any docker containers present on the target system."""
 
         for data_root in self.installs:
-            containers_path = f"{data_root}/containers"
+            containers_path = self.target.fs.path(data_root.joinpath("/containers"))
 
-            for container in self.target.fs.path(containers_path).iterdir():
-                if (fp := self.target.fs.path(f"{container}/config.v2.json")).exists():
-                    config = json.loads(fp.read_text())
+            for container in containers_path.iterdir():
+                if (config_path := containers_path.joinpath("config.v2.json")).exists():
+                    config = json.loads(config_path.read_text())
 
                     if config.get("State").get("Running"):
                         ports = config.get("NetworkSettings").get("Ports", {})
