@@ -29,6 +29,8 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
 
+TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
+
 if TYPE_CHECKING:
     from dissect.target.target import Target
 
@@ -1246,9 +1248,8 @@ class VirtualFilesystem(Filesystem):
             entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
             directory.add(entry_name, entry)
 
-    def map_dir_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path], custom_path=None) -> None:
+    def map_dir_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path]) -> None:
         """Map files in a tar onto the VFS."""
-        from dissect.target.filesystems.tar import TarFilesystem
 
         if not isinstance(tar_file, pathlib.Path):
             try:
@@ -1256,21 +1257,29 @@ class VirtualFilesystem(Filesystem):
             except TypeError:
                 raise ValueError("tar_file should be a string or Path instance")
 
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         tfs = TarFilesystem(tar_file.open("rb"))
-        for _, _, files in tfs.walk_ext("/"):
-            for file in files:
-                vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
-                if custom_path:
-                    file_path = vfspath.lstrip("/")
-                else:
-                    file_path = vfspath.lstrip("/") + "/" + file.path
-                self.map_file_entry(file_path, VirtualFile(self, file_path, file.open(), stat=file.stat()))
+        self.mount(vfspath, tfs)
 
     def map_file_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path]) -> None:
         """Map a single file in a tar archive to the given path in the VFS.
 
-        NOTE: The provided tar archive should contain *one* file."""
-        return self.map_dir_from_tar(vfspath, tar_file, custom_path=True)
+        The provided tar archive should contain *one* file."""
+
+        if not isinstance(tar_file, pathlib.Path):
+            try:
+                tar_file = pathlib.Path(tar_file)
+            except TypeError:
+                raise ValueError("tar_file should be a string or Path instance")
+
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).lstrip("/")
+
+        tfs = TarFilesystem(tar_file.open("rb"))
+
+        for _, _, files in tfs.walk_ext("/"):
+            for file in files:
+                self.map_file_entry(vfspath, VirtualFile(self, vfspath, file.open(), stat=file.stat()))
+                break
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location.
