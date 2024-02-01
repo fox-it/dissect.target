@@ -263,10 +263,11 @@ class DockerPlugin(Plugin):
             entry = c_local.entry(fh)
             if entry.header != entry.footer:
                 self.target.log.warning(
-                    "Could not reliably parse log entry at offset %i."
+                    "Could not reliably parse log entry at offset %i in file %s."
                     "Entry could be parsed incorrectly. Please report this "
                     "issue as Docker's protobuf could have changed.",
                     fh.tell(),
+                    path,
                 )
             yield entry
 
@@ -275,7 +276,7 @@ class DockerPlugin(Plugin):
             try:
                 entry = json.loads(line)
             except json.JSONDecodeError as e:
-                self.target.log.warning("Could not decode JSON line in file %s", fh)
+                self.target.log.warning("Could not decode JSON line in file %s", path)
                 self.target.log.debug("", exc_info=e)
                 continue
             yield entry

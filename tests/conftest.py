@@ -424,8 +424,8 @@ def fs_docker() -> TarFilesystem:
 
 
 @pytest.fixture
-def target_linux_docker(fs_docker: TarFilesystem) -> Target:
-    mock_target = next(make_mock_target())
+def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Target:
+    mock_target = next(make_mock_target(tmp_path))
     mock_target._os_plugin = LinuxPlugin
 
     mock_target.filesystems.add(fs_docker)
