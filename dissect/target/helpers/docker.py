@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import re
-from typing import Union
 
 from dissect.cstruct import cstruct
 
@@ -70,7 +71,7 @@ def convert_timestamp(timestamp: str) -> str:
     return f"{timestamp[:19]}.{microseconds}{match['postfix']}"
 
 
-def convert_ports(ports: dict) -> dict:
+def convert_ports(ports: dict[str, list | dict]) -> dict:
     """Depending on the state of the container (turned on or off) we
     can salvage forwarded ports for the container in different
     parts of the config.v2.json file.
@@ -99,7 +100,7 @@ def hash_to_image_id(hash: str) -> str:
     return hash.split(":")[-1][:12]
 
 
-def strip_log(input: Union[str, bytes], exc_backspace: bool = False) -> str:
+def strip_log(input: str | bytes, exc_backspace: bool = False) -> str:
     """Remove ANSI escape sequences from a given input string.
 
     Also translates ASCII codes such as backspaces to readable format.
