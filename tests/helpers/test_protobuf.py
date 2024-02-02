@@ -31,15 +31,17 @@ def test_protobuf_varint_encode(input: int, expected_output: bytes):
 def test_protobuf_varint_cstruct():
     struct_def = """
     struct foo {
+        uint32 foo;
         varint size;
         char   bar[size];
     };
     """
     cs = cstruct(endian=">")
-    cs.addtype("varint", ProtobufVarint(cstruct=cs, name="varint", size=0, signed=False, alignment=1))
+    cs.addtype("varint", ProtobufVarint(cstruct=cs, name="varint", size=1, signed=False, alignment=1))
     cs.load(struct_def, compiled=False)
 
     aaa = b"a" * 123456
-    foo = cs.foo(BytesIO(b"\xc0\xc4\x07" + aaa + b"\x01\x02\x03"))
+    foo = cs.foo(BytesIO(b"\x00\x00\x00\x01\xc0\xc4\x07" + aaa + b"\x01\x02\x03"))
+    assert foo.foo == 1
     assert foo.size == 123456
     assert foo.bar == aaa
