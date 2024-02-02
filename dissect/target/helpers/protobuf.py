@@ -35,7 +35,7 @@ def decode_varint(stream: BinaryIO) -> int:
         byte = stream.read(1)
         result |= (byte[0] & 0x7F) << (i * 7)
         i += 1
-        if int.from_bytes(byte, byteorder="big") & 0x80 == 0:
+        if byte[0] & 0x80 == 0:
             break
 
     return result
