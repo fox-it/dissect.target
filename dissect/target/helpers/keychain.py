@@ -89,6 +89,9 @@ def register_keychain_file(keychain_path: Path) -> None:
     with keychain_path.open(mode="r") as fh:
         rows = csv.reader(fh)
         for row in rows:
+            # Skip comment rows (starting with #)
+            if row[0].startswith("#"):
+                continue
             if len(row) != 4:
                 log.warning("Expecting 4 values per row in a keychain CSV file, found %d: %s. Skipping", len(row), row)
                 continue

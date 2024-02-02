@@ -10,7 +10,7 @@ from dissect.target.plugins.apps.webserver import iis
 from tests._utils import absolute_path
 
 
-def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 
@@ -39,7 +39,7 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
         "_data/plugins/apps/webserver/iis/iis-applicationHost-w3c-logFile-without-directory-attr.config",
     ],
 )
-def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str):
+def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str) -> None:
     config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -87,14 +87,14 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str):
+def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
     server = iis.IISLogsPlugin(target_win_tzinfo)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
         assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"
 
 
-def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
@@ -121,7 +121,7 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target
     assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
 
 
-def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-w3c.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
