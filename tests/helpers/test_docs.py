@@ -2,11 +2,11 @@ from dissect.target.helpers import docs
 from dissect.target.plugins.apps.webserver.iis import IISLogsPlugin
 
 
-def get_nonempty_lines_set(paragraph):
+def get_nonempty_lines_set(paragraph: str) -> set[str]:
     return set(filter(None, (line.strip() for line in paragraph.splitlines())))
 
 
-def test_docs_plugin_description():
+def test_docs_plugin_description() -> None:
     plugin_desc = docs.get_plugin_description(IISLogsPlugin)
 
     assert plugin_desc
@@ -15,13 +15,13 @@ def test_docs_plugin_description():
     assert get_nonempty_lines_set(IISLogsPlugin.__doc__).issubset(get_nonempty_lines_set(plugin_desc))
 
 
-def test_docs_plugin_functions_desc():
+def test_docs_plugin_functions_desc() -> None:
     functions_short_desc = docs.get_plugin_functions_desc(IISLogsPlugin, with_docstrings=False)
 
     assert functions_short_desc
     desc_lines = functions_short_desc.splitlines()
 
-    assert len(desc_lines) == 2
+    assert len(desc_lines) == 3
     assert "iis.logs" in functions_short_desc
     assert "Return contents of IIS (v7 and above) log files." in functions_short_desc
     assert "output: records" in functions_short_desc
@@ -36,7 +36,7 @@ def test_docs_plugin_functions_desc():
     assert "Supported log formats: IIS, W3C." in lines_bag
 
 
-def test_docs_get_func_description():
+def test_docs_get_func_description() -> None:
     func = IISLogsPlugin.logs
     func_desc = docs.get_func_description(func, with_docstrings=False)
 
