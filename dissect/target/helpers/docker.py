@@ -35,7 +35,7 @@ struct entry {
 """
 
 c_local = cstruct(endian=">")
-c_local.addtype("varint", ProtobufVarint(cstruct=c_local, name="varint", size=1, signed=False, alignment=1))
+c_local.addtype("varint", ProtobufVarint(c_local, "varint", size=None, signed=False, alignment=1))
 c_local.load(local_def, compiled=False)
 
 RE_DOCKER_NS = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")

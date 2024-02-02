@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, BinaryIO
 
+from dissect.cstruct.types.base import BaseType
 from dissect.cstruct.types.bytesinteger import BytesInteger
 
 
@@ -21,6 +22,10 @@ class ProtobufVarint(BytesInteger):
 
     def _write(self, stream: BinaryIO, data: int) -> int:
         return stream.write(encode_varint(data))
+
+    _read_array = BaseType._read_array
+
+    _write_array = BaseType._write_array
 
 
 def decode_varint(stream: BinaryIO) -> int:
