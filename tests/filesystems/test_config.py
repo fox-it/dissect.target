@@ -17,10 +17,11 @@ from tests._utils import absolute_path
 
 @pytest.fixture
 def etc_directory(tmp_path: Path, fs_unix: VirtualFilesystem) -> VirtualFilesystem:
-    tmp_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
-    tmp_path.joinpath("new/path/config").write_text(Path(absolute_path("_data/helpers/configutil/config")).read_text())
-    fs_unix.map_dir("/etc", tmp_path)
+    etc_path = tmp_path.joinpath("etc/")
+    etc_path.joinpath("new/path").mkdir(parents=True, exist_ok=True)
+    etc_path.joinpath("new/config").mkdir(parents=True, exist_ok=True)
+    etc_path.joinpath("new/path/config").write_text(Path(absolute_path("_data/helpers/configutil/config")).read_text())
+    fs_unix.map_dir("/etc", etc_path)
 
     return fs_unix
 
@@ -69,6 +70,61 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
                     "AllowTcpForwarding": "no",
                     "PermitTTY": "no",
                     "ForceCommand": "cvs server",
+                },
+            },
+        ),
+        (
+            "_data/helpers/configutil/test.xml",
+            {
+                "Server": {
+                    "attributes": {"port": "8005", "shutdown": "SHUTDOWN"},
+                    "nodes": {
+                        "Listener": {
+                            "attributes": {"className": "org.apache.catalina.core.JasperListener1"},
+                            "text": "a",
+                        },
+                        "Listener-2": {
+                            "attributes": {"className": "org.apache.catalina.core.JasperListener2"},
+                            "text": "b",
+                        },
+                        "Service": {
+                            "attributes": {"name": "Catalina"},
+                            "nodes": {
+                                "Connector": {
+                                    "attributes": {
+                                        "port": "8080",
+                                        "protocol": "HTTP/1.1",
+                                        "connectionTimeout": "20000",
+                                        "redirectPort": "8443",
+                                    },
+                                },
+                                "Engine": {
+                                    "attributes": {"name": "Catalina", "defaultHost": "localhost"},
+                                    "nodes": {
+                                        "Host": {
+                                            "attributes": {
+                                                "name": "localhost",
+                                                "appBase": "webapps",
+                                                "unpackWARs": "true",
+                                                "autoDeploy": "true",
+                                            },
+                                            "nodes": {
+                                                "Valve": {
+                                                    "attributes": {
+                                                        "className": "org.apache.catalina.valves.AccessLogValve",
+                                                        "directory": "logs",
+                                                        "prefix": "localhost_access_log.",
+                                                        "suffix": ".txt",
+                                                        "pattern": "%h %l %u %t s",
+                                                    },
+                                                }
+                                            },
+                                        }
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
             },
         ),
@@ -143,12 +199,12 @@ def test_config_entry() -> None:
 
 def test_parse_functions(target_unix: Target, etc_directory: VirtualFilesystem) -> None:
     config_fs = ConfigurationFilesystem(target_unix, "/etc")
-    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, seperator=(r"\s",))
+    entry: ConfigurationEntry = config_fs.get("/new/path/config", collapse=True, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == "you"
 
-    entry = config_fs.get("/new/path/config", collapse={"help"}, seperator=(r"\s",))
+    entry = config_fs.get("/new/path/config", collapse={"help"}, separator=(r"\s",))
 
     assert entry["help"] == "you"
     assert entry["test"] == ["me", "you"]

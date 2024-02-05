@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import BinaryIO, Iterator, Tuple
 
 from dissect.esedb import esedb, record, table
+from dissect.esedb.exceptions import KeyNotFoundError
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -68,6 +69,9 @@ class WebCache:
         """Yield records from the iedownload webcache container."""
         yield from self._iter_records("iedownload")
 
+    def cookies(self) -> None:
+        raise NotImplementedError("Cookies plugin is not implemented for Internet Explorer yet")
+
 
 class InternetExplorerPlugin(BrowserPlugin):
     """Internet explorer browser plugin."""
@@ -77,12 +81,15 @@ class InternetExplorerPlugin(BrowserPlugin):
     DIRS = [
         "AppData/Local/Microsoft/Windows/WebCache",
     ]
+
     CACHE_FILENAME = "WebCacheV01.dat"
-    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
-    )
+
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/ie/history", GENERIC_HISTORY_RECORD_FIELDS
+    )
+
+    BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/ie/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
     def __init__(self, target: Target):
@@ -124,8 +131,6 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser history records from Internet Explorer.
 
         Yields BrowserHistoryRecord with the following fields:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -178,8 +183,6 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser downloads records from Internet Explorer.
 
         Yields BrowserDownloadRecord with the following fields:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
@@ -192,15 +195,24 @@ class InternetExplorerPlugin(BrowserPlugin):
         """
         for user, cache_file, cache in self._iter_cache():
             for container_record in cache.downloads():
-                response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
-                ref_url, mime_type, temp_download_path, down_url, down_path = response_headers.split("\x00")[-6:-1]
+                down_path = None
+                down_url = None
+                ts_end = wintimestamp(container_record.AccessedTime) if container_record.AccessedTime else None
+
+                try:
+                    response_headers = container_record.ResponseHeaders.decode("utf-16-le", errors="ignore")
+                    # Not used here, but [-6:-3] should give: ref_url, mime_type, temp_download_path
+                    down_url, down_path = response_headers.split("\x00")[-3:-1]
+                except (AttributeError, KeyNotFoundError) as e:
+                    self.target.log.error("Error parsing response headers: %s", e)
+                    self.target.log.debug("", exc_info=e)
 
                 yield self.BrowserDownloadRecord(
                     ts_start=None,
-                    ts_end=wintimestamp(container_record.AccessedTime),
+                    ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
-                    path=down_path,
+                    path=self.target.fs.path(down_path),
                     url=down_url,
                     size=None,
                     state=None,

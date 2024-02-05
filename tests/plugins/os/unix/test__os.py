@@ -1,11 +1,13 @@
-import platform
 import tempfile
+from io import BytesIO
+from pathlib import Path
 from uuid import UUID
 
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import parse_fstab
+from dissect.target.target import Target
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -40,11 +42,10 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 """  # noqa
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Permission Error. Needs to be fixed.")
-def test_parse_fstab():
-    with tempfile.NamedTemporaryFile() as tf:
+def test_parse_fstab(tmp_path):
+    with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(FSTAB_CONTENT.encode("ascii"))
-        tf.flush()
+        tf.close()
 
         fs = VirtualFilesystem()
         fs.map_file("/etc/fstab", tf.name)
@@ -58,10 +59,44 @@ def test_parse_fstab():
     # = 6 expected results
 
     assert set(records) == {
-        (UUID("5d1f1508-069b-4274-9bfa-ae2bf7ffb5e0"), None, "ext4", "/home"),
-        (UUID("28a25297-9825-4f87-ac41-f9c20cd5db4f"), None, "ext4", "/boot"),
-        (UUID("af0b9707-0945-499a-a37d-4da23d8dd245"), None, "auto", "/moredata"),
-        ("F631-BECA", None, "vfat", "/boot/efi"),
-        (None, "vg--main-lv--var", "auto", "/var"),
-        (None, "vg--main-lv--data", "auto", "/data"),
+        (UUID("5d1f1508-069b-4274-9bfa-ae2bf7ffb5e0"), None, "/home", "ext4", "defaults"),
+        (UUID("28a25297-9825-4f87-ac41-f9c20cd5db4f"), None, "/boot", "ext4", "defaults"),
+        (UUID("af0b9707-0945-499a-a37d-4da23d8dd245"), None, "/moredata", "auto", "default"),
+        ("F631-BECA", None, "/boot/efi", "vfat", "defaults,discard,umask=0077"),
+        (None, "vg--main-lv--var", "/var", "auto", "default"),
+        (None, "vg--main-lv--data", "/data", "auto", "default"),
     }
+
+
+@pytest.mark.parametrize(
+    "path, expected_hostname, expected_domain, file_content",
+    [
+        ("/etc/hostname", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        ("/etc/HOSTNAME", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        (
+            "/etc/sysconfig/network",
+            "myhost",
+            "mydomain.com",
+            "NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+        ),
+        ("/etc/hostname", "myhost", None, "myhost"),
+        ("/etc/sysconfig/network", "myhost", None, "NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
+        ("/not_a_valid_hostname_path", None, None, ""),
+        ("/etc/hostname", None, None, ""),
+        ("/etc/sysconfig/network", None, None, ""),
+    ],
+)
+def test__parse_hostname_string(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    path: Path,
+    expected_hostname: str,
+    expected_domain: str,
+    file_content: str,
+) -> None:
+    fs_unix.map_file_fh(path, BytesIO(file_content.encode("ascii")))
+
+    hostname_dict = target_unix._os._parse_hostname_string()
+
+    assert hostname_dict["hostname"] == expected_hostname
+    assert hostname_dict["domain"] == expected_domain

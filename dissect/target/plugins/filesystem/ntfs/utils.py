@@ -1,3 +1,4 @@
+import re
 from enum import Enum, auto
 from typing import Optional, Tuple
 from uuid import UUID
@@ -7,6 +8,8 @@ from dissect.ntfs.mft import MftRecord
 
 from dissect.target import Target
 from dissect.target.filesystems.ntfs import NtfsFilesystem
+
+DRIVE_LETTER_RE = re.compile(r"[a-zA-Z]:")
 
 
 class InformationType(Enum):
@@ -20,13 +23,33 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem):
 
     When the drive letter is not available for that filesystem it returns empty.
     """
+    # A filesystem can be known under multiple drives (mount points). If it is
+    # a windows system volume, there are the default sysvol and c: drives.
+    # If the target has a virtual ntfs filesystem, e.g. as constructed by the
+    # tar and dir loaders, there is also the /$fs$/fs<n> drive, under which the
+    # "fake" ntfs filesystem is mounted.
+    # The precedence for drives is first the drive letter drives (e.g. c:),
+    # second the "normally" named drives (e.g. sysvol) and finally the anonymous
+    # drives (e.g. /$fs/fs0).
     mount_items = (item for item in target.fs.mounts.items() if hasattr(item[1], "ntfs"))
-    driveletters = [key for key, fs in mount_items if fs.ntfs is filesystem.ntfs]
+    drives = [key for key, fs in mount_items if fs.ntfs is filesystem.ntfs]
 
-    if driveletters:
-        # Currently, mount_dict contain 2 instances of the same filesystem: 'sysvol' and 'c:'
-        # This is to choose the latter which will be 'c:'
-        return f"{driveletters[-1]}\\"
+    single_letter_drives = []
+    other_drives = []
+    anon_drives = []
+
+    for drive in drives:
+        if DRIVE_LETTER_RE.match(drive):
+            single_letter_drives.append(drive)
+        elif "$fs$" in drive:
+            anon_drives.append(drive)
+        else:
+            other_drives.append(drive)
+
+    drives = sorted(single_letter_drives) + sorted(other_drives) + sorted(anon_drives)
+
+    if drives:
+        return f"{drives[0]}\\"
     else:
         return ""
 

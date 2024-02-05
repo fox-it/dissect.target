@@ -6,7 +6,6 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from flow.record.fieldtypes import datetime as dt
-from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.filesystems.tar import TarFilesystem
@@ -34,12 +33,12 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
         assert results[0].ts == datetime(2022, 1, 1, 13, 21, 34, tzinfo=ZoneInfo("Europe/Amsterdam"))
         assert results[0].message == "Stopped target Swap."
         assert results[0].pid is None
-        assert results[0].source == path.from_posix("/var/log/messages")
+        assert results[0].source == "/var/log/messages"
 
         assert results[1].ts == datetime(2021, 12, 31, 3, 14, 15, tzinfo=ZoneInfo("Europe/Amsterdam"))
         assert results[1].message == "Starting Journal Service..."
         assert results[1].pid == 1
-        assert results[1].source == path.from_posix("/var/log/messages")
+        assert results[1].source == "/var/log/messages"
 
     # assure syslog() behaves the same as messages()
     syslogs = list(target_unix_users.syslog())
@@ -73,8 +72,10 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
     fs = TarFilesystem(bio)
     target.filesystems.add(fs)
     target.fs.mount("/", fs)
-    target.add_plugin(default.DefaultPlugin)
+    target._os_plugin = default.DefaultPlugin
+    target.apply()
     target.add_plugin(MessagesPlugin)
+
     results = list(target.messages())
     results.reverse()
 

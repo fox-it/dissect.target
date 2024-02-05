@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers import regutil
@@ -220,7 +219,7 @@ class AmcachePluginOldMixin:
                     created_timestamp=parse_win_timestamp(subkey_data.get("created_timestamp")),
                     mtime_regf=subkey.timestamp,
                     reference=int(subkey.name, 16),
-                    path=path.from_windows(subkey_data["full_path"]) if subkey_data.get("full_path") else None,
+                    path=self.target.fs.path(subkey_data["full_path"]) if subkey_data.get("full_path") else None,
                     language_code=subkey_data.get("language_code"),
                     digests=[None, subkey_data["sha1"][-40:] if subkey_data.get("sha1") else None, None],
                     program_id=subkey_data.get("program_id"),
@@ -265,7 +264,7 @@ class AmcachePluginOldMixin:
                         language_code=entry_data.get("LanguageCode"),
                         entry_type=entry_data.get("EntryType"),
                         uninstall_key=entry_data.get("UninstallKey"),
-                        path=path.from_windows(file_path_entry),
+                        path=self.target.fs.path(file_path_entry),
                         product_code=entry_data.get("ProductCode"),
                         package_code=entry_data.get("PackageCode"),
                         msi_package_code=entry_data.get("MsiPackageCode"),
@@ -284,7 +283,7 @@ class AmcachePluginOldMixin:
                         language_code=entry_data.get("LanguageCode"),
                         entry_type=entry_data.get("EntryType"),
                         uninstall_key=entry_data.get("UninstallKey"),
-                        path=path.from_windows(file_entry),
+                        path=self.target.fs.path(file_entry),
                         product_code=entry_data.get("ProductCode"),
                         package_code=entry_data.get("PackageCode"),
                         msi_package_code=entry_data.get("MsiPackageCode"),
@@ -416,7 +415,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 program_instance_id=entry_data.get("ProgramInstanceId"),
                 publisher=entry_data.get("Publisher"),
                 registry_key_path=entry_data.get("RegistryKeyPath"),
-                root_dir_path=path.from_windows(entry_data.get("RootDirPath")),
+                root_dir_path=self.target.fs.path(entry_data.get("RootDirPath")),
                 source=entry_data.get("Source"),
                 uninstall_string=entry_data.get("UninstallString"),
                 type=entry_data.get("Type"),
@@ -467,7 +466,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 mtime_regf=entry.timestamp,
                 program_id=entry_data.get("ProgramId"),
                 digests=[None, sha1_digest, None],
-                path=path.from_windows(entry_data.get("LowerCaseLongPath")),
+                path=self.target.fs.path(entry_data.get("LowerCaseLongPath")),
                 link_date=parse_win_datetime(entry_data.get("LinkDate")),
                 hash_path=entry_data.get("LongPathHash"),
                 name=entry_data.get("Name"),
@@ -492,8 +491,8 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
             yield BinaryAppcompatRecord(
                 mtime_regf=entry.timestamp,
-                driver_name=path.from_windows(entry_data.get("DriverName")),
-                inf=path.from_windows(entry_data.get("Inf")),
+                driver_name=self.target.fs.path(entry_data.get("DriverName")),
+                inf=self.target.fs.path(entry_data.get("Inf")),
                 driver_version=entry_data.get("DriverVersion"),
                 product=entry_data.get("Product"),
                 product_version=entry_data.get("ProductVersion"),
@@ -515,7 +514,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         for entry in self.read_key_subkeys(key):
             yield ShortcutAppcompatRecord(
                 mtime_regf=entry.timestamp,
-                path=path.from_windows(entry.value("ShortCutPath").value),
+                path=self.target.fs.path(entry.value("ShortCutPath").value),
                 _target=self.target,
             )
 
@@ -637,7 +636,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 parts = line.rstrip().split("|")
                 yield AppLaunchAppcompatRecord(
                     ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
-                    path=path.from_windows(parts[0]),
+                    path=self.target.fs.path(parts[0]),
                     _target=self.target,
                 )
 

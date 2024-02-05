@@ -10,6 +10,7 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     UnsupportedPluginError,
 )
+from dissect.target.helpers.mui import MUI_TZ_MAP
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, internal
 
@@ -37,7 +38,10 @@ c_tz = cstruct.cstruct()
 c_tz.load(tz_def)
 
 
-SundayFirstCalendar = calendar.Calendar(calendar.SUNDAY)
+# Althoug calendar.SUNDAY is only officially documented since Python 3.10, it
+# is present in Python 3.9, so we ignore the vermin warnings.
+SUNDAY = calendar.SUNDAY  # novermin
+SundayFirstCalendar = calendar.Calendar(SUNDAY)
 TimezoneInformation = namedtuple(
     "TimezoneInformation",
     (
@@ -134,9 +138,9 @@ class WindowsTimezone(tzinfo):
 
     def __init__(self, name: str, key: RegistryKey):
         self.name = name
-        self.display = key.value("Display").value
-        self.dlt_name = key.value("Dlt").value
-        self.std_name = key.value("Std").value
+        self.display = translate_tz(key, "Display")
+        self.dlt_name = translate_tz(key, "Dlt")
+        self.std_name = translate_tz(key, "Std")
         self.tzi = parse_tzi(key.value("TZI").value)
         self.dynamic_dst = parse_dynamic_dst(key)
 
@@ -247,3 +251,19 @@ class DateTimePlugin(Plugin):
         UTC datetime object.
         """
         return self.local(dt).astimezone(timezone.utc)
+
+
+def translate_tz(key: RegistryKey, name: str) -> str:
+    """Translate a timezone resource string to English.
+
+    Non-English distributions of Windows contain a local translation in the "Display", "Dlt" and "Std" keys.
+    The ``MUI_*`` keys contain a reference to the English timezone name we want, e.g. "@tzres.dll,-1337".
+    """
+    try:
+        string_id = int(key.value("MUI_" + name).value.replace("@tzres.dll,-", ""))
+        if translation := MUI_TZ_MAP.get(string_id):
+            return translation
+    except (RegistryValueNotFoundError, ValueError):
+        pass
+
+    return key.value(name).value

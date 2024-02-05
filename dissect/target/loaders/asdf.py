@@ -15,13 +15,15 @@ if TYPE_CHECKING:
 
 
 class AsdfLoader(Loader):
+    """Load an ASDF target."""
+
     METADATA_PREFIX = "$asdf$"
 
     def __init__(self, path: Path, **kwargs):
         path = path.resolve()
 
         super().__init__(path)
-        self.asdf = AsdfSnapshot(open(path, "rb"))
+        self.asdf = AsdfSnapshot(path.open("rb"))
 
     @staticmethod
     def detect(path) -> bool:

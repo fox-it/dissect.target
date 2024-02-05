@@ -9,6 +9,8 @@ from dissect.target.container import Container
 
 
 class AsdfContainer(Container):
+    __type__ = "asdf"
+
     def __init__(self, fh: BinaryIO, *args, **kwargs):
         file_container = fh
 

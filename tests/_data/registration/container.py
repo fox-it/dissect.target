@@ -9,7 +9,7 @@ class TestContainer(Container):
     def __init__(self, fh: Union[BinaryIO, Path], vs=None):
         super().__init__(fh, size=20, vs=vs)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @staticmethod

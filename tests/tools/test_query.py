@@ -56,7 +56,7 @@ def test_target_query_invalid_functions(
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive-dot-folder.tgz"],
+            ["target-query", "-f", ",".join(given_funcs), "tests/_data/loaders/tar/test-archive.tar.gz"],
         )
 
         with pytest.raises((SystemExit)):
@@ -115,7 +115,7 @@ def test_target_query_invalid_excluded_functions(
                 "hostname",
                 "-xf",
                 ",".join(given_funcs),
-                "tests/_data/loaders/tar/test-archive-dot-folder.tgz",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
             ],
         )
 
@@ -139,7 +139,7 @@ def test_target_query_unsupported_plugin_log(capsys: pytest.CaptureFixture, monk
     with monkeypatch.context() as m:
         m.setattr(
             "sys.argv",
-            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive-dot-folder.tgz"],
+            ["target-query", "-f", "regf", "tests/_data/loaders/tar/test-archive.tar.gz"],
         )
 
         target_query()
@@ -160,7 +160,7 @@ def mock_find_plugin_function(
             PluginFunction(
                 name=pattern,
                 output_type="record",
-                path="",
+                path=pattern,
                 class_object=MagicMock(),
                 method_name=pattern,
                 plugin_desc={},
@@ -188,7 +188,7 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
                 "foo,bar,bla,foo",
                 "-xf",
                 "bla",
-                "tests/_data/loaders/tar/test-archive-dot-folder.tgz",
+                "tests/_data/loaders/tar/test-archive.tar.gz",
             ],
         )
 
@@ -220,9 +220,9 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     if os.sep == "\\":
-        target_file = "tests\\_data\\loaders\\tar\\test-archive-dot-folder.tgz"
+        target_file = "tests\\_data\\loaders\\tar\\test-archive.tar.gz"
     else:
-        target_file = "tests/_data/loaders/tar/test-archive-dot-folder.tgz"
+        target_file = "tests/_data/loaders/tar/test-archive.tar.gz"
 
     with monkeypatch.context() as m:
         m.setattr(
@@ -233,4 +233,8 @@ def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest
         target_query()
         out, _ = capsys.readouterr()
 
-        assert out == f"Dry run on: <Target {target_file}>\n  execute: osinfo (general.osinfo.osinfo)\n"
+        assert out == (
+            f"Dry run on: <Target {target_file}>\n"
+            "  execute: users (general.default.users)\n"
+            "  execute: osinfo (general.osinfo.osinfo)\n"
+        )

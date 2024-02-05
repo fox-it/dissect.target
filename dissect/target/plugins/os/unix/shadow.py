@@ -5,7 +5,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 UnixShadowRecord = TargetRecordDescriptor(
-    "linux/shadow",
+    "unix/shadow",
     [
         ("string", "name"),
         ("string", "crypt"),

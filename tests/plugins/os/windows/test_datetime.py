@@ -1,6 +1,8 @@
 import datetime
 
+from dissect.target.helpers.regutil import RegistryHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.datetime import DateTimePlugin
+from dissect.target.plugins.os.windows.locale import LocalePlugin as WindowsLocalePlugin
 from dissect.target.target import Target
 
 
@@ -57,3 +59,57 @@ def test_windows_timezone_legacy(target_win_tzinfo_legacy: Target) -> None:
     # Older Windows version (prior to Windows 7) use localized time zone ids like "Paaseiland"
     target_win_tzinfo_legacy.add_plugin(DateTimePlugin)
     assert target_win_tzinfo_legacy.datetime.tzinfo.display == "(UTC-06:00) Easter Island"
+
+
+def test_windows_datetime_foreign(target_win_users: Target, hive_hku: RegistryHive, hive_hklm: RegistryHive) -> None:
+    # add keyboards
+    preload_key_name = "Keyboard Layout\\Preload"
+    preload_key = VirtualKey(hive_hku, preload_key_name)
+    preload_key.add_value("1", VirtualValue(hive_hku, "1", "00000413"))
+    preload_key.add_value("2", VirtualValue(hive_hku, "2", "00000409"))
+    hive_hku.map_key(preload_key_name, preload_key)
+
+    # add keyboard languages
+    doskeybcodes_key_name = "SYSTEM\\ControlSet001\\Control\\Keyboard Layout\\DosKeybCodes"
+    doskeybcodes_key = VirtualKey(hive_hklm, doskeybcodes_key_name)
+    doskeybcodes_key.add_value("00000413", VirtualValue(hive_hklm, "00000413", "nl"))
+    doskeybcodes_key.add_value("00000409", VirtualValue(hive_hklm, "00000409", "us"))
+    hive_hklm.map_key(doskeybcodes_key_name, doskeybcodes_key)
+
+    # add PST timezone
+    tz_data_path = "Software\\Microsoft\\Windows NT\\CurrentVersion\\Time Zones\\Pacific Standard Time"
+    tz_data = VirtualKey(hive_hklm, tz_data_path)
+
+    tz_data.add_value("Display", "(UTC-08:00) Some Localized Translation")
+    tz_data.add_value("Dlt", "Some Localized Translation DLT")
+    tz_data.add_value("Std", "Some Localized Translation STD")
+
+    tz_data.add_value("MUI_Display", "@tzres.dll,-210")
+    tz_data.add_value("MUI_Dlt", "@tzres.dll,-211")
+    tz_data.add_value("MUI_Std", "@tzres.dll,-212")
+
+    tzi = bytes.fromhex("e001000000000000c4ffffff00000b0000000100020000000000000000000300000002000200000000000000")
+    tz_data.add_value("TZI", tzi)
+    hive_hklm.map_key(tz_data_path, tz_data)
+
+    # set configured language
+    userprofile_key_name = "Control Panel\\International\\User Profile"
+    userprofile_key = VirtualKey(hive_hku, userprofile_key_name)
+    subkey = VirtualKey(hive_hku, "en-US")
+    subkey.add_value("CachedLanguageName", "@Winlangdb.dll,-1337")
+    userprofile_key.add_subkey("en-US", subkey)
+    hive_hku.map_key(userprofile_key_name, userprofile_key)
+
+    # set configured timezone
+    timezoneinformation_key_name = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
+    timezoneinformation_key = VirtualKey(hive_hklm, timezoneinformation_key_name)
+    timezoneinformation_key.add_value("TimeZoneKeyName", "Pacific Standard Time")
+    hive_hklm.map_key(timezoneinformation_key_name, timezoneinformation_key)
+
+    target_win_users.add_plugin(DateTimePlugin)
+    assert target_win_users.datetime.tzinfo.display == "(UTC-08:00) Pacific Time (US & Canada)"
+    assert target_win_users.datetime.tzinfo.std_name == "Pacific Standard Time"
+    assert target_win_users.datetime.tzinfo.dlt_name == "Pacific Daylight Time"
+
+    target_win_users.add_plugin(WindowsLocalePlugin)
+    assert target_win_users.timezone == "America/Los_Angeles"

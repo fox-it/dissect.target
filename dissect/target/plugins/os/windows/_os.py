@@ -19,6 +19,11 @@ class WindowsPlugin(OSPlugin):
         # Just run this here for now
         self.add_mounts()
 
+        target.props["sysvol_drive"] = next(
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts["sysvol"] and mnt != "sysvol"),
+            None,
+        )
+
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
@@ -32,17 +37,11 @@ class WindowsPlugin(OSPlugin):
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
-        target.fs.mount("c:", sysvol)
 
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
                 if fs.exists("boot") and fs.exists("boot/BCD"):
                     target.fs.mount("efi", fs)
-
-        if target.fs.exists("sysvol/windows"):
-            target.windir = target.fs.get("sysvol/windows")
-        else:
-            target.windir = target.fs.get("sysvol/winnt")
 
         return cls(target)
 
@@ -58,8 +57,6 @@ class WindowsPlugin(OSPlugin):
                     p = name.lower()[1:].split("\\")
                     if p[0] == "dosdevices":
                         drive = p[1]
-                        if drive == "c:":
-                            continue
 
                         if value.startswith(b"DMIO:ID:"):
                             guid = value[8:]
@@ -77,7 +74,8 @@ class WindowsPlugin(OSPlugin):
                                             self.target.fs.mount(drive, volume.fs)
                                             break
         except Exception as e:
-            self.target.log.warning("Failed to map drive letters", exc_info=e)
+            self.target.log.warning("Failed to map drive letters")
+            self.target.log.debug("", exc_info=e)
 
     @export(property=True)
     def hostname(self) -> Optional[str]:

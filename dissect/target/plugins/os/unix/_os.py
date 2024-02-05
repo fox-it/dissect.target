@@ -6,11 +6,10 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
-from flow.record.fieldtypes import posix_path
-
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -61,7 +60,7 @@ class UnixPlugin(OSPlugin):
                         uid=pwent.get(2),
                         gid=pwent.get(3),
                         gecos=pwent.get(4),
-                        home=posix_path(pwent.get(5)),
+                        home=self.target.fs.path(pwent.get(5)),
                         shell=pwent.get(6),
                         source=passwd_file,
                         _target=self.target,
@@ -133,28 +132,46 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
+    def _parse_rh_legacy(self, path):
+        hostname = None
+        file_contents = path.open("rt").readlines()
+        for line in file_contents:
+            if not line.startswith("HOSTNAME"):
+                continue
+            _, _, hostname = line.rstrip().partition("=")
+        return hostname
+
     def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
         """
-        Returns a dict with containing the hostname and domain name portion of the path(s) specified
+        Returns a dict containing the hostname and domain name portion of the path(s) specified
 
         Args:
             paths (list): list of paths
         """
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME"]
-        hostname_string = None
+        redhat_legacy_path = "/etc/sysconfig/network"
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", redhat_legacy_path]
+        hostname_dict = {"hostname": None, "domain": None}
 
         for path in paths:
-            for fs in self.target.filesystems:
-                if fs.exists(path):
-                    hostname_string = fs.path(path).open("rt").read().rstrip()
+            path = self.target.fs.path(path)
+
+            if not path.exists():
+                continue
+
+            if path.as_posix() == redhat_legacy_path:
+                hostname_string = self._parse_rh_legacy(path)
+            else:
+                hostname_string = path.open("rt").read().rstrip()
 
             if hostname_string and "." in hostname_string:
                 hostname_string = hostname_string.split(".", maxsplit=1)
                 hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-            else:
+            elif hostname_string != "":
                 hostname_dict = {"hostname": hostname_string, "domain": None}
-
-            return hostname_dict
+            else:
+                hostname_dict = {"hostname": None, "domain": None}
+            break  # break whenever a valid hostname is found
+        return hostname_dict
 
     def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
@@ -177,33 +194,41 @@ class UnixPlugin(OSPlugin):
     def _add_mounts(self) -> None:
         fstab = self.target.fs.path("/etc/fstab")
 
-        volumes_to_mount = [v for v in self.target.volumes if v.fs]
-
-        for dev_id, volume_name, _, mount_point in parse_fstab(fstab, self.target.log):
-            for volume in volumes_to_mount:
+        for dev_id, volume_name, mount_point, _, options in parse_fstab(fstab, self.target.log):
+            opts = parse_options_string(options)
+            subvol = opts.get("subvol", None)
+            subvolid = opts.get("subvolid", None)
+            for fs in self.target.filesystems:
                 fs_id = None
+                fs_subvol = None
+                fs_subvolid = None
+                fs_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
                 last_mount = None
 
                 if dev_id:
-                    if volume.fs.__fstype__ == "xfs":
-                        fs_id = volume.fs.xfs.uuid
-                    elif volume.fs.__fstype__ == "ext":
-                        fs_id = volume.fs.extfs.uuid
-                        last_mount = volume.fs.extfs.last_mount
-                    elif volume.fs.__fstype__ == "fat":
-                        fs_id = volume.fs.fatfs.volume_id
+                    if fs.__type__ == "xfs":
+                        fs_id = fs.xfs.uuid
+                    elif fs.__type__ == "ext":
+                        fs_id = fs.extfs.uuid
+                        last_mount = fs.extfs.last_mount
+                    elif fs.__type__ == "btrfs":
+                        fs_id = fs.btrfs.uuid
+                        fs_subvol = fs.subvolume.path
+                        fs_subvolid = fs.subvolume.objectid
+                    elif fs.__type__ == "fat":
+                        fs_id = fs.fatfs.volume_id
                         # This normalizes fs_id to comply with libblkid generated UUIDs
                         # This is needed because FAT filesystems don't have a real UUID,
                         # but instead a volume_id which is not case-sensitive
                         fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
 
                 if (
-                    (fs_id and (fs_id == dev_id))
-                    or (volume.name and (volume.name == volume_name))
+                    (fs_id and (fs_id == dev_id and (subvol == fs_subvol or subvolid == fs_subvolid)))
+                    or (fs_volume_name and (fs_volume_name == volume_name))
                     or (last_mount and (last_mount == mount_point))
                 ):
-                    self.target.log.debug("Mounting %s at %s", volume, mount_point)
-                    self.target.fs.mount(mount_point, volume.fs)
+                    self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
+                    self.target.fs.mount(mount_point, fs)
 
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
         """Parse files containing Unix version information.
@@ -247,7 +272,7 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix") -> Optional[str]:
+    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> Optional[str]:
         arch_strings = {
             0x00: "Unknown",
             0x02: "SPARC",
@@ -264,8 +289,8 @@ class UnixPlugin(OSPlugin):
         }
 
         for fs in self.target.filesystems:
-            if fs.exists("/bin/ls"):
-                fh = fs.open("/bin/ls")
+            if fs.exists(path):
+                fh = fs.open(path)
                 fh.seek(4)
                 # ELF - e_ident[EI_CLASS]
                 bits = unpack("B", fh.read(1))[0]
@@ -283,7 +308,7 @@ class UnixPlugin(OSPlugin):
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
-) -> Iterator[tuple[Union[uuid.UUID, str], str, str, str]]:
+) -> Iterator[tuple[Union[uuid.UUID, str], str, str, str, str]]:
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
@@ -310,7 +335,7 @@ def parse_fstab(
         if len(entry_parts) != 6:
             continue
 
-        dev, mount_point, fs_type, _, _, _ = entry_parts
+        dev, mount_point, fs_type, options, _, _ = entry_parts
 
         if fs_type in SKIP_FS_TYPES:
             log.warning("Skipped FS type: %s, %s, %s", fs_type, dev, mount_point)
@@ -341,4 +366,4 @@ def parse_fstab(
             except ValueError:
                 pass
 
-        yield dev_id, volume_name, fs_type, mount_point
+        yield dev_id, volume_name, mount_point, fs_type, options

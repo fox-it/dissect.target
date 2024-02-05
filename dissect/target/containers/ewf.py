@@ -12,12 +12,14 @@ from dissect.target.container import Container
 class EwfContainer(Container):
     """Expert Witness Disk Image Format"""
 
+    __type__ = "ewf"
+
     def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
         fhs = [fh] if not isinstance(fh, list) else fh
         if hasattr(fhs[0], "read"):
             self.ewf = EWF(fhs)
         else:
-            self.ewf = EWF([path.open("rb") for path in find_files(fhs[0])])
+            self.ewf = EWF(find_files(fhs[0]))
 
         self._stream = self.ewf.open()
         super().__init__(fh, self.ewf.size, *args, **kwargs)

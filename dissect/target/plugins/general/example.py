@@ -55,7 +55,6 @@ class ExamplePlugin(Plugin):
 
     # IMPORTANT: Remove these attributes when using this as boilerplate for your own plugin!
     __findable__ = False
-    __skip__ = True
 
     def check_compatible(self) -> None:
         """Perform a compatibility check with the target.

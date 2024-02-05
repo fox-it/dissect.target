@@ -17,7 +17,7 @@ class LUKSVolumeSystemError(VolumeSystemError):
 
 
 class LUKSVolumeSystem(EncryptedVolumeSystem):
-    PROVIDER = "luks"
+    __type__ = "luks"
 
     def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
@@ -52,7 +52,9 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             **volume_details,
         )
 
-    def unlock_with_volume_encryption_key(self, key: bytes, keyslot: Optional[int] = None) -> None:
+    def unlock_with_volume_encryption_key(
+        self, key: bytes, keyslot: Optional[int] = None, is_wildcard: bool = False
+    ) -> None:
         try:
             if keyslot is None:
                 for keyslot in self.luks.keyslots.keys():
@@ -68,25 +70,31 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
 
             log.debug("Unlocked LUKS volume with provided volume encryption key")
         except ValueError:
-            log.exception("Failed to unlock LUKS volume with provided volume encryption key")
+            if not is_wildcard:
+                log.exception("Failed to unlock LUKS volume with provided volume encryption key")
 
-    def unlock_with_passphrase(self, passphrase: str, keyslot: Optional[int] = None) -> None:
+    def unlock_with_passphrase(self, passphrase: str, keyslot: Optional[int] = None, is_wildcard: bool = False) -> None:
         try:
             self.luks.unlock_with_passphrase(passphrase, keyslot)
             log.debug("Unlocked LUKS volume with provided passphrase")
         except ValueError:
-            log.exception("Failed to unlock LUKS volume with provided passphrase")
+            if not is_wildcard:
+                log.exception("Failed to unlock LUKS volume with provided passphrase")
 
-    def unlock_with_key_file(self, key_file: pathlib.Path, keyslot: Optional[int] = None) -> None:
+    def unlock_with_key_file(
+        self, key_file: pathlib.Path, keyslot: Optional[int] = None, is_wildcard: bool = False
+    ) -> None:
         if not key_file.exists():
-            log.error("Provided key file does not exist: %s", key_file)
+            if not is_wildcard:
+                log.error("Provided key file does not exist: %s", key_file)
             return
 
         try:
             self.luks.unlock_with_key_file(key_file, keyslot=keyslot)
             log.debug("Unlocked LUKS volume with key file %s", key_file)
         except ValueError:
-            log.exception("Failed to unlock LUKS volume with key file %s", key_file)
+            if not is_wildcard:
+                log.exception("Failed to unlock LUKS volume with key file %s", key_file)
 
     def unlock_volume(self) -> AlignedStream:
         keyslots = list(map(str, self.luks.keyslots.keys()))
@@ -99,12 +107,12 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
                 keyslot = None
 
             if key.key_type == KeyType.RAW:
-                self.unlock_with_volume_encryption_key(key.value, keyslot)
+                self.unlock_with_volume_encryption_key(key.value, keyslot, key.is_wildcard)
             if key.key_type == KeyType.PASSPHRASE:
-                self.unlock_with_passphrase(key.value, keyslot)
+                self.unlock_with_passphrase(key.value, keyslot, key.is_wildcard)
             elif key.key_type == KeyType.FILE:
                 key_file = pathlib.Path(key.value)
-                self.unlock_with_key_file(key_file, keyslot)
+                self.unlock_with_key_file(key_file, keyslot, key.is_wildcard)
 
             if self.luks.unlocked:
                 log.info("Volume %s unlocked with %s (keyslot: %d)", self.fh, key, self.luks._active_keyslot_id)

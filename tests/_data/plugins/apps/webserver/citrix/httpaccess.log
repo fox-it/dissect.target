@@ -1,0 +1,2 @@
+1.2.3.4 -> 5.6.7.8 - - [19/Dec/2022:17:25:48 +0100] [69420] "GET / HTTP/1.1" 200 1436 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36" "Time: 58774 microsecs"
+127.0.0.1 - - [11/Aug/2023:08:30:00 +0000] [82775] "GET / HTTP/1.1" 200 18705 "-" "curl/7.78.0" "Time: 39770 microsecs"

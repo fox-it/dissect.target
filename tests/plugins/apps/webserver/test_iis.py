@@ -1,4 +1,3 @@
-import platform
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import mock_open, patch
@@ -11,7 +10,7 @@ from dissect.target.plugins.apps.webserver import iis
 from tests._utils import absolute_path
 
 
-def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 
@@ -40,7 +39,7 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
         "_data/plugins/apps/webserver/iis/iis-applicationHost-w3c-logFile-without-directory-attr.config",
     ],
 )
-def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str):
+def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str) -> None:
     config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -88,15 +87,14 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str):
+def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
     server = iis.IISLogsPlugin(target_win_tzinfo)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
         assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="IIS Assertion Error. Needs to be fixed.")
-def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
@@ -120,11 +118,10 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target
     assert record.bytes_sent == 143
     assert record.referer is None
     assert record.useragent is None
-    assert str(record.source) == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
+    assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="IIS Assertion Error. Needs to be fixed.")
-def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-w3c.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -151,7 +148,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_wi
         w3c_record_1.useragent
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
-    assert str(w3c_record_1.source) == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+    assert w3c_record_1.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
     # W3C format type 2: contains HTTP version
     w3c_record_2 = results[6]
@@ -168,7 +165,7 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_wi
         w3c_record_2.useragent
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
-    assert str(w3c_record_2.source) == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+    assert w3c_record_2.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
 
     # W3C format type 3
     w3c_record_3 = results[11]
@@ -185,4 +182,4 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_wi
         w3c_record_3.useragent
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
-    assert str(w3c_record_3.source) == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+    assert w3c_record_3.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"

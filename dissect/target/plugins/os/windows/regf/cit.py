@@ -11,7 +11,6 @@ from io import BytesIO
 from dissect.cstruct import cstruct
 from dissect.util.compression import lznt1
 from dissect.util.ts import wintimestamp
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -735,7 +734,7 @@ class CITPlugin(Plugin):
                             start_time=local_wintimestamp(self.target, cit.header.StartTimeLocal),
                             current_time=local_wintimestamp(self.target, cit.header.CurrentTimeLocal),
                             aggregation_period_in_s=cit.header.AggregationPeriodInS,
-                            path=path.from_windows(entry.file_path),
+                            path=self.target.fs.path(entry.file_path),
                             command_line=entry.command_line,
                             pe_timedatestamp=program_data.PeTimeDateStamp,
                             pe_checksum=program_data.PeCheckSum,
@@ -895,7 +894,7 @@ class CITPlugin(Plugin):
                     yield CITTelemetryRecord(
                         regf_mtime=version_key.ts,
                         version=version_key.name,
-                        path=path.from_windows(value.name),
+                        path=self.target.fs.path(value.name),
                         value=str(c_cit.TELEMETRY_ANSWERS(value.value)).split(".")[1],
                         _target=self.target,
                     )
@@ -941,8 +940,8 @@ class CITPlugin(Plugin):
                     yield CITModuleRecord(
                         last_loaded=wintimestamp(value.value),
                         regf_mtime=monitored_dll.ts,
-                        tracked_module=path.from_windows(monitored_dll.name),
-                        executable=path.from_windows(value.name),
+                        tracked_module=self.target.fs.path(monitored_dll.name),
+                        executable=self.target.fs.path(value.name),
                         # These are actually specific for the tracked module, but just include them in every record
                         overflow_quota=overflow_quota,
                         overflow_value=overflow_value,

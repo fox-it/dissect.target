@@ -8,6 +8,8 @@ from dissect.target.container import Container
 
 
 class VhdContainer(Container):
+    __type__ = "vhd"
+
     def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
@@ -18,8 +20,11 @@ class VhdContainer(Container):
 
     @staticmethod
     def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
-        fh.seek(-512, io.SEEK_END)
-        return b"conectix" in fh.read(9)
+        try:
+            fh.seek(-512, io.SEEK_END)
+            return b"conectix" in fh.read(9)
+        except OSError:
+            return False
 
     @staticmethod
     def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:

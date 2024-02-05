@@ -1,16 +1,20 @@
+from __future__ import annotations
+
+import logging
 import warnings
 from typing import Iterator, Union
 
 from flow.record import GroupedRecord
 
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
 from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
-from dissect.target.target import Target
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
+log = logging.getLogger(__name__)
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
@@ -42,7 +46,6 @@ TaskRecord = TargetRecordDescriptor(
         ("string", "run_level"),
         ("string", "process_token_sid_type"),
         ("string", "required_privileges"),
-        ("boolean", "allow_start_on_demand"),
         ("string", "restart_on_failure_interval"),
         ("string", "restart_on_failure_count"),
         ("string", "mutiple_instances_policy"),

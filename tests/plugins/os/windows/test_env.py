@@ -1,5 +1,5 @@
-import platform
 from collections import OrderedDict, namedtuple
+from typing import Iterator
 from unittest import mock
 
 import pytest
@@ -17,38 +17,35 @@ MockUser = namedtuple("user", ["name", "home", "sid"])(
     "test-user-sid",
 )
 
-
-class MockEnvironmentVariablePlugin(EnvironmentVariablePlugin):
-    VARIABLES = [
-        EnvVarDetails(
-            "%foo%",
-            (
-                "foo1",
-                "foo2",
-            ),
-            "FOO",
+TEST_VARIABLES = [
+    EnvVarDetails(
+        "%foo%",
+        (
+            "foo1",
+            "foo2",
         ),
-        EnvVarDetails(
-            "%path%",
-            (
-                "path1;;;",
-                "path2;;;",
-            ),
-            "PATH",
+        "FOO",
+    ),
+    EnvVarDetails(
+        "%path%",
+        (
+            "path1;;;",
+            "path2;;;",
         ),
-    ]
+        "PATH",
+    ),
+]
 
-    USER_VARIABLES = [
-        EnvVarDetails(
-            "%path%",
-            (
-                "{user_sid}/path1;;;",
-                "{user_sid}/path2;;;",
-            ),
-            "PATH",
+TEST_USER_VARIABLES = [
+    EnvVarDetails(
+        "%path%",
+        (
+            "{user_sid}/path1;;;",
+            "{user_sid}/path2;;;",
         ),
-    ]
-
+        "PATH",
+    ),
+]
 
 TEST_USER_ENV_VARS = (
     (
@@ -69,7 +66,7 @@ TEST_USER_ENV_VARS = (
 
 
 @pytest.fixture
-def env_plugin():
+def env_plugin() -> Iterator[EnvironmentVariablePlugin]:
     mock_target = mock.Mock()
 
     def registry_value_side_effect(key, value):
@@ -85,20 +82,24 @@ def env_plugin():
     mock_target.path = "mock"
     mock_target._config.CACHE_DIR = "cache"
 
-    plugin = MockEnvironmentVariablePlugin(mock_target)
-    plugin._pathext = set(PATHEXTS)
+    with (
+        mock.patch.object(EnvironmentVariablePlugin, "VARIABLES", TEST_VARIABLES),
+        mock.patch.object(EnvironmentVariablePlugin, "USER_VARIABLES", TEST_USER_VARIABLES),
+    ):
+        plugin = EnvironmentVariablePlugin(mock_target)
+        plugin._pathext = set(PATHEXTS)
 
-    return plugin
+        yield plugin
 
 
-def test__expand_env():
+def test__expand_env() -> None:
     test_value = "%foo%%bAr%/%FoO%foo%bar%bar"
     test_env_vars = OrderedDict([("%FOO%", "bar"), ("%bar%", "foo")])
     expanded_value = EnvironmentVariablePlugin._expand_env(test_value, test_env_vars)
     assert expanded_value == "barfoo/barfoofoobar"
 
 
-def test__expand_env_vars():
+def test__expand_env_vars() -> None:
     test_env_vars = OrderedDict(
         [
             ("%first%", "first"),
@@ -120,14 +121,14 @@ def test__expand_env_vars():
     assert result_env_vars == EnvironmentVariablePlugin._expand_env_vars(test_env_vars)
 
 
-def test__get_env_vars(env_plugin):
+def test__get_env_vars(env_plugin: EnvironmentVariablePlugin) -> None:
     env_vars = env_plugin._get_env_vars(env_plugin.VARIABLES)
 
     assert env_vars["%foo%"] == "foo2"
     assert env_vars["%path%"] == "path1;path2;;;"
 
 
-def test__get_system_env_vars(env_plugin):
+def test__get_system_env_vars(env_plugin: EnvironmentVariablePlugin) -> None:
     with mock.patch.object(env_plugin, "_get_env_vars"):
         with mock.patch.object(env_plugin, "_expand_env_vars"):
             env_plugin._get_system_env_vars()
@@ -136,7 +137,9 @@ def test__get_system_env_vars(env_plugin):
 
 
 @pytest.mark.parametrize("user, results", TEST_USER_ENV_VARS)
-def test__get_user_env_vars(env_plugin, user, results):
+def test__get_user_env_vars(
+    env_plugin: EnvironmentVariablePlugin, user: MockUser, results: tuple[tuple[str, str]]
+) -> None:
     user_sid = None
     if user:
         user_sid = user.sid
@@ -147,7 +150,7 @@ def test__get_user_env_vars(env_plugin, user, results):
 
 
 @pytest.mark.parametrize("user, _", TEST_USER_ENV_VARS)
-def test_expand_env(env_plugin, user, _):
+def test_expand_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, _) -> None:
     path = "mock"
 
     with mock.patch.object(env_plugin, "_get_user_env_vars"):
@@ -162,7 +165,7 @@ def test_expand_env(env_plugin, user, _):
 
 
 @pytest.mark.parametrize("user, _", TEST_USER_ENV_VARS)
-def test_user_env(env_plugin, user, _):
+def test_user_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, _) -> None:
     with mock.patch.object(env_plugin, "_get_user_env_vars"):
         user_sid = None
         if user:
@@ -172,18 +175,14 @@ def test_user_env(env_plugin, user, _):
         assert env_vars == env_plugin._get_user_env_vars.return_value
 
 
-def test_env(env_plugin):
+def test_env(env_plugin: EnvironmentVariablePlugin) -> None:
     with mock.patch.object(env_plugin, "_get_system_env_vars"):
         env_vars = env_plugin.env
         env_plugin._get_system_env_vars.assert_called()
         assert env_vars == env_plugin._get_system_env_vars.return_value
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="NotImplementedError: access: effective_ids unavailable on this platform. Needs to be fixed.",
-)
-def test_environment_variables(env_plugin):
+def test_environment_variables(env_plugin: EnvironmentVariablePlugin) -> None:
     with mock.patch.object(env_plugin, "_get_system_env_vars", side_effect=lambda: {"sys-name": "sys-value"}):
         with mock.patch.object(env_plugin, "_get_user_env_vars", side_effect=lambda _: {"usr-name": "usr-value"}):
             records = list(env_plugin.environment_variables())
@@ -199,23 +198,19 @@ def test_environment_variables(env_plugin):
             assert records[1].username == "test-user"
 
 
-def test__get_pathext(env_plugin):
+def test__get_pathext(env_plugin: EnvironmentVariablePlugin) -> None:
     pathexts = env_plugin.pathext
     pathexts = sorted(tuple(pathexts))
     assert pathexts == PATHEXTS
 
 
-def test_pathext(env_plugin):
+def test_pathext(env_plugin: EnvironmentVariablePlugin) -> None:
     with mock.patch.object(env_plugin, "_get_pathext"):
         env_plugin.pathext()
         env_plugin._get_pathext.assert_called_once()
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="NotImplementedError: access: effective_ids unavailable on this platform. Needs to be fixed.",
-)
-def test_path_extensions(env_plugin):
+def test_path_extensions(env_plugin: EnvironmentVariablePlugin) -> None:
     pathext_records = env_plugin.path_extensions()
     pathext_records = sorted(pathext_records, key=lambda record: record.pathext)
     for idx, record in enumerate(pathext_records):

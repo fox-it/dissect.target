@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class ITunesFilesystem(Filesystem):
     """Filesystem implementation for iTunes backups."""
 
-    __fstype__ = "itunes"
+    __type__ = "itunes"
 
     def __init__(self, backup: ITunesBackup, *args, **kwargs):
         super().__init__(None, *args, **kwargs)

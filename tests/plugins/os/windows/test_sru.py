@@ -1,10 +1,14 @@
+import logging
+
 import pytest
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows import sru
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_sru_plugin(target_win, fs_win):
+def test_sru_plugin(target_win: Target, fs_win: VirtualFilesystem, caplog: pytest.LogCaptureFixture) -> None:
     srudb = absolute_path("_data/plugins/os/windows/sru/SRUDB.dat")
 
     fs_win.map_file("Windows/System32/sru/SRUDB.dat", srudb)
@@ -18,7 +22,7 @@ def test_sru_plugin(target_win, fs_win):
     assert len(list(target_win.sru.sdp_physical_disk_provider())) == 3
     assert len(list(target_win.sru.sdp_cpu_provider())) == 3
 
-    with pytest.raises(ValueError) as e:
-        list(target_win.sru.vfu())
-
-    assert str(e.value) == "Table not found: vfu"
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        assert list(target_win.sru.vfu()) == []
+        assert "Table not found: vfu" in caplog.text

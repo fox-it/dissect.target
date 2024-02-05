@@ -5,13 +5,13 @@ from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
-from flow.record.fieldtypes import path
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
+    GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
     BrowserPlugin,
@@ -35,9 +35,15 @@ class FirefoxPlugin(BrowserPlugin):
         # macOS
         "Library/Application Support/Firefox",
     ]
+
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/history", GENERIC_HISTORY_RECORD_FIELDS
     )
+
+    BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/cookie", GENERIC_COOKIE_FIELDS
+    )
+
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
@@ -61,6 +67,7 @@ class FirefoxPlugin(BrowserPlugin):
 
         Args:
             filename: The filename of the database.
+
         Yields:
             Opened SQLite3 databases.
         """
@@ -80,8 +87,6 @@ class FirefoxPlugin(BrowserPlugin):
         """Return browser history records from Firefox.
 
         Yields BrowserHistoryRecord with the following fields:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -135,13 +140,52 @@ class FirefoxPlugin(BrowserPlugin):
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
+    @export(record=BrowserCookieRecord)
+    def cookies(self) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookie records from Firefox.
+
+        Args:
+            browser_name: The name of the browser as a string.
+
+        Yields:
+            Records with the following fields:
+                ts_created (datetime): Cookie created timestamp.
+                ts_last_accessed (datetime): Cookie last accessed timestamp.
+                browser (string): The browser from which the records are generated from.
+                name (string): The cookie name.
+                value (string): The cookie value.
+                host (string): Cookie host key.
+                path (string): Cookie path.
+                expiry (varint): Cookie expiry.
+                is_secure (bool): Cookie secury flag.
+                is_http_only (bool): Cookie http only flag.
+                same_site (bool): Cookie same site flag.
+        """
+        for user, db_file, db in self._iter_db("cookies.sqlite"):
+            try:
+                for cookie in db.table("moz_cookies").rows():
+                    yield self.BrowserCookieRecord(
+                        ts_created=from_unix_us(cookie.creationTime),
+                        ts_last_accessed=from_unix_us(cookie.lastAccessed),
+                        browser="Firefox",
+                        name=cookie.name,
+                        value=cookie.value,
+                        host=cookie.host,
+                        path=cookie.path,
+                        expiry=cookie.expiry,
+                        is_secure=bool(cookie.isSecure),
+                        is_http_only=bool(cookie.isHttpOnly),
+                        same_site=bool(cookie.sameSite),
+                        _user=user,
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
+
     @export(record=BrowserDownloadRecord)
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from Firefox.
 
         Yields BrowserDownloadRecord with the following fields:
-            hostname (string): The target hostname.
-            domain (string): The target domain.
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
@@ -197,12 +241,9 @@ class FirefoxPlugin(BrowserPlugin):
                         state = content.get("state")
 
                     dest_file_info = annotation.get("downloads/destinationFileURI", {})
-                    download_path = dest_file_info.get("content")
 
-                    if download_path and self.target.os == "windows":
-                        download_path = path.from_windows(download_path)
-                    elif download_path:
-                        download_path = path.from_posix(download_path)
+                    if download_path := dest_file_info.get("content"):
+                        download_path = self.target.fs.path(download_path)
 
                     place = places.get(place_id)
                     url = place.get("url")
@@ -222,4 +263,5 @@ class FirefoxPlugin(BrowserPlugin):
                         _user=user,
                     )
             except SQLError as e:
+                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)

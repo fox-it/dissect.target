@@ -20,7 +20,7 @@ from dissect.target.helpers import fsutil
 
 
 class NtfsFilesystem(Filesystem):
-    __fstype__ = "ntfs"
+    __type__ = "ntfs"
 
     def __init__(
         self,

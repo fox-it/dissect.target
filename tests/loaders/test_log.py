@@ -1,8 +1,8 @@
 import io
-import platform
 from urllib.parse import urlparse
 
 import pytest
+from flow.record.fieldtypes import path as flow_path
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
@@ -17,14 +17,11 @@ from dissect.target.loaders.log import LogLoader
         ("/source/iis.log", "log:///dir/with/files/*.log?hint=iis", "/source/iis.log", "/sysvol/files/logs/iis.log"),
     ],
 )
-@pytest.mark.skipif(
-    platform.system() == "Windows", reason="Assertion fails because of Unix-specific path. Needs to be fixed."
-)
-def test_log_loader(path: str, uri: str, input_file: str, expected_mapping: str) -> None:
+def test_log_loader(target_default: Target, path: str, uri: str, input_file: str, expected_mapping: str) -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh(input_file, io.BytesIO(b"\x00"))
-    target = Target()
     log_loader = LogLoader(vfs.path(path), parsed_path=urlparse(uri))
-    log_loader.map(target)
-    observed_mapping = next(target.filesystems[0].path("/").rglob("*.*"))
-    assert str(expected_mapping) == str(observed_mapping)
+    log_loader.map(target_default)
+    # TODO: RGLOB does not take into account the seperator of the target, so maybe an issue with the flavour?
+    observed_mapping = next(target_default.fs.path("/").rglob("*.*"))
+    assert expected_mapping == flow_path(observed_mapping)

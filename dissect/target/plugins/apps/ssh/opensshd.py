@@ -3,8 +3,9 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Union
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
+from dissect.target.plugins.apps.ssh.ssh import SSHPlugin
 
 if TYPE_CHECKING:
     from dissect.target.plugins.general.config import ConfigurationTreePlugin
@@ -72,8 +73,8 @@ SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS = (
 )
 
 
-class SSHServerPlugin(Plugin):
-    __namespace__ = "sshd"
+class SSHServerPlugin(SSHPlugin):
+    __namespace__ = "opensshd"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -128,45 +129,46 @@ class SSHServerPlugin(Plugin):
         config = {}
         for key, value in sshd_config.items():
             if isinstance(value, dict):
-                # A match statment, ignore for now
+                # A match statement, ignore for now
                 continue
-            _type, value = self._determine_type_and_value(key, value)
+            _type, _value = _determine_type_and_value(key, value)
 
-            config[key] = value
+            config[key] = _value
             record_fields.append((_type, key))
 
         yield TargetRecordDescriptor("application/openssh/sshd_config", record_fields)(
             mtime=self.sshd_config_path.stat().st_mtime, source=self.sshd_config_path, **config, _target=self.target
         )
 
-    def _determine_type_and_value(self, key: str, value: str) -> tuple[str, Any]:
+
+def _determine_type_and_value(key: str, value: str) -> tuple[str, Any]:
+    _type = "string"
+    _value = value
+
+    _unpack = None
+    if key in SSHD_INTEGER_FIELDS:
+        _type = "varint"
+        _unpack = int
+    elif key in SSHD_BOOLEAN_FIELDS and _value.lower() in SSHD_BOOLEAN_VALUES:
+        _type = "boolean"
+        _unpack = _convert_bool
+    else:
         _type = "string"
-        _value = value
 
-        _unpack = None
-        if key in SSHD_INTEGER_FIELDS:
-            _type = "varint"
-            _unpack = int
-        elif key in SSHD_BOOLEAN_FIELDS and _value.lower() in SSHD_BOOLEAN_VALUES:
-            _type = "boolean"
-            _unpack = _convert_bool
-        else:
-            _type = "string"
+    if multiple_fields := (key in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS):
+        _value = _value if isinstance(_value, list) else [_value]
 
-        if multiple_fields := (key in SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS):
-            _value = _value if isinstance(_value, list) else [value]
+    try:
+        _value = _convert_function(_value, _unpack)
+    except Exception:
+        # Something went wrong, restore default type
+        _type = "string"
 
-        try:
-            _value = _convert_function(value, _unpack)
-        except Exception:
-            # Something went wrong, restore default type
-            _type = "string"
+    if multiple_fields:
+        # The type can still be a list, so in that case, we append `[]`
+        _type = f"{_type}[]"
 
-        if multiple_fields:
-            # The type can still be a list, so in that case, we append `[]`
-            _type = f"{_type}[]"
-
-        return _type, _value
+    return _type, _value
 
 
 def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]) -> Union[list[Any], Any]:
