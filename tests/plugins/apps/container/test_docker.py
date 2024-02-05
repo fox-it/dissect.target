@@ -76,10 +76,10 @@ def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
     assert len(results) == 288
 
     # json log driver
-    assert results[40].ts == datetime.datetime(2023, 11, 9, 8, 43, 42, 321404, tzinfo=datetime.timezone.utc)
-    assert results[40].container == "f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
-    assert results[40].stream == "stdout"
-    assert results[40].message == '~ # echo \'[BS]"ths [BS][BS]s [BS][BS]is is a secret!" > secret.txt'
+    assert results[0].ts == datetime.datetime(2023, 11, 9, 8, 42, 57, 79838, tzinfo=datetime.timezone.utc)
+    assert results[0].container == "f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
+    assert results[0].stream == "stdout"
+    assert results[0].message == '/ # '
 
     # local log driver (protobuf)
     assert results[-1].ts == datetime.datetime(2023, 11, 9, 9, 52, 52, 587579, tzinfo=datetime.timezone.utc)
