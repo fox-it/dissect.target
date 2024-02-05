@@ -1,5 +1,5 @@
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.locate.plocate import PLocateFileParser
+from dissect.target.helpers.locate.plocate import PLocateFile
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
@@ -14,8 +14,8 @@ except ImportError:
 PLocateRecord = TargetRecordDescriptor(
     "linux/locate/plocate",
     [
-        ("string", "path"),
-        ("string", "source"),
+        ("path", "path"),
+        ("path", "source"),
     ],
 )
 
@@ -30,7 +30,9 @@ class PLocatePlugin(BaseLocatePlugin):
             raise UnsupportedPluginError(f"No plocate.db file found at {self.path}")
 
         if not HAS_ZSTD:
-            raise RuntimeError("Please install `python-zstandard` or `pip install zstandard` to use the PLocatePlugin")
+            raise UnsupportedPluginError(
+                "Please install `python-zstandard` or `pip install zstandard` to use the PLocatePlugin"
+            )
 
     @export(record=PLocateRecord)
     def locate(self) -> PLocateRecord:
@@ -43,8 +45,11 @@ class PLocatePlugin(BaseLocatePlugin):
             - https://manpages.debian.org/testing/plocate/plocate.1.en.html
             - https://git.sesse.net/?p=plocate
         """
-        plocate_fh = self.target.fs.path(self.path).open()
-        plocate_file = PLocateFileParser(plocate_fh)
+        plocate = self.target.fs.path(self.path)
+        plocate_file = PLocateFile(plocate.open())
 
-        for path in plocate_file.paths():
-            yield PLocateRecord(path=path, source=self.path)
+        for path in plocate_file:
+            yield PLocateRecord(
+                path=self.target.fs.path(path),
+                source=self.path,
+            )

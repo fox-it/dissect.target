@@ -1,7 +1,7 @@
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.locate.gnulocate import (
     GNULocatePlugin,
-    LocateRecord,
+    GNULocateRecord,
 )
 from dissect.target.target import Target
 from tests._utils import absolute_path
@@ -14,7 +14,7 @@ def test_gnulocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     records = list(target_unix.gnulocate.locate())
 
     assert len(records) == 3575
-    assert isinstance(records[0], type(LocateRecord()))
+    assert isinstance(records[0], type(GNULocateRecord()))
 
     assert records[0].path == "/"
     assert records[1].path == "/.dockerenv"
@@ -23,7 +23,7 @@ def test_gnulocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     records = list(target_unix.locate.locate())
 
     assert len(records) == 3575
-    assert isinstance(records[0], type(LocateRecord()))
+    assert isinstance(records[0], type(GNULocateRecord()))
 
     assert records[0].path == "/"
     assert records[1].path == "/.dockerenv"

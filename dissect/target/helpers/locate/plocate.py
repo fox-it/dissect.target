@@ -1,7 +1,10 @@
-from typing import IO, Iterator
+from __future__ import annotations
+
+from typing import BinaryIO, Iterable
 
 import zstandard
 from dissect.cstruct import cstruct
+from dissect.util.stream import RangeStream
 
 # Resource: https://git.sesse.net/?p=plocate @ db.h
 plocate_def = """
@@ -41,7 +44,7 @@ c_plocate = cstruct()
 c_plocate.load(plocate_def)
 
 
-class PLocateFileParser:
+class PLocateFile:
     """plocate file parser
 
     The ``plocate.db`` file contains a hashtable and trigrams to enable quick lookups of filenames.
@@ -69,35 +72,27 @@ class PLocateFileParser:
     TRIGRAM_SIZE_BYTES = 16
     DOCID_SIZE_BYTES = 8
 
-    def __init__(self, file_handler: IO):
-        self.fh = file_handler
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
 
         magic = int.from_bytes(self.fh.read(8), byteorder="big")
         if magic != c_plocate.MAGIC:
-            raise ValueError("is not a valid plocate file")
+            raise ValueError(f"Invalid plocate file magic. Expected b'/x00plocate', got {magic}")
 
         self.header = c_plocate.header(self.fh)
+        self.dict_data = None
 
-    def paths(self) -> Iterator[str]:
-        """
-        A zstd compressed blob with null byte separated paths is located after the file header.
-        The compression was done either with or without a dictionary. This is specified by the
-        zstd_dictionary_length_bytes / zstd_dictionary_offset_bytes values in the header. If there is no dictionary,
-        they are both 0.
-        """
-        self.fh.seek(self.HEADER_SIZE)
-        if self.header.zstd_dictionary_offset_bytes == 0:
-            dict_data = None
-        else:
-            dict_data = zstandard.ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
+        if self.header.zstd_dictionary_offset_bytes:
+            self.dict_data = zstandard.ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
 
-        compressed_length_bytes = (
+        self.compressed_length_bytes = (
             self.header.filename_index_offset_bytes - self.HEADER_SIZE - self.header.zstd_dictionary_length_bytes
         )
-        compressed_buf = self.fh.read(compressed_length_bytes)
-        ctx = zstandard.ZstdDecompressor(dict_data=dict_data)
+        self.ctx = zstandard.ZstdDecompressor(dict_data=self.dict_data)
+        self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
 
-        with ctx.stream_reader(compressed_buf) as reader:
+    def __iter__(self) -> Iterable[PLocateFile]:
+        with self.ctx.stream_reader(self.buf) as reader:
             while True:
                 try:
                     file = c_plocate.file(reader)
@@ -106,12 +101,14 @@ class PLocateFileParser:
                     return
 
     def filename_index(self) -> bytes:
+        """Return the filename index of the plocate.db file."""
         self.fh.seek(self.header.filename_index_offset_bytes)
         num_docids = self.header.num_docids
         filename_index_size = num_docids * self.DOCID_SIZE_BYTES
         return self.fh.read(filename_index_size)
 
     def hashtable(self) -> bytes:
+        """Return the hashtable of the plocate.db file."""
         self.fh.seek(self.header.hash_table_offset_bytes)
         hashtable_size = (self.header.hashtable_size + self.NUM_OVERFLOW_SLOTS + 1) * self.TRIGRAM_SIZE_BYTES
         return self.fh.read(hashtable_size)

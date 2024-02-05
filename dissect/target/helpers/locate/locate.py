@@ -1,20 +1,23 @@
-from typing import IO, Iterator
+from __future__ import annotations
+
+from typing import BinaryIO, Iterable
 
 from dissect.cstruct import cstruct
 
-locate_def = """
+gnulocate_def = """
 #define MAGIC 0x004c4f43415445303200             /* b'/x00LOCATE02/x00' */
 
-struct file {
-    char path_ending[];
+struct entry {
+    int8 offset;
+    char path[];
 }
 """
 
-c_locate = cstruct()
-c_locate.load(locate_def)
+c_gnulocate = cstruct()
+c_gnulocate.load(gnulocate_def)
 
 
-class LocateFileParser:
+class GNULocateFile:
     """locate file parser
 
     Multiple formats exist for the locatedb file. This class only supports the most recent version ``LOCATE02``.
@@ -26,28 +29,28 @@ class LocateFileParser:
         - https://manpages.ubuntu.com/manpages/trusty/en/man5/locatedb.5.html
     """
 
-    def __init__(self, file_handler: IO):
-        self.fh = file_handler
-        self.fh.seek(0)
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
+        self.count = 0
+        self.previous_path = ""
 
         magic = int.from_bytes(self.fh.read(10), byteorder="big")
-        if magic != c_locate.MAGIC:
-            raise ValueError("is not a valid locate file")
+        if magic != c_gnulocate.MAGIC:
+            raise ValueError(f"Invalid Locate file magic. Expected /x00LOCATE02/x00, got {magic}")
 
-    def __iter__(self) -> Iterator[str]:
-        count = 0
-        previous_path = ""
-
+    def __iter__(self) -> Iterable[GNULocateFile]:
         try:
             while True:
-                # NOTE: The offset could be negative, which indicates that we
-                # decrease the number of characters of the previous path.
-                offset = int.from_bytes(self.fh.read(1), byteorder="big", signed=True)
-                count += offset
+                # NOTE: The offset could be negative, which indicates
+                # that we decrease the number of characters of the previous path.
+                entry = c_gnulocate.entry(self.fh)
+                current_filepath_end = entry.path.decode(errors="backslashreplace")
+                offset = entry.offset
 
-                current_filepath_end = c_locate.file(self.fh).path_ending.decode()
-                path = previous_path[0:count] + current_filepath_end
+                self.count += offset
+
+                path = self.previous_path[0 : self.count] + current_filepath_end
+                self.previous_path = path
                 yield path
-                previous_path = path
         except EOFError:
             return

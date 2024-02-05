@@ -1,37 +1,22 @@
-from typing import Iterator, Union
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.locate.mlocate import (
-    MLocateDirectory,
-    MLocateEntry,
-    MLocateFileParser,
-)
+from dissect.target.helpers.locate.mlocate import MLocateFile
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
 
-MLocateDirectoryRecord = TargetRecordDescriptor(
-    "linux/locate/mlocate_directory",
+MLocateRecord = TargetRecordDescriptor(
+    "linux/locate/mlocate",
     [
         ("datetime", "ts"),
-        ("string", "path"),
-        ("string", "source"),
-    ],
-)
-
-MLocateEntryRecord = TargetRecordDescriptor(
-    "linux/locate/mlocate_entry",
-    [
-        ("string", "path"),
+        ("varint", "ts_ns"),
+        ("path", "parent"),
+        ("path", "path"),
         ("string", "type"),
         ("string", "source"),
     ],
 )
-
-MLocateRecord = Union[
-    MLocateEntryRecord,
-    MLocateDirectoryRecord,
-]
 
 
 class MLocatePlugin(BaseLocatePlugin):
@@ -54,10 +39,15 @@ class MLocatePlugin(BaseLocatePlugin):
             - https://manpages.debian.org/testing/mlocate/mlocate.db.5.en.html
         """
         mlocate_fh = self.target.fs.path(self.path).open()
-        mlocate_file = MLocateFileParser(mlocate_fh)
+        mlocate_file = MLocateFile(mlocate_fh)
 
         for item in mlocate_file:
-            if isinstance(item, MLocateDirectory):
-                yield MLocateDirectoryRecord(ts=item.ts, path=item.path, source=self.path, _target=self.target)
-            elif isinstance(item, MLocateEntry):
-                yield MLocateEntryRecord(path=item.path, type=item.dbe_type, source=self.path, _target=self.target)
+            yield MLocateRecord(
+                ts=item.ts,
+                ts_ns=item.ts_ns,
+                parent=self.target.fs.path(item.parent),
+                path=self.target.fs.path(item.path),
+                type=item.dbe_type,
+                source=self.path,
+                _target=self.target,
+            )

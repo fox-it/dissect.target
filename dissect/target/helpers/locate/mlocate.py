@@ -1,5 +1,9 @@
-import os.path
-from typing import IO, Iterator, Union
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import BinaryIO, Iterable, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import from_unix
@@ -24,7 +28,7 @@ enum DBE_TYPE: uint8 {                       /* database entry type */
     END          = 0x2                       /* end of directory */
 };
 
-struct directory {
+struct directory_entry {
     /* time is the 'maximum of st_ctime and
        st_mtime of the directory' according to docs */
     int64 time_seconds;
@@ -42,55 +46,53 @@ c_mlocate = cstruct(endian=">")
 c_mlocate.load(mlocate_def)
 
 
-class MLocateDirectory:
-    def __init__(self, time_seconds, path):
-        self.ts = from_unix(time_seconds)
-        self.path = path
+@dataclass
+class MLocate:
+    ts: datetime
+    ts_ns: int
+    parent: str
+    path: Path
+    dbe_type: str
 
 
-class MLocateEntry:
-    def __init__(self, path, dbe_type):
-        self.path = path
-        self.dbe_type = dbe_type
-
-
-class MLocateFileParser:
+class MLocateFile:
     """mlocate file parser
 
     Resources:
         - https://manpages.debian.org/testing/mlocate/mlocate.db.5.en.html
     """
 
-    def __init__(self, file_handler: IO):
-        self.fh = file_handler
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
 
         magic = int.from_bytes(self.fh.read(8), byteorder="big")
         if magic != c_mlocate.MAGIC:
-            raise ValueError("is not a valid mlocate file")
+            raise ValueError(f"Invalid mlocate file magic. Expected b'x00mlocate', got {magic}")
 
         self.header = c_mlocate.header_config(self.fh)
 
-    def _parse_directory_entries(self) -> Iterator:
-        while True:
-            dbe_type = c_mlocate.DBE_TYPE(self.fh)
-            if dbe_type == c_mlocate.DBE_TYPE.END:
-                break
-
+    def _parse_directory_entries(self) -> Iterator[str, c_mlocate.entry]:
+        while (dbe_type := c_mlocate.DBE_TYPE(self.fh)) != c_mlocate.DBE_TYPE.END:
             entry = c_mlocate.entry(self.fh)
             dbe_type = "file" if dbe_type == c_mlocate.DBE_TYPE.FILE else "directory"
+
             yield dbe_type, entry
 
-    def __iter__(self) -> Iterator[Union[MLocateEntry, MLocateEntry]]:
+    def __iter__(self) -> Iterable[MLocateFile]:
         while True:
             try:
-                directory = c_mlocate.directory(self.fh)
-                directory_path = directory.path.decode()
+                directory_entry = c_mlocate.directory_entry(self.fh)
+                parent = Path(directory_entry.path.decode())
+
+                for dbe_type, file_entry in self._parse_directory_entries():
+                    file_path = file_entry.path.decode()
+
+                    yield MLocate(
+                        ts=from_unix(directory_entry.time_seconds),
+                        ts_ns=directory_entry.time_nanoseconds,
+                        parent=parent,
+                        path=parent.joinpath(file_path),
+                        dbe_type=dbe_type,
+                    )
             except EOFError:
-                self.fh.close()
                 return
-
-            yield MLocateDirectory(time_seconds=directory.time_seconds, path=directory.path)
-
-            for dbe_type, entry in self._parse_directory_entries():
-                entry = entry.path.decode()
-                yield MLocateEntry(path=os.path.join(directory_path, entry), dbe_type=dbe_type)
