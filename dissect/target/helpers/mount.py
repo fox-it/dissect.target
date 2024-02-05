@@ -1,11 +1,25 @@
 import errno
 import logging
+from ctypes import c_void_p
 from functools import lru_cache
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator, Optional
 
-from fuse import FuseOSError, Operations
+from dissect.util.feature import Feature, feature_enabled
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
+
+HAS_FUSE3 = False
+if feature_enabled(Feature.BETA):
+    from fuse3 import FuseOSError, Operations
+    from fuse3.c_fuse import fuse_config_p, fuse_conn_info_p
+
+    HAS_FUSE3 = True
+else:
+    from fuse import FuseOSError, Operations
+
+    fuse_config_p = c_void_p
+    fuse_conn_info_p = c_void_p
+
 
 log = logging.getLogger(__name__)
 
@@ -27,15 +41,32 @@ class DissectMount(Operations):
         except Exception:
             raise FuseOSError(errno.ENOENT)
 
+    def init(self, path: str, conn: Optional[fuse_conn_info_p] = None, cfg: Optional[fuse_config_p] = None) -> None:
+        if cfg:
+            # Enables the use of inodes in getattr
+            cfg.contents.use_ino = 1
+
     def getattr(self, path: str, fh: Optional[int] = None) -> dict:
         fe = self._get(path)
 
         try:
             st = fe.lstat()
+
             return dict(
                 (key, getattr(st, key))
-                for key in ("st_atime", "st_ctime", "st_gid", "st_mode", "st_mtime", "st_nlink", "st_size", "st_uid")
+                for key in (
+                    "st_atime",
+                    "st_ctime",
+                    "st_ino",
+                    "st_gid",
+                    "st_mode",
+                    "st_mtime",
+                    "st_nlink",
+                    "st_size",
+                    "st_uid",
+                )
             )
+
         except Exception:
             raise FuseOSError(errno.EIO)
 
@@ -75,7 +106,7 @@ class DissectMount(Operations):
             log.exception("Exception in fuse::read")
             raise FuseOSError(errno.EIO)
 
-    def readdir(self, path: str, fh: int):
+    def readdir(self, path: str, fh: int, flags: int = 0) -> Iterator[str]:
         if fh not in self.dir_handles:
             raise FuseOSError(errno.EBADFD)
 
@@ -100,7 +131,19 @@ class DissectMount(Operations):
             raise FuseOSError(errno.EIO)
 
     def release(self, path: str, fh: int) -> int:
+        if file := self.file_handles.get(fh):
+            file.close()
+
         del self.file_handles[fh]
+        return 0
 
     def releasedir(self, path: str, fh: int) -> int:
         del self.dir_handles[fh]
+        return 0
+
+    if HAS_FUSE3:
+        # Define the fuse3 bindings here
+
+        def lseek(self, path: str, off: int, whence: int, fh: int) -> int:
+            if file := self.file_handles.get(fh):
+                return file.seek(off, whence)

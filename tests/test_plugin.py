@@ -2,7 +2,7 @@ import os
 from functools import reduce
 from pathlib import Path
 from typing import Optional
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from flow.record import Record
@@ -82,9 +82,9 @@ class MockOSWarpPlugin(OSPlugin):
 @patch(
     "dissect.target.plugin.plugins",
     return_value=[
-        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "cls": MagicMock},
-        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "cls": MagicMock},
-        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "cls": MockOSWarpPlugin},
+        {"module": "test.x13", "exports": ["f3"], "namespace": "Warp", "class": "x13", "is_osplugin": False},
+        {"module": "os", "exports": ["f3"], "namespace": None, "class": "f3", "is_osplugin": False},
+        {"module": "os.warp._os", "exports": ["f6"], "namespace": None, "class": "warp", "is_osplugin": True},
     ],
 )
 @patch("dissect.target.Target", create=True)
@@ -266,33 +266,33 @@ def test_incompatible_plugin(target_bare: Target) -> None:
 
 MOCK_PLUGINS = {
     "apps": {  # Plugin descriptors in this branch should be returned for any osfilter
-        "mail": {"functions": "mail"},
+        "mail": {"module": "apps.mail", "functions": "mail"},
     },
     "os": {
         # The OSPlugin for Generic OS, plugins in this branch should only be
         # returned when the osfilter starts with "os." or is None.
         # The _os plugin itself should only be returned if special_keys
         # contains the "_os" key.
-        "_os": {"functions": "GenericOS"},
+        "_os": {"module": "os._os", "functions": "GenericOS"},
         "apps": {
-            "app1": {"functions": "app1"},
-            "app2": {"functions": "app2"},
+            "app1": {"module": "os.apps.app1", "functions": "app1"},
+            "app2": {"module": "os.apps.app2", "functions": "app2"},
         },
         "fooos": {
             # The OSPlugin for FooOS, plugins in this branch should only be
             # returned when the osfilter is "os.fooos" or "os.fooos._os" or
             # None.
-            "_os": {"functions": "FooOS"},
-            "foobar": {"functions": "foobar"},
+            "_os": {"module": "os.foos._os", "functions": "FooOS"},
+            "foobar": {"module": "os.foos.foobar", "functions": "foobar"},
             # The plugins under _misc should only be returned if special_keys
             # contains the "_misc" key.
             "_misc": {
-                "bar": {"functions": "bar"},
-                "tender": {"functions": "tender"},
+                "bar": {"module": "os.foos._misc.bar", "functions": "bar"},
+                "tender": {"module": "os.foos._misc.tender", "functions": "tender"},
             },
             "apps": {
-                "foo_app": {"functions": "foo_app"},
-                "bar_app": {"functions": "bar_app"},
+                "foo_app": {"module": "os.foos.apps.foo_app", "functions": "foo_app"},
+                "bar_app": {"module": "os.foos.apps.bar_app", "functions": "bar_app"},
             },
         },
     },

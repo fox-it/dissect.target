@@ -12,7 +12,7 @@ from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixBsdPlugin
+from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
@@ -256,6 +256,7 @@ def target_win(tmp_path: pathlib.Path, hive_hklm: VirtualHive, fs_win: Filesyste
         hive_hklm,
         TargetPath(mock_target.fs, ""),
     )
+    mock_target.fs.mount("c:", fs_win)
 
     mock_target.apply()
 
@@ -301,11 +302,15 @@ def target_osx(tmp_path: pathlib.Path, fs_osx: Filesystem) -> Iterator[Target]:
 
 
 @pytest.fixture
-def target_citrix(tmp_path: pathlib.Path, fs_bsd: Filesystem) -> Iterator[Target]:
-    mock_target = make_os_target(tmp_path, CitrixBsdPlugin, root_fs=fs_bsd, apply_target=False)
+def target_citrix(tmp_path: pathlib.Path, fs_bsd: VirtualFilesystem) -> Target:
+    mock_target = next(make_mock_target(tmp_path))
+    mock_target._os_plugin = CitrixPlugin
+
+    mock_target.filesystems.add(fs_bsd)
 
     var_filesystem = VirtualFilesystem()
     var_filesystem.makedirs("/netscaler")
+    var_filesystem.makedirs("/log")
     mock_target.filesystems.add(var_filesystem)
 
     flash_filesystem = VirtualFilesystem()

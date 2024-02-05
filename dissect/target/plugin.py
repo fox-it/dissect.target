@@ -64,7 +64,7 @@ class OperatingSystem(StrEnum):
     ANDROID = "android"
     VYOS = "vyos"
     IOS = "ios"
-    FORTIGATE = "fortigate"
+    FORTIOS = "fortios"
     CITRIX = "citrix-netscaler"
 
 
@@ -495,7 +495,7 @@ def register(plugincls: Type[Plugin]) -> None:
     root["exports"] = plugincls.__exports__
     root["namespace"] = plugincls.__namespace__
     root["fullname"] = ".".join((plugincls.__module__, plugincls.__qualname__))
-    root["cls"] = plugincls
+    root["is_osplugin"] = issubclass(plugincls, OSPlugin)
 
 
 def internal(*args, **kwargs) -> Callable:
@@ -683,10 +683,14 @@ def plugins(
                             prev_module_path=module_path,
                         )
 
-    yield from _walk(
-        _get_plugins(),
-        special_keys=special_keys,
-        only_special_keys=only_special_keys,
+    yield from sorted(
+        _walk(
+            _get_plugins(),
+            special_keys=special_keys,
+            only_special_keys=only_special_keys,
+        ),
+        key=lambda plugin: len(plugin["module"]),
+        reverse=True,
     )
 
 
@@ -1119,7 +1123,7 @@ def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDes
             available["exports"].remove("get_all_records")
 
         for exported in available["exports"]:
-            if issubclass(available["cls"], OSPlugin) and os_type == general.default.DefaultPlugin:
+            if available["is_osplugin"] and os_type == general.default.DefaultPlugin:
                 # This makes the os plugin exports listed under the special
                 # "OS plugins" header by the 'plugins' plugin.
                 available["module"] = ""
