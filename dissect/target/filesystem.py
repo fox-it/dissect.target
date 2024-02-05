@@ -5,20 +5,10 @@ import io
 import logging
 import os
 import pathlib
-import posixpath
 import stat
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    BinaryIO,
-    Callable,
-    Iterator,
-    Optional,
-    Type,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Iterator, Optional, Type
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -53,7 +43,7 @@ class Filesystem:
 
     def __init__(
         self,
-        volume: Optional[Union[BinaryIO, list[BinaryIO]]] = None,
+        volume: Optional[BinaryIO | list[BinaryIO]] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:
@@ -490,7 +480,7 @@ class Filesystem:
         """
         return self.get(path).sha256()
 
-    def hash(self, path: str, algos: Optional[Union[list[str], list[Callable]]] = None) -> tuple[str]:
+    def hash(self, path: str, algos: Optional[list[str] | list[Callable]] = None) -> tuple[str]:
         """Calculate the digest of the contents of ``path``, using the ``algos`` algorithms.
 
         Args:
@@ -826,7 +816,7 @@ class FilesystemEntry:
         """
         return hashutil.sha256(self.open())
 
-    def hash(self, algos: Optional[Union[list[str], list[Callable]]] = None) -> tuple[str]:
+    def hash(self, algos: Optional[list[str] | list[Callable]] = None) -> tuple[str]:
         """Calculate the digest of this entry, using the ``algos`` algorithms.
 
         Args:
@@ -1242,7 +1232,7 @@ class VirtualFilesystem(Filesystem):
             entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
             directory.add(entry_name, entry)
 
-    def map_dir_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path], custom_path: bool = False) -> None:
+    def map_dir_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, map_single_file: bool = False) -> None:
         """Map files in a tar onto the VFS."""
 
         if not isinstance(tar_file, pathlib.Path):
@@ -1254,19 +1244,21 @@ class VirtualFilesystem(Filesystem):
         vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
         tfs = TarFilesystem(tar_file.open("rb"))
 
-        if custom_path:
+        if map_single_file:
+            # We map the first file we find in the tar to the provided vfspath.
             for file in [f[0] for _, _, f in tfs.walk_ext("/") if f]:
-                file.name = posixpath.basename(vfspath)
+                file.name = fsutil.basename(vfspath)
                 self.map_file_entry(vfspath, file)
-                break
+                return
 
         self.mount(vfspath, tfs)
 
-    def map_file_from_tar(self, vfspath: str, tar_file: Union[str, pathlib.Path]) -> None:
+    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path) -> None:
         """Map a single file in a tar archive to the given path in the VFS.
 
-        The provided tar archive should contain *one* file."""
-        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, custom_path=True)
+        The provided tar archive should contain *one* file.
+        """
+        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True)
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location.
