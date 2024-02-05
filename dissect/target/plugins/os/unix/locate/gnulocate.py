@@ -1,5 +1,5 @@
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.locate.locate import GNULocateFile
+from dissect.target.helpers.locate.gnulocate import GNULocateFile
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
