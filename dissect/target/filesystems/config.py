@@ -120,9 +120,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
         try:
             config_parser = parse(entry, *args, **kwargs)
             entry = ConfigurationEntry(self, entry.path, entry, config_parser)
-        except ConfigurationParsingError:
+        except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
-            log.debug("Error when parsing %s", entry.path)
+            log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
         return entry
 

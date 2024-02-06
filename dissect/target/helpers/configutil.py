@@ -21,12 +21,18 @@ from typing import (
     Union,
 )
 
-import yaml
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
+
+try:
+    import yaml
+
+    PY_YAML = True
+except (AttributeError, ImportError):
+    PY_YAML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -153,7 +159,7 @@ class ConfigurationParser:
         try:
             self.parse_file(fh)
         except Exception as e:
-            raise ConfigurationParsingError from e
+            raise ConfigurationParsingError(*e.args) from e
 
         if self.collapse_all or self.collapse:
             self.parsed_data = self._collapse_dict(self.parsed_data)
@@ -399,8 +405,11 @@ class Yaml(ConfigurationParser):
     """Parses a Yaml file."""
 
     def parse_file(self, fh: TextIO) -> None:
-        parsed_data = yaml.load(fh, yaml.BaseLoader)
-        self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+        if PY_YAML:
+            parsed_data = yaml.load(fh, yaml.BaseLoader)
+            self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+        else:
+            raise ConfigurationParsingError("Failed to parse file, please install PyYAML.")
 
 
 class ScopeManager:
