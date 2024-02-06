@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
@@ -20,6 +21,7 @@ from typing import (
     Union,
 )
 
+import yaml
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
@@ -329,6 +331,78 @@ class Xml(ConfigurationParser):
         self.parsed_data = tree
 
 
+class ListUnwrapper:
+    """Provides utility functions to unwrap dictionary objects out of lists."""
+
+    @staticmethod
+    def unwrap(data: dict | list) -> dict | list:
+        """Transforms a list with dictionaries to a dictionary.
+
+        The oprder of the list is preserved. And if no dictionary
+        is found, the list remains untouched::
+
+            ["value1", "value2"]    -> ["value1", "value2"]
+
+            {"data": "value"}       -> {"data": "value"}
+
+            [{"data": "value"}]     -> {
+                                           "list_item0": {
+                                                "data": "value"
+                                           }
+                                       }
+        """
+        orig = ListUnwrapper._unwrap_value(data)
+        return ListUnwrapper._unwrap_dict(orig)
+
+    @staticmethod
+    def _unwrap_dict(data: dict | list) -> dict | list:
+        """Looks for dictionaries and unwrap its values."""
+
+        if not isinstance(data, dict):
+            return data
+
+        root = dict()
+        for key, value in data.items():
+            _value = ListUnwrapper._unwrap_value(value)
+            if isinstance(_value, dict):
+                _value = ListUnwrapper._unwrap_dict(_value)
+            root[key] = _value
+
+        return root
+
+    @staticmethod
+    def _unwrap_value(data: list | dict) -> dict | list:
+        """Unwraps a list containing dictionaries."""
+        if not isinstance(data, list):
+            return data
+
+        if not any(isinstance(obj, dict) for obj in data):
+            return data
+
+        return_value = {}
+
+        for idx, elem in enumerate(data):
+            return_value[f"list_item{idx}"] = elem
+
+        return return_value
+
+
+class Json(ConfigurationParser):
+    """Parses a JSON file."""
+
+    def parse_file(self, fh: TextIO):
+        parsed_data = json.load(fh)
+        self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+
+
+class Yaml(ConfigurationParser):
+    """Parses a Yaml file."""
+
+    def parse_file(self, fh: TextIO) -> None:
+        parsed_data = yaml.load(fh, yaml.BaseLoader)
+        self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+
+
 class ScopeManager:
     """A (context)manager for dictionary scoping.
 
@@ -609,7 +683,9 @@ MATCH_MAP: dict[str, ParserConfig] = {
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
     "xml": ParserConfig(Xml),
-    "json": ParserConfig(Txt),
+    "json": ParserConfig(Json),
+    "yml": ParserConfig(Yaml),
+    "yaml": ParserConfig(Yaml),
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
     "sample": ParserConfig(Txt),
