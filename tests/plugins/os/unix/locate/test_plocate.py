@@ -13,5 +13,5 @@ def test_plocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(records) == 3481
     assert isinstance(records[0], type(PLocateRecord()))
 
-    assert records[0].path == "/.dockerenv"
-    assert records[1].path == "/bin"
+    assert records[0].path.as_posix() == "/.dockerenv"
+    assert records[1].path.as_posix() == "/bin"
