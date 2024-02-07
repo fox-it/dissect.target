@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.locate.plocate import PLocatePlugin, PLocateRecord
 from dissect.target.target import Target
@@ -13,5 +15,5 @@ def test_plocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(records) == 3481
     assert isinstance(records[0], type(PLocateRecord()))
 
-    assert records[0].path.as_posix() == "/.dockerenv"
-    assert records[1].path.as_posix() == "/bin"
+    assert Path(records[0].path).as_posix() == "/.dockerenv"
+    assert Path(records[1].path).as_posix() == "/bin"
