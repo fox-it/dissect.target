@@ -16,8 +16,8 @@ def test_gnulocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(records) == 3575
     assert isinstance(records[0], type(GNULocateRecord()))
 
-    assert records[0].path == "/"
-    assert records[1].path == "/.dockerenv"
+    assert records[0].path.as_posix() == "/"
+    assert records[1].path.as_posix() == "/.dockerenv"
 
     # test namespace plugin
     records = list(target_unix.locate.locate())
@@ -25,5 +25,5 @@ def test_gnulocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(records) == 3575
     assert isinstance(records[0], type(GNULocateRecord()))
 
-    assert records[0].path == "/"
-    assert records[1].path == "/.dockerenv"
+    assert records[0].path.as_posix() == "/"
+    assert records[1].path.as_posix() == "/.dockerenv"
