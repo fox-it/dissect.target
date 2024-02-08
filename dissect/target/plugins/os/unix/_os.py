@@ -222,6 +222,9 @@ class UnixPlugin(OSPlugin):
                         # but instead a volume_id which is not case-sensitive
                         fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
 
+                if fs.__type__ == "ext":
+                    fs_volume_name = fs.extfs.volume_name
+
                 if (
                     (fs_id and (fs_id == dev_id and (subvol == fs_subvol or subvolid == fs_subvolid)))
                     or (fs_volume_name and (fs_volume_name == volume_name))
@@ -353,6 +356,8 @@ def parse_fstab(
             volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
             dev_id = dev.split("=")[1]
+        elif dev.startswith("LABEL="):
+            volume_name = dev.split("=")[1]
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue
