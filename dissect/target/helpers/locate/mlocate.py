@@ -50,7 +50,7 @@ class MLocate:
     ts: datetime
     ts_ns: int
     parent: str
-    path: Path
+    path: str
     dbe_type: str
 
 
