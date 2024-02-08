@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from pathlib import Path
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.locate.mlocate import MLocatePlugin, MLocateRecord
@@ -16,25 +15,25 @@ def test_mlocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     root_directory = records[0]
     assert isinstance(root_directory, type(MLocateRecord()))
-    assert Path(root_directory.parent).as_posix() == "/"
-    assert Path(root_directory.path).as_posix() == "/.dockerenv"
+    assert root_directory.parent.as_posix() == "/"
+    assert root_directory.path.as_posix() == "/.dockerenv"
     assert root_directory.ts == datetime(1970, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
     entry = records[1]
     assert isinstance(entry, type(MLocateRecord()))
-    assert Path(entry.parent).as_posix() == "/"
-    assert Path(entry.path).as_posix() == "/bin"
+    assert entry.parent.as_posix() == "/"
+    assert entry.path.as_posix() == "/bin"
     assert entry.type == "file"  # symlink
 
     entry = records[2]
     assert isinstance(entry, type(MLocateRecord()))
-    assert Path(entry.parent).as_posix() == "/"
-    assert Path(entry.path).as_posix() == "/boot"
+    assert entry.parent.as_posix() == "/"
+    assert entry.path.as_posix() == "/boot"
     assert entry.type == "directory"
 
     entry = records[1337]
     assert isinstance(entry, type(MLocateRecord()))
-    assert Path(entry.parent).as_posix() == "/usr/lib/x86_64-linux-gnu/perl-base/unicore/lib/Bc"
-    assert Path(entry.path).as_posix() == "/usr/lib/x86_64-linux-gnu/perl-base/unicore/lib/Bc/WS.pl"
+    assert entry.parent.as_posix() == "/usr/lib/x86_64-linux-gnu/perl-base/unicore/lib/Bc"
+    assert entry.path.as_posix() == "/usr/lib/x86_64-linux-gnu/perl-base/unicore/lib/Bc/WS.pl"
     assert entry.type == "file"
     assert entry.ts == datetime(2024, 1, 15, 12, 16, 7, tzinfo=timezone.utc)
