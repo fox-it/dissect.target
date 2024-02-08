@@ -16,9 +16,16 @@ from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
 try:
     import bz2
 
-    HAVE_BZ2 = True
+    HAS_BZ2 = True
 except ImportError:
-    HAVE_BZ2 = False
+    HAS_BZ2 = False
+
+try:
+    import zstandard
+
+    HAS_ZSTD = True
+except ImportError:
+    HAS_ZSTD = False
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
@@ -451,7 +458,7 @@ def open_decompress(
     errors: Optional[str] = "backslashreplace",
     newline: Optional[str] = None,
 ) -> Union[BinaryIO, TextIO]:
-    """Open and decompress a file. Handles gz and bz2 files. Uncompressed files are opened as-is.
+    """Open and decompress a file. Handles gz, bz2 and zstd files. Uncompressed files are opened as-is.
 
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
@@ -469,7 +476,7 @@ def open_decompress(
         for line in open_decompress(Path("/dir/file.gz"), "rt"):
             print(line)
     """
-    file = path.open()
+    file = path.open("rb")
     magic = file.read(4)
     file.seek(0)
 
@@ -480,9 +487,16 @@ def open_decompress(
 
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
-    # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
-    elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+
+    elif HAS_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+        # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
+
+    elif HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+        # stream_reader is not seekable, so we have to resort to the less
+        # efficient decompressor which returns bytes.
+        return io.BytesIO(zstandard.decompress(path.open("rb").read()))
+
     else:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)

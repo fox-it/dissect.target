@@ -203,4 +203,5 @@ register("velociraptor", "VelociraptorLoader")
 register("smb", "SmbLoader")
 register("cb", "CbLoader")
 register("cyber", "CyberLoader")
+register("cpio", "CpioLoader")
 register("multiraw", "MultiRawLoader")  # Should be last
