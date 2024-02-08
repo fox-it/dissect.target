@@ -43,7 +43,6 @@ class MLocatePlugin(BaseLocatePlugin):
 
         for item in mlocate_file:
             parent = self.target.fs.path(item.parent)
-            
             yield MLocateRecord(
                 ts=item.ts,
                 ts_ns=item.ts_ns,
