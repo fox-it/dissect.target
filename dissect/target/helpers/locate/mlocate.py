@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import BinaryIO, Iterable, Iterator
 
 from dissect.cstruct import cstruct
@@ -82,7 +81,7 @@ class MLocateFile:
         while True:
             try:
                 directory_entry = c_mlocate.directory_entry(self.fh)
-                parent = Path(directory_entry.path.decode())
+                parent = directory_entry.path.decode()
 
                 for dbe_type, file_entry in self._parse_directory_entries():
                     file_path = file_entry.path.decode()
@@ -91,7 +90,7 @@ class MLocateFile:
                         ts=from_unix(directory_entry.time_seconds),
                         ts_ns=directory_entry.time_nanoseconds,
                         parent=parent,
-                        path=parent.joinpath(file_path),
+                        path=file_path,
                         dbe_type=dbe_type,
                     )
             except EOFError:
