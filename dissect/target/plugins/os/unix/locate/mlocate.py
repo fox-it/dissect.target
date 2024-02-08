@@ -42,11 +42,13 @@ class MLocatePlugin(BaseLocatePlugin):
         mlocate_file = MLocateFile(mlocate_fh)
 
         for item in mlocate_file:
+            parent = self.target.fs.path(item.parent)
+            
             yield MLocateRecord(
                 ts=item.ts,
                 ts_ns=item.ts_ns,
-                parent=self.target.fs.path(item.parent),
-                path=self.target.fs.path(item.path),
+                parent=parent,
+                path=parent.joinpath(item.path),
                 type=item.dbe_type,
                 source=self.path,
                 _target=self.target,
