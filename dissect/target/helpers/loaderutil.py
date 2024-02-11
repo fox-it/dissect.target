@@ -80,4 +80,4 @@ def extract_path_info(path: Union[str, Path]) -> tuple[Path, Optional[urllib.par
     if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
         return Path(path), None
     else:
-        return Path(parsed_path.netloc + parsed_path.path), parsed_path
+        return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path
