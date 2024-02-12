@@ -94,6 +94,8 @@ def cyber_print(buf: str, color: Optional[Color] = None, **kwargs) -> None:
 
     if not CAN_CYBER:
         sys.__stdout__.write("you're not cybering hard enough\n")
+        sys.__stdout__.write(buf)
+        return
 
     if os.getenv("CYBER") == "💊":
         matrix(buf, color, **kwargs)
