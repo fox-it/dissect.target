@@ -159,7 +159,7 @@ class ApachePlugin(WebserverPlugin):
     Apache has three default access log formats, which this plugin can all parse automatically. These are::
 
         LogFormat "%v:%p %h %l %u %t \\"%r\\" %>s %O \\"%{Referer}i\\" \\"%{User-Agent}i\\"" vhost_combined
-        LogFormat "%h %l %u %t \\"%r\\" %>s %O \\"%{Referer}i\\" \\"%{User-Agent}i\"" combined
+        LogFormat "%h %l %u %t \\"%r\\" %>s %O \\"%{Referer}i\\" \\"%{User-Agent}i\\"" combined
         LogFormat "%h %l %u %t \\"%r\\" %>s %O"`` common
 
     For the definitions of each format string, see https://httpd.apache.org/docs/2.4/mod/mod_log_config.html#formats
