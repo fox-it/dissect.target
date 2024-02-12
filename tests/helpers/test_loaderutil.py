@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import urllib
 from pathlib import Path
 from typing import Optional
