@@ -1,25 +1,30 @@
+from __future__ import annotations
+
 import logging
 import re
 import urllib
 from os import PathLike
 from pathlib import Path
-from typing import BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO, Optional, Union
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
+
 log = logging.getLogger(__name__)
 
 
 def add_virtual_ntfs_filesystem(
-    target,
-    fs,
-    boot_path="$Boot",
-    mft_path="$MFT",
-    usnjrnl_path="$Extend/$Usnjrnl:$J",
-    sds_path="$Secure:$SDS",
-):
+    target: Target,
+    fs: Filesystem,
+    boot_path: str = "$Boot",
+    mft_path: str = "$MFT",
+    usnjrnl_path: str = "$Extend/$Usnjrnl:$J",
+    sds_path: str = "$Secure:$SDS",
+) -> None:
     """Utility for creating an NtfsFilesystem with separate system files from another Filesystem, usually
     a DirectoryFilesystem or VirtualFilesystem.
 
