@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import urllib
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -27,10 +30,12 @@ from dissect.target.helpers.loaderutil import extract_path_info
             "tar://relative/folder/file.tar.gz",
             (Path("relative/folder/file.tar.gz"), urllib.parse.urlparse("tar://relative/folder/file.tar.gz")),
         ),
-        ("tar://~/file.tar.gz", (Path("~/file.tar.gz"), urllib.parse.urlparse("tar://~/file.tar.gz"))),
+        ("tar://~/file.tar.gz", (Path("~/file.tar.gz").expanduser(), urllib.parse.urlparse("tar://~/file.tar.gz"))),
         # But not if the URI has a faux scheme
         ("C:\\path\\to\\file", (Path("C:\\path\\to\\file"), None)),
     ],
 )
-def test_extract_path_info(path, expected):
+def test_extract_path_info(
+    path: Path | str, expected: tuple[Optional[Path], Optional[urllib.parse.ParseResult[str]]]
+) -> None:
     assert extract_path_info(path) == expected

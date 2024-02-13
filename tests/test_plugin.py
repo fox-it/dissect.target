@@ -444,7 +444,7 @@ def test_os_plugin_property_methods(target_bare: Target, method_name: str) -> No
         getattr(os_plugin, method_name)
 
 
-class TestOS1(OSPlugin):
+class MockOS1(OSPlugin):
     @export(property=True)
     def hostname(self) -> Optional[str]:
         pass
@@ -470,7 +470,7 @@ class TestOS1(OSPlugin):
         pass
 
 
-class TestOS2(OSPlugin):
+class MockOS2(OSPlugin):
     @export(property=True)
     def hostname(self) -> Optional[str]:
         """Test docstring hostname"""
@@ -505,8 +505,8 @@ class TestOS2(OSPlugin):
 @pytest.mark.parametrize(
     "subclass, replaced",
     [
-        (TestOS1, True),
-        (TestOS2, False),
+        (MockOS1, True),
+        (MockOS2, False),
     ],
 )
 def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -> None:

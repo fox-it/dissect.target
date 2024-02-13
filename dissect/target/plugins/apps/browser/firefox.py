@@ -176,6 +176,7 @@ class FirefoxPlugin(BrowserPlugin):
                         is_secure=bool(cookie.isSecure),
                         is_http_only=bool(cookie.isHttpOnly),
                         same_site=bool(cookie.sameSite),
+                        source=db_file,
                         _user=user,
                     )
             except SQLError as e:
