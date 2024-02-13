@@ -341,10 +341,10 @@ class ListUnwrapper:
     """Provides utility functions to unwrap dictionary objects out of lists."""
 
     @staticmethod
-    def unwrap(data: dict | list) -> dict | list:
+    def unwrap(data: Union[dict, list]) -> Union[dict, list]:
         """Transforms a list with dictionaries to a dictionary.
 
-        The order of the list is preserved. If no dictionary is found, 
+        The order of the list is preserved. If no dictionary is found,
         the list remains untouched:
 
             ["value1", "value2"]    -> ["value1", "value2"]
@@ -357,11 +357,11 @@ class ListUnwrapper:
                                            }
                                        }
         """
-        orig = ListUnwrapper._unwrap_value(data)
+        orig = ListUnwrapper._unwrap_dict_list(data)
         return ListUnwrapper._unwrap_dict(orig)
 
     @staticmethod
-    def _unwrap_dict(data: dict | list) -> dict | list:
+    def _unwrap_dict(data: Union[dict, list]) -> Union[dict, list]:
         """Looks for dictionaries and unwraps its values."""
 
         if not isinstance(data, dict):
@@ -369,7 +369,7 @@ class ListUnwrapper:
 
         root = dict()
         for key, value in data.items():
-            _value = ListUnwrapper._unwrap_value(value)
+            _value = ListUnwrapper._unwrap_dict_list(value)
             if isinstance(_value, dict):
                 _value = ListUnwrapper._unwrap_dict(_value)
             root[key] = _value
@@ -377,12 +377,9 @@ class ListUnwrapper:
         return root
 
     @staticmethod
-    def _unwrap_value(data: list | dict) -> dict | list:
+    def _unwrap_dict_list(data: Union[dict, list]) -> Union[dict, list]:
         """Unwraps a list containing dictionaries."""
-        if not isinstance(data, list):
-            return data
-
-        if not any(isinstance(obj, dict) for obj in data):
+        if not isinstance(data, list) or not any(isinstance(obj, dict) for obj in data):
             return data
 
         return_value = {}
