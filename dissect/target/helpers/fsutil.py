@@ -16,16 +16,16 @@ from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
 try:
     import bz2
 
-    HAS_BZ2 = True
+    HAVE_BZ2 = True
 except ImportError:
-    HAS_BZ2 = False
+    HAVE_BZ2 = False
 
 try:
     import zstandard
 
-    HAS_ZSTD = True
+    HAVE_ZSTD = True
 except ImportError:
-    HAS_ZSTD = False
+    HAVE_ZSTD = False
 
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
@@ -488,11 +488,11 @@ def open_decompress(
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    elif HAS_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+    elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    elif HAS_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+    elif HAVE_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
         # stream_reader is not seekable, so we have to resort to the less
         # efficient decompressor which returns bytes.
         return io.BytesIO(zstandard.decompress(path.open("rb").read()))
