@@ -344,8 +344,8 @@ class ListUnwrapper:
     def unwrap(data: dict | list) -> dict | list:
         """Transforms a list with dictionaries to a dictionary.
 
-        The oprder of the list is preserved. And if no dictionary
-        is found, the list remains untouched::
+        The order of the list is preserved. If no dictionary is found, 
+        the list remains untouched:
 
             ["value1", "value2"]    -> ["value1", "value2"]
 
@@ -362,7 +362,7 @@ class ListUnwrapper:
 
     @staticmethod
     def _unwrap_dict(data: dict | list) -> dict | list:
-        """Looks for dictionaries and unwrap its values."""
+        """Looks for dictionaries and unwraps its values."""
 
         if not isinstance(data, dict):
             return data
@@ -386,7 +386,6 @@ class ListUnwrapper:
             return data
 
         return_value = {}
-
         for idx, elem in enumerate(data):
             return_value[f"list_item{idx}"] = elem
 

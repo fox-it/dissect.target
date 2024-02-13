@@ -220,7 +220,7 @@ class ConfigurationEntry(FilesystemEntry):
         output_buffer = io.StringIO()
 
         if isinstance(values, list):
-            # Explicitly convert the values to strings for this to strings for this
+            # Explicitly convert the list values to strings
             _text = "\n".join(str(val) for val in values)
             output_buffer.write(textwrap.indent(text=_text, prefix=prefix))
         elif hasattr(values, "keys"):
