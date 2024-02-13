@@ -1,4 +1,3 @@
-import io
 import json
 import logging
 from pathlib import Path
@@ -254,7 +253,7 @@ class DockerPlugin(Plugin):
                             _target=self.target,
                         )
 
-    def _parse_local_log(self, path: Path) -> Iterator[io.BytesIO]:
+    def _parse_local_log(self, path: Path) -> Iterator[c_local.entry]:
         fh = open_decompress(path, "rb")  # can be a .gz file
 
         while True:
@@ -272,7 +271,7 @@ class DockerPlugin(Plugin):
             except EOFError:
                 break
 
-    def _parse_json_log(self, path: Path) -> Iterator[io.BytesIO]:
+    def _parse_json_log(self, path: Path) -> Iterator[dict]:
         for line in open_decompress(path, "rt"):
             try:
                 entry = json.loads(line)
