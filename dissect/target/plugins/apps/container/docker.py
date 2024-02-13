@@ -1,19 +1,17 @@
+from __future__ import annotations
+
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Iterator, Optional
 
+from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.docker import (
-    c_local,
-    convert_ports,
-    convert_timestamp,
-    hash_to_image_id,
-    strip_log,
-)
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.helpers.protobuf import ProtobufVarint
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.target import Target
@@ -49,7 +47,6 @@ DockerImageRecord = TargetRecordDescriptor(
     ],
 )
 
-
 DockerLogRecord = TargetRecordDescriptor(
     "apps/containers/docker/log",
     [
@@ -60,51 +57,47 @@ DockerLogRecord = TargetRecordDescriptor(
     ],
 )
 
+# Resources:
+# - https://github.com/moby/moby/pull/37092
+# - https://github.com/cpuguy83/docker/blob/master/daemon/logger/local/doc.go
+# - https://github.com/moby/moby/blob/master/api/types/plugins/logdriver/entry.proto
+local_def = """
+struct entry {
+    uint32   header;
 
-def get_data_path(path: Path) -> Optional[str]:
-    """Returns the configured Docker daemon data-root path."""
-    try:
-        config = json.loads(path.open("rt").read())
-    except json.JSONDecodeError as e:
-        log.warning("Could not read JSON file '%s'", path)
-        log.debug(exc_info=e)
+    // source
+    uint8    s_type;        // 0x0a
+    varint   s_len;         // 0x06
+    char     source[s_len]; // stdout or stderr
 
-    return config.get("data-root")
+    // timestamp
+    uint8    t_type;        // 0x10
+    varint   ts;            // timestamp in ums
 
+    // message
+    uint8    m_type;        // 0x1a
+    varint   m_len;         // message length
+    char     message[m_len];
 
-def find_installs(target: Target) -> Iterator[Path]:
-    """Attempt to find additional configured and existing Docker daemon data-root folders.
+    // partial_log_metadata not implemented
 
-    References:
-        - https://docs.docker.com/config/daemon/
-    """
+    uint32 footer;
+};
+"""
 
-    default_config_paths = [
-        # Linux
-        "/etc/docker/daemon.json",
-        "/var/snap/docker/current/config/daemon.json",
-        # Windows
-        "sysvol/ProgramData/docker/config/daemon.json",
-    ]
+c_local = cstruct(endian=">")
+c_local.addtype("varint", ProtobufVarint(c_local, "varint", size=None, signed=False, alignment=1))
+c_local.load(local_def, compiled=False)
 
-    user_config_paths = [
-        # Docker Desktop (macOS/Windows/Linux)
-        ".docker/daemon.json",
-    ]
+RE_DOCKER_NS = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
+RE_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
-    if (default_root := target.fs.path("/var/lib/docker")).exists():
-        yield default_root
-
-    for path in default_config_paths:
-        if (config_file := target.fs.path(path)).exists():
-            if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
-                yield data_root_path
-
-    for path in user_config_paths:
-        for user_details in target.user_details.all_with_home():
-            if (config_file := user_details.home_path.joinpath(path)).exists():
-                if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
-                    yield data_root_path
+ASCII_MAP = {
+    "\x08": "[BS]",
+    "\x09": "[TAB]",
+    "\x0A": "",  # \n
+    "\x0D": "",  # \r
+}
 
 
 class DockerPlugin(Plugin):
@@ -280,3 +273,137 @@ class DockerPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
             yield entry
+
+
+def get_data_path(path: Path) -> Optional[str]:
+    """Returns the configured Docker daemon data-root path."""
+    try:
+        config = json.loads(path.open("rt").read())
+    except json.JSONDecodeError as e:
+        log.warning("Could not read JSON file '%s'", path)
+        log.debug(exc_info=e)
+
+    return config.get("data-root")
+
+
+def find_installs(target: Target) -> Iterator[Path]:
+    """Attempt to find additional configured and existing Docker daemon data-root folders.
+
+    References:
+        - https://docs.docker.com/config/daemon/
+    """
+
+    default_config_paths = [
+        # Linux
+        "/etc/docker/daemon.json",
+        "/var/snap/docker/current/config/daemon.json",
+        # Windows
+        "sysvol/ProgramData/docker/config/daemon.json",
+    ]
+
+    user_config_paths = [
+        # Docker Desktop (macOS/Windows/Linux)
+        ".docker/daemon.json",
+    ]
+
+    if (default_root := target.fs.path("/var/lib/docker")).exists():
+        yield default_root
+
+    for path in default_config_paths:
+        if (config_file := target.fs.path(path)).exists():
+            if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
+                yield data_root_path
+
+    for path in user_config_paths:
+        for user_details in target.user_details.all_with_home():
+            if (config_file := user_details.home_path.joinpath(path)).exists():
+                if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
+                    yield data_root_path
+
+
+def convert_timestamp(timestamp: str) -> str:
+    """Docker sometimes uses (unpadded) 9 digit nanosecond precision
+    in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
+
+    Python has no native %n nanosecond strptime directive, so we
+    strip the last three digits from the timestamp to force
+    compatbility with the 6 digit %f microsecond directive.
+    """
+
+    timestamp_nanoseconds_plus_postfix = timestamp[19:]
+    match = RE_DOCKER_NS.match(timestamp_nanoseconds_plus_postfix)
+
+    # Timestamp does not have nanoseconds if there is no match.
+    if not match:
+        return timestamp
+
+    # Take the first six digits and reconstruct the timestamp.
+    match = match.groupdict()
+    microseconds = match["nanoseconds"][:6]
+    return f"{timestamp[:19]}.{microseconds}{match['postfix']}"
+
+
+def convert_ports(ports: dict[str, list | dict]) -> dict:
+    """Depending on the state of the container (turned on or off) we
+    can salvage forwarded ports for the container in different
+    parts of the config.v2.json file.
+
+    This function attempts to be agnostic and deals with
+    "Ports" lists and "ExposedPorts" dicts.
+
+    NOTE: This function makes a couple of assumptions and ignores
+    ipv6 assignments. Feel free to improve this helper function.
+    """
+
+    fports = {}
+    for key, value in ports.items():
+        if isinstance(value, list):
+            # NOTE: We ignore IPv6 assignments here.
+            fports[key] = f"{value[0]['HostIp']}:{value[0]['HostPort']}"
+        elif isinstance(value, dict):
+            # NOTE: We make the assumption the default broadcast ip 0.0.0.0 was used.
+            fports[key] = f"0.0.0.0:{key.split('/')[0]}"
+
+    return fports
+
+
+def hash_to_image_id(hash: str) -> str:
+    """Convert the hash to an abbrevated docker image id."""
+    return hash.split(":")[-1][:12]
+
+
+def strip_log(input: str | bytes, exc_backspace: bool = False) -> str:
+    """Remove ANSI escape sequences from a given input string.
+
+    Also translates ASCII codes such as backspaces to readable format.
+
+    Resources:
+        - https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#general-ascii-codes
+    """
+
+    if isinstance(input, bytes):
+        input = input.decode("utf-8", errors="backslashreplace")
+
+    out = RE_ANSI_ESCAPE.sub("", input)
+
+    if exc_backspace:
+        out = _replace_backspace(out)
+
+    for hex, name in ASCII_MAP.items():
+        out = out.replace(hex, name)
+
+    return out
+
+
+def _replace_backspace(input: str) -> str:
+    """Remove ANSI backspace characters (``\x08``) and 'replay' their effect on the rest of the string.
+
+    For example, with the input ``123\x084``, the output would be ``124``.
+    """
+    out = ""
+    for char in input:
+        if char == "\x08":
+            out = out[:-1]
+        else:
+            out += char
+    return out

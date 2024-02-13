@@ -3,8 +3,12 @@ from io import BytesIO
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.helpers.docker import convert_timestamp, strip_log
-from dissect.target.plugins.apps.container.docker import DockerPlugin, find_installs
+from dissect.target.plugins.apps.container.docker import (
+    DockerPlugin,
+    convert_timestamp,
+    find_installs,
+    strip_log,
+)
 from tests._utils import absolute_path
 
 
