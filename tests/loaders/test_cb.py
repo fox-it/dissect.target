@@ -9,12 +9,15 @@ from dissect.target.target import Target
 
 @pytest.fixture
 def mock_cbc_sdk(monkeypatch: pytest.MonkeyPatch) -> Iterator[MagicMock]:
-    try:
-        del sys.modules["dissect.target.loader"]
-    except KeyError:
-        pass
-
     with monkeypatch.context() as m:
+        # The references to cbc_sdk properties in the cb loader will point to the MagicMock created
+        # for the first test function that runs.
+        # Thus we need to delete the cb loader module to force it to be reimported when used in a
+        # new test so the MagickMock used in the cb module will be the one created for the test
+        # function that is running.
+        if "dissect.target.loaders.cb" in sys.modules:
+            m.delitem(sys.modules, "dissect.target.loaders.cb")
+
         mock_cbc_sdk = MagicMock()
         m.setitem(sys.modules, "cbc_sdk", mock_cbc_sdk)
         m.setitem(sys.modules, "cbc_sdk.errors", mock_cbc_sdk.errors)

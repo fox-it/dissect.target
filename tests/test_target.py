@@ -1,5 +1,6 @@
 import io
 import urllib.parse
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
@@ -377,7 +378,7 @@ def test_target_set_event_callback() -> None:
     mock_callback2 = MagicMock()
 
     class MockTarget(Target):
-        pass
+        event_callbacks = defaultdict(set)
 
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback1)
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback2)
@@ -405,7 +406,7 @@ def test_target_send_event() -> None:
     mock_callback2 = MagicMock()
 
     class MockTarget(Target):
-        pass
+        event_callbacks = defaultdict(set)
 
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback1)
     MockTarget.set_event_callback(event_type=Event.FUNC_EXEC, event_callback=mock_callback2)
