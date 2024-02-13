@@ -63,46 +63,48 @@ class Color(Enum):
 
 
 class CyberIO(StringIO):
-    def __init__(self, color: Optional[Color] = None, mask_space: bool = False, run_at_end: bool = False):
+    def __init__(self, color: Optional[Color] = None, run_at_end: bool = False, **kwargs):
         self._color = color
-        self._mask_space = mask_space
         self._run_at_end = run_at_end
+        self._kwargs = kwargs
         super().__init__()
 
     def write(self, s: str) -> int:
         if self._run_at_end:
             super().write(s)
         else:
-            cyber_print(s, self._color, self._mask_space)
+            cyber_print(s, self._color, **self._kwargs)
         return len(s)
 
 
 @contextmanager
-def cyber(color: Optional[Color] = Color.YELLOW, mask_space: bool = False, run_at_end: bool = False) -> None:
-    stream = CyberIO(color, mask_space, run_at_end)
+def cyber(color: Optional[Color] = Color.YELLOW, run_at_end: bool = False, **kwargs) -> Iterator[None]:
+    stream = CyberIO(color, run_at_end, **kwargs)
     with redirect_stdout(stream):
         yield
 
     if run_at_end:
-        cyber_print(stream.getvalue(), color, mask_space)
+        cyber_print(stream.getvalue(), color, **kwargs)
 
 
-def cyber_print(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> None:
+def cyber_print(buf: str, color: Optional[Color] = None, **kwargs) -> None:
     if not buf or buf == "\n":
         sys.__stdout__.write(buf)
         return
 
     if not CAN_CYBER:
         sys.__stdout__.write("you're not cybering hard enough\n")
+        sys.__stdout__.write(buf)
+        return
 
     if os.getenv("CYBER") == "💊":
-        matrix(buf, color, mask_space)
+        matrix(buf, color, **kwargs)
     else:
-        nms(buf, color, mask_space)
+        nms(buf, color, **kwargs)
 
 
 # https://github.com/bartobri/libnms
-def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> None:
+def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_indent: bool = True, **kwargs) -> None:
     orig_row, orig_col = (0, 0)
     with _set_terminal():
         max_rows, max_cols = _get_win_size()
@@ -118,6 +120,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
         character_state = []
 
         try:
+            is_indent = True
             # Write initial mask
             for char, has_ansi, end_ansi in characters:
                 # Initialize the character state with a mask and reveal time
@@ -129,7 +132,16 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
                 mask = random.choice(NMS_MASK_TABLE)
                 character_state.append((char, mask, reveal_time, has_ansi))
 
-                if ("\n" in char or "\r\n" in char) or (not mask_space and char == " "):
+                if char != " ":
+                    is_indent = False
+
+                if (
+                    ("\n" in char or "\r\n" in char)
+                    or (not mask_space and char == " " and not is_indent and not mask_indent)
+                    or (not mask_indent and is_indent)
+                ):
+                    if "\n" in char:
+                        is_indent = True
                     sys.__stdout__.write(char)
                     continue
 
@@ -141,11 +153,21 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
             _clear_input()
             time.sleep(1)
 
+            is_indent = True
             for _ in range((NMS_JUMBLE_SECONDS * 1000) // NMS_JUMBLE_LOOP_SPEED):
                 _cursor_move(orig_row, orig_col)
 
                 for char, _, _, _ in character_state:
-                    if ("\n" in char or "\r\n" in char) or (not mask_space and char == " "):
+                    if char != " ":
+                        is_indent = False
+
+                    if (
+                        ("\n" in char or "\r\n" in char)
+                        or (not mask_space and char == " ")
+                        or (not mask_indent and is_indent)
+                    ):
+                        if "\n" in char:
+                            is_indent = True
                         sys.__stdout__.write(char)
                         continue
 
@@ -160,8 +182,18 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
                 _cursor_move(orig_row, orig_col)
                 revealed = True
 
+                is_indent = True
                 for i, (char, mask, time_remaining, has_ansi) in enumerate(character_state):
-                    if ("\n" in char or "\r\n" in char) or (not mask_space and char == " "):
+                    if char != " ":
+                        is_indent = False
+
+                    if (
+                        ("\n" in char or "\r\n" in char)
+                        or (not mask_space and char == " " and not is_indent and not mask_indent)
+                        or (not mask_indent and is_indent)
+                    ):
+                        if "\n" in char:
+                            is_indent = True
                         sys.__stdout__.write(char)
                         continue
 
@@ -207,7 +239,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> No
 
 
 # https://github.com/jsbueno/terminal_matrix
-def matrix(buf: str, color: Optional[Color] = None, mask_space: bool = False) -> None:
+def matrix(buf: str, color: Optional[Color] = None, **kwargs) -> None:
     orig_row, orig_col = (0, 0)
     with _set_terminal():
         max_rows, max_cols = _get_win_size()

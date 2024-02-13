@@ -39,6 +39,8 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 /dev/vg-main/lv-data                      /data        auto    default             0    2
 
 /dev/disk/by-uuid/af0b9707-0945-499a-a37d-4da23d8dd245 /moredata auto default      0    2
+
+LABEL=foo                                 /foo         auto    default             0    2
 """  # noqa
 
 
@@ -65,6 +67,7 @@ def test_parse_fstab(tmp_path):
         ("F631-BECA", None, "/boot/efi", "vfat", "defaults,discard,umask=0077"),
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
+        (None, "foo", "/foo", "auto", "default"),
     }
 
 
