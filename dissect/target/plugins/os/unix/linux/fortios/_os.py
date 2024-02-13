@@ -466,8 +466,10 @@ def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
 
     Currently supported versions (each release has a new key):
         - FortiGate VM 7.0.13
+        - FortiGate VM 7.0.14
         - FortiGate VM 7.4.1
         - FortiGate VM 7.4.2
+        - FortiGate VM 7.4.3
 
     Resources:
         - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
