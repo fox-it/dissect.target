@@ -36,8 +36,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/edge/cookie",
-        GENERIC_COOKIE_FIELDS,
+        "browser/edge/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(

@@ -43,6 +43,7 @@ GENERIC_COOKIE_FIELDS = [
     ("boolean", "is_secure"),
     ("boolean", "is_http_only"),
     ("boolean", "same_site"),
+    ("path", "source"),
 ]
 
 GENERIC_HISTORY_RECORD_FIELDS = [

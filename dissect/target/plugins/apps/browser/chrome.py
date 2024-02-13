@@ -38,8 +38,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/cookie",
-        GENERIC_COOKIE_FIELDS,
+        "browser/chrome/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
