@@ -1233,7 +1233,13 @@ class VirtualFilesystem(Filesystem):
             directory.add(entry_name, entry)
 
     def map_dir_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, map_single_file: bool = False) -> None:
-        """Map files in a tar onto the VFS."""
+        """Map files in a tar onto the VFS.
+
+        Args:
+            vfspath: Destination path in the virtual filesystem.
+            tar_file: Source path of the tar file to map.
+            map_single_file: Only mount a single file found inside the tar at the specified path.
+        """
 
         if not isinstance(tar_file, pathlib.Path):
             try:
@@ -1257,6 +1263,10 @@ class VirtualFilesystem(Filesystem):
         """Map a single file in a tar archive to the given path in the VFS.
 
         The provided tar archive should contain *one* file.
+
+        Args:
+            vfspath: Destination path in the virtual filesystem.
+            tar_file: Source path of the tar file to map.
         """
         return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True)
 
