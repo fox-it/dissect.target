@@ -1,3 +1,4 @@
+import itertools
 import json
 from collections import defaultdict
 from typing import Iterator, Optional
@@ -9,7 +10,7 @@ from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
@@ -69,11 +70,12 @@ class ChromiumMixin:
                 users_dirs.append((user_details.user, cur_dir))
         return users_dirs
 
-    def _iter_db(self, filename: str) -> Iterator[SQLite3]:
+    def _iter_db(self, filename: str, *subfolders: Optional[list[str]]) -> Iterator[SQLite3]:
         """Generate a connection to a sqlite database file.
 
         Args:
             filename: The filename as string of the database where the data is stored.
+            subfolders (optional): Subfolder(s) to also try for every configured directory.
 
         Yields:
             opened db_file (SQLite3)
@@ -83,7 +85,11 @@ class ChromiumMixin:
             SQLError: If the history file could not be opened.
         """
 
-        for user, cur_dir in self._build_userdirs(self.DIRS):
+        dirs = self.DIRS
+        if subfolders:
+            dirs = dirs + [join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subfolders)]
+
+        for user, cur_dir in self._build_userdirs(dirs):
             db_file = cur_dir.joinpath(filename)
             try:
                 yield user, db_file, sqlite3.SQLite3(db_file.open())
@@ -198,7 +204,7 @@ class ChromiumMixin:
                 is_http_only (bool): Cookie http only flag.
                 same_site (bool): Cookie same site flag.
         """
-        for user, db_file, db in self._iter_db("Cookies"):
+        for user, db_file, db in self._iter_db("Cookies", "Network"):
             try:
                 for cookie in db.table("cookies").rows():
                     yield self.BrowserCookieRecord(
