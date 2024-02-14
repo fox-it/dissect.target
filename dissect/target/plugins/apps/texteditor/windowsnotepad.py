@@ -1,4 +1,3 @@
-import io
 import zlib
 from typing import BinaryIO, Iterator
 
@@ -11,23 +10,6 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
     TexteditorTabPlugin,
 )
-
-
-def seek_size(fh: BinaryIO) -> int:
-    """
-    Find the size of a file on disk.
-
-    Args:
-        fh: A file-like object that we want to calculate the size of.
-
-    Returns:
-        An integer representing the size (in bytes) of the file.
-    """
-    pos = fh.tell()
-    fh.seek(0, io.SEEK_END)
-    size = fh.tell()
-    fh.seek(pos)
-    return size
 
 
 def parse_large_structure_data_length(fh: BinaryIO) -> (int, bytes):
