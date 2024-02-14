@@ -130,7 +130,7 @@ class DockerPlugin(Plugin):
                 repositories = json.loads(images_path.read_text()).get("Repositories")
             else:
                 self.target.log.debug("No docker images found, file %s does not exist.", images_path)
-                return
+                continue
 
             for name, tags in repositories.items():
                 for tag, hash in tags.items():
