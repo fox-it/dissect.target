@@ -97,11 +97,7 @@ def test_docker_plugin_logs_raw(target_linux_docker_logs: Target) -> None:
     results = list(target_linux_docker_logs.docker.logs(raw_messages=True))
 
     assert len(results) == 288
-
-    assert (
-        results[40].message
-        == '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'  # noqa E501
-    )
+    assert results[0].message == "/ # \x1b[6n\r\n"
     assert results[-1].message == "\x1b[?2004l\rexit\r"
 
 
