@@ -7,7 +7,6 @@ from typing import Callable, Iterator, Optional
 import pytest
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
-from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
@@ -406,32 +405,6 @@ def target_win_tzinfo_legacy(hive_hklm: VirtualHive, target_win: Target) -> Iter
     hive_hklm.map_key(east_tz_data_path, east_tz_data)
 
     yield target_win
-
-
-@pytest.fixture
-def target_linux_docker_logs(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
-    docker_containers = absolute_path("_data/plugins/apps/container/docker/logs")
-    fs_linux.map_dir("/var/lib/docker/containers", docker_containers)
-    yield target_linux
-
-
-@pytest.fixture
-def fs_docker() -> TarFilesystem:
-    docker_tar = pathlib.Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
-    fh = docker_tar.open("rb")
-    docker_fs = TarFilesystem(fh)
-    yield docker_fs
-
-
-@pytest.fixture
-def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Target:
-    mock_target = next(make_mock_target(tmp_path))
-    mock_target._os_plugin = LinuxPlugin
-
-    mock_target.filesystems.add(fs_docker)
-    mock_target.fs.mount("/", fs_docker)
-    mock_target.apply()
-    yield mock_target
 
 
 @pytest.fixture
