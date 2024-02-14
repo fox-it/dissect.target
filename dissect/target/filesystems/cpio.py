@@ -7,6 +7,8 @@ from dissect.target.helpers.fsutil import open_decompress
 
 
 class CpioFilesystem(TarFilesystem):
+    __type__ = "cpio"
+
     def __init__(self, fh: BinaryIO, base: Optional[str] = None, *args, **kwargs):
         super().__init__(open_decompress(fileobj=fh), base, tarinfo=cpio.CpioInfo, *args, **kwargs)
 
