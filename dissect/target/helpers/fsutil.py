@@ -452,7 +452,8 @@ def resolve_link(
 
 
 def open_decompress(
-    path: TargetPath,
+    path: Optional[TargetPath] = None,
+    fileobj: Optional[BinaryIO] = None,
     mode: str = "rb",
     encoding: Optional[str] = "UTF-8",
     errors: Optional[str] = "backslashreplace",
@@ -462,6 +463,7 @@ def open_decompress(
 
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
+        fileobj: The file-like object to open and decompress. This is mutually exclusive with path.
         mode: The mode in which to open the file.
         encoding: The decoding for text streams. By default UTF-8 encoding is used.
         errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
@@ -476,7 +478,17 @@ def open_decompress(
         for line in open_decompress(Path("/dir/file.gz"), "rt"):
             print(line)
     """
-    file = path.open("rb")
+    if path and fileobj:
+        raise ValueError("path and fileobj are mutually exclusive")
+
+    if not path and not fileobj:
+        raise ValueError("path or fileobj is required")
+
+    if path:
+        file = path.open("rb")
+    else:
+        file = fileobj
+
     magic = file.read(4)
     file.seek(0)
 
@@ -495,11 +507,14 @@ def open_decompress(
     elif HAVE_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
         # stream_reader is not seekable, so we have to resort to the less
         # efficient decompressor which returns bytes.
-        return io.BytesIO(zstandard.decompress(path.open("rb").read()))
+        return io.BytesIO(zstandard.decompress(file.read()))
 
-    else:
+    elif path:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
+
+    else:
+        return file
 
 
 def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:
