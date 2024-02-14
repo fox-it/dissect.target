@@ -453,18 +453,21 @@ def resolve_link(
 
 def open_decompress(
     path: Optional[TargetPath] = None,
-    fileobj: Optional[BinaryIO] = None,
     mode: str = "rb",
+    *,
+    fileobj: Optional[BinaryIO] = None,
     encoding: Optional[str] = "UTF-8",
     errors: Optional[str] = "backslashreplace",
     newline: Optional[str] = None,
 ) -> Union[BinaryIO, TextIO]:
     """Open and decompress a file. Handles gz, bz2 and zstd files. Uncompressed files are opened as-is.
 
+    When passing in an already opened ``fileobj``, the mode, encoding, errors and newline arguments are ignored.
+
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
-        fileobj: The file-like object to open and decompress. This is mutually exclusive with path.
         mode: The mode in which to open the file.
+        fileobj: The file-like object to open and decompress. This is mutually exclusive with path.
         encoding: The decoding for text streams. By default UTF-8 encoding is used.
         errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
         newline: How newlines are handled for text streams.
