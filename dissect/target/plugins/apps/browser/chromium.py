@@ -70,12 +70,12 @@ class ChromiumMixin:
                 users_dirs.append((user_details.user, cur_dir))
         return users_dirs
 
-    def _iter_db(self, filename: str, *subfolders: Optional[list[str]]) -> Iterator[SQLite3]:
+    def _iter_db(self, filename: str, subdirs: Optional[list[str]] = None) -> Iterator[SQLite3]:
         """Generate a connection to a sqlite database file.
 
         Args:
             filename: The filename as string of the database where the data is stored.
-            subfolders (optional): Subfolder(s) to also try for every configured directory.
+            subdirs: Subdirectories to also try for every configured directory.
 
         Yields:
             opened db_file (SQLite3)
@@ -86,8 +86,8 @@ class ChromiumMixin:
         """
 
         dirs = self.DIRS
-        if subfolders:
-            dirs = dirs + [join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subfolders)]
+        if subdirs:
+            dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
 
         for user, cur_dir in self._build_userdirs(dirs):
             db_file = cur_dir.joinpath(filename)
@@ -204,7 +204,7 @@ class ChromiumMixin:
                 is_http_only (bool): Cookie http only flag.
                 same_site (bool): Cookie same site flag.
         """
-        for user, db_file, db in self._iter_db("Cookies", "Network"):
+        for user, db_file, db in self._iter_db("Cookies", subdirs=["Network"]):
             try:
                 for cookie in db.table("cookies").rows():
                     yield self.BrowserCookieRecord(
