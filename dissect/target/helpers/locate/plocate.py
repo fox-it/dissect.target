@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import BinaryIO, Iterable
 
 import zstandard
@@ -93,12 +94,15 @@ class PLocateFile:
 
     def __iter__(self) -> Iterable[PLocateFile]:
         with self.ctx.stream_reader(self.buf) as reader:
-            while True:
-                try:
-                    file = c_plocate.file(reader)
+            try:
+                # NOTE: this is a workaround for a pypy3.9 bug. this should be changed once moved to pypy3.10.
+                # wrapping the reader into a bytearray causes pypy3.9 to behave as expected.
+                buf = BytesIO(bytearray(reader.read()))
+                while True:
+                    file = c_plocate.file(buf)
                     yield file.path.decode(errors="surrogateescape")
-                except EOFError:
-                    return
+            except EOFError:
+                return
 
     def filename_index(self) -> bytes:
         """Return the filename index of the plocate.db file."""
