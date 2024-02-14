@@ -96,7 +96,7 @@ class PLocateFile:
             while True:
                 try:
                     file = c_plocate.file(reader)
-                    yield file.path.decode()
+                    yield file.path.decode(errors="surrogateescape")
                 except EOFError:
                     return
 
