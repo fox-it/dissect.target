@@ -36,8 +36,7 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     )
 
     BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/brave/cookie",
-        GENERIC_COOKIE_FIELDS,
+        "browser/brave/cookie", GENERIC_COOKIE_FIELDS
     )
 
     BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
