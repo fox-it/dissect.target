@@ -158,20 +158,27 @@ class ApachePlugin(WebserverPlugin):
 
     Apache has three default access log formats, which this plugin can all parse automatically. These are::
 
-        LogFormat "%v:%p %h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" vhost_combined
-        LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" combined
-        LogFormat "%h %l %u %t \"%r\" %>s %O"`` common
+        LogFormat "%v:%p %h %l %u %t \\"%r\\" %>s %O \\"%{Referer}i\\" \\"%{User-Agent}i\\"" vhost_combined
+        LogFormat "%h %l %u %t \\"%r\\" %>s %O \\"%{Referer}i\\" \\"%{User-Agent}i\\"" combined
+        LogFormat "%h %l %u %t \\"%r\\" %>s %O" common
 
     For the definitions of each format string, see https://httpd.apache.org/docs/2.4/mod/mod_log_config.html#formats
 
     For Apache, the error logs by default follow the following format::
 
-        ErrorLogFormat ``"[%{u}t] [%-m:%l] [pid %P:tid %T] %7F: %E: [client\ %a] %M% ,\ referer\ %{Referer}i"``
-    """  # noqa: E501, W605
+        ErrorLogFormat "[%{u}t] [%-m:%l] [pid %P:tid %T] %7F: %E: [client\\ %a] %M% ,\\ referer\\ %{Referer}i"
+    """
 
     __namespace__ = "apache"
 
-    DEFAULT_LOG_DIRS = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
+    DEFAULT_LOG_DIRS = [
+        "/var/log/apache2",
+        "/var/log/apache",
+        "/var/log/httpd",
+        "/var/log",
+        "sysvol/xampp/apache/logs",
+        "/opt/lampp/logs",
+    ]
     ACCESS_LOG_NAMES = ["access.log", "access_log", "httpd-access.log"]
     ERROR_LOG_NAMES = ["error.log"]
     DEFAULT_CONFIG_PATHS = [

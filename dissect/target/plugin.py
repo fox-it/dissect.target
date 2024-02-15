@@ -1120,7 +1120,12 @@ def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDes
             # The get_all_records does not only need to be not present in the
             # index, it also needs to be removed from the exports list, else
             # the 'plugins' plugin will still display them.
-            available["exports"].remove("get_all_records")
+            exports = available["exports"].copy()
+            exports.remove("get_all_records")
+            available["exports"] = exports
+
+            if "get_all_records" not in available_original["exports"]:
+                raise Exception(f"get_all_records removed from {available_original}")
 
         for exported in available["exports"]:
             if available["is_osplugin"] and os_type == general.default.DefaultPlugin:

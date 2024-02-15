@@ -1,3 +1,5 @@
+import os
+import textwrap
 from pathlib import Path
 
 from dissect.target import Target
@@ -30,8 +32,11 @@ class CyberLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
-        with cyber(mask_space=True):
-            print(HEADER)
+        cols, _ = os.get_terminal_size()
+        width = HEADER.index("\n", 1)
+        header = textwrap.indent(HEADER, " " * ((cols - width) // 2))
+        with cyber(mask_space=True, mask_indent=False):
+            print(header)
 
         target.props["cyber"] = True
         return self._real.map(target)
