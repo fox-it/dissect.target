@@ -135,16 +135,19 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
             text = data_entry.data.decode("utf-16-le")
 
         else:
-            text = ["\x00"] * 100
-
-            # in this case, the header contains a separate CRC32 checksum as well
+            # In this case, the header contains a separate CRC32 checksum as well
             header_crc = c_windowstab.tab_crc(fh)
 
-            # the header, minus the file magic, plus some bytes from the extra header are
+            # The header, minus the file magic, plus some bytes from the extra header are
             # required in the calculation
             assert header_crc.crc32 == _calc_crc32(header.dumps()[3:] + header_crc.unk.dumps())
 
-            # otherwise, the file can be reconstructed out of many smaller entries
+            # We don't know how many blocks there will be beforehand. So we also don't know the exact file
+            # size, since the file, next to data, also contains quite some metadata and checksums.
+            # Also, because blocks can possibly be present in a non-contiguous order, a list is used
+            # that gradually increases in size. This allows for quick and flexible insertion of chars.
+            text = ["\x00"] * 100
+
             while fh.tell() < data_threshold:
                 data_entry = c_windowstab.data_entry_multi_block(fh)
 
@@ -156,17 +159,16 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
                         f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
                     )
 
-                # insert the text at the right offset in the textfile
-                # since we don't know the size of the file in the beginning, gradually increase the size
-                # of the list that holds the data
+                # Since we don't know the size of the file in the beginning, gradually increase the size
+                # of the list that holds the data if there is not enough room
                 while data_entry.offset + data_entry.len > len(text) and data_entry.len > 0:
                     text += ["\x00"] * 100
 
-                # place the text on the correct spot
+                # Place the text at the correct offset. UTF16-LE consumes two bytes for one character.
                 for i in range(data_entry.len):
                     text[data_entry.offset + i] = data_entry.data[(2 * i) : (2 * i) + 2].decode("utf-16-le")
 
-            # join the data and strip off excess null bytes
+            # Join the chars and strip off excess null bytes that may be present
             text = "".join(text).rstrip("\x00")
 
         return self.TextEditorTabRecord(content=text, content_length=len(text), filename=file.name)
