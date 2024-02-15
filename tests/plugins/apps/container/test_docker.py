@@ -1,4 +1,5 @@
 import datetime
+import operator
 from io import BytesIO
 from pathlib import Path
 from typing import Iterator
@@ -109,6 +110,7 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
 def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
     target_linux_docker_logs.add_plugin(DockerPlugin)
     results = list(target_linux_docker_logs.docker.logs())
+    results.sort(key=operator.attrgetter('_generated'))
 
     assert len(results) == 288
 
@@ -128,6 +130,7 @@ def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
 def test_docker_plugin_logs_raw(target_linux_docker_logs: Target) -> None:
     target_linux_docker_logs.add_plugin(DockerPlugin)
     results = list(target_linux_docker_logs.docker.logs(raw_messages=True))
+    results.sort(key=operator.attrgetter('_generated'))
 
     assert len(results) == 288
     assert results[0].message == "/ # \x1b[6n\r\n"
