@@ -1,5 +1,8 @@
+import io
 import zlib
 from typing import BinaryIO, Iterator
+
+from dissect import cstruct
 
 from dissect.target.exceptions import CRCMismatchException, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -11,57 +14,38 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
     TexteditorTabPlugin,
 )
 
+c_def = """
+struct data_entry_multi_block {
+    uint16    offset;
+    uleb128   len;
+    char      data[len * 2];
+    char      crc32[4];
+};
 
-def parse_large_structure_data_length(fh: BinaryIO) -> (int, bytes):
-    """
-    Read a variable-length representation of a length field. Acts much like a ``varint`` object
-    from ``dissect.ntfs``, however it introduces some additional bit shifts and masking.
+struct data_entry_single_block {
+    uint16    offset;
+    uleb128   len;
+    char      data[len * 2];
+    char      unk1;
+    char      crc32[4];
+};
 
-    The position of ``fh`` will be restored before returning.
+struct tab_header {
+    char      magic[3];         // NP\x00
+    char      header_start[2];  // \x00\x01
+    uleb128   len1;
+    uleb128   len2;
+    char      header_end[2];    // \x01\x00
+};
 
-    Args:
-        fh: A file-like object where we want to read the length bytes from.
+struct tab_crc {
+    char      unk[4];
+    char      crc32[4];
+};
+"""
 
-    Returns:
-        Length of the data as an integer
-        The original bytes that have been processed to determine the length
-    """
-    offset = fh.tell()
-    original_bytes = b""
-    modified_bytes = b""
-
-    while True:
-        # Read the original byte
-        bt = fh.read(1)
-
-        # Transform into an integer
-        bt_int = int.from_bytes(bt)
-
-        # Shift this new byte a few places to the right, depending on the number of bytes that have already
-        # been processed
-        new_bt = bt_int >> len(original_bytes)
-
-        # Add this byte back to
-        modified_bytes += new_bt.to_bytes(length=1)
-
-        # Add the processed byte to the list of original by tes
-        original_bytes += bt
-
-        # If the first bit of the original byte is a zero, this is the final byte
-        # Otherwise, continue until we find the zero-led byte
-        if not bt_int & 128:
-            break
-
-    # Convert it to an integer
-    f = int.from_bytes(bytes=modified_bytes, byteorder="little")
-
-    # Apply the mask
-    f = f ^ (2 ** ((len(original_bytes) - 1) * 8) >> 1)
-
-    # Restore to original cursor
-    fh.seek(offset)
-
-    return f, original_bytes
+c_windowstab = cstruct.cstruct()
+c_windowstab.load(c_def)
 
 
 def _calc_crc32(data: bytes) -> bytes:
@@ -69,58 +53,21 @@ def _calc_crc32(data: bytes) -> bytes:
     return zlib.crc32(data).to_bytes(length=4, byteorder="big")
 
 
-def _parse_large_structure_tab(handle: BinaryIO, header_has_crc: bool, header: bytes) -> str:
-    # A dictionary where the data will be stored in the correct order
-    content = dict()
+def seek_size(fh: BinaryIO) -> int:
+    """
+    Find the size of a file on disk.
 
-    while True:
-        offset_bytes = handle.read(2)
+    Args:
+        fh: A file-like object that we want to calculate the size of.
 
-        # If we reach the end of the file, break
-        if offset_bytes == b"":
-            break
-
-        offset = int.from_bytes(offset_bytes, byteorder="big")
-
-        # Parse the length field based on the first one, two, three or four bytes.
-        data_length, data_length_bytes = parse_large_structure_data_length(handle)
-
-        # Move the cursor past the length bytes
-        handle.seek(handle.tell() + len(data_length_bytes))
-
-        chunk_data = b""
-        for i in range(data_length):
-            r = handle.read(2)
-            chunk_data += r
-
-        # Insert the chunk data into the correct offset. I have not yet encountered a file
-        # where the chunks were placed in a non-sequential order, but you never know.
-        for i in range(len(chunk_data)):
-            content[offset + i] = chunk_data[i].to_bytes(length=1)
-
-        # CRC32 consists of the following data
-        crc_data_reconstructed = offset_bytes + data_length_bytes + chunk_data
-
-        # If the header did not have a CRC, this means that it is combined with the only data entry
-        # in the file. So we need to prepend this extra header data.
-        if not header_has_crc:
-            # Furthermore, if the header does not have its own CRC32 it
-            # places a byte at the end to indicate the start
-            # of the CRC32. This should be included in the CRC32 calculation
-            crc_data_reconstructed = header + crc_data_reconstructed + handle.read(1)
-
-        # Finally, read the CRC32 from disk and compare it
-        crc32_on_disk = handle.read(4)
-
-        crc32_calculated = _calc_crc32(crc_data_reconstructed)
-
-        if not crc32_on_disk == crc32_calculated:
-            raise CRCMismatchException(message=f"data, calculated={crc32_calculated}, expected={crc32_on_disk}")
-
-    # Reconstruct the text
-    text_reconstructed = b"".join(content.values())
-    text = text_reconstructed.decode("utf-16-le")
-    return text
+    Returns:
+        An integer representing the size (in bytes) of the file.
+    """
+    pos = fh.tell()
+    fh.seek(0, io.SEEK_END)
+    size = fh.tell()
+    fh.seek(pos)
+    return size
 
 
 class WindowsNotepadPlugin(TexteditorTabPlugin):
@@ -147,33 +94,80 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
             raise UnsupportedPluginError("No tabs directories found")
 
     def _process_tab_file(self, file: TargetPath) -> TextEditorTabRecord:
-        handle: BinaryIO = file.open(mode="rb")
+        """
+        Function that parses a binary tab file and reconstructs the contents.
 
-        # Skip the presumed magic bytes 0x4e5000 (NP\x00)
-        handle.read(3)
+        Args:
+            file: The binary file on disk that needs to be parsed.
 
-        # Read some of the info in the header. Not entirely sure at this point what info is in there,
-        # there seems to be an indication of the length of the file.
-        header = handle.read(6)
+        Returns:
+            A TextEditorTabRecord containing information that is in the tab.
+        """
+        fh: BinaryIO = file.open(mode="rb")
 
-        # Whenever the bytes between the two \x01 bytes in the header are zeroed out, it means that the
-        # header itself has a CRC32 checksum
-        header_has_crc32 = True if header[2:4] == b"\x00\x00" else False
+        # There is always a 4 byte value at the end. The offset is always 2 bytes, and the length is always at
+        # least 1 byte. That means that if we reach the end of a data section, and we have equal or less
+        # than 4 + 2 + 1 = 7 bytes left, we should stop parsing new data blobs.
+        data_threshold = seek_size(fh) - 4 - 2 - 1
 
-        if header_has_crc32:
-            # Header CRC32 is composed of the header, plus four more bytes.
-            header_crc_data = header + handle.read(4)
-            # After that, the CRC32 of the header is stored.
-            header_crc_on_disk = handle.read(4)
+        # Parse the generic header
+        header = c_windowstab.tab_header(fh)
 
-            # This should match
-            header_crc_calculated = _calc_crc32(header_crc_data)
-            if not header_crc_on_disk == header_crc_calculated:
+        # Some tabs are stored as one big block. In this case, the data is contiguous and the file
+        # only contains one CRC32 at the end which checksums the entire file (excluding the file magic).
+        # It is likely stored as a single block whenever a length field is nonzero in the header.
+        is_single_blob = header.len1 != 0
+
+        if is_single_blob:
+            # In this case, we parse the single block
+            data_entry = c_windowstab.data_entry_single_block(fh)
+
+            # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included
+            actual_crc32 = _calc_crc32(header.dumps()[3:] + data_entry.dumps()[:-4])
+
+            if data_entry.crc32 != actual_crc32:
                 raise CRCMismatchException(
-                    message=f"header, calculated={header_crc_calculated}, " f"expected={header_crc_on_disk}"
+                    f"CRC32 mismatch in single-block file. "
+                    f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
                 )
 
-        text = _parse_large_structure_tab(handle, header_has_crc32, header)
+            # Finally, decode the block using UTF16-LE, common for Windows.
+            text = data_entry.data.decode("utf-16-le")
+
+        else:
+            text = ["\x00"] * 100
+
+            # in this case, the header contains a separate CRC32 checksum as well
+            header_crc = c_windowstab.tab_crc(fh)
+
+            # the header, minus the file magic, plus some bytes from the extra header are
+            # required in the calculation
+            assert header_crc.crc32 == _calc_crc32(header.dumps()[3:] + header_crc.unk.dumps())
+
+            # otherwise, the file can be reconstructed out of many smaller entries
+            while fh.tell() < data_threshold:
+                data_entry = c_windowstab.data_entry_multi_block(fh)
+
+                # Check for CRC mismatch in a data block
+                actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
+                if data_entry.crc32 != actual_crc32:
+                    raise CRCMismatchException(
+                        f"CRC32 mismatch in single-block file. "
+                        f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
+                    )
+
+                # insert the text at the right offset in the textfile
+                # since we don't know the size of the file in the beginning, gradually increase the size
+                # of the list that holds the data
+                while data_entry.offset + data_entry.len > len(text) and data_entry.len > 0:
+                    text += ["\x00"] * 100
+
+                # place the text on the correct spot
+                for i in range(data_entry.len):
+                    text[data_entry.offset + i] = data_entry.data[(2 * i) : (2 * i) + 2].decode("utf-16-le")
+
+            # join the data and strip off excess null bytes
+            text = "".join(text).rstrip("\x00")
 
         return self.TextEditorTabRecord(content=text, content_length=len(text), filename=file.name)
 
