@@ -1,6 +1,7 @@
 import textwrap
 from io import StringIO
 from pathlib import Path
+from typing import Union
 
 import pytest
 
@@ -8,6 +9,7 @@ from dissect.target.helpers.configutil import (
     ConfigurationParser,
     Default,
     Indentation,
+    Json,
     ScopeManager,
     SystemD,
 )
@@ -227,3 +229,32 @@ def test_systemd_basic_syntax() -> None:
     parser.parse_file(StringIO(data.read_text()))
 
     assert parser.parsed_data == output
+
+
+@pytest.mark.parametrize(
+    "data_string, expected_data",
+    [
+        (r'{"data" : "value"}', {"data": "value"}),
+        (r'[{"data" : "value"}]', {"list_item0": {"data": "value"}}),
+        (
+            r'[{"data" : "value"}, {"data" : "value2"}]',
+            {"list_item0": {"data": "value"}, "list_item1": {"data": "value2"}},
+        ),
+        (
+            r'[{"data": [{"key1": "value1"}, {"key1": "value2"}]}]',
+            {
+                "list_item0": {
+                    "data": {
+                        "list_item0": {"key1": "value1"},
+                        "list_item1": {"key1": "value2"},
+                    },
+                },
+            },
+        ),
+    ],
+)
+def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None:
+    parser = Json()
+    parser.parse_file(StringIO(data_string))
+
+    assert parser.parsed_data == expected_data

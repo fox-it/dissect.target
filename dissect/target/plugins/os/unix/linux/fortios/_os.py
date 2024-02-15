@@ -466,8 +466,10 @@ def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
 
     Currently supported versions (each release has a new key):
         - FortiGate VM 7.0.13
+        - FortiGate VM 7.0.14
         - FortiGate VM 7.4.1
         - FortiGate VM 7.4.2
+        - FortiGate VM 7.4.3
 
     Resources:
         - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
@@ -484,6 +486,11 @@ def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
             bytes.fromhex("c87e13e1f7d21c1aca81dc13329c3a948d6e420d3a859f3958bd098747873d08"),
             bytes.fromhex("87486a24637e9a66f09ec182eee25594"),
         ),
+        # FortiGate VM 7.0.14
+        "67d4c913b1ceb7a62e2076ca835ebfdc67e65c7716fc604caa7552512f171197": (
+            bytes.fromhex("9ba00c035bcaa97717d936f8268a973eb1dd64d19388153fad5f7849b8fdf0d8"),
+            bytes.fromhex("9df4ba40dbddcf5ec9d2983681eb1940"),
+        ),
         # FortiGate VM 7.4.1
         "a008b47327293e48502a121ee8709f243ad5da4e63d6f663c253db27bd01ea28": _kdf_7_4_x(
             "366486c0f2c6322ec23e4f33a98caa1b19d41c74bb4f25f6e8e2087b0655b30f"
@@ -491,6 +498,10 @@ def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
         # FortiGate VM 7.4.2
         "c392cf83ab484e0b2419b2711b02cdc88a73db35634c10340037243394a586eb": _kdf_7_4_x(
             "480767be539de28ee773497fa731dd6368adc9946df61da8e1253fa402ba0302"
+        ),
+        # FortiGate VM 7.4.3
+        "ba0450947e51844588b29bd302d2a1a3802f7718cf6840011c1b34f1c1f0bb89": _kdf_7_4_x(
+            "4cf7a950b99cf29b0343e7ba6c609e49d9766f16c6d2f075f72ad400542f0765"
         ),
     }
 

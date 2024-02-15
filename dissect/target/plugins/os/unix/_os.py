@@ -203,29 +203,29 @@ class UnixPlugin(OSPlugin):
                 fs_subvol = None
                 fs_subvolid = None
                 fs_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
-                last_mount = None
+                fs_last_mount = None
 
-                if dev_id:
-                    if fs.__type__ == "xfs":
-                        fs_id = fs.xfs.uuid
-                    elif fs.__type__ == "ext":
-                        fs_id = fs.extfs.uuid
-                        last_mount = fs.extfs.last_mount
-                    elif fs.__type__ == "btrfs":
-                        fs_id = fs.btrfs.uuid
-                        fs_subvol = fs.subvolume.path
-                        fs_subvolid = fs.subvolume.objectid
-                    elif fs.__type__ == "fat":
-                        fs_id = fs.fatfs.volume_id
-                        # This normalizes fs_id to comply with libblkid generated UUIDs
-                        # This is needed because FAT filesystems don't have a real UUID,
-                        # but instead a volume_id which is not case-sensitive
-                        fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
+                if fs.__type__ == "xfs":
+                    fs_id = fs.xfs.uuid
+                elif fs.__type__ == "ext":
+                    fs_id = fs.extfs.uuid
+                    fs_last_mount = fs.extfs.last_mount
+                    fs_volume_name = fs.extfs.volume_name
+                elif fs.__type__ == "btrfs":
+                    fs_id = fs.btrfs.uuid
+                    fs_subvol = fs.subvolume.path
+                    fs_subvolid = fs.subvolume.objectid
+                elif fs.__type__ == "fat":
+                    fs_id = fs.fatfs.volume_id
+                    # This normalizes fs_id to comply with libblkid generated UUIDs
+                    # This is needed because FAT filesystems don't have a real UUID,
+                    # but instead a volume_id which is not case-sensitive
+                    fs_id = fs_id[:4].upper() + "-" + fs_id[4:].upper()
 
                 if (
                     (fs_id and (fs_id == dev_id and (subvol == fs_subvol or subvolid == fs_subvolid)))
                     or (fs_volume_name and (fs_volume_name == volume_name))
-                    or (last_mount and (last_mount == mount_point))
+                    or (fs_last_mount and (fs_last_mount == mount_point))
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
@@ -353,6 +353,8 @@ def parse_fstab(
             volume_name = "-".join(part.replace("-", "--") for part in dev.rsplit("/")[-2:])
         elif dev.startswith("UUID="):
             dev_id = dev.split("=")[1]
+        elif dev.startswith("LABEL="):
+            volume_name = dev.split("=")[1]
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue
