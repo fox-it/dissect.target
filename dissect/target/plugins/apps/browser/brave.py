@@ -2,12 +2,13 @@ from typing import Iterator
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
 from dissect.target.plugins.apps.browser.chromium import (
@@ -47,6 +48,10 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
         "browser/brave/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/brave/password", GENERIC_PASSWORD_RECORD_FIELDS
+    )
+
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records for Brave."""
@@ -66,3 +71,14 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Brave."""
         yield from super().extensions("brave")
+
+    @export(record=BrowserPasswordRecord)
+    @arg(
+        "--passwords",
+        type=str,
+        default="",
+        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
+    )
+    def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
+        """Return browser password records for Brave."""
+        yield from super().passwords("brave", passwords)
