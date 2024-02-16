@@ -95,12 +95,27 @@ class PLocateFile:
         self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
 
     def __iter__(self) -> Iterable[PLocateFile]:
-        with self.ctx.stream_reader(self.buf) as reader:
-            # NOTE: This is a workaround for a pypy3.9 bug
-            # Somehow _only_ wrapping it in a BytesIO results in reading the correct data
-            if platform.python_implementation() == "PyPy" and sys.version_info < (3, 10):
-                reader = BytesIO(bytearray(reader.read()))
+        # NOTE: This is a workaround for a pypy3.9 bug
+        if platform.python_implementation() == "PyPy" and sys.version_info < (3, 10):
+            obj = self.ctx.decompressobj()
+            buf = self.buf.read()
 
+            tmp = obj.decompress(buf)
+            while unused_data := obj.unused_data:
+                obj = self.ctx.decompressobj()
+                tmp += obj.decompress(unused_data)
+
+            buf = BytesIO(tmp)
+
+            try:
+                while True:
+                    file = c_plocate.file(buf)
+                    yield file.path.decode(errors="surrogateescape")
+            except EOFError:
+                return
+            return
+
+        with self.ctx.stream_reader(self.buf) as reader:
             try:
                 while True:
                     file = c_plocate.file(reader)
