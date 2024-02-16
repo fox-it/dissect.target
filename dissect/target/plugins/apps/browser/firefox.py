@@ -302,7 +302,9 @@ class FirefoxPlugin(BrowserPlugin):
             key4_file = profile_dir.joinpath("key4.db")
 
             if not login_file.exists():
-                self.target.log.warning(f"No 'logins.json' password file found for user {user} in directory {profile_dir}")
+                self.target.log.warning(
+                    f"No 'logins.json' password file found for user {user} in directory {profile_dir}"
+                )
                 continue
 
             if key3_file.exists() and not key4_file.exists():
