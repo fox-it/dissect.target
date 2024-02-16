@@ -47,8 +47,9 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
+
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/chrome/password", GENERIC_PASSWORD_RECORD_FIELDS
+        "browser/edge/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     @export(record=BrowserHistoryRecord)
@@ -76,7 +77,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         "--passwords",
         type=str,
         default="",
-        help="Supply plaintext Windows passwords or sha1 hashes in comma delimited fashion.",
+        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
     )
     def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
         """Return browser password records for Microsoft Edge."""

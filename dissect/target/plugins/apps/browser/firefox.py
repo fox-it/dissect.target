@@ -284,7 +284,7 @@ class FirefoxPlugin(BrowserPlugin):
         "--passwords",
         type=str,
         default="",
-        help="Supply a firefox primary password (master password) to decrypt the internal password store.",
+        help="Supply a primary password (master password) to decrypt the internal password store.",
     )
     def passwords(self, firefox_primary_password="") -> Iterator[BrowserPasswordRecord]:
         """Return Firefox browser password records.

@@ -79,7 +79,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         "--passwords",
         type=str,
         default="",
-        help="Supply plaintext Windows passwords or sha1 hashes in comma delimited fashion.",
+        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
     )
     def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
         """Return browser password records for Google Chrome."""
