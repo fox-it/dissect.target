@@ -95,7 +95,11 @@ class PLocateFile:
         self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
 
     def __iter__(self) -> Iterable[PLocateFile]:
-        # NOTE: This is a workaround for a pypy3.9 bug
+        # NOTE: This is a workaround for a PyPy 3.9 bug
+        # We don't know what breaks, but PyPy + zstandard = unhappy times
+        # You just get random garbage data back instead of the decompressed data
+        # This weird dance of using a decompressobj and unused data is the only way that seems to work
+        # It's more expensive on memory, but at least it doesn't break
         if platform.python_implementation() == "PyPy" and sys.version_info < (3, 10):
             obj = self.ctx.decompressobj()
             buf = self.buf.read()
@@ -105,17 +109,11 @@ class PLocateFile:
                 obj = self.ctx.decompressobj()
                 tmp += obj.decompress(unused_data)
 
-            buf = BytesIO(tmp)
+            reader = BytesIO(tmp)
+        else:
+            reader = self.ctx.stream_reader(self.buf)
 
-            try:
-                while True:
-                    file = c_plocate.file(buf)
-                    yield file.path.decode(errors="surrogateescape")
-            except EOFError:
-                return
-            return
-
-        with self.ctx.stream_reader(self.buf) as reader:
+        with reader:
             try:
                 while True:
                     file = c_plocate.file(reader)
