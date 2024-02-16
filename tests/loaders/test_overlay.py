@@ -1,7 +1,15 @@
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.overlay import OverlayLoader
+from tests.plugins.apps.container.test_docker import (  # noqa: F401
+    fs_docker,
+    target_linux_docker,
+)
 
 
-def test_overlay_loader_docker_container(target_linux_docker, fs_docker) -> None:
+def test_overlay_loader_docker_container(
+    target_linux_docker: Target, fs_docker: VirtualFilesystem  # noqa: F811
+) -> None:
     for container in target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir():
         assert OverlayLoader.detect(container)
         loader = OverlayLoader(container)
@@ -11,7 +19,7 @@ def test_overlay_loader_docker_container(target_linux_docker, fs_docker) -> None
 
     container_fs = target_linux_docker.filesystems[1]
     for layer in container_fs.mounts["/"]:
-        assert layer.__fstype__ == "overlay_layer"
+        assert layer.__type__ == "overlay"
 
     assert [str(p) for p in container_fs.path("/").iterdir()] == [
         "/home",

@@ -33,7 +33,7 @@ class OverlayFilesystem(RootFilesystem):
 class OverlayLayerFilesystem(Filesystem):
     """Based on DirectoryFilesystem."""
 
-    __fstype__ = "overlay_layer"
+    __type__ = "overlay"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
