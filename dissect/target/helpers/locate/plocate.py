@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import platform
+import sys
 from io import BytesIO
 from typing import BinaryIO, Iterable
 
@@ -38,7 +40,7 @@ struct header {
 
 struct file {
     char path[];
-}
+};
 """
 
 c_plocate = cstruct()
@@ -94,12 +96,14 @@ class PLocateFile:
 
     def __iter__(self) -> Iterable[PLocateFile]:
         with self.ctx.stream_reader(self.buf) as reader:
+            # NOTE: This is a workaround for a pypy3.9 bug
+            # Somehow _only_ wrapping it in a BytesIO results in reading the correct data
+            if platform.python_implementation() == "PyPy" and sys.version_info < (3, 10):
+                reader = BytesIO(bytearray(reader.read()))
+
             try:
-                # NOTE: this is a workaround for a pypy3.9 bug. this should be changed once moved to pypy3.10.
-                # wrapping the reader into a bytearray causes pypy3.9 to behave as expected.
-                buf = BytesIO(bytearray(reader.read()))
                 while True:
-                    file = c_plocate.file(buf)
+                    file = c_plocate.file(reader)
                     yield file.path.decode(errors="surrogateescape")
             except EOFError:
                 return
