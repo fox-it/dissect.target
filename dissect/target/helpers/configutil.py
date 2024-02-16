@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
@@ -25,6 +26,13 @@ from defusedxml import ElementTree
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
+
+try:
+    import yaml
+
+    PY_YAML = True
+except (AttributeError, ImportError):
+    PY_YAML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -151,7 +159,7 @@ class ConfigurationParser:
         try:
             self.parse_file(fh)
         except Exception as e:
-            raise ConfigurationParsingError from e
+            raise ConfigurationParsingError(*e.args) from e
 
         if self.collapse_all or self.collapse:
             self.parsed_data = self._collapse_dict(self.parsed_data)
@@ -327,6 +335,77 @@ class Xml(ConfigurationParser):
             raise ConfigurationParsingError(f"Could not parse XML file: {fh.name} after {errors} attempts.")
 
         self.parsed_data = tree
+
+
+class ListUnwrapper:
+    """Provides utility functions to unwrap dictionary objects out of lists."""
+
+    @staticmethod
+    def unwrap(data: Union[dict, list]) -> Union[dict, list]:
+        """Transforms a list with dictionaries to a dictionary.
+
+        The order of the list is preserved. If no dictionary is found,
+        the list remains untouched:
+
+            ["value1", "value2"]    -> ["value1", "value2"]
+
+            {"data": "value"}       -> {"data": "value"}
+
+            [{"data": "value"}]     -> {
+                                           "list_item0": {
+                                                "data": "value"
+                                           }
+                                       }
+        """
+        orig = ListUnwrapper._unwrap_dict_list(data)
+        return ListUnwrapper._unwrap_dict(orig)
+
+    @staticmethod
+    def _unwrap_dict(data: Union[dict, list]) -> Union[dict, list]:
+        """Looks for dictionaries and unwraps its values."""
+
+        if not isinstance(data, dict):
+            return data
+
+        root = dict()
+        for key, value in data.items():
+            _value = ListUnwrapper._unwrap_dict_list(value)
+            if isinstance(_value, dict):
+                _value = ListUnwrapper._unwrap_dict(_value)
+            root[key] = _value
+
+        return root
+
+    @staticmethod
+    def _unwrap_dict_list(data: Union[dict, list]) -> Union[dict, list]:
+        """Unwraps a list containing dictionaries."""
+        if not isinstance(data, list) or not any(isinstance(obj, dict) for obj in data):
+            return data
+
+        return_value = {}
+        for idx, elem in enumerate(data):
+            return_value[f"list_item{idx}"] = elem
+
+        return return_value
+
+
+class Json(ConfigurationParser):
+    """Parses a JSON file."""
+
+    def parse_file(self, fh: TextIO):
+        parsed_data = json.load(fh)
+        self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+
+
+class Yaml(ConfigurationParser):
+    """Parses a Yaml file."""
+
+    def parse_file(self, fh: TextIO) -> None:
+        if PY_YAML:
+            parsed_data = yaml.load(fh, yaml.BaseLoader)
+            self.parsed_data = ListUnwrapper.unwrap(parsed_data)
+        else:
+            raise ConfigurationParsingError("Failed to parse file, please install PyYAML.")
 
 
 class ScopeManager:
@@ -609,7 +688,9 @@ MATCH_MAP: dict[str, ParserConfig] = {
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "ini": ParserConfig(Ini),
     "xml": ParserConfig(Xml),
-    "json": ParserConfig(Txt),
+    "json": ParserConfig(Json),
+    "yml": ParserConfig(Yaml),
+    "yaml": ParserConfig(Yaml),
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
     "sample": ParserConfig(Txt),

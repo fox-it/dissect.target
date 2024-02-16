@@ -171,7 +171,14 @@ class ApachePlugin(WebserverPlugin):
 
     __namespace__ = "apache"
 
-    DEFAULT_LOG_DIRS = ["/var/log/apache2", "/var/log/apache", "/var/log/httpd", "/var/log"]
+    DEFAULT_LOG_DIRS = [
+        "/var/log/apache2",
+        "/var/log/apache",
+        "/var/log/httpd",
+        "/var/log",
+        "sysvol/xampp/apache/logs",
+        "/opt/lampp/logs",
+    ]
     ACCESS_LOG_NAMES = ["access.log", "access_log", "httpd-access.log"]
     ERROR_LOG_NAMES = ["error.log"]
     DEFAULT_CONFIG_PATHS = [

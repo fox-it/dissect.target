@@ -69,7 +69,8 @@ def test_collapse_types(
     [
         ("ini", b"[DEFAULT]\nkey=value"),
         ("xml", b"<a>currently_just_text</a>"),
-        ("json", b"currently_just_text"),
+        ("json", b'{"key": "value"}'),
+        ("yaml", b"key: value"),
         ("cnf", b"key=value"),
         ("conf", b"key value"),
         ("sample", b"currently_just_text"),
