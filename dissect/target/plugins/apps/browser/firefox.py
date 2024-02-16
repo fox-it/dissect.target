@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Iterator
 
 from dissect.sql import sqlite3
@@ -7,13 +8,15 @@ from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import from_unix_ms, from_unix_us
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.helpers.apps.browser import firefox
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
     try_idna,
 )
@@ -48,6 +51,10 @@ class FirefoxPlugin(BrowserPlugin):
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
+    )
+
     def __init__(self, target):
         super().__init__(target)
         self.users_dirs = []
@@ -62,6 +69,14 @@ class FirefoxPlugin(BrowserPlugin):
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 
+    def _iter_profiles(self) -> Iterator[tuple[str, Path, Path]]:
+        """Yield user directories."""
+        for user, cur_dir in self.users_dirs:
+            for profile_dir in cur_dir.iterdir():
+                if not profile_dir.is_dir():
+                    continue
+                yield user, cur_dir, profile_dir
+
     def _iter_db(self, filename: str) -> Iterator[SQLite3]:
         """Yield opened history database files of all users.
 
@@ -71,16 +86,14 @@ class FirefoxPlugin(BrowserPlugin):
         Yields:
             Opened SQLite3 databases.
         """
-        for user, cur_dir in self.users_dirs:
-            for profile_dir in cur_dir.iterdir():
-                if profile_dir.is_dir():
-                    db_file = profile_dir.joinpath(filename)
-                    try:
-                        yield user, db_file, sqlite3.SQLite3(db_file.open())
-                    except FileNotFoundError:
-                        self.target.log.warning("Could not find %s file: %s", filename, db_file)
-                    except SQLError as e:
-                        self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
+        for user, cur_dir, profile_dir in self._iter_profiles():
+            db_file = profile_dir.joinpath(filename)
+            try:
+                yield user, db_file, sqlite3.SQLite3(db_file.open())
+            except FileNotFoundError:
+                self.target.log.warning("Could not find %s file: %s", filename, db_file)
+            except SQLError as e:
+                self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
@@ -167,7 +180,7 @@ class FirefoxPlugin(BrowserPlugin):
                     yield self.BrowserCookieRecord(
                         ts_created=from_unix_us(cookie.creationTime),
                         ts_last_accessed=from_unix_us(cookie.lastAccessed),
-                        browser="Firefox",
+                        browser="firefox",
                         name=cookie.name,
                         value=cookie.value,
                         host=cookie.host,
@@ -265,4 +278,71 @@ class FirefoxPlugin(BrowserPlugin):
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+
+    @export(record=BrowserPasswordRecord)
+    @arg(
+        "--passwords",
+        type=str,
+        default="",
+        help="Supply a firefox primary password (master password) to decrypt the internal password store.",
+    )
+    def passwords(self, firefox_primary_password="") -> Iterator[BrowserPasswordRecord]:
+        """Return Firefox browser password records.
+
+        Automatically decrypts passwords from Firefox 58 onwards (2018) if no primary password is set.
+        Alternatively, you can supply a primary password through ``--passwords`` to access the Firefox password store.
+
+        Resources:
+            - https://github.com/lclevy/firepwd
+        """
+
+        for user, _, profile_dir in self._iter_profiles():
+            login_file = profile_dir.joinpath("logins.json")
+            key3_file = profile_dir.joinpath("key3.db")
+            key4_file = profile_dir.joinpath("key4.db")
+
+            if not login_file.exists():
+                self.target.log.warning(f"No 'logins.json' password file found for user {user} in directory {profile_dir}")
+                continue
+
+            if key3_file.exists() and not key4_file.exists():
+                self.target.log.warning(f"Unsupported file 'key3.db' found in {profile_dir}")
+                continue
+
+            if not key4_file.exists():
+                self.target.log.warning(f"No 'key4.db' found in {profile_dir}")
+                continue
+
+            try:
+                logins = json.load(login_file.open())
+
+                for login in logins.get("logins", []):
+                    decrypted_username, decrypted_password = firefox.decrypt(
+                        login.get("encryptedUsername"),
+                        login.get("encryptedPassword"),
+                        key4_file,
+                        firefox_primary_password,
+                    )
+
+                    yield self.BrowserPasswordRecord(
+                        browser="firefox",
+                        id=login.get("id"),
+                        ts_created=login.get("timeCreated", 0) // 1000,
+                        ts_last_used=login.get("timeLastUsed", 0) // 1000,
+                        ts_last_changed=login.get("timePasswordChanged", 0) // 1000,
+                        url=login.get("hostname"),
+                        encrypted_username=login.get("encryptedUsername"),
+                        encrypted_password=login.get("encryptedPassword"),
+                        decrypted_username=decrypted_username,
+                        decrypted_password=decrypted_password,
+                        source=login_file,
+                        _target=self.target,
+                        _user=user,
+                    )
+
+            except FileNotFoundError:
+                self.target.log.info(f"No password file found for user {user} in directory {profile_dir}.")
+            except json.JSONDecodeError:
+                self.target.log.warning(
+                    f"logins.json file in directory {profile_dir} is malformed, consider inspecting the file manually."
+                )

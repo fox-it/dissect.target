@@ -63,6 +63,21 @@ GENERIC_HISTORY_RECORD_FIELDS = [
     ("uri", "from_url"),
     ("path", "source"),
 ]
+
+GENERIC_PASSWORD_RECORD_FIELDS = [
+    ("datetime", "ts_created"),
+    ("datetime", "ts_last_used"),
+    ("datetime", "ts_last_changed"),
+    ("string", "browser"),
+    ("varint", "id"),
+    ("uri", "url"),
+    ("string", "encrypted_username"),
+    ("string", "encrypted_password"),
+    ("string", "decrypted_username"),
+    ("string", "decrypted_password"),
+    ("path", "source"),
+]
+
 BrowserDownloadRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/download", GENERIC_DOWNLOAD_RECORD_FIELDS
 )
@@ -74,6 +89,9 @@ BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension
 )
 BrowserCookieRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "browser/cookie", GENERIC_COOKIE_FIELDS
+)
+BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "browser/password", GENERIC_PASSWORD_RECORD_FIELDS
 )
 
 

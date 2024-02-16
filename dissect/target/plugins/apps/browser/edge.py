@@ -2,12 +2,13 @@ from typing import Iterator
 
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
 from dissect.target.plugins.apps.browser.chromium import (
@@ -46,6 +47,9 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chrome/password", GENERIC_PASSWORD_RECORD_FIELDS
+    )
 
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
@@ -66,3 +70,14 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Microsoft Edge."""
         yield from super().extensions("edge")
+
+    @export(record=BrowserPasswordRecord)
+    @arg(
+        "--passwords",
+        type=str,
+        default="",
+        help="Supply plaintext Windows passwords or sha1 hashes in comma delimited fashion.",
+    )
+    def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
+        """Return browser password records for Microsoft Edge."""
+        yield from super().passwords("edge", passwords)
