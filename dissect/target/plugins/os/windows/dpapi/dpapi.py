@@ -25,6 +25,7 @@ class DPAPIPlugin(InternalPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
+        self.mk_passwords = None
 
     def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
@@ -84,6 +85,10 @@ class DPAPIPlugin(InternalPlugin):
 
         return result
 
+    @cached_property
+    def _users(self) -> dict:
+        return {u.name: {"sid": u.sid} for u in self.target.users()}
+
     def _load_master_keys_from_path(self, username: str, path: Path) -> dict[str, MasterKeyFile]:
         if not path.exists():
             return {}
@@ -104,6 +109,21 @@ class DPAPIPlugin(InternalPlugin):
                     if not mkf.decrypted:
                         raise Exception("Failed to decrypt System master key")
 
+                elif self.mk_passwords is not None:
+                    user = self._users[username]
+                    for mk_pass in self.mk_passwords:
+                        if mkf.decrypt_with_password(user["sid"], mk_pass):
+                            break
+                        else:
+                            try:
+                                if mkf.decrypt_with_hash(user["sid"], bytes.fromhex(mk_pass)) is True:
+                                    break
+                            except ValueError:
+                                pass
+
+                    if not mkf.decrypted:
+                        self.target.log.warning(f"Could not decrypt user DPAPI master key for user {username}")
+
                 result[file.name] = mkf
 
         return result
@@ -118,6 +138,19 @@ class DPAPIPlugin(InternalPlugin):
             raise ValueError("Failed to decrypt system blob")
 
         return blob.clear_text
+
+    def decrypt_blob(self, data: bytes, mk_passwords: list) -> bytes:
+        """Attempt to decrypt the given bytes using any of the available master keys."""
+        blob = DPAPIBlob(data)
+        self.mk_passwords = mk_passwords
+
+        for user in self.master_keys:
+            for mk_uuid in self.master_keys[user]:
+                mk = self.master_keys[user][mk_uuid]
+                if blob.decrypt(mk.key):
+                    return blob.clear_text
+
+        raise ValueError("Failed to decrypt user blob")
 
 
 def _decrypt_aes(data: bytes, key: bytes) -> bytes:

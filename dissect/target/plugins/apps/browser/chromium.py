@@ -1,7 +1,8 @@
+import base64
 import itertools
 import json
 from collections import defaultdict
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
@@ -9,15 +10,17 @@ from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.helpers.apps.browser.chromium import decrypt_v10, decrypt_v10_2
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import OperatingSystem, arg, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
     try_idna,
 )
@@ -49,6 +52,10 @@ class ChromiumMixin:
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/chromium/extension", GENERIC_EXTENSION_RECORD_FIELDS
+    )
+
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/chromium/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     def _build_userdirs(self, hist_paths: list[str]) -> list[tuple[UserDetails, TargetPath]]:
@@ -100,7 +107,7 @@ class ChromiumMixin:
 
     def _iter_json(self, filename: str) -> Iterator[tuple[str, TargetPath, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
-        of user name, JSON file path, and the parsed JSON data.
+        of username, JSON file path, and the parsed JSON data.
 
         Args:
             filename (str): The name of the JSON file to search for in each
@@ -371,6 +378,119 @@ class ChromiumMixin:
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
+    def _get_local_state_key(self, local_state_path: TargetPath, chromium_passwords: list) -> Union[bytes, bool]:
+        """Get the Chromium os_crypt encrypted_key and decrypt the key using DPAPI."""
+
+        if not local_state_path.exists():
+            self.target.log.warning(f"File {local_state_path} does not exist.")
+            return False
+
+        try:
+            local_state_conf = json.loads(local_state_path.read_text())
+        except json.JSONDecodeError:
+            self.target.log.warning(f"File {local_state_path} does not contain valid JSON.")
+            return False
+
+        if "os_crypt" not in local_state_conf:
+            self.target.log.warning(
+                f"File {local_state_path} does not contain os_crypt, Chrome is likely older than v80."
+            )
+            return False
+
+        encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
+        decrypted_key = self.target.dpapi.decrypt_blob(encrypted_key, chromium_passwords)
+        return decrypted_key
+
+    def passwords(self, browser_name: str = None, chromium_passwords: list = None) -> Iterator[BrowserPasswordRecord]:
+        """Return browser password records from Chromium browsers.
+
+        Chromium on Linux has ``basic``, ``gnome`` and ``kwallet`` methods for password storage:
+            - ``basic`` ciphertext prefixed with ``v10`` and encrypted with hard coded parameters.
+            - ``gnome`` and ``kwallet`` ciphertext prefixed with ``v11`` which is not implemented (yet).
+
+        Chromium on Windows uses DPAPI user encryption. Passwords from Chromium before and after version 80 can be
+        decrypted. The SHA1 hash of the user's password or the plaintext password is required to decrypt passwords.
+
+        You can supply a SHA1 hash or plaintext password using the ``--passwords`` option.
+
+        Resources:
+            - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
+            - https://chromium.googlesource.com/chromium/src/+/master/components/os_crypt/sync/os_crypt_linux.cc#40
+        """
+
+        for user, db_file, db in self._iter_db("Login Data"):
+            rows = db.table("logins").rows()
+            decrypted_key = False
+
+            if self.target.os == OperatingSystem.WINDOWS.value:
+                local_state_path = db_file.parent.parent.joinpath("Local State")
+                decrypted_key = self._get_local_state_key(local_state_path, chromium_passwords)
+
+            for row in rows:
+                encrypted_password: bytes = row.password_value
+                decrypted_password = ""
+
+                # 1. Windows DPAPI encrypted password. Chrome > 80
+                #    For passwords saved after Chromium v80, we have to use DPAPI to decrypt the AES key
+                #    stored by Chromium to encrypt and decrypt passwords.
+                if self.target.os == OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v10"):
+                    if not decrypted_key:
+                        self.target.log.warning("Cannot decrypt password, no decrypted_key could be calculated.")
+
+                    else:
+                        try:
+                            decrypted_password = decrypt_v10_2(encrypted_password, decrypted_key)
+                        except Exception as e:
+                            self.target.log.warning("Failed to decrypt AES Chromium password")
+                            self.target.log.debug("", exc_info=e)
+
+                # 2. Windows DPAPI encrypted password. Chrome < 80
+                #    For passwords saved before Chromium v80, we use DPAPI directly for each entry.
+                elif self.target.os == OperatingSystem.WINDOWS.value and encrypted_password.startswith(
+                    b"\x01\x00\x00\x00"
+                ):
+                    try:
+                        decrypted_password = self.target.dpapi.decrypt_blob(encrypted_password, chromium_passwords)
+                    except ValueError as e:
+                        self.target.log.warning("Failed to decrypt DPAPI Chromium password")
+                        self.target.log.debug("", exc_info=e)
+                    except UnsupportedPluginError as e:
+                        self.target.log.warning("Target is missing required registry keys for DPAPI")
+                        self.target.log.debug("", exc_info=e)
+
+                # 3. Linux 'basic' v10 encrypted password.
+                elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v10"):
+                    decrypted_password = decrypt_v10(encrypted_password)
+
+                # 4. Linux 'gnome' or 'kwallet' encrypted password.
+                elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v11"):
+                    self.target.log.warning(
+                        f"Unable to decrypt {browser_name} password in '{db_file}': unsupported format."
+                    )
+
+                # 5. Unsupported.
+                else:
+                    prefix = encrypted_password[:10]
+                    self.target.log.warning(
+                        f"Unsupported {browser_name} encrypted password found in '{db_file}' with prefix '{prefix}'"
+                    )
+
+                yield self.BrowserPasswordRecord(
+                    browser=browser_name,
+                    id=row.id,
+                    ts_created=webkittimestamp(row.date_created),
+                    ts_last_used=webkittimestamp(row.date_last_used),
+                    ts_last_changed=webkittimestamp(row.date_password_modified or 0),
+                    url=row.origin_url,
+                    encrypted_username="",
+                    encrypted_password=base64.b64encode(row.password_value),
+                    decrypted_username=row.username_value,
+                    decrypted_password=decrypted_password,
+                    source=db_file,
+                    _target=self.target,
+                    _user=user,
+                )
+
 
 class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     """Chromium browser plugin."""
@@ -405,3 +525,14 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     def extensions(self) -> Iterator[ChromiumMixin.BrowserExtensionRecord]:
         """Return browser extension records for Chromium browser."""
         yield from super().extensions("chromium")
+
+    @export(record=ChromiumMixin.BrowserPasswordRecord)
+    @arg(
+        "--passwords",
+        type=str,
+        default="",
+        help="Supply plaintext Windows passwords or sha1 hashes in comma delimited fashion.",
+    )
+    def passwords(self, passwords: str = "") -> Iterator[ChromiumMixin.BrowserPasswordRecord]:
+        """Return browser password records for Chromium browser."""
+        yield from super().passwords("chromium", passwords.split(","))
