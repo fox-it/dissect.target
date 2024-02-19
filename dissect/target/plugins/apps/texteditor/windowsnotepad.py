@@ -1,4 +1,3 @@
-import io
 import zlib
 from typing import BinaryIO, Iterator
 
@@ -15,14 +14,14 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
 )
 
 c_def = """
-struct data_entry_multi_block {
+struct multi_block_entry {
     uint16    offset;
     uleb128   len;
     char      data[len * 2];
     char      crc32[4];
 };
 
-struct data_entry_single_block {
+struct single_block_entry {
     uint16    offset;
     uleb128   len;
     char      data[len * 2];
@@ -30,17 +29,32 @@ struct data_entry_single_block {
     char      crc32[4];
 };
 
-struct tab_header {
-    char      magic[3];         // NP\x00
-    char      header_start[2];  // \x00\x01
-    uleb128   len1;
-    uleb128   len2;
-    char      header_end[2];    // \x01\x00
-};
-
-struct tab_crc {
+struct header_crc {
     char      unk[4];
     char      crc32[4];
+};
+
+struct tab {
+    char                        magic[3];         // NP\x00
+    char                        header_start[2];  // \x00\x01
+    uleb128                     len1;
+    uleb128                     len2;
+    char                        header_end[2];    // \x01\x00
+    
+    // Data can be stored in two says:
+    //  1. A single, contiguous block of data that holds all the data
+    //     In this case, the header is included in the single CRC32 checksum present at the end of the block
+    //  2. Multiple blocks of data that, when combined, hold all the data
+    //     In this case, the header has a separate CRC32 value stored at the end of the header
+    // The following bitmask operations basically check whether len1 is nonzero (boolean check) and depending
+    // on the outcome, parse 0 or 1 (so basically, parse or not parse) structs.
+    header_crc                  header_crc[((len1 | -len1) >> 31) ^ 1]; // Optional, only if len1 == 0
+    single_block_entry          single_block_entry[((len1 | (~len1 + 1)) >> 31) & 1];  // Optional, only if len1 > 0
+
+
+    multi_block_entry           multi_block_entries[EOF];  // Optional. If a single_block_entry is present
+                                                           // this will already be at EOF, so it won't do anything.
+                                                           // Otherwise, it will parse the individual blocks.
 };
 """
 
@@ -49,25 +63,8 @@ c_windowstab.load(c_def)
 
 
 def _calc_crc32(data: bytes) -> bytes:
-    """Perform a CRC32 checksum on the data and return it as a big-endian uint32"""
+    """Perform a CRC32 checksum on the data and return it as bytes"""
     return zlib.crc32(data).to_bytes(length=4, byteorder="big")
-
-
-def seek_size(fh: BinaryIO) -> int:
-    """
-    Find the size of a file on disk.
-
-    Args:
-        fh: A file-like object that we want to calculate the size of.
-
-    Returns:
-        An integer representing the size (in bytes) of the file.
-    """
-    pos = fh.tell()
-    fh.seek(0, io.SEEK_END)
-    size = fh.tell()
-    fh.seek(pos)
-    return size
 
 
 class WindowsNotepadPlugin(TexteditorTabPlugin):
@@ -105,25 +102,14 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
         """
         fh: BinaryIO = file.open(mode="rb")
 
-        # There is always a 4 byte value at the end. The offset is always 2 bytes, and the length is always at
-        # least 1 byte. That means that if we reach the end of a data section, and we have equal or less
-        # than 4 + 2 + 1 = 7 bytes left, we should stop parsing new data blobs.
-        data_threshold = seek_size(fh) - 4 - 2 - 1
+        tab = c_windowstab.tab(fh)
 
-        # Parse the generic header
-        header = c_windowstab.tab_header(fh)
+        if tab.len1 != 0:
+            # Reconstruct the text of the single_block_entry variant
+            data_entry = tab.single_block_entry[0]
 
-        # Some tabs are stored as one big block. In this case, the data is contiguous and the file
-        # only contains one CRC32 at the end which checksums the entire file (excluding the file magic).
-        # It is likely stored as a single block whenever a length field is nonzero in the header.
-        is_single_blob = header.len1 != 0
-
-        if is_single_blob:
-            # In this case, we parse the single block
-            data_entry = c_windowstab.data_entry_single_block(fh)
-
-            # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included
-            actual_crc32 = _calc_crc32(header.dumps()[3:] + data_entry.dumps()[:-4])
+            # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included in the checksum
+            actual_crc32 = _calc_crc32(tab.dumps()[3:-4])
 
             if data_entry.crc32 != actual_crc32:
                 raise CRCMismatchException(
@@ -131,27 +117,19 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
                     f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
                 )
 
-            # Finally, decode the block using UTF16-LE, common for Windows.
             text = data_entry.data.decode("utf-16-le")
 
         else:
-            # In this case, the header contains a separate CRC32 checksum as well
-            header_crc = c_windowstab.tab_crc(fh)
+            # Reconstruct the text of the multi_block_entry variant
+            # CRC32 is calculated based on the entire header, up to the point where the CRC32 value is stored
+            assert tab.header_crc[0].crc32 == _calc_crc32(tab.dumps()[3 : tab.dumps().index(tab.header_crc[0].crc32)])
 
-            # The header, minus the file magic, plus some bytes from the extra header are
-            # required in the calculation
-            assert header_crc.crc32 == _calc_crc32(header.dumps()[3:] + header_crc.unk.dumps())
+            # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
+            # a list is used to easily insert text at offsets
+            text = ["\x00"]
 
-            # We don't know how many blocks there will be beforehand. So we also don't know the exact file
-            # size, since the file, next to data, also contains quite some metadata and checksums.
-            # Also, because blocks can possibly be present in a non-contiguous order, a list is used
-            # that gradually increases in size. This allows for quick and flexible insertion of chars.
-            text = ["\x00"] * 100
-
-            while fh.tell() < data_threshold:
-                data_entry = c_windowstab.data_entry_multi_block(fh)
-
-                # Check for CRC mismatch in a data block
+            for data_entry in tab.multi_block_entries:
+                # Check the CRC32 checksum for this block
                 actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
                 if data_entry.crc32 != actual_crc32:
                     raise CRCMismatchException(
@@ -159,17 +137,20 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
                         f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
                     )
 
-                # Since we don't know the size of the file in the beginning, gradually increase the size
-                # of the list that holds the data if there is not enough room
-                while data_entry.offset + data_entry.len > len(text) and data_entry.len > 0:
-                    text += ["\x00"] * 100
+                # If there is no data to be added, skip. This may happen sometimes.
+                if data_entry.len <= 0:
+                    continue
+
+                # Extend the list if required. All characters need to fit in the list.
+                while data_entry.offset + data_entry.len > len(text):
+                    text += "\x00"
 
                 # Place the text at the correct offset. UTF16-LE consumes two bytes for one character.
                 for i in range(data_entry.len):
                     text[data_entry.offset + i] = data_entry.data[(2 * i) : (2 * i) + 2].decode("utf-16-le")
 
-            # Join the chars and strip off excess null bytes that may be present
-            text = "".join(text).rstrip("\x00")
+            # Join all the characters to reconstruct the original text
+            text = "".join(text)
 
         return self.TextEditorTabRecord(content=text, content_length=len(text), filename=file.name)
 
