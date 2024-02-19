@@ -1,54 +1,74 @@
-import socket
-import ssl
-from struct import unpack
-from unittest.mock import MagicMock, call, patch
+import time
+from struct import pack
+from unittest.mock import MagicMock, patch
 
-from dissect.target.loaders.remote import RemoteStream, RemoteStreamConnection
+import paho.mqtt.client as mqtt
+import pytest
 
-
-@patch.object(ssl, "SSLContext", autospec=True)
-@patch.object(socket, "socket", autospec=True)
-def test_remote_loader_stream(mock_socket_class: MagicMock, mock_context: MagicMock) -> None:
-    rsc = RemoteStreamConnection("remote://127.0.0.1", 9001, options={"ca": "A", "key": "B", "crt": "C"})
-    assert rsc.is_connected() is False
-    rsc.connect()
-
-    rsc.remote_disk_data = b"ABC"
-    rsc.remote_disk_response = None
-
-    def send(data: bytes) -> None:
-        _, offset, read = unpack(">BQQ", data)
-        rsc.remote_disk_response = rsc.remote_disk_data[offset : offset + read]
-        return len(data)
-
-    def receive(num: bytes) -> bytes:
-        return rsc.remote_disk_response
-
-    rsc._ssl_sock.send = send
-    rsc._ssl_sock.recv = receive
-    rs = RemoteStream(rsc, 0, 3)
-    rs.align = 1
-    rs.seek(1)
-    data = rs.read(2)
-    rs.close()
-    mock_socket_class.assert_called_with(socket.AddressFamily.AF_INET, socket.SocketKind.SOCK_STREAM)
-    expected = [
-        call(ssl.PROTOCOL_TLSv1_2),
-        call().load_default_certs(),
-        call().load_cert_chain(certfile="C", keyfile="B"),
-        call().load_verify_locations("A"),
-        call().wrap_socket(rsc._socket, server_hostname="remote://127.0.0.1"),
-        call().wrap_socket().connect(("remote://127.0.0.1", 9001)),
-    ]
-    assert data == b"BC"
-    assert mock_context.mock_calls == expected
-    assert rs.tell() == 3
-    assert rsc.is_connected() is True
+from dissect.target import Target
+from dissect.target.loaders.remote import Broker, RemoteLoader
 
 
-@patch.object(ssl, "SSLContext", autospec=False)
-@patch.object(socket, "socket", autospec=True)
-def test_remote_loader_stream_embedded(mock_socket_class: MagicMock, mock_context: MagicMock) -> None:
-    RemoteStreamConnection.configure("K", "C")
-    RemoteStreamConnection("remote://127.0.0.1", 9001)
-    mock_context.assert_has_calls([call().load_cert_chain_str(certfile="C", keyfile="K")])
+class MQTTMock(MagicMock):
+    disks = []
+    hostname = ""
+
+    def fill_disks(self, sizes: list[int]):
+        self.disks = []
+        pattern = list(range(0, 8))
+        for size in sizes:
+            self.disks.append(bytearray(pattern) * 64 * size)  # sizes in sectors of 512
+
+    def publish(self, topic, payload=None):
+        response = mqtt.MQTTMessage()
+        tokens = topic.split("/")
+        command = tokens[2]
+        if command == "TOPO":
+            tokens[2] = "ID"
+            response.topic = "/".join(tokens).encode("utf-8")
+            response.payload = self.hostname.encode("utf-8")
+        elif tokens[2] == "INFO":
+            tokens[2] = "DISKS"
+            response.topic = "/".join(tokens).encode("utf-8")
+            response.payload = pack("<B", len(self.disks))
+            for disk in self.disks:
+                response.payload += pack("<IQ", 512, len(disk))
+        elif tokens[2] == "SEEK":
+            tokens[2] = "READ"
+            response.topic = "/".join(tokens).encode("utf-8")
+            begin = int(tokens[4], 16)
+            end = int(tokens[5], 16)
+            response.payload = self.disks[int(tokens[3])][begin : begin + end]
+        self.on_message(self, None, response)
+        return
+
+
+@pytest.mark.parametrize(
+    "alias, host, disks, disk, seek, read, expected",
+    [
+        ("host1", "host1", [3], 0, 0, 3, b"\x00\x01\x02"),  # basic
+        ("host1", "host1", [10], 0, 1, 3, b"\x01\x02\x03"),  # + use offset
+        ("group1", "host1", [10], 0, 1, 3, b"\x01\x02\x03"),  # + use alias
+        ("group1", "host1", [10, 10, 1], 1, 1, 3, b"\x01\x02\x03"),  # + use disk 2
+    ],
+)
+@patch.object(mqtt, "Client", return_value=MQTTMock())
+@patch.object(time, "sleep")  # improve speed during test, no need to wait for peers
+def test_remote_loader_stream(
+    time: MagicMock, Client: MagicMock, alias, host, disks, disk, seek, read, expected
+) -> None:
+    broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1")
+    broker.connect()
+    broker.mqtt_client.fill_disks(disks)
+    broker.mqtt_client.hostname = host
+    RemoteLoader.broker = broker
+    targets = list(
+        Target.open_all(
+            [f"remote://{alias}?broker=0.0.0.0&port=1884&key=key&crt=crt&ca=ca&peers=1&case=case1"],
+            include_children=True,
+        )
+    )
+    target = targets[-1]
+    target.disks[disk].seek(seek)
+    data = target.disks[disk].read(read)
+    assert data == expected

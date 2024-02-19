@@ -173,8 +173,11 @@ class Broker:
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.client.MQTTMessage) -> None:
         tokens = msg.topic.split("/")
+        casename = tokens[0]
         hostname = tokens[1]
         response = tokens[2]
+        if casename != self.case:
+            return
         if response == "DISKS":
             self._on_disk(hostname, msg.payload)
         elif response == "READ":
@@ -219,7 +222,6 @@ class Broker:
 
 @arg("--remote-peers", type=int, dest="peers", help="minimum number of peers to await for first alias")
 @arg("--remote-case", dest="case", help="case name (broker will determine if you are allowed to access this data)")
-@arg("--remote-host", dest="host", help="hostname of target")
 @arg("--remote-port", type=int, dest="port", help="broker connection port")
 @arg("--remote-broker", dest="broker", help="broker ip-address")
 @arg("--remote-key", dest="key", help="private key file")
