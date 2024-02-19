@@ -16,3 +16,4 @@ tests/_data/plugins/apps/browser/firefox/cookies.sqlite filter=lfs diff=lfs merg
 tests/_data/plugins/os/unix/locate/locatedb filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/os/unix/locate/mlocate.db filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/os/unix/locate/plocate.db filter=lfs diff=lfs merge=lfs -text
+tests/_data/plugins/apps/container/docker/docker.tgz filter=lfs diff=lfs merge=lfs -text
