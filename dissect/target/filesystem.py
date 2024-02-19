@@ -1256,8 +1256,8 @@ class VirtualFilesystem(Filesystem):
                 file.name = fsutil.basename(vfspath)
                 self.map_file_entry(vfspath, file)
                 return
-
-        self.mount(vfspath, tfs)
+        else:
+            self.mount(vfspath, tfs)
 
     def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path) -> None:
         """Map a single file in a tar archive to the given path in the VFS.
