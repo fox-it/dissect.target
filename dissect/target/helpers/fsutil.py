@@ -20,6 +20,13 @@ try:
 except ImportError:
     HAVE_BZ2 = False
 
+try:
+    import zstandard
+
+    HAVE_ZSTD = True
+except ImportError:
+    HAVE_ZSTD = False
+
 import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
 from dissect.target.helpers.polypath import (
@@ -445,17 +452,22 @@ def resolve_link(
 
 
 def open_decompress(
-    path: TargetPath,
+    path: Optional[TargetPath] = None,
     mode: str = "rb",
+    *,
+    fileobj: Optional[BinaryIO] = None,
     encoding: Optional[str] = "UTF-8",
     errors: Optional[str] = "backslashreplace",
     newline: Optional[str] = None,
 ) -> Union[BinaryIO, TextIO]:
-    """Open and decompress a file. Handles gz and bz2 files. Uncompressed files are opened as-is.
+    """Open and decompress a file. Handles gz, bz2 and zstd files. Uncompressed files are opened as-is.
+
+    When passing in an already opened ``fileobj``, the mode, encoding, errors and newline arguments are ignored.
 
     Args:
         path: The path to the file to open and decompress. It is assumed this path exists.
         mode: The mode in which to open the file.
+        fileobj: The file-like object to open and decompress. This is mutually exclusive with path.
         encoding: The decoding for text streams. By default UTF-8 encoding is used.
         errors: The error handling for text streams. By default we're more lenient and use ``backslashreplace``.
         newline: How newlines are handled for text streams.
@@ -469,7 +481,17 @@ def open_decompress(
         for line in open_decompress(Path("/dir/file.gz"), "rt"):
             print(line)
     """
-    file = path.open()
+    if path and fileobj:
+        raise ValueError("path and fileobj are mutually exclusive")
+
+    if not path and not fileobj:
+        raise ValueError("path or fileobj is required")
+
+    if path:
+        file = path.open("rb")
+    else:
+        file = fileobj
+
     magic = file.read(4)
     file.seek(0)
 
@@ -480,12 +502,21 @@ def open_decompress(
 
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
-    # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
-    elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+
+    if HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+        # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
-    else:
+
+    if HAVE_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+        # stream_reader is not seekable, so we have to resort to the less
+        # efficient decompressor which returns bytes.
+        return io.BytesIO(zstandard.decompress(file.read()))
+
+    if path:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
+
+    return file
 
 
 def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:

@@ -12,6 +12,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 DEFENDER_EVTX_FIELDS = [
+    ("datetime", "ts"),
     ("uint32", "EventID"),
     ("string", "Provider_Name"),
     ("string", "Action_ID"),
@@ -78,7 +79,7 @@ DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusion
 
 DefenderLogRecord = TargetRecordDescriptor(
     "filesystem/windows/defender/evtx",
-    [("datetime", "ts")] + DEFENDER_EVTX_FIELDS,
+    DEFENDER_EVTX_FIELDS,
 )
 
 DefenderExclusionRecord = TargetRecordDescriptor(
