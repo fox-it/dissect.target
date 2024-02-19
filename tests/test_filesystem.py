@@ -1,5 +1,6 @@
 import os
 import stat
+from datetime import datetime, timezone
 from io import BytesIO
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 from typing import Union
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from _pytest.fixtures import FixtureRequest
+from dissect.util import ts
 
 from dissect.target import filesystem
 from dissect.target.exceptions import (
@@ -1119,3 +1121,27 @@ def test_reset_file_position() -> None:
         assert isinstance(opened_fs, mock_fs.MockFilesystem)
         assert opened_fs.success
         assert fh.tell() == 512
+
+
+def test_virtual_filesystem_map_dir_from_tar() -> None:
+    mock_fs = VirtualFilesystem()
+    tar_file = absolute_path("_data/loaders/tar/test-archive.tar")
+    mock_fs.map_dir_from_tar("/foo/bar", tar_file)
+
+    assert mock_fs.path("/foo/bar/test-data/test-file.txt").exists()
+    assert mock_fs.path("/foo/bar/test-data/test-file.txt").open().read() == b"test-value\n"
+
+    stat = mock_fs.path("/foo/bar/test-data/test-file.txt").stat()
+    assert ts.from_unix(stat.st_mtime) == datetime(2021, 12, 6, 9, 51, 40, tzinfo=timezone.utc)
+
+
+def test_virtual_filesystem_map_file_from_tar() -> None:
+    mock_fs = VirtualFilesystem()
+    tar_file = absolute_path("_data/loaders/tar/test-archive.tar")
+    mock_fs.map_file_from_tar("/var/example/test.txt", tar_file)
+
+    assert mock_fs.path("/var/example/test.txt").exists()
+    assert mock_fs.path("/var/example/test.txt").open().read() == b"test-value\n"
+
+    stat = mock_fs.path("/var/example/test.txt").stat()
+    assert ts.from_unix(stat.st_mtime) == datetime(2021, 12, 6, 9, 51, 40, tzinfo=timezone.utc)
