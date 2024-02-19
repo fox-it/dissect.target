@@ -932,6 +932,8 @@ class NamespacePlugin(Plugin):
             try:
                 subplugin = getattr(self.target, entry)
                 self._subplugins.append(subplugin)
+            except UnsupportedPluginError:
+                target.log.warning("Subplugin %s is not compatible with target.", entry)
             except Exception:
                 target.log.exception("Failed to load subplugin: %s", entry)
 
