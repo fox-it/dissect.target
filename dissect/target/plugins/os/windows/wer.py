@@ -49,7 +49,7 @@ def _collect_wer_data(wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, 
                 record_type = "datetime"
                 key = "ts"
 
-            key = _key_to_snake_case(key if key else name)
+            key = _sanitize_key(key if key else name)
 
             record_values[key] = value
             record_fields.append((record_type, key)) if key != "ts" else record_fields.insert(0, (record_type, key))
@@ -70,7 +70,7 @@ def _collect_wer_metadata(metadata_xml_file: Path) -> tuple[list[tuple[str, str]
         for category in metadata:
             for value in category:
                 if record_value := value.text.strip("\t\n"):
-                    key = _key_to_snake_case(f"{category.tag}{value.tag}")
+                    key = _sanitize_key(f"{category.tag}{value.tag}")
                     record_fields.append(("string", key))
                     record_values[key] = record_value
 
@@ -87,9 +87,14 @@ def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, s
     return TargetRecordDescriptor(record_name, record_fields)
 
 
-def _key_to_snake_case(key: str) -> str:
+def _sanitize_key(key: str) -> str:
+    # Convert camel case to snake case
     for pattern in camel_case_patterns:
         key = pattern.sub(r"\1_\2", key)
+
+    # Keep only basic characters in key
+    key = re.sub(r"[^a-zA-Z0-9_]", "", key)
+
     return key.lower()
 
 
