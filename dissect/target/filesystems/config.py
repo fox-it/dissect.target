@@ -120,9 +120,9 @@ class ConfigurationFilesystem(VirtualFilesystem):
         try:
             config_parser = parse(entry, *args, **kwargs)
             entry = ConfigurationEntry(self, entry.path, entry, config_parser)
-        except ConfigurationParsingError:
+        except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
-            log.debug("Error when parsing %s", entry.path)
+            log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
         return entry
 
@@ -220,13 +220,15 @@ class ConfigurationEntry(FilesystemEntry):
         output_buffer = io.StringIO()
 
         if isinstance(values, list):
-            output_buffer.write(textwrap.indent(text="\n".join(values), prefix=prefix))
+            # Explicitly convert the list values to strings
+            _text = "\n".join(str(val) for val in values)
+            output_buffer.write(textwrap.indent(text=_text, prefix=prefix))
         elif hasattr(values, "keys"):
             for key, value in values.items():
                 output_buffer.write(textwrap.indent(key, prefix=prefix) + "\n")
                 output_buffer.write(self._write_value_mapping(value, indentation_nr + 4))
         else:
-            output_buffer.write(textwrap.indent(values, prefix=prefix) + "\n")
+            output_buffer.write(textwrap.indent(str(values), prefix=prefix) + "\n")
 
         return output_buffer.getvalue()
 
