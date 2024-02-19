@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import platform
-import sys
 from io import BytesIO
 from typing import BinaryIO, Iterable
 
