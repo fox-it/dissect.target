@@ -503,21 +503,20 @@ def open_decompress(
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    elif HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
+    if HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
         return bz2.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
-    elif HAVE_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
+    if HAVE_ZSTD and magic[:4] in [b"\xfd\x2f\xb5\x28", b"\x28\xb5\x2f\xfd"]:
         # stream_reader is not seekable, so we have to resort to the less
         # efficient decompressor which returns bytes.
         return io.BytesIO(zstandard.decompress(file.read()))
 
-    elif path:
+    if path:
         file.close()
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
 
-    else:
-        return file
+    return file
 
 
 def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:
