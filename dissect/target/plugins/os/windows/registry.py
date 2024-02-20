@@ -72,6 +72,9 @@ class RegistryPlugin(Plugin):
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
+
+        self.key = lru_cache(4096)(self.key)
+
         self._root = VirtualHive()
         self._hive_collections = defaultdict(HiveCollection)
         self._hive_paths = []
@@ -217,7 +220,6 @@ class RegistryPlugin(Plugin):
         return self.key()
 
     @internal
-    @lru_cache(4096)
     def key(self, key: Optional[str] = None) -> KeyCollection:
         """Query the virtual registry on the given key.
 

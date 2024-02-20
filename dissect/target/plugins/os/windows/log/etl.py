@@ -13,6 +13,9 @@ from dissect.target.plugins.os.windows.datetime import parse_tzi
 class EtlRecordBuilder:
     RECORD_NAME = "filesystem/windows/etl"
 
+    def __init__(self):
+        self._create_event_descriptor = lru_cache(self._create_event_descriptor)
+
     def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
         """Builds an ETL event record"""
 
@@ -51,7 +54,6 @@ class EtlRecordBuilder:
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    @lru_cache(maxsize=4096)
     def _create_event_descriptor(self, record_fields):
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
