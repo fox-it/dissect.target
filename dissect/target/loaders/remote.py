@@ -69,6 +69,8 @@ class RemoteConnection:
     def __init__(self, broker: Broker, host: str):
         self.broker = broker
         self.host = str(host)
+        self.info = lru_cache(maxsize=128)(self.info)
+        self.read = lru_cache(maxsize=128)(self.read)
 
     def topo(self, peers: int):
         self.broker.topology(self.host)
@@ -77,7 +79,6 @@ class RemoteConnection:
             time.sleep(1)
         return self.broker.peers(self.host)
 
-    @lru_cache(maxsize=128)
     def info(self) -> list[RemoteStream]:
         disks = []
         self.broker.info(self.host)
@@ -88,7 +89,6 @@ class RemoteConnection:
             disks.append(RemoteStream(self, i, message.disks[i].total_size))
         return disks
 
-    @lru_cache(maxsize=128)
     def read(self, disk_id: int, offset: int, length: int, optimization_strategy: int) -> bytes:
         message = None
         self.broker.seek(self.host, disk_id, offset, length, optimization_strategy)
