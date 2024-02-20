@@ -239,17 +239,22 @@ def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> 
     return local_tgz
 
 
-def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO:
-    """Decrypt ``local.tgz.ve`` using esxi ``crypto-util``."""
+def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
+    """Decrypt ``local.tgz.ve`` using ESXi ``crypto-util``.
 
-    local_tgz = BytesIO(
-        subprocess.run(
-            ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
-            capture_output=True,
-        ).stdout
+    Using subprocess run will return a non-zero return_code, where stderr contains an an I/O error message.
+    However, the file gets properly decrypted, so we return ``None`` if there are no bytes in stdout.
+    """
+
+    crypto_util = subprocess.run(
+        ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
+        capture_output=True,
     )
 
-    return local_tgz
+    if len(crypto_util.stdout) == 0:
+        return None
+
+    return BytesIO(crypto_util.stdout)
 
 
 def _create_local_fs(
@@ -263,16 +268,16 @@ def _create_local_fs(
         except NotImplementedError:
             target.log.debug("Failed to decrypt %s, likely TPM encrypted", local_tgz_ve)
 
-    if not local_tgz:
-        if target.name == "local":
-            target.log.warning(
-                "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
-            )
-            local_tgz = _decrypt_crypto_util(local_tgz_ve)
-        else:
-            target.log.warning(
-                "local.tgz is encrypted but static decryption failed and no dynamic decryption available!"
-            )
+    if not local_tgz and target.name == "local":
+        target.log.info(
+            "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
+        )
+        local_tgz = _decrypt_crypto_util(local_tgz_ve)
+
+        if local_tgz is None:
+            target.log.warning("Dynamic decryption of %s failed.", local_tgz_ve)
+    else:
+        target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
     if local_tgz:
         return tar.TarFilesystem(local_tgz)
