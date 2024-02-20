@@ -13,13 +13,13 @@ class MQTTMock(MagicMock):
     disks = []
     hostname = ""
 
-    def fill_disks(self, sizes: list[int]):
+    def fill_disks(self, sizes: list[int]) -> None:
         self.disks = []
         pattern = list(range(0, 8))
         for size in sizes:
             self.disks.append(bytearray(pattern) * 64 * size)  # sizes in sectors of 512
 
-    def publish(self, topic, payload=None):
+    def publish(self, topic: str, *args) -> None:
         response = mqtt.MQTTMessage()
         tokens = topic.split("/")
         command = tokens[2]
@@ -40,7 +40,6 @@ class MQTTMock(MagicMock):
             end = int(tokens[5], 16)
             response.payload = self.disks[int(tokens[3])][begin : begin + end]
         self.on_message(self, None, response)
-        return
 
 
 @pytest.mark.parametrize(
@@ -55,7 +54,15 @@ class MQTTMock(MagicMock):
 @patch.object(mqtt, "Client", return_value=MQTTMock())
 @patch.object(time, "sleep")  # improve speed during test, no need to wait for peers
 def test_remote_loader_stream(
-    time: MagicMock, Client: MagicMock, alias, host, disks, disk, seek, read, expected
+    time: MagicMock,
+    Client: MagicMock,
+    alias: str,
+    host: str,
+    disks: list[int],
+    disk: int,
+    seek: int,
+    read: int,
+    expected: bytes,
 ) -> None:
     broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1")
     broker.connect()
