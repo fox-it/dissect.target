@@ -242,19 +242,19 @@ def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> 
 def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
     """Decrypt ``local.tgz.ve`` using ESXi ``crypto-util``.
 
-    Using subprocess run will return a non-zero return_code, where stderr contains an an I/O error message.
-    However, the file gets properly decrypted, so we return ``None`` if there are no bytes in stdout.
+    We write to stdout, but this results in ``crypto-util`` exiting with a non-zero return code and stderr containing an  I/O error message.
+    The file does get properly decrypted, so we return ``None`` if there are no bytes in stdout which would indicate it actually failed.
     """
 
-    crypto_util = subprocess.run(
+    result = subprocess.run(
         ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
         capture_output=True,
     )
 
-    if len(crypto_util.stdout) == 0:
+    if len(result.stdout) == 0:
         return None
 
-    return BytesIO(crypto_util.stdout)
+    return BytesIO(result.stdout)
 
 
 def _create_local_fs(
