@@ -242,8 +242,9 @@ def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> 
 def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
     """Decrypt ``local.tgz.ve`` using ESXi ``crypto-util``.
 
-    We write to stdout, but this results in ``crypto-util`` exiting with a non-zero return code and stderr containing an  I/O error message.
-    The file does get properly decrypted, so we return ``None`` if there are no bytes in stdout which would indicate it actually failed.
+    We write to stdout, but this results in ``crypto-util`` exiting with a non-zero return code
+    and stderr containing an I/O error message. The file does get properly decrypted, so we return
+    ``None`` if there are no bytes in stdout which would indicate it actually failed.
     """
 
     result = subprocess.run(
@@ -267,6 +268,8 @@ def _create_local_fs(
             local_tgz = _decrypt_envelope(local_tgz_ve, encryption_info)
         except NotImplementedError:
             target.log.debug("Failed to decrypt %s, likely TPM encrypted", local_tgz_ve)
+    else:
+        target.log.debug("Skipping static decryption because of missing crypto module")
 
     if not local_tgz and target.name == "local":
         target.log.info(
