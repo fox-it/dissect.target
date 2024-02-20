@@ -73,8 +73,6 @@ class RegistryPlugin(Plugin):
     def __init__(self, target: Target) -> None:
         super().__init__(target)
 
-        self.key = lru_cache(4096)(self.key)
-
         self._root = VirtualHive()
         self._hive_collections = defaultdict(HiveCollection)
         self._hive_paths = []
@@ -85,6 +83,8 @@ class RegistryPlugin(Plugin):
         self._currentcontrolset = None
         self._users_loaded = False
         self._init_registry()
+
+        self.key = lru_cache(4096)(self.key)
 
     def _init_registry(self) -> None:
         dirs = [
