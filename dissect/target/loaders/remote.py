@@ -9,7 +9,7 @@ from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 from struct import pack, unpack_from
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
@@ -24,7 +24,7 @@ from dissect.target.target import Target
 log = logging.getLogger(__name__)
 
 
-def suppress(func):
+def suppress(func: Callable) -> Callable:
     def suppressed(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -165,7 +165,7 @@ class Broker:
             self.mqtt_client.subscribe(f"{self.case}/{host}/READ/#")
             time.sleep(1)
 
-    def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str):
+    def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
 
     def _on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int) -> None:
