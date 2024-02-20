@@ -1,5 +1,4 @@
 import re
-from itertools import chain
 from pathlib import Path
 from typing import Iterator
 

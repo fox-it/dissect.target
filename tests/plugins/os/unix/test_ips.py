@@ -84,7 +84,7 @@ def test_dns_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> No
 
 
 def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/xx-xxx."""
+    """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/*.yaml"""
 
     config = """
     # This file describes the network interfaces available on your system
@@ -102,9 +102,28 @@ def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesyste
     """
 
     fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
-
     target_unix_users.add_plugin(LinuxPlugin)
     assert target_unix_users.ips == ["192.168.1.123"]
+
+
+@pytest.mark.parametrize(
+    "config, expected_output",
+    [
+        ("", []),
+        ("network:", []),
+        ("network:\n    ethernets:\n", []),
+        ("network:\n    ethernets:\n        eth0:\n", []),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: []\n", []),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: [1.2.3.4/24]\n", ["1.2.3.4"]),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: ['1.2.3.4']\n", ["1.2.3.4"]),
+    ],
+)
+def test_ips_netplan_static_invalid(
+    target_unix_users: Target, fs_unix: VirtualFilesystem, config: str, expected_output: list
+) -> None:
+    fs_unix.map_file_fh("/etc/netplan/02-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+    target_unix_users.add_plugin(LinuxPlugin)
+    assert target_unix_users.ips == expected_output
 
 
 def test_ips_netplan_static_empty_regression(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

@@ -291,11 +291,12 @@ class Parser:
         Returns:
             Value(s) corrensponding to that network configuration option.
         """
+
         if not config:
             return None
 
         if section:
-            config = config.get(section, {})
+            config = config.get(section, {}) or {}
 
         for key, value in config.items():
             if key == option:
