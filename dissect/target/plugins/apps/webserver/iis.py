@@ -60,6 +60,8 @@ class IISLogsPlugin(WebserverPlugin):
         super().__init__(target)
         self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
 
+        self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
+
     def check_compatible(self) -> None:
         if not self.config.exists() and not self.target.fs.path("sysvol/files").exists():
             raise UnsupportedPluginError("No ApplicationHost config file found")
@@ -157,7 +159,6 @@ class IISLogsPlugin(WebserverPlugin):
             row = replace_dash_with_none(row)
             yield BasicRecordDescriptor(**row)
 
-    @lru_cache(maxsize=4096)
     def _create_extended_descriptor(self, extra_fields: tuple[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS + list(extra_fields))
 
