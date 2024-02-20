@@ -279,7 +279,7 @@ class Parser:
             if option in translation_values and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
+    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable, None]:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
 
         Args:
@@ -290,8 +290,12 @@ class Parser:
         Returns:
             Value(s) corrensponding to that network configuration option.
         """
+        if not config:
+            return None
+
         if section:
-            config = config[section]
+            config = config.get(section, {})
+
         for key, value in config.items():
             if key == option:
                 return value
