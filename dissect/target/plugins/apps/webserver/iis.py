@@ -54,17 +54,26 @@ class IISLogsPlugin(WebserverPlugin):
 
     APPLICATION_HOST_CONFIG = "sysvol/windows/system32/inetsrv/config/applicationHost.config"
 
+    DEFAULT_LOG_PATHS = [
+        "sysvol\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
+        "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
+        "sysvol\\inetpub\\logs\\LogFiles\\*.log",
+        "sysvol\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
+        "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*\\*.log",
+    ]
+
     __namespace__ = "iis"
 
     def __init__(self, target):
         super().__init__(target)
         self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
+        self.log_dirs = self.get_log_dirs()
 
         self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
 
     def check_compatible(self) -> None:
-        if not self.config.exists() and not self.target.fs.path("sysvol/files").exists():
-            raise UnsupportedPluginError("No ApplicationHost config file found")
+        if not self.log_dirs:
+            raise UnsupportedPluginError("No IIS log files found")
 
     @plugin.internal
     def get_log_dirs(self) -> list[tuple[str, Path]]:
@@ -84,11 +93,23 @@ class IISLogsPlugin(WebserverPlugin):
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
             self.target.log.warning(f"Error while parsing {self.config}: {e}")
 
+        for log_path in self.DEFAULT_LOG_PATHS:
+            for log_file in self.target.fs.glob(log_path):
+                try:
+                    log_dir = self.target.fs.path(log_file).parents[1]
+                    if (
+                        "auto",
+                        log_dir,
+                    ) not in log_paths:
+                        log_paths.append(("auto", log_dir))
+                except KeyError:
+                    pass
+
         return log_paths
 
     @plugin.internal
     def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
-        for log_format, log_dir_path in self.get_log_dirs():
+        for log_format, log_dir_path in self.log_dirs:
             for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
 
