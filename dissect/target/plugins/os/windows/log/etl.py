@@ -14,7 +14,7 @@ class EtlRecordBuilder:
     RECORD_NAME = "filesystem/windows/etl"
 
     def __init__(self):
-        self._create_event_descriptor = lru_cache(self._create_event_descriptor)
+        self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
     def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
         """Builds an ETL event record"""
