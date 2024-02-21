@@ -176,6 +176,7 @@ def open(item: Union[str, Path], *args, **kwargs) -> Loader:
 
 register("local", "LocalLoader")
 register("remote", "RemoteLoader")
+register("mqtt", "MQTTLoader")
 register("targetd", "TargetdLoader")
 register("asdf", "AsdfLoader")
 register("tar", "TarLoader")

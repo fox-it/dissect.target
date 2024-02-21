@@ -12,10 +12,10 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-class Remote(ChildTargetPlugin):
+class MQTT(ChildTargetPlugin):
     """Child target plugin that yields from remote broker."""
 
-    __type__ = "remote"
+    __type__ = "mqtt"
 
     PATH = "/remote/data/children.txt"
     FOLDER = "/remote/children"
