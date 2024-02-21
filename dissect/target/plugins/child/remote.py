@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -28,4 +30,6 @@ class Remote(ChildTargetPlugin):
     def list_children(self) -> Iterator[ChildTargetRecord]:
         hosts = self.target.fs.path(self.PATH).read_text(encoding="utf-8").split("\n")
         for index, host in enumerate(hosts):
-            yield ChildTargetRecord(type=self.__type__, path=f"{self.FOLDER}/child{index}.txt", _target=self.target)
+            yield ChildTargetRecord(
+                type=self.__type__, path=posix_path(f"{self.FOLDER}/child{index}.txt"), _target=self.target
+            )
