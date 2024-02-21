@@ -4,19 +4,11 @@ import gzip
 import io
 import logging
 import os
+import pathlib
 import stat
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    BinaryIO,
-    Callable,
-    Iterator,
-    Optional,
-    Type,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Iterator, Optional, Type
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -27,6 +19,8 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers import fsutil, hashutil
 from dissect.target.helpers.lazy import import_lazy
+
+TarFilesystem = import_lazy("dissect.target.filesystems.tar").TarFilesystem
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
@@ -49,7 +43,7 @@ class Filesystem:
 
     def __init__(
         self,
-        volume: Optional[Union[BinaryIO, list[BinaryIO]]] = None,
+        volume: Optional[BinaryIO | list[BinaryIO]] = None,
         alt_separator: str = "",
         case_sensitive: bool = True,
     ) -> None:
@@ -486,7 +480,7 @@ class Filesystem:
         """
         return self.get(path).sha256()
 
-    def hash(self, path: str, algos: Optional[Union[list[str], list[Callable]]] = None) -> tuple[str]:
+    def hash(self, path: str, algos: Optional[list[str] | list[Callable]] = None) -> tuple[str]:
         """Calculate the digest of the contents of ``path``, using the ``algos`` algorithms.
 
         Args:
@@ -822,7 +816,7 @@ class FilesystemEntry:
         """
         return hashutil.sha256(self.open())
 
-    def hash(self, algos: Optional[Union[list[str], list[Callable]]] = None) -> tuple[str]:
+    def hash(self, algos: Optional[list[str] | list[Callable]] = None) -> tuple[str]:
         """Calculate the digest of this entry, using the ``algos`` algorithms.
 
         Args:
@@ -1237,6 +1231,44 @@ class VirtualFilesystem(Filesystem):
 
             entry_name = fsutil.basename(vfspath, alt_separator=self.alt_separator)
             directory.add(entry_name, entry)
+
+    def map_dir_from_tar(self, vfspath: str, tar_file: str | pathlib.Path, map_single_file: bool = False) -> None:
+        """Map files in a tar onto the VFS.
+
+        Args:
+            vfspath: Destination path in the virtual filesystem.
+            tar_file: Source path of the tar file to map.
+            map_single_file: Only mount a single file found inside the tar at the specified path.
+        """
+
+        if not isinstance(tar_file, pathlib.Path):
+            try:
+                tar_file = pathlib.Path(tar_file)
+            except TypeError:
+                raise ValueError("tar_file should be a string or Path instance")
+
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator)
+        tfs = TarFilesystem(tar_file.open("rb"))
+
+        if map_single_file:
+            # We map the first file we find in the tar to the provided vfspath.
+            for file in [f[0] for _, _, f in tfs.walk_ext("/") if f]:
+                file.name = fsutil.basename(vfspath)
+                self.map_file_entry(vfspath, file)
+                return
+        else:
+            self.mount(vfspath, tfs)
+
+    def map_file_from_tar(self, vfspath: str, tar_file: str | pathlib.Path) -> None:
+        """Map a single file in a tar archive to the given path in the VFS.
+
+        The provided tar archive should contain *one* file.
+
+        Args:
+            vfspath: Destination path in the virtual filesystem.
+            tar_file: Source path of the tar file to map.
+        """
+        return self.map_dir_from_tar(vfspath.lstrip("/"), tar_file, map_single_file=True)
 
     def link(self, src: str, dst: str) -> None:
         """Hard link a FilesystemEntry to another location.
