@@ -43,11 +43,12 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
         if accessor_root.exists():
             # If the accessor directory exists, assume all the subdirectories are volumes
             for volume in accessor_root.iterdir():
-                # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
-                if "HarddiskVolumeShadowCopy" in volume.name:
-                    vss_volumes.add(volume)
-                else:
-                    volumes.add(volume)
+                if volume.is_dir():
+                    # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
+                    if "HarddiskVolumeShadowCopy" in volume.name:
+                        vss_volumes.add(volume)
+                    else:
+                        volumes.add(volume)
 
     if volumes:
         # The volumes that represent drives (C, D) are mounted first,
