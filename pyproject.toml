@@ -35,6 +35,7 @@ dependencies = [
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.volume>=3.0.dev,<4.0.dev",
     "flow.record~=3.14.0",
+    "paho-mqtt>=1.6.1",
     "structlog",
 ]
 dynamic = ["version"]
