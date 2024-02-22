@@ -60,7 +60,10 @@ class TarFilesystem(Filesystem):
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         """Detect a tar file on a given file-like object."""
-        return tarfile.is_tarfile(fh)
+        fh = fsutil.open_decompress(fileobj=fh)
+
+        fh.seek(257)
+        return fh.read(8) in (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
 
     def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
