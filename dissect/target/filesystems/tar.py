@@ -63,7 +63,7 @@ class TarFilesystem(Filesystem):
         fh = fsutil.open_decompress(fileobj=fh)
 
         fh.seek(257)
-        return fh.read(7) == b"ustar  "
+        return fh.read(8) in (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
 
     def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
