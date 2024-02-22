@@ -77,10 +77,10 @@ class IISLogsPlugin(WebserverPlugin):
 
     @plugin.internal
     def get_log_dirs(self) -> list[tuple[str, Path]]:
-        log_paths = []
+        log_paths = set()
 
         if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
-            log_paths.append(("auto", sysvol_files))
+            log_paths.add(("auto", sysvol_files))
 
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
@@ -88,7 +88,7 @@ class IISLogsPlugin(WebserverPlugin):
                 log_format = log_file_element.get("logFormat") or "W3C"
                 if log_dir := log_file_element.get("directory"):
                     log_dir = self.target.resolve(log_dir)
-                    log_paths.append((log_format, log_dir))
+                    log_paths.add((log_format, log_dir))
 
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
             self.target.log.warning(f"Error while parsing {self.config}: {e}")
@@ -97,15 +97,11 @@ class IISLogsPlugin(WebserverPlugin):
             for log_file in self.target.fs.glob(log_path):
                 try:
                     log_dir = self.target.fs.path(log_file).parents[1]
-                    if (
-                        "auto",
-                        log_dir,
-                    ) not in log_paths:
-                        log_paths.append(("auto", log_dir))
+                    log_paths.add(("auto", log_dir))
                 except KeyError:
                     pass
 
-        return log_paths
+        return list(log_paths)
 
     @plugin.internal
     def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
