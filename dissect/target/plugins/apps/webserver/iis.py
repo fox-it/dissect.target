@@ -10,6 +10,7 @@ from flow.record.base import RE_VALID_FIELD_NAME
 from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundError
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
+from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
@@ -94,11 +95,20 @@ class IISLogsPlugin(WebserverPlugin):
             self.target.log.warning(f"Error while parsing {self.config}: {e}")
 
         for log_path in self.DEFAULT_LOG_PATHS:
+            try:
+                log_dir = self.target.fs.path(log_path).parents[1]
+            except IndexError:
+                continue
+
+            if not has_glob_magic(str(log_dir)) and log_dir.exists():
+                log_paths.add(("auto", log_dir))
+                continue
+
             for log_file in self.target.fs.glob(log_path):
                 try:
                     log_dir = self.target.fs.path(log_file).parents[1]
                     log_paths.add(("auto", log_dir))
-                except KeyError:
+                except IndexError:
                     pass
 
         return list(log_paths)
