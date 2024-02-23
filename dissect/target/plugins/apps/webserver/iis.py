@@ -96,6 +96,7 @@ class IISLogsPlugin(WebserverPlugin):
 
         for log_path in self.DEFAULT_LOG_PATHS:
             try:
+                # later on we use */*.log to collect the files, so we need to move up 2 levels
                 log_dir = self.target.fs.path(log_path).parents[1]
             except IndexError:
                 continue
