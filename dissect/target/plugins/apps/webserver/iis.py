@@ -92,13 +92,14 @@ class IISLogsPlugin(WebserverPlugin):
                     log_paths.add((log_format, log_dir))
 
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
-            self.target.log.warning(f"Error while parsing {self.config}: {e}")
+            self.target.log.warning("Error while parsing %s:%s", self.config, e)
 
         for log_path in self.DEFAULT_LOG_PATHS:
             try:
                 # later on we use */*.log to collect the files, so we need to move up 2 levels
                 log_dir = self.target.fs.path(log_path).parents[1]
             except IndexError:
+                self.target.log.error("Incompatible path found: %s", log_path)
                 continue
 
             if not has_glob_magic(str(log_dir)) and log_dir.exists():
