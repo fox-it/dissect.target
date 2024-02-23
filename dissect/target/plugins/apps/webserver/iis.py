@@ -104,7 +104,7 @@ class IISLogsPlugin(WebserverPlugin):
                 log_paths.add(("auto", log_dir))
                 continue
 
-            for _log_dir in self.target.fs.glob(log_dir):
+            for _log_dir in self.target.fs.glob(str(log_dir)):
                 if not (_log_dir := self.target.fs.path(_log_dir)).is_dir():
                     continue
                 log_paths.add(("auto", _log_dir))
