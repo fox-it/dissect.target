@@ -4,7 +4,7 @@ from dissect.target.filesystems.vmtar import VmtarFilesystem
 from tests._utils import absolute_path
 
 
-def test_filesystems_vmtar():
+def test_filesystems_vmtar() -> None:
     vmtar_path = Path(absolute_path("_data/filesystems/vmtar/simple.vmtar"))
 
     with vmtar_path.open("rb") as fh:
