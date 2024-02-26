@@ -3,7 +3,7 @@ from typing import BinaryIO, Iterator
 
 from dissect import cstruct
 
-from dissect.target.exceptions import CRCMismatchException, UnsupportedPluginError
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
@@ -37,19 +37,19 @@ struct header_crc {
 struct tab {
     char                        magic[3];         // NP\x00
     char                        header_start[2];  // \x00\x01
-    uleb128                     len1;
-    uleb128                     len2;
+    uleb128                     fsize1;
+    uleb128                     fsize2;
     char                        header_end[2];    // \x01\x00
-    
+
     // Data can be stored in two says:
     //  1. A single, contiguous block of data that holds all the data
     //     In this case, the header is included in the single CRC32 checksum present at the end of the block
     //  2. Multiple blocks of data that, when combined, hold all the data
     //     In this case, the header has a separate CRC32 value stored at the end of the header
-    // The following bitmask operations basically check whether len1 is nonzero (boolean check) and depending
+    // The following bitmask operations basically check whether fsize1 is nonzero (boolean check) and depending
     // on the outcome, parse 0 or 1 (so basically, parse or not parse) structs.
-    header_crc                  header_crc[((len1 | -len1) >> 31) ^ 1]; // Optional, only if len1 == 0
-    single_block_entry          single_block_entry[((len1 | (~len1 + 1)) >> 31) & 1];  // Optional, only if len1 > 0
+    header_crc                  header_crc[((fsize1 | -fsize1) >> 31) ^ 1]; // Optional, only if fsize1 == 0
+    single_block_entry          single_block_entry[((fsize1 | (~fsize1 + 1)) >> 31) & 1];  // Optional, only if fsize1 > 0  # noqa: E501
 
 
     multi_block_entry           multi_block_entries[EOF];  // Optional. If a single_block_entry is present
@@ -58,7 +58,7 @@ struct tab {
 };
 """
 TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+    "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
 )
 
 c_windowstab = cstruct.cstruct()
@@ -80,7 +80,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
     def __init__(self, target):
         super().__init__(target)
         self.users_tabs = []
-        
+
         for user_details in self.target.user_details.all_with_home():
             for tab_file in user_details.home_path.glob(self.GLOB):
                 if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
@@ -116,8 +116,10 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
             if data_entry.crc32 != actual_crc32:
                 self.target.log.warning(
-                    "CRC32 mismatch in single-block file: %s "
-                    "expected=%s, actual=%s", file.name, data_entry.crc32.hex(), actual_crc32.hex()
+                    "CRC32 mismatch in single-block file: %s " "expected=%s, actual=%s",
+                    file.name,
+                    data_entry.crc32.hex(),
+                    actual_crc32.hex(),
                 )
 
             text = data_entry.data
@@ -129,8 +131,10 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             actual_header_crc32 = _calc_crc32(tab.dumps()[3 : tab.dumps().index(defined_header_crc32)])
             if defined_header_crc32 != actual_header_crc32:
                 self.target.log.warning(
-                    "CRC32 mismatch in header of multi-block file: %s "
-                    "expected=%s, actual=%s", file.name, defined_header_crc32.hex(), actual_header_crc32.hex(),
+                    "CRC32 mismatch in header of multi-block file: %s " "expected=%s, actual=%s",
+                    file.name,
+                    defined_header_crc32.hex(),
+                    actual_header_crc32.hex(),
                 )
 
             # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
@@ -142,14 +146,16 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # If there is no data to be added, skip. This may happen sometimes.
                 if data_entry.len <= 0:
                     continue
-                
+
                 size += data_entry.len
                 # Check the CRC32 checksum for this block
                 actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
                 if data_entry.crc32 != actual_crc32:
                     self.target.log.warning(
-                        "CRC32 mismatch in multi-block file: %s "
-                        "expected=%s, actual=%s", file.name, data_entry.crc32.hex(), actual_crc32.hex()
+                        "CRC32 mismatch in multi-block file: %s " "expected=%s, actual=%s",
+                        file.name,
+                        data_entry.crc32.hex(),
+                        actual_crc32.hex(),
                     )
 
                 # Extend the list if required. All characters need to fit in the list.
