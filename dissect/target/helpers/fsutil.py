@@ -14,6 +14,13 @@ from pathlib import Path
 from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
 
 try:
+    import lzma
+
+    HAVE_XZ = True
+except ImportError:
+    HAVE_XZ = False
+
+try:
     import bz2
 
     HAVE_BZ2 = True
@@ -492,7 +499,7 @@ def open_decompress(
     else:
         file = fileobj
 
-    magic = file.read(4)
+    magic = file.read(5)
     file.seek(0)
 
     if "b" in mode:
@@ -502,6 +509,9 @@ def open_decompress(
 
     if magic[:2] == b"\x1f\x8b":
         return gzip.open(file, mode, encoding=encoding, errors=errors, newline=newline)
+
+    if HAVE_XZ and magic[:5] == b"\xfd7zXZ":
+        return lzma.open(file, mode, encoding=encoding, errors=errors, newline=newline)
 
     if HAVE_BZ2 and magic[:3] == b"BZh" and 0x31 <= magic[3] <= 0x39:
         # In a valid bz2 header the 4th byte is in the range b'1' ... b'9'.
