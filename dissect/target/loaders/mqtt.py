@@ -71,8 +71,8 @@ class MQTTConnection:
     def __init__(self, broker: Broker, host: str):
         self.broker = broker
         self.host = str(host)
-        self.info = lru_cache(maxsize=128)(self.info)
-        self.read = lru_cache(maxsize=128)(self.read)
+        self.info = lru_cache(128)(self.info)
+        self.read = lru_cache(128)(self.read)
 
     def topo(self, peers: int):
         self.broker.topology(self.host)
