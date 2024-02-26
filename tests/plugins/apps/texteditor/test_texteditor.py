@@ -24,14 +24,16 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
         "ba291ccd-f1c3-4ca8-949c-c01f6633789d.bin": (text5 * 5),
         "e609218e-94f2-45fa-84e2-f29df2190b26.bin": (text6 * 1260),
         "3d0cc86e-dfc9-4f16-b74a-918c2c24188c.bin": loremipsum,
-        "wrong-checksum.bin": "",  # only added to check for corrupt checksum, not validity
+        "wrong-checksum.bin": text4,  # only added to check for corrupt checksum, not validity
         "cfe38135-9dca-4480-944f-d5ea0e1e589f.bin": (loremipsum * 37)[:-2],  # removed the two newlines in this file
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
 
     user = target_win_users.user_details.find(username="John")
-    tab_dir = user.home_path.joinpath(windowsnotepad.WindowsNotepadPlugin.DIRECTORY)
+    tab_dir = user.home_path.joinpath(
+        "AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState"
+    )
 
     fs_win.map_dir("Users\\John", tmp_path)
 
@@ -45,17 +47,12 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
 
     # Check the amount of files
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
+    assert len(records) == len(file_text_map.keys())
 
-    # Only one should not be parsed correctly, without errors/warnings
-    assert len(records) == len(file_text_map.keys()) - 1
-
-    # One file should not return any contents, there should be an entry for this in the logging.
-    assert "CRC32 checksum mismatch in file: wrong-checksum.bin" in caplog.text
-    assert (
-        "CRCMismatchException: CRC32 mismatch in single-block file. expected=deadbeef, actual=a48d30a6" in caplog.text
-    )
+    # One file should still return contents, but there should be an entry for in the logging for a CRC missmatch.
+    assert "CRC32 mismatch in single-block file: wrong-checksum.bin expected=deadbeef, actual=a48d30a6" in caplog.text
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
-        assert rec.content == file_text_map[rec.filename]
-        assert len(rec.content) == len(file_text_map[rec.filename])
+        assert rec.content == file_text_map[rec.path.name]
+        assert len(rec.content) == len(file_text_map[rec.path.name])

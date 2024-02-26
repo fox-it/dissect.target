@@ -10,23 +10,24 @@ from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.texteditor.texteditor import (
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
-    TexteditorTabPlugin,
+    TexteditorPlugin,
 )
 
 c_def = """
 struct multi_block_entry {
     uint16    offset;
     uleb128   len;
-    char      data[len * 2];
+    wchar     data[len];
     char      crc32[4];
 };
 
 struct single_block_entry {
     uint16    offset;
     uleb128   len;
-    char      data[len * 2];
+    wchar     data[len];
     char      unk1;
     char      crc32[4];
+};
 };
 
 struct header_crc {
@@ -57,6 +58,9 @@ struct tab {
                                                            // Otherwise, it will parse the individual blocks.
 };
 """
+TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+)
 
 c_windowstab = cstruct.cstruct()
 c_windowstab.load(c_def)
@@ -67,28 +71,27 @@ def _calc_crc32(data: bytes) -> bytes:
     return zlib.crc32(data).to_bytes(length=4, byteorder="big")
 
 
-class WindowsNotepadPlugin(TexteditorTabPlugin):
+class WindowsNotepadPlugin(TexteditorPlugin):
     """Windows notepad tab content plugin."""
 
     __namespace__ = "windowsnotepad"
 
-    DIRECTORY = "AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState"
-    TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
-    )
+    GLOB = "AppData/Local/Packages/Microsoft.WindowsNotepad_*/LocalState/TabState/*.bin"
 
     def __init__(self, target):
         super().__init__(target)
-        self.users_dirs = []
+        self.users_tabs = []
+        
         for user_details in self.target.user_details.all_with_home():
-            cur_dir = user_details.home_path.joinpath(self.DIRECTORY)
-            if not cur_dir.exists():
-                continue
-            self.users_dirs.append((user_details.user, cur_dir))
+            for tab_file in user_details.home_path.glob(self.GLOB):
+                if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
+                    continue
+
+                self.users_tabs.append(tab_file)
 
     def check_compatible(self) -> None:
-        if not len(self.users_dirs):
-            raise UnsupportedPluginError("No tabs directories found")
+        if not self.users_tabs:
+            raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
 
     def _process_tab_file(self, file: TargetPath) -> TextEditorTabRecord:
         """
@@ -107,17 +110,18 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
         if tab.len1 != 0:
             # Reconstruct the text of the single_block_entry variant
             data_entry = tab.single_block_entry[0]
+            size = data_entry.len
 
             # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included in the checksum
             actual_crc32 = _calc_crc32(tab.dumps()[3:-4])
 
             if data_entry.crc32 != actual_crc32:
-                raise CRCMismatchException(
-                    f"CRC32 mismatch in single-block file. "
-                    f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
+                self.target.log.warning(
+                    "CRC32 mismatch in single-block file: %s "
+                    "expected=%s, actual=%s", file.name, data_entry.crc32.hex(), actual_crc32.hex()
                 )
 
-            text = data_entry.data.decode("utf-16-le")
+            text = data_entry.data
 
         else:
             # Reconstruct the text of the multi_block_entry variant
@@ -126,49 +130,45 @@ class WindowsNotepadPlugin(TexteditorTabPlugin):
 
             # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
             # a list is used to easily insert text at offsets
-            text = ["\x00"]
+            text = []
+            size = 0
 
             for data_entry in tab.multi_block_entries:
-                # Check the CRC32 checksum for this block
-                actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
-                if data_entry.crc32 != actual_crc32:
-                    raise CRCMismatchException(
-                        f"CRC32 mismatch in single-block file. "
-                        f"expected={data_entry.crc32.hex()}, actual={actual_crc32.hex()} "
-                    )
-
                 # If there is no data to be added, skip. This may happen sometimes.
                 if data_entry.len <= 0:
                     continue
+                
+                size += data_entry.len
+                # Check the CRC32 checksum for this block
+                actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
+                if data_entry.crc32 != actual_crc32:
+                    self.target.log.warning(
+                        "CRC32 mismatch in multi-block file: %s "
+                        "expected=%s, actual=%s", file.name, data_entry.crc32.hex(), actual_crc32.hex()
+                    )
+
 
                 # Extend the list if required. All characters need to fit in the list.
                 while data_entry.offset + data_entry.len > len(text):
-                    text += "\x00"
+                    text.append("\x00")
 
                 # Place the text at the correct offset. UTF16-LE consumes two bytes for one character.
-                for i in range(data_entry.len):
-                    text[data_entry.offset + i] = data_entry.data[(2 * i) : (2 * i) + 2].decode("utf-16-le")
+                for idx in range(data_entry.len):
+                    text[data_entry.offset + idx] = data_entry.data[(2 * idx) : (2 * idx) + 2]
 
             # Join all the characters to reconstruct the original text
             text = "".join(text)
 
-        return self.TextEditorTabRecord(content=text, content_length=len(text), filename=file.name)
+        return TextEditorTabRecord(content=text, content_length=size, path=file)
 
     @export(record=TextEditorTabRecord)
     def tabs(self) -> Iterator[TextEditorTabRecord]:
-        """Return contents from the notepad tab.
+        """Return contents from Windows 11 temporary Notepad tabs.
 
         Yields TextEditorTabRecord with the following fields:
             contents (string): The contents of the tab.
-            title (string): The title of the tab.
+            content_length (int): The length of the tab content.
+            path (path): The path the content originates from.
         """
-        for user, directory in self.users_dirs:
-            for file in self.target.fs.path(directory).iterdir():
-                if file.name.endswith(".1.bin") or file.name.endswith(".0.bin"):
-                    continue
-
-                try:
-                    yield self._process_tab_file(file)
-                except CRCMismatchException as e:
-                    self.target.log.warning("CRC32 checksum mismatch in file: %s", file.name, exc_info=e)
-                    continue
+        for file in self.users_tabs:
+            yield self._process_tab_file(file)
