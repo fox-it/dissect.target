@@ -21,6 +21,7 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import (
     FilesystemEntry,
     MappedFile,
+    NotASymlinkError,
     RootFilesystem,
     RootFilesystemEntry,
     VirtualDirectory,
@@ -1102,6 +1103,17 @@ def test_mapped_file_lattr(mapped_file: MappedFile) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         mapped_file.lattr()
         fs_attrs.assert_called_with(mapped_file.entry, follow_symlinks=False)
+
+
+def test_mapped_file_is_symlink(vfs: VirtualFilesystem) -> None:
+    assert MappedFile(vfs, "/guestlink", "/hostlink").is_symlink() is False
+
+
+def test_mapped_file_readlink(vfs: VirtualFilesystem) -> None:
+    with pytest.raises(NotASymlinkError):
+        MappedFile(vfs, "/guestlink", "/hostlink").readlink()
+    with pytest.raises(NotASymlinkError):
+        MappedFile(vfs, "/guestlink", "/hostlink").readlink_ext()
 
 
 def test_reset_file_position() -> None:
