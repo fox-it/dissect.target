@@ -64,7 +64,6 @@ full = [
     "dissect.xfs>=3.0.dev,<4.0.dev",
     "ipython",
     "fusepy",
-    "paho-mqtt==1.6.1",
     "pycryptodome",
     "pyyaml",
     # dissect.target's caching uses flow.record functionlity which depends on the
@@ -90,6 +89,11 @@ cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
     "carbon-black-cloud-sdk~=1.4.3"
+]
+mqtt = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "paho-mqtt==1.6.1",
 ]
 
 [project.scripts]
