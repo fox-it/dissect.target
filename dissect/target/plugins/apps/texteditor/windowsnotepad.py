@@ -28,7 +28,6 @@ struct single_block_entry {
     char      unk1;
     char      crc32[4];
 };
-};
 
 struct header_crc {
     char      unk[4];
@@ -126,7 +125,13 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         else:
             # Reconstruct the text of the multi_block_entry variant
             # CRC32 is calculated based on the entire header, up to the point where the CRC32 value is stored
-            assert tab.header_crc[0].crc32 == _calc_crc32(tab.dumps()[3 : tab.dumps().index(tab.header_crc[0].crc32)])
+            defined_header_crc32 = tab.header_crc[0].crc32
+            actual_header_crc32 = _calc_crc32(tab.dumps()[3 : tab.dumps().index(defined_header_crc32)])
+            if defined_header_crc32 != actual_header_crc32:
+                self.target.log.warning(
+                    "CRC32 mismatch in header of multi-block file: %s "
+                    "expected=%s, actual=%s", file.name, defined_header_crc32.hex(), actual_header_crc32.hex(),
+                )
 
             # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
             # a list is used to easily insert text at offsets
@@ -146,7 +151,6 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                         "CRC32 mismatch in multi-block file: %s "
                         "expected=%s, actual=%s", file.name, data_entry.crc32.hex(), actual_crc32.hex()
                     )
-
 
                 # Extend the list if required. All characters need to fit in the list.
                 while data_entry.offset + data_entry.len > len(text):
