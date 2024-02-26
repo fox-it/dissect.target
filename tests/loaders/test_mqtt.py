@@ -15,7 +15,7 @@ class MQTTMock(MagicMock):
 
     def fill_disks(self, sizes: list[int]) -> None:
         self.disks = []
-        pattern = list(range(0, 8))
+        pattern = list(range(8))
         for size in sizes:
             self.disks.append(bytearray(pattern) * 64 * size)  # sizes in sectors of 512
 
