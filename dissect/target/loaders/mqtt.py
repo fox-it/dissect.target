@@ -173,9 +173,7 @@ class Broker:
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.client.MQTTMessage) -> None:
         tokens = msg.topic.split("/")
-        casename = tokens[0]
-        hostname = tokens[1]
-        response = tokens[2]
+        casename, hostname, response, *_ = tokens
         if casename != self.case:
             return
         if response == "DISKS":
