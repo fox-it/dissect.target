@@ -138,7 +138,7 @@ class Broker:
     def _on_disk(self, hostname: str, payload: bytes) -> None:
         (num_of_disks,) = unpack_from("<B", payload, offset=0)
         disks = []
-        for disk_index in range(0, num_of_disks):
+        for disk_index in range(num_of_disks):
             (
                 sector_size,
                 total_size,
