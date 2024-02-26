@@ -5,7 +5,7 @@ from dissect.target.plugin import NamespacePlugin
 GENERIC_TAB_CONTENTS_RECORD_FIELDS = [
     ("string", "content"),
     ("string", "content_length"),
-    ("string", "filename"),
+    ("path", "path"),
 ]
 
 TexteditorTabContentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -13,5 +13,5 @@ TexteditorTabContentRecord = create_extended_descriptor([UserRecordDescriptorExt
 )
 
 
-class TexteditorTabPlugin(NamespacePlugin):
-    __namespace__ = "texteditortab"
+class TexteditorPlugin(NamespacePlugin):
+    __namespace__ = "texteditor"
