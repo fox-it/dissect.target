@@ -23,6 +23,8 @@ from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
+DISK_INDEX_OFFSET = 9
+
 
 def suppress(func: Callable) -> Callable:
     def suppressed(*args, **kwargs):
@@ -142,7 +144,7 @@ class Broker:
             (
                 sector_size,
                 total_size,
-            ) = unpack_from("<IQ", payload, offset=1 + (disk_index * 9))
+            ) = unpack_from("<IQ", payload, offset=1 + (disk_index * DISK_INDEX_OFFSET))
             disks.append(DiskMessage(index=disk_index, sector_size=sector_size, total_size=total_size))
         self.diskinfo[hostname] = InfoMessage(disks=disks)
 
