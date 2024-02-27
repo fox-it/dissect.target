@@ -267,7 +267,7 @@ class MQTTLoader(Loader):
             vfs = VirtualFilesystem()
             vfs.map_file_fh(self.PATH, BytesIO("\n".join(self.peers).encode("utf-8")))
             for index, peer in enumerate(self.peers):
-                vfs.map_file_fh(f"{self.FOLDER}/host-{peer}", BytesIO(peer.encode("utf-8")))
+                vfs.map_file_fh(f"{self.FOLDER}/host-{index}-{peer}", BytesIO(peer.encode("utf-8")))
 
             target.fs.mount("/data", vfs)
             target.filesystems.add(vfs)
