@@ -228,6 +228,40 @@ class Default(ConfigurationParser):
         self.parsed_data = information_dict
 
 
+class OpenVPN(Default):
+    def parse_file(self, fh: io.TextIO) -> None:
+        root = {}
+        iterator = self.line_reader(fh)
+        for line in self.line_reader(fh):
+            if line.startswith("<"):
+                key = line.strip().strip("<>")
+                value = self._read_blob(iterator)
+                _update_dictionary(root, key, value)
+                continue
+
+            prev_key, *value = self.SEPARATOR.split(line, 1)
+            value = value[0].strip().strip('"') if value else ""
+
+            _update_dictionary(root, prev_key, value)
+
+        self.parsed_data = root
+
+    def _read_blob(self, lines: Iterable[str]) -> str:
+        output = ""
+        with io.StringIO() as buffer:
+            for line in lines:
+                if "</" in line:
+                    break
+
+                buffer.write(line)
+                buffer.write("\n")
+            output = buffer.getvalue()
+
+        if not output.startswith("-----"):
+            return output.split("\n")
+        return output
+
+
 class Ini(ConfigurationParser):
     """Parses an ini file according using the built-in python ConfigParser"""
 
@@ -696,6 +730,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "sample": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
+    "ovpn": ParserConfig(OpenVPN, separator=(r"\s",)),
 }
 
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {

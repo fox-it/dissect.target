@@ -1,12 +1,13 @@
 import itertools
 import re
+from itertools import product
 from os.path import basename
 from typing import Iterator, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import OperatingSystem, Plugin, export
+from dissect.target.plugin import OperatingSystem, Plugin, arg, export
 
 COMMON_ELEMENTS = [
     ("string", "name"),  # basename of .conf file
@@ -61,93 +62,83 @@ class OpenVPNPlugin(Plugin):
     config_globs = [
         # This catches openvpn@, openvpn-client@, and openvpn-server@ systemd configurations
         # Linux
-        "/etc/openvpn/*.conf",
-        "/etc/openvpn/server/*.conf",
-        "/etc/openvpn/client/*.conf",
+        "/etc/openvpn/",
         # Windows
-        "sysvol/Program Files/OpenVPN/config/*.conf",
+        "sysvol/Program Files/OpenVPN/config/",
     ]
 
     user_config_paths = {
-        OperatingSystem.WINDOWS.value: ["OpenVPN/config/*.conf"],
-        OperatingSystem.OSX.value: ["Library/Application Support/OpenVPN Connect/profiles/*.conf"],
+        OperatingSystem.WINDOWS.value: ["OpenVPN/config/"],
+        OperatingSystem.OSX.value: ["Library/Application Support/OpenVPN Connect/profiles/"],
     }
 
     def __init__(self, target) -> None:
         super().__init__(target)
         self.configs: list[fsutil.TargetPath] = []
-        for path in self.config_globs:
-            self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
+        for base, glob in product(self.config_globs, ["*.conf", "*.ovpn"]):
+            self.configs.extend(self.target.fs.path(base).rglob(glob))
 
         user_paths = self.user_config_paths.get(target.os, [])
-        for path, user_details in itertools.product(user_paths, self.target.user_details.all_with_home()):
-            self.configs.extend(user_details.home_path.glob(path))
+        for path, glob, user_details in itertools.product(
+            user_paths, ["*.conf", "*.ovpn"], self.target.user_details.all_with_home()
+        ):
+            self.configs.extend(user_details.home_path.joinpath(path).rglob(glob))
 
     def check_compatible(self) -> None:
         if not self.configs:
             raise UnsupportedPluginError("No OpenVPN configuration files found")
 
     @export(record=[OpenVPNServer, OpenVPNClient])
-    def config(self) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
+    @arg("--export-key", action="store_true")
+    def config(self, export_key: bool = False) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
         """Parses config files from openvpn interfaces."""
 
         for config_path in self.configs:
-            config = _parse_config(config_path.read_text())
+            open_vpn_config = self.target.config_tree(
+                config_path,
+                hint="ovpn",
+                as_dict=True,
+                collapse=["key", "ca", "cert"],
+            )
+            config = _parse_config(open_vpn_config)
 
-            name = basename(config_path).replace(".conf", "")
-            proto = config.get("proto", "udp")  # Default is UDP
-            dev = config.get("dev")
-            ca = _unquote(config.get("ca"))
-            cert = _unquote(config.get("cert"))
-            key = _unquote(config.get("key"))
+            common_elements = {
+                "name": config_path.stem,
+                "proto": config.get("proto", "udp"),  # Default is UDP
+                "dev": config.get("dev"),
+                "ca": config.get("ca"),
+                "cert": config.get("cert"),
+                "key": config.get("key"),
+                "status": config.get("status"),
+                "log": config.get("log"),
+                "source": config_path,
+                "_target": self.target,
+            }
+
+            if not export_key and "PRIVATE KEY" in common_elements.get("key"):
+                common_elements.update({"key": "REDACTED"})
+
             tls_auth = config.get("tls-auth", "")
             # The format of tls-auth is 'tls-auth ta.key <NUM>'.
             # NUM is either 0 or 1 depending on whether the configuration
             # is for the client or server, and that does not interest us
             # This gets rid of the number at the end, while still supporting spaces
             tls_auth = _unquote(" ".join(tls_auth.split(" ")[:-1]))
-            status = config.get("status")
-            log = config.get("log")
+
+            common_elements.update({"tls_auth": tls_auth})
 
             if "client" in config:
                 remote = config.get("remote", [])
-                # In cases when there is only a single remote,
-                # we want to return it as its own list
-                if isinstance(remote, str):
-                    remote = [remote]
 
                 yield OpenVPNClient(
-                    name=name,
-                    proto=proto,
-                    dev=dev,
-                    ca=ca,
-                    cert=cert,
-                    key=key,
-                    tls_auth=tls_auth,
-                    status=status,
-                    log=log,
+                    **common_elements,
                     remote=remote,
-                    source=config_path,
-                    _target=self.target,
                 )
             else:
                 pushed_options = config.get("push", [])
-                # In cases when there is only a single push,
-                # we want to return it as its own list
-                if isinstance(pushed_options, str):
-                    pushed_options = [pushed_options]
-                pushed_options = [_unquote(opt) for opt in pushed_options]
                 # Defaults here are taken from `man (8) openvpn`
                 yield OpenVPNServer(
-                    name=name,
-                    proto=proto,
-                    dev=dev,
-                    ca=ca,
-                    cert=cert,
-                    key=key,
-                    tls_auth=tls_auth,
-                    status=status,
-                    log=log,
+                    **common_elements,
                     local=config.get("local", "0.0.0.0"),
                     port=int(config.get("port", "1194")),
                     dh=_unquote(config.get("dh")),
@@ -157,36 +148,18 @@ class OpenVPNPlugin(Plugin):
                     pushed_options=pushed_options,
                     client_to_client=config.get("client-to-client", False),
                     duplicate_cn=config.get("duplicate-cn", False),
-                    source=config_path,
-                    _target=self.target,
                 )
 
 
-def _parse_config(content: str) -> dict[str, Union[str, list[str]]]:
+def _parse_config(content: dict[str, str]) -> dict[str, Union[str, list[str]]]:
     """Parses Openvpn config  files"""
-    lines = content.splitlines()
-    res = {}
     boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
     boolean_field_names = set(field.name for field in boolean_fields)
+    for key in content.keys():
+        if key in boolean_field_names:
+            content.update({key: value == ""})
 
-    for line in lines:
-        # As per man (8) openvpn, lines starting with ; or # are comments
-        if line and not line.startswith((";", "#")):
-            key, *value = line.split(" ", 1)
-            value = value[0] if value else ""
-            # This removes all text after the first comment
-            value = CONFIG_COMMENT_SPLIT_REGEX.split(value, 1)[0].strip()
-
-            if key in boolean_field_names and value == "":
-                value = True
-
-            if old_value := res.get(key):
-                if not isinstance(old_value, list):
-                    old_value = [old_value]
-                res[key] = old_value + [value]
-            else:
-                res[key] = value
-    return res
+    return content
 
 
 def _unquote(content: str) -> str:

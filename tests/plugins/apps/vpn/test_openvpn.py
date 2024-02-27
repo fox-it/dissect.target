@@ -17,7 +17,9 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
     client_config = absolute_path("_data/plugins/apps/vpn/openvpn/client.conf")
     server_config = absolute_path("_data/plugins/apps/vpn/openvpn/server.conf")
     filesystem.map_file(str(target_dir.joinpath("server.conf")), server_config)
+    filesystem.map_file(str(target_dir.joinpath("server.ovpn")), server_config)
     filesystem.map_file(str(target_dir.joinpath("client.conf")), client_config)
+    filesystem.map_file(str(target_dir.joinpath("client.ovpn")), client_config)
 
 
 @pytest.mark.parametrize(
@@ -26,12 +28,12 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
         (
             "target_win_users",
             "fs_win",
-            "Program Files/OpenVPN/config",
+            "Program Files/OpenVPN/config/helper",
         ),
         (
             "target_win_users",
             "fs_win",
-            "Users/John/OpenVPN/config",
+            "Users/John/OpenVPN/config/helper",
         ),
         (
             "target_unix_users",
@@ -50,7 +52,7 @@ def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.Fix
 
 
 def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
-    assert len(records) == 2
+    assert len(records) == 4
 
     for record in records:
         if record.name == "server":
@@ -69,9 +71,9 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.duplicate_cn.value is False
             assert record.proto == "udp"
             assert record.dev == "tun"
-            assert record.ca == "ca.crt"
-            assert record.cert == "server.crt"
-            assert record.key == "server.key"
+            assert "BEGIN CERTIFICATE" in record.ca
+            assert "BEGIN CERTIFICATE" in record.cert
+            assert record.key == "REDACTED"
             assert record.tls_auth == "/etc/a ta.key"
             assert record.status == "/var/log/openvpn/openvpn-status.log"
             assert record.log is None
