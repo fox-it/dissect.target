@@ -59,7 +59,7 @@ class MQTTStream(AlignedStream):
         self.disk_id = disk_id
         super().__init__(size)
 
-    def _read(self, offset: int, length: int, optimization_strategy: Optional[int] = None) -> bytes:
+    def _read(self, offset: int, length: int, optimization_strategy: int = 0) -> bytes:
         data = self.stream.read(self.disk_id, offset, length, optimization_strategy)
         return data
 
