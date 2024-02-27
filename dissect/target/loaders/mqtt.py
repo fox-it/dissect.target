@@ -197,7 +197,7 @@ class Broker:
 
     def seek(self, host: str, disk_id: int, offset: int, length: int, optimization_strategy: int) -> None:
         self.mqtt_client.publish(
-            f"{self.case}/{host}/SEEK/{disk_id}/{hex(offset)}/{hex(length)}", pack("<I", optimization_strategy or 0)
+            f"{self.case}/{host}/SEEK/{disk_id}/{hex(offset)}/{hex(length)}", pack("<I", optimization_strategy)
         )
 
     def info(self, host: str) -> None:
