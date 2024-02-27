@@ -78,6 +78,7 @@ __all__ = [
     "generate_addr",
     "glob_ext",
     "glob_split",
+    "has_glob_magic",
     "isabs",
     "join",
     "normalize",
