@@ -17,19 +17,19 @@ class MQTT(ChildTargetPlugin):
 
     __type__ = "mqtt"
 
-    PATH = "/remote/data/children.txt"
-    FOLDER = "/remote/children"
+    PATH = "/remote/data/hosts.txt"
+    FOLDER = "/remote/hosts"
 
     def __init__(self, target: Target):
         super().__init__(target)
 
     def check_compatible(self) -> None:
-        if not self.target.fs.path(self.PATH).exists():
+        if not self.target.mqtt or not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("No remote children.txt file found.")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         hosts = self.target.fs.path(self.PATH).read_text(encoding="utf-8").split("\n")
         for index, host in enumerate(hosts):
             yield ChildTargetRecord(
-                type=self.__type__, path=posix_path(f"{self.FOLDER}/child{index}.txt"), _target=self.target
+                type=self.__type__, path=posix_path(f"{self.FOLDER}/host-{host}"), _target=self.target
             )
