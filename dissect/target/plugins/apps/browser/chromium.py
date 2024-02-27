@@ -1,3 +1,4 @@
+import itertools
 import json
 from collections import defaultdict
 from typing import Iterator, Optional
@@ -9,7 +10,7 @@ from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.browser.browser import (
@@ -69,11 +70,12 @@ class ChromiumMixin:
                 users_dirs.append((user_details.user, cur_dir))
         return users_dirs
 
-    def _iter_db(self, filename: str) -> Iterator[SQLite3]:
+    def _iter_db(self, filename: str, subdirs: Optional[list[str]] = None) -> Iterator[SQLite3]:
         """Generate a connection to a sqlite database file.
 
         Args:
             filename: The filename as string of the database where the data is stored.
+            subdirs: Subdirectories to also try for every configured directory.
 
         Yields:
             opened db_file (SQLite3)
@@ -83,7 +85,11 @@ class ChromiumMixin:
             SQLError: If the history file could not be opened.
         """
 
-        for user, cur_dir in self._build_userdirs(self.DIRS):
+        dirs = self.DIRS
+        if subdirs:
+            dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
+
+        for user, cur_dir in self._build_userdirs(dirs):
             db_file = cur_dir.joinpath(filename)
             try:
                 yield user, db_file, sqlite3.SQLite3(db_file.open())
@@ -116,6 +122,108 @@ class ChromiumMixin:
     def check_compatible(self) -> None:
         if not len(self._build_userdirs(self.DIRS)):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
+
+    def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
+        """Return browser history records from supported Chromium-based browsers.
+
+        Args:
+            browser_name: The name of the browser as a string.
+
+        Yields:
+            Records with the following fields:
+                ts (datetime): Visit timestamp.
+                browser (string): The browser from which the records are generated from.
+                id (string): Record ID.
+                url (uri): History URL.
+                title (string): Page title.
+                description (string): Page description.
+                rev_host (string): Reverse hostname.
+                visit_type (varint): Visit type.
+                visit_count (varint): Amount of visits.
+                hidden (string): Hidden value.
+                typed (string): Typed value.
+                session (varint): Session value.
+                from_visit (varint): Record ID of the "from" visit.
+                from_url (uri): URL of the "from" visit.
+                source: (path): The source file of the history record.
+        """
+        for user, db_file, db in self._iter_db("History"):
+            try:
+                urls = {row.id: row for row in db.table("urls").rows()}
+                visits = {}
+
+                for row in db.table("visits").rows():
+                    visits[row.id] = row
+                    url = urls[row.url]
+
+                    if row.from_visit and row.from_visit in visits:
+                        from_visit = visits[row.from_visit]
+                        from_url = urls[from_visit.url]
+                    else:
+                        from_visit, from_url = None, None
+
+                    yield self.BrowserHistoryRecord(
+                        ts=webkittimestamp(row.visit_time),
+                        browser=browser_name,
+                        id=row.id,
+                        url=try_idna(url.url),
+                        title=url.title,
+                        description=None,
+                        rev_host=None,
+                        visit_type=None,
+                        visit_count=url.visit_count,
+                        hidden=url.hidden,
+                        typed=None,
+                        session=None,
+                        from_visit=row.from_visit or None,
+                        from_url=try_idna(from_url.url) if from_url else None,
+                        source=db_file,
+                        _target=self.target,
+                        _user=user,
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
+
+    def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
+        """Return browser cookie records from supported Chromium-based browsers.
+
+        Args:
+            browser_name: The name of the browser as a string.
+
+        Yields:
+            Records with the following fields:
+                ts_created (datetime): Cookie created timestamp.
+                ts_last_accessed (datetime): Cookie last accessed timestamp.
+                browser (string): The browser from which the records are generated from.
+                name (string): The cookie name.
+                value (string): The cookie value.
+                host (string): Cookie host key.
+                path (string): Cookie path.
+                expiry (varint): Cookie expiry.
+                is_secure (bool): Cookie secury flag.
+                is_http_only (bool): Cookie http only flag.
+                same_site (bool): Cookie same site flag.
+        """
+        for user, db_file, db in self._iter_db("Cookies", subdirs=["Network"]):
+            try:
+                for cookie in db.table("cookies").rows():
+                    yield self.BrowserCookieRecord(
+                        ts_created=webkittimestamp(cookie.creation_utc),
+                        ts_last_accessed=webkittimestamp(cookie.last_access_utc),
+                        browser=browser_name,
+                        name=cookie.name,
+                        value=cookie.value,
+                        host=cookie.host_key,
+                        path=cookie.path,
+                        expiry=int(cookie.has_expires),
+                        is_secure=bool(cookie.is_secure),
+                        is_http_only=bool(cookie.is_httponly),
+                        same_site=bool(cookie.samesite),
+                        source=db_file,
+                        _user=user,
+                    )
+            except SQLError as e:
+                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
 
     def downloads(self, browser_name: Optional[str] = None) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from supported Chromium-based browsers.
@@ -176,46 +284,6 @@ class ChromiumMixin:
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
-
-    def cookies(self, browser_name: Optional[str] = None) -> Iterator[BrowserCookieRecord]:
-        """Return browser cookie records from supported Chromium-based browsers.
-
-        Args:
-            browser_name: The name of the browser as a string.
-
-        Yields:
-            Records with the following fields:
-                ts_created (datetime): Cookie created timestamp.
-                ts_last_accessed (datetime): Cookie last accessed timestamp.
-                browser (string): The browser from which the records are generated from.
-                name (string): The cookie name.
-                value (string): The cookie value.
-                host (string): Cookie host key.
-                path (string): Cookie path.
-                expiry (varint): Cookie expiry.
-                is_secure (bool): Cookie secury flag.
-                is_http_only (bool): Cookie http only flag.
-                same_site (bool): Cookie same site flag.
-        """
-        for user, db_file, db in self._iter_db("Cookies"):
-            try:
-                for cookie in db.table("cookies").rows():
-                    yield self.BrowserCookieRecord(
-                        ts_created=webkittimestamp(cookie.creation_utc),
-                        ts_last_accessed=webkittimestamp(cookie.last_access_utc),
-                        browser=browser_name,
-                        name=cookie.name,
-                        value=cookie.value,
-                        host=cookie.host_key,
-                        path=cookie.path,
-                        expiry=int(cookie.has_expires),
-                        is_secure=bool(cookie.is_secure),
-                        is_http_only=bool(cookie.is_httponly),
-                        same_site=bool(cookie.samesite),
-                        _user=user,
-                    )
-            except SQLError as e:
-                self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
 
     def extensions(self, browser_name: Optional[str] = None) -> Iterator[BrowserExtensionRecord]:
         """Iterates over all installed extensions for a given browser.
@@ -302,67 +370,6 @@ class ChromiumMixin:
                         )
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
-
-    def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
-        """Return browser history records from supported Chromium-based browsers.
-
-        Args:
-            browser_name: The name of the browser as a string.
-
-        Yields:
-            Records with the following fields:
-                ts (datetime): Visit timestamp.
-                browser (string): The browser from which the records are generated from.
-                id (string): Record ID.
-                url (uri): History URL.
-                title (string): Page title.
-                description (string): Page description.
-                rev_host (string): Reverse hostname.
-                visit_type (varint): Visit type.
-                visit_count (varint): Amount of visits.
-                hidden (string): Hidden value.
-                typed (string): Typed value.
-                session (varint): Session value.
-                from_visit (varint): Record ID of the "from" visit.
-                from_url (uri): URL of the "from" visit.
-                source: (path): The source file of the history record.
-        """
-        for user, db_file, db in self._iter_db("History"):
-            try:
-                urls = {row.id: row for row in db.table("urls").rows()}
-                visits = {}
-
-                for row in db.table("visits").rows():
-                    visits[row.id] = row
-                    url = urls[row.url]
-
-                    if row.from_visit and row.from_visit in visits:
-                        from_visit = visits[row.from_visit]
-                        from_url = urls[from_visit.url]
-                    else:
-                        from_visit, from_url = None, None
-
-                    yield self.BrowserHistoryRecord(
-                        ts=webkittimestamp(row.visit_time),
-                        browser=browser_name,
-                        id=row.id,
-                        url=try_idna(url.url),
-                        title=url.title,
-                        description=None,
-                        rev_host=None,
-                        visit_type=None,
-                        visit_count=url.visit_count,
-                        hidden=url.hidden,
-                        typed=None,
-                        session=None,
-                        from_visit=row.from_visit or None,
-                        from_url=try_idna(from_url.url) if from_url else None,
-                        source=db_file,
-                        _target=self.target,
-                        _user=user,
-                    )
-            except SQLError as e:
-                self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
 
 class ChromiumPlugin(ChromiumMixin, BrowserPlugin):

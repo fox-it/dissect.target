@@ -10,7 +10,7 @@ from dissect.target.plugins.apps.webserver import iis
 from tests._utils import absolute_path
 
 
-def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
 
@@ -39,7 +39,7 @@ def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesys
         "_data/plugins/apps/webserver/iis/iis-applicationHost-w3c-logFile-without-directory-attr.config",
     ],
 )
-def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str):
+def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, iis_config_path: str) -> None:
     config_path = absolute_path(iis_config_path)
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -87,14 +87,14 @@ def test_iis_plugin_w3c_format(target_win: Target, fs_win: VirtualFilesystem, ii
         (b"#Date: -\n#Fields: s-computername\n\xa7", "parse_w3c_format_log"),
     ],
 )
-def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str):
+def test_iis_plugin_iis_nonutf8(target_win_tzinfo: Target, stream: bytes, method: str) -> None:
     server = iis.IISLogsPlugin(target_win_tzinfo)
     # should not crash on invalid bytes like \xa7
     with patch("pathlib.Path.open", new_callable=mock_open, read_data=stream):
         assert list(getattr(server, method)(Path("/iis")))[0].server_name == "\\xa7"
 
 
-def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=-5))
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-iis.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis")
@@ -121,7 +121,7 @@ def test_plugins_apps_webservers_iis_access_iis_format(target_win_tzinfo: Target
     assert record.source == "sysvol/Users/John/iis-logs/W3SVC1/u_in211001.log"
 
 
-def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem):
+def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     config_path = absolute_path("_data/plugins/apps/webserver/iis/iis-applicationHost-w3c.config")
     data_dir = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-w3c")
 
@@ -183,3 +183,30 @@ def test_plugins_apps_webservers_iis_access_w3c_format(target_win: Target, fs_wi
         == "Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/93.0.4577.82+Safari/537.36+Edg/93.0.961.52"  # noqa: E501
     )
     assert w3c_record_3.source == "C:/Users/John/w3c-logs/W3SVC1/u_ex211001_x.log"
+
+
+@pytest.mark.parametrize(
+    "map_dir",
+    [
+        ("inetpub/logs/LogFiles/W3SVC1"),
+        ("inetpub/logs/LogFiles"),
+        ("Windows/System32/LogFiles/W3SVC1"),
+        ("Windows.old/Windows/System32/LogFiles/W3SVC2"),
+        ("Resources/Directory/aaa/LogFiles/Web/W3SVC1"),
+    ],
+)
+@pytest.mark.parametrize(
+    "log_format",
+    [
+        ("iis"),
+        ("w3c"),
+    ],
+)
+def test_plugins_apps_webservers_iis_access_iis_format_noconfig(
+    target_win_tzinfo: Target, fs_win: VirtualFilesystem, map_dir: str, log_format: str
+) -> None:
+    data_dir = absolute_path(f"_data/plugins/apps/webserver/iis/iis-logs-{log_format}/W3SVC1")
+    fs_win.map_dir(map_dir, data_dir)
+    target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
+    results = list(target_win_tzinfo.iis.access())
+    assert len(results) > 0

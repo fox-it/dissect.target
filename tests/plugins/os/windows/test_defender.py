@@ -1,10 +1,8 @@
 import os
-import platform
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
-import pytest
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 
 from dissect.target.filesystem import VirtualFilesystem
@@ -28,6 +26,7 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     assert len(records) == 9
 
     # verify that all records have unique EventIDs
+    assert all(r.ts is not None for r in records)
     assert len(list(r.EventID for r in records)) == 9
     assert {r.Provider_Name for r in records} == {"Microsoft-Windows-Windows Defender"}
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}
@@ -60,11 +59,6 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
     assert mimikatz_record.last_accessed_time.date() == detection_date
 
 
-@pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="Windows Defender cleans up the restored quarentine files when you try to open it.",
-)
-# TODO: Create a more sane quarentine file for this.
 def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     # Map the quarantine folder from our test data
     quarantine_dir = absolute_path("_data/plugins/os/windows/defender/quarantine")
@@ -94,11 +88,8 @@ def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesys
     directory_content = os.listdir(recovery_dst)
     directory_content.sort()
     assert expected_files == directory_content
-
-    # Verify that the payloads are both properly restored by checking for the MZ header
-    with open(recovery_dst.joinpath(payload_filename), "rb") as payload_file:
-        header = payload_file.read(2)
-        assert header == b"MZ"
+    # Replaced the mimikatz payload with `DUMMY_PAYLOAD` to avoid defender collecting it
+    assert recovery_dst.joinpath(payload_filename).read_bytes() == b"DUMMY_PAYLOAD"
 
     # Verify that the security descriptors are valid security descriptors
     with open(recovery_dst.joinpath(security_descriptor_filename), "rb") as descriptor_file:
