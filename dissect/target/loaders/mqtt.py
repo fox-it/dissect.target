@@ -94,9 +94,19 @@ class MQTTConnection:
     def read(self, disk_id: int, offset: int, length: int, optimization_strategy: int) -> bytes:
         message = None
         self.broker.seek(self.host, disk_id, offset, length, optimization_strategy)
-        while message is None:
+
+        attempts = 0
+        while True:
             message = self.broker.read(self.host, disk_id, offset, length)
-            self.broker.read(self.host, disk_id, offset, length, optimization_strategy)
+            # don't waste time with sleep if we have a response
+            if message:
+                break
+            attempts += 1
+            time.sleep(0.01)
+            if attempts > 100:
+                # message might have not reached agent, resend...
+                self.broker.seek(self.host, disk_id, offset, length, optimization_strategy)
+                attempts = 0
 
         return message.data
 
