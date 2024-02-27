@@ -34,7 +34,7 @@ WireGuardPeerRecord = TargetRecordDescriptor(
         ("string", "name"),
         ("string", "public_key"),
         ("string", "pre_shared_key"),
-        ("net.ipnetwork", "allowed_ips"),
+        ("net.ipnetwork[]", "allowed_ips"),
         ("string", "endpoint"),
         ("varint", "persistent_keep_alive"),
         ("string", "source"),
@@ -102,37 +102,40 @@ class WireGuardPlugin(Plugin):
 
             config = _parse_config(config_buf)
 
-            for section in config.sections():
+            for section, config_dict in config._sections.items():
                 if "Interface" in section:
-                    if address := config.get(section, "Address", fallback=None):
+                    if address := config_dict.get("Address"):
                         address = address.split("/")[0]
                     name = basename(config_path)
                     name = self.TUNNEL_NAME_RE.sub("", name)
                     yield WireGuardInterfaceRecord(
                         name=name,
                         address=address,
-                        listen_port=config.get(section, "ListenPort", fallback=None),
-                        private_key=config.get(section, "PrivateKey", fallback=None),
-                        fw_mark=config.get(section, "FwMark", fallback=None),
-                        dns=config.get(section, "DNS", fallback=None),
-                        table=config.get(section, "Table", fallback=None),
-                        mtu=config.get(section, "MTU", fallback=None),
-                        preup=config.get(section, "PreUp", fallback=None),
-                        postup=config.get(section, "PostUp", fallback=None),
-                        predown=config.get(section, "PreDown", fallback=None),
-                        postdown=config.get(section, "PostDown", fallback=None),
+                        listen_port=config_dict.get("ListenPort"),
+                        private_key=config_dict.get("PrivateKey"),
+                        fw_mark=config_dict.get("FwMark"),
+                        dns=config_dict.get("DNS"),
+                        table=config_dict.get("Table"),
+                        mtu=config_dict.get("MTU"),
+                        preup=config_dict.get("PreUp"),
+                        postup=config_dict.get("PostUp"),
+                        predown=config_dict.get("PreDown"),
+                        postdown=config_dict.get("PostDown"),
                         source=config_path,
                         _target=self.target,
                     )
 
                 if "Peer" in section:
+                    if allowed_ips := config_dict.get("AllowedIPs"):
+                        allowed_ips = [value.strip() for value in allowed_ips.split(",")]
+
                     yield WireGuardPeerRecord(
-                        name=config.get(section, "Name", fallback=None),
-                        public_key=config.get(section, "PublicKey", fallback=None),
-                        pre_shared_key=config.get(section, "PreSharedKey", fallback=None),
-                        allowed_ips=config.get(section, "AllowedIPs", fallback=None),
-                        endpoint=config.get(section, "Endpoint", fallback=None),
-                        persistent_keep_alive=config.get(section, "PersistentKeepAlive", fallback=None),
+                        name=config_dict.get("Name"),
+                        public_key=config_dict.get("PublicKey"),
+                        pre_shared_key=config_dict.get("PreSharedKey"),
+                        allowed_ips=allowed_ips,
+                        endpoint=config_dict.get("Endpoint"),
+                        persistent_keep_alive=config_dict.get("PersistentKeepAlive"),
                         source=config_path,
                         _target=self.target,
                     )
@@ -148,6 +151,8 @@ def _parse_config(content: str) -> ConfigParser:
     """
 
     cp = ConfigParser(defaults=None, dict_type=MultiDict, strict=False)
+    # Set to use str so it doesn't do any lower operation on the keys.
+    cp.optionxform = str
     cp.read_string(content)
     return cp
 
