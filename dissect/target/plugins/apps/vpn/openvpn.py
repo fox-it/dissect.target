@@ -1,7 +1,6 @@
 import itertools
 import re
 from itertools import product
-from os.path import basename
 from typing import Iterator, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -155,7 +154,7 @@ def _parse_config(content: dict[str, str]) -> dict[str, Union[str, list[str]]]:
     """Parses Openvpn config  files"""
     boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
     boolean_field_names = set(field.name for field in boolean_fields)
-    for key in content.keys():
+    for key, value in content.items():
         if key in boolean_field_names:
             content.update({key: value == ""})
 
