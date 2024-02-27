@@ -241,7 +241,7 @@ class MQTTLoader(Loader):
         super().__init__(path)
         cls = MQTTLoader
 
-        if str(path).startswith("/remote/hosts/host-"):
+        if str(path).startswith("/remote/hosts/host"):
             self.path = path.read_text()  # update path to reflect the resolved host
 
         num_peers = 1
@@ -267,11 +267,11 @@ class MQTTLoader(Loader):
             vfs = VirtualFilesystem()
             vfs.map_file_fh(self.PATH, BytesIO("\n".join(self.peers).encode("utf-8")))
             for index, peer in enumerate(self.peers):
-                vfs.map_file_fh(f"{self.FOLDER}/host-{index}-{peer}", BytesIO(peer.encode("utf-8")))
+                vfs.map_file_fh(f"{self.FOLDER}/host{index}-{peer}", BytesIO(peer.encode("utf-8")))
 
             target.fs.mount("/data", vfs)
             target.filesystems.add(vfs)
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return str(path).startswith("/remote/hosts/host-")
+        return str(path).startswith("/remote/hosts/host")
