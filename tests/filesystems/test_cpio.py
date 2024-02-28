@@ -5,7 +5,7 @@ from tests._utils import absolute_path
 
 
 def test_cpio_uncompressed() -> None:
-    cpio_path = Path(absolute_path("_data/loaders/cpio/initrd.img-6.1.0-17-amd64"))
+    cpio_path = Path(absolute_path("_data/filesystems/cpio/initrd.img-6.1.0-17-amd64"))
 
     with cpio_path.open("rb") as fh:
         assert CpioFilesystem.detect(fh)
@@ -15,7 +15,7 @@ def test_cpio_uncompressed() -> None:
 
 
 def test_cpio_compressed_zstd() -> None:
-    cpio_path = Path(absolute_path("_data/loaders/cpio/initrd.img-6.1.0-15-amd64"))
+    cpio_path = Path(absolute_path("_data/filesystems/cpio/initrd.img-6.1.0-15-amd64"))
 
     with cpio_path.open("rb") as fh:
         assert CpioFilesystem.detect(fh)
