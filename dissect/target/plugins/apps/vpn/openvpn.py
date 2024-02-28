@@ -134,7 +134,6 @@ class OpenVPNPlugin(Plugin):
                     remote=remote,
                 )
             else:
-                pushed_options = config.get("push", [])
                 # Defaults here are taken from `man (8) openvpn`
                 yield OpenVPNServer(
                     **common_elements,
@@ -144,7 +143,7 @@ class OpenVPNPlugin(Plugin):
                     topology=config.get("topology"),
                     server=config.get("server"),
                     ifconfig_pool_persist=config.get("ifconfig-pool-persist"),
-                    pushed_options=pushed_options,
+                    pushed_options=config.get("push", []),
                     client_to_client=config.get("client-to-client", False),
                     duplicate_cn=config.get("duplicate-cn", False),
                 )

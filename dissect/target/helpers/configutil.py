@@ -232,21 +232,19 @@ class OpenVPN(Default):
     def parse_file(self, fh: io.TextIO) -> None:
         root = {}
         iterator = self.line_reader(fh)
-        for line in self.line_reader(fh):
+        for line in iterator:
             if line.startswith("<"):
                 key = line.strip().strip("<>")
                 value = self._read_blob(iterator)
                 _update_dictionary(root, key, value)
                 continue
 
-            prev_key, *value = self.SEPARATOR.split(line, 1)
-            value = value[0].strip().strip('"') if value else ""
+            self._parse_line(root, line)
 
-            _update_dictionary(root, prev_key, value)
+        self.parsed_data = ListUnwrapper.unwrap(root)
 
-        self.parsed_data = root
-
-    def _read_blob(self, lines: Iterable[str]) -> str:
+    def _read_blob(self, lines: Iterable[str]) -> str | list[dict]:
+        """Read the whole section between <data></data> sections"""
         output = ""
         with io.StringIO() as buffer:
             for line in lines:
@@ -254,12 +252,24 @@ class OpenVPN(Default):
                     break
 
                 buffer.write(line)
-                buffer.write("\n")
             output = buffer.getvalue()
 
+        # Check for connection profile blocks
         if not output.startswith("-----"):
-            return output.split("\n")
+            profile_dict = dict()
+            for line in output.splitlines():
+                self._parse_line(profile_dict, line)
+
+            # We put it as a list as _update_dictionary appends data in a list.
+            output = [profile_dict]
+
         return output
+
+    def _parse_line(self, root: dict, line: str) -> None:
+        prev_key, *value = self.SEPARATOR.split(line, 1)
+        value = value[0].strip().strip('"') if value else ""
+
+        _update_dictionary(root, prev_key, value)
 
 
 class Ini(ConfigurationParser):
