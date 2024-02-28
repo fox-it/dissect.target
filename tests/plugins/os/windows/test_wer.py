@@ -8,7 +8,16 @@ def test_wer_plugin(target_win, fs_win):
     wer_dir = absolute_path("_data/plugins/os/windows/wer")
     fs_win.map_dir("ProgramData/Microsoft/Windows/WER/ReportQueue/test", wer_dir)
     target_win.add_plugin(WindowsErrorReportingPlugin)
-    tests = ["os_version_information_lcid", "response_type", "sig", "dynamic_sig", "dynamic_signatures_parameter1"]
+    tests = [
+        "os_version_information_lcid",
+        "response_type",
+        "sig",
+        "dynamic_sig",
+        "dynamic_signatures_parameter1",
+        "ui1",
+        "spcial_charactr",
+        "невидимый",
+    ]
 
     records = list(target_win.wer())
     assert len(records) == 2
@@ -20,6 +29,12 @@ def test_wer_plugin(target_win, fs_win):
     record = wer_record_map["wer_test.wer"]
     for test in tests:
         record_field = getattr(record, test, None)
+
+        # Check if expected line has been skipped
+        if record_field is None:
+            assert test == "невидимый"
+            continue
+
         assert record_field == f"test_{test}"
 
     assert record.ts == datetime.datetime(2022, 10, 4, 11, 0, 0, 0, tzinfo=datetime.timezone.utc)

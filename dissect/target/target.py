@@ -87,8 +87,8 @@ class Target:
 
         try:
             self._config = config.load(self.path)
-        except Exception:
-            self.log.exception("Error loading config file")
+        except Exception as e:
+            self.log.debug("Error loading config file", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
         # Fill the disks and/or volumes and/or filesystems and apply() will
@@ -372,7 +372,7 @@ class Target:
             recursive: Whether to check the child ``Target`` for more ``Targets``.
 
         Returns:
-            An interator of ``Targets``.
+            An iterator of ``Targets``.
         """
         for child in self.list_children():
             try:

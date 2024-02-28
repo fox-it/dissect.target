@@ -26,6 +26,7 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     assert len(records) == 9
 
     # verify that all records have unique EventIDs
+    assert all(r.ts is not None for r in records)
     assert len(list(r.EventID for r in records)) == 9
     assert {r.Provider_Name for r in records} == {"Microsoft-Windows-Windows Defender"}
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}

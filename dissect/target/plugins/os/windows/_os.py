@@ -62,7 +62,7 @@ class WindowsPlugin(OSPlugin):
                             guid = value[8:]
 
                             for volume in self.target.volumes:
-                                if volume.guid == guid:
+                                if volume.guid == guid and volume.fs:
                                     self.target.fs.mount(drive, volume.fs)
 
                         elif len(value) == 12:
