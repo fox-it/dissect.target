@@ -4,6 +4,7 @@ import gzip
 import json
 import lzma
 import struct
+import subprocess
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
@@ -12,6 +13,8 @@ from typing import Any, BinaryIO, Iterator, Optional, TextIO
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
+
+from dissect.target.helpers.fsutil import TargetPath
 
 try:
     from dissect.hypervisor.util.envelope import Envelope, KeyStore
@@ -217,21 +220,70 @@ def _mount_local(target: Target, local_layer: VirtualFilesystem):
         local_fs = tar.TarFilesystem(local_tgz.open())
     else:
         local_tgz_ve = target.fs.path("local.tgz.ve")
-        encryption_info = target.fs.path("encryption.info")
+        # In the case "encryption.info" does not exist, but ".#encryption.info" does
+        encryption_info = next(target.fs.path("/").glob("*encryption.info"), None)
         if not local_tgz_ve.exists() or not encryption_info.exists():
             raise ValueError("Unable to find valid configuration archive")
 
-        if HAS_ENVELOPE:
-            target.log.info("local.tgz is encrypted, attempting to decrypt")
-            envelope = Envelope(local_tgz_ve.open())
-            keystore = KeyStore.from_text(encryption_info.read_text("utf-8"))
-            local_tgz = BytesIO(envelope.decrypt(keystore.key, aad=b"ESXConfiguration"))
-            local_fs = tar.TarFilesystem(local_tgz)
-        else:
-            target.log.warning("local.tgz is encrypted but no crypto module available!")
+        local_fs = _create_local_fs(target, local_tgz_ve, encryption_info)
 
     if local_fs:
         local_layer.mount("/", local_fs)
+
+
+def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> BinaryIO:
+    """Decrypt ``local.tgz.ve`` ourselves with hard-coded keys."""
+    envelope = Envelope(local_tgz_ve.open())
+    keystore = KeyStore.from_text(encryption_info.read_text("utf-8"))
+    local_tgz = BytesIO(envelope.decrypt(keystore.key, aad=b"ESXConfiguration"))
+    return local_tgz
+
+
+def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
+    """Decrypt ``local.tgz.ve`` using ESXi ``crypto-util``.
+
+    We write to stdout, but this results in ``crypto-util`` exiting with a non-zero return code
+    and stderr containing an I/O error message. The file does get properly decrypted, so we return
+    ``None`` if there are no bytes in stdout which would indicate it actually failed.
+    """
+
+    result = subprocess.run(
+        ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
+        capture_output=True,
+    )
+
+    if len(result.stdout) == 0:
+        return None
+
+    return BytesIO(result.stdout)
+
+
+def _create_local_fs(
+    target: Target, local_tgz_ve: TargetPath, encryption_info: TargetPath
+) -> Optional[tar.TarFilesystem]:
+    local_tgz = None
+
+    if HAS_ENVELOPE:
+        try:
+            local_tgz = _decrypt_envelope(local_tgz_ve, encryption_info)
+        except NotImplementedError:
+            target.log.debug("Failed to decrypt %s, likely TPM encrypted", local_tgz_ve)
+    else:
+        target.log.debug("Skipping static decryption because of missing crypto module")
+
+    if not local_tgz and target.name == "local":
+        target.log.info(
+            "local.tgz is encrypted but static decryption failed, attempting dynamic decryption using crypto-util"
+        )
+        local_tgz = _decrypt_crypto_util(local_tgz_ve)
+
+        if local_tgz is None:
+            target.log.warning("Dynamic decryption of %s failed.", local_tgz_ve)
+    else:
+        target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
+
+    if local_tgz:
+        return tar.TarFilesystem(local_tgz)
 
 
 def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):

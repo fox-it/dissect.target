@@ -29,6 +29,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
     def __init__(self, target):
         super().__init__(target)
+        self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
@@ -145,7 +146,6 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    @lru_cache(maxsize=4096)
     def _create_event_descriptor(self, record_fields) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
