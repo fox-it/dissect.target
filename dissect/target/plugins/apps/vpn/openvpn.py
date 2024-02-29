@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import itertools
-import re
 from itertools import product
 from typing import Iterable, Iterator, Union
 
