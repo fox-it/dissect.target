@@ -113,7 +113,7 @@ def test_windows_chromium_passwords(target_chromium_win: Target) -> None:
     for record in records:
         assert record.browser == "chromium"
         assert record.decrypted_username == "username"
-        assert record.decrypted_password == ""
+        assert record.decrypted_password is None
 
     assert records[0].url == "https://example.com/"
     assert records[1].url == "https://example.org/"
@@ -145,7 +145,7 @@ def test_unix_chromium_passwords_gnome(target_unix_users: Target, fs_unix: Virtu
     assert len(records) == 1
 
     assert records[0].decrypted_username == "username"
-    assert records[0].decrypted_password == ""
+    assert records[0].decrypted_password is None
     assert records[0].url == "https://test.com/"
 
 

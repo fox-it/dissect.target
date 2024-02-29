@@ -197,15 +197,15 @@ def test_decrypt_is_succesful(path_key4, logins, decrypted):
 @patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", return_value=(b"", ""))
 def test_decrypt_bad_master_key(mock_target, path_key4, logins):
     dec_username, dec_password = decrypt(logins.get("username"), logins.get("password"), path_key4)
-    assert dec_username == ""
-    assert dec_password == ""
+    assert dec_username is None
+    assert dec_password is None
 
 
 @patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", return_value=(b"", "not.existing.algorithm"))
 def test_decrypt_unsupported_algoritm(mock_target, path_key4, logins):
     dec_username, dec_password = decrypt(logins.get("username"), logins.get("password"), path_key4)
-    assert dec_username == ""
-    assert dec_password == ""
+    assert dec_username is None
+    assert dec_password is None
 
 
 def test_decrypt_with_primary_password_is_succesful(
@@ -231,8 +231,8 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
         path_key4_primary_password,
         "BAD_PRIMARY_PASSWORD",
     )
-    assert dec_username == ""
-    assert dec_password == ""
+    assert dec_username is None
+    assert dec_password is None
 
 
 def test_retrieve_master_key_is_succesful(path_key4):

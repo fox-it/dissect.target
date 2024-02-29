@@ -2,7 +2,7 @@ import base64
 import itertools
 import json
 from collections import defaultdict
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
@@ -379,24 +379,24 @@ class ChromiumMixin:
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
-    def _get_local_state_key(self, local_state_path: TargetPath, chromium_passwords: list) -> Union[bytes, bool]:
-        """Get the Chromium os_crypt encrypted_key and decrypt the key using DPAPI."""
+    def _get_local_state_key(self, local_state_path: TargetPath, chromium_passwords: list) -> Optional[bytes]:
+        """Get the Chromium ``os_crypt`` ``encrypted_key`` and decrypt it using DPAPI."""
 
         if not local_state_path.exists():
-            self.target.log.warning(f"File {local_state_path} does not exist.")
-            return False
+            self.target.log.warning("File %s does not exist.", local_state_path)
+            return None
 
         try:
             local_state_conf = json.loads(local_state_path.read_text())
         except json.JSONDecodeError:
-            self.target.log.warning(f"File {local_state_path} does not contain valid JSON.")
-            return False
+            self.target.log.warning("File %s does not contain valid JSON.", local_state_path)
+            return None
 
         if "os_crypt" not in local_state_conf:
             self.target.log.warning(
-                f"File {local_state_path} does not contain os_crypt, Chrome is likely older than v80."
+                "File %s does not contain os_crypt, Chrome is likely older than v80.", local_state_path
             )
-            return False
+            return None
 
         encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
         decrypted_key = self.target.dpapi.decrypt_blob(encrypted_key, chromium_passwords)
@@ -409,8 +409,10 @@ class ChromiumMixin:
             - ``basic`` ciphertext prefixed with ``v10`` and encrypted with hard coded parameters.
             - ``gnome`` and ``kwallet`` ciphertext prefixed with ``v11`` which is not implemented (yet).
 
-        Chromium on Windows uses DPAPI user encryption. Passwords from Chromium before and after version 80 can be
-        decrypted. The SHA1 hash of the user's password or the plaintext password is required to decrypt passwords.
+        Chromium on Windows uses DPAPI user encryption.
+
+        The SHA1 hash of the user's password or the plaintext password is required to decrypt passwords
+        when dealing with encrypted passwords created with Chromium v80 (February 2020) and newer.
 
         You can supply a SHA1 hash or plaintext password using the ``--passwords`` option.
 
@@ -421,7 +423,7 @@ class ChromiumMixin:
 
         for user, db_file, db in self._iter_db("Login Data"):
             rows = db.table("logins").rows()
-            decrypted_key = False
+            decrypted_key = None
 
             if self.target.os == OperatingSystem.WINDOWS.value:
                 local_state_path = db_file.parent.parent.joinpath("Local State")
@@ -429,7 +431,7 @@ class ChromiumMixin:
 
             for row in rows:
                 encrypted_password: bytes = row.password_value
-                decrypted_password = ""
+                decrypted_password = None
 
                 # 1. Windows DPAPI encrypted password. Chrome > 80
                 #    For passwords saved after Chromium v80, we have to use DPAPI to decrypt the AES key
@@ -466,24 +468,27 @@ class ChromiumMixin:
                 # 4. Linux 'gnome' or 'kwallet' encrypted password.
                 elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v11"):
                     self.target.log.warning(
-                        f"Unable to decrypt {browser_name} password in '{db_file}': unsupported format."
+                        "Unable to decrypt %s password in '%s': unsupported format.", browser_name, db_file
                     )
 
                 # 5. Unsupported.
                 else:
                     prefix = encrypted_password[:10]
                     self.target.log.warning(
-                        f"Unsupported {browser_name} encrypted password found in '{db_file}' with prefix '{prefix}'"
+                        "Unsupported %s encrypted password found in '%s' with prefix '%s'",
+                        browser_name,
+                        db_file,
+                        prefix,
                     )
 
                 yield self.BrowserPasswordRecord(
-                    browser=browser_name,
-                    id=row.id,
                     ts_created=webkittimestamp(row.date_created),
                     ts_last_used=webkittimestamp(row.date_last_used),
                     ts_last_changed=webkittimestamp(row.date_password_modified or 0),
+                    browser=browser_name,
+                    id=row.id,
                     url=row.origin_url,
-                    encrypted_username="",
+                    encrypted_username=None,
                     encrypted_password=base64.b64encode(row.password_value),
                     decrypted_username=row.username_value,
                     decrypted_password=decrypted_password,
