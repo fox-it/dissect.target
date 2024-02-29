@@ -56,7 +56,7 @@ def test_windows_edge_passwords_plugin(target_brave: Target) -> None:
     for record in records:
         assert record.browser == "brave"
         assert record.decrypted_username == "username"
-        assert record.decrypted_password == ""
+        assert record.decrypted_password is None
 
     assert records[0].url == "https://example.com/"
     assert records[1].url == "https://example.org/"

@@ -91,7 +91,7 @@ def test_windows_edge_passwords_plugin(target_edge_win: Target) -> None:
     for record in records:
         assert record.browser == "edge"
         assert record.decrypted_username == "username"
-        assert record.decrypted_password == ""
+        assert record.decrypted_password is None
 
     assert records[0].url == "https://example.com/"
     assert records[1].url == "https://example.org/"
@@ -127,5 +127,5 @@ def test_unix_edge_passwords_gnome_plugin(target_edge_unix: Target, fs_unix: Vir
     assert len(records) == 1
 
     assert records[0].decrypted_username == "username"
-    assert records[0].decrypted_password == ""
+    assert records[0].decrypted_password is None
     assert records[0].url == "https://test.com/"

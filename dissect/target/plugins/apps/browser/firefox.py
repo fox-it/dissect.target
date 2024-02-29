@@ -312,16 +312,16 @@ class FirefoxPlugin(BrowserPlugin):
 
             if not login_file.exists():
                 self.target.log.warning(
-                    f"No 'logins.json' password file found for user {user} in directory {profile_dir}"
+                    "No 'logins.json' password file found for user %s in directory %s", user, profile_dir
                 )
                 continue
 
             if key3_file.exists() and not key4_file.exists():
-                self.target.log.warning(f"Unsupported file 'key3.db' found in {profile_dir}")
+                self.target.log.warning("Unsupported file 'key3.db' found in %s", profile_dir)
                 continue
 
             if not key4_file.exists():
-                self.target.log.warning(f"No 'key4.db' found in {profile_dir}")
+                self.target.log.warning("No 'key4.db' found in %s", profile_dir)
                 continue
 
             try:
@@ -336,11 +336,11 @@ class FirefoxPlugin(BrowserPlugin):
                     )
 
                     yield self.BrowserPasswordRecord(
-                        browser="firefox",
-                        id=login.get("id"),
                         ts_created=login.get("timeCreated", 0) // 1000,
                         ts_last_used=login.get("timeLastUsed", 0) // 1000,
                         ts_last_changed=login.get("timePasswordChanged", 0) // 1000,
+                        browser="firefox",
+                        id=login.get("id"),
                         url=login.get("hostname"),
                         encrypted_username=login.get("encryptedUsername"),
                         encrypted_password=login.get("encryptedPassword"),
@@ -352,10 +352,10 @@ class FirefoxPlugin(BrowserPlugin):
                     )
 
             except FileNotFoundError:
-                self.target.log.info(f"No password file found for user {user} in directory {profile_dir}.")
+                self.target.log.info("No password file found for user %s in directory %s.", user, profile_dir)
             except json.JSONDecodeError:
                 self.target.log.warning(
-                    f"logins.json file in directory {profile_dir} is malformed, consider inspecting the file manually."
+                    "logins.json file in directory %s is malformed, consider inspecting the file manually.", profile_dir
                 )
 
 
@@ -424,22 +424,22 @@ def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> b
 
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
-        raise ValueError(f"Expected pbkdf2 object identifier, got: {pkcs5_oid}")
+        raise ValueError("Expected pbkdf2 object identifier, got: %s", pkcs5_oid)
 
     sha256_oid = decoded_item[0][1][0][1][3][0].dotted
     if algos.HmacAlgorithmId.map(sha256_oid) != "sha256":
-        raise ValueError(f"Expected SHA256 object identifier, got: {pkcs5_oid}")
+        raise ValueError("Expected SHA256 object identifier, got: %s", pkcs5_oid)
 
     aes256_cbc_oid = decoded_item[0][1][1][0].dotted
     if algos.EncryptionAlgorithmId.map(aes256_cbc_oid) != "aes256_cbc":
-        raise ValueError(f"Expected AES256-CBC object identifier, got: {pkcs5_oid}")
+        raise ValueError("Expected AES256-CBC object identifier, got: %s", pkcs5_oid)
 
     entry_salt = decoded_item[0][1][0][1][0].native
     iteration_count = decoded_item[0][1][0][1][1].native
     key_length = decoded_item[0][1][0][1][2].native
 
     if key_length != 32:
-        raise ValueError(f"Expected key_length to be 32, got: {key_length}")
+        raise ValueError("Expected key_length to be 32, got: %s", key_length)
 
     k = sha1(global_salt + primary_password).digest()
     key = pbkdf2_hmac("sha256", k, entry_salt, iteration_count, dklen=key_length)
@@ -515,7 +515,7 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
     decrypted_password_check, algorithm = decrypt_master_key(decoded_password_check, primary_password, global_salt)
 
     if not decrypted_password_check:
-        log.warning(f"Encountered unknown algorithm {algorithm} while decrypting master key.")
+        log.warning("Encountered unknown algorithm %s while decrypting master key.", algorithm)
         return b"", ""
 
     expected_password_check = b"password-check\x02\x02"
@@ -524,7 +524,7 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
             "Master key decryption failed. Either the master key is protected by a "
             "primary password which you did not supply, or the primary password you provided was incorrect."
         )
-        log.debug(f"Expected {expected_password_check} but got {decrypted_password_check}")
+        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
         return b"", ""
 
     master_key, master_key_cka = query_master_key(key4_file)
@@ -533,7 +533,7 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
         return b"", ""
 
     if master_key_cka != CKA_ID:
-        log.warning(f"Password master key cka '{master_key_cka}' is not equal to expected value '{CKA_ID}'.")
+        log.warning("Password master key cka '%s' is not equal to expected value '%s'.", master_key_cka, CKA_ID)
         return b"", ""
 
     decoded_master_key = core.load(master_key)
@@ -545,12 +545,14 @@ def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
     cka, iv, ciphertext = field
 
     if cka != CKA_ID:
-        raise ValueError(f"Expected cka to equal '{CKA_ID}' but got '{cka}'")
+        raise ValueError("Expected cka to equal '%s' but got '%s'", CKA_ID, cka)
 
     return unpad(DES3.new(key, DES3.MODE_CBC, iv).decrypt(ciphertext), 8)
 
 
-def decrypt(username: str, password: str, key4_file: TargetPath, primary_password: str = "") -> tuple[str, str]:
+def decrypt(
+    username: str, password: str, key4_file: TargetPath, primary_password: str = ""
+) -> tuple[str | None, str | None]:
     """Decrypt a stored username and password using provided credentials and key4 file.
 
     Args:
@@ -572,7 +574,7 @@ def decrypt(username: str, password: str, key4_file: TargetPath, primary_passwor
         key, algorithm = retrieve_master_key(primary_password_bytes, key4_file)
 
         if not key or not algorithm:
-            return "", ""
+            return None, None
 
         if algorithm == pbeWithSha1AndTripleDES_CBC or algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
             username = decrypt_field(key, username)
@@ -580,4 +582,4 @@ def decrypt(username: str, password: str, key4_file: TargetPath, primary_passwor
             return username.decode(), password.decode()
     except ValueError as e:
         log.error("Failed to decrypt encrypted password", exc_info=e)
-    return "", ""
+    return None, None
