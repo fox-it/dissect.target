@@ -75,7 +75,8 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.dev == "tun"
             assert "BEGIN CERTIFICATE" in record.ca
             assert "BEGIN CERTIFICATE" in record.cert
-            assert record.key == "REDACTED"
+            assert record.key is None
+            assert record.redacted
             assert record.tls_auth == "/etc/a ta.key"
             assert record.status == "/var/log/openvpn/openvpn-status.log"
             assert record.log is None
@@ -93,6 +94,7 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.ca == "ca.crt"
             assert record.cert == "client.crt"
             assert record.key == "client.key"
+            assert not record.redacted
             assert record.tls_auth == "ta.key"
             assert record.status is None
             assert record.log is None
