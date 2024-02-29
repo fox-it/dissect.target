@@ -5,7 +5,7 @@ from flow.record.fieldtypes import datetime as dt
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin
+from dissect.target.plugins.apps.browser.chromium import ChromiumPlugin, decrypt_v10
 from tests._utils import absolute_path
 
 
@@ -147,3 +147,9 @@ def test_unix_chromium_passwords_gnome(target_unix_users: Target, fs_unix: Virtu
     assert records[0].decrypted_username == "username"
     assert records[0].decrypted_password == ""
     assert records[0].url == "https://test.com/"
+
+
+def test_decrypt_v10():
+    encrypted = b"v10\xd0&E\xbb\x85\xe7_\xfd\xf8\x93\x90/\x08{'\xa9"
+    decrypted = decrypt_v10(encrypted)
+    assert decrypted == "password"

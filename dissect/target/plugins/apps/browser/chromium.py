@@ -4,13 +4,14 @@ import json
 from collections import defaultdict
 from typing import Iterator, Optional, Union
 
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
 from dissect.util.ts import webkittimestamp
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.helpers.apps.browser.chromium import decrypt_v10, decrypt_v10_2
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
@@ -536,3 +537,37 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
     def passwords(self, passwords: str = "") -> Iterator[ChromiumMixin.BrowserPasswordRecord]:
         """Return browser password records for Chromium browser."""
         yield from super().passwords("chromium", passwords.split(","))
+
+
+def remove_padding(decrypted: bytes) -> bytes:
+    number_of_padding_bytes = decrypted[-1]
+    return decrypted[:-number_of_padding_bytes]
+
+
+def decrypt_v10(encrypted_password: bytes) -> str:
+    encrypted_password = encrypted_password[3:]
+
+    salt = b"saltysalt"
+    iv = b" " * 16
+    pbkdf_password = "peanuts"
+
+    key = PBKDF2(pbkdf_password, salt, 16, 1)
+    cipher = AES.new(key, AES.MODE_CBC, IV=iv)
+
+    decrypted = cipher.decrypt(encrypted_password)
+    return remove_padding(decrypted).decode()
+
+
+def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
+    """
+    struct chrome_pass {
+        byte signature[3] = 'v10';
+        byte iv[12];
+        byte ciphertext[EOF];
+    }
+    """
+    iv = encrypted_password[3:15]
+    ciphertext = encrypted_password[15:]
+    cipher = AES.new(key, AES.MODE_GCM, iv)
+    plaintext = cipher.decrypt(ciphertext)
+    return plaintext[:-16].decode(errors="backslashreplace")
