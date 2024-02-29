@@ -74,6 +74,26 @@ def test_access_bz2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(results) == 4
 
 
+def test_xampp_unix(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
+    fs_unix.map_file("opt/lampp/logs/access.log", data_file)
+
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
+    assert len(results) == 6
+
+
+def test_xampp_windows(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
+    fs_win.map_file("xampp/apache/logs/access.log", data_file)
+
+    target_win.add_plugin(ApachePlugin)
+    results = list(target_win.apache.access())
+
+    assert len(results) == 6
+
+
 def test_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone(timedelta(hours=1))
     data_file = absolute_path("_data/plugins/apps/webserver/apache/access.log")
