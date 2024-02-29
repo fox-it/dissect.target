@@ -10,7 +10,6 @@ from dissect.target.helpers.configutil import (
     Default,
     Indentation,
     Json,
-    OpenVPN,
     ScopeManager,
     SystemD,
 )
@@ -256,28 +255,6 @@ def test_systemd_basic_syntax() -> None:
 )
 def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None:
     parser = Json()
-    parser.parse_file(StringIO(data_string))
-
-    assert parser.parsed_data == expected_data
-
-
-@pytest.mark.parametrize(
-    "data_string, expected_data",
-    [
-        (
-            "<connection>\nroute data\n</connection>\n",
-            {"connection": {"list_item0": {"route": "data"}}},
-        ),
-        (
-            "<ca>\n----- BEGIN PRIVATE DATA -----\n</ca>",
-            {
-                "ca": "----- BEGIN PRIVATE DATA -----\n",
-            },
-        ),
-    ],
-)
-def test_openvpn_config(data_string: str, expected_data: Union[dict, list]) -> None:
-    parser = OpenVPN(separator=r"\s")
     parser.parse_file(StringIO(data_string))
 
     assert parser.parsed_data == expected_data

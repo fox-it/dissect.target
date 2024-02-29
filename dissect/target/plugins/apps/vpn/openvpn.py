@@ -1,10 +1,14 @@
+from __future__ import annotations
+
+import io
 import itertools
 import re
 from itertools import product
-from typing import Iterator, Union
+from typing import Iterable, Iterator, Union
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import ConfigurationParsingError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.configutil import Default, ListUnwrapper, _update_dictionary
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, Plugin, arg, export
 
@@ -46,7 +50,60 @@ OpenVPNClient = TargetRecordDescriptor(
 )
 
 
-CONFIG_COMMENT_SPLIT_REGEX = re.compile("(#|;)")
+class OpenVPNParser(Default):
+    def __init__(self, *args, **kwargs):
+        boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
+        self.boolean_field_names = set(field.name.replace("_", "-") for field in boolean_fields)
+
+        super().__init__(*args, separator=(r"\s",), collapse=["key", "ca", "cert"], **kwargs)
+
+    def parse_file(self, fh: io.TextIOBase) -> None:
+        root = {}
+        iterator = self.line_reader(fh)
+        for line in iterator:
+            if line.startswith("<"):
+                key = line.strip().strip("<>")
+                value = self._read_blob(iterator)
+                _update_dictionary(root, key, value)
+                continue
+
+            self._parse_line(root, line)
+
+        self.parsed_data = ListUnwrapper.unwrap(root)
+
+    def _read_blob(self, lines: Iterable[str]) -> str | list[dict]:
+        """Read the whole section between <data></data> sections"""
+        output = ""
+        with io.StringIO() as buffer:
+            for line in lines:
+                if "</" in line:
+                    break
+
+                buffer.write(line)
+            output = buffer.getvalue()
+
+        # Check for connection profile blocks
+        if not output.startswith("-----"):
+            profile_dict = dict()
+            for line in output.splitlines():
+                self._parse_line(profile_dict, line)
+
+            # We put it as a list as _update_dictionary appends data in a list.
+            output = [profile_dict]
+
+        return output
+
+    def _parse_line(self, root: dict, line: str) -> None:
+        key, *value = self.SEPARATOR.split(line, 1)
+        # Unquote data
+        value = value[0].strip() if value else ""
+
+        value = value.strip("'\"")
+
+        if key in self.boolean_field_names:
+            value = True
+
+        _update_dictionary(root, key, value)
 
 
 class OpenVPNPlugin(Plugin):
@@ -87,19 +144,27 @@ class OpenVPNPlugin(Plugin):
         if not self.configs:
             raise UnsupportedPluginError("No OpenVPN configuration files found")
 
+    def _load_config(self, parser: OpenVPNParser, config_path: fsutil.TargetPath) -> dict:
+        with config_path.open("rt") as file:
+            try:
+                parser.parse_file(file)
+            except ConfigurationParsingError as e:
+                # Couldn't parse file, continue
+                self.target.log.info("An issue occurred during parsing of %s, continuing", config_path)
+                self.target.log.debug(exc_info=e)
+                return None
+
+        return parser.parsed_data
+
     @export(record=[OpenVPNServer, OpenVPNClient])
     @arg("--export-key", action="store_true")
     def config(self, export_key: bool = False) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
         """Parses config files from openvpn interfaces."""
+        # We define the parser here so we can reuse it
+        parser = OpenVPNParser()
 
         for config_path in self.configs:
-            open_vpn_config = self.target.config_tree(
-                config_path,
-                hint="ovpn",
-                as_dict=True,
-                collapse=["key", "ca", "cert"],
-            )
-            config = _parse_config(open_vpn_config)
+            config = self._load_config(parser, config_path)
 
             common_elements = {
                 "name": config_path.stem,
@@ -122,7 +187,7 @@ class OpenVPNPlugin(Plugin):
             # NUM is either 0 or 1 depending on whether the configuration
             # is for the client or server, and that does not interest us
             # This gets rid of the number at the end, while still supporting spaces
-            tls_auth = _unquote(" ".join(tls_auth.split(" ")[:-1]))
+            tls_auth = " ".join(tls_auth.split(" ")[:-1]).strip("'\"")
 
             common_elements.update({"tls_auth": tls_auth})
 
@@ -139,7 +204,7 @@ class OpenVPNPlugin(Plugin):
                     **common_elements,
                     local=config.get("local", "0.0.0.0"),
                     port=int(config.get("port", "1194")),
-                    dh=_unquote(config.get("dh")),
+                    dh=config.get("dh"),
                     topology=config.get("topology"),
                     server=config.get("server"),
                     ifconfig_pool_persist=config.get("ifconfig-pool-persist"),
@@ -147,18 +212,3 @@ class OpenVPNPlugin(Plugin):
                     client_to_client=config.get("client-to-client", False),
                     duplicate_cn=config.get("duplicate-cn", False),
                 )
-
-
-def _parse_config(content: dict[str, str]) -> dict[str, Union[str, list[str]]]:
-    """Parses Openvpn config  files"""
-    boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
-    boolean_field_names = set(field.name for field in boolean_fields)
-    for key, value in content.items():
-        if key in boolean_field_names:
-            content.update({key: value == ""})
-
-    return content
-
-
-def _unquote(content: str) -> str:
-    return content.strip("\"'")

@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 from typing import Union
 
@@ -6,6 +7,7 @@ import pytest
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.apps.vpn.openvpn import (
     OpenVPNClient,
+    OpenVPNParser,
     OpenVPNPlugin,
     OpenVPNServer,
 )
@@ -94,3 +96,25 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.tls_auth == "ta.key"
             assert record.status is None
             assert record.log is None
+
+
+@pytest.mark.parametrize(
+    "data_string, expected_data",
+    [
+        (
+            "<connection>\nroute data\n</connection>\n",
+            {"connection": {"list_item0": {"route": "data"}}},
+        ),
+        (
+            "<ca>\n----- BEGIN PRIVATE DATA -----\n</ca>",
+            {
+                "ca": "----- BEGIN PRIVATE DATA -----\n",
+            },
+        ),
+    ],
+)
+def test_openvpn_config(data_string: str, expected_data: Union[dict, list]) -> None:
+    parser = OpenVPNParser()
+    parser.parse_file(io.StringIO(data_string))
+
+    assert parser.parsed_data == expected_data
