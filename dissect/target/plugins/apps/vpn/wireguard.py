@@ -1,6 +1,7 @@
 import re
 from collections import OrderedDict
-from configparser import ConfigParser
+from configparser import ConfigParser, SectionProxy
+from functools import partial
 from os.path import basename
 from pathlib import Path
 from typing import Iterator, Union
@@ -102,40 +103,42 @@ class WireGuardPlugin(Plugin):
 
             config = _parse_config(config_buf)
 
-            for section, config_dict in config._sections.items():
+            # Set up an iterator to go through all the sections and pre-set the fallback
+            config_iterator = ((section, partial(config.get, section, fallback=None)) for section in config.sections())
+
+            for section, config_dict in config_iterator:
                 if "Interface" in section:
-                    if address := config_dict.get("Address"):
+                    if address := config_dict("Address"):
                         address = address.split("/")[0]
-                    name = basename(config_path)
-                    name = self.TUNNEL_NAME_RE.sub("", name)
+
                     yield WireGuardInterfaceRecord(
-                        name=name,
+                        name=config_path.stem,
                         address=address,
-                        listen_port=config_dict.get("ListenPort"),
-                        private_key=config_dict.get("PrivateKey"),
-                        fw_mark=config_dict.get("FwMark"),
-                        dns=config_dict.get("DNS"),
-                        table=config_dict.get("Table"),
-                        mtu=config_dict.get("MTU"),
-                        preup=config_dict.get("PreUp"),
-                        postup=config_dict.get("PostUp"),
-                        predown=config_dict.get("PreDown"),
-                        postdown=config_dict.get("PostDown"),
+                        listen_port=config_dict("ListenPort"),
+                        private_key=config_dict("PrivateKey"),
+                        fw_mark=config_dict("FwMark"),
+                        dns=config_dict("DNS"),
+                        table=config_dict("Table"),
+                        mtu=config_dict("MTU"),
+                        preup=config_dict("PreUp"),
+                        postup=config_dict("PostUp"),
+                        predown=config_dict("PreDown"),
+                        postdown=config_dict("PostDown"),
                         source=config_path,
                         _target=self.target,
                     )
 
                 if "Peer" in section:
-                    if allowed_ips := config_dict.get("AllowedIPs"):
+                    if allowed_ips := config_dict("AllowedIPs"):
                         allowed_ips = [value.strip() for value in allowed_ips.split(",")]
 
                     yield WireGuardPeerRecord(
-                        name=config_dict.get("Name"),
-                        public_key=config_dict.get("PublicKey"),
-                        pre_shared_key=config_dict.get("PreSharedKey"),
+                        name=config_dict("Name"),
+                        public_key=config_dict("PublicKey"),
+                        pre_shared_key=config_dict("PreSharedKey"),
                         allowed_ips=allowed_ips,
-                        endpoint=config_dict.get("Endpoint"),
-                        persistent_keep_alive=config_dict.get("PersistentKeepAlive"),
+                        endpoint=config_dict("Endpoint"),
+                        persistent_keep_alive=config_dict("PersistentKeepAlive"),
                         source=config_path,
                         _target=self.target,
                     )
@@ -163,7 +166,7 @@ class MultiDict(OrderedDict):
         super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, val):
-        if isinstance(val, dict) and (key == "Peer" or key == "Interface"):
+        if isinstance(val, dict) and (key in ["Peer", "Interface"]):
             self._unique += 1
             key += str(self._unique)
         super().__setitem__(key, val)
