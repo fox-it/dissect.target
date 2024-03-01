@@ -90,7 +90,7 @@ class MasterKey:
         """Decrypts the master key with the given user's password and SID."""
         for algo in ["sha1", "md4"]:
             if algo not in hashlib.algorithms_available:
-                log.warning("Hashlib does not support algorithm %s", algo)
+                log.info("Hashlib does not support algorithm %s", algo)
                 continue
 
             pwd_hash = hashlib.new(algo, pwd.encode("utf-16-le")).digest()

@@ -125,7 +125,6 @@ class DPAPIPlugin(InternalPlugin):
                     user = self._users.get(username)
                     if user:
                         for mk_pass in passwords:
-                            self.target.log.warning(f"trying {mk_pass}")
                             if mkf.decrypt_with_password(user["sid"], mk_pass):
                                 break
                             else:
