@@ -8,7 +8,7 @@ from tests._utils import absolute_path
 
 
 @pytest.mark.parametrize(
-    "filename, hashes, file_hints",
+    "filename, hashes, file_hints, len_results",
     [
         pytest.param(
             "catroot_package_name.cat",
@@ -18,6 +18,7 @@ from tests._utils import absolute_path
                 "d6bffeb5833fc17ddc441459f4a90f866a270d10b2261f1775f303ea1e600ede",
             ],
             ["Microsoft-Windows-PhotoBasic-WOW64-merged-Package"],
+            3,
             id="PackageName",
         ),
         pytest.param(
@@ -26,6 +27,7 @@ from tests._utils import absolute_path
                 "9504d1e72c0276088ba53d493b869d9dd1da253852823b4f44ea05d2c59e488e",
             ],
             ["Microsoft-Windows-Printing-PrintToPDFServices-Package"],
+            1,
             id="PackageName2",
         ),
         pytest.param(
@@ -54,12 +56,18 @@ from tests._utils import absolute_path
                 "msil_multipoint-wms.dashboard.forms.resources_31bf3856ad364e35_10.0.19041.1_en-us_3f56c777fba2ec12\\Wms.Dashboard.Forms.Resources.dll",  # noqa
                 "msil_multipoint-wms.dashboardcommon.resources_31bf3856ad364e35_10.0.19041.1_en-us_3c11dbfdda22a912\\Wms.DashboardCommon.Resources.dll",  # noqa
             ],
+            34,
             id="FileHint",
         ),
     ],
 )
 def test_catroot_files(
-    target_win: Target, fs_win: VirtualFilesystem, filename: str, hashes: list[str], file_hints: list[str]
+    target_win: Target,
+    fs_win: VirtualFilesystem,
+    filename: str,
+    hashes: list[str],
+    file_hints: list[str],
+    len_results: int,
 ) -> None:
     catroot_file = absolute_path(f"_data/plugins/os/windows/catroot/{filename}")
     file_location = f"\\windows\\system32\\catroot\\test\\{filename}"
@@ -72,16 +80,15 @@ def test_catroot_files(
 
     records = list(target_win.catroot.files())
 
-    assert len(records) == 1
-    record = records[0]
+    assert len(records) == len_results
 
-    assert str(record.source) == "sysvol" + file_location
-    assert record.filename == filename
-    assert sorted(record.hints) == sorted(file_hints)
-
+    sorted_file_hints = sorted(file_hints)
     # Make sure the order is constant by sorting on digest
-    for cat_hash, record_hash in zip(sorted(hashes), sorted(record.digests, key=lambda d: d.sha256)):
-        assert record_hash.sha256 == cat_hash
+    for cat_hash, record in zip(sorted(hashes), sorted(records, key=lambda r: r.digest.sha256)):
+        assert str(record.source) == "sysvol" + file_location
+        assert record.filename == filename
+        assert sorted(record.hints) == sorted_file_hints
+        assert record.digest.sha256 == cat_hash
 
 
 def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -97,16 +104,15 @@ def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
         digest({"sha1": "fe71c1d4efa330b807ce00dc0b5055f8ab95eb02"}),
     ]
 
-    assert len(records) == 1
-    record = records[0]
-
-    assert record.filename == "Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"
-    assert record.source == "sysvol\\windows\\system32\\catroot2\\{ID}\\catdb"
-    assert record.hints == ["Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"]
+    assert len(records) == 2
 
     # Make sure the order is constant by sorting on digest
-    for expected_hash, result_hash in zip(
-        sorted(hashes, key=lambda d: d.sha1 or d.sha256), sorted(record.digests, key=lambda d: d.sha1 or d.sha256)
+    for expected_digest, record in zip(
+        sorted(hashes, key=lambda d: d.sha1 or d.sha256),
+        sorted(records, key=lambda r: r.digest.sha1 or r.digest.sha256),
     ):
+        assert record.filename == "Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"
+        assert record.source == "sysvol\\windows\\system32\\catroot2\\{ID}\\catdb"
+        assert record.hints == ["Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"]
         # No direct comparison available, but representation comparison suffices.
-        assert str(expected_hash) == str(result_hash)
+        assert str(expected_digest) == str(record.digest)

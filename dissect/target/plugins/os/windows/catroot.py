@@ -1,4 +1,4 @@
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from enum import Enum
 from typing import Iterator, Optional
 
@@ -24,7 +24,7 @@ NEEDLES = {
 CatrootRecord = TargetRecordDescriptor(
     "windows/catroot",
     [
-        ("digest[]", "digests"),
+        ("digest", "digest"),
         ("string[]", "hints"),
         ("string", "filename"),
         ("path", "source"),
@@ -113,7 +113,7 @@ class CatrootPlugin(Plugin):
         Yields CatrootRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            digests (digest[]): The parsed digests.
+            digest (digest): The parsed digest.
             hints (string[]): File hints, if present.
             filename (string): catroot filename.
             source (path): Source catroot file.
@@ -175,7 +175,7 @@ class CatrootPlugin(Plugin):
                             hints.append(hint)
 
                     # If the package_name needle is not found or it's not present in the first 7 bytes of the hint_buf
-                    # We are probably dealing with a catroot file that contains "hint" needle.
+                    # We are probably dealing with a catroot file that contains "hint" needles.
                     if not hints:
                         for hint_offset in findall(encap_contents, NEEDLES["hint"]):
                             # Either 3 or 4 bytes before the needle, a sequence starts
@@ -190,13 +190,16 @@ class CatrootPlugin(Plugin):
                         "An error occurred while parsing the hint for catroot file %s: %s", file, error
                     )
 
-                yield CatrootRecord(
-                    digests=digests,
-                    hints=hints,
-                    filename=file.name,
-                    source=self.target.fs.path(file),
-                    _target=self.target,
-                )
+                # Currently, it is not known how the file hints are related to the digests. Therefore, each digest
+                # is yielded as a record with all of the file hints found.
+                for file_digest in digests:
+                    yield CatrootRecord(
+                        digest=file_digest,
+                        hints=hints,
+                        filename=file.name,
+                        source=self.target.fs.path(file),
+                        _target=self.target,
+                    )
 
             except Exception as error:
                 self.target.log.error("An error occurred while parsing the catroot file %s: %s", file, error)
@@ -215,7 +218,7 @@ class CatrootPlugin(Plugin):
         Yields CatrootRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            digests (digest[]): The parsed digests.
+            digest (digest): The parsed digest.
             hints (string[]): File hints, if present.
             filename (string): catroot filename.
             source (path): Source catroot file.
@@ -226,7 +229,6 @@ class CatrootPlugin(Plugin):
                 ese_db = EseDB(fh)
 
                 tables = [table.name for table in ese_db.tables()]
-                catroot_records = defaultdict(list)
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
                     if table_name not in tables:
                         continue
@@ -235,14 +237,11 @@ class CatrootPlugin(Plugin):
                         file_digest = digest()
                         setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
                         raw_hint = record.get("HashCatNameTable_CatNameCol").decode("utf-8").rstrip("|")
-                        # Group by raw_hint to get one record per raw_hint containing all digests (SHA256, SHA1)
-                        catroot_records[raw_hint].append(file_digest)
 
-                for raw_hint, digests in catroot_records.items():
-                    yield CatrootRecord(
-                        digests=digests,
-                        hints=raw_hint.split("|"),
-                        filename=raw_hint,
-                        source=ese_file,
-                        _target=self.target,
-                    )
+                        yield CatrootRecord(
+                            digest=file_digest,
+                            hints=raw_hint.split("|"),
+                            filename=raw_hint,
+                            source=ese_file,
+                            _target=self.target,
+                        )
