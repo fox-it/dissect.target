@@ -25,11 +25,15 @@ def test_tanium_loader(target_bare, tmp_path):
 
     loader = TaniumLoader(root)
     loader.map(target_bare)
+    target_bare.apply()
 
     assert "sysvol" in target_bare.fs.mounts
     assert "c:" in target_bare.fs.mounts
+    assert "d:" in target_bare.fs.mounts
+    assert "e:" in target_bare.fs.mounts
 
     # The 3 found drive letter directories + the fake NTFS filesystem
     assert len(target_bare.filesystems) == 4
-    assert len(target_bare.fs.mounts) == 3
+    # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
+    assert len(target_bare.fs.mounts) == 5
     assert len(list(target_bare.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
