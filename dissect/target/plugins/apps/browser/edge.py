@@ -73,12 +73,6 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         yield from super().extensions("edge")
 
     @export(record=BrowserPasswordRecord)
-    @arg(
-        "--passwords",
-        type=str,
-        default="",
-        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
-    )
-    def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
         """Return browser password records for Microsoft Edge."""
-        yield from super().passwords("edge", passwords)
+        yield from super().passwords("edge")

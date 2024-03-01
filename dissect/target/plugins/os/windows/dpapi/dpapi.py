@@ -7,9 +7,23 @@ from Crypto.Cipher import AES
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers import keychain
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
+
+
+def get_passwords() -> set:
+    passwords = set()
+    for key in (
+        keychain.get_keys_for_provider("dpapi")
+        + keychain.get_keys_for_provider("browser")
+        + keychain.get_keys_without_provider()
+    ):
+        if key.key_type == keychain.KeyType.PASSPHRASE:
+            passwords.add(key.value)
+    passwords.add("")
+    return passwords
 
 
 class DPAPIPlugin(InternalPlugin):
@@ -25,7 +39,7 @@ class DPAPIPlugin(InternalPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.mk_passwords = None
+        self.mk_passwords = get_passwords()
 
     def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
@@ -139,10 +153,9 @@ class DPAPIPlugin(InternalPlugin):
 
         return blob.clear_text
 
-    def decrypt_blob(self, data: bytes, mk_passwords: list) -> bytes:
+    def decrypt_blob(self, data: bytes) -> bytes:
         """Attempt to decrypt the given bytes using any of the available master keys."""
         blob = DPAPIBlob(data)
-        self.mk_passwords = mk_passwords
 
         for user in self.master_keys:
             for mk_uuid in self.master_keys[user]:

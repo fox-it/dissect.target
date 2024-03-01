@@ -379,7 +379,7 @@ class ChromiumMixin:
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
-    def _get_local_state_key(self, local_state_path: TargetPath, chromium_passwords: list) -> Optional[bytes]:
+    def _get_local_state_key(self, local_state_path: TargetPath) -> Optional[bytes]:
         """Get the Chromium ``os_crypt`` ``encrypted_key`` and decrypt it using DPAPI."""
 
         if not local_state_path.exists():
@@ -399,10 +399,10 @@ class ChromiumMixin:
             return None
 
         encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
-        decrypted_key = self.target.dpapi.decrypt_blob(encrypted_key, chromium_passwords)
+        decrypted_key = self.target.dpapi.decrypt_blob(encrypted_key)
         return decrypted_key
 
-    def passwords(self, browser_name: str = None, chromium_passwords: list = None) -> Iterator[BrowserPasswordRecord]:
+    def passwords(self, browser_name: str = None) -> Iterator[BrowserPasswordRecord]:
         """Return browser password records from Chromium browsers.
 
         Chromium on Linux has ``basic``, ``gnome`` and ``kwallet`` methods for password storage:
@@ -414,7 +414,7 @@ class ChromiumMixin:
         The SHA1 hash of the user's password or the plaintext password is required to decrypt passwords
         when dealing with encrypted passwords created with Chromium v80 (February 2020) and newer.
 
-        You can supply a SHA1 hash or plaintext password using the ``--passwords`` option.
+        You can supply a SHA1 hash or plaintext password using the keychain.
 
         Resources:
             - https://chromium.googlesource.com/chromium/src/+/master/docs/linux/password_storage.md
@@ -426,8 +426,11 @@ class ChromiumMixin:
             decrypted_key = None
 
             if self.target.os == OperatingSystem.WINDOWS.value:
-                local_state_path = db_file.parent.parent.joinpath("Local State")
-                decrypted_key = self._get_local_state_key(local_state_path, chromium_passwords)
+                try:
+                    local_state_path = db_file.parent.parent.joinpath("Local State")
+                    decrypted_key = self._get_local_state_key(local_state_path)
+                except ValueError:
+                    self.target.log.warning("Failed to decrypt local state key")
 
             for row in rows:
                 encrypted_password: bytes = row.password_value
@@ -533,15 +536,9 @@ class ChromiumPlugin(ChromiumMixin, BrowserPlugin):
         yield from super().extensions("chromium")
 
     @export(record=ChromiumMixin.BrowserPasswordRecord)
-    @arg(
-        "--passwords",
-        type=str,
-        default="",
-        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
-    )
-    def passwords(self, passwords: str = "") -> Iterator[ChromiumMixin.BrowserPasswordRecord]:
+    def passwords(self) -> Iterator[ChromiumMixin.BrowserPasswordRecord]:
         """Return browser password records for Chromium browser."""
-        yield from super().passwords("chromium", passwords.split(","))
+        yield from super().passwords("chromium")
 
 
 def remove_padding(decrypted: bytes) -> bytes:

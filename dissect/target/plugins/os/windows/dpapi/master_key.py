@@ -1,3 +1,4 @@
+import logging
 import hashlib
 from io import BytesIO
 from typing import BinaryIO
@@ -10,6 +11,8 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
     derive_password_hash,
     dpapi_hmac,
 )
+
+log = logging.getLogger(__name__)
 
 master_key_def = """
 struct DomainKey {
@@ -86,6 +89,11 @@ class MasterKey:
     def decrypt_with_password(self, user_sid: str, pwd: str) -> bool:
         """Decrypts the master key with the given user's password and SID."""
         for algo in ["sha1", "md4"]:
+
+            if algo not in hashlib.algorithms_available:
+                log.warning("Hashlib does not support algorithm %s", algo)
+                continue
+
             pwd_hash = hashlib.new(algo, pwd.encode("utf-16-le")).digest()
             self.decrypt_with_key(derive_password_hash(pwd_hash, user_sid))
             if self.decrypted:

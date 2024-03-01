@@ -8,6 +8,7 @@ from flow.record.fieldtypes import datetime as dt
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugins.apps.browser.firefox import (
     CKA_ID,
@@ -133,7 +134,14 @@ def test_unix_firefox_password_plugin_with_primary_password(
     )
     target_unix_users.add_plugin(FirefoxPlugin)
 
-    records = list(target_unix_users.firefox.passwords(firefox_primary_password="PrimaryPassword"))
+    keychain.register_key(
+        keychain.KeyType.PASSPHRASE,
+        "PrimaryPassword",
+        identifier=None,
+        provider="browser",
+    )
+
+    records = list(target_unix_users.firefox.passwords())
 
     assert len(records) == 1
 
