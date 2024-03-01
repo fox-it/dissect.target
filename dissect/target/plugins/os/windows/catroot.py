@@ -1,7 +1,6 @@
-from binascii import hexlify
 from collections import defaultdict, namedtuple
 from enum import Enum
-from typing import Optional
+from typing import Iterator, Optional
 
 from asn1crypto.cms import ContentInfo
 from asn1crypto.core import Sequence
@@ -41,7 +40,7 @@ class CatrootFileType(str, Enum):
 CatrootFileInfo = namedtuple("CatrootFileInfo", ["file_type", "pattern", "base_path"])
 
 
-def findall(buf, needle):
+def findall(buf: bytes, needle: bytes) -> Iterator[int]:
     offset = 0
     while True:
         offset = buf.find(needle, offset)
@@ -101,7 +100,7 @@ class CatrootPlugin(Plugin):
         raise UnsupportedPluginError("No catroot files or catroot ESE files found")
 
     @export(record=CatrootRecord)
-    def files(self):
+    def files(self) -> Iterator[CatrootRecord]:
         """Return the content of the catalog files in the CatRoot folder.
 
         A catalog file contains a collection of cryptographic hashes, or thumbprints. These files are generally used to
@@ -114,8 +113,8 @@ class CatrootPlugin(Plugin):
         Yields CatrootRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            digest (digest): The parsed digest.
-            hint (string): File hint, if present.
+            digests (digest[]): The parsed digests.
+            hints (string[]): File hints, if present.
             filename (string): catroot filename.
             source (path): Source catroot file.
         """
@@ -165,31 +164,30 @@ class CatrootPlugin(Plugin):
                 # the format is not yet known and therefore not supported.
                 hints = []
                 try:
-                    # As far as known, the hint data is only present in the encap_content_info after the last digest.
-                    hint_buf = encap_contents[offset + len(needle) + len(raw_digest) + 2 :]
+                    if offset:
+                        # As far as known, the PackageName data is only present in the encap_content_info
+                        # after the last digest.
+                        hint_buf = encap_contents[offset + len(needle) + len(raw_digest) + 2 :]
 
-                    # First try to find to find the "PackageName" value, if it's present.
-                    hint = find_package_name(hint_buf)
-                    if hint:
-                        hints.append(hint)
+                        # First try to find to find the "PackageName" value, if it's present.
+                        hint = find_package_name(hint_buf)
+                        if hint:
+                            hints.append(hint)
 
-                    # If the package_name needle is not found or it's present in the first 7 bytes of the hint_buf
-                    # We are dealing with a catroot file including a file hint.
+                    # If the package_name needle is not found or it's not present in the first 7 bytes of the hint_buf
+                    # We are probably dealing with a catroot file that contains "hint" needle.
                     if not hints:
                         for hint_offset in findall(encap_contents, NEEDLES["hint"]):
                             # Either 3 or 4 bytes before the needle, a sequence starts
-                            if encap_contents[hint_offset - 3] == 48:
-                                name_sequence = Sequence.load(encap_contents[hint_offset - 3 :])
-                            else:
-                                name_sequence = Sequence.load(encap_contents[hint_offset - 4 :])
+                            bytes_before_needle = 3 if encap_contents[hint_offset - 3] == 48 else 4
+                            name_sequence = Sequence.load(encap_contents[hint_offset - bytes_before_needle :])
 
                             hint = name_sequence[2].native.decode("utf-16-le").strip("\x00")
                             hints.append(hint)
-                            self.target.log.error(f"{hint} - {file}")
 
                 except Exception as error:
                     self.target.log.warning(
-                        f"An error occurred while parsing the hint for catroot file '{file}': {error}"
+                        "An error occurred while parsing the hint for catroot file %s: %s", file, error
                     )
 
                 yield CatrootRecord(
@@ -201,13 +199,13 @@ class CatrootPlugin(Plugin):
                 )
 
             except Exception as error:
-                self.target.log.error(f"An error occurred while parsing the catroot file '{file}': {error}")
+                self.target.log.error("An error occurred while parsing the catroot file %s: %s", file, error)
 
     @export(record=CatrootRecord)
-    def catdb(self):
+    def catdb(self) -> Iterator[CatrootRecord]:
         """Return the hash values present in the catdb files in the catroot2 folder.
 
-        The catdb file is a ESE database file that contains the digests of the catalog files present on the system.
+        The catdb file is an ESE database file that contains the digests of the catalog files present on the system.
         This database is used to speed up the process of validating a Portable Executable (PE) file.
 
         References:
@@ -217,8 +215,8 @@ class CatrootPlugin(Plugin):
         Yields CatrootRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            digest (digest): The parsed digest.
-            hint (string): File hint, if present.
+            digests (digest[]): The parsed digests.
+            hints (string[]): File hints, if present.
             filename (string): catroot filename.
             source (path): Source catroot file.
         """
@@ -235,7 +233,7 @@ class CatrootPlugin(Plugin):
 
                     for record in ese_db.table(table_name).records():
                         file_digest = digest()
-                        setattr(file_digest, hash_type, hexlify(record.get("HashCatNameTable_HashCol")).decode("utf-8"))
+                        setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
                         raw_hint = record.get("HashCatNameTable_CatNameCol").decode("utf-8").rstrip("|")
                         # Group by raw_hint to get one record per raw_hint containing all digests (SHA256, SHA1)
                         catroot_records[raw_hint].append(file_digest)

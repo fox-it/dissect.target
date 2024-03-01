@@ -60,7 +60,7 @@ from tests._utils import absolute_path
 )
 def test_catroot_files(
     target_win: Target, fs_win: VirtualFilesystem, filename: str, hashes: list[str], file_hints: list[str]
-):
+) -> None:
     catroot_file = absolute_path(f"_data/plugins/os/windows/catroot/{filename}")
     file_location = f"\\windows\\system32\\catroot\\test\\{filename}"
     fs_win.map_file(
@@ -84,7 +84,7 @@ def test_catroot_files(
         assert record_hash.sha256 == cat_hash
 
 
-def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem):
+def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
     catroot_file = absolute_path("_data/plugins/os/windows/catroot/catdb")
     fs_win.map_file("windows/system32/catroot2/{ID}/catdb", catroot_file)
 
