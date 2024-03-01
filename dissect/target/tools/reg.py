@@ -29,7 +29,8 @@ def main():
     parser.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to load")
     parser.add_argument("-k", "--key", required=True, help="key to query")
     parser.add_argument("-kv", "--value", help="value to query")
-    parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1)
+    parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1, help="Max depth of sub keys to print")
+    parser.add_argument("-l", "--length", type=int, default=100, help="Max length of key value to print")
 
     configure_generic_arguments(parser)
     args = parser.parse_args()
@@ -39,19 +40,23 @@ def main():
     try:
         for target in Target.open_all(args.targets):
             try:
-                if args.value:
-                    for key in target.registry.keys(args.key):
-                        try:
-                            print(key.value(args.value))
-                        except RegistryError:
-                            continue
-                else:
+                keys = list(target.registry.keys(args.key))
+
+                if not keys:
+                    log.error("Key %s does not exist on target %s", args.key, target)
+                    continue
+
+                print(target)
+
+                for key in keys:
                     try:
-                        print(target)
-                        for key in target.registry.keys(args.key):
-                            recursor(key, args.depth, 0)
+                        if args.value:
+                            print(key.value(args.value))
+                        else:
+                            recursor(key, args.depth, 0, args.length)
                     except RegistryError:
                         log.exception("Failed to find registry value")
+
             except Exception:
                 log.exception("Failed to iterate key")
     except TargetError as e:
@@ -60,12 +65,16 @@ def main():
         parser.exit(1)
 
 
-def recursor(key, depth, indent):
-    print(" " * indent + f"+ {key.name!r} ({key.ts})")
+def recursor(key, depth, indent, length: int = 100) -> None:
+    class_name = ""
+    if hasattr(key, "class_name") and key.class_name:
+        class_name = f" ({key.class_name})"
+
+    print(" " * indent + f"+ {key.name!r} ({key.ts})" + class_name)
 
     for r in key.values():
         try:
-            print(" " * indent + f"  - {r.name!r} {repr(r.value)[:100]}")
+            print(" " * indent + f"  - {r.name!r} {repr(r.value)[:length]}")
         except NotImplementedError:
             continue
 
