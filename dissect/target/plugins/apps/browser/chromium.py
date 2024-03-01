@@ -15,7 +15,7 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, join
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import OperatingSystem, arg, export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
@@ -456,7 +456,7 @@ class ChromiumMixin:
                     b"\x01\x00\x00\x00"
                 ):
                     try:
-                        decrypted_password = self.target.dpapi.decrypt_blob(encrypted_password, chromium_passwords)
+                        decrypted_password = self.target.dpapi.decrypt_blob(encrypted_password)
                     except ValueError as e:
                         self.target.log.warning("Failed to decrypt DPAPI Chromium password")
                         self.target.log.debug("", exc_info=e)

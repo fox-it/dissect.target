@@ -1,5 +1,5 @@
-import logging
 import hashlib
+import logging
 from io import BytesIO
 from typing import BinaryIO
 
@@ -89,7 +89,6 @@ class MasterKey:
     def decrypt_with_password(self, user_sid: str, pwd: str) -> bool:
         """Decrypts the master key with the given user's password and SID."""
         for algo in ["sha1", "md4"]:
-
             if algo not in hashlib.algorithms_available:
                 log.warning("Hashlib does not support algorithm %s", algo)
                 continue
