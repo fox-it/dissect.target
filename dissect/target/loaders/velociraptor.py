@@ -58,13 +58,13 @@ class VelociraptorLoader(DirLoader):
     """Load Rapid7 Velociraptor forensic image files.
 
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
-    Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration:
+    Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration::
 
         {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader only supports a collection where a single accessor is used, which can be forced by
-    using the following configuration:
+    using the following configuration::
 
         {"Windows.KapeFiles.Targets":{"VSSAnalysisAge":"1000","_SANS_Triage":"Y"}}
 
