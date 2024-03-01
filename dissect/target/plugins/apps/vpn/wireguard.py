@@ -2,7 +2,6 @@ import re
 from collections import OrderedDict
 from configparser import ConfigParser
 from functools import partial
-from os.path import basename
 from pathlib import Path
 from typing import Iterator, Union
 
