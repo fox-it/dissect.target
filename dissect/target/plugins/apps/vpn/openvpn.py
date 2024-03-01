@@ -144,14 +144,14 @@ class OpenVPNPlugin(Plugin):
         if not self.configs:
             raise UnsupportedPluginError("No OpenVPN configuration files found")
 
-    def _load_config(self, parser: OpenVPNParser, config_path: fsutil.TargetPath) -> dict:
+    def _load_config(self, parser: OpenVPNParser, config_path: fsutil.TargetPath) -> Optional[dict]:
         with config_path.open("rt") as file:
             try:
                 parser.parse_file(file)
             except ConfigurationParsingError as e:
                 # Couldn't parse file, continue
                 self.target.log.info("An issue occurred during parsing of %s, continuing", config_path)
-                self.target.log.debug(exc_info=e)
+                self.target.log.debug("", exc_info=e)
                 return None
 
         return parser.parsed_data
