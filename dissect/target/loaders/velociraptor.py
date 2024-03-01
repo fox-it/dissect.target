@@ -37,12 +37,14 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
         if accessor_root.exists():
             # If the accessor directory exists, assume all the subdirectories are volumes
             for volume in accessor_root.iterdir():
-                if volume.is_dir():
-                    # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
-                    if "HarddiskVolumeShadowCopy" in volume.name:
-                        vss_volumes.add(volume)
-                    else:
-                        volumes.add(volume)
+                if not volume.is_dir():
+                    continue
+
+                # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
+                if "HarddiskVolumeShadowCopy" in volume.name:
+                    vss_volumes.add(volume)
+                else:
+                    volumes.add(volume)
 
     if volumes:
         # The volumes that represent drives (C, D) are mounted first,
@@ -58,13 +60,13 @@ class VelociraptorLoader(DirLoader):
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration:
 
-        ``{"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\netc/**\nvar/log/**"}}``
+        {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader only supports a collection where a single accessor is used, which can be forced by
     using the following configuration:
 
-        ``{"Windows.KapeFiles.Targets":{"VSSAnalysisAge":"1000","_SANS_Triage":"Y"}}``
+        {"Windows.KapeFiles.Targets":{"VSSAnalysisAge":"1000","_SANS_Triage":"Y"}}
 
     References:
         - https://www.rapid7.com/products/velociraptor/
