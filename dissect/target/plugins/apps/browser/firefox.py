@@ -25,6 +25,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
+    keychain_passwords,
     try_idna,
 )
 
@@ -289,21 +290,17 @@ class FirefoxPlugin(BrowserPlugin):
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
     @export(record=BrowserPasswordRecord)
-    @arg(
-        "--passwords",
-        type=str,
-        default="",
-        help="Supply a primary password (master password) to decrypt the internal password store.",
-    )
-    def passwords(self, firefox_primary_password="") -> Iterator[BrowserPasswordRecord]:
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
         """Return Firefox browser password records.
 
         Automatically decrypts passwords from Firefox 58 onwards (2018) if no primary password is set.
-        Alternatively, you can supply a primary password through ``--passwords`` to access the Firefox password store.
+        Alternatively, you can supply a primary password through the keychain to access the Firefox password store.
 
         Resources:
             - https://github.com/lclevy/firepwd
         """
+
+        passwords = keychain_passwords()
 
         for user, _, profile_dir in self._iter_profiles():
             login_file = profile_dir.joinpath("logins.json")
@@ -328,12 +325,19 @@ class FirefoxPlugin(BrowserPlugin):
                 logins = json.load(login_file.open())
 
                 for login in logins.get("logins", []):
-                    decrypted_username, decrypted_password = decrypt(
-                        login.get("encryptedUsername"),
-                        login.get("encryptedPassword"),
-                        key4_file,
-                        firefox_primary_password,
-                    )
+                    decrypted_username = None
+                    decrypted_password = None
+
+                    for password in passwords:
+                        decrypted_username, decrypted_password = decrypt(
+                            login.get("encryptedUsername"),
+                            login.get("encryptedPassword"),
+                            key4_file,
+                            password,
+                        )
+
+                        if decrypted_password and decrypted_username:
+                            break
 
                     yield self.BrowserPasswordRecord(
                         ts_created=login.get("timeCreated", 0) // 1000,

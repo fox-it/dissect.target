@@ -75,12 +75,6 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
         yield from super().extensions("chrome")
 
     @export(record=BrowserPasswordRecord)
-    @arg(
-        "--passwords",
-        type=str,
-        default="",
-        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
-    )
-    def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
         """Return browser password records for Google Chrome."""
-        yield from super().passwords("chrome", passwords.split(","))
+        yield from super().passwords("chrome")

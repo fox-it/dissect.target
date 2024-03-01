@@ -73,12 +73,6 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
         yield from super().extensions("brave")
 
     @export(record=BrowserPasswordRecord)
-    @arg(
-        "--passwords",
-        type=str,
-        default="",
-        help="Supply plaintext Windows passwords or SHA1 hashes in comma delimited fashion.",
-    )
-    def passwords(self, passwords: str = "") -> Iterator[BrowserPasswordRecord]:
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
         """Return browser password records for Brave."""
-        yield from super().passwords("brave", passwords)
+        yield from super().passwords("brave")
