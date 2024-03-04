@@ -181,7 +181,7 @@ TYPE_VARIATIONS = {
 
 
 class CRCMismatchException(Error):
-    """A mismatch between CRC checksums has occurred."""
+    pass
 
 
 ShimCacheGeneratorType = Union[CRCMismatchException, Tuple[Optional[datetime], str]]
