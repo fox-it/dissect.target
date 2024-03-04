@@ -1,6 +1,6 @@
 import hashlib
 import re
-from functools import cached_property
+from functools import cached_property, lru_cache
 from pathlib import Path
 
 from Crypto.Cipher import AES
@@ -10,21 +10,6 @@ from dissect.target.helpers import keychain
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
-
-
-def get_passwords() -> set:
-    keys = (
-        keychain.get_keys_for_provider("dpapi")
-        + keychain.get_keys_for_provider("browser")
-        + keychain.get_keys_without_provider()
-    )
-    passwords = set()
-
-    for key in keys:
-        if key.key_type == keychain.KeyType.PASSPHRASE:
-            passwords.add(key.value)
-    passwords.add("")
-    return passwords
 
 
 class DPAPIPlugin(InternalPlugin):
@@ -40,7 +25,19 @@ class DPAPIPlugin(InternalPlugin):
 
     def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
-            raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
+            raise UnsupportedPluginError("Registry key not found: %s", self.SYSTEM_KEY)
+
+    @lru_cache(maxsize=4096)
+    def keychain(self) -> set:
+        passwords = set()
+
+        for key in keychain.get_keys_for_provider("user") + keychain.get_keys_without_provider():
+            if key.key_type == keychain.KeyType.PASSPHRASE:
+                passwords.add(key.value)
+
+        # It is possible to encrypt using an empty passphrase.
+        passwords.add("")
+        return passwords
 
     @cached_property
     def syskey(self) -> bytes:
@@ -120,7 +117,7 @@ class DPAPIPlugin(InternalPlugin):
                     if not mkf.decrypted:
                         raise Exception("Failed to decrypt System master key")
 
-                passwords = get_passwords()
+                passwords = self.keychain()
                 if passwords is not None:
                     user = self._users.get(username)
                     if user:
@@ -135,7 +132,7 @@ class DPAPIPlugin(InternalPlugin):
                                     pass
 
                         if not mkf.decrypted:
-                            self.target.log.warning(f"Could not decrypt user DPAPI master key for user {username}")
+                            self.target.log.warning("Could not decrypt DPAPI master key for username '%s'", username)
 
                 result[file.name] = mkf
 

@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -99,6 +101,23 @@ BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtensio
 class BrowserPlugin(NamespacePlugin):
     __namespace__ = "browser"
 
+    @lru_cache(maxsize=4096)
+    def keychain(self) -> set:
+        """Retrieve a set of passphrases to use for decrypting saved browser credentials.
+
+        Always adds an empty passphrase as some browsers encrypt values using empty passphrases.
+
+        Returns: Set of passphrase strings.
+        """
+        passphrases = set()
+        for provider in [self.__namespace__, "browser", "user", None]:
+            for key in keychain.get_keys_for_provider(provider) if provider else keychain.get_keys_without_provider():
+                if key.key_type == keychain.KeyType.PASSPHRASE:
+                    passphrases.add(key.value)
+
+        passphrases.add("")
+        return passphrases
+
 
 def try_idna(url: str) -> bytes:
     """Attempts to convert a possible Unicode url to ASCII using the IDNA standard.
@@ -112,19 +131,3 @@ def try_idna(url: str) -> bytes:
         return url.encode("idna")
     except Exception:
         return url
-
-
-def keychain_passwords() -> set:
-    """Retrieve a set of passphrases to use for decrypting saved browser credentials.
-
-    Returns: Set of passphrase strings.
-    """
-    keys = keychain.get_keys_for_provider("browser") + keychain.get_keys_without_provider()
-    passwords = set()
-
-    for key in keys:
-        if key.key_type == keychain.KeyType.PASSPHRASE:
-            passwords.add(key.value)
-
-    passwords.add("")
-    return passwords
