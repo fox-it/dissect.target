@@ -40,21 +40,6 @@ struct tab {
     uleb128                     fsize1;
     uleb128                     fsize2;
     char                        header_end[2];    // \x01\x00
-
-    // Data can be stored in two says:
-    //  1. A single, contiguous block of data that holds all the data
-    //     In this case, the header is included in the single CRC32 checksum present at the end of the block
-    //  2. Multiple blocks of data that, when combined, hold all the data
-    //     In this case, the header has a separate CRC32 value stored at the end of the header
-    // The following bitmask operations basically check whether fsize1 is nonzero (boolean check) and depending
-    // on the outcome, parse 0 or 1 (so basically, parse or not parse) structs.
-    header_crc                  header_crc[((fsize1 | -fsize1) >> 31) ^ 1]; // Optional, only if fsize1 == 0
-    single_block_entry          single_block_entry[((fsize1 | (~fsize1 + 1)) >> 31) & 1];  // Optional, only if fsize1 > 0  # noqa: E501
-
-
-    multi_block_entry           multi_block_entries[EOF];  // Optional. If a single_block_entry is present
-                                                           // this will already be at EOF, so it won't do anything.
-                                                           // Otherwise, it will parse the individual blocks.
 };
 """
 TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -106,13 +91,13 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
         tab = c_windowstab.tab(fh)
 
-        if tab.len1 != 0:
-            # Reconstruct the text of the single_block_entry variant
-            data_entry = tab.single_block_entry[0]
+        if tab.fsize1 != 0:
+            data_entry = c_windowstab.single_block_entry(fh)
+
             size = data_entry.len
 
             # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included in the checksum
-            actual_crc32 = _calc_crc32(tab.dumps()[3:-4])
+            actual_crc32 = _calc_crc32(tab.dumps()[3:] + data_entry.dumps()[:-4])
 
             if data_entry.crc32 != actual_crc32:
                 self.target.log.warning(
@@ -125,10 +110,13 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             text = data_entry.data
 
         else:
+            header_crc = c_windowstab.header_crc(fh)
+
             # Reconstruct the text of the multi_block_entry variant
             # CRC32 is calculated based on the entire header, up to the point where the CRC32 value is stored
-            defined_header_crc32 = tab.header_crc[0].crc32
-            actual_header_crc32 = _calc_crc32(tab.dumps()[3 : tab.dumps().index(defined_header_crc32)])
+            defined_header_crc32 = header_crc.crc32
+
+            actual_header_crc32 = _calc_crc32(tab.dumps()[3:] + header_crc.unk)
             if defined_header_crc32 != actual_header_crc32:
                 self.target.log.warning(
                     "CRC32 mismatch in header of multi-block file: %s " "expected=%s, actual=%s",
@@ -142,7 +130,12 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             text = []
             size = 0
 
-            for data_entry in tab.multi_block_entries:
+            while True:
+                try:
+                    data_entry = c_windowstab.multi_block_entry(fh)
+                except EOFError:
+                    break
+
                 # If there is no data to be added, skip. This may happen sometimes.
                 if data_entry.len <= 0:
                     continue
