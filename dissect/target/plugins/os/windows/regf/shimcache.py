@@ -7,11 +7,7 @@ from typing import Callable, Generator, Optional, Tuple, Union
 from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
 
-from dissect.target.exceptions import (
-    CRCMismatchException,
-    RegistryError,
-    UnsupportedPluginError,
-)
+from dissect.target.exceptions import Error, RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
@@ -182,6 +178,11 @@ TYPE_VARIATIONS = {
         "offset": 0x8,
     },
 }
+
+
+class CRCMismatchException(Error):
+    """A mismatch between CRC checksums has occurred."""
+
 
 ShimCacheGeneratorType = Union[CRCMismatchException, Tuple[Optional[datetime], str]]
 
