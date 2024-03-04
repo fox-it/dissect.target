@@ -19,3 +19,4 @@ tests/_data/loaders/cpio/initrd.img-6.1.0-17-amd64 filter=lfs diff=lfs merge=lfs
 tests/_data/plugins/os/unix/locate/locatedb filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/os/unix/locate/mlocate.db filter=lfs diff=lfs merge=lfs -text
 tests/_data/plugins/os/unix/locate/plocate.db filter=lfs diff=lfs merge=lfs -text
+tests/_data/tools/reg/SYSTEM.tar.gz filter=lfs diff=lfs merge=lfs -text
