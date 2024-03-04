@@ -22,6 +22,13 @@ def test_wireguard_plugin_global_log(target_unix_users, fs_unix):
     # Peer
     record = records[1]
     assert record.name is None
-    assert str(record.allowed_ips) == "10.13.37.2/32"
+    assert [str(addr) for addr in record.allowed_ips] == ["10.13.37.2/32", "::/0"]
     assert record.public_key == "UHVibGljS2V5MQ=="
+    assert record.source == "etc/wireguard/wg0.conf"
+
+    # Peer
+    record = records[2]
+    assert record.name is None
+    assert [str(addr) for addr in record.allowed_ips] == ["10.13.37.3/32", "::/0"]
+    assert record.public_key == "UHVibGljS2V5Mg=="
     assert record.source == "etc/wireguard/wg0.conf"
