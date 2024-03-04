@@ -4,8 +4,6 @@ import json
 from collections import defaultdict
 from typing import Iterator, Optional
 
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
@@ -26,6 +24,16 @@ from dissect.target.plugins.apps.browser.browser import (
     try_idna,
 )
 from dissect.target.plugins.general.users import UserDetails
+
+try:
+    from Crypto.Cipher import AES
+    from Crypto.Protocol.KDF import PBKDF2
+
+    HAS_CRYPTO = True
+
+except ImportError:
+    HAS_CRYPTO = False
+
 
 CHROMIUM_DOWNLOAD_RECORD_FIELDS = [
     ("uri", "tab_url"),
@@ -466,7 +474,11 @@ class ChromiumMixin:
 
                 # 3. Linux 'basic' v10 encrypted password.
                 elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v10"):
-                    decrypted_password = decrypt_v10(encrypted_password)
+                    try:
+                        decrypted_password = decrypt_v10(encrypted_password)
+                    except Exception as e:
+                        self.target.log.warning("Failed to decrypt AES Chromium password")
+                        self.target.log.debug("", exc_info=e)
 
                 # 4. Linux 'gnome' or 'kwallet' encrypted password.
                 elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v11"):
@@ -547,6 +559,9 @@ def remove_padding(decrypted: bytes) -> bytes:
 
 
 def decrypt_v10(encrypted_password: bytes) -> str:
+    if not HAS_CRYPTO:
+        raise ValueError("Missing pycryptodome dependency for AES operation.")
+
     encrypted_password = encrypted_password[3:]
 
     salt = b"saltysalt"
@@ -568,6 +583,10 @@ def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
         byte ciphertext[EOF];
     }
     """
+
+    if not HAS_CRYPTO:
+        raise ValueError("Missing pycryptodome dependency for AES operation.")
+
     iv = encrypted_password[3:15]
     ciphertext = encrypted_password[15:]
     cipher = AES.new(key, AES.MODE_GCM, iv)

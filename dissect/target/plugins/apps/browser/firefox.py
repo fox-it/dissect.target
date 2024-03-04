@@ -4,11 +4,8 @@ import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
-from asn1crypto import algos, core
-from Crypto.Cipher import AES, DES3
-from Crypto.Util.Padding import unpad
 from dissect.sql import sqlite3
 from dissect.sql.exceptions import Error as SQLError
 from dissect.sql.sqlite3 import SQLite3
@@ -25,9 +22,19 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_HISTORY_RECORD_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
-    keychain_passwords,
     try_idna,
 )
+
+try:
+    from asn1crypto import algos, core
+    from Crypto.Cipher import AES, DES3
+    from Crypto.Util.Padding import unpad
+
+    HAS_CRYPTO = True
+
+except ImportError:
+    HAS_CRYPTO = False
+
 
 log = logging.getLogger(__name__)
 
@@ -299,9 +306,6 @@ class FirefoxPlugin(BrowserPlugin):
         Resources:
             - https://github.com/lclevy/firepwd
         """
-
-        passwords = keychain_passwords()
-
         for user, _, profile_dir in self._iter_profiles():
             login_file = profile_dir.joinpath("logins.json")
             key3_file = profile_dir.joinpath("key3.db")
@@ -328,13 +332,17 @@ class FirefoxPlugin(BrowserPlugin):
                     decrypted_username = None
                     decrypted_password = None
 
-                    for password in passwords:
-                        decrypted_username, decrypted_password = decrypt(
-                            login.get("encryptedUsername"),
-                            login.get("encryptedPassword"),
-                            key4_file,
-                            password,
-                        )
+                    for password in self.keychain():
+                        try:
+                            decrypted_username, decrypted_password = decrypt(
+                                login.get("encryptedUsername"),
+                                login.get("encryptedPassword"),
+                                key4_file,
+                                password,
+                            )
+                        except ValueError as e:
+                            self.target.log.warning("Exception while trying to decrypt")
+                            self.target.log.debug("", exc_info=e)
 
                         if decrypted_password and decrypted_username:
                             break
@@ -369,6 +377,9 @@ CKA_ID = b"\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
 
 
 def decrypt_moz_3des(global_salt: bytes, primary_password: bytes, entry_salt: str, encrypted: bytes) -> bytes:
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     hp = sha1(global_salt + primary_password).digest()
     pes = entry_salt + b"\x00" * (20 - len(entry_salt))
     chp = sha1(hp + entry_salt).digest()
@@ -392,6 +403,9 @@ def decode_login_data(data: str) -> tuple[bytes, bytes, bytes]:
         CIPHERTEXT
     }
     """
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     decoded = core.load(b64decode(data))
     key_id = decoded[0].native
     iv = decoded[1][1].native
@@ -425,6 +439,9 @@ def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> b
       OCTETSTRING encrypted
     }
     """
+
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
 
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
@@ -485,6 +502,9 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
         ...
     }
     """
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     object_identifier = decoded_item[0][0]
     algorithm = object_identifier.dotted
 
@@ -493,27 +513,29 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
     elif algorithm == pbeWithSha1AndTripleDES_CBC:
         return decrypt_sha1_triple_des_cbc(decoded_item, primary_password, global_salt), algorithm
     else:
-        # Firefox supports other algorithms (i.e. Firefox published before 2018),
-        # but decrypting these are not (yet) supported.
+        # Firefox supports other algorithms (i.e. Firefox before 2018), but decrypting these is not (yet) supported.
         return b"", algorithm
 
 
 def query_global_salt(key4_file: TargetPath) -> tuple[str, str]:
-    db = sqlite3.SQLite3(key4_file.open())
-    metadata = db.table("metadata").rows()
-    for row in metadata:
-        if row.get("id") == "password":
-            return row.get("item1", ""), row.get("item2", "")
+    with key4_file.open("rb") as fh:
+        db = sqlite3.SQLite3(fh)
+        for row in db.table("metadata").rows():
+            if row.get("id") == "password":
+                return row.get("item1", ""), row.get("item2", "")
 
 
 def query_master_key(key4_file: TargetPath) -> tuple[str, str]:
-    db = sqlite3.SQLite3(key4_file.open())
-    metadata = db.table("nssPrivate").rows()
-    for row in metadata:
-        return row.get("a11", ""), row.get("a102", "")
+    with key4_file.open("rb") as fh:
+        db = sqlite3.SQLite3(fh)
+        for row in db.table("nssPrivate").rows():
+            return row.get("a11", ""), row.get("a102", "")
 
 
 def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple[bytes, str]:
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     global_salt, password_check = query_global_salt(key4_file)
     decoded_password_check = core.load(password_check)
     decrypted_password_check, algorithm = decrypt_master_key(decoded_password_check, primary_password, global_salt)
@@ -546,6 +568,9 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
 
 
 def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     cka, iv, ciphertext = field
 
     if cka != CKA_ID:
@@ -556,20 +581,23 @@ def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
 
 def decrypt(
     username: str, password: str, key4_file: TargetPath, primary_password: str = ""
-) -> tuple[str | None, str | None]:
+) -> tuple[Optional[str], Optional[str]]:
     """Decrypt a stored username and password using provided credentials and key4 file.
 
     Args:
-        username
-        password
-        key4_file
-        primary_password
+        username: encoded and encrypted password
+        password encoded and encrypted password
+        key4_file: path to key4.db file
+        primary_password: password to use for decryption routine
 
-    Returns: tuple of decoded username and password strings.
+    Returns: A tuple of decoded username and password strings.
 
     Resources:
         - https://github.com/lclevy/firepwd
     """
+    if not HAS_CRYPTO:
+        raise ValueError("Missing cryptography dependency")
+
     try:
         username = decode_login_data(username)
         password = decode_login_data(password)
@@ -585,5 +613,6 @@ def decrypt(
             password = decrypt_field(key, password)
             return username.decode(), password.decode()
     except ValueError as e:
-        log.error("Failed to decrypt encrypted password", exc_info=e)
+        log.error("Failed to decrypt password using keyfile %s and password '%s'", key4_file, primary_password)
+        log.debug("", exc_info=e)
     return None, None

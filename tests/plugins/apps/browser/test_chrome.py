@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, Optional
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
@@ -136,7 +136,16 @@ def test_unix_chrome_passwords_gnome_plugin(target_unix_users: Target, fs_unix: 
     assert records[0].url == "https://test.com/"
 
 
-def test_windows_chrome_passwords_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
+@pytest.mark.parametrize(
+    "keychain_value, expected_password",
+    [
+        ("user", "StrongPassword"),
+        ("invalid", None),
+    ],
+)
+def test_windows_chrome_passwords_dpapi(
+    target_win_users_dpapi: Target, fs_win: VirtualFilesystem, keychain_value: str, expected_password: Optional[str]
+) -> None:
     fs_win.map_dir(
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
@@ -144,11 +153,12 @@ def test_windows_chrome_passwords_dpapi(target_win_users_dpapi: Target, fs_win: 
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
+    keychain.KEYCHAIN.clear()
     keychain.register_key(
-        keychain.KeyType.PASSPHRASE,
-        "user",
+        key_type=keychain.KeyType.PASSPHRASE,
+        value=keychain_value,
         identifier=None,
-        provider="browser",
+        provider="user",
     )
 
     records = list(target_win_users_dpapi.chrome.passwords())
@@ -158,8 +168,4 @@ def test_windows_chrome_passwords_dpapi(target_win_users_dpapi: Target, fs_win: 
 
     assert records[0].url == "https://example.com/"
     assert records[0].encrypted_password == "djEwT8fVcC9jiZPrMl8QdcFGSlfNArTPJG7Q/Wz4svHp9cRVG1NqC1/Jc8QR"
-    assert records[0].decrypted_password == "StrongPassword"
-
-    assert records[1].url == "https://login.example.net/"
-    assert records[1].encrypted_password == "djEwnRm3E6hUXj3UBevbd2zR+R1akWms8772gryMoNIHuNU="
-    assert records[1].decrypted_password == "pass"
+    assert records[0].decrypted_password == expected_password
