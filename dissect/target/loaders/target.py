@@ -1,27 +1,33 @@
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
+
 try:
-    import yaml
+    from ruamel.yaml import YAML
 except ImportError:
-    raise ImportError("Missing PyYAML dependency")
+    raise ImportError("Missing ruamel.yaml dependency")
 
 from dissect.target import container
 from dissect.target.loader import Loader
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 class TargetLoader(Loader):
     """Load target files."""
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path)
         self.base_dir = path.parent
-        self.definition = yaml.safe_load(path.open("rb"))
+        self.definition = YAML(typ="safe").load(path.open("rb"))
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         return path.suffix.lower() == ".target"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         for disk in self.definition["disks"]:
             target.disks.add(container.open(disk))
 
-    def open(self, path):
+    def open(self, path: Path) -> BinaryIO:
         return self.base_dir.joinpath(path).open("rb")

@@ -28,11 +28,11 @@ from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
 
 try:
-    import yaml
+    from ruamel.yaml import YAML
 
-    PY_YAML = True
+    HAS_YAML = True
 except (AttributeError, ImportError):
-    PY_YAML = False
+    HAS_YAML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -401,11 +401,11 @@ class Yaml(ConfigurationParser):
     """Parses a Yaml file."""
 
     def parse_file(self, fh: TextIO) -> None:
-        if PY_YAML:
-            parsed_data = yaml.load(fh, yaml.BaseLoader)
+        if HAS_YAML:
+            parsed_data = YAML(typ="safe").load(fh)
             self.parsed_data = ListUnwrapper.unwrap(parsed_data)
         else:
-            raise ConfigurationParsingError("Failed to parse file, please install PyYAML.")
+            raise ConfigurationParsingError("Failed to parse file, please install ruamel.yaml.")
 
 
 class ScopeManager:
