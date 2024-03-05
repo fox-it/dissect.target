@@ -25,13 +25,13 @@ def target_win_reg(target_win: Target, fs_win: VirtualFilesystem) -> Iterator[Ta
         # test invalid target
         ("target_default", "FOOBAR", 1, 100, "has no Windows Registry"),
         # test invalid key feedback
-        ("target_win_reg", "FOOBAR", 1, 100, "Key FOOBAR does not exist on target"),
+        ("target_win_reg", "FOOBAR", 1, 100, "Key 'FOOBAR' does not exist"),
         (
             "target_win_reg",
             "HKEY_LOCAL_MACHINE\\FOOBAR",
             1,
             100,
-            "Key HKEY_LOCAL_MACHINE\\FOOBAR does not exist on target",
+            "Key 'HKEY_LOCAL_MACHINE\\\\FOOBAR' does not exist",
         ),
         # test key value abbrevation
         (
