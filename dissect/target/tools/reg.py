@@ -34,8 +34,8 @@ def main():
     parser.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to load")
     parser.add_argument("-k", "--key", required=True, help="key to query")
     parser.add_argument("-kv", "--value", help="value to query")
-    parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1, help="Max depth of sub keys to print")
-    parser.add_argument("-l", "--length", type=int, default=100, help="Max length of key value to print")
+    parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1, help="max depth of subkeys to print")
+    parser.add_argument("-l", "--length", type=int, default=100, help="max length of key value to print")
 
     configure_generic_arguments(parser)
     args = parser.parse_args()
@@ -45,15 +45,14 @@ def main():
     try:
         for target in Target.open_all(args.targets):
             if not target.has_function("registry"):
-                log.error("Target %s has no Windows Registry", target)
+                target.log.error("Target has no Windows Registry")
                 continue
 
             try:
                 keys = list(target.registry.keys(args.key))
 
                 if not keys:
-                    log.error("Key %s does not exist on target %s", args.key, target)
-                    continue
+                    raise RegistryKeyNotFoundError()
 
                 print(target)
 
@@ -67,10 +66,11 @@ def main():
                         log.exception("Failed to find registry value")
 
             except RegistryKeyNotFoundError:
-                log.error("Key %s does not exist on target %s", args.key, target)
+                target.log.error("Key %r does not exist", args.key)
 
-            except Exception:
-                log.exception("Failed to iterate key")
+            except Exception as e:
+                target.log.error("Failed to iterate key: %s", e)
+                target.log.debug("", exc_info=e)
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)
