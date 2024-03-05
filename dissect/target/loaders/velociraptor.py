@@ -43,6 +43,8 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
                 # https://github.com/Velocidex/velociraptor/blob/87368e7cc678144592a1614bb3bbd0a0f900ded9/accessors/ntfs/vss.go#L82
                 if "HarddiskVolumeShadowCopy" in volume.name:
                     vss_volumes.add(volume)
+                elif (drive_letter := extract_drive_letter(volume.name)) is not None:
+                    volumes.add((drive_letter, volume))
                 else:
                     volumes.add(volume)
 
@@ -52,6 +54,12 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
         return OperatingSystem.WINDOWS, list(volumes) + list(vss_volumes)
 
     return None, None
+
+
+def extract_drive_letter(name: str) -> Optional[str]:
+    # \\.\X: in URL encoding
+    if len(name) == 14 and name.startswith("%5C%5C.%5C") and name.endswith("%3A"):
+        return name[10].lower()
 
 
 class VelociraptorLoader(DirLoader):

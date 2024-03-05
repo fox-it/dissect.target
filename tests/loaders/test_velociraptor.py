@@ -55,6 +55,9 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp
     loader.map(target_bare)
     target_bare.apply()
 
+    assert "sysvol" in target_bare.fs.mounts
+    assert "c:" in target_bare.fs.mounts
+
     usnjrnl_records = 0
     for fs in target_bare.filesystems:
         if isinstance(fs, NtfsFilesystem):
@@ -79,6 +82,9 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target,
     loader = VelociraptorLoader(zip_path)
     loader.map(target_bare)
     target_bare.apply()
+
+    assert "sysvol" in target_bare.fs.mounts
+    assert "c:" in target_bare.fs.mounts
 
     usnjrnl_records = 0
     for fs in target_bare.filesystems:
