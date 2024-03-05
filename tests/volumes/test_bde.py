@@ -6,9 +6,9 @@ from dissect.target.helpers import keychain
 try:
     from dissect.target.volumes.bde import BitlockerVolumeSystem
 
-    HAVE_DISSECT_FVE = True
+    HAS_DISSECT_FVE = True
 except ModuleNotFoundError:
-    HAVE_DISSECT_FVE = False
+    HAS_DISSECT_FVE = False
 
 
 from tests._utils import absolute_path
@@ -21,7 +21,7 @@ def encrypted_volume():
         yield f
 
 
-@pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
+@pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_failure(target_win, encrypted_volume):
     enc_vol = volume.Volume(encrypted_volume, 1, 0, None, None, None, disk=encrypted_volume)
     target_win.volumes.add(enc_vol)
@@ -31,7 +31,7 @@ def test_bde_volume_failure(target_win, encrypted_volume):
     assert enc_vol in target_win.volumes
 
 
-@pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
+@pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_recovery_key(target_win, encrypted_volume):
     recovery_key = "272316-265804-640728-713570-509047-503305-045837-324731"
 
@@ -58,7 +58,7 @@ def test_bde_volume_with_recovery_key(target_win, encrypted_volume):
     assert target_win.fs.path("e:/test-folder/test-file-2.txt").exists()
 
 
-@pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
+@pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_passphrase(target_win, encrypted_volume):
     identifier = "B6AD258A-2725-4A42-93C6-844478BF7A90"
     passphrase = "Password1234"
@@ -86,7 +86,7 @@ def test_bde_volume_with_passphrase(target_win, encrypted_volume):
     assert target_win.fs.path("e:/test-folder/test-file-2.txt").exists()
 
 
-@pytest.mark.skipif(not HAVE_DISSECT_FVE, reason="requires dissect.fve")
+@pytest.mark.skipif(not HAS_DISSECT_FVE, reason="requires dissect.fve")
 def test_bde_volume_with_wildcard_key(target_win, encrypted_volume):
     keychain.register_wildcard_value("Password1234")
 
