@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING
 
 try:
     from ruamel.yaml import YAML
@@ -28,6 +28,3 @@ class TargetLoader(Loader):
     def map(self, target: Target) -> None:
         for disk in self.definition["disks"]:
             target.disks.add(container.open(disk))
-
-    def open(self, path: Path) -> BinaryIO:
-        return self.base_dir.joinpath(path).open("rb")
