@@ -132,6 +132,7 @@ class Broker:
         self.certificate_file = crt
         self.cacert_file = ca
         self.case = case
+        self.command = kwargs.get("command", None)
 
     @suppress
     def read(self, host: str, disk_id: int, seek_address: int, read_length: int) -> SeekMessage:
@@ -173,6 +174,8 @@ class Broker:
             self.topo[key].append(payload.decode("utf-8"))
             self.mqtt_client.subscribe(f"{self.case}/{host}/DISKS")
             self.mqtt_client.subscribe(f"{self.case}/{host}/READ/#")
+            if self.command is not None:
+                self.mqtt_client.publish(f"{self.case}/{host}/COMM", self.command.encode("utf-8"))
             time.sleep(1)
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
@@ -235,6 +238,7 @@ class Broker:
 @arg("--mqtt-key", dest="key", help="private key file")
 @arg("--mqtt-crt", dest="crt", help="client certificate file")
 @arg("--mqtt-ca", dest="ca", help="certificate authority file")
+@arg("--mqtt-command", dest="command", help="direct command to client(s)")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
