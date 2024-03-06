@@ -17,6 +17,7 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.linux.fortios._keys import KERNEL_KEY_MAP
 from dissect.target.target import Target
 
 try:
@@ -92,12 +93,14 @@ class FortiOSPlugin(LinuxPlugin):
         except ReadError:
             # The rootfs.gz file could be encrypted.
             try:
-                rfs_fh = decrypt_rootfs(rootfs.open(), get_kernel_hash(sysvol))
+                kernel_hash = get_kernel_hash(sysvol)
+                key, iv = key_iv_for_kernel_hash(kernel_hash)
+                rfs_fh = decrypt_rootfs(rootfs.open(), key, iv)
                 vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
             except ValueError as e:
-                target.log.warning("Could not decrypt rootfs.gz. Unsupported kernel version.")
+                target.log.warning(f"Could not decrypt rootfs.gz. Unknown kernel hash ({kernel_hash}).")
                 target.log.debug("", exc_info=e)
             except ReadError as e:
                 target.log.warning("Could not mount rootfs.gz. It could be corrupt.")
@@ -457,58 +460,61 @@ def decrypt_password(input: str) -> str:
         return "ENC:" + input
 
 
-def decrypt_rootfs(fh: BinaryIO, kernel_hash: str) -> BinaryIO:
-    """Attempt to decrypt an encrypted ``rootfs.gz`` file.
+def key_iv_for_kernel_hash(kernel_hash: str) -> tuple[bytes, bytes]:
+    """Return decryption key and IV for a specific sha256 kernel hash.
+
+    The decryption key and IV are used to decrypt the ``rootfs.gz`` file.
+
+    Args:
+        kernel_hash: SHA256 hash of the kernel file
+
+    Returns:
+        Tuple with decryption key and IV
+
+    Raises:
+        ValueError: When no decryption keys are available for the given kernel hash
+    """
+
+    key = bytes.fromhex(KERNEL_KEY_MAP.get(kernel_hash, ""))
+    if len(key) == 32:
+        # FortiOS 7.4.x uses a KDF to derive the key and IV
+        return _kdf_7_4_x(key)
+    elif len(key) == 48:
+        # FortiOS 7.0.13 and 7.0.14 uses a static key and IV
+        return key[:32], key[32:]
+    raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
+
+
+def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
+    """Attempt to decrypt an encrypted ``rootfs.gz`` file with given key and IV.
 
     FortiOS releases as of 7.4.1 / 2023-08-31, have ChaCha20 encrypted ``rootfs.gz`` files.
     This function attempts to decrypt a ``rootfs.gz`` file using a static key and IV
     which can be found in the kernel.
 
-    Currently supported versions (each release has a new key):
-        - FortiGate VM 7.0.13
-        - FortiGate VM 7.0.14
-        - FortiGate VM 7.4.1
-        - FortiGate VM 7.4.2
-        - FortiGate VM 7.4.3
+    Known keys can be found in the `_keys.py` file.
 
     Resources:
         - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
         - Reversing kernel (fgt_verifier_iv, fgt_verifier_decrypt, fgt_verifier_initrd)
+
+    Args:
+        fh: File handle to the encrypted rootfs.gz file
+        key: ChaCha20 key
+        iv: ChaCha20 iv
+
+    Returns:
+        File handle to the decrypted rootfs.gz file
+
+    Raises:
+        ValueError: When decryption failed
+        RuntimeError: When PyCryptodome is not available
+
     """
 
     if not HAS_PYCRYPTODOME:
         raise RuntimeError("PyCryptodome module not available")
 
-    # SHA256 hashes of kernel files
-    KERNEL_KEY_MAP = {
-        # FortiGate VM 7.0.13
-        "25cb2c8a419cde1f42d38fc6cbc95cf8b53db41096d0648015674d8220eba6bf": (
-            bytes.fromhex("c87e13e1f7d21c1aca81dc13329c3a948d6e420d3a859f3958bd098747873d08"),
-            bytes.fromhex("87486a24637e9a66f09ec182eee25594"),
-        ),
-        # FortiGate VM 7.0.14
-        "67d4c913b1ceb7a62e2076ca835ebfdc67e65c7716fc604caa7552512f171197": (
-            bytes.fromhex("9ba00c035bcaa97717d936f8268a973eb1dd64d19388153fad5f7849b8fdf0d8"),
-            bytes.fromhex("9df4ba40dbddcf5ec9d2983681eb1940"),
-        ),
-        # FortiGate VM 7.4.1
-        "a008b47327293e48502a121ee8709f243ad5da4e63d6f663c253db27bd01ea28": _kdf_7_4_x(
-            "366486c0f2c6322ec23e4f33a98caa1b19d41c74bb4f25f6e8e2087b0655b30f"
-        ),
-        # FortiGate VM 7.4.2
-        "c392cf83ab484e0b2419b2711b02cdc88a73db35634c10340037243394a586eb": _kdf_7_4_x(
-            "480767be539de28ee773497fa731dd6368adc9946df61da8e1253fa402ba0302"
-        ),
-        # FortiGate VM 7.4.3
-        "ba0450947e51844588b29bd302d2a1a3802f7718cf6840011c1b34f1c1f0bb89": _kdf_7_4_x(
-            "4cf7a950b99cf29b0343e7ba6c609e49d9766f16c6d2f075f72ad400542f0765"
-        ),
-    }
-
-    if not (key_data := KERNEL_KEY_MAP.get(kernel_hash)):
-        raise ValueError("Failed to decrypt: Unknown kernel hash.")
-
-    key, iv = key_data
     # First 8 bytes = counter, last 8 bytes = nonce
     # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
     # We're interested in updating the position in the ChaCha20 internal state, so to make
