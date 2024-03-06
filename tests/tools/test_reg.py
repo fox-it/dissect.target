@@ -13,9 +13,9 @@ from tests._utils import absolute_path
 
 @pytest.fixture
 def target_win_reg(target_win: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
-    fs_win.map_file_from_tar("Windows/System32/config/SYSTEM", absolute_path("_data/tools/reg/SYSTEM.tar.gz"))
+    fs_win.map_file("Windows/System32/config/SYSTEM", absolute_path("_data/tools/reg/SYSTEM.gz"), "gzip")
     target_win.apply()
-    target_win.add_plugin(RegistryPlugin, check_compatible=False)
+    target_win.add_plugin(RegistryPlugin)
     yield target_win
 
 
