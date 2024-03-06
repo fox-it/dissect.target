@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import argparse
+import itertools
 import logging
 
 from dissect.target import Target
@@ -49,14 +50,12 @@ def main():
                 continue
 
             try:
-                keys = list(target.registry.keys(args.key))
-
-                if not keys:
-                    raise RegistryKeyNotFoundError()
+                keys = target.registry.keys(args.key)
+                first_key = next(keys)
 
                 print(target)
 
-                for key in keys:
+                for key in itertools.chain([first_key], keys):
                     try:
                         if args.value:
                             print(key.value(args.value))
@@ -65,7 +64,7 @@ def main():
                     except RegistryError:
                         log.exception("Failed to find registry value")
 
-            except RegistryKeyNotFoundError:
+            except (RegistryKeyNotFoundError, StopIteration):
                 target.log.error("Key %r does not exist", args.key)
 
             except Exception as e:
@@ -79,7 +78,7 @@ def main():
 
 def recursor(key: RegistryKey, depth: int, indent: int, max_length: int = 100) -> None:
     class_name = ""
-    if hasattr(key, "class_name") and key.class_name:
+    if key.class_name:
         class_name = f" ({key.class_name})"
 
     print(" " * indent + f"+ {key.name!r} ({key.ts})" + class_name)
