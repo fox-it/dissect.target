@@ -139,6 +139,7 @@ class CatrootPlugin(Plugin):
                 needle = NEEDLES[digest_type]
 
                 digests = []
+                offset = None
                 for offset in findall(encap_contents, needle):
                     # 4 bytes before the digest type, a sequence starts
                     objseq = Sequence.load(encap_contents[offset - 4 :])
