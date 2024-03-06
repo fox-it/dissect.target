@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 # SHA256 hashes of kernel files
 KERNEL_KEY_MAP = {
     # FFW_1801F-v7.4.2.F-build2571-FORTINET
