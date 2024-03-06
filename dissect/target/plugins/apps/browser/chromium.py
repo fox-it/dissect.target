@@ -221,14 +221,45 @@ class ChromiumMixin:
                 same_site (bool): Cookie same site flag.
         """
         for user, db_file, db in self._iter_db("Cookies", subdirs=["Network"]):
+            decrypted_key = None
+
+            if self.target.os == OperatingSystem.WINDOWS.value:
+                try:
+                    local_state_path = db_file.parent.parent / "Local State"
+                    if db_file.parent.name == "Network":
+                        local_state_path = db_file.parent.parent.parent / "Local State"
+
+                    decrypted_key = self._get_local_state_key(local_state_path)
+                except ValueError:
+                    self.target.log.warning("Failed to decrypt local state key")
+
             try:
                 for cookie in db.table("cookies").rows():
+                    cookie_value = cookie.value
+
+                    if (
+                        not cookie_value
+                        and decrypted_key
+                        and (enc_value := cookie.get("encrypted_value"))
+                        and enc_value.startswith(b"v10")
+                    ):
+                        try:
+                            if self.target.os == OperatingSystem.LINUX.value:
+                                cookie_value = decrypt_v10(enc_value)
+                            elif self.target.os == OperatingSystem.WINDOWS.value:
+                                cookie_value = decrypt_v10_2(enc_value, decrypted_key)
+                        except (ValueError, UnicodeDecodeError):
+                            pass
+
+                    if not cookie_value:
+                        self.target.log.warning(f"Failed to decrypt cookie value for {cookie.host_key} {cookie.name}")
+
                     yield self.BrowserCookieRecord(
                         ts_created=webkittimestamp(cookie.creation_utc),
                         ts_last_accessed=webkittimestamp(cookie.last_access_utc),
                         browser=browser_name,
                         name=cookie.name,
-                        value=cookie.value,
+                        value=cookie_value,
                         host=cookie.host_key,
                         path=cookie.path,
                         expiry=int(cookie.has_expires),

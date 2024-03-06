@@ -1,6 +1,7 @@
 from typing import Iterator, Optional
 
 import pytest
+from dissect.util.ts import webkittimestamp
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target import Target
@@ -8,8 +9,6 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.plugins.apps.browser.chrome import ChromePlugin
 from tests._utils import absolute_path
-
-# NOTE: Missing cookie tests for Chrome.
 
 
 @pytest.fixture
@@ -169,3 +168,39 @@ def test_windows_chrome_passwords_dpapi(
     assert records[0].url == "https://example.com/"
     assert records[0].encrypted_password == "djEwT8fVcC9jiZPrMl8QdcFGSlfNArTPJG7Q/Wz4svHp9cRVG1NqC1/Jc8QR"
     assert records[0].decrypted_password == expected_password
+
+
+def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: VirtualFilesystem) -> None:
+    fs_win.map_dir(
+        "Users/user/AppData/Local/Google/Chrome/User Data",
+        absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
+    )
+
+    target_win_users_dpapi.add_plugin(ChromePlugin)
+
+    keychain.KEYCHAIN.clear()
+    keychain.register_key(
+        key_type=keychain.KeyType.PASSPHRASE,
+        value="user",
+        identifier=None,
+        provider="user",
+    )
+
+    records = list(target_win_users_dpapi.chrome.cookies())
+
+    assert len(records) == 4
+
+    assert records[0].ts_created == webkittimestamp(13370000000000000)
+    assert records[0].ts_last_accessed == webkittimestamp(13370000000000000)
+    assert records[0].browser == "chrome"
+    assert records[0].name == "tbb"
+    assert records[0].value == "false"
+    assert records[0].host == ".tweakers.net"
+    assert records[0].is_secure
+
+    assert {c.name: c.value for c in records} == {
+        "tbb": "false",
+        "twk-theme": "twk-light",
+        "GPS": "1",
+        "PREF": "tz=Europe.Berlin",
+    }
