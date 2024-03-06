@@ -1,9 +1,12 @@
+from functools import lru_cache
 from typing import Generator, NamedTuple, Optional, Union
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, WindowsUserRecord
 from dissect.target.plugin import InternalPlugin
+
+from ... import Target
 
 
 class UserDetails(NamedTuple):
@@ -15,6 +18,10 @@ class UsersPlugin(InternalPlugin):
     """Internal plugin that provides helper functions for retrieving user details."""
 
     __namespace__ = "user_details"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.find = lru_cache(4096)(self.find)
 
     def check_compatible(self) -> None:
         if not hasattr(self.target, "users"):
