@@ -1,12 +1,11 @@
 from functools import lru_cache
 from typing import Generator, NamedTuple, Optional, Union
 
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, WindowsUserRecord
 from dissect.target.plugin import InternalPlugin
-
-from ... import Target
 
 
 class UserDetails(NamedTuple):
