@@ -20,7 +20,7 @@ class UsersPlugin(InternalPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.find = lru_cache(4096)(self.find)
+        self.find = lru_cache(32)(self.find)
 
     def check_compatible(self) -> None:
         if not hasattr(self.target, "users"):
