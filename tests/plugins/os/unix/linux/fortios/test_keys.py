@@ -9,7 +9,7 @@ from dissect.target.plugins.os.unix.linux.fortios._os import (
 )
 
 
-def test_kernel_key_map():
+def test_kernel_key_map() -> None:
     # Ensure that the kernel key map is valid
     for kernel_hash, key in KERNEL_KEY_MAP.items():
         # test if the kernel hash is a valid hex string
@@ -25,7 +25,7 @@ def test_kernel_key_map():
         assert len(bytes.fromhex(key)) in [32, 48]
 
 
-def test_key_iv_for_kernel_hash():
+def test_key_iv_for_kernel_hash() -> None:
     # test FFW_1801F-v7.4.2.F-build2571-FORTINET (KDF)
     key, iv = key_iv_for_kernel_hash("d719f7fd533d05efb872907cf3711d0d895750d288b856ce70fefecbd7ace482")
     assert key == bytes.fromhex("39ef9ceb4262b49252164a4558b14a9b006d91a5247f5c797af281fade2198a8")
@@ -41,7 +41,7 @@ def test_key_iv_for_kernel_hash():
         key_iv_for_kernel_hash("12345")
 
 
-def test_decrypt_rootfs():
+def test_decrypt_rootfs() -> None:
     # test decrypt of rootfs.gz header (FWF_81F_2R_POE-v7.4.3.F-build2573-FORTINET)
     encrypted_rootfs_header = bytes.fromhex("3ccb 7d85 b9b0 4c8e 8c92 36d4 1d9c c48c")
     key = bytes.fromhex("b9c77cfca5c3f4fe543b5b861b5eeab61b0bfd23fa93f52f5cd428bb5567ec37")
