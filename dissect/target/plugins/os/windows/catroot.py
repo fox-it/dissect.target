@@ -11,9 +11,9 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-NEEDLES = {
-    "hint": b"\x1e\x08\x00H\x00i\x00n\x00t",
-    "package_name": b"\x06\n+\x06\x01\x04\x01\x827\x0c\x02\x01",
+HINT_NEEDLE = b"\x1e\x08\x00H\x00i\x00n\x00t"
+PACKAGE_NAME_NEEDLE = b"\x06\n+\x06\x01\x04\x01\x827\x0c\x02\x01"
+DIGEST_NEEDLES = {
     "md5": b"\x06\x08\x2a\x86\x48\x86\xf7\x0d\x02\x05",
     "sha1": b"\x06\x05\x2b\x0e\x03\x02\x1a",
     "sha_generic": b"\x06\x09\x08\x86\x48\x01\x65\x03\x04\x02",
@@ -30,14 +30,6 @@ CatrootRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
-
-
-class CatrootFileType(str, Enum):
-    CATROOT_FILE = "catroot_file"
-    CATDB = "catdb"
-
-
-CatrootFileInfo = namedtuple("CatrootFileInfo", ["file_type", "pattern", "base_path"])
 
 
 def findall(buf: bytes, needle: bytes) -> Iterator[int]:
@@ -63,7 +55,7 @@ def _get_package_name(sequence: Sequence) -> str:
 
 def find_package_name(hint_buf: bytes) -> Optional[str]:
     """Find a sequence that contains the 'PackageName' key and return the value if present."""
-    for hint_offset in findall(hint_buf, NEEDLES["package_name"]):
+    for hint_offset in findall(hint_buf, PACKAGE_NAME_NEEDLE):
         # 7, 6 or 5 bytes before the package_name needle, a sequence starts (starts with b"0\x82" or b"0\x81").
         for sequence_needle in [b"0\x82", b"0\x81"]:
             if (sequence_offset := hint_buf.find(sequence_needle, hint_offset - 8, hint_offset)) == -1:
@@ -83,21 +75,12 @@ class CatrootPlugin(Plugin):
 
     def __init__(self, target):
         super().__init__(target)
-        self.catroot_dirs = {
-            CatrootFileType.CATROOT_FILE: CatrootFileInfo(
-                CatrootFileType.CATROOT_FILE, "*.cat", self.target.fs.path("sysvol/windows/system32/catroot")
-            ),
-            CatrootFileType.CATDB: CatrootFileInfo(
-                CatrootFileType.CATDB, "catdb", self.target.fs.path("sysvol/windows/system32/catroot2")
-            ),
-        }
+        self.catroot_dir = self.target.fs.path("sysvol/windows/system32/catroot")
+        self.catroot2_dir = self.target.fs.path("sysvol/windows/system32/catroot2")
 
     def check_compatible(self) -> None:
-        for catroot_info in self.catroot_dirs.values():
-            for _ in catroot_info.base_path.rglob(catroot_info.pattern):
-                return
-
-        raise UnsupportedPluginError("No catroot files or catroot ESE files found")
+        if next(self.catroot2_dir.rglob("catdb"), None) is None and next(self.catroot_dir.rglob("*.cat"), None) is None:
+            raise UnsupportedPluginError("No catroot files or catroot ESE databases found")
 
     @export(record=CatrootRecord)
     def files(self) -> Iterator[CatrootRecord]:
@@ -122,14 +105,12 @@ class CatrootPlugin(Plugin):
         # encap_content_info along with an optional file hint. Here we parse the digest values
         # ourselves by looking for the corresponding digest needles in the raw encap_content_info
         # data. Furthermore, we try to find the file hint if it is present in that same raw data.
-        catroot_info = self.catroot_dirs[CatrootFileType.CATROOT_FILE]
-        for file in catroot_info.base_path.rglob(catroot_info.pattern):
+        for file in self.catroot_dir.rglob("*.cat"):
             if not file.is_file():
                 continue
 
             try:
-                with file.open("rb") as fh:
-                    buf = fh.read()
+                buf = file.read_bytes()
 
                 # TODO: Parse other data in the content info
                 content_info = ContentInfo.load(buf)["content"]
@@ -178,7 +159,7 @@ class CatrootPlugin(Plugin):
                     # If the package_name needle is not found or it's not present in the first 7 bytes of the hint_buf
                     # We are probably dealing with a catroot file that contains "hint" needles.
                     if not hints:
-                        for hint_offset in findall(encap_contents, NEEDLES["hint"]):
+                        for hint_offset in findall(encap_contents, HINT_NEEDLE):
                             # Either 3 or 4 bytes before the needle, a sequence starts
                             bytes_before_needle = 3 if encap_contents[hint_offset - 3] == 48 else 4
                             name_sequence = Sequence.load(encap_contents[hint_offset - bytes_before_needle :])
@@ -186,9 +167,9 @@ class CatrootPlugin(Plugin):
                             hint = name_sequence[2].native.decode("utf-16-le").strip("\x00")
                             hints.append(hint)
 
-                except Exception as error:
+                except Exception as e:
                     self.target.log.warning(
-                        "An error occurred while parsing the hint for catroot file %s: %s", file, error
+                        "An error occurred while parsing the hint for catroot file %s: %s", file, e
                     )
 
                 # Currently, it is not known how the file hints are related to the digests. Therefore, each digest
@@ -224,8 +205,7 @@ class CatrootPlugin(Plugin):
             filename (string): catroot filename.
             source (path): Source catroot file.
         """
-        catroot_info = self.catroot_dirs[CatrootFileType.CATDB]
-        for ese_file in catroot_info.base_path.rglob(catroot_info.pattern):
+        for ese_file in self.catroot2_dir.rglob("catdb"):
             with ese_file.open("rb") as fh:
                 ese_db = EseDB(fh)
 
@@ -237,7 +217,7 @@ class CatrootPlugin(Plugin):
                     for record in ese_db.table(table_name).records():
                         file_digest = digest()
                         setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
-                        raw_hint = record.get("HashCatNameTable_CatNameCol").decode("utf-8").rstrip("|")
+                        raw_hint = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|")
 
                         yield CatrootRecord(
                             digest=file_digest,
