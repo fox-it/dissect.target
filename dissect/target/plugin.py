@@ -82,7 +82,7 @@ def export(*args, **kwargs) -> Callable:
         - default: Single return value
         - record: Yields records. Implicit when record argument is given.
         - yield: Yields printable values.
-        - none: No return value. Plugin is responsible for output formatting and should return None.
+        - none: No return value. Plugin is responsible for output formatting and should return ``None``.
 
     The ``export`` decorator adds some additional private attributes to an exported method or property:
 
