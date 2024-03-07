@@ -100,7 +100,7 @@ class FortiOSPlugin(LinuxPlugin):
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
             except ValueError as e:
-                target.log.warning(f"Could not decrypt rootfs.gz. Unknown kernel hash ({kernel_hash}).")
+                target.log.warning("Could not decrypt rootfs.gz. Unknown kernel hash (%s).", kernel_hash)
                 target.log.debug("", exc_info=e)
             except ReadError as e:
                 target.log.warning("Could not mount rootfs.gz. It could be corrupt.")
@@ -466,13 +466,13 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> tuple[bytes, bytes]:
     The decryption key and IV are used to decrypt the ``rootfs.gz`` file.
 
     Args:
-        kernel_hash: SHA256 hash of the kernel file
+        kernel_hash: SHA256 hash of the kernel file.
 
     Returns:
-        Tuple with decryption key and IV
+        Tuple with decryption key and IV.
 
     Raises:
-        ValueError: When no decryption keys are available for the given kernel hash
+        ValueError: When no decryption keys are available for the given kernel hash.
     """
 
     key = bytes.fromhex(KERNEL_KEY_MAP.get(kernel_hash, ""))
@@ -492,24 +492,23 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
     This function attempts to decrypt a ``rootfs.gz`` file using a static key and IV
     which can be found in the kernel.
 
-    Known keys can be found in the `_keys.py` file.
+    Known keys can be found in the ``_keys.py`` file.
 
     Resources:
         - https://docs.fortinet.com/document/fortimanager/7.4.2/release-notes/519207/special-notices
         - Reversing kernel (fgt_verifier_iv, fgt_verifier_decrypt, fgt_verifier_initrd)
 
     Args:
-        fh: File handle to the encrypted rootfs.gz file
-        key: ChaCha20 key
-        iv: ChaCha20 iv
+        fh: File-like object to the encrypted rootfs.gz file.
+        key: ChaCha20 key.
+        iv: ChaCha20 iv.
 
     Returns:
-        File handle to the decrypted rootfs.gz file
+        File-like object to the decrypted rootfs.gz file.
 
     Raises:
-        ValueError: When decryption failed
-        RuntimeError: When PyCryptodome is not available
-
+        ValueError: When decryption failed.
+        RuntimeError: When PyCryptodome is not available.
     """
 
     if not HAS_PYCRYPTODOME:
