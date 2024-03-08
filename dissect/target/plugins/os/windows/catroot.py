@@ -87,6 +87,10 @@ class CatrootPlugin(Plugin):
         A catalog file contains a collection of cryptographic hashes, or thumbprints. These files are generally used to
         verify the integrity of Windows operating system files, instead of per-file authenticode signatures.
 
+        At the moment, parsing catalog files is done on best effort. Asn1crypto is not able to fully parse the
+        `encap_content_info`, highly likely because Microsoft uses its own format. Future research should result in
+        a more resilient and complete implementation of the catroot.files plugin.
+
         References:
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
@@ -167,10 +171,10 @@ class CatrootPlugin(Plugin):
 
                 except Exception as e:
                     self.target.log.debug("", exc_info=e)
-                
+
                 # Currently, it is not known how the file hints are related to the digests. Therefore, each digest
                 # is yielded as a record with all of the file hints found.
-                # TODO: find the correlation between the file hints and the digests in catroot files
+                # TODO: find the correlation between the file hints and the digests in catroot files.
                 for file_digest in digests:
                     yield CatrootRecord(
                         digest=file_digest,
@@ -189,6 +193,8 @@ class CatrootPlugin(Plugin):
 
         The catdb file is an ESE database file that contains the digests of the catalog files present on the system.
         This database is used to speed up the process of validating a Portable Executable (PE) file.
+
+        Note: catalog files can include file hints, however these seem not to be present in the catdb files.
 
         References:
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
@@ -210,12 +216,12 @@ class CatrootPlugin(Plugin):
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
                     if table_name not in tables:
                         continue
-                    
+
                     for record in ese_db.table(table_name).records():
                         file_digest = digest()
                         setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
                         catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
-                        
+
                         for catroot_name in catroot_names:
                             yield CatrootRecord(
                                 digest=file_digest,
