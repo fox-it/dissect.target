@@ -87,9 +87,9 @@ class CatrootPlugin(Plugin):
         A catalog file contains a collection of cryptographic hashes, or thumbprints. These files are generally used to
         verify the integrity of Windows operating system files, instead of per-file authenticode signatures.
 
-        At the moment, parsing catalog files is done on best effort. Asn1crypto is not able to fully parse the
-        `encap_content_info`, highly likely because Microsoft uses its own format. Future research should result in
-        a more resilient and complete implementation of the catroot.files plugin.
+        At the moment, parsing catalog files is done on best effort. ``asn1crypto`` is not able to fully parse the
+        ``encap_content_info``, highly likely because Microsoft uses its own format. Future research should result in
+        a more resilient and complete implementation of the ``catroot.files`` plugin.
 
         References:
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
