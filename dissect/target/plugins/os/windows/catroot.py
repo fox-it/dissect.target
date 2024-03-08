@@ -1,5 +1,3 @@
-from collections import namedtuple
-from enum import Enum
 from typing import Iterator, Optional
 
 from asn1crypto.cms import ContentInfo
@@ -26,7 +24,7 @@ CatrootRecord = TargetRecordDescriptor(
     [
         ("digest", "digest"),
         ("string[]", "hints"),
-        ("string", "filename"),
+        ("string", "catroot_name"),
         ("path", "source"),
     ],
 )
@@ -98,8 +96,8 @@ class CatrootPlugin(Plugin):
             domain (string): The target domain.
             digest (digest): The parsed digest.
             hints (string[]): File hints, if present.
-            filename (string): catroot filename.
-            source (path): Source catroot file.
+            catroot_name (string): Catroot name.
+            source (path): Source of the catroot record.
         """
         # As far as known, Microsoft uses its own implementation to store the digest in the
         # encap_content_info along with an optional file hint. Here we parse the digest values
@@ -117,7 +115,7 @@ class CatrootPlugin(Plugin):
 
                 digest_type = content_info["digest_algorithms"].native[0].get("algorithm")
                 encap_contents = content_info["encap_content_info"].contents
-                needle = NEEDLES[digest_type]
+                needle = DIGEST_NEEDLES[digest_type]
 
                 digests = []
                 offset = None
@@ -168,9 +166,7 @@ class CatrootPlugin(Plugin):
                             hints.append(hint)
 
                 except Exception as e:
-                    self.target.log.warning(
-                        "An error occurred while parsing the hint for catroot file %s: %s", file, e
-                    )
+                    self.target.log.debug("", exc_info=e)
 
                 # Currently, it is not known how the file hints are related to the digests. Therefore, each digest
                 # is yielded as a record with all of the file hints found.
@@ -178,8 +174,8 @@ class CatrootPlugin(Plugin):
                     yield CatrootRecord(
                         digest=file_digest,
                         hints=hints,
-                        filename=file.name,
-                        source=self.target.fs.path(file),
+                        catroot_name=file.name,
+                        source=file,
                         _target=self.target,
                     )
 
@@ -202,8 +198,8 @@ class CatrootPlugin(Plugin):
             domain (string): The target domain.
             digest (digest): The parsed digest.
             hints (string[]): File hints, if present.
-            filename (string): catroot filename.
-            source (path): Source catroot file.
+            catroot_name (string): Catroot name.
+            source (path): Source of the catroot record.
         """
         for ese_file in self.catroot2_dir.rglob("catdb"):
             with ese_file.open("rb") as fh:
@@ -213,16 +209,17 @@ class CatrootPlugin(Plugin):
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
                     if table_name not in tables:
                         continue
-
+                    
                     for record in ese_db.table(table_name).records():
                         file_digest = digest()
                         setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
-                        raw_hint = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|")
-
-                        yield CatrootRecord(
-                            digest=file_digest,
-                            hints=raw_hint.split("|"),
-                            filename=raw_hint,
-                            source=ese_file,
-                            _target=self.target,
-                        )
+                        catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+                        
+                        for catroot_name in catroot_names:
+                            yield CatrootRecord(
+                                digest=file_digest,
+                                hints=None,
+                                catroot_name=catroot_name,
+                                source=ese_file,
+                                _target=self.target,
+                            )
