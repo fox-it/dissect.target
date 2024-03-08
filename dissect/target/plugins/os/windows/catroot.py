@@ -167,9 +167,10 @@ class CatrootPlugin(Plugin):
 
                 except Exception as e:
                     self.target.log.debug("", exc_info=e)
-
+                
                 # Currently, it is not known how the file hints are related to the digests. Therefore, each digest
                 # is yielded as a record with all of the file hints found.
+                # TODO: find the correlation between the file hints and the digests in catroot files
                 for file_digest in digests:
                     yield CatrootRecord(
                         digest=file_digest,
