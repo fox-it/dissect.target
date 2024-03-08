@@ -1,2 +1,3 @@
-sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops
-253: 00000000:00FD 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 1337 2 00000000f7e50cca 0
+version https://git-lfs.github.com/spec/v1
+oid sha256:769dc5e4655af51ba3d8388aaf4063f41ff1576f2f953fba377a241080603e2c
+size 228

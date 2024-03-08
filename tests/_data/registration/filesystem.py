@@ -1,23 +1,3 @@
-from typing import BinaryIO, Optional
-
-from dissect.target.filesystem import Filesystem, FilesystemEntry, register
-from dissect.target.volume import Volume
-
-
-class TestFilesystem(Filesystem):
-    __type__: str = "Data"
-
-    def __init__(
-        self, case_sensitive: bool = True, alt_separator: Optional[str] = None, volume: Optional[Volume] = None
-    ):
-        super().__init__(case_sensitive, alt_separator, volume)
-        print("Helloworld from TestFilesystem")
-
-    def get(self, path: str) -> FilesystemEntry:
-        pass
-
-    def detect(fh: BinaryIO) -> bool:
-        return False
-
-
-register(__name__, TestFilesystem.__name__, internal=False)
+version https://git-lfs.github.com/spec/v1
+oid sha256:8b80829bf3bdf878a286f83f6a1743a9ab466f5637c993d757984e0e0d1daeb7
+size 654
