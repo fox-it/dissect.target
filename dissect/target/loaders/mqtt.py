@@ -159,6 +159,7 @@ class Broker:
                 total_size,
             ) = unpack_from("<IQ", payload, offset=1 + (disk_index * DISK_INDEX_OFFSET))
             disks.append(DiskMessage(index=disk_index, sector_size=sector_size, total_size=total_size))
+
         self.diskinfo[hostname] = InfoMessage(disks=disks)
 
     def _on_read(self, hostname: str, tokens: list[str], payload: bytes) -> None:
