@@ -104,6 +104,7 @@ class MQTTConnection:
             # don't waste time with sleep if we have a response
             if message:
                 break
+
             attempts += 1
             time.sleep(0.01)
             if attempts > 100:
