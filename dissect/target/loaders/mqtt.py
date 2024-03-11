@@ -195,6 +195,7 @@ class Broker:
         casename, hostname, response, *_ = tokens
         if casename != self.case:
             return
+
         if response == "DISKS":
             self._on_disk(hostname, msg.payload)
         elif response == "READ":
