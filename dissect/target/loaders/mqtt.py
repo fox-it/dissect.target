@@ -85,9 +85,11 @@ class MQTTConnection:
     def info(self) -> list[MQTTStream]:
         disks = []
         self.broker.info(self.host)
+
         message = None
         while message is None:
             message = self.broker.disk(self.host)
+
         for idx, disk in enumerate(message.disks):
             disks.append(MQTTStream(self, idx, disk.total_size))
         return disks
