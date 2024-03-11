@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import itertools
 from itertools import product
-from typing import Iterable, Iterator, Union
+from typing import Iterable, Iterator, Optional, Union
 
 from dissect.target.exceptions import ConfigurationParsingError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
