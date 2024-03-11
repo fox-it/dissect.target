@@ -76,6 +76,7 @@ class MQTTConnection:
 
     def topo(self, peers: int):
         self.broker.topology(self.host)
+
         while len(self.broker.peers(self.host)) < peers:
             self.broker.topology(self.host)
             time.sleep(1)
