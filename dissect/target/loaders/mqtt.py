@@ -92,6 +92,7 @@ class MQTTConnection:
 
         for idx, disk in enumerate(message.disks):
             disks.append(MQTTStream(self, idx, disk.total_size))
+
         return disks
 
     def read(self, disk_id: int, offset: int, length: int, optimization_strategy: int) -> bytes:
