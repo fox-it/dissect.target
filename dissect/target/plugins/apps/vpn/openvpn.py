@@ -18,7 +18,7 @@ COMMON_ELEMENTS = [
     ("string", "ca"),
     ("string", "cert"),
     ("string", "key"),
-    ("boolean", "redacted"),
+    ("boolean", "redacted_key"),
     ("string", "tls_auth"),
     ("string", "status"),
     ("string", "log"),
@@ -181,7 +181,7 @@ class OpenVPNPlugin(Plugin):
 
             if not export_key and "PRIVATE KEY" in common_elements.get("key"):
                 common_elements.update({"key": None})
-                common_elements.update({"redacted": True})
+                common_elements.update({"redacted_key": True})
 
             tls_auth = config.get("tls-auth", "")
             # The format of tls-auth is 'tls-auth ta.key <NUM>'.
