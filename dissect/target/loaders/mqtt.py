@@ -167,9 +167,12 @@ class Broker:
         seek_address = int(tokens[4], 16)
         read_length = int(tokens[5], 16)
         msg = SeekMessage(data=payload)
+
         key = f"{hostname}-{disk_id}-{seek_address}-{read_length}"
+
         if key in self.index:
             return
+
         self.index[key] = msg
 
     def _on_id(self, hostname: str, payload: bytes) -> None:
