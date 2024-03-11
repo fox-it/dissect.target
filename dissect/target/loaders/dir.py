@@ -34,12 +34,12 @@ def find_entry_path(path: Path) -> str | None:
             return prefix
 
 
-def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
+def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, **kwargs) -> None:
     """Map directories as filesystems into the given target.
 
     Args:
         target: The target to map into.
-        dirs: The directories to map as filesystems.
+        dirs: The directories to map as filesystems. If a list member is a tuple, the first element is the drive letter.
         os_type: The operating system type, used to determine how the filesystem should be mounted.
     """
     alt_separator = ""
@@ -49,6 +49,12 @@ def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
         case_sensitive = False
 
     for path in dirs:
+        drive_letter = None
+        if isinstance(path, tuple):
+            drive_letter, path = path
+        elif is_drive_letter_path(path):
+            drive_letter = path.name[0]
+
         if isinstance(path, zipfile.Path):
             dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
@@ -58,8 +64,8 @@ def map_dirs(target: Target, dirs: list[Path], os_type: str, **kwargs) -> None:
         if os_type == OperatingSystem.WINDOWS:
             loaderutil.add_virtual_ntfs_filesystem(target, dfs, **kwargs)
 
-            if is_drive_letter_path(path):
-                target.fs.mount(path.name[0] + ":", dfs)
+            if drive_letter is not None:
+                target.fs.mount(drive_letter.lower() + ":", dfs)
 
 
 def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
