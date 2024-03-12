@@ -88,7 +88,7 @@ smb = [
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "carbon-black-cloud-sdk-python~=1.4.3"
+    "carbon-black-cloud-sdk~=1.4.3"
 ]
 mqtt = [
     # Grab the dependencies for dissect.target

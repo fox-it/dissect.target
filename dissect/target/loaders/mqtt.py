@@ -76,6 +76,7 @@ class MQTTConnection:
 
     def topo(self, peers: int):
         self.broker.topology(self.host)
+
         while len(self.broker.peers(self.host)) < peers:
             self.broker.topology(self.host)
             time.sleep(1)
@@ -84,11 +85,14 @@ class MQTTConnection:
     def info(self) -> list[MQTTStream]:
         disks = []
         self.broker.info(self.host)
+
         message = None
         while message is None:
             message = self.broker.disk(self.host)
+
         for idx, disk in enumerate(message.disks):
             disks.append(MQTTStream(self, idx, disk.total_size))
+
         return disks
 
     def read(self, disk_id: int, offset: int, length: int, optimization_strategy: int) -> bytes:
@@ -101,6 +105,7 @@ class MQTTConnection:
             # don't waste time with sleep if we have a response
             if message:
                 break
+
             attempts += 1
             time.sleep(0.01)
             if attempts > 100:
@@ -155,6 +160,7 @@ class Broker:
                 total_size,
             ) = unpack_from("<IQ", payload, offset=1 + (disk_index * DISK_INDEX_OFFSET))
             disks.append(DiskMessage(index=disk_index, sector_size=sector_size, total_size=total_size))
+
         self.diskinfo[hostname] = InfoMessage(disks=disks)
 
     def _on_read(self, hostname: str, tokens: list[str], payload: bytes) -> None:
@@ -162,9 +168,12 @@ class Broker:
         seek_address = int(tokens[4], 16)
         read_length = int(tokens[5], 16)
         msg = SeekMessage(data=payload)
+
         key = f"{hostname}-{disk_id}-{seek_address}-{read_length}"
+
         if key in self.index:
             return
+
         self.index[key] = msg
 
     def _on_id(self, hostname: str, payload: bytes) -> None:
@@ -189,6 +198,7 @@ class Broker:
         casename, hostname, response, *_ = tokens
         if casename != self.case:
             return
+
         if response == "DISKS":
             self._on_disk(hostname, msg.payload)
         elif response == "READ":
