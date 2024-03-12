@@ -90,6 +90,11 @@ cb = [
     "dissect.target[full]",
     "carbon-black-cloud-sdk~=1.4.3"
 ]
+mqtt = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "paho-mqtt==1.6.1",
+]
 
 [project.scripts]
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
