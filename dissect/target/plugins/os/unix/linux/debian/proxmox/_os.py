@@ -24,6 +24,15 @@ class ProxmoxPlugin(LinuxPlugin):
         return None
 
     @export(property=True)
+    def version(self) -> str:
+            """Returns Proxmox VE version with underlying os release"""
+
+            for pkg in self.target.dpkg.status():
+                if pkg.name == PROXMOX_PACKAGE_NAME:
+                    distro_name = self._os_release.get("PRETTY_NAME", "")
+                    return f"{pkg.name} {pkg.version} ({distro_name})"
+
+    @export(property=True)
     def os(self) -> str:
         return OperatingSystem.PROXMOX.value
 
