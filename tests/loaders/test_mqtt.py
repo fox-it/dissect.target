@@ -2,11 +2,18 @@ import time
 from struct import pack
 from unittest.mock import MagicMock, patch
 
-import paho.mqtt.client as mqtt
+try:
+    import paho.mqtt.client as mqtt
+
+    from dissect.target.loaders.mqtt import Broker, MQTTLoader
+
+    HAS_MQTT = True
+except ImportError:
+    mqtt = MagicMock()
+    HAS_MQTT = False
 import pytest
 
 from dissect.target import Target
-from dissect.target.loaders.mqtt import Broker, MQTTLoader
 
 
 class MQTTMock(MagicMock):
@@ -42,6 +49,7 @@ class MQTTMock(MagicMock):
         self.on_message(self, None, response)
 
 
+@pytest.mark.skipif(not HAS_MQTT, reason="requires paho-mqtt")
 @pytest.mark.parametrize(
     "alias, host, disks, disk, seek, read, expected",
     [
