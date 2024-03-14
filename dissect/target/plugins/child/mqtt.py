@@ -24,7 +24,7 @@ class MQTT(ChildTargetPlugin):
         super().__init__(target)
 
     def check_compatible(self) -> None:
-        if not self.target.mqtt or not self.target.fs.path(self.PATH).exists():
+        if not self.target.props.get("mqtt") or not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("No remote children.txt file found.")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
