@@ -3,7 +3,10 @@ from io import BytesIO
 
 from Crypto.Hash import MD4
 
-from dissect.target.plugins.os.windows.dpapi.credhist import CredHistFile
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.helpers import keychain
+from dissect.target.plugins.os.windows.credhist import CredHistFile, CredHistPlugin
 from tests._utils import absolute_path
 
 
@@ -11,7 +14,7 @@ def test_credhist() -> None:
     """The provided CREDHIST file has the following password history: ``user -> password -> password3``.
     The current password of the user is ``password4``.
     """
-    with open(absolute_path("_data/plugins/os/windows/dpapi/credhist/CREDHIST"), "rb") as fh:
+    with open(absolute_path("_data/plugins/os/windows/credhist/CREDHIST"), "rb") as fh:
         ch = CredHistFile(fh)
 
     assert len(ch.entries) == 3
@@ -22,17 +25,42 @@ def test_credhist() -> None:
 
     ch.decrypt(password_hash=hashlib.sha1("password4".encode("utf-16-le")).digest())
 
-    assert ch.entries[0].guid.upper() == "99EC7176-D16C-41BD-9C94-D3A4C5B94232"
+    assert str(ch.entries[0].guid) == "99ec7176-d16c-41bd-9c94-d3a4c5b94232"
     assert ch.entries[0].hash_sha == sha1("user")
     assert ch.entries[0].hash_nt == md4("user")
 
-    assert ch.entries[1].guid.upper() == "120A3A30-309C-4FDA-BFB8-06F44EA93CB2"
+    assert str(ch.entries[1].guid) == "120a3a30-309c-4fda-bfb8-06f44ea93cb2"
     assert ch.entries[1].hash_nt == md4("password")
     assert ch.entries[1].hash_sha == sha1("password")
 
-    assert ch.entries[2].guid.upper() == "5657891F-28DD-4F69-BABA-95E44BCD178A"
+    assert str(ch.entries[2].guid) == "5657891f-28dd-4f69-baba-95e44bcd178a"
     assert ch.entries[2].hash_nt == md4("password3")
     assert ch.entries[2].hash_sha == sha1("password3")
+
+
+def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    """Test if we can get a partially decrypted CREDHIST chain if we know an intermediate password.
+
+    The latest entry is encrypted with 'password4' but we provide 'password3'. The plugin
+    should decrypt every entry except the latest entry.
+    """
+    fs_win.map_file(
+        "Users/John/AppData/Roaming/Microsoft/Protect/CREDHIST",
+        absolute_path("_data/plugins/os/windows/credhist/CREDHIST"),
+    )
+    target_win_users.add_plugin(CredHistPlugin)
+
+    keychain.KEYCHAIN.clear()
+    keychain.register_key(
+        key_type=keychain.KeyType.PASSPHRASE,
+        value="password3",
+        identifier=None,
+        provider="user",
+    )
+
+    results = list(target_win_users.credhist())
+    assert len(results) == 3
+    assert [result.hash_nt for result in results] == [md4("user"), md4("password"), None]
 
 
 def md4(plaintext: str) -> str:
