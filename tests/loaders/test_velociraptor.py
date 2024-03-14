@@ -43,11 +43,19 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    "sub_dir",
-    ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
+    "sub_dir, other_dir",
+    [
+        ("mft", "auto"),
+        ("ntfs", "auto"),
+        ("ntfs_vss", "auto"),
+        ("lazy_ntfs", "auto"),
+        ("auto", "ntfs"),
+    ],
 )
-def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
+def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
+    root.joinpath(f"uploads/{other_dir}/C%3A").mkdir(parents=True, exist_ok=True)
+    root.joinpath(f"uploads/{other_dir}/C%3A/other.txt").write_text("my first file")
 
     assert VelociraptorLoader.detect(root) is True
 
@@ -65,13 +73,14 @@ def test_velociraptor_loader_windows_ntfs(sub_dir: str, target_bare: Target, tmp
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
 
 
 @pytest.mark.parametrize(
     "sub_dir",
     ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
-def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
+def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> None:
     create_root(sub_dir, tmp_path)
 
     shutil.make_archive(tmp_path.joinpath("test_ntfs"), "zip", tmp_path)
@@ -106,7 +115,7 @@ def test_velociraptor_loader_windows_ntfs_zip(sub_dir: str, target_bare: Target,
         (["uploads/auto/Library", "uploads/auto/Applications"]),
     ],
 )
-def test_dir_loader_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
+def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 
@@ -131,7 +140,7 @@ def test_dir_loader_unix(paths: list[str], target_bare: Target, tmp_path: Path) 
         (["uploads/auto/Library", "uploads/auto/Applications"]),
     ],
 )
-def test_dir_loader_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
+def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
     root = tmp_path
     mkdirs(root, paths)
 

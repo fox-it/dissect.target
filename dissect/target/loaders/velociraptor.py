@@ -61,6 +61,10 @@ def extract_drive_letter(name: str) -> Optional[str]:
     if len(name) == 14 and name.startswith("%5C%5C.%5C") and name.endswith("%3A"):
         return name[10].lower()
 
+    # X: in URL encoding
+    if len(name) == 4 and name.endswith("%3A"):
+        return name[0].lower()
+
 
 class VelociraptorLoader(DirLoader):
     """Load Rapid7 Velociraptor forensic image files.
