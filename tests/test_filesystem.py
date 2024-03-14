@@ -20,6 +20,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import (
     FilesystemEntry,
+    LayerFilesystem,
     MappedFile,
     NotASymlinkError,
     RootFilesystem,
@@ -797,7 +798,7 @@ def top_virt_dir() -> VirtualDirectory:
     return VirtualDirectory(Mock(), "")
 
 
-def test_virutal_directory_stat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
+def test_virtual_directory_stat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
     assert virt_dir.stat(follow_symlinks=False) == virt_dir._stat()
     assert virt_dir.stat(follow_symlinks=True) == virt_dir._stat()
 
@@ -806,7 +807,7 @@ def test_virutal_directory_stat(virt_dir: VirtualDirectory, top_virt_dir: Virtua
     assert virt_dir.stat(follow_symlinks=True) == top_virt_dir.stat(follow_symlinks=True)
 
 
-def test_virutal_directory_lstat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
+def test_virtual_directory_lstat(virt_dir: VirtualDirectory, top_virt_dir: VirtualDirectory) -> None:
     assert virt_dir.lstat() == virt_dir._stat()
     assert virt_dir.lstat() == virt_dir.stat(follow_symlinks=False)
     assert virt_dir.lstat().st_mode == stat.S_IFDIR
@@ -815,12 +816,12 @@ def test_virutal_directory_lstat(virt_dir: VirtualDirectory, top_virt_dir: Virtu
     assert virt_dir.lstat() == top_virt_dir.lstat()
 
 
-def test_virutal_directory_is_dir(virt_dir: VirtualDirectory) -> None:
+def test_virtual_directory_is_dir(virt_dir: VirtualDirectory) -> None:
     assert virt_dir.is_dir(follow_symlinks=True)
     assert virt_dir.is_dir(follow_symlinks=False)
 
 
-def test_virutal_directory_is_file(virt_dir: VirtualDirectory) -> None:
+def test_virtual_directory_is_file(virt_dir: VirtualDirectory) -> None:
     assert not virt_dir.is_file(follow_symlinks=True)
     assert not virt_dir.is_file(follow_symlinks=False)
 
@@ -830,21 +831,21 @@ def virt_file() -> VirtualFile:
     return VirtualFile(Mock(), "", Mock())
 
 
-def test_virutal_file_stat(virt_file: VirtualFile) -> None:
+def test_virtual_file_stat(virt_file: VirtualFile) -> None:
     assert virt_file.stat(follow_symlinks=False) == virt_file.lstat()
     assert virt_file.stat(follow_symlinks=True) == virt_file.lstat()
 
 
-def test_virutal_file_lstat(virt_file: VirtualFile) -> None:
+def test_virtual_file_lstat(virt_file: VirtualFile) -> None:
     assert virt_file.lstat().st_mode == stat.S_IFREG
 
 
-def test_virutal_file_is_dir(virt_file: VirtualFile) -> None:
+def test_virtual_file_is_dir(virt_file: VirtualFile) -> None:
     assert not virt_file.is_dir(follow_symlinks=True)
     assert not virt_file.is_dir(follow_symlinks=False)
 
 
-def test_virutal_file_is_file(virt_file: VirtualFile) -> None:
+def test_virtual_file_is_file(virt_file: VirtualFile) -> None:
     assert virt_file.is_file(follow_symlinks=True)
     assert virt_file.is_file(follow_symlinks=False)
 
@@ -1164,3 +1165,37 @@ def test_virtual_filesystem_map_file_from_tar() -> None:
 
     stat = mock_fs.path("/var/example/test.txt").stat()
     assert ts.from_unix(stat.st_mtime) == datetime(2021, 12, 6, 9, 51, 40, tzinfo=timezone.utc)
+
+
+def test_layer_filesystem() -> None:
+    lfs = LayerFilesystem()
+
+    vfs1 = VirtualFilesystem()
+    vfs1.map_file_fh("file1", BytesIO(b"value1"))
+
+    vfs2 = VirtualFilesystem()
+    vfs2.map_file_fh("file2", BytesIO(b"value2"))
+
+    vfs3 = VirtualFilesystem()
+    vfs3.map_file_fh("file3", BytesIO(b"value3"))
+
+    vfs4 = VirtualFilesystem()
+    vfs4.map_file_fh("file1", BytesIO(b"value4"))
+
+    lfs.add_fs_layer(vfs1)
+    assert lfs.path("file1").read_text() == "value1"
+
+    lfs.add_fs_layer(vfs2)
+    assert lfs.path("file1").read_text() == "value1"
+    assert lfs.path("file2").read_text() == "value2"
+
+    lfs.add_fs_layer(vfs3)
+    assert lfs.path("file1").read_text() == "value1"
+    assert lfs.path("file2").read_text() == "value2"
+    assert lfs.path("file3").read_text() == "value3"
+
+    lfs.add_fs_layer(vfs4)
+    assert lfs.path("file1").read_text() == "value1"
+    lfs.remove_fs_layer(vfs4)
+    lfs.prepend_fs_layer(vfs4)
+    assert lfs.path("file1").read_text() == "value4"
