@@ -85,7 +85,7 @@ class Template:
         if HAS_YAML:
             return self.parser(path.open("rb"))
         else:
-            self.target.log.error("Failed to parse %s. Cannot import PyYAML", self.name)
+            self.target.log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
             return None
 
     def _parse_wicked_config(self, path: TargetPath) -> dict:
