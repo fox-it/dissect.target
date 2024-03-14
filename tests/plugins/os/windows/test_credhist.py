@@ -1,5 +1,4 @@
 import hashlib
-from io import BytesIO
 
 from Crypto.Hash import MD4
 
