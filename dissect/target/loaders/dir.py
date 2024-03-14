@@ -4,6 +4,7 @@ import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
@@ -48,6 +49,7 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
         alt_separator = "\\"
         case_sensitive = False
 
+    drive_letter_map = {}
     for path in dirs:
         drive_letter = None
         if isinstance(path, tuple):
@@ -59,13 +61,28 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
             dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
             dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
-        target.filesystems.add(dfs)
 
+        drive_letter_map.setdefault(drive_letter, []).append(dfs)
+
+    fs_to_add = []
+    for drive_letter, dfs in drive_letter_map.items():
+        if drive_letter is not None:
+            if len(dfs) > 1:
+                vfs = LayerFilesystem()
+                for fs in dfs:
+                    vfs.add_fs_layer(fs)
+            else:
+                vfs = dfs[0]
+
+            fs_to_add.append(vfs)
+            target.fs.mount(drive_letter.lower() + ":", vfs)
+        else:
+            fs_to_add.extend(dfs)
+
+    for fs in fs_to_add:
+        target.filesystems.add(fs)
         if os_type == OperatingSystem.WINDOWS:
-            loaderutil.add_virtual_ntfs_filesystem(target, dfs, **kwargs)
-
-            if drive_letter is not None:
-                target.fs.mount(drive_letter.lower() + ":", dfs)
+            loaderutil.add_virtual_ntfs_filesystem(target, fs, **kwargs)
 
 
 def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
