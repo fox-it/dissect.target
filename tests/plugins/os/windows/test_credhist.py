@@ -60,7 +60,7 @@ def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -
 
     results = list(target_win_users.credhist())
     assert len(results) == 3
-    assert [result.hash_nt for result in results] == [md4("user"), md4("password"), None]
+    assert [result.nt for result in results] == [md4("user"), md4("password"), None]
 
 
 def md4(plaintext: str) -> str:
