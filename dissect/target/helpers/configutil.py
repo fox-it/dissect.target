@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import sys
 from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
@@ -31,8 +32,19 @@ try:
     import yaml
 
     PY_YAML = True
-except (AttributeError, ImportError):
+except ImportError:
     PY_YAML = False
+
+try:
+    if sys.version_info < (3, 11):
+        import tomli as toml
+    else:
+        # tomllib is included since python 3.11
+        import tomllib as toml
+
+    TOML = True
+except ImportError:
+    TOML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -408,6 +420,16 @@ class Yaml(ConfigurationParser):
             raise ConfigurationParsingError("Failed to parse file, please install PyYAML.")
 
 
+class Toml(ConfigurationParser):
+    """Parses a Toml file."""
+
+    def parse_file(self, fh: TextIO) -> None:
+        if TOML:
+            self.parsed_data = toml.loads(fh.read())
+        else:
+            raise ConfigurationParsingError("Failed to parse file, please install tomli.")
+
+
 class ScopeManager:
     """A (context)manager for dictionary scoping.
 
@@ -696,6 +718,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "sample": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
+    "toml": ParserConfig(Toml),
 }
 
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
