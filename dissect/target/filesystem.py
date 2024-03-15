@@ -1371,8 +1371,10 @@ class LayerFilesystem(Filesystem):
         Args:
             fs: The filesystem to append.
         """
-        self.layers.append(fs)
-        self._root_entry.entries.append(fs.get("/"))
+        # Counterintuitively, we prepend the filesystem to the list of layers
+        # We could reverse the list of layers upon iteration, but that is a hot path
+        self.layers.insert(0, fs)
+        self._root_entry.entries.insert(0, fs.get("/"))
 
     def prepend_fs_layer(self, fs: Filesystem) -> None:
         """Prepend a filesystem as a layer.
@@ -1380,8 +1382,10 @@ class LayerFilesystem(Filesystem):
         Args:
             fs: The filesystem to prepend.
         """
-        self.layers.insert(0, fs)
-        self._root_entry.entries.insert(0, fs.get("/"))
+        # Counterintuitively, we append the filesystem to the list of layers
+        # We could reverse the list of layers upon iteration, but that is a hot path
+        self.layers.append(fs)
+        self._root_entry.entries.append(fs.get("/"))
 
     def remove_fs_layer(self, fs: Filesystem) -> None:
         """Remove a filesystem layer.
