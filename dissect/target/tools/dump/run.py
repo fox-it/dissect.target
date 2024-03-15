@@ -28,7 +28,10 @@ from dissect.target.tools.dump.utils import (
     get_nested_attr,
 )
 from dissect.target.tools.utils import (
+    PluginFunction,
     configure_generic_arguments,
+    execute_function_on_target,
+    find_and_filter_plugins,
     process_generic_arguments,
 )
 
@@ -62,7 +65,7 @@ def execute_function(target: Target, function: str) -> Generator[TargetRecordDes
     local_log.debug("Function execution")
 
     try:
-        target_attr = get_nested_attr(target, function)
+        output_type, target_attr, _ = execute_function_on_target(target, function)
     except UnsupportedPluginError:
         local_log.error("Function is not supported for target", exc_info=True)
         return
@@ -70,14 +73,7 @@ def execute_function(target: Target, function: str) -> Generator[TargetRecordDes
         local_log.error("Plugin error while executing function for target", exc_info=True)
         return
 
-    # skip non-record outputs
-    try:
-        output = getattr(target_attr, "__output__", "default") if hasattr(target_attr, "__output__") else None
-    except PluginError as e:
-        local_log.error("Plugin error while fetching an attribute", exc_info=e)
-        return
-
-    if output != "record":
+    if output_type != "record":
         local_log.warn("Output format is not supported", output=output)
         return
 
@@ -107,17 +103,17 @@ def produce_target_func_pairs(
         pairs_to_skip.update((str(sink.target_path), sink.func) for sink in state.finished_sinks)
 
     for target in targets:
-        for func in functions:
-            if state and (target.path, func) in pairs_to_skip:
+        for func_def in find_and_filter_plugins(target, functions):
+            if state and (target.path, func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
                     target=target.path,
-                    func=func,
+                    func=func_def.name,
                     state=state.path,
                 )
                 continue
-            yield (target, func)
-            state.mark_as_finished(target, func)
+            yield (target, func_def)
+            state.mark_as_finished(target, func_def.name)
 
 
 def execute_functions(target_func_stream: Iterable[Tuple[Target, str]]) -> Generator[RecordStreamElement, None, None]:
