@@ -7,7 +7,7 @@ import sys
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Generator, Iterable, List, Optional, Tuple
+from typing import Any, Iterable, Iterator, Optional
 
 import structlog
 from flow.record import Record
@@ -15,6 +15,7 @@ from flow.record import Record
 from dissect.target import Target
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import find_plugin_functions
 from dissect.target.tools.dump.state import (
     DumpState,
     create_state,
@@ -47,13 +48,13 @@ class RecordStreamElement:
     sink_path: Optional[Path] = None
 
 
-def get_targets(targets: List[str]) -> Generator[Target, None, None]:
+def get_targets(targets: list[str]) -> Iterator[Target]:
     """Return a generator with `Target` objects for provided paths"""
     for target in Target.open_all(targets):
         yield target
 
 
-def execute_function(target: Target, function: str) -> Generator[TargetRecordDescriptor, None, None]:
+def execute_function(target: Target, function: PluginFunction) -> TargetRecordDescriptor:
     """
     Execute function `function` on provided target `target` and return a generator
     with the records produced.
@@ -90,9 +91,9 @@ def execute_function(target: Target, function: str) -> Generator[TargetRecordDes
 
 def produce_target_func_pairs(
     targets: Iterable[Target],
-    functions: List[str],
+    functions: str,
     state: DumpState,
-) -> Generator[Tuple[Target, str], None, None]:
+) -> Iterator[tuple[Target, PluginFunction]]:
     """
     Return a generator with target and function pairs for execution.
 
@@ -116,7 +117,7 @@ def produce_target_func_pairs(
             state.mark_as_finished(target, func_def.name)
 
 
-def execute_functions(target_func_stream: Iterable[Tuple[Target, str]]) -> Generator[RecordStreamElement, None, None]:
+def execute_functions(target_func_stream: Iterable[tuple[Target, str]]) -> Iterable[RecordStreamElement]:
     """
     Execute a function on a target for target / function pairs in the stream.
 
@@ -127,7 +128,7 @@ def execute_functions(target_func_stream: Iterable[Tuple[Target, str]]) -> Gener
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
-def log_progress(stream: Iterable[Any], step_size: int = 1000) -> Generator[Any, None, None]:
+def log_progress(stream: Iterable[Any], step_size: int = 1000) -> Iterable[Any]:
     """
     Log a number of items that went though the generator stream
     after every N element (N is configured in `step_size`).
@@ -151,7 +152,7 @@ def log_progress(stream: Iterable[Any], step_size: int = 1000) -> Generator[Any,
 def sink_records(
     record_stream: Iterable[RecordStreamElement],
     state: DumpState,
-) -> Generator[RecordStreamElement, None, None]:
+) -> Iterator[RecordStreamElement]:
     """
     Persist records from the stream into appropriate sinks, per serialization, compression and record type.
     """
@@ -164,7 +165,7 @@ def sink_records(
 def persist_processing_state(
     record_stream: Iterable[RecordStreamElement],
     state: DumpState,
-) -> Generator[RecordStreamElement, None, None]:
+) -> Iterator[RecordStreamElement]:
     """
     Keep track of the pipeline state in a persistent state object.
     """
@@ -175,8 +176,8 @@ def persist_processing_state(
 
 
 def execute_pipeline(
-    targets: List[str],
-    functions: List[str],
+    targets: list[str],
+    functions: str,
     output_dir: Path,
     serialization: Serialization,
     compression: Optional[Compression] = None,
@@ -293,7 +294,7 @@ def main():
     try:
         execute_pipeline(
             targets=args.targets,
-            functions=args.function.split(","),
+            functions=args.function,
             output_dir=args.output,
             serialization=Serialization(args.serialization),
             compression=Compression(args.compression),
