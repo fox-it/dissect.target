@@ -1195,7 +1195,7 @@ def test_layer_filesystem() -> None:
     assert lfs.path("file3").read_text() == "value3"
 
     lfs.add_fs_layer(vfs4)
-    assert lfs.path("file1").read_text() == "value1"
+    assert lfs.path("file1").read_text() == "value4"
     lfs.remove_fs_layer(vfs4)
     lfs.prepend_fs_layer(vfs4)
-    assert lfs.path("file1").read_text() == "value4"
+    assert lfs.path("file1").read_text() == "value1"
