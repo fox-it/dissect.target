@@ -225,9 +225,10 @@ class ChromiumMixin:
 
             if self.target.os == OperatingSystem.WINDOWS.value:
                 try:
-                    local_state_path = db_file.parent.parent / "Local State"
+                    local_state_parent = db_file.parent.parent
                     if db_file.parent.name == "Network":
-                        local_state_path = db_file.parent.parent.parent / "Local State"
+                        local_state_parent = local_state_parent.parent
+                    local_state_path = local_state_parent.joinpath("Local State")
 
                     decrypted_key = self._get_local_state_key(local_state_path)
                 except ValueError:
@@ -252,7 +253,7 @@ class ChromiumMixin:
                             pass
 
                     if not cookie_value:
-                        self.target.log.warning(f"Failed to decrypt cookie value for {cookie.host_key} {cookie.name}")
+                        self.target.log.warning("Failed to decrypt cookie value for %s %s", cookie.host_key, cookie.name)
 
                     yield self.BrowserCookieRecord(
                         ts_created=webkittimestamp(cookie.creation_utc),
@@ -461,7 +462,6 @@ class ChromiumMixin:
         """
 
         for user, db_file, db in self._iter_db("Login Data"):
-            rows = db.table("logins").rows()
             decrypted_key = None
 
             if self.target.os == OperatingSystem.WINDOWS.value:
@@ -471,7 +471,7 @@ class ChromiumMixin:
                 except ValueError:
                     self.target.log.warning("Failed to decrypt local state key")
 
-            for row in rows:
+            for row in db.table("logins").rows():
                 encrypted_password: bytes = row.password_value
                 decrypted_password = None
 
@@ -480,7 +480,7 @@ class ChromiumMixin:
                 #    stored by Chromium to encrypt and decrypt passwords.
                 if self.target.os == OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v10"):
                     if not decrypted_key:
-                        self.target.log.warning("Cannot decrypt password, no decrypted_key could be calculated.")
+                        self.target.log.warning("Cannot decrypt password, no decrypted_key could be calculated")
 
                     else:
                         try:
@@ -514,7 +514,7 @@ class ChromiumMixin:
                 # 4. Linux 'gnome' or 'kwallet' encrypted password.
                 elif self.target.os != OperatingSystem.WINDOWS.value and encrypted_password.startswith(b"v11"):
                     self.target.log.warning(
-                        "Unable to decrypt %s password in '%s': unsupported format.", browser_name, db_file
+                        "Unable to decrypt %s password in '%s': unsupported format", browser_name, db_file
                     )
 
                 # 5. Unsupported.
@@ -591,7 +591,7 @@ def remove_padding(decrypted: bytes) -> bytes:
 
 def decrypt_v10(encrypted_password: bytes) -> str:
     if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency for AES operation.")
+        raise ValueError("Missing pycryptodome dependency for AES operation")
 
     encrypted_password = encrypted_password[3:]
 
@@ -616,7 +616,7 @@ def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
     """
 
     if not HAS_CRYPTO:
-        raise ValueError("Missing pycryptodome dependency for AES operation.")
+        raise ValueError("Missing pycryptodome dependency for AES operation")
 
     iv = encrypted_password[3:15]
     ciphertext = encrypted_password[15:]
