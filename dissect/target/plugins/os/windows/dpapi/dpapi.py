@@ -25,7 +25,7 @@ class DPAPIPlugin(InternalPlugin):
 
     def check_compatible(self) -> None:
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
-            raise UnsupportedPluginError("Registry key not found: %s", self.SYSTEM_KEY)
+            raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
 
     @lru_cache(maxsize=4096)
     def keychain(self) -> set:

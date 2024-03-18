@@ -110,7 +110,8 @@ class FirefoxPlugin(BrowserPlugin):
             except FileNotFoundError:
                 self.target.log.warning("Could not find %s file: %s", filename, db_file)
             except SQLError as e:
-                self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
+                self.target.log.warning("Could not open %s file: %s", filename, db_file)
+                self.target.log.debug("", exc_info=e)
 
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
@@ -364,10 +365,10 @@ class FirefoxPlugin(BrowserPlugin):
                     )
 
             except FileNotFoundError:
-                self.target.log.info("No password file found for user %s in directory %s.", user, profile_dir)
+                self.target.log.info("No password file found for user %s in directory %s", user, profile_dir)
             except json.JSONDecodeError:
                 self.target.log.warning(
-                    "logins.json file in directory %s is malformed, consider inspecting the file manually.", profile_dir
+                    "logins.json file in directory %s is malformed, consider inspecting the file manually", profile_dir
                 )
 
 
@@ -585,12 +586,13 @@ def decrypt(
     """Decrypt a stored username and password using provided credentials and key4 file.
 
     Args:
-        username: encoded and encrypted password
-        password encoded and encrypted password
-        key4_file: path to key4.db file
-        primary_password: password to use for decryption routine
+        username: encoded and encrypted password.
+        password encoded and encrypted password.
+        key4_file: path to key4.db file.
+        primary_password: password to use for decryption routine.
 
-    Returns: A tuple of decoded username and password strings.
+    Returns: 
+        A tuple of decoded username and password strings.
 
     Resources:
         - https://github.com/lclevy/firepwd

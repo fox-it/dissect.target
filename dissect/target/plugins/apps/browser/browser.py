@@ -107,7 +107,8 @@ class BrowserPlugin(NamespacePlugin):
 
         Always adds an empty passphrase as some browsers encrypt values using empty passphrases.
 
-        Returns: Set of passphrase strings.
+        Returns: 
+            Set of passphrase strings.
         """
         passphrases = set()
         for provider in [self.__namespace__, "browser", "user", None]:
