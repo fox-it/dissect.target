@@ -37,6 +37,7 @@ from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_bound_method,
@@ -1223,10 +1224,17 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
+    parser.add_argument(
+        "-L",
+        "--loader",
+        action="store",
+        default=None,
+        help="select a specific loader (i.e. vmx, raw)",
+    )
 
     configure_generic_arguments(parser)
-    args = parser.parse_args()
-
+    args, rest = parser.parse_known_args()
+    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
     process_generic_arguments(args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL

@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 from typing import Union
 
@@ -6,6 +7,7 @@ import pytest
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.apps.vpn.openvpn import (
     OpenVPNClient,
+    OpenVPNParser,
     OpenVPNPlugin,
     OpenVPNServer,
 )
@@ -17,7 +19,9 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
     client_config = absolute_path("_data/plugins/apps/vpn/openvpn/client.conf")
     server_config = absolute_path("_data/plugins/apps/vpn/openvpn/server.conf")
     filesystem.map_file(str(target_dir.joinpath("server.conf")), server_config)
+    filesystem.map_file(str(target_dir.joinpath("server.ovpn")), server_config)
     filesystem.map_file(str(target_dir.joinpath("client.conf")), client_config)
+    filesystem.map_file(str(target_dir.joinpath("client.ovpn")), client_config)
 
 
 @pytest.mark.parametrize(
@@ -26,12 +30,12 @@ def map_openvpn_configs(filesystem: Filesystem, target_dir: Path):
         (
             "target_win_users",
             "fs_win",
-            "Program Files/OpenVPN/config",
+            "Program Files/OpenVPN/config/helper",
         ),
         (
             "target_win_users",
             "fs_win",
-            "Users/John/OpenVPN/config",
+            "Users/John/OpenVPN/config/helper",
         ),
         (
             "target_unix_users",
@@ -50,7 +54,7 @@ def test_openvpn_plugin(target: str, fs: str, map_path: str, request: pytest.Fix
 
 
 def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
-    assert len(records) == 2
+    assert len(records) == 4
 
     for record in records:
         if record.name == "server":
@@ -69,9 +73,10 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.duplicate_cn.value is False
             assert record.proto == "udp"
             assert record.dev == "tun"
-            assert record.ca == "ca.crt"
-            assert record.cert == "server.crt"
-            assert record.key == "server.key"
+            assert "BEGIN CERTIFICATE" in record.ca
+            assert "BEGIN CERTIFICATE" in record.cert
+            assert record.key is None
+            assert record.redacted_key
             assert record.tls_auth == "/etc/a ta.key"
             assert record.status == "/var/log/openvpn/openvpn-status.log"
             assert record.log is None
@@ -89,6 +94,29 @@ def _verify_records(records: list[Union[OpenVPNClient, OpenVPNServer]]):
             assert record.ca == "ca.crt"
             assert record.cert == "client.crt"
             assert record.key == "client.key"
+            assert not record.redacted_key
             assert record.tls_auth == "ta.key"
             assert record.status is None
             assert record.log is None
+
+
+@pytest.mark.parametrize(
+    "data_string, expected_data",
+    [
+        (
+            "<connection>\nroute data\n</connection>\n",
+            {"connection": {"list_item0": {"route": "data"}}},
+        ),
+        (
+            "<ca>\n----- BEGIN PRIVATE DATA -----\n</ca>",
+            {
+                "ca": "----- BEGIN PRIVATE DATA -----\n",
+            },
+        ),
+    ],
+)
+def test_openvpn_config(data_string: str, expected_data: Union[dict, list]) -> None:
+    parser = OpenVPNParser()
+    parser.parse_file(io.StringIO(data_string))
+
+    assert parser.parsed_data == expected_data

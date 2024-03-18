@@ -8,15 +8,15 @@ try:
 
     from dissect.target.plugins.os.windows.sam import SamPlugin
 
-    HAVE_CRYPTO = True
+    HAS_CRYPTO = True
 except ImportError:
-    HAVE_CRYPTO = False
+    HAS_CRYPTO = False
 
 SAM_KEY_PATH = "SAM\\SAM\\Domains\\Account"
 SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
 
 
-@pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
+@pytest.mark.skipif(not HAS_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev1(target_win_users, hive_hklm):
     sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
@@ -143,7 +143,7 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
     assert results[2].nt == MD4.new("L0ngLiv3LM!".encode("utf-16-le")).digest().hex()
 
 
-@pytest.mark.skipif(not HAVE_CRYPTO, reason="requires pycryptodome")
+@pytest.mark.skipif(not HAS_CRYPTO, reason="requires pycryptodome")
 def test_sam_plugin_rev2(target_win_users, hive_hklm):
     sam_key = VirtualKey(hive_hklm, SAM_KEY_PATH)
     sam_key.add_value(
