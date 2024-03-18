@@ -4,7 +4,12 @@ import hashlib
 import hmac
 from typing import Optional, Union
 
-from Crypto.Cipher import AES, ARC4
+try:
+    from Crypto.Cipher import AES, ARC4
+
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
 
 CIPHER_ALGORITHMS: dict[Union[int, str], CipherAlgorithm] = {}
 HASH_ALGORITHMS: dict[Union[int, str], HashAlgorithm] = {}
@@ -62,6 +67,9 @@ class _AES(CipherAlgorithm):
     block_length = 128 // 8
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        if not HAS_CRYPTO:
+            raise RuntimeError("Missing pycryptodome dependency")
+
         cipher = AES.new(
             key[: self.key_length], mode=AES.MODE_CBC, IV=iv[: self.iv_length] if iv else b"\x00" * self.iv_length
         )
@@ -93,6 +101,9 @@ class _RC4(CipherAlgorithm):
     block_length = 1 // 8
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        if not HAS_CRYPTO:
+            raise RuntimeError("Missing pycryptodome dependency")
+
         cipher = ARC4.new(key[: self.key_length])
         return cipher.decrypt(data)
 

@@ -23,9 +23,9 @@ from dissect.target.target import Target
 try:
     from Crypto.Cipher import AES, ChaCha20
 
-    HAS_PYCRYPTODOME = True
+    HAS_CRYPTO = True
 except ImportError:
-    HAS_PYCRYPTODOME = False
+    HAS_CRYPTO = False
 
 FortiOSUserRecord = TargetRecordDescriptor(
     "fortios/user",
@@ -442,7 +442,7 @@ def decrypt_password(input: str) -> str:
         - https://www.fortiguard.com/psirt/FG-IR-19-007
     """
 
-    if not HAS_PYCRYPTODOME:
+    if not HAS_CRYPTO:
         raise RuntimeError("PyCryptodome module not available")
 
     if input[:3] in ["SH2", "AK1"]:
@@ -511,7 +511,7 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
         RuntimeError: When PyCryptodome is not available.
     """
 
-    if not HAS_PYCRYPTODOME:
+    if not HAS_CRYPTO:
         raise RuntimeError("PyCryptodome module not available")
 
     # First 8 bytes = counter, last 8 bytes = nonce
