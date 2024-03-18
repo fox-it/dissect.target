@@ -35,6 +35,9 @@ class Sink:
     record_count: int = 0
     size_bytes: int = 0
 
+    def __post_init__(self):
+        self.func = getattr(self.func, "name", self.func)
+
 
 @dataclass
 class DumpState:

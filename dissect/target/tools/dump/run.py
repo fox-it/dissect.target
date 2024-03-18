@@ -15,7 +15,6 @@ from flow.record import Record
 from dissect.target import Target
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import find_plugin_functions
 from dissect.target.tools.dump.state import (
     DumpState,
     create_state,
@@ -26,7 +25,6 @@ from dissect.target.tools.dump.utils import (
     Compression,
     Serialization,
     cached_sink_writers,
-    get_nested_attr,
 )
 from dissect.target.tools.utils import (
     PluginFunction,
@@ -75,7 +73,7 @@ def execute_function(target: Target, function: PluginFunction) -> TargetRecordDe
         return
 
     if output_type != "record":
-        local_log.warn("Output format is not supported", output=output)
+        local_log.warn("Output format is not supported", output=output_type)
         return
 
     # no support for function-specific arguments
