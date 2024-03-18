@@ -3,7 +3,13 @@ import re
 from functools import cached_property, lru_cache
 from pathlib import Path
 
-from Crypto.Cipher import AES
+try:
+    from Crypto.Cipher import AES
+
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import keychain
@@ -29,6 +35,9 @@ class DPAPIPlugin(InternalPlugin):
     SYSTEM_USERNAME = "System"
 
     def check_compatible(self) -> None:
+        if not HAS_CRYPTO:
+            raise UnsupportedPluginError("Missing pycryptodome dependency")
+
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
             raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
 
