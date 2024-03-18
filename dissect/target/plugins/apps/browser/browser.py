@@ -4,6 +4,7 @@ from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import NamespacePlugin
+from dissect.target.target import Target
 
 GENERIC_DOWNLOAD_RECORD_FIELDS = [
     ("datetime", "ts_start"),
@@ -101,13 +102,16 @@ BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtensio
 class BrowserPlugin(NamespacePlugin):
     __namespace__ = "browser"
 
-    @lru_cache(maxsize=4096)
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.keychain = lru_cache(4096)(self.keychain)
+
     def keychain(self) -> set:
         """Retrieve a set of passphrases to use for decrypting saved browser credentials.
 
         Always adds an empty passphrase as some browsers encrypt values using empty passphrases.
 
-        Returns: 
+        Returns:
             Set of passphrase strings.
         """
         passphrases = set()
