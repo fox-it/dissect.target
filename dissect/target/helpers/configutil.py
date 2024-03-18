@@ -40,7 +40,7 @@ try:
         import tomli as toml
     else:
         # tomllib is included since python 3.11
-        import tomllib as toml
+        import tomllib as toml  # novermin
 
     HAS_TOML = True
 except ImportError:
