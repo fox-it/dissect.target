@@ -10,10 +10,15 @@ from dissect.target.helpers import keychain
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
+from dissect.target.target import Target
 
 
 class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.keychain = lru_cache(4096)(self.keychain)
 
     # This matches master key file names
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
@@ -27,7 +32,6 @@ class DPAPIPlugin(InternalPlugin):
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
             raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
 
-    @lru_cache(maxsize=4096)
     def keychain(self) -> set:
         passwords = set()
 
@@ -117,22 +121,19 @@ class DPAPIPlugin(InternalPlugin):
                     if not mkf.decrypted:
                         raise Exception("Failed to decrypt System master key")
 
-                passwords = self.keychain()
-                if passwords is not None:
-                    user = self._users.get(username)
-                    if user:
-                        for mk_pass in passwords:
-                            if mkf.decrypt_with_password(user["sid"], mk_pass):
-                                break
-                            else:
-                                try:
-                                    if mkf.decrypt_with_hash(user["sid"], bytes.fromhex(mk_pass)) is True:
-                                        break
-                                except ValueError:
-                                    pass
+                if user := self._users.get(username):
+                    for mk_pass in self.keychain():
+                        if mkf.decrypt_with_password(user["sid"], mk_pass):
+                            break
 
-                        if not mkf.decrypted:
-                            self.target.log.warning("Could not decrypt DPAPI master key for username '%s'", username)
+                        try:
+                            if mkf.decrypt_with_hash(user["sid"], bytes.fromhex(mk_pass)) is True:
+                                break
+                        except ValueError:
+                            pass
+
+                    if not mkf.decrypted:
+                        self.target.log.warning("Could not decrypt DPAPI master key for username '%s'", username)
 
                 result[file.name] = mkf
 

@@ -27,6 +27,14 @@ from dissect.target.plugins.apps.browser.browser import (
 
 try:
     from asn1crypto import algos, core
+
+    HAS_ASN1 = True
+
+except ImportError:
+    HAS_ASN1 = False
+
+
+try:
     from Crypto.Cipher import AES, DES3
     from Crypto.Util.Padding import unpad
 
@@ -304,6 +312,9 @@ class FirefoxPlugin(BrowserPlugin):
         Automatically decrypts passwords from Firefox 58 onwards (2018) if no primary password is set.
         Alternatively, you can supply a primary password through the keychain to access the Firefox password store.
 
+        ``PASSPHRASE`` passwords in the keychain with providers ``browser``, ``firefox``, ``user`` and no provider
+        can be used to decrypt secrets for this plugin.
+
         Resources:
             - https://github.com/lclevy/firepwd
         """
@@ -379,7 +390,7 @@ CKA_ID = b"\xf8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
 
 def decrypt_moz_3des(global_salt: bytes, primary_password: bytes, entry_salt: str, encrypted: bytes) -> bytes:
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
 
     hp = sha1(global_salt + primary_password).digest()
     pes = entry_salt + b"\x00" * (20 - len(entry_salt))
@@ -405,7 +416,10 @@ def decode_login_data(data: str) -> tuple[bytes, bytes, bytes]:
     }
     """
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto dependency")
 
     decoded = core.load(b64decode(data))
     key_id = decoded[0].native
@@ -442,7 +456,10 @@ def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> b
     """
 
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto dependency")
 
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
@@ -504,7 +521,10 @@ def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, glo
     }
     """
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto depdendency")
 
     object_identifier = decoded_item[0][0]
     algorithm = object_identifier.dotted
@@ -535,33 +555,38 @@ def query_master_key(key4_file: TargetPath) -> tuple[str, str]:
 
 def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple[bytes, str]:
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto dependency")
 
     global_salt, password_check = query_global_salt(key4_file)
     decoded_password_check = core.load(password_check)
-    decrypted_password_check, algorithm = decrypt_master_key(decoded_password_check, primary_password, global_salt)
+
+    try:
+        decrypted_password_check, algorithm = decrypt_master_key(decoded_password_check, primary_password, global_salt)
+    except EOFError:
+        raise ValueError("No primary password provided")
 
     if not decrypted_password_check:
-        log.warning("Encountered unknown algorithm %s while decrypting master key.", algorithm)
-        return b"", ""
+        raise ValueError("Encountered unknown algorithm %s while decrypting master key." % algorithm)
 
     expected_password_check = b"password-check\x02\x02"
     if decrypted_password_check != b"password-check\x02\x02":
-        log.warning(
+        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
+        raise ValueError(
             "Master key decryption failed. Either the master key is protected by a "
             "primary password which you did not supply, or the primary password you provided was incorrect."
         )
-        log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
-        return b"", ""
 
     master_key, master_key_cka = query_master_key(key4_file)
     if master_key == b"":
-        log.warning("Password master key is not defined.")
-        return b"", ""
+        raise ValueError("Password master key is not defined.")
 
     if master_key_cka != CKA_ID:
-        log.warning("Password master key cka '%s' is not equal to expected value '%s'.", master_key_cka, CKA_ID)
-        return b"", ""
+        raise ValueError(
+            "Password master key CKA_ID '%s' is not equal to expected value '%s'." % (master_key_cka, CKA_ID)
+        )
 
     decoded_master_key = core.load(master_key)
     decrypted, algorithm = decrypt_master_key(decoded_master_key, primary_password, global_salt)
@@ -570,7 +595,7 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
 
 def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
 
     cka, iv, ciphertext = field
 
@@ -591,14 +616,17 @@ def decrypt(
         key4_file: path to key4.db file.
         primary_password: password to use for decryption routine.
 
-    Returns: 
+    Returns:
         A tuple of decoded username and password strings.
 
     Resources:
         - https://github.com/lclevy/firepwd
     """
     if not HAS_CRYPTO:
-        raise ValueError("Missing cryptography dependency")
+        raise ValueError("Missing pycryptodome dependency")
+
+    if not HAS_ASN1:
+        raise ValueError("Missing asn1crypto dependency")
 
     try:
         username = decode_login_data(username)
@@ -607,14 +635,12 @@ def decrypt(
         primary_password_bytes = primary_password.encode()
         key, algorithm = retrieve_master_key(primary_password_bytes, key4_file)
 
-        if not key or not algorithm:
-            return None, None
-
         if algorithm == pbeWithSha1AndTripleDES_CBC or algos.EncryptionAlgorithmId.map(algorithm) == "pbes2":
             username = decrypt_field(key, username)
             password = decrypt_field(key, password)
             return username.decode(), password.decode()
+
     except ValueError as e:
-        log.error("Failed to decrypt password using keyfile %s and password '%s'", key4_file, primary_password)
-        log.debug("", exc_info=e)
-    return None, None
+        raise ValueError(
+            "Failed to decrypt password using keyfile %s and password '%s'" % (key4_file, primary_password)
+        ) from e

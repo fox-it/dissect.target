@@ -202,18 +202,10 @@ def test_decrypt_is_succesful(path_key4, logins, decrypted):
     assert dec_password == decrypted.get("password")
 
 
-@patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", return_value=(b"", ""))
+@patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", side_effect=ValueError(""))
 def test_decrypt_bad_master_key(mock_target, path_key4, logins):
-    dec_username, dec_password = decrypt(logins.get("username"), logins.get("password"), path_key4)
-    assert dec_username is None
-    assert dec_password is None
-
-
-@patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", return_value=(b"", "not.existing.algorithm"))
-def test_decrypt_unsupported_algoritm(mock_target, path_key4, logins):
-    dec_username, dec_password = decrypt(logins.get("username"), logins.get("password"), path_key4)
-    assert dec_username is None
-    assert dec_password is None
+    with pytest.raises(ValueError):
+        decrypt(logins.get("username"), logins.get("password"), path_key4)
 
 
 def test_decrypt_with_primary_password_is_succesful(
@@ -233,14 +225,14 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
     path_key4_primary_password,
     logins_with_primary_password,
 ):
-    dec_username, dec_password = decrypt(
-        logins_with_primary_password.get("username"),
-        logins_with_primary_password.get("password"),
-        path_key4_primary_password,
-        "BAD_PRIMARY_PASSWORD",
-    )
-    assert dec_username is None
-    assert dec_password is None
+    with pytest.raises(ValueError) as e:
+        decrypt(
+            logins_with_primary_password.get("username"),
+            logins_with_primary_password.get("password"),
+            path_key4_primary_password,
+            "BAD_PRIMARY_PASSWORD",
+        )
+        assert e.msg == "Failed to decrypt password using keyfile /key4.db and password 'BAD_PRIMARY_PASSWORD'"
 
 
 def test_retrieve_master_key_is_succesful(path_key4):
@@ -250,25 +242,11 @@ def test_retrieve_master_key_is_succesful(path_key4):
     assert key.hex() == "452c2f920285f794614af1c2d99ed331940d73298a526140"
 
 
-@patch("dissect.target.plugins.apps.browser.firefox.decrypt_master_key", return_value=(b"", ""))
-def test_retrieve_master_key_bad_password_check(mock_target, path_key4):
-    key, algorithm = retrieve_master_key(b"", path_key4)
-    assert key.hex() == ""
-    assert algorithm == ""
-
-
-@patch("dissect.target.plugins.apps.browser.firefox.query_master_key", return_value=(b"", ""))
-def test_retrieve_master_key_no_master_key(mock_target, path_key4):
-    key, algorithm = retrieve_master_key(b"", path_key4)
-    assert key.hex() == ""
-    assert algorithm == ""
-
-
 @patch("dissect.target.plugins.apps.browser.firefox.query_master_key", return_value=(b"aaaa", "BAD_CKA_VALUE"))
 def test_retrieve_master_key_bad_cka_value(mock_target, path_key4):
-    key, algorithm = retrieve_master_key(b"", path_key4)
-    assert key.hex() == ""
-    assert algorithm == ""
+    with pytest.raises(ValueError) as e:
+        retrieve_master_key(b"", path_key4)
+        assert "Password master key CKA_ID 'BAD_CKA_VALUE' is not equal to expected value" in e.msg
 
 
 def test_query_master_key(path_key4):

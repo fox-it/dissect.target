@@ -253,7 +253,9 @@ class ChromiumMixin:
                             pass
 
                     if not cookie_value:
-                        self.target.log.warning("Failed to decrypt cookie value for %s %s", cookie.host_key, cookie.name)
+                        self.target.log.warning(
+                            "Failed to decrypt cookie value for %s %s", cookie.host_key, cookie.name
+                        )
 
                     yield self.BrowserCookieRecord(
                         ts_created=webkittimestamp(cookie.creation_utc),
