@@ -42,9 +42,9 @@ try:
         # tomllib is included since python 3.11
         import tomllib as toml
 
-    TOML = True
+    HAS_TOML = True
 except ImportError:
-    TOML = False
+    HAS_TOML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -424,7 +424,7 @@ class Toml(ConfigurationParser):
     """Parses a Toml file."""
 
     def parse_file(self, fh: TextIO) -> None:
-        if TOML:
+        if HAS_TOML:
             self.parsed_data = toml.loads(fh.read())
         else:
             raise ConfigurationParsingError("Failed to parse file, please install tomli.")
