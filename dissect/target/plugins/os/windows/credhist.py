@@ -68,15 +68,15 @@ class CredHistEntry:
     raw: c_credhist.entry = field(repr=False)
 
     def decrypt(self, password_hash: bytes) -> None:
-        """Decrypt this CREDHIST entry using the provided password hash. Modifies hash_sha and hash_nt values.
+        """Decrypt this CREDHIST entry using the provided password hash. Modifies ``hash_sha`` and ``hash_nt`` values.
 
-        If the decrypted nt_hash is 32 characters long we assume the decryption was successful.
-        Raises a ValueError if the decryption seems to have failed.
+        If the decrypted ``nt_hash`` is 32 characters long we assume the decryption was successful.
 
         Args:
             password_hash: bytes of SHA1 password hash digest
 
-        Returns: None
+        Raises:
+            ValueError: If the decryption seems to have failed.
         """
         data = self.cipher_alg.decrypt_with_hmac(
             data=self.raw.encrypted,
@@ -159,9 +159,9 @@ class CredHistPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.files: tuple[UserDetails, Path] = list(self._find_files())
+        self.files = list(self._find_files())
 
-    def _find_files(self) -> Iterator[Path]:
+    def _find_files(self) -> Iterator[tuple[UserDetails, Path]]:
         hashes = set()
         for user_details in self.target.user_details.all_with_home():
             for path in ["AppData/Roaming/Microsoft/Protect/CREDHIST", "Application Data/Microsoft/Protect/CREDHIST"]:
@@ -175,12 +175,12 @@ class CredHistPlugin(Plugin):
             raise UnsupportedPluginError("No CREDHIST files found on target.")
 
     @export(record=CredHistRecord)
-    def credhist(self) -> Iterator[CredHistFile]:
+    def credhist(self) -> Iterator[CredHistRecord]:
         """Yield and decrypt all Windows CREDHIST entries on the target."""
         passwords = keychain_passwords()
 
         if not passwords:
-            self.target.log.warning("No passwords provided in keychain, cannot decrypt CREDHIST hashes.")
+            self.target.log.warning("No passwords provided in keychain, cannot decrypt CREDHIST hashes")
 
         for user, path in self.files:
             credhist = CredHistFile(path.open("rb"))
