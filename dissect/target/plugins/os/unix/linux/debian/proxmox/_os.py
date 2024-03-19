@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import pathlib
 import logging
 from io import BytesIO
 from typing import Optional
@@ -20,6 +21,16 @@ FILETREE_TABLE_NAME="tree"
 PMXCFS_DATABASE_PATH="/var/lib/pve-cluster/config.db"
 
 
+VirtualMachineRecord = TargetRecordDescriptor(
+    "proxmox/vm",
+    [
+        ("string", "id"),
+        ("string", "name"),
+        ("path", "disk"),
+    ],
+)
+
+
 class ProxmoxPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
@@ -35,6 +46,7 @@ class ProxmoxPlugin(LinuxPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> ProxmoxPlugin:
         obj = super().create(target, sysvol)
         # [PERSONAL TO REMOVE] Modifies target / executescode before initializing the class
+        obj = super().create(target, sysvol)
         pmxcfs = _create_pmxcfs(sysvol.path(PMXCFS_DATABASE_PATH).open("rb"))
         target.fs.mount("/etc/pve", pmxcfs)
 
@@ -50,6 +62,25 @@ class ProxmoxPlugin(LinuxPlugin):
                 if pkg.name == PROXMOX_PACKAGE_NAME:
                     distro_name = self._os_release.get("PRETTY_NAME", "")
                     return f"{pkg.name} {pkg.version} ({distro_name})"
+
+    @export(property=VirtualMachineRecord)
+    def vms(self) -> Iterator[VirtualMachineRecord]:
+        configs = self.target.fs.path("/etc/pve/qemu-server")
+        for config in configs.iterdir():
+
+            parsed_config = _parse_vm_configuration(config)
+            for option in parsed_config:
+                
+                if _is_disk(option.decode()):
+                    id_num = pathlib.Path(config).stem
+                    # TypeError: expected str, bytes or os.PathLike object, not Match
+                    yield VirtualMachineRecord(
+                        id=id_num,
+                        name=parsed_config[b'name'],
+                        disk=_get_disk_name(parsed_config[option].decode())
+                    )
+
+        return None
 
     @export(property=True)
     def os(self) -> str:
