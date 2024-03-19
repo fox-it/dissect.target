@@ -75,6 +75,7 @@ def test_collapse_types(
         ("conf", b"key value"),
         ("sample", b"currently_just_text"),
         ("template", b"currently_just_text"),
+        ("toml", b"key = 'value'"),
     ],
 )
 def test_as_dict(
