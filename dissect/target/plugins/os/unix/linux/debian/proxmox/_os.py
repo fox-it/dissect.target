@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import logging
 from io import BytesIO
 from typing import Optional
@@ -79,3 +80,19 @@ def _create_pmxcfs(fh):
                     vfs.map_file_fh(f"/{path}", BytesIO(content or b""))
 
     return  vfs
+
+def _parse_vm_configuration(conf) -> list:
+    file = conf.open()
+    parsed_lines = {}
+    for line in file:
+        key, value = line.split(b': ')
+        parsed_lines[key] = value.replace(b'\n', b'')
+    return parsed_lines
+
+def _is_disk(config_value: str) -> str | None:
+    disk = re.match(r"^(sata|scsi|ide)[0-9]+$", config_value)
+    return True if disk else None 
+
+def _get_disk_name(config_value: str) -> str | None:
+    disk = re.search(r"vm-[0-9]+-disk-[0-9]+", config_value)
+    return disk if disk else None
