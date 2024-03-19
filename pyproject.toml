@@ -66,6 +66,7 @@ full = [
     "fusepy",
     "pycryptodome",
     "pyyaml",
+    "tomli; python_version<'3.11'",
     # dissect.target's caching uses flow.record functionlity which depends on the
     # zstandard module being available. However flow.record does not define
     # zstandard as a dependency, nor does it allow zstandard to be installed
@@ -88,7 +89,12 @@ smb = [
 cb = [
     # Grab the dependencies for dissect.target
     "dissect.target[full]",
-    "carbon-black-cloud-sdk-python~=1.4.3"
+    "carbon-black-cloud-sdk~=1.4.3"
+]
+mqtt = [
+    # Grab the dependencies for dissect.target
+    "dissect.target[full]",
+    "paho-mqtt==1.6.1",
 ]
 
 [project.scripts]
