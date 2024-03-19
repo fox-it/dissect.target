@@ -199,7 +199,7 @@ register("target", "TargetLoader")
 register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
-register("overlay", "OverlayLoader")
+register("overlay", "Overlay2Loader")
 register("phobos", "PhobosLoader")
 register("velociraptor", "VelociraptorLoader")
 register("smb", "SmbLoader")

@@ -1,6 +1,6 @@
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.loaders.overlay import OverlayLoader
+from dissect.target.loaders.overlay import Overlay2Loader
 from tests.plugins.apps.container.test_docker import (  # noqa: F401
     fs_docker,
     target_linux_docker,
@@ -11,17 +11,17 @@ def test_overlay_loader_docker_container(
     target_linux_docker: Target, fs_docker: VirtualFilesystem  # noqa: F811
 ) -> None:
     for container in target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir():
-        assert OverlayLoader.detect(container)
-        loader = OverlayLoader(container)
+        assert Overlay2Loader.detect(container)
+        loader = Overlay2Loader(container)
         loader.map(target_linux_docker)
 
     assert len(target_linux_docker.filesystems) == 4
 
     container_fs = target_linux_docker.filesystems[1]
     for layer in container_fs.mounts["/"]:
-        assert layer.__type__ == "overlay"
+        assert layer.__type__ == "overlay2"
 
-    assert [str(p) for p in container_fs.path("/").iterdir()] == [
+    assert sorted([str(p) for p in container_fs.path("/").iterdir()]) == sorted([
         "/home",
         "/root",
         "/media",
@@ -40,7 +40,7 @@ def test_overlay_loader_docker_container(
         "/usr",
         "/srv",
         "/.dockerenv",
-    ]
+    ])
 
     assert [str(p) for p in container_fs.path("/root").iterdir()] == [
         "/root/secret.txt",

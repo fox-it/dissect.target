@@ -8,19 +8,15 @@ from dissect.target.exceptions import (
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import Filesystem, FilesystemEntry, RootFilesystem
+from dissect.target.filesystem import Filesystem, FilesystemEntry, LayerFilesystem
 from dissect.target.helpers import fsutil
-from dissect.target.target import Target
 
 
-class OverlayFilesystem(RootFilesystem):
-    __fstype__ = "overlay"
+class Overlay2Filesystem(LayerFilesystem):
+    __type__ = "overlay2"
 
-    def __init__(self, target: Target = None):
-        if not target:
-            target = Target()
-
-        super().__init__(target)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.mounts["/"] = []
 
     def mount(self, fs: Filesystem) -> None:
@@ -30,10 +26,10 @@ class OverlayFilesystem(RootFilesystem):
         self.mounts["/"].append(fs)
 
 
-class OverlayLayerFilesystem(Filesystem):
+class Overlay2LayerFilesystem(Filesystem):
     """Based on DirectoryFilesystem."""
 
-    __type__ = "overlay"
+    __type__ = "overlay2"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
@@ -50,7 +46,7 @@ class OverlayLayerFilesystem(Filesystem):
         path = path.strip("/")
 
         if not path:
-            return OverlayLayerFilesystemEntry(self, "/", self.base_path)
+            return Overlay2LayerFilesystemEntry(self, "/", self.base_path)
 
         if not self.case_sensitive:
             searchpath = self.base_path
@@ -69,12 +65,12 @@ class OverlayLayerFilesystem(Filesystem):
 
         try:
             entry.lstat()
-            return OverlayLayerFilesystemEntry(self, path, entry)
+            return Overlay2LayerFilesystemEntry(self, path, entry)
         except Exception:
             raise FileNotFoundError(path)
 
 
-class OverlayLayerFilesystemEntry(FilesystemEntry):
+class Overlay2LayerFilesystemEntry(FilesystemEntry):
     """Based on DirectoryFilesystemEntry."""
 
     def get(self, path: str) -> FilesystemEntry:
@@ -105,7 +101,7 @@ class OverlayLayerFilesystemEntry(FilesystemEntry):
         else:
             for item in self.entry.iterdir():
                 path = fsutil.join(self.path, item.name, alt_separator=self.fs.alt_separator)
-                yield OverlayLayerFilesystemEntry(self.fs, path, item)
+                yield Overlay2LayerFilesystemEntry(self.fs, path, item)
 
     def exists(self) -> bool:
         try:
