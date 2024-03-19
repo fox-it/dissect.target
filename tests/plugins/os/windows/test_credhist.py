@@ -25,16 +25,16 @@ def test_credhist() -> None:
     ch.decrypt(password_hash=hashlib.sha1("password4".encode("utf-16-le")).digest())
 
     assert str(ch.entries[0].guid) == "99ec7176-d16c-41bd-9c94-d3a4c5b94232"
-    assert ch.entries[0].hash_sha == sha1("user")
-    assert ch.entries[0].hash_nt == md4("user")
+    assert ch.entries[0].sha1 == sha1("user")
+    assert ch.entries[0].nt == md4("user")
 
     assert str(ch.entries[1].guid) == "120a3a30-309c-4fda-bfb8-06f44ea93cb2"
-    assert ch.entries[1].hash_nt == md4("password")
-    assert ch.entries[1].hash_sha == sha1("password")
+    assert ch.entries[1].sha1 == sha1("password")
+    assert ch.entries[1].nt == md4("password")
 
     assert str(ch.entries[2].guid) == "5657891f-28dd-4f69-baba-95e44bcd178a"
-    assert ch.entries[2].hash_nt == md4("password3")
-    assert ch.entries[2].hash_sha == sha1("password3")
+    assert ch.entries[2].sha1 == sha1("password3")
+    assert ch.entries[2].nt == md4("password3")
 
 
 def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -> None:

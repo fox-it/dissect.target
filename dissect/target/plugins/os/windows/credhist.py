@@ -28,6 +28,7 @@ CredHistRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/credential/history",
     [
         ("string", "guid"),
+        ("boolean", "decrypted"),
         ("string", "sha1"),
         ("string", "nt"),
     ],
@@ -61,16 +62,18 @@ class CredHistEntry:
     version: int
     guid: str
     user_sid: str
+    sha1: Optional[str]
+    nt: Optional[str]
     hash_alg: HashAlgorithm = field(repr=False)
     cipher_alg: CipherAlgorithm = field(repr=False)
-    hash_sha: Optional[str]
-    hash_nt: Optional[str]
     raw: c_credhist.entry = field(repr=False)
+    decrypted: bool = False
 
     def decrypt(self, password_hash: bytes) -> None:
-        """Decrypt this CREDHIST entry using the provided password hash. Modifies ``hash_sha`` and ``hash_nt`` values.
+        """Decrypt this CREDHIST entry using the provided password hash. Modifies ``CredHistEntry.sha1``
+        and ``CredHistEntry.nt`` values.
 
-        If the decrypted ``nt_hash`` is 32 characters long we assume the decryption was successful.
+        If the decrypted ``nt`` value is 32 characters we assume the decryption was successful.
 
         Args:
             password_hash: bytes of SHA1 password hash digest
@@ -89,14 +92,15 @@ class CredHistEntry:
         sha_size = self.raw.dwShaHashSize
         nt_size = self.raw.dwNtHashSize
 
-        sha_hash = data[:sha_size].hex()
-        nt_hash = data[sha_size : sha_size + nt_size].rstrip(b"\x00").hex()
+        sha1 = data[:sha_size].hex()
+        nt = data[sha_size : sha_size + nt_size].rstrip(b"\x00").hex()
 
-        if len(nt_hash) != 32:
+        if len(nt) != 32:
             raise ValueError("Decrypting failed, invalid password hash?")
 
-        self.hash_sha = sha_hash
-        self.hash_nt = nt_hash
+        self.decrypted = True
+        self.sha1 = sha1
+        self.nt = nt
 
 
 class CredHistFile:
@@ -105,7 +109,7 @@ class CredHistFile:
         self.entries = list(self._parse())
 
     def __repr__(self) -> str:
-        return f"<CredHistFile fh='{self.fh}'>"
+        return f"<CredHistFile fh='{self.fh}' entries={len(self.entries)}>"
 
     def _parse(self) -> Iterator[CredHistEntry]:
         self.fh.seek(0)
@@ -125,8 +129,8 @@ class CredHistFile:
                     user_sid=read_sid(entry.pSid),
                     hash_alg=HashAlgorithm.from_id(entry.algHash),
                     cipher_alg=cipher_alg,
-                    hash_sha=None,
-                    hash_nt=None,
+                    sha1=None,
+                    nt=None,
                     raw=entry,
                 )
         except EOFError:
@@ -144,7 +148,7 @@ class CredHistFile:
                 log.warning("Could not decrypt entry %s with password %s", entry.guid, password_hash.hex())
                 log.debug("", exc_info=e)
                 continue
-            password_hash = bytes.fromhex(entry.hash_sha)
+            password_hash = bytes.fromhex(entry.sha1)
 
 
 class CredHistPlugin(Plugin):
@@ -191,8 +195,9 @@ class CredHistPlugin(Plugin):
             for entry in credhist.entries:
                 yield CredHistRecord(
                     guid=entry.guid,
-                    sha1=entry.hash_sha,
-                    nt=entry.hash_nt,
+                    decrypted=entry.decrypted,
+                    sha1=entry.sha1,
+                    nt=entry.nt,
                     _user=user,
                     _target=self.target,
                 )
