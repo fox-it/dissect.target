@@ -519,7 +519,6 @@ class TargetCli(TargetCmd):
         """list directory contents"""
 
         path = self.resolve_path(args.path)
-        dir_list = []
 
         if args.use_ctime and args.use_atime:
             print("can't specify -c and -u at the same time")
@@ -530,35 +529,34 @@ class TargetCli(TargetCmd):
 
         self._print_ls(args, path, 0, stdout)
 
-    # def _print_ls(self, args: argparse.Namespace, dir_name: fsutil.TargetPath, stdout: TextIO) -> Optional[bool]:
-    def _print_ls(self, args: argparse.Namespace, dir_name: fsutil.TargetPath, dir_depth: int, stdout: TextIO) -> Optional[bool]:
-        path = self.resolve_path(dir_name)
-        dir_list = []
+    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> Optional[bool]:
+        path = self.resolve_path(path)
+        subdirs = []
 
         if path.is_dir():
             contents = self.scandir(path, color=True)
         elif path.is_file():
             contents = [(path, path.name)]
 
-        if dir_depth > 0:
+        if depth > 0:
             print(f"\n{str(path)}:", file=stdout)
 
         if not args.l:
             for target_path, name in contents:
                 print(name, file=stdout)
                 if target_path.is_dir():
-                    dir_list.append(target_path)
+                    subdirs.append(target_path)
         else:
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
                 self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
                 if target_path.is_dir():
-                    dir_list.append(target_path)
+                    subdirs.append(target_path)
 
-        if args.recursive and len(dir_list):
-            for dir_name in dir_list:
-                self._print_ls(args, dir_name, dir_depth+1, stdout)
+        if args.recursive and subdirs:
+            for subdir in subdirs:
+                self._print_ls(args, subdir, depth + 1, stdout)
 
     def print_extensive_file_stat(self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
         """Print the file status."""
