@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from struct import pack, unpack_from
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
 
 import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
@@ -72,7 +72,7 @@ class MQTTConnection:
         self.info = lru_cache(128)(self.info)
         self.read = lru_cache(128)(self.read)
 
-    def topo(self, peers: int):
+    def topo(self, peers: int) -> list[str]:
         self.broker.topology(self.host)
 
         while len(self.broker.peers(self.host)) < peers:
@@ -146,7 +146,7 @@ class Broker:
     def disk(self, host: str) -> DiskMessage:
         return self.diskinfo[host]
 
-    def peers(self, host: str) -> int:
+    def peers(self, host: str) -> list[str]:
         return self.topo[host]
 
     def _on_disk(self, hostname: str, payload: bytes) -> None:
@@ -260,7 +260,11 @@ class MQTTLoader(Loader):
         self.broker = cls.broker
         self.connection = MQTTConnection(self.broker, path)
 
-    def find_all(path: Path, **kwargs):
+    @staticmethod
+    def detect(path: Path) -> bool:
+        return False
+
+    def find_all(path: Path, **kwargs) -> Iterator[str]:
         cls = MQTTLoader
         num_peers = 1
         if cls.broker is None:
@@ -279,7 +283,3 @@ class MQTTLoader(Loader):
     def map(self, target: Target) -> None:
         for disk in self.connection.info():
             target.disks.add(RawContainer(disk))
-
-    @staticmethod
-    def detect(path: Path) -> bool:
-        return False
