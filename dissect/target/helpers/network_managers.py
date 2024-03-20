@@ -280,7 +280,7 @@ class Parser:
             if option in translation_values and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable, None]:
+    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Optional[str | Callable]:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
 
         Args:
@@ -296,6 +296,7 @@ class Parser:
             return None
 
         if section:
+            # account for values of sections which are None
             config = config.get(section, {}) or {}
 
         for key, value in config.items():
@@ -505,7 +506,7 @@ class LinuxNetworkManager:
 
 
 def parse_unix_dhcp_log_messages(target) -> list[str]:
-    """Parse local syslog, journal and cloud init log files for DHCP lease IPs.
+    """Parse local syslog, journal and cloud init-log files for DHCP lease IPs.
 
     Args:
         target: Target to discover and obtain network information from.
@@ -514,11 +515,17 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
         List of DHCP ip addresses.
     """
     ips = set()
-    messages = set(())
+    messages = set()
 
     for log_func in ["messages", "journal"]:
         try:
+    for log_func in ["messages", "journal"]:
+        try:
             messages = chain(messages, getattr(target, log_func)())
+            if not messages:
+                target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
+        except PluginError:
+            target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
         except PluginError:
             target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
 
@@ -573,8 +580,6 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
         if len(ips) >= 2 and record._desc.name == "linux/log/journal":
             break
 
-    if not messages:
-        target.log.warning("Could not search for DHCP leases: No log files found.")
 
     return ips
 

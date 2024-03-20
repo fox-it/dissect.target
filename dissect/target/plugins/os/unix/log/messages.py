@@ -36,13 +36,11 @@ class MessagesPlugin(Plugin):
         log_dirs = ["/var/log/", "/var/log/installer/"]
         file_globs = ["syslog*", "messages*", "cloud-init.log*"]
         for log_dir in log_dirs:
-            log_dir = self.target.fs.path(log_dir)
-            for file_glob in file_globs:
-                for file in log_dir.glob(file_glob):
-                    yield file
+            for glob in file_globs:
+                yield from self.target.fs.path(log_dir).glob(glob)
 
     def check_compatible(self) -> None:
-        if not any(self.log_files):
+        if not self.log_files:
             raise UnsupportedPluginError("No log files found")
 
     @export(record=MessagesRecord)
@@ -101,22 +99,17 @@ class MessagesPlugin(Plugin):
         Returns: ``MessagesRecord``
         """
         for line in log_file.open("rt").readlines():
-            line = line.strip()
-            if not line:
-                continue
-
-            match = RE_CLOUD_INIT_LINE.match(line)
-            if not match:
-                self.target.log.warning("Could not match cloud-init log line")
-                self.target.log.debug(f"No match for line '{line}'")
-                continue
-
-            match = match.groupdict()
-            yield MessagesRecord(
-                ts=match["ts"].split(",")[0],
-                daemon=match["daemon"],
-                pid=None,
-                message=match["message"],
-                source=log_file,
-                _target=self.target,
-            )
+            if (line := line.strip()):
+                if (match := RE_CLOUD_INIT_LINE.match(line)):
+                    match = match.groupdict()
+                    yield MessagesRecord(
+                        ts=match["ts"].split(",")[0],
+                        daemon=match["daemon"],
+                        pid=None,
+                        message=match["message"],
+                        source=log_file,
+                        _target=self.target,
+                    )
+                else:
+                    self.target.log.warning("Could not match cloud-init log line")
+                    self.target.log.debug("No match for line '%s'", line)
