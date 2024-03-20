@@ -269,7 +269,7 @@ class MQTTLoader(Loader):
         num_peers = 1
         if cls.broker is None:
             if (uri := kwargs.get("parsed_path")) is None:
-                raise LoaderError("No URI connection details has been passed.")
+                raise LoaderError("No URI connection details have been passed.")
             options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
             cls.broker = Broker(**options)
             cls.broker.connect()
