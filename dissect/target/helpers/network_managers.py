@@ -4,7 +4,7 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional, Union
+from typing import Any, Callable, Iterable, Match, Optional
 
 from defusedxml import ElementTree
 
@@ -50,7 +50,7 @@ class Template:
         """Sets the name of the the used parsing template to the name of the discovered network manager."""
         self.name = name
 
-    def create_config(self, path: TargetPath) -> Union[dict, None]:
+    def create_config(self, path: TargetPath) -> Optional[dict]:
         """Create a network config dictionary based on the configured template and supplied path.
 
         Args:
@@ -74,7 +74,7 @@ class Template:
             config = self._parse_configparser_config(path)
         return config
 
-    def _parse_netplan_config(self, fh: TargetPath) -> Union[dict, None]:
+    def _parse_netplan_config(self, fh: TargetPath) -> Optional[dict]:
         """Internal function to parse a netplan YAML based configuration file into a dict.
 
         Args:
