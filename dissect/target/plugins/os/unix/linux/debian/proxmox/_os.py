@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 PROXMOX_PACKAGE_NAME="proxmox-ve"
 FILETREE_TABLE_NAME="tree"
 PMXCFS_DATABASE_PATH="/var/lib/pve-cluster/config.db"
+# Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
+VM_CONFIG_PATH="/etc/pve/qemu-server"
 
 
 VirtualMachineRecord = TargetRecordDescriptor(
@@ -28,6 +30,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("string", "name"),
         ("string", "storage_id"),
         ("string", "disk"),
+        ("path", "path"),
     ],
 )
 
@@ -69,10 +72,8 @@ class ProxmoxPlugin(LinuxPlugin):
                 return f"{pkg.name} {pkg.version} ({distro_name})"
 
     @export(record=VirtualMachineRecord)
-    def vms(self) -> Iterator[VirtualMachineRecord]:
-        # ipdb.set_trace()
-        # Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
-        configs = self.target.fs.path("/etc/pve/qemu-server")
+    def vm_list(self) -> Iterator[VirtualMachineRecord]:
+        configs = self.target.fs.path(VM_CONFIG_PATH)
         for config in configs.iterdir():
             parsed_config = _parse_vm_configuration(config)
             for option in parsed_config:
@@ -83,7 +84,8 @@ class ProxmoxPlugin(LinuxPlugin):
                         id=vm_id,
                         name=parsed_config[b'name'].decode(),
                         storage_id=_get_storage_ID(config_value),
-                        disk=_get_disk_name(config_value)
+                        disk=_get_disk_name(config_value),
+                        path=VM_CONFIG_PATH + f"/{vm_id}.conf",
                     )
 
 def _create_pmxcfs(fh) -> VirtualFilesystem:
