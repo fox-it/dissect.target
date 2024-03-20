@@ -26,7 +26,8 @@ VirtualMachineRecord = TargetRecordDescriptor(
     [
         ("string", "id"),
         ("string", "name"),
-        ("path", "disk"),
+        ("string", "storage_id"),
+        ("string", "disk"),
     ],
 )
 
@@ -55,38 +56,37 @@ class ProxmoxPlugin(LinuxPlugin):
         return obj
 
     @export(property=True)
-    def version(self) -> str:
-            """Returns Proxmox VE version with underlying os release"""
-
-            for pkg in self.target.dpkg.status():
-                if pkg.name == PROXMOX_PACKAGE_NAME:
-                    distro_name = self._os_release.get("PRETTY_NAME", "")
-                    return f"{pkg.name} {pkg.version} ({distro_name})"
-
-    @export(property=VirtualMachineRecord)
-    def vms(self) -> Iterator[VirtualMachineRecord]:
-        configs = self.target.fs.path("/etc/pve/qemu-server")
-        for config in configs.iterdir():
-
-            parsed_config = _parse_vm_configuration(config)
-            for option in parsed_config:
-                
-                if _is_disk(option.decode()):
-                    id_num = pathlib.Path(config).stem
-                    # TypeError: expected str, bytes or os.PathLike object, not Match
-                    yield VirtualMachineRecord(
-                        id=id_num,
-                        name=parsed_config[b'name'],
-                        disk=_get_disk_name(parsed_config[option].decode())
-                    )
-
-        return None
-
-    @export(property=True)
     def os(self) -> str:
         return OperatingSystem.PROXMOX.value
 
-def _create_pmxcfs(fh):
+    @export(property=True)
+    def version(self) -> str:
+        """Returns Proxmox VE version with underlying os release"""
+
+        for pkg in self.target.dpkg.status():
+            if pkg.name == PROXMOX_PACKAGE_NAME:
+                distro_name = self._os_release.get("PRETTY_NAME", "")
+                return f"{pkg.name} {pkg.version} ({distro_name})"
+
+    @export(record=VirtualMachineRecord)
+    def vms(self) -> Iterator[VirtualMachineRecord]:
+        # ipdb.set_trace()
+        # Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
+        configs = self.target.fs.path("/etc/pve/qemu-server")
+        for config in configs.iterdir():
+            parsed_config = _parse_vm_configuration(config)
+            for option in parsed_config:
+                if _is_disk_device(option.decode()):
+                    vm_id = pathlib.Path(config).stem
+                    config_value = parsed_config[option].decode()
+                    yield VirtualMachineRecord(
+                        id=vm_id,
+                        name=parsed_config[b'name'].decode(),
+                        storage_id=_get_storage_ID(config_value),
+                        disk=_get_disk_name(config_value)
+                    )
+
+def _create_pmxcfs(fh) -> VirtualFilesystem:
     db = sqlite3.SQLite3(fh)
     filetree_table = db.table(FILETREE_TABLE_NAME)
     # columns = filetree_table.columns  # For implementing fs with propper stat data later
@@ -120,10 +120,14 @@ def _parse_vm_configuration(conf) -> list:
         parsed_lines[key] = value.replace(b'\n', b'')
     return parsed_lines
 
-def _is_disk(config_value: str) -> str | None:
+def _is_disk_device(config_value: str) -> str | None:
     disk = re.match(r"^(sata|scsi|ide)[0-9]+$", config_value)
     return True if disk else None 
 
+def _get_storage_ID(config_value: str) -> str | None:
+    storage_id = config_value.split(":")
+    return storage_id[0] if storage_id else None
+
 def _get_disk_name(config_value: str) -> str | None:
     disk = re.search(r"vm-[0-9]+-disk-[0-9]+", config_value)
-    return disk if disk else None
+    return disk.group(0) if disk else None
