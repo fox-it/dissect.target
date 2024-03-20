@@ -39,30 +39,45 @@ class YaraPlugin(InternalPlugin):
             raise UnsupportedPluginError("Please install 'yara-python' to use the yara plugin.")
 
     def yara(
-        self, rules: str | list[str | Path], path: str = "/", max_size: int = MAX_SCAN_SIZE, check_rules: bool = False
+        self,
+        rules: list[str | Path],
+        path: str = "/",
+        max_size: int = DEFAULT_MAX_SCAN_SIZE,
+        check: bool = False,
     ) -> Iterator[YaraMatchRecord]:
-        """Scan files inside the target up to a given maximum size with YARA rule file(s)."""
-        rules_path = rules
+        """Scan files inside the target up to a given maximum size with YARA rule file(s).
 
-        if isinstance(rules, str):
-            rules = rules.split(",")
+        Args:
+            rules: ``list`` of strings or ``Path`` objects pointing to rule files to use.
+            path: ``string`` of absolute target path to scan.
+            max_size: Files larger than this size will not be scanned.
+            check: Check if provided rules are valid, only compiles valid rules.
 
-        rules = process_rules(rules, check_rules)
+        Returns:
+            Iterator yields ``YaraMatchRecord``.
+        """
+
+        compiled_rules = process_rules(rules, check)
 
         if not rules:
-            self.target.log.error("No working rules found in %s", rules_path)
+            self.target.log.error("No working rules found in '%s'", ",".join(rules))
             return set(())
 
-        if hasattr(rules, "warnings") and (num_warns := len(rules.warnings)) > 0:
+        if hasattr(compiled_rules, "warnings") and (num_warns := len(compiled_rules.warnings)) > 0:
             self.target.log.warning("Yara generated %s warnings while compiling rules", num_warns)
+            for warning in compiled_rules.warnings:
+                self.target.log.debug(warning)
 
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
                 try:
-                    if file.stat().st_size > max_size:
+                    if file_size := file.stat().st_size > max_size:
+                        self.target.log.debug(
+                            "Skipping file '%s' as it is larger than %s bytes (size is %s)", file, file_size, max_size
+                        )
                         continue
 
-                    for match in rules.match(data=file.open().read()):
+                    for match in compiled_rules.match(data=file.open().read()):
                         yield YaraMatchRecord(
                             path=file.path,
                             digest=file.hash(),
@@ -75,9 +90,9 @@ class YaraPlugin(InternalPlugin):
                 except FileNotFoundError:
                     continue
                 except RuntimeWarning as e:
-                    self.target.log.warning("Runtime warning while scanning file %s: %s", file, e)
+                    self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
                 except Exception as e:
-                    self.target.log.error("Exception scanning file %s", file)
+                    self.target.log.error("Exception scanning file '%s'", file)
                     self.target.log.debug("", exc_info=e)
 
 
@@ -90,8 +105,8 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
         paths: Path to file(s) or folder(s) containing YARA files.
         check: Attempt to compile every rule file before appending to rules.
 
-    Returns: 
-        Compiled YARA rules.
+    Returns:
+        Compiled YARA rules or None.
     """
     files = {}
     rules = None
@@ -126,10 +141,10 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
                 continue
             else:
                 log.info("Adding single compiled YARA file %s", file)
-                rules = compile_yara(file)
+                rules = compile_yara(file, is_compiled=True)
                 break
 
-        elif check_rules and not compile_yara({namespace: file}):
+        elif check and not compile_yara({namespace: file}):
             log.warning("File %s contains invalid rule(s)!", file)
             files.pop(namespace)
             continue
@@ -140,12 +155,12 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
     return rules
 
 
-def compile_yara(files: dict[str, Path] | Path) -> Optional[yara.Rules]:
+def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> Optional[yara.Rules]:
     try:
-        if isinstance(files, Path):
+        if is_compiled and isinstance(files, Path):
             return yara.load(files.as_posix())
         else:
-            return yara.compile(filepaths={ns: path.as_posix() for ns, path in files.items()})
+            return yara.compile(filepaths={ns: Path(path).as_posix() for ns, path in files.items()})
     except (yara.SyntaxError, yara.WarningError, yara.Error) as e:
-        log.debug("Rule file is invalid", exc_info=e)
+        log.debug("Rule file is invalid: %s", e)
         return None

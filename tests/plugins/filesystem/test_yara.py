@@ -52,13 +52,13 @@ def test_yara_plugin(target_yara: Target) -> None:
     ],
 )
 def test_yara_plugin_invalid_rules(target_yara: Target, rules: list[str | Path], expected_hits: int) -> None:
-    results = list(target_yara.yara(rules=rules, check_rules=True))
+    results = list(target_yara.yara(rules=rules, check=True))
     assert len(results) == expected_hits
 
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
 def test_yara_plugin_invalid_rule_warn(target_yara: Target, caplog: pytest.CaptureFixture) -> None:
-    results = list(target_yara.yara(rules=[invalid_rule, another_rule_file], check_rules=True))
+    results = list(target_yara.yara(rules=[invalid_rule, another_rule_file], check=True))
     assert "invalid.yar contains invalid rule(s)!" in caplog.text
     assert len(results) == 2
 

@@ -5,7 +5,7 @@ import logging
 
 from dissect.target import Target
 from dissect.target.exceptions import TargetError
-from dissect.target.plugins.filesystem.yara import HAS_YARA, DEFAULT_MAX_SCAN_SIZE
+from dissect.target.plugins.filesystem.yara import DEFAULT_MAX_SCAN_SIZE, HAS_YARA
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -26,12 +26,10 @@ def main():
     )
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
-    parser.add_argument("-r", "--rules", required=True, help="path to YARA rule file(s) or folder with YARA rule files")
+    parser.add_argument("-r", "--rules", required=True, nargs="*", help="path(s) to YARA rule file(s) or folder(s)")
     parser.add_argument("-p", "--path", default="/", help="path on target(s) to recursively scan")
     parser.add_argument("-m", "--max-size", default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
-    parser.add_argument(
-        "-c", "--check-rules", default=False, action="store_true", help="check if every YARA rule is valid"
-    )
+    parser.add_argument("-c", "--check", default=False, action="store_true", help="check if every YARA rule is valid")
     parser.add_argument("-s", "--strings", default=False, action="store_true", help="print output as string")
     configure_generic_arguments(parser)
 
@@ -49,8 +47,8 @@ def main():
     try:
         for target in Target.open_all(args.targets):
             target.log.info("Scanning target")
-            rs = record_output(args.string, False)
-            for record in target.yara(args.rules.split(","), args.path, args.max_size, args.check_rules):
+            rs = record_output(args.strings, False)
+            for record in target.yara(args.rules, args.path, args.max_size, args.check):
                 rs.write(record)
 
     except TargetError as e:

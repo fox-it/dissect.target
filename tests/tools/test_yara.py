@@ -23,12 +23,12 @@ def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: p
             "sys.argv",
             [
                 "target-yara",
-                "target.img",
+                "example.img",
                 "--rules",
                 absolute_path("_data/plugins/filesystem/yara/rule.yar"),
                 "--path",
                 "/",
-                "--check-rules",
+                "--check",
                 "-s",
             ],
         )
