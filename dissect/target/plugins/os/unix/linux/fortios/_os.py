@@ -443,7 +443,7 @@ def decrypt_password(input: str) -> str:
     """
 
     if not HAS_CRYPTO:
-        raise RuntimeError("PyCryptodome module not available")
+        raise RuntimeError("Missing pycryptodome dependency")
 
     if input[:3] in ["SH2", "AK1"]:
         raise ValueError("Password is a hash (SHA-256 or SHA-1) and cannot be decrypted.")
@@ -512,7 +512,7 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
     """
 
     if not HAS_CRYPTO:
-        raise RuntimeError("PyCryptodome module not available")
+        raise RuntimeError("Missing pycryptodome dependency")
 
     # First 8 bytes = counter, last 8 bytes = nonce
     # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple

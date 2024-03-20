@@ -10,6 +10,7 @@ from dissect.target.plugin import Plugin, export
 try:
     from asn1crypto.cms import ContentInfo
     from asn1crypto.core import Sequence
+
     HAS_ASN1 = True
 except ImportError:
     HAS_ASN1 = False

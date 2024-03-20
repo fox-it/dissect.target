@@ -405,16 +405,27 @@ def decrypt_moz_3des(global_salt: bytes, primary_password: bytes, entry_salt: st
 
 
 def decode_login_data(data: str) -> tuple[bytes, bytes, bytes]:
+    """Decode Firefox login data.
+
+    Args:
+        data: Base64 encoded data in string format.
+
+    Raises:
+        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
+
+    Returns:
+        Tuple of bytes with ``key_id``, ``iv`` and ``ciphertext``
     """
-    SEQUENCE {
-        KEY_ID
-        SEQUENCE {
-            OBJECT_IDENTIFIER
-            IV
-        }
-        CIPHERTEXT
-    }
-    """
+
+    # SEQUENCE {
+    #     KEY_ID
+    #     SEQUENCE {
+    #         OBJECT_IDENTIFIER
+    #         IV
+    #     }
+    #     CIPHERTEXT
+    # }
+
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
 
@@ -428,32 +439,44 @@ def decode_login_data(data: str) -> tuple[bytes, bytes, bytes]:
     return key_id, iv, ciphertext
 
 
-def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> bytes:
+def decrypt_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> bytes:
+    """Decrypt an item with the given primary password and salt.
+
+    Args:
+        decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
+        primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
+        global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
+
+    Raises:
+        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
+
+    Returns:
+        Bytes of decrypted AES ciphertext.
     """
-    SEQUENCE {
-      SEQUENCE {
-        OBJECTIDENTIFIER 1.2.840.113549.1.5.13 => pkcs5 pbes2
-        SEQUENCE {
-          SEQUENCE {
-            OBJECTIDENTIFIER 1.2.840.113549.1.5.12 => pbkdf2
-            SEQUENCE {
-              OCTETSTRING 32 bytes, entrySalt
-              INTEGER 01
-              INTEGER 20
-              SEQUENCE {
-                OBJECTIDENTIFIER 1.2.840.113549.2.9 => hmacWithSHA256
-              }
-            }
-          }
-          SEQUENCE {
-            OBJECTIDENTIFIER 2.16.840.1.101.3.4.1.42 => aes256-CBC
-            OCTETSTRING 14 bytes, iv
-          }
-        }
-      }
-      OCTETSTRING encrypted
-    }
-    """
+
+    # SEQUENCE {
+    #   SEQUENCE {
+    #     OBJECTIDENTIFIER 1.2.840.113549.1.5.13 => pkcs5 pbes2
+    #     SEQUENCE {
+    #       SEQUENCE {
+    #         OBJECTIDENTIFIER 1.2.840.113549.1.5.12 => pbkdf2
+    #         SEQUENCE {
+    #           OCTETSTRING 32 bytes, entrySalt
+    #           INTEGER 01
+    #           INTEGER 20
+    #           SEQUENCE {
+    #             OBJECTIDENTIFIER 1.2.840.113549.2.9 => hmacWithSHA256
+    #           }
+    #         }
+    #       }
+    #       SEQUENCE {
+    #         OBJECTIDENTIFIER 2.16.840.1.101.3.4.1.42 => aes256-CBC
+    #         OCTETSTRING 14 bytes, iv
+    #       }
+    #     }
+    #   }
+    #   OCTETSTRING encrypted
+    # }
 
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
@@ -463,22 +486,22 @@ def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> b
 
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
-        raise ValueError("Expected pbkdf2 object identifier, got: %s", pkcs5_oid)
+        raise ValueError("Expected pbkdf2 object identifier, got: %s" % pkcs5_oid)
 
     sha256_oid = decoded_item[0][1][0][1][3][0].dotted
     if algos.HmacAlgorithmId.map(sha256_oid) != "sha256":
-        raise ValueError("Expected SHA256 object identifier, got: %s", pkcs5_oid)
+        raise ValueError("Expected SHA256 object identifier, got: %s" % pkcs5_oid)
 
     aes256_cbc_oid = decoded_item[0][1][1][0].dotted
     if algos.EncryptionAlgorithmId.map(aes256_cbc_oid) != "aes256_cbc":
-        raise ValueError("Expected AES256-CBC object identifier, got: %s", pkcs5_oid)
+        raise ValueError("Expected AES256-CBC object identifier, got: %s" % pkcs5_oid)
 
     entry_salt = decoded_item[0][1][0][1][0].native
     iteration_count = decoded_item[0][1][0][1][1].native
     key_length = decoded_item[0][1][0][1][2].native
 
     if key_length != 32:
-        raise ValueError("Expected key_length to be 32, got: %s", key_length)
+        raise ValueError("Expected key_length to be 32, got: %s" % key_length)
 
     k = sha1(global_salt + primary_password).digest()
     key = pbkdf2_hmac("sha256", k, entry_salt, iteration_count, dklen=key_length)
@@ -489,18 +512,31 @@ def decrypt_pbes2(decoded_item: list, primary_password: bytes, global_salt) -> b
 
 
 def decrypt_sha1_triple_des_cbc(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> bytes:
+    """Decrypt an item with the given Firefox primary password and salt.
+
+    Args:
+        decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
+        primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
+        global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
+
+    Raises:
+        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
+
+    Returns:
+        Bytes of decrypted 3DES ciphertext.
     """
-    SEQUENCE {
-        SEQUENCE {
-            OBJECTIDENTIFIER 1.2.840.113549.1.12.5.1.3
-            SEQUENCE {
-                OCTETSTRING entry_salt
-                INTEGER 01
-            }
-        }
-        OCTETSTRING encrypted
-    }
-    """
+
+    # SEQUENCE {
+    #     SEQUENCE {
+    #         OBJECTIDENTIFIER 1.2.840.113549.1.12.5.1.3
+    #         SEQUENCE {
+    #             OCTETSTRING entry_salt
+    #             INTEGER 01
+    #         }
+    #     }
+    #     OCTETSTRING encrypted
+    # }
+
     entry_salt = decoded_item[0][1][0].native
     cipher_text = decoded_item[1].native
     key = decrypt_moz_3des(global_salt, primary_password, entry_salt, cipher_text)
@@ -508,18 +544,32 @@ def decrypt_sha1_triple_des_cbc(decoded_item: core.Sequence, primary_password: b
 
 
 def decrypt_master_key(decoded_item: core.Sequence, primary_password: bytes, global_salt: bytes) -> tuple[bytes, str]:
-    """At this stage, we're not yet sure of the structure of decoded_item.
+    """Decrypt the provided ``core.Sequence`` with the provided Firefox primary password and salt.
 
-    The structure will depend on the object identifier at [0][0], hence we extract it.
+    At this stage we are not yet sure of the structure of ``decoded_item``. The structure will depend on the
+    ``core.Sequence`` object identifier at ``decoded_item[0][0]``, hence we extract it. This function will
+    then call the apropriate ``decrypt_pbes2``or ``decrypt_sha1_triple_des_cbc`` functions to decrypt the item.
 
-    SEQUENCE {
-        SEQUENCE {
-            OBJECTIDENTIFIER ???
-            ...
-        }
-        ...
-    }
+    Args:
+        decoded_item: ``core.Sequence`` is a ``list`` representation of ``SEQUENCE`` as described below.
+        primary_password: ``bytes`` of Firefox primary password to decrypt ciphertext with.
+        global_salt: ``bytes`` of salt to prepend to primary password when calculating AES key.
+
+    Raises:
+        ValueError: When missing ``pycryptodome`` or ``asn1crypto`` dependencies.
+
+    Returns:
+        Tuple of decrypted bytes and a string representation of the identified encryption algorithm.
     """
+
+    # SEQUENCE {
+    #     SEQUENCE {
+    #         OBJECTIDENTIFIER ???
+    #         ...
+    #     }
+    #     ...
+    # }
+
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency")
 
@@ -600,7 +650,7 @@ def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
     cka, iv, ciphertext = field
 
     if cka != CKA_ID:
-        raise ValueError("Expected cka to equal '%s' but got '%s'", CKA_ID, cka)
+        raise ValueError("Expected cka to equal '%s' but got '%s'" % (CKA_ID, cka))
 
     return unpad(DES3.new(key, DES3.MODE_CBC, iv).decrypt(ciphertext), 8)
 
@@ -611,10 +661,10 @@ def decrypt(
     """Decrypt a stored username and password using provided credentials and key4 file.
 
     Args:
-        username: encoded and encrypted password.
-        password encoded and encrypted password.
-        key4_file: path to key4.db file.
-        primary_password: password to use for decryption routine.
+        username: Encoded and encrypted password.
+        password Encoded and encrypted password.
+        key4_file: Path to key4.db file.
+        primary_password: Password to use for decryption routine.
 
     Returns:
         A tuple of decoded username and password strings.
