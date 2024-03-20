@@ -1,7 +1,10 @@
 import logging
 from hashlib import md5
+from io import BytesIO
 from pathlib import Path
 from typing import Iterator, Optional
+
+from dissect.target.helpers import hashutil
 
 try:
     import yara
@@ -68,6 +71,8 @@ class YaraPlugin(InternalPlugin):
             for warning in compiled_rules.warnings:
                 self.target.log.debug(warning)
 
+        self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
+
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
                 try:
@@ -77,10 +82,11 @@ class YaraPlugin(InternalPlugin):
                         )
                         continue
 
-                    for match in compiled_rules.match(data=file.open().read()):
+                    file_content = file.open().read()
+                    for match in compiled_rules.match(data=file_content):
                         yield YaraMatchRecord(
                             path=file.path,
-                            digest=file.hash(),
+                            digest=hashutil.common(BytesIO(file_content)),
                             rule=match.rule,
                             tags=match.tags,
                             namespace=match.namespace,
@@ -108,8 +114,8 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
     Returns:
         Compiled YARA rules or None.
     """
-    files = {}
-    rules = None
+    files = set()
+    compiled_rules = None
 
     for rules_path in paths:
         if isinstance(rules_path, str):
@@ -123,15 +129,11 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
             for file in rules_path.rglob("*"):
                 if not file.is_file():
                     continue
-                namespace = md5(file.as_posix().encode("utf-8")).digest().hex()
-                files[namespace] = file.as_posix()
+                files.add(file)
         else:
-            namespace = md5(rules_path.as_posix().encode("utf-8")).digest().hex()
-            files[namespace] = rules_path.as_posix()
+            files.add(rules_path)
 
-    for namespace, file in dict(files).items():
-        file = Path(file)
-
+    for file in set(files):
         with file.open("rb") as fh:
             magic = fh.read(4)
 
@@ -141,18 +143,18 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
                 continue
             else:
                 log.info("Adding single compiled YARA file %s", file)
-                rules = compile_yara(file, is_compiled=True)
+                compiled_rules = compile_yara(file, is_compiled=True)
                 break
 
-        elif check and not compile_yara({namespace: file}):
+        elif check and not compile_yara({"check_namespace": file}):
             log.warning("File %s contains invalid rule(s)!", file)
-            files.pop(namespace)
+            files.remove(file)
             continue
 
-    if files and not rules:
-        rules = compile_yara(files)
+    if files and not compiled_rules:
+        compiled_rules = compile_yara({md5(file.as_posix().encode("utf-8")).digest().hex(): file for file in files})
 
-    return rules
+    return compiled_rules
 
 
 def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> Optional[yara.Rules]:
