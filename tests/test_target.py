@@ -128,7 +128,7 @@ def test_target_open_dirs(topo: list[str], entry_point: str, expected_result: st
             return path.is_dir() and path.joinpath("select.txt").exists()
 
         @staticmethod
-        def find_all(path: Path) -> Iterator[Path]:
+        def find_all(path: Path, **kwargs) -> Iterator[Path]:
             return [Path("/dir/raw1.img").as_posix(), Path("/dir/raw3.img").as_posix()]
 
         def map(self, target: Target):
