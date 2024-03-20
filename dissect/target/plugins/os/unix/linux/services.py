@@ -62,7 +62,8 @@ class ServicesPlugin(Plugin):
                     for segment, configuration in parsed_file.items():
                         for key, value in configuration.items():
                             _value = value or None
-                            _key = f"{segment}_{key.replace("-","_")}"
+                            _key = f"{segment}_{key}"
+                            _key = _key.replace("-","_")
                             types.append(("string", _key))
                             config.update({_key: _value})
                 except FileNotFoundError:
