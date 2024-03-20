@@ -7,7 +7,7 @@ from tests.plugins.apps.container.test_docker import (  # noqa: F401
 )
 
 
-def test_overlay_loader_docker_container(
+def test_overlay_filesystem_docker_container(
     target_linux_docker: Target, fs_docker: VirtualFilesystem  # noqa: F811
 ) -> None:
     mount_path = list(target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir())[0]
