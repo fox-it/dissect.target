@@ -486,22 +486,22 @@ def decrypt_pbes2(decoded_item: core.Sequence, primary_password: bytes, global_s
 
     pkcs5_oid = decoded_item[0][1][0][0].dotted
     if algos.KdfAlgorithmId.map(pkcs5_oid) != "pbkdf2":
-        raise ValueError("Expected pbkdf2 object identifier, got: %s" % pkcs5_oid)
+        raise ValueError(f"Expected pbkdf2 object identifier, got: {pkcs5_oid}")
 
     sha256_oid = decoded_item[0][1][0][1][3][0].dotted
     if algos.HmacAlgorithmId.map(sha256_oid) != "sha256":
-        raise ValueError("Expected SHA256 object identifier, got: %s" % pkcs5_oid)
+        raise ValueError("Expected SHA256 object identifier, got: {pkcs5_oid}")
 
     aes256_cbc_oid = decoded_item[0][1][1][0].dotted
     if algos.EncryptionAlgorithmId.map(aes256_cbc_oid) != "aes256_cbc":
-        raise ValueError("Expected AES256-CBC object identifier, got: %s" % pkcs5_oid)
+        raise ValueError("Expected AES256-CBC object identifier, got: {pkcs5_oid}")
 
     entry_salt = decoded_item[0][1][0][1][0].native
     iteration_count = decoded_item[0][1][0][1][1].native
     key_length = decoded_item[0][1][0][1][2].native
 
     if key_length != 32:
-        raise ValueError("Expected key_length to be 32, got: %s" % key_length)
+        raise ValueError("Expected key_length to be 32, got: {key_length}")
 
     k = sha1(global_salt + primary_password).digest()
     key = pbkdf2_hmac("sha256", k, entry_salt, iteration_count, dklen=key_length)
