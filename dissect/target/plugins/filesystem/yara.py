@@ -61,7 +61,7 @@ class YaraPlugin(InternalPlugin):
 
         if not rules:
             self.target.log.error("No working rules found in '%s'", ",".join(rules))
-            return set(())
+            return
 
         if hasattr(compiled_rules, "warnings") and (num_warns := len(compiled_rules.warnings)) > 0:
             self.target.log.warning("Yara generated %s warnings while compiling rules", num_warns)
