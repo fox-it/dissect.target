@@ -1,6 +1,6 @@
 import hashlib
 import re
-from functools import cached_property, lru_cache
+from functools import cache, cached_property
 from pathlib import Path
 
 try:
@@ -24,7 +24,7 @@ class DPAPIPlugin(InternalPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.keychain = lru_cache(4096)(self.keychain)
+        self.keychain = cache(self.keychain)
 
     # This matches master key file names
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
@@ -107,7 +107,7 @@ class DPAPIPlugin(InternalPlugin):
         return result
 
     @cached_property
-    def _users(self) -> dict:
+    def _users(self) -> dict[str, dict[str, str]]:
         return {u.name: {"sid": u.sid} for u in self.target.users()}
 
     def _load_master_keys_from_path(self, username: str, path: Path) -> dict[str, MasterKeyFile]:

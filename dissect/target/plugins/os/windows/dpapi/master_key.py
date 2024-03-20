@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import sys
 from io import BytesIO
 from typing import BinaryIO
 
@@ -14,13 +13,14 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
 )
 
 try:
-    from Crypto.Hash import MD4, SHA1  # noqa F401
+    from Crypto.Hash import MD4
 
     HAS_CRYPTO = True
 except ImportError:
     HAS_CRYPTO = False
 
 log = logging.getLogger(__name__)
+
 
 master_key_def = """
 struct DomainKey {
@@ -101,11 +101,10 @@ class MasterKey:
         for algo in ["sha1", "md4"]:
             if algo in hashlib.algorithms_available:
                 pwd_hash = hashlib.new(algo, pwd)
-            elif HAS_CRYPTO:
-                hashClass = getattr(sys.modules[__name__], algo.upper())
-                pwd_hash = hashClass.new(pwd)
+            elif HAS_CRYPTO and algo == "md4":
+                pwd_hash = MD4.new(pwd)
             else:
-                log.info("No cryptography capabilities for algorithm %s", algo)
+                log.warning("No cryptography capabilities for algorithm %s", algo)
                 continue
 
             self.decrypt_with_key(derive_password_hash(pwd_hash.digest(), user_sid))
