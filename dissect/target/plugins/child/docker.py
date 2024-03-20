@@ -1,9 +1,7 @@
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
-from dissect.target.plugins.apps.container.docker import (
-    find_installs,  # NOTE: Requires `find_installs` from PR 507
-)
+from dissect.target.plugins.apps.container.docker import find_installs
 from dissect.target.target import Target
 
 
