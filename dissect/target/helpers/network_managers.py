@@ -519,15 +519,12 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
 
     for log_func in ["messages", "journal"]:
         try:
-    for log_func in ["messages", "journal"]:
-        try:
             messages = chain(messages, getattr(target, log_func)())
-            if not messages:
-                target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
         except PluginError:
             target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
-        except PluginError:
-            target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
+
+    if not messages:
+        target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
 
     for record in messages:
         line = record.message
@@ -579,7 +576,6 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
         # so we stop if we have some results and have reached the journal plugin.
         if len(ips) >= 2 and record._desc.name == "linux/log/journal":
             break
-
 
     return ips
 

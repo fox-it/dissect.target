@@ -34,7 +34,7 @@ class MessagesPlugin(Plugin):
 
     def _find_log_files(self) -> Iterator[Path]:
         log_dirs = ["/var/log/", "/var/log/installer/"]
-        file_globs = ["syslog*", "messages*", "cloud-init.log*"]
+        file_globs = ["syslog*", "messages*", "cloud-init*.log*"]
         for log_dir in log_dirs:
             for glob in file_globs:
                 yield from self.target.fs.path(log_dir).glob(glob)
@@ -45,7 +45,7 @@ class MessagesPlugin(Plugin):
 
     @export(record=MessagesRecord)
     def syslog(self) -> Iterator[MessagesRecord]:
-        """Return contents of /var/log/messages* and /var/log/syslog*.
+        """Return contents of /var/log/messages*, /var/log/syslog* and cloud-init logs.
 
         See ``messages`` for more information.
         """
@@ -64,12 +64,13 @@ class MessagesPlugin(Plugin):
         References:
             - https://geek-university.com/linux/var-log-messages-file/
             - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
+            - https://cloudinit.readthedocs.io/en/latest/development/logging.html#logging-command-output
         """
 
         tzinfo = self.target.datetime.tzinfo
 
         for log_file in self.log_files:
-            if "cloud-init.log" in log_file.name:
+            if "cloud-init" in log_file.name:
                 yield from self._parse_cloud_init_log(log_file)
                 continue
 
@@ -99,8 +100,8 @@ class MessagesPlugin(Plugin):
         Returns: ``MessagesRecord``
         """
         for line in log_file.open("rt").readlines():
-            if (line := line.strip()):
-                if (match := RE_CLOUD_INIT_LINE.match(line)):
+            if line := line.strip():
+                if match := RE_CLOUD_INIT_LINE.match(line):
                     match = match.groupdict()
                     yield MessagesRecord(
                         ts=match["ts"].split(",")[0],
