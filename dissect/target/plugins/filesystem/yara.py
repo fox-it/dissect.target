@@ -85,7 +85,7 @@ class YaraPlugin(InternalPlugin):
                     file_content = file.open().read()
                     for match in compiled_rules.match(data=file_content):
                         yield YaraMatchRecord(
-                            path=file.path,
+                            path=self.target.fs.path(file.path),
                             digest=hashutil.common(BytesIO(file_content)),
                             rule=match.rule,
                             tags=match.tags,

@@ -70,4 +70,13 @@ def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
         rules.save(tmp_file.name)
 
         results = list(target_yara.yara(rules=[tmp_file.name]))
+
         assert len(results) == 2
+
+        assert results[0].path == "/test_file"
+        assert results[0].rule == "test_rule_name"
+        assert results[0].tags == ["tag1", "tag2", "tag3"]
+        assert results[0].namespace == "default"
+        assert results[0].digest.md5 == "6f8db599de986fab7a21625b7916589c"
+        assert results[0].digest.sha1 == "661295c9cbf9d6b2f6428414504a8deed3020641"
+        assert results[0].digest.sha256 == "d5579c46dfcc7f18207013e65b44e4cb4e2c2298f4ac457ba8f82743f31e930b"
