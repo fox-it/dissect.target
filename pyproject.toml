@@ -66,6 +66,7 @@ full = [
     "fusepy",
     "pycryptodome",
     "ruamel.yaml",
+    "tomli; python_version<'3.11'",
     # dissect.target's caching uses flow.record functionlity which depends on the
     # zstandard module being available. However flow.record does not define
     # zstandard as a dependency, nor does it allow zstandard to be installed

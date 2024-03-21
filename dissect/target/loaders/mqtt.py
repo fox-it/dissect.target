@@ -137,6 +137,7 @@ class Broker:
         self.certificate_file = crt
         self.cacert_file = ca
         self.case = case
+        self.command = kwargs.get("command", None)
 
     @suppress
     def read(self, host: str, disk_id: int, seek_address: int, read_length: int) -> SeekMessage:
@@ -182,6 +183,8 @@ class Broker:
             self.topo[key].append(payload.decode("utf-8"))
             self.mqtt_client.subscribe(f"{self.case}/{host}/DISKS")
             self.mqtt_client.subscribe(f"{self.case}/{host}/READ/#")
+            if self.command is not None:
+                self.mqtt_client.publish(f"{self.case}/{host}/COMM", self.command.encode("utf-8"))
             time.sleep(1)
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
@@ -245,6 +248,7 @@ class Broker:
 @arg("--mqtt-key", dest="key", help="private key file")
 @arg("--mqtt-crt", dest="crt", help="client certificate file")
 @arg("--mqtt-ca", dest="ca", help="certificate authority file")
+@arg("--mqtt-command", dest="command", help="direct command to client(s)")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
@@ -265,7 +269,7 @@ class MQTTLoader(Loader):
         num_peers = 1
         if cls.broker is None:
             if (uri := kwargs.get("parsed_path")) is None:
-                raise LoaderError("No URI connection details has been passed.")
+                raise LoaderError("No URI connection details have been passed.")
             options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
             cls.broker = Broker(**options)
             cls.broker.connect()
@@ -281,7 +285,8 @@ class MQTTLoader(Loader):
             for disk in self.connection.info():
                 target.disks.add(RawContainer(disk))
         else:
-            target.mqtt = True
+            target.props["mqtt"] = True
+
             vfs = VirtualFilesystem()
             vfs.map_file_fh(self.PATH, BytesIO("\n".join(self.peers).encode("utf-8")))
             for index, peer in enumerate(self.peers):
