@@ -292,7 +292,9 @@ def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[s
     return uris
 
 
-def find_and_filter_plugins(target: Target, functions: str, excluded_func_paths: set[str] = None):
+def find_and_filter_plugins(
+    target: Target, functions: str, excluded_func_paths: set[str] = None
+) -> Iterator[PluginFunction]:
     # Keep a set of plugins that were already executed on the target.
     executed_plugins = set()
     excluded_func_paths = excluded_func_paths or set()
