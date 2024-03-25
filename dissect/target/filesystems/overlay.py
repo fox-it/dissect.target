@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from dissect.target.filesystem import LayerFilesystem
@@ -8,8 +9,12 @@ class Overlay2Filesystem(LayerFilesystem):
     """Overlay 2 filesystem implementation.
 
     Deleted files will be present on the reconstructed filesystem.
+    Volumes and bind mounts will be added to their respective mount locations.
+    Does not support tmpfs mounts.
 
     References:
+        - https://docs.docker.com/storage/storagedriver/
+        - https://docs.docker.com/storage/volumes/
         - https://www.didactic-security.com/resources/docker-forensics.pdf
         - https://www.didactic-security.com/resources/docker-forensics-cheatsheet.pdf
         - https://github.com/google/docker-explorer
@@ -34,7 +39,9 @@ class Overlay2Filesystem(LayerFilesystem):
             cache_id = layer_ref.joinpath("cache-id").open("r").read()
             layers.append(root.joinpath(f"overlay2/{cache_id}/diff"))
 
-            if not (parent_layer := layer_ref.joinpath("parent")).exists():
+            if (parent_layer := layer_ref.joinpath("parent")).exists():
+                parent_layer = parent_layer.open("r").read()
+            else:
                 parent_layer = False
 
         # add the container layers
@@ -46,6 +53,34 @@ class Overlay2Filesystem(LayerFilesystem):
         for layer in layers:
             layer_fs = DirectoryFilesystem(layer)
             self.add_fs_layer(layer_fs)
+
+        # add anonymous volumes, named volumes and bind mounts
+        if (config_path := root / "containers" / path.name / "config.v2.json").exists():
+            try:
+                config = json.loads(config_path.read_text())
+            except json.JSONDecodeError as e:
+                path._fs.target.log.warning("Unable to parse overlay mounts for container %s", path.name)
+                path._fs.target.log.debug("", exc_info=e)
+                return
+
+            for mount in config.get("MountPoints").values():
+                if not mount["Type"] in ["volume", "bind"]:
+                    path._fs.target.log.warning(
+                        "Encountered unsupported mount type %s in container %s", mount["Type"], path.name
+                    )
+                    continue
+
+                if not mount["Source"] and mount["Name"]:
+                    # anonymous volumes do not have a Source but a volume id
+                    layer_fs = DirectoryFilesystem(root / "volumes" / mount["Name"] / "_data")
+                elif mount["Source"]:
+                    # named volumes and bind mounts have a Source set
+                    layer_fs = DirectoryFilesystem(root.parents[-1] / mount["Source"])
+                else:
+                    path._fs.target.log.warning("Could not determine layer source for mount in container %s", path.name)
+                    path._fs.target.log.debug(json.dumps(mount))
+
+                self.mount(mount["Destination"], layer_fs)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"
