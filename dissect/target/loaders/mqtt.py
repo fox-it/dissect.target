@@ -277,8 +277,7 @@ class MQTTLoader(Loader):
 
         cls.connection = MQTTConnection(cls.broker, path)
         cls.peers = cls.connection.topo(num_peers)
-        for index, peer in enumerate(cls.peers):
-            yield peer
+        yield from cls.peers
 
     def map(self, target: Target) -> None:
         for disk in self.connection.info():
