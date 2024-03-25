@@ -1,15 +1,18 @@
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.os.unix.linux.proc import ProcPlugin
 from dissect.target.plugins.os.unix.linux.sockets import NetSocketPlugin
 from dissect.target.target import Target
 
 
 def test_sockets_plugin(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets())
     assert len(results) == 24
 
 
 def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
 
     results = list(target_linux_users.sockets.tcp())
@@ -49,6 +52,7 @@ def test_tcp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
 
 
 def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.udp())
 
@@ -82,6 +86,7 @@ def test_udp(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
 
 
 def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.raw())
 
@@ -105,6 +110,7 @@ def test_raw(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesyste
 
 
 def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.packet())
 
@@ -121,6 +127,7 @@ def test_packet(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesy
 
 
 def test_unix(target_linux_users: Target, fs_linux_proc_sockets: VirtualFilesystem):
+    target_linux_users.add_plugin(ProcPlugin)
     target_linux_users.add_plugin(NetSocketPlugin)
     results = list(target_linux_users.sockets.unix())
 
