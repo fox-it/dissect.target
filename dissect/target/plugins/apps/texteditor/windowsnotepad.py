@@ -46,12 +46,13 @@ struct tab {
     char                        header_end[2];    // \x01\x00
 };
 """
-TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
-)
 
 c_windowstab = cstruct()
 c_windowstab.load(c_def)
+
+TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+)
 
 
 def _calc_crc32(data: bytes) -> bytes:
