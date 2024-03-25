@@ -62,7 +62,7 @@ def test_execute_pipeline(
         serialization = utils.Serialization(serialization_name)
         compression = utils.Compression(compression_name)
 
-        functions = ["iis.logs", "amcache.applications"]
+        functions = "iis.logs,amcache.applications"
 
         run.execute_pipeline(
             targets=["dummy"],
@@ -112,7 +112,7 @@ def test_execute_pipeline(
         sink_blobs = state_blob["sinks"]
 
         assert len(sink_blobs) == 2
-        assert {s["func"] for s in sink_blobs} == set(functions)
+        assert {s["func"] for s in sink_blobs} == set(functions.split(","))
 
         assert all(s["is_dirty"] is False for s in sink_blobs)
 
@@ -150,7 +150,7 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
     ):
         output_dir = tmp_path / "output"
 
-        functions = ["iis.logs", "amcache.applications"]
+        functions = "iis.logs,amcache.applications"
 
         run.execute_pipeline(
             targets=["dummy"],
@@ -203,7 +203,7 @@ def test_execute_pipeline_limited(limit, target_win_iis_amcache, tmp_path):
             assert (output_dir / target_name / "amcache" / amcache_sink_filename).exists()
 
             assert len(sink_blobs) == 2
-            assert {s["func"] for s in sink_blobs} == set(functions)
+            assert {s["func"] for s in sink_blobs} == set(functions.split(","))
 
             amcache_sink_blob = next(s for s in state_blob["sinks"] if s["func"] == "amcache.applications")
 
