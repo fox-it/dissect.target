@@ -65,10 +65,10 @@ def mock_client(mock_paho: MagicMock) -> Iterator[MagicMock]:
 @pytest.mark.parametrize(
     "alias, hosts, disks, disk, seek, read, expected",
     [
-        ("host1", "host1", [3], 0, 0, 3, b"\x00\x01\x02"),  # basic
-        ("host2", "host2", [10], 0, 1, 3, b"\x01\x02\x03"),  # + use offset
-        ("group1", "host3", [10], 0, 1, 3, b"\x01\x02\x03"),  # + use alias
-        ("group2", "host4", [10, 10, 1], 1, 1, 3, b"\x01\x02\x03"),  # + use disk 2
+        ("host1", ["host1"], [3], 0, 0, 3, b"\x00\x01\x02"),  # basic
+        ("host2", ["host2"], [10], 0, 1, 3, b"\x01\x02\x03"),  # + use offset
+        ("group1", ["host3"], [10], 0, 1, 3, b"\x01\x02\x03"),  # + use alias
+        ("group2", ["host4"], [10, 10, 1], 1, 1, 3, b"\x01\x02\x03"),  # + use disk 2
         ("group3", ["host4", "host5"], [10, 10, 1], 1, 1, 3, b"\x01\x02\x03"),  # + use disk 2
     ],
 )
