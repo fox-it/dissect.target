@@ -50,7 +50,7 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
     assert len(records) == len(file_text_map.keys())
 
     # One file should still return contents, but there should be an entry for in the logging for a CRC missmatch.
-    assert "CRC32 mismatch in single-block file: wrong-checksum.bin expected=deadbeef, actual=a48d30a6" in caplog.text
+    assert "CRC32 mismatch in single-block file: wrong-checksum.bin (expected=deadbeef, actual=a48d30a6)" in caplog.text
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
