@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import zlib
 from typing import Iterator
 
@@ -22,7 +24,7 @@ struct multi_block_entry {
     uint16    offset;
     uleb128   len;
     wchar     data[len];
-    char      crc32[4];
+    char      crc32[4]; // Big endian CRC32
 };
 
 struct single_block_entry {
@@ -30,12 +32,12 @@ struct single_block_entry {
     uleb128   len;
     wchar     data[len];
     char      unk1;
-    char      crc32[4];
+    char      crc32[4]; // Big endian CRC32
 };
 
 struct header_crc {
     char      unk[4];
-    char      crc32[4];
+    char      crc32[4]; // Big endian CRC32
 };
 
 struct tab {
@@ -82,9 +84,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         if not self.users_tabs:
             raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
 
-    def _process_tab_file(
-        self, file: TargetPath, user: UnixUserRecord | WindowsUserRecord
-    ) -> TextEditorTabRecord:
+    def _process_tab_file(self, file: TargetPath, user: UnixUserRecord | WindowsUserRecord) -> TextEditorTabRecord:
         """Parse a binary tab file and reconstruct the contents.
 
         Args:
@@ -164,12 +164,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Join all the characters to reconstruct the original text
                 text = "".join(text)
 
-        return TextEditorTabRecord(
-            content=text,
-            path=file,
-            _target=self.target,
-            _user=user
-        )
+        return TextEditorTabRecord(content=text, path=file, _target=self.target, _user=user)
 
     @export(record=TextEditorTabRecord)
     def tabs(self) -> Iterator[TextEditorTabRecord]:
