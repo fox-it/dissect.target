@@ -100,8 +100,6 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             if tab.fsize1 != 0:
                 data_entry = c_windowstab.single_block_entry(fh)
 
-                size = data_entry.len
-
                 # The header (minus the magic) plus all data (exluding the CRC32 at the end) is included in the checksum
                 actual_crc32 = _calc_crc32(tab.dumps()[3:] + data_entry.dumps()[:-4])
 
@@ -117,7 +115,6 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
             else:
                 header_crc = c_windowstab.header_crc(fh)
-
                 # Reconstruct the text of the multi_block_entry variant
                 # CRC32 is calculated based on the entire header, up to the point where the CRC32 value is stored
                 defined_header_crc32 = header_crc.crc32
@@ -168,7 +165,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Join all the characters to reconstruct the original text
                 text = "".join(text)
 
-        return TextEditorTabRecord(content=text, content_length=size, path=file, _target=self.target, _user=user)
+        return TextEditorTabRecord(content=text, path=file, _target=self.target, _user=user)
 
     @export(record=TextEditorTabRecord)
     def tabs(self) -> Iterator[TextEditorTabRecord]:
@@ -176,7 +173,6 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
         Yields TextEditorTabRecord with the following fields:
             contents (string): The contents of the tab.
-            content_length (int): The length of the tab content.
             path (path): The path the content originates from.
         """
         for file, user in self.users_tabs:
