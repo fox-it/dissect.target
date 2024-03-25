@@ -164,7 +164,12 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Join all the characters to reconstruct the original text
                 text = "".join(text)
 
-        return TextEditorTabRecord(content=text, path=file, _target=self.target, _user=user)
+        return TextEditorTabRecord(
+            content=text,
+            path=file,
+            _target=self.target,
+            _user=user
+        )
 
     @export(record=TextEditorTabRecord)
     def tabs(self) -> Iterator[TextEditorTabRecord]:
