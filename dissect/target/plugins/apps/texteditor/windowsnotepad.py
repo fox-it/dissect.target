@@ -1,5 +1,5 @@
 import zlib
-from typing import Iterator, List, Union
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 
@@ -69,7 +69,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
     def __init__(self, target):
         super().__init__(target)
-        self.users_tabs: List[TargetPath, Union[UnixUserRecord, WindowsUserRecord]] = []
+        self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
 
         for user_details in self.target.user_details.all_with_home():
             for tab_file in user_details.home_path.glob(self.GLOB):
@@ -83,10 +83,9 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
 
     def _process_tab_file(
-        self, file: TargetPath, user: Union[UnixUserRecord, WindowsUserRecord]
+        self, file: TargetPath, user: UnixUserRecord | WindowsUserRecord
     ) -> TextEditorTabRecord:
-        """
-        Function that parses a binary tab file and reconstructs the contents.
+        """Parse a binary tab file and reconstruct the contents.
 
         Args:
             file: The binary file on disk that needs to be parsed.
@@ -105,7 +104,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
                 if data_entry.crc32 != actual_crc32:
                     self.target.log.warning(
-                        "CRC32 mismatch in single-block file: %s " "expected=%s, actual=%s",
+                        "CRC32 mismatch in single-block file: %s (expected=%s, actual=%s)",
                         file.name,
                         data_entry.crc32.hex(),
                         actual_crc32.hex(),
