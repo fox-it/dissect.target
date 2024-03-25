@@ -21,6 +21,7 @@ from dissect.target.plugin import (
     OSPlugin,
     Plugin,
     PluginFunction,
+    find_plugin_functions,
     get_external_module_paths,
     load_modules_from_paths,
 )
@@ -289,3 +290,25 @@ def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[s
     for target in targets:
         uris.append(f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else ""))
     return uris
+
+
+def find_and_filter_plugins(
+    target: Target, functions: str, excluded_func_paths: set[str] = None
+) -> Iterator[PluginFunction]:
+    # Keep a set of plugins that were already executed on the target.
+    executed_plugins = set()
+    excluded_func_paths = excluded_func_paths or set()
+
+    func_defs, _ = find_plugin_functions(target, functions, compatibility=False)
+
+    for func_def in func_defs:
+        if func_def.path in excluded_func_paths:
+            continue
+
+        # Avoid executing same plugin for multiple OSes (like hostname)
+        if func_def.name in executed_plugins:
+            continue
+
+        executed_plugins.add(func_def.name)
+
+        yield func_def
