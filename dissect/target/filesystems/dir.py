@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import BinaryIO, Iterator
 
@@ -7,6 +6,7 @@ from dissect.target.exceptions import (
     FilesystemError,
     IsADirectoryError,
     NotADirectoryError,
+    NotASymlinkError,
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
@@ -113,7 +113,9 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             return False
 
     def readlink(self) -> str:
-        return os.readlink(self.entry)  # Python 3.7 compatibility
+        if not self.is_symlink():
+            raise NotASymlinkError()
+        return str(self.entry.readlink())
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
