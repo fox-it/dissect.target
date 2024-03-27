@@ -6,7 +6,7 @@ import logging
 import zlib
 from itertools import cycle, islice
 from pathlib import Path
-from typing import BinaryIO, Optional, Sequence
+from typing import BinaryIO
 
 from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
@@ -16,7 +16,7 @@ from dissect.target.tools.utils import catch_sigpipe
 log = logging.getLogger(__name__)
 
 
-def find_xor_key(fh: io.BytesIO) -> bytes:
+def find_xor_key(fh: BinaryIO) -> bytes:
     """Find the XOR key for the firmware file by using known plaintext of zeros.
 
     File-like object ``fh`` must be seeked to the correct offset where it should decode to all zeroes (0x00).
@@ -57,6 +57,7 @@ class FortiFirmwareFile(AlignedStream):
         self.fh = fh
         self.trailer_offset = None
         self.trailer_data = None
+        self.xor_key = None
         self.is_gzipped = False
 
         size = None
@@ -81,8 +82,8 @@ class FortiFirmwareFile(AlignedStream):
 
             # Ignore the trailer data of the gzip file if we have any
             if dec.unused_data:
-                self.fh.seek(-len(dec.unused_data), io.SEEK_END)
-                self.trailer_offset = self.fh.tell()
+                self.fh.seek(size)
+                self.trailer_offset = size
                 self.trailer_data = self.fh.read()
                 log.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
                 self.fh = RangeStream(self.fh, 0, self.trailer_offset)
@@ -99,13 +100,11 @@ class FortiFirmwareFile(AlignedStream):
                 log.info("Found key %r @ offset %s", self.xor_key, zero_offset)
                 break
         else:
-            self.xor_key = None
             log.info("No xor key found")
 
         # Determine the size of the firmware file if we didn't calculate it yet
         if size is None:
-            self.fh.seek(0, io.SEEK_END)
-            size = self.fh.tell()
+            size = self.fh.seek(0, io.SEEK_END)
 
         log.info("firmware size: %s", size)
         log.info("xor key: %r", self.xor_key)
@@ -171,7 +170,7 @@ class FortiFirmwareContainer(Container):
 
 
 @catch_sigpipe
-def main(argv: Optional[Sequence[str]] = None) -> None:
+def main(argv: list[str] | None = None) -> None:
     import argparse
     import shutil
     import sys
