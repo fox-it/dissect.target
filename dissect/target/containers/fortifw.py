@@ -3,8 +3,9 @@ import io
 import logging
 import os
 import zlib
+from itertools import cycle, islice
 from pathlib import Path
-from typing import BinaryIO, Union
+from typing import BinaryIO, Optional, Sequence, Union
 
 from dissect.util.stream import RangeStream, RelativeStream
 
@@ -26,18 +27,24 @@ def find_xor_key(fobj: io.BytesIO) -> bytes:
     """
     key = bytearray()
 
-    old_pos = fobj.tell()
+    pos = fobj.tell()
     buf = fobj.read(32)
-    fobj.seek(old_pos)
+    fobj.seek(pos)
 
-    xor_char = 0xFF
-    for idx in range(32):
-        for k in range(0x100):
-            key_char = (xor_char ^ k ^ idx) & 0xFF
-            if key_char == buf[idx]:
-                key.append(k)
-                xor_char = buf[idx]
-                break
+    if pos % 512 == 0:
+        xor_char = 0xFF
+    else:
+        fobj.seek(pos - 1)
+        xor_char = ord(fobj.read(1))
+
+    for i, k_char in enumerate(buf):
+        idx = (i + pos) & 0x1F
+        key.append((xor_char ^ k_char ^ idx) & 0xFF)
+        xor_char = k_char
+
+    # align xor key
+    koffset = 32 - (pos & 0x1F)
+    key = islice(cycle(key), koffset, koffset + 32)
     return bytes(key)
 
 
@@ -79,10 +86,10 @@ class FortiFirmwareFile:
             self.fh = gzip.GzipFile(fileobj=self.fh)
 
         # Find the xor key based on known offsets where the firmware should decode to zero bytes
-        for zero_offset in (0, 0x400, 0x200):
+        for zero_offset in (0x30, 0x40, 0x400):
             self.fh.seek(zero_offset)
             xor_key = find_xor_key(self.fh)
-            if xor_key and xor_key.isascii():
+            if xor_key.isalnum():
                 self.xor_key = xor_key
                 logger.info("Found key %r @ offset %s", self.xor_key, zero_offset)
                 break
@@ -106,7 +113,6 @@ class FortiFirmwareFile:
     def read(self, n=-1):
         data = bytearray()
 
-        xor_char = -1
         while True:
             pos = self.fh.tell()
             buf = self.fh.read(io.DEFAULT_BUFFER_SIZE)
@@ -114,9 +120,16 @@ class FortiFirmwareFile:
                 break
 
             if self.xor_key:
+                if pos % 512 == 0:
+                    xor_char = 0xFF
+                else:
+                    self.fh.seek(pos - 1)
+                    xor_char = ord(self.fh.read(1))
+                    self.fh.seek(pos + len(buf))
+
                 for i, cur_char in enumerate(buf):
                     if (i + pos) % 512 == 0:
-                        xor_char = -1
+                        xor_char = 0xFF
                     idx = (i + pos) & 0x1F
                     data.append(((self.xor_key[idx] ^ cur_char ^ xor_char) - idx) & 0xFF)
                     xor_char = cur_char
@@ -165,3 +178,27 @@ class FortiFirmwareContainer(Container):
 
     def close(self) -> None:
         pass
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Decompress and deobfuscate Fortinet firmware file to stdout.")
+    parser.add_argument("file", type=argparse.FileType("rb"), help="Fortinet firmware file")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    args = parser.parse_args(argv)
+
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    ff = FortiFirmwareFile(args.file)
+    while True:
+        data = ff.read(io.DEFAULT_BUFFER_SIZE)
+        if not data:
+            break
+        sys.stdout.buffer.write(data)
+
+
+if __name__ == "__main__":
+    main()
