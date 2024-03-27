@@ -122,16 +122,16 @@ class FortiFirmwareFile(AlignedStream):
         if not self.xor_key:
             return buf
 
-        data = bytearray()
+        buf = bytearray(buf)
         xor_char = 0xFF
         for i, cur_char in enumerate(buf):
             if (i + offset) % 512 == 0:
                 xor_char = 0xFF
             idx = (i + offset) & 0x1F
-            data.append(((self.xor_key[idx] ^ cur_char ^ xor_char) - idx) & 0xFF)
+            buf[i] = ((self.xor_key[idx] ^ cur_char ^ xor_char) - idx) & 0xFF
             xor_char = cur_char
 
-        return bytes(data)
+        return bytes(buf)
 
 
 class FortiFirmwareContainer(Container):
