@@ -3,11 +3,10 @@ from __future__ import annotations
 import gzip
 import io
 import logging
-import os
 import zlib
 from itertools import cycle, islice
 from pathlib import Path
-from typing import BinaryIO, Optional, Sequence, Union
+from typing import BinaryIO, Optional, Sequence
 
 from dissect.util.stream import RangeStream, RelativeStream
 
@@ -20,13 +19,13 @@ log = logging.getLogger(__name__)
 def find_xor_key(fh: io.BytesIO) -> bytes:
     """Find the XOR key for the firmware file by using known plaintext of zeros.
 
-    File object ``fobj`` should be at the correct offset where it should decode to all zeroes (0x00).
+    File-like object ``fh`` must be seeked to the correct offset where it should decode to all zeroes (0x00).
 
     Arguments:
         fh: File-like object to read from.
 
     Returns:
-        bytes: XOR key, zero bytes if no key is found.
+        bytes: XOR key, note that the XOR key is not validated and may be incorrect.
     """
     key = bytearray()
 
@@ -37,7 +36,7 @@ def find_xor_key(fh: io.BytesIO) -> bytes:
     if pos % 512 == 0:
         xor_char = 0xFF
     else:
-        fobj.seek(pos - 1)
+        fh.seek(pos - 1)
         xor_char = ord(fh.read(1))
 
     for i, k_char in enumerate(buf):
@@ -57,9 +56,11 @@ class FortiFirmwareFile:
     def __init__(self, fh: BinaryIO):
         self.fh = fh
         self.size = None
+        self.trailer_offset = None
+        self.trailer_data = None
+        self.is_gzipped = False
 
         # Check if the file is gzipped
-        self.is_gzipped = False
         self.fh.seek(0)
         header = self.fh.read(4)
         if header.startswith(b"\x1f\x8b"):
@@ -82,7 +83,7 @@ class FortiFirmwareFile:
                 self.fh.seek(-len(dec.unused_data), io.SEEK_END)
                 self.trailer_offset = self.fh.tell()
                 self.trailer_data = self.fh.read()
-                logger.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
+                log.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
                 self.fh = RangeStream(self.fh, 0, self.trailer_offset)
 
             self.fh.seek(0)
@@ -94,20 +95,20 @@ class FortiFirmwareFile:
             xor_key = find_xor_key(self.fh)
             if xor_key.isalnum():
                 self.xor_key = xor_key
-                logger.info("Found key %r @ offset %s", self.xor_key, zero_offset)
+                log.info("Found key %r @ offset %s", self.xor_key, zero_offset)
                 break
         else:
             self.xor_key = None
-            logger.info("No xor key found")
+            log.info("No xor key found")
 
         # Determine the size of the firmware file if we didn't calculate it yet
         if self.size is None:
             self.fh.seek(0, io.SEEK_END)
             self.size = self.fh.tell()
 
-        logger.info("firmware size: %s", self.size)
-        logger.info("key: %r", self.xor_key)
-        logger.info("gzipped: %s", self.is_gzipped)
+        log.info("firmware size: %s", self.size)
+        log.info("xor key: %r", self.xor_key)
+        log.info("gzipped: %s", self.is_gzipped)
         self.fh.seek(0)
 
     def seek(self, offset, whence=io.SEEK_SET):
@@ -186,6 +187,7 @@ class FortiFirmwareContainer(Container):
 @catch_sigpipe
 def main(argv: Optional[Sequence[str]] = None) -> None:
     import argparse
+    import shutil
     import sys
 
     parser = argparse.ArgumentParser(description="Decompress and deobfuscate Fortinet firmware file to stdout.")
@@ -197,11 +199,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         logging.basicConfig(level=logging.INFO)
 
     ff = FortiFirmwareFile(args.file)
-    while True:
-        data = ff.read(io.DEFAULT_BUFFER_SIZE)
-        if not data:
-            break
-        sys.stdout.buffer.write(data)
+    shutil.copyfileobj(ff, sys.stdout.buffer)
 
 
 if __name__ == "__main__":
