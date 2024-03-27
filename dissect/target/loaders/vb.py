@@ -14,8 +14,8 @@ class VBLoader(Loader):
         return (mft_exists or c_drive_exists) and config_exists
 
     def map(self, target):
-        remap_overlay = target.fs.add_layer()
-        ntfs_overlay = target.fs.add_layer()
+        remap_overlay = target.fs.append_layer()
+        ntfs_overlay = target.fs.append_layer()
         dfs = DirectoryFilesystem(self.path, case_sensitive=False)
         target.filesystems.add(dfs)
 

@@ -99,10 +99,10 @@ def test_symlink_across_layers(target_bare: Target) -> None:
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
     target_entry = target_bare.fs.get("/path/to/symlink/target").readlink_ext()
@@ -118,10 +118,10 @@ def test_symlink_files_across_layers(target_bare: Target) -> None:
     vfs2 = VirtualFilesystem()
     target_dir = vfs2.makedirs("/path/to/target/derp")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
     target_entry = target_bare.fs.get("/path/to/symlink/target/derp")
@@ -139,10 +139,10 @@ def test_symlink_to_symlink_across_layers(target_bare: Target) -> None:
     vfs2 = VirtualFilesystem()
     vfs2.symlink("../target", "/path/to/target")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
     target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
@@ -158,10 +158,10 @@ def test_recursive_symlink_across_layers(target_bare: Target) -> None:
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
@@ -179,13 +179,13 @@ def test_symlink_across_3_layers(target_bare: Target) -> None:
     vfs3 = VirtualFilesystem()
     target_dir = vfs3.makedirs("/path/target")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
-    layer3 = target_bare.fs.add_layer()
+    layer3 = target_bare.fs.append_layer()
     layer3.mount("/", vfs3)
 
     target_entry = target_bare.fs.get("/path/to/symlink/target/").readlink_ext()
@@ -204,10 +204,10 @@ def test_recursive_symlink_open_across_layers(target_bare: Target) -> None:
     vfs2 = VirtualFilesystem()
     vfs2.symlink("symlink/target", "/path/to/target")
 
-    layer1 = target_bare.fs.add_layer()
+    layer1 = target_bare.fs.append_layer()
     layer1.mount("/", vfs1)
 
-    layer2 = target_bare.fs.add_layer()
+    layer2 = target_bare.fs.append_layer()
     layer2.mount("/", vfs2)
 
     with pytest.raises(SymlinkRecursionError):
@@ -1182,20 +1182,45 @@ def test_layer_filesystem() -> None:
     vfs4 = VirtualFilesystem()
     vfs4.map_file_fh("file1", BytesIO(b"value4"))
 
-    lfs.add_fs_layer(vfs1)
+    lfs.append_fs_layer(vfs1)
     assert lfs.path("file1").read_text() == "value1"
 
-    lfs.add_fs_layer(vfs2)
+    lfs.append_fs_layer(vfs2)
     assert lfs.path("file1").read_text() == "value1"
     assert lfs.path("file2").read_text() == "value2"
 
-    lfs.add_fs_layer(vfs3)
+    lfs.append_fs_layer(vfs3)
     assert lfs.path("file1").read_text() == "value1"
     assert lfs.path("file2").read_text() == "value2"
     assert lfs.path("file3").read_text() == "value3"
 
-    lfs.add_fs_layer(vfs4)
+    lfs.append_fs_layer(vfs4)
     assert lfs.path("file1").read_text() == "value4"
     lfs.remove_fs_layer(vfs4)
     lfs.prepend_fs_layer(vfs4)
     assert lfs.path("file1").read_text() == "value1"
+
+
+def test_layer_filesystem_mount() -> None:
+    lfs = LayerFilesystem()
+
+    vfs1 = VirtualFilesystem()
+    vfs1.map_file_fh("file1", BytesIO(b"value1"))
+
+    vfs2 = VirtualFilesystem()
+    vfs2.map_file_fh("file2", BytesIO(b"value2"))
+
+    lfs.mount("/vfs", vfs1)
+    lfs.mount("/vfs", vfs2, ignore_existing=True)
+
+    assert lfs.listdir("/vfs") == ["file2"]
+
+    lfs.mount("/vfs", vfs1, ignore_existing=True)
+
+    assert lfs.listdir("/vfs") == ["file1"]
+
+    lfs.mount("/vfs", vfs2, ignore_existing=False)
+
+    assert sorted(lfs.listdir("/vfs")) == ["file1", "file2"]
+    assert lfs.path("/vfs/file1").read_text() == "value1"
+    assert lfs.path("/vfs/file2").read_text() == "value2"

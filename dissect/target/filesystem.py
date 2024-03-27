@@ -1302,7 +1302,7 @@ class LayerFilesystem(Filesystem):
         self._alt_separator = "/"
         self._case_sensitive = True
         self._root_entry = LayerFilesystemEntry(self, "/", [])
-        self.root = self.add_layer()
+        self.root = self.append_layer()
         super().__init__(None, **kwargs)
 
     def __getattr__(self, attr: str) -> Any:
@@ -1339,7 +1339,7 @@ class LayerFilesystem(Filesystem):
                 continue
 
             if path.startswith(mount):
-                root = self.add_layer()
+                root = self.append_layer()
                 break
 
         root.map_fs(path, fs)
