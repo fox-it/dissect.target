@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gzip
 import io
 import logging
@@ -12,31 +14,31 @@ from dissect.util.stream import RangeStream, RelativeStream
 from dissect.target.container import Container
 from dissect.target.tools.utils import catch_sigpipe
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
-def find_xor_key(fobj: io.BytesIO) -> bytes:
+def find_xor_key(fh: io.BytesIO) -> bytes:
     """Find the XOR key for the firmware file by using known plaintext of zeros.
 
     File object ``fobj`` should be at the correct offset where it should decode to all zeroes (0x00).
 
     Arguments:
-        fobj: file object to read from
+        fh: File-like object to read from.
 
     Returns:
-        bytes: XOR key, zero bytes if no key is found
+        bytes: XOR key, zero bytes if no key is found.
     """
     key = bytearray()
 
-    pos = fobj.tell()
-    buf = fobj.read(32)
-    fobj.seek(pos)
+    pos = fh.tell()
+    buf = fh.read(32)
+    fh.seek(pos)
 
     if pos % 512 == 0:
         xor_char = 0xFF
     else:
         fobj.seek(pos - 1)
-        xor_char = ord(fobj.read(1))
+        xor_char = ord(fh.read(1))
 
     for i, k_char in enumerate(buf):
         idx = (i + pos) & 0x1F
@@ -52,8 +54,8 @@ def find_xor_key(fobj: io.BytesIO) -> bytes:
 class FortiFirmwareFile:
     """Fortinet firmware file, handles transparant decompression and deobfuscation of the firmware file."""
 
-    def __init__(self, fobj: io.BytesIO) -> None:
-        self.fh = fobj
+    def __init__(self, fh: BinaryIO):
+        self.fh = fh
         self.size = None
 
         # Check if the file is gzipped
@@ -77,7 +79,7 @@ class FortiFirmwareFile:
 
             # Ignore the trailer data of the gzip file if we have any
             if dec.unused_data:
-                self.fh.seek(-len(dec.unused_data), os.SEEK_END)
+                self.fh.seek(-len(dec.unused_data), io.SEEK_END)
                 self.trailer_offset = self.fh.tell()
                 self.trailer_data = self.fh.read()
                 logger.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
@@ -148,7 +150,7 @@ class FortiFirmwareFile:
 class FortiFirmwareContainer(Container):
     __type__ = "fortifw"
 
-    def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs) -> None:
+    def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
         if not hasattr(fh, "read"):
             fh = fh.open("rb")
 
@@ -160,11 +162,11 @@ class FortiFirmwareContainer(Container):
         super().__init__(self.fw, self.ff.size, *args, **kwargs)
 
     @staticmethod
-    def detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return False
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         # all Fortinet firmware files end with `-FORTINET.out`
         return str(path).lower().endswith("-fortinet.out")
 
@@ -188,7 +190,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
     parser = argparse.ArgumentParser(description="Decompress and deobfuscate Fortinet firmware file to stdout.")
     parser.add_argument("file", type=argparse.FileType("rb"), help="Fortinet firmware file")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--verbose", "-v", action="store_true", help="verbose output")
     args = parser.parse_args(argv)
 
     if args.verbose:
