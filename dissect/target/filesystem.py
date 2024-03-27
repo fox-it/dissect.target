@@ -1600,7 +1600,7 @@ class RootFilesystem(LayerFilesystem):
     def detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on RootFilesystem class")
 
-    def get(self, path: str, relentry: LayerFilesystemEntry = None) -> RootFilesystemEntry:
+    def get(self, path: str, relentry: Optional[LayerFilesystemEntry] = None) -> RootFilesystemEntry:
         self.target.log.debug("%r::get(%r)", self, path)
         entry = super().get(path, relentry)
         entry.__class__ = RootFilesystemEntry
