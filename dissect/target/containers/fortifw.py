@@ -8,7 +8,7 @@ from itertools import cycle, islice
 from pathlib import Path
 from typing import BinaryIO, Optional, Sequence
 
-from dissect.util.stream import RangeStream, RelativeStream
+from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
 from dissect.target.container import Container
 from dissect.target.tools.utils import catch_sigpipe
@@ -50,15 +50,16 @@ def find_xor_key(fh: io.BytesIO) -> bytes:
     return bytes(key)
 
 
-class FortiFirmwareFile:
+class FortiFirmwareFile(AlignedStream):
     """Fortinet firmware file, handles transparant decompression and deobfuscation of the firmware file."""
 
     def __init__(self, fh: BinaryIO):
         self.fh = fh
-        self.size = None
         self.trailer_offset = None
         self.trailer_data = None
         self.is_gzipped = False
+
+        size = None
 
         # Check if the file is gzipped
         self.fh.seek(0)
@@ -70,13 +71,13 @@ class FortiFirmwareFile:
             # as a bonus we can also calculate the size of the firmware here
             dec = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
             self.fh.seek(0)
-            self.size = 0
+            size = 0
             while True:
                 data = self.fh.read(io.DEFAULT_BUFFER_SIZE)
                 if not data:
                     break
                 d = dec.decompress(dec.unconsumed_tail + data)
-                self.size += len(d)
+                size += len(d)
 
             # Ignore the trailer data of the gzip file if we have any
             if dec.unused_data:
@@ -102,50 +103,35 @@ class FortiFirmwareFile:
             log.info("No xor key found")
 
         # Determine the size of the firmware file if we didn't calculate it yet
-        if self.size is None:
+        if size is None:
             self.fh.seek(0, io.SEEK_END)
-            self.size = self.fh.tell()
+            size = self.fh.tell()
 
-        log.info("firmware size: %s", self.size)
+        log.info("firmware size: %s", size)
         log.info("xor key: %r", self.xor_key)
         log.info("gzipped: %s", self.is_gzipped)
         self.fh.seek(0)
 
-    def seek(self, offset, whence=io.SEEK_SET):
-        return self.fh.seek(offset, whence)
+        # Align the stream to 512 bytes which simplifies the XOR deobfuscation code
+        super().__init__(size=size, align=512)
 
-    def read(self, n=-1):
+    def _read(self, offset: int, length: int) -> bytes:
+        self.fh.seek(offset)
+        buf = self.fh.read(length)
+
+        if not self.xor_key:
+            return buf
+
         data = bytearray()
+        xor_char = 0xFF
+        for i, cur_char in enumerate(buf):
+            if (i + offset) % 512 == 0:
+                xor_char = 0xFF
+            idx = (i + offset) & 0x1F
+            data.append(((self.xor_key[idx] ^ cur_char ^ xor_char) - idx) & 0xFF)
+            xor_char = cur_char
 
-        while True:
-            pos = self.fh.tell()
-            buf = self.fh.read(io.DEFAULT_BUFFER_SIZE)
-            if not buf:
-                break
-
-            if self.xor_key:
-                if pos % 512 == 0:
-                    xor_char = 0xFF
-                else:
-                    self.fh.seek(pos - 1)
-                    xor_char = ord(self.fh.read(1))
-                    self.fh.seek(pos + len(buf))
-
-                for i, cur_char in enumerate(buf):
-                    if (i + pos) % 512 == 0:
-                        xor_char = 0xFF
-                    idx = (i + pos) & 0x1F
-                    data.append(((self.xor_key[idx] ^ cur_char ^ xor_char) - idx) & 0xFF)
-                    xor_char = cur_char
-            else:
-                data.extend(buf)
-
-            if n > 0 and len(data) >= n:
-                break
-
-        if n == -1:
-            n = None
-        return bytes(data[:n])
+        return bytes(data)
 
 
 class FortiFirmwareContainer(Container):
