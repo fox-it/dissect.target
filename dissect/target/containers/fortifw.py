@@ -10,6 +10,7 @@ from typing import BinaryIO, Optional, Sequence, Union
 from dissect.util.stream import RangeStream, RelativeStream
 
 from dissect.target.container import Container
+from dissect.target.tools.utils import catch_sigpipe
 
 logger = logging.getLogger(__name__)
 
@@ -180,6 +181,7 @@ class FortiFirmwareContainer(Container):
         pass
 
 
+@catch_sigpipe
 def main(argv: Optional[Sequence[str]] = None) -> None:
     import argparse
     import sys
