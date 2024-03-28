@@ -82,8 +82,7 @@ class FortiFirmwareFile(AlignedStream):
 
             # Ignore the trailer data of the gzip file if we have any
             if dec.unused_data:
-                self.fh.seek(size)
-                self.trailer_offset = size
+                self.trailer_offset = self.fh.seek(-len(dec.unused_data), io.SEEK_END)
                 self.trailer_data = self.fh.read()
                 log.info("Found trailer offset: %d, data: %r", self.trailer_offset, self.trailer_data)
                 self.fh = RangeStream(self.fh, 0, self.trailer_offset)

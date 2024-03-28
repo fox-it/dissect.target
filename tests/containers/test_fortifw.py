@@ -57,6 +57,19 @@ def test_deobfuscate_firmware_file(header, is_gzipped):
     assert ff.size == len(FIRMWARE_HEADER)
 
 
+def test_gzip_trailer():
+    trailer_data = b"TRAILER DATA"
+
+    gzip_data = gzip.compress(FIRMWARE_HEADER)
+    fh = io.BytesIO(gzip_data + trailer_data)
+    ff = FortiFirmwareFile(fh)
+
+    assert ff.is_gzipped
+    assert ff.size == len(FIRMWARE_HEADER)
+    assert ff.trailer_offset == len(gzip_data)
+    assert ff.trailer_data == trailer_data
+
+
 def test_fortifw_main(tmp_path, capsysbinary):
     fw_path = tmp_path / "fw.bin"
     fw_path.write_bytes(FIRMWARE_HEADER)
