@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import zlib
-from enum import IntEnum
 from typing import Iterator
 
 from dissect.cstruct import cstruct
@@ -66,11 +65,6 @@ TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension]
 )
 
 
-class FileState(IntEnum):
-    Unsaved = 0x00
-    Saved = 0x01
-
-
 def _calc_crc32(data: bytes) -> bytes:
     """Perform a CRC32 checksum on the data and return it as bytes."""
     return zlib.crc32(data).to_bytes(length=4, byteorder="big")
@@ -115,7 +109,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             # Currently, no information in the header is used in the outputted records, only the contents of the tab
             tab = (
                 c_windowstab.header_saved_tab(fh)
-                if header.fileState == FileState.Saved
+                if header.fileState == 0x01  # 0x00 is unsaved, 0x01 is saved
                 else c_windowstab.header_unsaved_tab(fh)
             )
 
