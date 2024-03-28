@@ -26,6 +26,12 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
         "3d0cc86e-dfc9-4f16-b74a-918c2c24188c.bin": loremipsum,
         "wrong-checksum.bin": text4,  # only added to check for corrupt checksum, not validity
         "cfe38135-9dca-4480-944f-d5ea0e1e589f.bin": (loremipsum * 37)[:-2],  # removed the two newlines in this file
+        "saved.bin": "Saved!",
+        "unsaved.bin": "Not saved at all",
+        "unsaved-with-deletions.bin": "Not saved aasdflasd",
+        "appclosed_saved_and_deletions.bin": "Closing application now. It's saved but now I'm adding unsaved"
+        " changes and closing the application again. Dit a few deletions!",
+        "appclosed_unsaved.bin": "Closing application now",
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
