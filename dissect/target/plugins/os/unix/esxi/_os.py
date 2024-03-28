@@ -97,7 +97,7 @@ class ESXiPlugin(UnixPlugin):
 
         # Create a root layer for the "local state" filesystem
         # This stores persistent configuration data
-        local_layer = target.fs.add_layer()
+        local_layer = target.fs.append_layer()
 
         # Mount all the visor tars in individual filesystem layers
         _mount_modules(target, sysvol, cfg)
@@ -209,7 +209,7 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
             tfs = tar.TarFilesystem(cfile, tarinfo=vmtar.VisorTarInfo)
 
         if tfs:
-            target.fs.add_layer().mount("/", tfs)
+            target.fs.append_layer().mount("/", tfs)
 
 
 def _mount_local(target: Target, local_layer: VirtualFilesystem):
