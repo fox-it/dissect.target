@@ -9,6 +9,17 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 
+DROP_FILE_DIR = "sysvol/drop/"
+
+
+def dropfolder(target: Target, pattern: str):
+    """Convience function, usage:
+
+    for data_file in dropfolder(target, "*.data"):
+        self._plugin_files.append(data_file)
+    """
+    return target.fs.path(DROP_FILE_DIR).glob(pattern)
+
 
 @arg("--log-hint", dest="hint", help="hint for file type")
 class LogLoader(Loader):
@@ -42,7 +53,7 @@ class LogLoader(Loader):
         target.fs.mount("/", vfs)
         for entry in self.path.parent.glob(self.path.name):
             ext = self.options.get("hint", entry.suffix.lower()).strip(".")
-            if (mapping := self.LOGS_DIRS.get(ext, None)) is None:
+            if (mapping := self.LOGS_DIRS.get(ext, DROP_FILE_DIR)) is None:
                 continue
             mapping = str(vfs.path(mapping).joinpath(entry.name))
             vfs.map_file(mapping, str(entry))
