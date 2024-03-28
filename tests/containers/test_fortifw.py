@@ -1,5 +1,6 @@
 import gzip
 import io
+from pathlib import Path
 
 import pytest
 
@@ -20,7 +21,7 @@ a9f1 a2fb a2fc b0eb 9eca 93c6 83d1 b5fa
 )
 
 
-def test_find_xor_key():
+def test_find_xor_key() -> None:
     fh = io.BytesIO(FIRMWARE_HEADER)
     for offset in (0x30, 0x40, 0x31, 0x35):
         fh.seek(offset)
@@ -41,7 +42,7 @@ def test_find_xor_key():
         pytest.param(gzip.compress(FIRMWARE_HEADER), True, id="compressed"),
     ],
 )
-def test_deobfuscate_firmware_file(header, is_gzipped):
+def test_deobfuscate_firmware_file(header: bytes, is_gzipped: bool) -> None:
     ff = FortiFirmwareFile(io.BytesIO(header))
 
     # magic bytes
@@ -57,7 +58,20 @@ def test_deobfuscate_firmware_file(header, is_gzipped):
     assert ff.size == len(FIRMWARE_HEADER)
 
 
-def test_fortifw_main(tmp_path, capsysbinary):
+def test_gzip_trailer() -> None:
+    trailer_data = b"TRAILER DATA"
+
+    gzip_data = gzip.compress(FIRMWARE_HEADER)
+    fh = io.BytesIO(gzip_data + trailer_data)
+    ff = FortiFirmwareFile(fh)
+
+    assert ff.is_gzipped
+    assert ff.size == len(FIRMWARE_HEADER)
+    assert ff.trailer_offset == len(gzip_data)
+    assert ff.trailer_data == trailer_data
+
+
+def test_fortifw_main(tmp_path: Path, capsysbinary: pytest.CaptureFixture[bytes]) -> None:
     fw_path = tmp_path / "fw.bin"
     fw_path.write_bytes(FIRMWARE_HEADER)
 
