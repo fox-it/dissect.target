@@ -193,13 +193,9 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                                 actual_crc32.hex(),
                             )
 
-                        # Extend the list if required. All characters need to fit in the list.
-                        while data_entry.offset + data_entry.nAdded > len(text):
-                            text.append("\x00")
-
                         # Insert the text at the correct offset.
                         for idx in range(data_entry.nAdded):
-                            text[data_entry.offset + idx] = data_entry.data[idx]
+                            text.insert(data_entry.offset + idx, data_entry.data[idx])
 
                     elif data_entry.nDeleted > 0:
                         # Create a new slice. Include everything up to the offset,

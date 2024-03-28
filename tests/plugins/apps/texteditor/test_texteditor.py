@@ -32,6 +32,9 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
         "appclosed_saved_and_deletions.bin": "Closing application now. It's saved but now I'm adding unsaved"
         " changes and closing the application again. Dit a few deletions!",
         "appclosed_unsaved.bin": "Closing application now",
+        "lots-of-deletions.bin": "This a text, which is nothing special. But I am going to modify it a bit. "
+        "For example, I have removed quote some stuff. Adding a word in the beginning now."
+        ".. At this point, I've edited it quite a lot.",
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
