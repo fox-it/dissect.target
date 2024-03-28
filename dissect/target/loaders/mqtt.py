@@ -65,6 +65,9 @@ class MQTTStream(AlignedStream):
 class MQTTConnection:
     broker = None
     host = None
+    prev = -1
+    factor = 1
+    prefetch_factor_inc = 10
 
     def __init__(self, broker: Broker, host: str):
         self.broker = broker
@@ -95,8 +98,21 @@ class MQTTConnection:
 
     def read(self, disk_id: int, offset: int, length: int, optimization_strategy: int) -> bytes:
         message = None
-        self.broker.seek(self.host, disk_id, offset, length, optimization_strategy)
 
+        message = self.broker.read(self.host, disk_id, offset, length)
+        if message:
+            return message.data
+
+        if self.prev == offset - (length * self.factor):
+            if self.factor < 500:
+                self.factor += self.prefetch_factor_inc
+        else:
+            self.factor = 1
+
+        self.prev = offset
+        flength = length * self.factor
+        self.broker.factor = self.factor
+        self.broker.seek(self.host, disk_id, offset, flength, optimization_strategy)
         attempts = 0
         while True:
             message = self.broker.read(self.host, disk_id, offset, length)
@@ -108,7 +124,7 @@ class MQTTConnection:
             time.sleep(0.01)
             if attempts > 100:
                 # message might have not reached agent, resend...
-                self.broker.seek(self.host, disk_id, offset, length, optimization_strategy)
+                self.broker.seek(self.host, disk_id, offset, flength, optimization_strategy)
                 attempts = 0
 
         return message.data
@@ -123,10 +139,10 @@ class Broker:
     mqtt_client = None
     connected = False
     case = None
-
     diskinfo = {}
     index = {}
     topo = {}
+    factor = 1
 
     def __init__(self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, **kwargs):
         self.broker_host = broker
@@ -137,10 +153,14 @@ class Broker:
         self.case = case
         self.command = kwargs.get("command", None)
 
+    def clear_cache(self) -> None:
+        self.index = {}
+
     @suppress
     def read(self, host: str, disk_id: int, seek_address: int, read_length: int) -> SeekMessage:
         key = f"{host}-{disk_id}-{seek_address}-{read_length}"
-        return self.index.pop(key)
+        msg = self.index.get(key)
+        return msg
 
     @suppress
     def disk(self, host: str) -> DiskMessage:
@@ -165,14 +185,15 @@ class Broker:
         disk_id = tokens[3]
         seek_address = int(tokens[4], 16)
         read_length = int(tokens[5], 16)
-        msg = SeekMessage(data=payload)
 
-        key = f"{hostname}-{disk_id}-{seek_address}-{read_length}"
+        for i in range(0, self.factor):
+            sublength = int(read_length / self.factor)
+            start = int(i * sublength)
+            key = f"{hostname}-{disk_id}-{seek_address+start}-{sublength}"
+            if key in self.index:
+                continue
 
-        if key in self.index:
-            return
-
-        self.index[key] = msg
+            self.index[key] = SeekMessage(data=payload[start : start + sublength])
 
     def _on_id(self, hostname: str, payload: bytes) -> None:
         key = hostname
@@ -204,9 +225,14 @@ class Broker:
         elif response == "ID":
             self._on_id(hostname, msg.payload)
 
-    def seek(self, host: str, disk_id: int, offset: int, length: int, optimization_strategy: int) -> None:
+    def seek(self, host: str, disk_id: int, offset: int, flength: int, optimization_strategy: int) -> None:
+        length = int(flength / self.factor)
+        key = f"{host}-{disk_id}-{offset}-{length}"
+        if key in self.index:
+            return
+
         self.mqtt_client.publish(
-            f"{self.case}/{host}/SEEK/{disk_id}/{hex(offset)}/{hex(length)}", pack("<I", optimization_strategy)
+            f"{self.case}/{host}/SEEK/{disk_id}/{hex(offset)}/{hex(flength)}", pack("<I", optimization_strategy)
         )
 
     def info(self, host: str) -> None:
