@@ -27,7 +27,7 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
 c_def = """
 struct header {
     char        magic[2]; // NP
-    uint8       unk0; //
+    uint8       unk0;
     uint8       fileState; // 0 if unsaved, 1 if saved
 }
 
@@ -39,15 +39,13 @@ struct header_saved_tab {
     uleb128     carriageReturnType;
     uleb128     timestamp; // Windows Filetime format (not unix timestamp)
     char        sha256[32];
-    uleb128     unk0;
-    uleb128     unk1;
-    char        crc32[4]; // Big endian CRC32
+    char        unk[6];
 };
 
 struct header_unsaved_tab {
     uint8       unk0;
     uleb128     fileSize;
-    uleb128     fileSizeDuplicate; // not used
+    uleb128     fileSizeDuplicate;
     uint8       unk1;
     uint8       unk2;
 };
@@ -130,7 +128,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # An extra byte is appended to the single block, not yet sure where this is defined and/or used for
                 extra_byte = fh.read(1)
 
-                # The CRC32 value is appended after the extra byte
+                # The CRC32 value is appended after the extra byte in big-endian
                 defined_crc32 = fh.read(4)
 
                 # The header (minus the magic) plus all data (including the extra byte)  is included in the checksum
@@ -155,7 +153,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Likely holds some addition information about the tab (view options etc)
                 unknown_bytes = fh.read(4)
 
-                # In this multi-block variant, he header itself has a CRC32 value as well
+                # In this multi-block variant, he header itself has a CRC32 value in big-endian as well
                 defined_header_crc32 = fh.read(4)
 
                 # Calculate CRC32 of the header and check if it matches
@@ -180,7 +178,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                     except EOFError:
                         break
 
-                    # Each block has a CRC32 value appended to the block
+                    # Each block has a CRC32 value in big-endian appended to the block
                     defined_crc32 = fh.read(4)
 
                     # Either the nAdded is nonzero, or the nDeleted
