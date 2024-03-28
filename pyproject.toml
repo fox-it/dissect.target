@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml",
-    "dissect.cstruct>=3.14.dev,<4.0.dev",
+    "dissect.cstruct>=3.14.dev4,<4.0.dev",
     "dissect.eventlog>=3.0.dev,<4.0.dev",
     "dissect.evidence>=3.0.dev,<4.0.dev",
     "dissect.hypervisor>=3.0.dev,<4.0.dev",
