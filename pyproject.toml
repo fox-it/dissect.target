@@ -107,6 +107,7 @@ target-mount = "dissect.target.tools.mount:main"
 target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
+target-yara = "dissect.target.tools.yara:main"
 
 [tool.black]
 line-length = 120
