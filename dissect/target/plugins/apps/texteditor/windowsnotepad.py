@@ -195,7 +195,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
                         # Extend the list if required. All characters need to fit in the list.
                         while data_entry.offset + data_entry.nAdded > len(text):
-                            text.append("\x00" * 100)
+                            text.append("\x00")
 
                         # Insert the text at the correct offset.
                         for idx in range(data_entry.nAdded):
