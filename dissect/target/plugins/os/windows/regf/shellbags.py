@@ -617,7 +617,7 @@ class VOLUME(SHITEM):
         if self.type == 0x2E:
             self.identifier = uuid.UUID(bytes_le=buf[4:20].tobytes())
         else:
-            self.volume_name = self.fh.read(20).rstrip(b"\x00").decode()
+            self.volume_name = self.fh.read(20).rstrip(b"\x00").decode(errors="backslashreplace")
             if self.size >= 41:
                 self.identifier = uuid.UUID(bytes_le=buf[25:41].tobytes())
 
