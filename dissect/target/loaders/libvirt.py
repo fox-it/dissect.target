@@ -20,10 +20,12 @@ class LibvirtLoader(Loader):
         if path.suffix.lower() != ".xml":
             return False
 
-        return "<domain>" in path.read_text().lower()
+        with path.open("rb") as fh:
+            return b"<domain>" in fh.read(512)
 
     def map(self, target: Target) -> None:
         xml_data = ElementTree.XML(self.path.read_text())
         for disk in xml_data.findall("devices/disk/source"):
             if file := disk.get("file"):
-                target.disk.add(container.open(file))
+                target_file = self.path.joinpath(file)
+                target.disks.add(container.open(target_file))
