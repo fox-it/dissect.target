@@ -4,8 +4,13 @@ from unittest.mock import patch
 
 import pytest
 
-from dissect.target.plugin import arg
-from dissect.target.tools.utils import args_to_uri, persist_execution_report
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.plugin import arg, find_plugin_functions
+from dissect.target.tools.utils import (
+    args_to_uri,
+    get_target_attribute,
+    persist_execution_report,
+)
 
 
 def test_persist_execution_report():
@@ -51,3 +56,24 @@ def test_args_to_uri(targets: list[str], loader_name: str, rest: list[str], uris
 
     with patch("dissect.target.tools.utils.LOADERS_BY_SCHEME", {"loader": FakeLoader}):
         assert args_to_uri(targets, loader_name, rest) == uris
+
+
+@pytest.mark.parametrize(
+    "pattern, expected_function",
+    [
+        ("passwords", "dissect.target.plugins.os.unix.shadow.ShadowPlugin"),
+        ("firefox.passwords", "Unsupported function `firefox` for target"),
+    ],
+)
+def test_plugin_name_confusion_regression(target_unix_users, pattern, expected_function):
+    plugins, _ = find_plugin_functions(target_unix_users, pattern)
+    assert len(plugins) == 1
+
+    # We don't expect these functions to work since our target_unix_users fixture
+    # does not include the neccesary artifacts for them to work. However we are
+    # only interested in the plugin or namespace that was called so we check
+    # the exception stack trace.
+    with pytest.raises(UnsupportedPluginError) as exc_info:
+        get_target_attribute(target_unix_users, plugins[0])
+
+    assert expected_function in str(exc_info.value)

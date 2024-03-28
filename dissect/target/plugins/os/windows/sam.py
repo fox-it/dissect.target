@@ -2,7 +2,13 @@ from hashlib import md5, sha256
 from struct import pack
 from typing import Iterator
 
-from Crypto.Cipher import AES, ARC4, DES
+try:
+    from Crypto.Cipher import AES, ARC4, DES
+
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
 from dissect import cstruct
 from dissect.util import ts
 
@@ -295,6 +301,9 @@ class SamPlugin(Plugin):
     SAM_KEY = "HKEY_LOCAL_MACHINE\\SAM\\SAM\\Domains\\Account"
 
     def check_compatible(self) -> None:
+        if not HAS_CRYPTO:
+            raise UnsupportedPluginError("Missing pycryptodome dependency")
+
         if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
             raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
 

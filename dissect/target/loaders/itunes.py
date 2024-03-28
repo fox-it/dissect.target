@@ -28,9 +28,9 @@ except ImportError:
 try:
     from Crypto.Cipher import AES
 
-    HAS_PYCRYPTODOME = True
+    HAS_CRYPTO = True
 except ImportError:
-    HAS_PYCRYPTODOME = False
+    HAS_CRYPTO = False
 
 
 DOMAIN_TRANSLATION = {
@@ -383,7 +383,7 @@ def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc") -> A
             raise ValueError(f"Invalid key size: {key_size}")
 
         return _pystandalone.cipher(f"aes-{key_size * 8}-{mode}", key, iv)
-    elif HAS_PYCRYPTODOME:
+    elif HAS_CRYPTO:
         mode_map = {
             "cbc": (AES.MODE_CBC, True),
             "ecb": (AES.MODE_ECB, False),

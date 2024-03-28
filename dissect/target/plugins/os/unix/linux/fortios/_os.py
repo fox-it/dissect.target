@@ -23,9 +23,9 @@ from dissect.target.target import Target
 try:
     from Crypto.Cipher import AES, ChaCha20
 
-    HAS_PYCRYPTODOME = True
+    HAS_CRYPTO = True
 except ImportError:
-    HAS_PYCRYPTODOME = False
+    HAS_CRYPTO = False
 
 FortiOSUserRecord = TargetRecordDescriptor(
     "fortios/user",
@@ -442,8 +442,8 @@ def decrypt_password(input: str) -> str:
         - https://www.fortiguard.com/psirt/FG-IR-19-007
     """
 
-    if not HAS_PYCRYPTODOME:
-        raise RuntimeError("PyCryptodome module not available")
+    if not HAS_CRYPTO:
+        raise RuntimeError("Missing pycryptodome dependency")
 
     if input[:3] in ["SH2", "AK1"]:
         raise ValueError("Password is a hash (SHA-256 or SHA-1) and cannot be decrypted.")
@@ -511,8 +511,8 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
         RuntimeError: When PyCryptodome is not available.
     """
 
-    if not HAS_PYCRYPTODOME:
-        raise RuntimeError("PyCryptodome module not available")
+    if not HAS_CRYPTO:
+        raise RuntimeError("Missing pycryptodome dependency")
 
     # First 8 bytes = counter, last 8 bytes = nonce
     # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple

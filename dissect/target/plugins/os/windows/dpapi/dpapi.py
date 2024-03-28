@@ -1,19 +1,30 @@
 import hashlib
 import re
-from functools import cached_property
+from functools import cache, cached_property
 from pathlib import Path
 
-from Crypto.Cipher import AES
+try:
+    from Crypto.Cipher import AES
 
-from dissect.target import Target
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers import keychain
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
+from dissect.target.target import Target
 
 
 class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.keychain = cache(self.keychain)
 
     # This matches master key file names
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
@@ -23,12 +34,23 @@ class DPAPIPlugin(InternalPlugin):
 
     SYSTEM_USERNAME = "System"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-
     def check_compatible(self) -> None:
+        if not HAS_CRYPTO:
+            raise UnsupportedPluginError("Missing pycryptodome dependency")
+
         if not list(self.target.registry.keys(self.SYSTEM_KEY)):
             raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
+
+    def keychain(self) -> set:
+        passwords = set()
+
+        for key in keychain.get_keys_for_provider("user") + keychain.get_keys_without_provider():
+            if key.key_type == keychain.KeyType.PASSPHRASE:
+                passwords.add(key.value)
+
+        # It is possible to encrypt using an empty passphrase.
+        passwords.add("")
+        return passwords
 
     @cached_property
     def syskey(self) -> bytes:
@@ -84,6 +106,10 @@ class DPAPIPlugin(InternalPlugin):
 
         return result
 
+    @cached_property
+    def _users(self) -> dict[str, dict[str, str]]:
+        return {u.name: {"sid": u.sid} for u in self.target.users()}
+
     def _load_master_keys_from_path(self, username: str, path: Path) -> dict[str, MasterKeyFile]:
         if not path.exists():
             return {}
@@ -104,6 +130,20 @@ class DPAPIPlugin(InternalPlugin):
                     if not mkf.decrypted:
                         raise Exception("Failed to decrypt System master key")
 
+                if user := self._users.get(username):
+                    for mk_pass in self.keychain():
+                        if mkf.decrypt_with_password(user["sid"], mk_pass):
+                            break
+
+                        try:
+                            if mkf.decrypt_with_hash(user["sid"], bytes.fromhex(mk_pass)) is True:
+                                break
+                        except ValueError:
+                            pass
+
+                    if not mkf.decrypted:
+                        self.target.log.warning("Could not decrypt DPAPI master key for username '%s'", username)
+
                 result[file.name] = mkf
 
         return result
@@ -118,6 +158,18 @@ class DPAPIPlugin(InternalPlugin):
             raise ValueError("Failed to decrypt system blob")
 
         return blob.clear_text
+
+    def decrypt_blob(self, data: bytes) -> bytes:
+        """Attempt to decrypt the given bytes using any of the available master keys."""
+        blob = DPAPIBlob(data)
+
+        for user in self.master_keys:
+            for mk_uuid in self.master_keys[user]:
+                mk = self.master_keys[user][mk_uuid]
+                if blob.decrypt(mk.key):
+                    return blob.clear_text
+
+        raise ValueError("Failed to decrypt user blob")
 
 
 def _decrypt_aes(data: bytes, key: bytes) -> bytes:
