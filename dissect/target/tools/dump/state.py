@@ -6,7 +6,7 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterator, List, Optional, TextIO
+from typing import Any, Callable, Iterator, Optional, TextIO
 
 import structlog
 
@@ -35,17 +35,20 @@ class Sink:
     record_count: int = 0
     size_bytes: int = 0
 
+    def __post_init__(self):
+        self.func = getattr(self.func, "name", self.func)
+
 
 @dataclass
 class DumpState:
-    target_paths: List[str]
-    functions: List[str]
+    target_paths: list[str]
+    functions: list[str]
     serialization: str
     compression: str
     start_time: datetime.datetime
     last_update_time: datetime.datetime
 
-    sinks: List[Sink] = dataclasses.field(default_factory=list)
+    sinks: list[Sink] = dataclasses.field(default_factory=list)
 
     # Volatile properties
     output_dir: Optional[Path] = None
@@ -56,7 +59,7 @@ class DumpState:
         return sum(s.record_count for s in self.sinks)
 
     @property
-    def finished_sinks(self) -> List[Sink]:
+    def finished_sinks(self) -> list[Sink]:
         return [sink for sink in self.sinks if not sink.is_dirty]
 
     @property
@@ -178,7 +181,7 @@ class DumpState:
         state.output_dir = output_dir
         return state
 
-    def get_invalid_sinks(self) -> List[Sink]:
+    def get_invalid_sinks(self) -> list[Sink]:
         """Return sinks that have a mismatch between recorded size and a real file size"""
         invalid_sinks = []
         for sink in self.sinks:
@@ -214,8 +217,8 @@ class DumpState:
 def create_state(
     *,
     output_dir: Path,
-    target_paths: List[str],
-    functions: List[str],
+    target_paths: list[str],
+    functions: list[str],
     serialization: Serialization,
     compression: Compression = None,
 ) -> DumpState:
