@@ -529,7 +529,7 @@ class TargetCli(TargetCmd):
 
         self._print_ls(args, path, 0, stdout)
 
-    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> Optional[bool]:
+    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> None:
         path = self.resolve_path(path)
         subdirs = []
 
@@ -558,7 +558,9 @@ class TargetCli(TargetCmd):
             for subdir in subdirs:
                 self._print_ls(args, subdir, depth + 1, stdout)
 
-    def print_extensive_file_stat(self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
+    def print_extensive_file_stat(
+        self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str
+    ) -> None:
         """Print the file status."""
         try:
             entry = target_path.get()
