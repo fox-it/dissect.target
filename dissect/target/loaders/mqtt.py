@@ -160,8 +160,7 @@ class Broker:
     @suppress
     def read(self, host: str, disk_id: int, seek_address: int, read_length: int) -> SeekMessage:
         key = f"{host}-{disk_id}-{seek_address}-{read_length}"
-        msg = self.index.get(key)
-        return msg
+        return self.index.get(key)
 
     @suppress
     def disk(self, host: str) -> DiskMessage:
