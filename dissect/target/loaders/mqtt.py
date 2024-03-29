@@ -139,6 +139,7 @@ class Broker:
     mqtt_client = None
     connected = False
     case = None
+
     diskinfo = {}
     index = {}
     topo = {}
