@@ -1475,7 +1475,7 @@ class LayerFilesystem(Filesystem):
 class EntryList(list):
     """Wrapper list for filesystem entries.
 
-    Expose a getattr on a list of items. Useful to access internal objects from specific filesystem implementations.
+    Exposes a ``__getattr__`` on a list of items. Useful to access internal objects from specific filesystem implementations.
     For example, access the underlying NTFS object from a list of virtual and NTFS entries.
     """
 
