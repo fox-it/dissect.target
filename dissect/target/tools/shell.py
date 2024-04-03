@@ -31,7 +31,7 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
+from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
@@ -469,7 +469,7 @@ class TargetCli(TargetCmd):
                 # If we happen to scan an NTFS filesystem see if any of the
                 # entries has an alternative data stream and also list them.
                 entry = file_.get()
-                if isinstance(entry, RootFilesystemEntry):
+                if isinstance(entry, LayerFilesystemEntry):
                     if entry.entries.fs.__type__ == "ntfs":
                         attrs = entry.lattr()
                         for data_stream in attrs.DATA:
