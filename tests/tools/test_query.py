@@ -199,6 +199,11 @@ def test_target_query_filtered_functions(monkeypatch: pytest.MonkeyPatch) -> Non
                 side_effect=mock_find_plugin_function,
             ),
             patch(
+                "dissect.target.tools.utils.find_plugin_functions",
+                autospec=True,
+                side_effect=mock_find_plugin_function,
+            ),
+            patch(
                 "dissect.target.tools.query.execute_function_on_target",
                 autospec=True,
                 side_effect=mock_execute_function,
