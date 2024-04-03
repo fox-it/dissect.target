@@ -70,7 +70,7 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
             if len(dfs) > 1:
                 vfs = LayerFilesystem()
                 for fs in dfs:
-                    vfs.add_fs_layer(fs)
+                    vfs.append_fs_layer(fs)
             else:
                 vfs = dfs[0]
 
