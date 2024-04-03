@@ -6,17 +6,15 @@ import time
 import urllib
 from dataclasses import dataclass
 from functools import lru_cache
-from io import BytesIO
 from pathlib import Path
 from struct import pack, unpack_from
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
 
 import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
 from dissect.target.target import Target
@@ -74,7 +72,7 @@ class MQTTConnection:
         self.info = lru_cache(128)(self.info)
         self.read = lru_cache(128)(self.read)
 
-    def topo(self, peers: int):
+    def topo(self, peers: int) -> list[str]:
         self.broker.topology(self.host)
 
         while len(self.broker.peers(self.host)) < peers:
@@ -148,7 +146,7 @@ class Broker:
     def disk(self, host: str) -> DiskMessage:
         return self.diskinfo[host]
 
-    def peers(self, host: str) -> int:
+    def peers(self, host: str) -> list[str]:
         return self.topo[host]
 
     def _on_disk(self, hostname: str, payload: bytes) -> None:
@@ -252,9 +250,6 @@ class Broker:
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
-    PATH = "/remote/data/hosts.txt"
-    FOLDER = "/remote/hosts"
-
     connection = None
     broker = None
     peers = []
@@ -262,10 +257,15 @@ class MQTTLoader(Loader):
     def __init__(self, path: Union[Path, str], **kwargs):
         super().__init__(path)
         cls = MQTTLoader
+        self.broker = cls.broker
+        self.connection = MQTTConnection(self.broker, path)
 
-        if str(path).startswith("/remote/hosts/host"):
-            self.path = path.read_text()  # update path to reflect the resolved host
+    @staticmethod
+    def detect(path: Path) -> bool:
+        return False
 
+    def find_all(path: Path, **kwargs) -> Iterator[str]:
+        cls = MQTTLoader
         num_peers = 1
         if cls.broker is None:
             if (uri := kwargs.get("parsed_path")) is None:
@@ -275,26 +275,10 @@ class MQTTLoader(Loader):
             cls.broker.connect()
             num_peers = int(options.get("peers", 1))
 
-        self.broker = cls.broker
-        self.connection = MQTTConnection(self.broker, self.path)
-        self.peers = self.connection.topo(num_peers)
+        cls.connection = MQTTConnection(cls.broker, path)
+        cls.peers = cls.connection.topo(num_peers)
+        yield from cls.peers
 
     def map(self, target: Target) -> None:
-        if len(self.peers) == 1 and self.peers[0] == str(self.path):
-            target.path = Path(str(self.path))
-            for disk in self.connection.info():
-                target.disks.add(RawContainer(disk))
-        else:
-            target.props["mqtt"] = True
-
-            vfs = VirtualFilesystem()
-            vfs.map_file_fh(self.PATH, BytesIO("\n".join(self.peers).encode("utf-8")))
-            for index, peer in enumerate(self.peers):
-                vfs.map_file_fh(f"{self.FOLDER}/host{index}-{peer}", BytesIO(peer.encode("utf-8")))
-
-            target.fs.mount("/data", vfs)
-            target.filesystems.add(vfs)
-
-    @staticmethod
-    def detect(path: Path) -> bool:
-        return str(path).startswith("/remote/hosts/host")
+        for disk in self.connection.info():
+            target.disks.add(RawContainer(disk))

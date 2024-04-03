@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import sys
 from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
@@ -28,11 +29,22 @@ from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
 
 try:
-    import yaml
+    from ruamel.yaml import YAML
 
-    PY_YAML = True
-except (AttributeError, ImportError):
-    PY_YAML = False
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
+try:
+    if sys.version_info < (3, 11):
+        import tomli as toml
+    else:
+        # tomllib is included since python 3.11
+        import tomllib as toml  # novermin
+
+    HAS_TOML = True
+except ImportError:
+    HAS_TOML = False
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -401,11 +413,21 @@ class Yaml(ConfigurationParser):
     """Parses a Yaml file."""
 
     def parse_file(self, fh: TextIO) -> None:
-        if PY_YAML:
-            parsed_data = yaml.load(fh, yaml.BaseLoader)
+        if HAS_YAML:
+            parsed_data = YAML(typ="safe").load(fh)
             self.parsed_data = ListUnwrapper.unwrap(parsed_data)
         else:
-            raise ConfigurationParsingError("Failed to parse file, please install PyYAML.")
+            raise ConfigurationParsingError("Failed to parse file, please install ruamel.yaml.")
+
+
+class Toml(ConfigurationParser):
+    """Parses a Toml file."""
+
+    def parse_file(self, fh: TextIO) -> None:
+        if HAS_TOML:
+            self.parsed_data = toml.loads(fh.read())
+        else:
+            raise ConfigurationParsingError("Failed to parse file, please install tomli.")
 
 
 class ScopeManager:
@@ -696,6 +718,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "sample": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
+    "toml": ParserConfig(Toml),
 }
 
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
