@@ -9,7 +9,7 @@ import pytest
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
-from dissect.target.helpers.fsutil import TargetPath, normalize, stat_result
+from dissect.target.helpers.fsutil import normalize, stat_result
 from dissect.target.tools import shell
 from dissect.target.tools.shell import (
     TargetCli,
@@ -18,6 +18,7 @@ from dissect.target.tools.shell import (
     build_pipe_stdout,
 )
 from dissect.target.tools.shell import main as target_shell
+from dissect.target.tools.shell import print_extensive_file_stat
 from tests._utils import absolute_path
 
 GREP_MATCH = "test1 and test2"
@@ -179,44 +180,30 @@ def test_target_cli_print_extensive_file_stat(target_win, capsys):
     mock_entry = MagicMock(spec_set=FilesystemEntry)
     mock_entry.lstat.return_value = mock_stat
     mock_entry.is_symlink.return_value = False
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.return_value = mock_entry
 
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
+    print_extensive_file_stat(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo\n"
 
 
-def test_target_cli_print_extensive_file_stat_symlink(target_win, capsys):
+def test_print_extensive_file_stat_symlink(target_win, capsys):
     mock_stat = stat_result([0o1777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
     mock_entry = MagicMock(spec_set=FilesystemEntry)
     mock_entry.lstat.return_value = mock_stat
     mock_entry.is_symlink.return_value = True
     mock_entry.readlink.return_value = "bar"
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.return_value = mock_entry
 
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
+    print_extensive_file_stat(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo -> bar\n"
 
 
-def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.side_effect = FileNotFoundError("ERROR")
-
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
+def test_print_extensive_file_stat_fail(target_win, capsys):
+    mock_entry = MagicMock(spec_set=FilesystemEntry)
+    mock_entry.lstat.side_effect = FileNotFoundError("ERROR")
+    print_extensive_file_stat(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
     assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"

@@ -90,7 +90,7 @@ def prepare_ls_colors() -> dict[str, str]:
 LS_COLORS = prepare_ls_colors()
 
 
-class TargetCmd(cmd.Cmd):
+class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
 
     Add new simple commands by implementing:
@@ -110,10 +110,10 @@ class TargetCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
 
-    def __init__(self, target: Target):
+    def __init__(self, start_in_cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.target = target
         self.debug = False
+        self.cyber = start_in_cyber
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -141,22 +141,29 @@ class TargetCmd(cmd.Cmd):
 
         return names
 
-    def default(self, line: str) -> Optional[bool]:
+    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
+        """Check whether custom handling of the cmd can be performed and if so, do it. Returns a tuple containing a
+        boolean whether or not a custom command execution was performed, and the result of said execution."""
         if line == "EOF":
-            return True
+            return True, True
 
-        # Override default command execution to first attempt complex
-        # command execution, and then target plugin command execution
+        # Override default command execution to first attempt complex command execution
         command, command_args_str, line = self.parseline(line)
 
         try:
-            return self._exec_command(command, command_args_str)
+            return True, self._exec_command(command, command_args_str)
         except AttributeError:
-            pass
+            return False, None
 
-        if self.target.has_function(command):
-            return self._exec_target(command, command_args_str)
-
+    def default(self, line: str):
+        try:
+            handled, response = self.check_custom_command_execution(line)
+            if handled:
+                return response
+        except Exception:
+            # For unhandled exceptions, we do not want the 'unknown syntax' error, but a stacktrace.
+            traceback.print_exc()
+            return
         return cmd.Cmd.default(self, line)
 
     def emptyline(self) -> None:
@@ -175,10 +182,7 @@ class TargetCmd(cmd.Cmd):
 
         argparts = []
         if command_args_str is not None:
-            lexer = shlex.shlex(command_args_str, posix=True, punctuation_chars=True)
-            lexer.wordchars += "$"
-            lexer.whitespace_split = True
-            argparts = list(lexer)
+            argparts = arg_str_to_arg_list(command_args_str)
 
         if "|" in argparts:
             pipeidx = argparts.index("|")
@@ -191,7 +195,7 @@ class TargetCmd(cmd.Cmd):
                 print(e)
         else:
             ctx = contextlib.nullcontext()
-            if self.target.props.get("cyber") and not no_cyber:
+            if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
             with ctx:
@@ -212,6 +216,50 @@ class TargetCmd(cmd.Cmd):
         # These commands enter a subshell, which doesn't work well with cyber
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
+
+    def do_clear(self, line: str) -> Optional[bool]:
+        """clear the terminal screen"""
+        os.system("cls||clear")
+
+    def do_exit(self, line: str) -> Optional[bool]:
+        """exit shell"""
+        return True
+
+    def do_cyber(self, line: str):
+        """cyber"""
+        self.cyber = not self.cyber
+        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
+        with cyber.cyber(color=color):
+            print(f"C Y B E R - M O D E - {word} G A G E D")
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
+
+
+class TargetCmd(ExtendedCmd):
+    def __init__(self, target: Target):
+        self.target = target
+        start_in_cyber = self.target.props.get("cyber")
+
+        super().__init__(start_in_cyber)
+
+    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
+        handled, response = super().check_custom_command_execution(line)
+        if handled:
+            return handled, response
+
+        # The parent class has already attempted complex command execution, we now attempt target plugin command
+        # execution
+        command, command_args_str, line = self.parseline(line)
+
+        if self.target.has_function(command):
+            return True, self._exec_target(command, command_args_str)
+        return False, None
 
     def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
@@ -259,31 +307,6 @@ class TargetCmd(cmd.Cmd):
     def do_python(self, line: str) -> Optional[bool]:
         """drop into a Python shell"""
         python_shell([self.target])
-
-    def do_clear(self, line: str) -> Optional[bool]:
-        """clear the terminal screen"""
-        os.system("cls||clear")
-
-    def do_cyber(self, line: str) -> Optional[bool]:
-        """cyber"""
-        self.target.props["cyber"] = not bool(self.target.props.get("cyber"))
-        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[
-            self.target.props["cyber"]
-        ]
-        with cyber.cyber(color=color):
-            print(f"C Y B E R - M O D E - {word} G A G E D")
-
-    def do_exit(self, line: str) -> Optional[bool]:
-        """exit shell"""
-        return True
-
-    def do_debug(self, line: str) -> Optional[bool]:
-        """toggle debug mode"""
-        self.debug = not self.debug
-        if self.debug:
-            print("Debug mode on")
-        else:
-            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -556,39 +579,24 @@ class TargetCli(TargetCmd):
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
-                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
+                try:
+                    entry = target_path.get()
+                    stat = entry.lstat()
+                    show_time = stat.st_mtime
+                    if args.use_ctime:
+                        show_time = stat.st_ctime
+                    elif args.use_atime:
+                        show_time = stat.st_atime
+                except FileNotFoundError:
+                    entry = None
+                    show_time = None
+                print_extensive_file_stat(stdout, name, entry, show_time)
                 if target_path.is_dir():
                     subdirs.append(target_path)
 
         if args.recursive and subdirs:
             for subdir in subdirs:
                 self._print_ls(args, subdir, depth + 1, stdout)
-
-    def print_extensive_file_stat(
-        self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str
-    ) -> None:
-        """Print the file status."""
-        try:
-            entry = target_path.get()
-            stat = entry.lstat()
-            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            show_time = stat.st_mtime
-            if args.use_ctime:
-                show_time = stat.st_ctime
-            elif args.use_atime:
-                show_time = stat.st_atime
-            utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
-
-            print(
-                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
-                file=stdout,
-            )
-
-        except FileNotFoundError:
-            print(
-                f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}",
-                file=stdout,
-            )
 
     @arg("path", nargs="?")
     @arg("-name", default="*")
@@ -1102,6 +1110,36 @@ def fmt_ls_colors(ft: str, name: str) -> str:
         pass
 
     return name
+
+
+def arg_str_to_arg_list(args: str) -> list[str]:
+    """Convert a commandline string to a list of command line arguments."""
+    lexer = shlex.shlex(args, posix=True, punctuation_chars=True)
+    lexer.wordchars += "$"
+    lexer.whitespace_split = True
+    return list(lexer)
+
+
+def print_extensive_file_stat(
+    stdout: TextIO, name: str, entry: Optional[FilesystemEntry] = None, timestamp: Optional[datetime.datetime] = None
+) -> None:
+    """Print the file status."""
+    if entry is not None:
+        try:
+            stat = entry.lstat()
+            if timestamp is None:
+                timestamp = stat.st_mtime
+            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
+            utc_time = datetime.datetime.utcfromtimestamp(timestamp).isoformat()
+
+            print(
+                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
+                file=stdout,
+            )
+            return
+        except FileNotFoundError:
+            pass
+    print(f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}", file=stdout)
 
 
 @contextmanager
