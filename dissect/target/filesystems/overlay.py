@@ -89,13 +89,13 @@ class Overlay2Filesystem(LayerFilesystem):
 
         # append and mount every layer
         for dest, layer in layers:
-            if layer.is_dir():
-                layer_fs = DirectoryFilesystem(layer)
-
-            elif layer.is_file():
+            if layer.is_file() and dest in ["/etc/hosts", "/etc/hostname", "/etc/resolv.conf"]:
                 layer_fs = VirtualFilesystem()
                 layer_fs.map_file_fh("/etc/" + layer.name, layer.open("rb"))
                 dest = dest.split("/")[0]
+
+            else:
+                layer_fs = DirectoryFilesystem(layer)
 
             self.append_layer().mount(dest, layer_fs)
 

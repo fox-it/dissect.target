@@ -14,7 +14,6 @@ from dissect.target.plugins.apps.container.docker import (
     find_installs,
     strip_log,
 )
-
 from tests._utils import absolute_path
 
 
