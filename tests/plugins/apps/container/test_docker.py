@@ -1,7 +1,6 @@
 import datetime
 import operator
 from io import BytesIO
-from pathlib import Path
 from typing import Iterator
 
 import pytest
@@ -9,16 +8,14 @@ from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.plugins.apps.container.docker import (
     DockerPlugin,
     convert_timestamp,
     find_installs,
     strip_log,
 )
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+
 from tests._utils import absolute_path
-from tests.conftest import make_mock_target
 
 
 @pytest.fixture
@@ -26,25 +23,6 @@ def target_linux_docker_logs(target_linux: Target, fs_linux: VirtualFilesystem) 
     docker_containers = absolute_path("_data/plugins/apps/container/docker/logs")
     fs_linux.map_dir("/var/lib/docker/containers", docker_containers)
     yield target_linux
-
-
-@pytest.fixture
-def fs_docker() -> Iterator[TarFilesystem]:
-    docker_tar = Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
-    fh = docker_tar.open("rb")
-    docker_fs = TarFilesystem(fh)
-    yield docker_fs
-
-
-@pytest.fixture
-def target_linux_docker(tmp_path: Path, fs_docker: TarFilesystem) -> Iterator[Target]:
-    mock_target = next(make_mock_target(tmp_path))
-    mock_target._os_plugin = LinuxPlugin
-
-    mock_target.filesystems.add(fs_docker)
-    mock_target.fs.mount("/", fs_docker)
-    mock_target.apply()
-    yield mock_target
 
 
 def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

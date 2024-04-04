@@ -7,6 +7,7 @@ from typing import Callable, Iterator, Optional
 import pytest
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
@@ -436,3 +437,22 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
     yield target_osx
+
+
+@pytest.fixture
+def fs_docker() -> Iterator[TarFilesystem]:
+    docker_tar = pathlib.Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
+    fh = docker_tar.open("rb")
+    docker_fs = TarFilesystem(fh)
+    yield docker_fs
+
+
+@pytest.fixture
+def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Iterator[Target]:
+    mock_target = next(make_mock_target(tmp_path))
+    mock_target._os_plugin = LinuxPlugin
+
+    mock_target.filesystems.add(fs_docker)
+    mock_target.fs.mount("/", fs_docker)
+    mock_target.apply()
+    yield mock_target

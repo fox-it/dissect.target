@@ -1,15 +1,8 @@
 from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.overlay import Overlay2Filesystem
-from tests.plugins.apps.container.test_docker import (  # noqa: F401
-    fs_docker,
-    target_linux_docker,
-)
 
 
-def test_overlay_filesystem_docker_container(
-    target_linux_docker: Target, fs_docker: VirtualFilesystem  # noqa: F811
-) -> None:
+def test_overlay_filesystem_docker_container(target_linux_docker: Target) -> None:
     mount_path = list(target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir())[0]
     fs = Overlay2Filesystem(mount_path)
 

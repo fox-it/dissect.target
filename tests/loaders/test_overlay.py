@@ -1,13 +1,8 @@
 from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.overlay import Overlay2Loader
-from tests.plugins.apps.container.test_docker import (  # noqa: F401
-    fs_docker,
-    target_linux_docker,
-)
 
 
-def test_overlay_loader_docker(target_linux_docker: Target, fs_docker: VirtualFilesystem) -> None:  # noqa: F811
+def test_overlay_loader_docker(target_linux_docker: Target) -> None:
     for container in target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir():
         assert Overlay2Loader.detect(container)
         loader = Overlay2Loader(container)
