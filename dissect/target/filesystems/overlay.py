@@ -1,8 +1,11 @@
 import json
+import logging
 from pathlib import Path
 
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+
+log = logging.getLogger(__name__)
 
 
 class Overlay2Filesystem(LayerFilesystem):
@@ -37,7 +40,7 @@ class Overlay2Filesystem(LayerFilesystem):
             hash_type, layer_hash = parent_layer.split(":")
             layer_ref = root.joinpath("image", "overlay2", "layerdb", hash_type, layer_hash)
             cache_id = layer_ref.joinpath("cache-id").read_text()
-            layers.append(root.joinpath("overlay2", cache_id, "diff"))
+            layers.append(("/", root.joinpath("overlay2", cache_id, "diff")))
 
             if (parent_file := layer_ref.joinpath("parent")).exists():
                 parent_layer = parent_file.read_text()
@@ -47,40 +50,39 @@ class Overlay2Filesystem(LayerFilesystem):
         # add the container layers
         for container_layer_name in ["init-id", "mount-id"]:
             layer = path.joinpath(container_layer_name).read_text()
-            layers.append(root.joinpath("overlay2", layer, "diff"))
-
-        # add every diff directory
-        for layer in layers:
-            layer_fs = DirectoryFilesystem(layer)
-            self.add_fs_layer(layer_fs)
+            layers.append(("/", root.joinpath("overlay2", layer, "diff")))
 
         # add anonymous volumes, named volumes and bind mounts
         if (config_path := root.joinpath("containers", path.name, "config.v2.json")).exists():
             try:
                 config = json.loads(config_path.read_text())
             except json.JSONDecodeError as e:
-                path._fs.target.log.warning("Unable to parse overlay mounts for container %s", path.name)
-                path._fs.target.log.debug("", exc_info=e)
+                log.warning("Unable to parse overlay mounts for container %s", path.name)
+                log.debug("", exc_info=e)
                 return
 
             for mount in config.get("MountPoints").values():
                 if not mount["Type"] in ["volume", "bind"]:
-                    path._fs.target.log.warning(
-                        "Encountered unsupported mount type %s in container %s", mount["Type"], path.name
-                    )
+                    log.warning("Encountered unsupported mount type %s in container %s", mount["Type"], path.name)
                     continue
 
                 if not mount["Source"] and mount["Name"]:
                     # anonymous volumes do not have a Source but a volume id
-                    layer_fs = DirectoryFilesystem(root .joinpath("volumes", mount["Name"], "_data"))
+                    layer = root.joinpath("volumes", mount["Name"], "_data")
                 elif mount["Source"]:
                     # named volumes and bind mounts have a Source set
-                    layer_fs = DirectoryFilesystem(root.parents[-1] / mount["Source"])
+                    layer = root.parents[-1].joinpath(mount["Source"])
                 else:
-                    path._fs.target.log.warning("Could not determine layer source for mount in container %s", path.name)
-                    path._fs.target.log.debug(json.dumps(mount))
+                    log.warning("Could not determine layer source for mount in container %s", path.name)
+                    log.debug(json.dumps(mount))
+                    continue
 
-                self.mount(mount["Destination"], layer_fs)
+                layers.append((mount["Destination"], layer))
+
+        # append and mount every layer
+        for dest, layer in layers:
+            layer_fs = DirectoryFilesystem(layer)
+            self.append_layer().mount(dest, layer_fs)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"

@@ -7,9 +7,7 @@ from tests.plugins.apps.container.test_docker import (  # noqa: F401
 )
 
 
-def test_overlay_loader_docker_container(
-    target_linux_docker: Target, fs_docker: VirtualFilesystem  # noqa: F811
-) -> None:
+def test_overlay_loader_docker(target_linux_docker: Target, fs_docker: VirtualFilesystem) -> None:  # noqa: F811
     for container in target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir():
         assert Overlay2Loader.detect(container)
         loader = Overlay2Loader(container)

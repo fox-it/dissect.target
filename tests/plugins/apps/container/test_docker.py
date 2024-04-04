@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterator
 
 import pytest
+from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
@@ -103,8 +104,9 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
     assert result.finished == datetime.datetime(1, 1, 1, 00, 00, 00, 000000, tzinfo=datetime.timezone.utc)
     assert result.ports == str({"1234/tcp": "0.0.0.0:1234", "5678/tcp": "0.0.0.0:5678"})
     assert result.names == "example_container_name"
-    assert result.source == f"/var/lib/docker/containers/{id}/config.v2.json"
     assert result.volumes == ["/tmp/test:/test"]
+    assert result.config_path == path.from_posix(f"/var/lib/docker/containers/{id}/config.v2.json")
+    assert result.mount_path == path.from_posix(f"/var/lib/docker/image/overlay2/layerdb/mounts/{id}")
 
 
 def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:

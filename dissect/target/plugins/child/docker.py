@@ -1,8 +1,6 @@
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
-from dissect.target.plugins.apps.container.docker import find_installs
-from dissect.target.target import Target
 
 
 class DockerChildTargetPlugin(ChildTargetPlugin):
@@ -10,21 +8,15 @@ class DockerChildTargetPlugin(ChildTargetPlugin):
 
     __type__ = "docker"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self.data_roots = set(find_installs(target))
-
     def check_compatible(self) -> None:
-        if not self.data_roots:
+        if not self.target.has_function("docker"):
             raise UnsupportedPluginError("No Docker data root folder(s) found!")
 
     def list_children(self):
-        for data_root in self.data_roots:
-            mount_folder = data_root.joinpath("image/overlay2/layerdb/mounts")
-
-            for container in self.target.docker.containers():
+        for container in self.target.docker.containers():
+            if container.mount_path:
                 yield ChildTargetRecord(
                     type=self.__type__,
-                    path=mount_folder.joinpath(container.container_id),
+                    path=container.mount_path,
                     _target=self.target,
                 )

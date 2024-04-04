@@ -32,7 +32,8 @@ DockerContainerRecord = TargetRecordDescriptor(
         ("string", "ports"),
         ("string", "names"),
         ("stringlist", "volumes"),
-        ("string", "source"),
+        ("path", "mount_path"),
+        ("path", "config_path"),
     ],
 )
 
@@ -159,6 +160,9 @@ class DockerPlugin(Plugin):
         for data_root in self.installs:
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
                 config = json.loads(config_path.read_text())
+                container_id = config.get("ID")
+
+                # determine state
                 running = config.get("State").get("Running")
                 if running:
                     ports = config.get("NetworkSettings").get("Ports", {})
@@ -166,13 +170,26 @@ class DockerPlugin(Plugin):
                 else:
                     ports = config.get("Config").get("ExposedPorts", {})
                     pid = None
+
+                # parse volumes
                 volumes = []
                 if mount_points := config.get("MountPoints"):
                     for mp in mount_points:
                         mount_point = mount_points[mp]
                         volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
+
+                # determine mount point
+                mount_path = None
+                if config.get("Driver") == "overlay2":
+                    mount_path = data_root.joinpath("image/overlay2/layerdb/mounts", container_id)
+                    if not mount_path.exists():
+                        self.target.log.warning("Overlay2 mount path for container %s does not exist!", container_id)
+
+                else:
+                    self.target.log.warning("Encountered unsupported container filesystem %s", config.get("Driver"))
+
                 yield DockerContainerRecord(
-                    container_id=config.get("ID"),
+                    container_id=container_id,
                     image=config.get("Config").get("Image"),
                     command=config.get("Config").get("Cmd"),
                     created=convert_timestamp(config.get("Created")),
@@ -183,7 +200,8 @@ class DockerPlugin(Plugin):
                     ports=convert_ports(ports),
                     names=config.get("Name").replace("/", "", 1),
                     volumes=volumes,
-                    source=config_path,
+                    mount_path=mount_path,
+                    config_path=config_path,
                     _target=self.target,
                 )
 
