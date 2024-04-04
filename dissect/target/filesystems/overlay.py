@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from dissect.target.filesystem import LayerFilesystem
+from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 
 log = logging.getLogger(__name__)
@@ -79,9 +79,24 @@ class Overlay2Filesystem(LayerFilesystem):
 
                 layers.append((mount["Destination"], layer))
 
+        # add hosts, hostname and resolv.conf files
+        for file in ["HostnamePath", "HostsPath", "ResolvConfPath"]:
+            if not config.get(file) or not (fp := path.parents[-1].joinpath(config.get(file))).exists():
+                log.warning("Container %s has no %s mount", path.name, file)
+                continue
+
+            layers.append(("/etc/" + fp.name, fp))
+
         # append and mount every layer
         for dest, layer in layers:
-            layer_fs = DirectoryFilesystem(layer)
+            if layer.is_dir():
+                layer_fs = DirectoryFilesystem(layer)
+
+            elif layer.is_file():
+                layer_fs = VirtualFilesystem()
+                layer_fs.map_file_fh("/etc/" + layer.name, layer.open("rb"))
+                dest = dest.split("/")[0]
+
             self.append_layer().mount(dest, layer_fs)
 
     def __repr__(self) -> str:
