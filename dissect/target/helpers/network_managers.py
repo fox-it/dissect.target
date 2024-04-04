@@ -1,5 +1,5 @@
-import re
 import logging
+import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
