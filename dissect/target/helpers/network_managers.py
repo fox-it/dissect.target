@@ -4,7 +4,7 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional, Union
+from typing import Any, Callable, Iterable, Match, Optional
 
 from defusedxml import ElementTree
 
