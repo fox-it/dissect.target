@@ -1265,6 +1265,36 @@ def _target_name(target: Target) -> str:
     return target.name
 
 
+def arg_str_to_arg_list(args: str) -> list[str]:
+    """Convert a commandline string to a list of command line arguments."""
+    lexer = shlex.shlex(args, posix=True, punctuation_chars=True)
+    lexer.wordchars += "$"
+    lexer.whitespace_split = True
+    return list(lexer)
+
+
+def print_extensive_file_stat(
+    stdout: TextIO, name: str, entry: Optional[FilesystemEntry] = None, timestamp: Optional[datetime.datetime] = None
+) -> None:
+    """Print the file status."""
+    if entry is not None:
+        try:
+            stat = entry.lstat()
+            if timestamp is None:
+                timestamp = stat.st_mtime
+            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
+            utc_time = datetime.datetime.utcfromtimestamp(timestamp).isoformat()
+
+            print(
+                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
+                file=stdout,
+            )
+            return
+        except FileNotFoundError:
+            pass
+    print(f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}", file=stdout)
+
+
 @contextmanager
 def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Iterator[tuple[TextIO, BinaryIO]]:
     """
