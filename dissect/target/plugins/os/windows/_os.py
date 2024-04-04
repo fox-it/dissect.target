@@ -40,7 +40,7 @@ class WindowsPlugin(OSPlugin):
 
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
-                if fs.exists("boot") and fs.exists("boot/BCD"):
+                if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
 
         return cls(target)
