@@ -15,7 +15,7 @@ class DockerChildTargetPlugin(ChildTargetPlugin):
         self.data_roots = set(find_installs(target))
 
     def check_compatible(self) -> None:
-        if not any(self.data_roots):
+        if not self.data_roots:
             raise UnsupportedPluginError("No Docker data root folder(s) found!")
 
     def list_children(self):

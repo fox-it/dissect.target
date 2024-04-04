@@ -30,24 +30,24 @@ class Overlay2Filesystem(LayerFilesystem):
         root = path.parents[4]
 
         layers = []
-        parent_layer = path.joinpath("parent").open("r").read()
+        parent_layer = path.joinpath("parent").read_text()
 
         # iterate over all image layers
         while parent_layer:
             hash_type, layer_hash = parent_layer.split(":")
-            layer_ref = root.joinpath(f"image/overlay2/layerdb/{hash_type}/{layer_hash}")
-            cache_id = layer_ref.joinpath("cache-id").open("r").read()
-            layers.append(root.joinpath(f"overlay2/{cache_id}/diff"))
+            layer_ref = root.joinpath("image", "overlay2", "layerdb", hash_type, layer_hash)
+            cache_id = layer_ref.joinpath("cache-id").read_text()
+            layers.append(root.joinpath("overlay2", cache_id, "diff"))
 
-            if (parent_layer := layer_ref.joinpath("parent")).exists():
-                parent_layer = parent_layer.open("r").read()
+            if (parent_file := layer_ref.joinpath("parent")).exists():
+                parent_layer = parent_file.read_text()
             else:
-                parent_layer = False
+                parent_layer = None
 
         # add the container layers
         for container_layer_name in ["init-id", "mount-id"]:
-            layer = path.joinpath(container_layer_name).open("r").read()
-            layers.append(root.joinpath(f"overlay2/{layer}/diff"))
+            layer = path.joinpath(container_layer_name).read_text()
+            layers.append(root.joinpath("overlay2", layer, "diff"))
 
         # add every diff directory
         for layer in layers:
@@ -55,7 +55,7 @@ class Overlay2Filesystem(LayerFilesystem):
             self.add_fs_layer(layer_fs)
 
         # add anonymous volumes, named volumes and bind mounts
-        if (config_path := root / "containers" / path.name / "config.v2.json").exists():
+        if (config_path := root.joinpath("containers", path.name, "config.v2.json")).exists():
             try:
                 config = json.loads(config_path.read_text())
             except json.JSONDecodeError as e:
@@ -72,7 +72,7 @@ class Overlay2Filesystem(LayerFilesystem):
 
                 if not mount["Source"] and mount["Name"]:
                     # anonymous volumes do not have a Source but a volume id
-                    layer_fs = DirectoryFilesystem(root / "volumes" / mount["Name"] / "_data")
+                    layer_fs = DirectoryFilesystem(root .joinpath("volumes", mount["Name"], "_data"))
                 elif mount["Source"]:
                     # named volumes and bind mounts have a Source set
                     layer_fs = DirectoryFilesystem(root.parents[-1] / mount["Source"])
