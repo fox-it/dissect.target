@@ -121,8 +121,8 @@ class MQTTConnection:
                 break
 
             attempts += 1
-            time.sleep(0.01)
-            if attempts > 100:
+            time.sleep(0.1)
+            if attempts > 300:
                 # message might have not reached agent, resend...
                 self.broker.seek(self.host, disk_id, offset, flength, optimization_strategy)
                 attempts = 0
