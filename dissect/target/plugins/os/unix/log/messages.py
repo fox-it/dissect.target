@@ -34,7 +34,7 @@ class MessagesPlugin(Plugin):
 
     def _find_log_files(self) -> Iterator[Path]:
         log_dirs = ["/var/log/", "/var/log/installer/"]
-        file_globs = ["syslog*", "messages*", "cloud-init*.log*"]
+        file_globs = ["syslog*", "messages*", "cloud-init.log*"]
         for log_dir in log_dirs:
             for glob in file_globs:
                 yield from self.target.fs.path(log_dir).glob(glob)
@@ -93,6 +93,8 @@ class MessagesPlugin(Plugin):
 
         Lines are structured in the following format:
         ``YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK``
+
+        NOTE: ``cloud-init-output.log`` files are not supported as they do not contain structured logs.
 
         Args:
             ``log_file``: path to cloud-init.log file.

@@ -8,16 +8,17 @@ from zoneinfo import ZoneInfo
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.plugins.general import default
 from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
 from tests._utils import absolute_path
 
 
-def test_unix_log_messages_plugin(target_unix_users, fs_unix):
+def test_unix_log_messages_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
-    data_file = absolute_path("_data/plugins/os/unix/log//messages/messages")
+    data_file = absolute_path("_data/plugins/os/unix/log/messages/messages")
     fs_unix.map_file("var/log/messages", data_file)
 
     entry = fs_unix.get("var/log/messages")
@@ -46,7 +47,7 @@ def test_unix_log_messages_plugin(target_unix_users, fs_unix):
     assert isinstance(syslogs[0], type(MessagesRecord()))
 
 
-def test_unix_log_messages_compressed_timezone_year_rollover():
+def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     target = Target()
     bio = BytesIO()
 
@@ -86,7 +87,7 @@ def test_unix_log_messages_compressed_timezone_year_rollover():
     assert results[1].ts == dt(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
 
 
-def test_unix_log_messages_malformed_log_year_rollover(target_unix_users, fs_unix):
+def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     messages = BytesIO(
@@ -105,3 +106,21 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users, fs_uni
 
         results = list(target_unix_users.messages())
         assert len(results) == 2
+
+
+def test_unix_messages_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    messages = """
+    2005-08-09 11:55:21,000 - foo.py[DEBUG]: This is a cloud-init message!
+    2005-08-09 11:55:21,001 - util.py[DEBUG]: Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds.
+    """
+    fs_unix.map_file_fh("/var/log/installer/cloud-init.log", BytesIO(textwrap.dedent(messages).encode()))
+
+    target_unix_users.add_plugin(MessagesPlugin)
+
+    results = list(target_unix_users.messages())
+    assert len(results) == 2
+    assert results[0].ts == dt.fromtimestamp(1_1_2_3_5_8_13_21)
+    assert results[0].daemon == "foo.py"
+    assert results[0].pid is None
+    assert results[0].message == "This is a cloud-init message!"
+    assert results[0].source == "/var/log/installer/cloud-init.log"
