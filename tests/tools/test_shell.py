@@ -182,8 +182,10 @@ def test_target_cli_print_extensive_file_stat(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.return_value = mock_entry
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo\n"
@@ -198,8 +200,10 @@ def test_target_cli_print_extensive_file_stat_symlink(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.return_value = mock_entry
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo -> bar\n"
@@ -209,8 +213,10 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.side_effect = FileNotFoundError("ERROR")
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"

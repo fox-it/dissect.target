@@ -31,12 +31,13 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
+from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.plugin import arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     generate_argparse_for_bound_method,
@@ -468,7 +469,7 @@ class TargetCli(TargetCmd):
                 # If we happen to scan an NTFS filesystem see if any of the
                 # entries has an alternative data stream and also list them.
                 entry = file_.get()
-                if isinstance(entry, RootFilesystemEntry):
+                if isinstance(entry, LayerFilesystemEntry):
                     if entry.entries.fs.__type__ == "ntfs":
                         attrs = entry.lattr()
                         for data_stream in attrs.DATA:
@@ -511,34 +512,66 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
+    @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
+    @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
+    @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """list directory contents"""
 
         path = self.resolve_path(args.path)
 
+        if args.use_ctime and args.use_atime:
+            print("can't specify -c and -u at the same time")
+            return
+
         if not path or not path.exists():
             return
+
+        self._print_ls(args, path, 0, stdout)
+
+    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> None:
+        path = self.resolve_path(path)
+        subdirs = []
 
         if path.is_dir():
             contents = self.scandir(path, color=True)
         elif path.is_file():
             contents = [(path, path.name)]
 
+        if depth > 0:
+            print(f"\n{str(path)}:", file=stdout)
+
         if not args.l:
-            print("\n".join([name for _, name in contents]), file=stdout)
+            for target_path, name in contents:
+                print(name, file=stdout)
+                if target_path.is_dir():
+                    subdirs.append(target_path)
         else:
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
-                self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
+                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
+                if target_path.is_dir():
+                    subdirs.append(target_path)
 
-    def print_extensive_file_stat(self, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
+        if args.recursive and subdirs:
+            for subdir in subdirs:
+                self._print_ls(args, subdir, depth + 1, stdout)
+
+    def print_extensive_file_stat(
+        self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str
+    ) -> None:
         """Print the file status."""
         try:
             entry = target_path.get()
             stat = entry.lstat()
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
+            show_time = stat.st_mtime
+            if args.use_ctime:
+                show_time = stat.st_ctime
+            elif args.use_atime:
+                show_time = stat.st_atime
+            utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
 
             print(
                 f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
@@ -1223,10 +1256,17 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
+    parser.add_argument(
+        "-L",
+        "--loader",
+        action="store",
+        default=None,
+        help="select a specific loader (i.e. vmx, raw)",
+    )
 
     configure_generic_arguments(parser)
-    args = parser.parse_args()
-
+    args, rest = parser.parse_known_args()
+    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
     process_generic_arguments(args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL

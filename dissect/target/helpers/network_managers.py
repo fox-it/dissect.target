@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
@@ -12,12 +15,14 @@ from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
 
-try:
-    import yaml
+log = logging.getLogger(__name__)
 
-    PY_YAML = True
+try:
+    from ruamel.yaml import YAML
+
+    HAS_YAML = True
 except ImportError:
-    PY_YAML = False
+    HAS_YAML = False
 
 IGNORED_IPS = [
     "0.0.0.0",
@@ -61,7 +66,7 @@ class Template:
         """
 
         if not path.exists() or path.is_dir():
-            self.target.log.debug("Failed to get config file %s", path)
+            log.debug("Failed to get config file %s", path)
             config = None
 
         if self.name == "netplan":
@@ -74,26 +79,26 @@ class Template:
             config = self._parse_configparser_config(path)
         return config
 
-    def _parse_netplan_config(self, fh: TargetPath) -> Optional[dict]:
+    def _parse_netplan_config(self, path: TargetPath) -> Optional[dict]:
         """Internal function to parse a netplan YAML based configuration file into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            fh: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed YAML based configuration file.
         """
-        if PY_YAML:
-            return self.parser(stream=fh.open(), Loader=yaml.FullLoader)
+        if HAS_YAML:
+            return self.parser(path.open("rb"))
         else:
-            self.target.log.error("Failed to parse %s. Cannot import PyYAML", self.name)
+            log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
             return None
 
-    def _parse_wicked_config(self, fh: TargetPath) -> dict:
+    def _parse_wicked_config(self, path: TargetPath) -> dict:
         """Internal function to parse a wicked XML based configuration file into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            fh: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed xml based Linux network manager based configuration file.
@@ -102,44 +107,43 @@ class Template:
         # we have to replace the ":" for this with "___" (three underscores) to make the xml config non-namespaced.
         pattern = compile(r"(?<=\n)\s+(<.+?>)")
         replace_match: Callable[[Match]] = lambda match: match.group(1).replace(":", "___")
-        text = sub(pattern, replace_match, fh.open("rt").read())
+        text = sub(pattern, replace_match, path.open("rt").read())
 
         xml = self.parser.parse(StringIO(text))
         return self._parse_xml_config(xml, self.sections, self.options)
 
-    def _parse_configparser_config(self, fh: TargetPath) -> dict:
+    def _parse_configparser_config(self, path: TargetPath) -> dict:
         """Internal function to parse ConfigParser compatible configuration files into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            path: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed ConfigParser compatible configuration file.
         """
         try:
-            self.parser.read_string(fh.open("rt").read(), fh.name)
+            self.parser.read_string(path.open("rt").read(), path.name)
             return self.parser._sections
         except MissingSectionHeaderError:
             # configparser does like config files without headers, so we inject a header to make it work.
-            self.parser.read_string(f"[{self.name}]\n" + fh.open("rt").read(), fh.name)
+            self.parser.read_string(f"[{self.name}]\n" + path.open("rt").read(), path.name)
             return self.parser._sections
 
-    def _parse_text_config(self, comments: str, delim: str, fh: TargetPath) -> dict:
+    def _parse_text_config(self, comments: str, delim: str, path: TargetPath) -> dict:
         """Internal function to parse a basic plain text based configuration file into a dict.
 
         Args:
             comments: A string value defining the comment style of the configuration file.
             delim: A string value defining the delimiters used in the configuration file.
-            fh: A file-like object to the configuration file to be parsed.
+            path: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary with a parsed plain text based Linux network manager configuration file.
         """
         config = defaultdict(dict)
         option_dict = {}
-        fh = fh.open("rt")
 
-        for line in fh.readlines():
+        for line in path.open("rt"):
             line = line.strip()
 
             if not line or line.startswith(comments):
@@ -291,9 +295,9 @@ class Parser:
         Returns:
             Value(s) corrensponding to that network configuration option.
         """
-
         if not config:
-            return None
+            log.error("Cannot get option %s: No config to parse", option)
+            return
 
         if section:
             # account for values of sections which are None
@@ -372,7 +376,7 @@ class NetworkManager:
         if self.registered:
             self.config = self.parser.parse()
         else:
-            self.target.log.error("Network manager %s is not registered. Cannot parse config.", self.name)
+            log.error("Network manager %s is not registered. Cannot parse config.", self.name)
 
     @property
     def interface(self) -> set:
@@ -653,7 +657,9 @@ TEMPLATES = {
         ["netctl"],
         ["address", "gateway", "dns", "ip"],
     ),
-    "netplan": Template("netplan", yaml.load if PY_YAML else None, ["network"], ["addresses", "dhcp4", "gateway4"]),
+    "netplan": Template(
+        "netplan", YAML(typ="safe").load if HAS_YAML else None, ["network"], ["addresses", "dhcp4", "gateway4"]
+    ),
     "NetworkManager": Template(
         "NetworkManager",
         ConfigParser(delimiters=("="), comment_prefixes="#", dict_type=dict),
