@@ -7,6 +7,7 @@ from dissect.ntfs.mft import MftRecord
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
@@ -104,9 +105,12 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
+    def __init__(self, target):
+        super().__init__(target)
+        self.ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
+
     def check_compatible(self) -> None:
-        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
-        if not len(ntfs_filesystems):
+        if not len(self.ntfs_filesystems):
             raise UnsupportedPluginError("No NTFS filesystems found")
 
     @export(
@@ -118,7 +122,10 @@ class MftPlugin(Plugin):
         ]
     )
     @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
-    def mft(self, compact: bool = False):
+    @arg("--fs", type=int, default=-1, help="optional filesystem index, zero indexed")
+    @arg("--start", type=int, default=0, help="the first MFT segment number")
+    @arg("--end", type=int, default=-1, help="the last MFT segment number")
+    def mft(self, compact: bool = False, fs: int = -1, start: int = 0, end: int = -1):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -138,53 +145,62 @@ class MftPlugin(Plugin):
         else:
             record_formatter = formatter
 
-        for fs in self.target.filesystems:
-            if fs.__type__ != "ntfs":
-                continue
-
-            # If this filesystem is a "fake" NTFS filesystem, used to enhance a
-            # VirtualFilesystem, The driveletter (more accurate mount point)
-            # returned will be that of the VirtualFilesystem. This makes sure
-            # the paths returned in the records are actually reachable.
-            drive_letter = get_drive_letter(self.target, fs)
-            volume_uuid = get_volume_identifier(fs)
-
+        if fs:
             try:
-                for record in fs.ntfs.mft.segments():
-                    try:
-                        inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
-                        owner, _ = get_owner_and_group(record, fs)
-                        resident = None
-                        size = None
+                filesystem = self.ntfs_filesystems[fs]
+            except IndexError:
+                self.target.log.exception("%s does not have a filesystem with index number: %s", self.target, fs)
+                return
 
-                        if not record.is_dir():
-                            for data_attribute in record.attributes.DATA:
-                                if data_attribute.name == "":
-                                    resident = data_attribute.resident
-                                    break
+            yield from self.segments(filesystem, record_formatter, start, end)
+        else:
+            for filesystem in self.ntfs_filesystems:
+                yield from self.segments(filesystem, record_formatter, start, end)
 
-                            size = get_record_size(record)
+    def segments(self, fs: NtfsFilesystem, record_formatter: Callable, start: int, end: int):
+        # If this filesystem is a "fake" NTFS filesystem, used to enhance a
+        # VirtualFilesystem, The driveletter (more accurate mount point)
+        # returned will be that of the VirtualFilesystem. This makes sure
+        # the paths returned in the records are actually reachable.
+        drive_letter = get_drive_letter(self.target, fs)
+        volume_uuid = get_volume_identifier(fs)
 
-                        for path in record.full_paths():
-                            path = f"{drive_letter}{path}"
-                            yield from self.mft_records(
-                                drive_letter=drive_letter,
-                                record=record,
-                                segment=record.segment,
-                                path=path,
-                                owner=owner,
-                                size=size,
-                                resident=resident,
-                                inuse=inuse,
-                                volume_uuid=volume_uuid,
-                                record_formatter=record_formatter,
-                            )
-                    except Exception as e:
-                        self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
-                        self.target.log.debug("", exc_info=e)
+        try:
+            for record in fs.ntfs.mft.segments(start, end):
+                try:
+                    inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
+                    owner, _ = get_owner_and_group(record, fs)
+                    resident = None
+                    size = None
 
-            except Exception:
-                log.exception("An error occured constructing FilesystemRecords")
+                    if not record.is_dir():
+                        for data_attribute in record.attributes.DATA:
+                            if data_attribute.name == "":
+                                resident = data_attribute.resident
+                                break
+
+                        size = get_record_size(record)
+
+                    for path in record.full_paths():
+                        path = f"{drive_letter}{path}"
+                        yield from self.mft_records(
+                            drive_letter=drive_letter,
+                            record=record,
+                            segment=record.segment,
+                            path=path,
+                            owner=owner,
+                            size=size,
+                            resident=resident,
+                            inuse=inuse,
+                            volume_uuid=volume_uuid,
+                            record_formatter=record_formatter,
+                        )
+                except Exception as e:
+                    self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
+                    self.target.log.debug("", exc_info=e)
+
+        except Exception:
+            log.exception("An error occured constructing FilesystemRecords")
 
     def mft_records(
         self,
