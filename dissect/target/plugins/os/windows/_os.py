@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 import struct
 from typing import Any, Iterator, Optional
 
@@ -76,6 +77,10 @@ class WindowsPlugin(OSPlugin):
         except Exception as e:
             self.target.log.warning("Failed to map drive letters")
             self.target.log.debug("", exc_info=e)
+
+        # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
+        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts["sysvol"]) == 1:
+            self.target.fs.mount("c:", self.target.fs.mounts["sysvol"])
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
