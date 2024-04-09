@@ -81,12 +81,14 @@ class ChromiumMixin:
             for d in hist_paths:
                 cur_dir: TargetPath = user_details.home_path.joinpath(d)
                 cur_dir = cur_dir.resolve()
-                if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
+                if not cur_dir.exists() or (user_details, cur_dir) in users_dirs:
                     continue
-                users_dirs.append((user_details.user, cur_dir))
+                users_dirs.append((user_details, cur_dir))
         return users_dirs
 
-    def _iter_db(self, filename: str, subdirs: Optional[list[str]] = None) -> Iterator[SQLite3]:
+    def _iter_db(
+        self, filename: str, subdirs: Optional[list[str]] = None
+    ) -> Iterator[tuple[UserDetails, TargetPath, SQLite3]]:
         """Generate a connection to a sqlite database file.
 
         Args:
@@ -114,7 +116,7 @@ class ChromiumMixin:
             except SQLError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file, exc_info=e)
 
-    def _iter_json(self, filename: str) -> Iterator[tuple[str, TargetPath, dict]]:
+    def _iter_json(self, filename: str) -> Iterator[tuple[UserDetails, TargetPath, dict]]:
         """Iterate over all JSON files in the user directories, yielding a tuple
         of username, JSON file path, and the parsed JSON data.
 
@@ -136,7 +138,7 @@ class ChromiumMixin:
                 self.target.log.warning("Could not find %s file: %s", filename, json_file)
 
     def check_compatible(self) -> None:
-        if not len(self._build_userdirs(self.DIRS)):
+        if not self._build_userdirs(self.DIRS):
             raise UnsupportedPluginError("No Chromium-based browser directories found")
 
     def history(self, browser_name: Optional[str] = None) -> Iterator[BrowserHistoryRecord]:
@@ -195,7 +197,7 @@ class ChromiumMixin:
                         from_url=try_idna(from_url.url) if from_url else None,
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -230,7 +232,7 @@ class ChromiumMixin:
                         local_state_parent = local_state_parent.parent
                     local_state_path = local_state_parent.joinpath("Local State")
 
-                    decrypted_key = self._get_local_state_key(local_state_path)
+                    decrypted_key = self._get_local_state_key(local_state_path, user.user.name)
                 except ValueError:
                     self.target.log.warning("Failed to decrypt local state key")
 
@@ -270,7 +272,7 @@ class ChromiumMixin:
                         is_http_only=bool(cookie.is_httponly),
                         same_site=bool(cookie.samesite),
                         source=db_file,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
@@ -330,7 +332,7 @@ class ChromiumMixin:
                         state=row.get("state"),
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -416,12 +418,12 @@ class ChromiumMixin:
                             manifest_version=manifest_version,
                             source=json_file,
                             _target=self.target,
-                            _user=user,
+                            _user=user.user,
                         )
                 except (AttributeError, KeyError) as e:
                     self.target.log.info("No browser extensions found in: %s", json_file, exc_info=e)
 
-    def _get_local_state_key(self, local_state_path: TargetPath) -> Optional[bytes]:
+    def _get_local_state_key(self, local_state_path: TargetPath, username: str) -> Optional[bytes]:
         """Get the Chromium ``os_crypt`` ``encrypted_key`` and decrypt it using DPAPI."""
 
         if not local_state_path.exists():
@@ -441,7 +443,7 @@ class ChromiumMixin:
             return None
 
         encrypted_key = base64.b64decode(local_state_conf["os_crypt"]["encrypted_key"])[5:]
-        decrypted_key = self.target.dpapi.decrypt_blob(encrypted_key)
+        decrypted_key = self.target.dpapi.decrypt_user_blob(encrypted_key, username)
         return decrypted_key
 
     def passwords(self, browser_name: str = None) -> Iterator[BrowserPasswordRecord]:
@@ -469,7 +471,7 @@ class ChromiumMixin:
             if self.target.os == OperatingSystem.WINDOWS.value:
                 try:
                     local_state_path = db_file.parent.parent.joinpath("Local State")
-                    decrypted_key = self._get_local_state_key(local_state_path)
+                    decrypted_key = self._get_local_state_key(local_state_path, user.user.name)
                 except ValueError:
                     self.target.log.warning("Failed to decrypt local state key")
 
@@ -542,7 +544,7 @@ class ChromiumMixin:
                     decrypted_password=decrypted_password,
                     source=db_file,
                     _target=self.target,
-                    _user=user,
+                    _user=user.user,
                 )
 
 

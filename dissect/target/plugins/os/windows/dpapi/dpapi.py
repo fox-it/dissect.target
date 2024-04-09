@@ -149,13 +149,18 @@ class DPAPIPlugin(InternalPlugin):
         return result
 
     def decrypt_system_blob(self, data: bytes) -> bytes:
+        """Decrypt the given bytes using the System master key."""
+        return self.decrypt_user_blob(data, self.SYSTEM_USERNAME)
+
+    def decrypt_user_blob(self, data: bytes, username: str) -> bytes:
+        """Decrypt the given bytes using the master key of the given user."""
         blob = DPAPIBlob(data)
 
-        if not (mk := self.master_keys.get(self.SYSTEM_USERNAME, {}).get(blob.guid)):
-            raise ValueError("Blob UUID is unknown to system master keys")
+        if not (mk := self.master_keys.get(username, {}).get(blob.guid)):
+            raise ValueError(f"Blob UUID is unknown to {username} master keys")
 
         if not blob.decrypt(mk.key):
-            raise ValueError("Failed to decrypt system blob")
+            raise ValueError("Failed to decrypt blob")
 
         return blob.clear_text
 
@@ -164,12 +169,11 @@ class DPAPIPlugin(InternalPlugin):
         blob = DPAPIBlob(data)
 
         for user in self.master_keys:
-            for mk_uuid in self.master_keys[user]:
-                mk = self.master_keys[user][mk_uuid]
+            for mk in self.master_keys[user].values():
                 if blob.decrypt(mk.key):
                     return blob.clear_text
 
-        raise ValueError("Failed to decrypt user blob")
+        raise ValueError("Failed to decrypt blob")
 
 
 def _decrypt_aes(data: bytes, key: bytes) -> bytes:
