@@ -152,7 +152,7 @@ class OpenSSHPlugin(SSHPlugin):
                 key_type=key_type,
                 public_key=public_key,
                 comment=comment,
-                **fingerprints,
+                fingerprint=fingerprints,
                 path=file_path,
                 _target=self.target,
                 _user=user,
@@ -196,7 +196,7 @@ def parse_known_host(known_host_string: str) -> tuple[str, list, str, str, str]:
     return marker, hostnames.split(","), keytype, public_key, comment
 
 
-def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format=False) -> dict:
+def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format: bool = False) -> tuple[str, str, str]:
     """Calculate the MD5, SHA1 and SHA256 digest of the given decoded public key.
 
     Adheres as much as possible to the output provided by ssh-keygen when ``ssh_keygen_format``
@@ -209,12 +209,12 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format=False) -
         - ``ssh-keygen -l -E <alg> -f key.pub``
     """
     if not public_key_decoded:
-        raise ValueError("No decoded public key provided.")
+        raise ValueError("No decoded public key provided")
 
     if not isinstance(public_key_decoded, bytes):
         raise ValueError("Provided public key should be bytes")
 
-    if public_key_decoded[0:3] != b"\x00" * 3:
+    if public_key_decoded[0:3] != b"\x00\x00\x00":
         raise ValueError("Provided value does not look like a public key")
 
     fingerprint_md5 = md5(public_key_decoded).hexdigest()
@@ -226,8 +226,4 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format=False) -
         fingerprint_sha1 = sha1(public_key_decoded).hexdigest()
         fingerprint_sha256 = sha256(public_key_decoded).hexdigest()
 
-    return {
-        "fingerprint_md5": fingerprint_md5,
-        "fingerprint_sha1": fingerprint_sha1,
-        "fingerprint_sha256": fingerprint_sha256,
-    }
+    return fingerprint_md5, fingerprint_sha1, fingerprint_sha256

@@ -106,7 +106,7 @@ class PuTTYPlugin(SSHPlugin):
                 port=port,
                 key_type=key_type,
                 public_key=public_key,
-                **fingerprints,
+                fingerprint=fingerprints,
                 comment="",
                 marker=None,
                 path=windows_path(ssh_host_keys.path),
@@ -134,7 +134,7 @@ class PuTTYPlugin(SSHPlugin):
                     port=port,
                     key_type=key_type,
                     public_key=public_key,
-                    **fingerprints,
+                    fingerprint=fingerprints,
                     comment="",
                     marker=None,
                     path=posix_path(ssh_host_keys_path),
@@ -205,7 +205,7 @@ def parse_host_user(host: str, user: str) -> tuple[str, str]:
     return host, user
 
 
-def construct_public_key(key_type: str, iv: str) -> tuple[str, dict]:
+def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, str]]:
     """Returns OpenSSH format public key calculated from PuTTY SshHostKeys format and set of fingerprints.
 
     PuTTY stores raw public key components instead of OpenSSH-formatted public keys
@@ -242,7 +242,7 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, dict]:
 
     if not key:
         log.warning("Could not reconstruct public key: type %s not implemented.", key_type)
-        return iv, {"fingerprint_md5": None, "fingerprint_sha1": None, "fingerprint_sha256": None}
+        return iv, (None, None, None)
 
     openssh_public_key = key.public_key().export_key(format="OpenSSH")
 

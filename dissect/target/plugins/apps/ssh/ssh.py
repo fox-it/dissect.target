@@ -10,12 +10,6 @@ COMMON_ELLEMENTS = [
     ("path", "path"),
 ]
 
-FINGERPRINTS = [
-    ("string", "fingerprint_md5"),
-    ("string", "fingerprint_sha1"),
-    ("string", "fingerprint_sha256"),
-]
-
 AuthorizedKeysRecord = OpenSSHUserRecordDescriptor(
     "application/openssh/authorized_keys",
     [
@@ -35,7 +29,7 @@ KnownHostRecord = OpenSSHUserRecordDescriptor(
         ("varint", "port"),
         ("string", "public_key"),
         ("string", "marker"),
-        *FINGERPRINTS,
+        ("digest", "fingerprint"),
     ],
 )
 
@@ -57,7 +51,7 @@ PublicKeyRecord = OpenSSHUserRecordDescriptor(
         ("datetime", "mtime_ts"),
         *COMMON_ELLEMENTS,
         ("string", "public_key"),
-        *FINGERPRINTS,
+        ("digest", "fingerprint"),
     ],
 )
 
