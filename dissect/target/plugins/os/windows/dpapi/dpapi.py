@@ -160,7 +160,7 @@ class DPAPIPlugin(InternalPlugin):
             raise ValueError(f"Blob UUID is unknown to {username} master keys")
 
         if not blob.decrypt(mk.key):
-            raise ValueError("Failed to decrypt blob")
+            raise ValueError(f"Failed to decrypt blob for user {username}")
 
         return blob.clear_text
 
