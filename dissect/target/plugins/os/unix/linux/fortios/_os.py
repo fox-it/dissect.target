@@ -113,7 +113,7 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.add_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
         target.log.warning("Attempting to load XZ files, this can take a while.")
@@ -127,11 +127,11 @@ class FortiOSPlugin(LinuxPlugin):
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
                 fh = xz.repair_checksum(tar.open("rb"))
-                target.fs.add_layer().mount("/", TarFilesystem(fh))
+                target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
-            target.fs.add_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
+            target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
 
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
