@@ -62,8 +62,8 @@ class CredHistEntry:
     version: int
     guid: str
     user_sid: str
-    sha1: Optional[str]
-    nt: Optional[str]
+    sha1: Optional[bytes]
+    nt: Optional[bytes]
     hash_alg: HashAlgorithm = field(repr=False)
     cipher_alg: CipherAlgorithm = field(repr=False)
     raw: c_credhist.entry = field(repr=False)
@@ -73,10 +73,10 @@ class CredHistEntry:
         """Decrypt this CREDHIST entry using the provided password hash. Modifies ``CredHistEntry.sha1``
         and ``CredHistEntry.nt`` values.
 
-        If the decrypted ``nt`` value is 32 characters we assume the decryption was successful.
+        If the decrypted ``nt`` value is 16 bytes we assume the decryption was successful.
 
         Args:
-            password_hash: bytes of SHA1 password hash digest
+            password_hash: Bytes of SHA1 password hash digest.
 
         Raises:
             ValueError: If the decryption seems to have failed.
@@ -92,10 +92,10 @@ class CredHistEntry:
         sha_size = self.raw.dwShaHashSize
         nt_size = self.raw.dwNtHashSize
 
-        sha1 = data[:sha_size].hex()
-        nt = data[sha_size : sha_size + nt_size].rstrip(b"\x00").hex()
+        sha1 = data[:sha_size]
+        nt = data[sha_size : sha_size + nt_size].rstrip(b"\x00")
 
-        if len(nt) != 32:
+        if len(nt) != 16:
             raise ValueError("Decrypting failed, invalid password hash?")
 
         self.decrypted = True
@@ -136,10 +136,8 @@ class CredHistFile:
         except EOFError:
             pass
 
-    def decrypt(self, password_hash: bytes | str) -> None:
+    def decrypt(self, password_hash: bytes) -> None:
         """Decrypt a CREDHIST chain using the provided password SHA1 hash."""
-        if isinstance(password_hash, str):
-            password_hash = bytes.fromhex(password_hash)
 
         for entry in reversed(self.entries):
             try:
@@ -196,8 +194,8 @@ class CredHistPlugin(Plugin):
                 yield CredHistRecord(
                     guid=entry.guid,
                     decrypted=entry.decrypted,
-                    sha1=entry.sha1,
-                    nt=entry.nt,
+                    sha1=entry.sha1.hex(),
+                    nt=entry.nt.hex(),
                     _user=user,
                     _target=self.target,
                 )
