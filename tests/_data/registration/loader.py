@@ -1,17 +1,3 @@
-from pathlib import Path
-
-import dissect.target.container as container
-from dissect.target.loader import Loader, register
-
-
-class TestLoader(Loader):
-    @staticmethod
-    def detect(path: Path) -> bool:
-        return False
-
-    def map(self, target) -> None:
-        target.disks.add(container.open(self.path))
-        pass
-
-
-register(__name__, TestLoader.__name__, internal=False)
+version https://git-lfs.github.com/spec/v1
+oid sha256:111e4f8097fc3bc038615391f11c9cec0f323366026a78d076a7f23ac13a3695
+size 384
