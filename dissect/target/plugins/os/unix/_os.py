@@ -20,6 +20,7 @@ class UnixPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
+        self._add_lvm_devices()
         self._hostname_dict = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
@@ -230,6 +231,19 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
+    def _add_lvm_devices(self) -> None:
+        """Parses and mounts lvm devices from external target to local target fs"""
+        vfs = VirtualFilesystem()
+        for volume in self.target.volumes.entries:
+            if isinstance(volume.vs, lvm.LvmVolumeSystem) and "disk" in volume.name:
+                vg_name =  volume.vs.lvm.vg.name
+
+                for logical_volume in volume.vs.lvm.vg.lv:
+                    lv_name = logical_volume.name
+                    vfs.map_file_fh(f"/{vg_name}/{lv_name}", BufferedStream(volume))
+    
+        self.target.fs.mount("/dev", vfs)
+                    
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
         """Parse files containing Unix version information.
 
