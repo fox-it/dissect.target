@@ -22,7 +22,7 @@ def test_credhist() -> None:
         assert ch.entries[0].version == 1
         assert entry.user_sid.upper() == "S-1-5-21-1342509979-482553916-3960431919-1000"
 
-    ch.decrypt(password_hash=hashlib.sha1("password4".encode("utf-16-le")).digest())
+    ch.decrypt(password_hash=sha1("password4"))
 
     assert str(ch.entries[0].guid) == "99ec7176-d16c-41bd-9c94-d3a4c5b94232"
     assert ch.entries[0].sha1 == sha1("user")
@@ -59,12 +59,12 @@ def test_credhist_partial(target_win_users: Target, fs_win: VirtualFilesystem) -
 
     results = list(target_win_users.credhist())
     assert len(results) == 3
-    assert [result.nt for result in results] == [md4("user"), md4("password"), None]
+    assert [result.nt for result in results] == [md4("user").hex(), md4("password").hex(), None]
 
 
 def md4(plaintext: str) -> str:
-    return MD4.new(plaintext.encode("utf-16-le")).digest().hex()
+    return MD4.new(plaintext.encode("utf-16-le")).digest()
 
 
 def sha1(plaintext: str) -> str:
-    return hashlib.sha1(plaintext.encode("utf-16-le")).digest().hex()
+    return hashlib.sha1(plaintext.encode("utf-16-le")).digest()

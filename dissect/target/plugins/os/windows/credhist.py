@@ -146,7 +146,7 @@ class CredHistFile:
                 log.warning("Could not decrypt entry %s with password %s", entry.guid, password_hash.hex())
                 log.debug("", exc_info=e)
                 continue
-            password_hash = bytes.fromhex(entry.sha1)
+            password_hash = entry.sha1
 
 
 class CredHistPlugin(Plugin):
@@ -194,8 +194,8 @@ class CredHistPlugin(Plugin):
                 yield CredHistRecord(
                     guid=entry.guid,
                     decrypted=entry.decrypted,
-                    sha1=entry.sha1.hex(),
-                    nt=entry.nt.hex(),
+                    sha1=entry.sha1.hex() if entry.sha1 else None,
+                    nt=entry.nt.hex() if entry.nt else None,
                     _user=user,
                     _target=self.target,
                 )
@@ -206,4 +206,5 @@ def keychain_passwords() -> set:
     for key in keychain.get_keys_for_provider("user") + keychain.get_keys_without_provider():
         if key.key_type == keychain.KeyType.PASSPHRASE:
             passphrases.add(key.value)
+    passphrases.add("")
     return passphrases
