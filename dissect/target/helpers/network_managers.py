@@ -1,15 +1,20 @@
+from __future__ import annotations
+
+import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional, Union
+from typing import Any, Callable, Iterable, Match, Optional
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
+
+log = logging.getLogger(__name__)
 
 try:
     from ruamel.yaml import YAML
@@ -60,7 +65,7 @@ class Template:
         """
 
         if not path.exists() or path.is_dir():
-            self.target.log.debug("Failed to get config file %s", path)
+            log.debug("Failed to get config file %s", path)
             config = None
 
         if self.name == "netplan":
@@ -85,7 +90,7 @@ class Template:
         if HAS_YAML:
             return self.parser(path.open("rb"))
         else:
-            self.target.log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
+            log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
             return None
 
     def _parse_wicked_config(self, path: TargetPath) -> dict:
@@ -278,7 +283,7 @@ class Parser:
             if option in translation_values and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
+    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Optional[str | Callable]:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
 
         Args:
@@ -289,8 +294,13 @@ class Parser:
         Returns:
             Value(s) corrensponding to that network configuration option.
         """
+        if not config:
+            log.error("Cannot get option %s: No config to parse", option)
+            return
+
         if section:
-            config = config[section]
+            config = config.get(section, {})
+
         for key, value in config.items():
             if key == option:
                 return value
@@ -364,7 +374,7 @@ class NetworkManager:
         if self.registered:
             self.config = self.parser.parse()
         else:
-            self.target.log.error("Network manager %s is not registered. Cannot parse config.", self.name)
+            log.error("Network manager %s is not registered. Cannot parse config.", self.name)
 
     @property
     def interface(self) -> set:
