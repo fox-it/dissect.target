@@ -1,3 +1,3 @@
-[Tue Dec 13 13:07:21.131489 2022] [mpm_prefork:notice] [pid 218] AH00163: Apache/2.4.54 (Unix) mod_perl/2.0.10 Perl/v5.30.2 configured -- resuming normal operations
-[Thu May 12 08:28:57.652118 2011] [core:error] [pid 8777:tid 4326490112] [client ::1:58619] File does not exist: /usr/local/apache2/htdocs/favicon.ico
-[Fri Feb 01 22:03:08.320285 2019] [authz_core:debug] [pid 7:tid 140597881775872] mod_authz_core.c(820): [client 172.17.0.1:50750] AH01626: authorization result of <RequireAny>: granted
+version https://git-lfs.github.com/spec/v1
+oid sha256:82f2bcc10aef88df7666e3a7c88c77a65f8909c1cf2b8aeadff3b14d9474c886
+size 500
