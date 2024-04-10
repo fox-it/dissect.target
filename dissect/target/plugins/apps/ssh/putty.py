@@ -1,4 +1,5 @@
 import logging
+from base64 import b64decode
 from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional, Union
@@ -12,6 +13,7 @@ from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import export
+from dissect.target.plugins.apps.ssh.openssh import calculate_fingerprints
 from dissect.target.plugins.apps.ssh.ssh import KnownHostRecord, SSHPlugin
 from dissect.target.plugins.general.users import UserDetails
 
@@ -96,12 +98,15 @@ class PuTTYPlugin(SSHPlugin):
             key_type, host = entry.name.split("@")
             port, host = host.split(":")
 
+            public_key, fingerprints = construct_public_key(key_type, entry.value)
+
             yield KnownHostRecord(
                 mtime_ts=ssh_host_keys.ts,
                 host=host,
                 port=port,
                 key_type=key_type,
-                public_key=construct_public_key(key_type, entry.value),
+                public_key=public_key,
+                **fingerprints,
                 comment="",
                 marker=None,
                 path=windows_path(ssh_host_keys.path),
@@ -121,12 +126,15 @@ class PuTTYPlugin(SSHPlugin):
                 key_type, host = parts[0].split("@")
                 port, host = host.split(":")
 
+                public_key, fingerprints = construct_public_key(key_type, parts[1])
+
                 yield KnownHostRecord(
                     mtime_ts=ts,
                     host=host,
                     port=port,
                     key_type=key_type,
-                    public_key=construct_public_key(key_type, parts[1]),
+                    public_key=public_key,
+                    **fingerprints,
                     comment="",
                     marker=None,
                     path=posix_path(ssh_host_keys_path),
@@ -197,8 +205,8 @@ def parse_host_user(host: str, user: str) -> tuple[str, str]:
     return host, user
 
 
-def construct_public_key(key_type: str, iv: str) -> str:
-    """Returns OpenSSH format public key calculated from PuTTY SshHostKeys format.
+def construct_public_key(key_type: str, iv: str) -> tuple[str, dict]:
+    """Returns OpenSSH format public key calculated from PuTTY SshHostKeys format and set of fingerprints.
 
     PuTTY stores raw public key components instead of OpenSSH-formatted public keys
     or fingerprints. With RSA public keys the exponent and modulus are stored.
@@ -206,9 +214,7 @@ def construct_public_key(key_type: str, iv: str) -> str:
 
     Currently supports ``ssh-ed25519``, ``ecdsa-sha2-nistp256`` and ``rsa2`` key types.
 
-    NOTE:
-        - Sha256 fingerprints of the reconstructed public keys are currently not generated.
-        - More key types could be supported in the future.
+    NOTE: More key types could be supported in the future.
 
     Resources:
         - https://github.com/github/putty/blob/master/contrib/kh2reg.py
@@ -217,20 +223,31 @@ def construct_public_key(key_type: str, iv: str) -> str:
         - https://github.com/mkorthof/reg2kh
     """
 
+    if not isinstance(key_type, str) or not isinstance(iv, str):
+        raise ValueError("Invalid key_type or iv")
+
+    key = None
+
     if key_type == "ssh-ed25519":
         x, y = iv.split(",")
         key = ECC.construct(curve="ed25519", point_x=int(x, 16), point_y=int(y, 16))
-        return key.public_key().export_key(format="OpenSSH").split()[-1]
 
     if key_type == "ecdsa-sha2-nistp256":
         _, x, y = iv.split(",")
         key = ECC.construct(curve="NIST P-256", point_x=int(x, 16), point_y=int(y, 16))
-        return key.public_key().export_key(format="OpenSSH").split()[-1]
 
     if key_type == "rsa2":
         exponent, modulus = iv.split(",")
         key = RSA.construct((int(modulus, 16), int(exponent, 16)))
-        return key.public_key().export_key(format="OpenSSH").decode("utf-8").split()[-1]
 
-    log.warning("Could not reconstruct public key: type %s not implemented.", key_type)
-    return iv
+    if not key:
+        log.warning("Could not reconstruct public key: type %s not implemented.", key_type)
+        return iv, {"fingerprint_md5": None, "fingerprint_sha1": None, "fingerprint_sha256": None}
+
+    openssh_public_key = key.public_key().export_key(format="OpenSSH")
+
+    if isinstance(openssh_public_key, bytes):
+        openssh_public_key = openssh_public_key.decode("utf-8")
+
+    fingerprints = calculate_fingerprints(b64decode(openssh_public_key.split(" ")[1]))
+    return openssh_public_key.split()[-1], fingerprints
