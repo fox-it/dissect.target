@@ -59,13 +59,8 @@ def main():
                     try:
                         if args.value:
                             print(key.value(args.value))
-                        except RegistryError:
-                            continue
-                else:
-                    try:
-                        print(target)
-                        for key in target.registry.keys(args.key):
-                            recursor(key, args.depth, 0)
+                        else:
+                            recursor(key, args.depth, 0, args.length)
                     except RegistryError:
                         log.exception("Failed to find registry value")
 
