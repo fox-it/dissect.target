@@ -13,8 +13,11 @@ from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import export
-from dissect.target.plugins.apps.ssh.openssh import calculate_fingerprints
-from dissect.target.plugins.apps.ssh.ssh import KnownHostRecord, SSHPlugin
+from dissect.target.plugins.apps.ssh.ssh import (
+    KnownHostRecord,
+    SSHPlugin,
+    calculate_fingerprints,
+)
 from dissect.target.plugins.general.users import UserDetails
 
 log = logging.getLogger(__name__)
@@ -250,5 +253,6 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
         # RSA's export_key() returns bytes
         openssh_public_key = openssh_public_key.decode()
 
-    fingerprints = calculate_fingerprints(b64decode(openssh_public_key.split(" ")[1]))
-    return openssh_public_key.split()[-1], fingerprints
+    key_part = openssh_public_key.split()[-1]
+    fingerprints = calculate_fingerprints(b64decode(key_part))
+    return key_part, fingerprints
