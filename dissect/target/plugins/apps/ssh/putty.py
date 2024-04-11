@@ -240,14 +240,15 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
         exponent, modulus = iv.split(",")
         key = RSA.construct((int(modulus, 16), int(exponent, 16)))
 
-    if not key:
-        log.warning("Could not reconstruct public key: type %s not implemented.", key_type)
+    if key is None:
+        log.warning("Could not reconstruct public key: type %s not implemented", key_type)
         return iv, (None, None, None)
 
     openssh_public_key = key.public_key().export_key(format="OpenSSH")
 
     if isinstance(openssh_public_key, bytes):
-        openssh_public_key = openssh_public_key.decode("utf-8")
+        # RSA's export_key() returns bytes
+        openssh_public_key = openssh_public_key.decode()
 
     fingerprints = calculate_fingerprints(b64decode(openssh_public_key.split(" ")[1]))
     return openssh_public_key.split()[-1], fingerprints

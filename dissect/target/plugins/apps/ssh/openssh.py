@@ -217,13 +217,15 @@ def calculate_fingerprints(public_key_decoded: bytes, ssh_keygen_format: bool = 
     if public_key_decoded[0:3] != b"\x00\x00\x00":
         raise ValueError("Provided value does not look like a public key")
 
-    fingerprint_md5 = md5(public_key_decoded).hexdigest()
+    digest_md5 = md5(public_key_decoded).digest()
+    digest_sha1 = sha1(public_key_decoded).digest()
+    digest_sha256 = sha256(public_key_decoded).digest()
 
     if ssh_keygen_format:
-        fingerprint_sha1 = base64.b64encode(sha1(public_key_decoded).digest()).rstrip(b"=").decode("utf-8")
-        fingerprint_sha256 = base64.b64encode(sha256(public_key_decoded).digest()).rstrip(b"=").decode("utf-8")
+        fingerprint_sha1 = base64.b64encode(digest_sha1).rstrip(b"=").decode()
+        fingerprint_sha256 = base64.b64encode(digest_sha256).rstrip(b"=").decode()
     else:
-        fingerprint_sha1 = sha1(public_key_decoded).hexdigest()
-        fingerprint_sha256 = sha256(public_key_decoded).hexdigest()
+        fingerprint_sha1 = digest_sha1.hex()
+        fingerprint_sha256 = digest_sha256.hex()
 
-    return fingerprint_md5, fingerprint_sha1, fingerprint_sha256
+    return digest_md5.hex(), fingerprint_sha1, fingerprint_sha256
