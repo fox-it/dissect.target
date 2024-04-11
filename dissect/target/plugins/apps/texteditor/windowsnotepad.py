@@ -20,7 +20,7 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
 )
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
-# thread. This really helped figuring out the last missing bits and pieces
+# thread. This really helped to figure out the last missing bits and pieces
 # required for recovering text from these files.
 
 c_def = """
@@ -105,7 +105,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             # Header is the same for all types
             header = c_windowstab.header(fh)
 
-            # File can be saved, or unsaved. Depending on the filestate, different header fields are present
+            # File can be saved, or unsaved. Depending on the file state, different header fields are present
             # Currently, no information in the header is used in the outputted records, only the contents of the tab
             tab = (
                 c_windowstab.header_saved_tab(fh)
@@ -113,7 +113,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 else c_windowstab.header_unsaved_tab(fh)
             )
 
-            # In the case that the filesize is known up front, then this file is zet to a nonzero value
+            # In the case that the file size is known up front, then this fileSize is set to a nonzero value
             # This means that the data is stored in one block
             if tab.fileSize != 0:
                 # So we only parse one block
@@ -139,15 +139,15 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 text = data_entry.data
 
             else:
-                # Here, the fileSize is zero'ed, meaning that the size is not known up front.
+                # Here, the fileSize is zeroed, meaning that the size is not known up front.
                 # Data may be stored in multiple, variable-length blocks. This happens, for example, when several
                 # additions and deletions of characters have been recorded and these changes have not been 'flushed'
 
-                # First, parse 4 as of yet unknown bytes
-                # Likely holds some addition information about the tab (view options etc)
+                # First, parse 4 unknown bytes. These likely
+                # hold some addition information about the tab (view options etc.)
                 unknown_bytes = fh.read(4)
 
-                # In this multi-block variant, he header itself has a CRC32 value in big-endian as well
+                # In this multi-block variant, the header itself has a CRC32 value in big-endian as well
                 defined_header_crc32 = fh.read(4)
 
                 # Calculate CRC32 of the header and check if it matches
