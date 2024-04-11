@@ -75,6 +75,7 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
 
     assert result.container_id == id
     assert result.image == "exampleimage:1.33.7"
+    assert result.image_id == "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f"
     assert result.created == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)
     assert bool(result.running) is True
     assert result.started == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)

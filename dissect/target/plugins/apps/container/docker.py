@@ -23,6 +23,7 @@ DockerContainerRecord = TargetRecordDescriptor(
     [
         ("string", "container_id"),
         ("string", "image"),
+        ("string", "image_id"),
         ("string", "command"),
         ("datetime", "created"),
         ("string", "running"),
@@ -191,6 +192,7 @@ class DockerPlugin(Plugin):
                 yield DockerContainerRecord(
                     container_id=container_id,
                     image=config.get("Config").get("Image"),
+                    image_id=config.get("Image").replace("sha256:", ""),
                     command=config.get("Config").get("Cmd"),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
