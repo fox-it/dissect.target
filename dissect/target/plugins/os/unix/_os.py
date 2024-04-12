@@ -6,12 +6,16 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
-from dissect.target.filesystem import Filesystem
+from dissect.util.stream import BufferedStream
+
+from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
+
+from dissect.target.volumes import lvm
 
 log = logging.getLogger(__name__)
 
