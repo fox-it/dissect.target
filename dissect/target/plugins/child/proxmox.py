@@ -16,6 +16,6 @@ class ProxmoxChildTargetPlugin(ChildTargetPlugin):
         for vm in self.target.vm_list():
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=vm.path,
+                path=vm.config_path,
                 _target=self.target,
             )

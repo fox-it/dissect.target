@@ -27,10 +27,7 @@ VirtualMachineRecord = TargetRecordDescriptor(
     "proxmox/vm",
     [
         ("string", "id"),
-        ("string", "name"),
-        ("string", "storage_id"),
-        ("string", "disk"),
-        ("path", "path"),
+        ("string", "config_path"),
     ],
 )
 
@@ -48,13 +45,10 @@ class ProxmoxPlugin(LinuxPlugin):
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> ProxmoxPlugin:
-        obj = super().create(target, sysvol)
         # [PERSONAL TO REMOVE] Modifies target / executescode before initializing the class
         obj = super().create(target, sysvol)
         pmxcfs = _create_pmxcfs(sysvol.path(PMXCFS_DATABASE_PATH).open("rb"))
         target.fs.mount("/etc/pve", pmxcfs)
-
-        ipdb.set_trace()
 
         return obj
 
@@ -75,18 +69,10 @@ class ProxmoxPlugin(LinuxPlugin):
     def vm_list(self) -> Iterator[VirtualMachineRecord]:
         configs = self.target.fs.path(VM_CONFIG_PATH)
         for config in configs.iterdir():
-            parsed_config = _parse_vm_configuration(config)
-            for option in parsed_config:
-                if _is_disk_device(option.decode()):
-                    vm_id = pathlib.Path(config).stem
-                    config_value = parsed_config[option].decode()
-                    yield VirtualMachineRecord(
-                        id=vm_id,
-                        name=parsed_config[b'name'].decode(),
-                        storage_id=_get_storage_ID(config_value),
-                        disk=_get_disk_name(config_value),
-                        path=VM_CONFIG_PATH + f"/{vm_id}.conf",
-                    )
+            yield VirtualMachineRecord(
+                id=pathlib.Path(config).stem,
+                config_path=config,
+            )
 
 def _create_pmxcfs(fh) -> VirtualFilesystem:
     db = sqlite3.SQLite3(fh)
@@ -114,13 +100,7 @@ def _create_pmxcfs(fh) -> VirtualFilesystem:
 
     return  vfs
 
-def _parse_vm_configuration(conf) -> list:
-    file = conf.open()
-    parsed_lines = {}
-    for line in file:
-        key, value = line.split(b': ')
-        parsed_lines[key] = value.replace(b'\n', b'')
-    return parsed_lines
+
 
 def _is_disk_device(config_value: str) -> str | None:
     disk = re.match(r"^(sata|scsi|ide)[0-9]+$", config_value)
