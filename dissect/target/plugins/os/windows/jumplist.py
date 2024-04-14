@@ -112,7 +112,7 @@ class CustomerDestinationFile:
             raise NotImplementedError()
 
     def __iter__(self) -> Iterator[Lnk]:
-        # This searches for all LNK GUID's because the number of entries in the header is not always the correct.
+        # Searches for all LNK GUID's because the number of entries in the header is not always correct.
         buf = self.fh.read()
 
         for offset in findall(buf, LNK_GUID):
