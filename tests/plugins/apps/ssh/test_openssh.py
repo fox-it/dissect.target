@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import textwrap
 from enum import Enum, auto
 from io import BytesIO
@@ -8,7 +9,10 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.ssh.openssh import OpenSSHPlugin
+from dissect.target.plugins.apps.ssh.openssh import (
+    OpenSSHPlugin,
+    calculate_fingerprints,
+)
 
 
 @pytest.fixture(
@@ -393,6 +397,9 @@ def test_public_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesyst
     assert user_public_key.key_type == user_public_key_data.split(" ", 2)[0]
     assert user_public_key.public_key == user_public_key_data.split(" ", 2)[1]
     assert user_public_key.comment == user_public_key_data.split(" ", 2)[2]
+    assert user_public_key.fingerprint.md5 == "1f3d475966231eeb5455c8485dd030e4"
+    assert user_public_key.fingerprint.sha1 == "e39242ca1d74bea99285b212e908e18cc67e4dec"
+    assert user_public_key.fingerprint.sha256 == "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2"
     assert str(user_public_key.path).replace("\\", "/") == target_system.filesystem_path(
         ".ssh/id_ed25519.pub", TargetDir.HOME
     ).replace("\\", "/")
@@ -400,6 +407,25 @@ def test_public_keys_plugin(target_and_filesystem: tuple[Target, VirtualFilesyst
     assert host_public_key.key_type == host_public_key_data.split(" ", 2)[0]
     assert host_public_key.public_key == host_public_key_data.split(" ", 2)[1]
     assert host_public_key.comment == host_public_key_data.split(" ", 2)[2]
+    assert host_public_key.fingerprint.md5 == "a3f2ebfa8d16efd321015e1618fd281b"
+    assert host_public_key.fingerprint.sha1 == "f6656cc642fb08f53a1df77d0acff9852a649989"
+    assert host_public_key.fingerprint.sha256 == "8c7023d563c763fcf5104332d7cf51c978c5ba1dd9f5cbd341edd32dfcbef3ef"
     assert str(host_public_key.path).replace("\\", "/") == target_system.filesystem_path(
         "ssh_host_rsa_key.pub", TargetDir.SSHD
     ).replace(target_system.label, "\\sysvol\\").replace("\\", "/")
+
+
+def test_calculate_fingerprints() -> None:
+    ed25519_pub = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINz6oq+IweAoQFMzQ0aJLYXJFkLn3tXMbVZ550wvUKOw long comment here"
+
+    assert calculate_fingerprints(base64.b64decode(ed25519_pub.split(" ")[1])) == (
+        "1f3d475966231eeb5455c8485dd030e4",
+        "e39242ca1d74bea99285b212e908e18cc67e4dec",
+        "7b77007b0b51a86ced6b5fe25639092484c4c39cf76b283ef65fdf49a00f44d2",
+    )
+
+    assert calculate_fingerprints(base64.b64decode(ed25519_pub.split(" ")[1]), ssh_keygen_format=True) == (
+        "1f3d475966231eeb5455c8485dd030e4",
+        "45JCyh10vqmShbIS6QjhjMZ+Tew",
+        "e3cAewtRqGzta1/iVjkJJITEw5z3ayg+9l/fSaAPRNI",
+    )
