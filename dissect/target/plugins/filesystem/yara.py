@@ -13,7 +13,7 @@ YaraMatchRecord = TargetRecordDescriptor(
     "filesystem/yara/match",
     [
         ("path", "path"),
-        ("digest", "digest"),
+        ("digest", "digests"),
         ("string", "rule"),
         ("string[]", "tags"),
     ],
@@ -52,7 +52,7 @@ class YaraPlugin(Plugin):
                     for match in rules.match(data=path.read_bytes()):
                         yield YaraMatchRecord(
                             path=path,
-                            digest=path.get().hash(),
+                            digests=path.get().hash(),
                             rule=match.rule,
                             tags=match.tags,
                             _target=self.target,

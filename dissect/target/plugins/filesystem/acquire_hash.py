@@ -10,7 +10,7 @@ AcquireHashRecord = TargetRecordDescriptor(
     [
         ("path", "path"),
         ("filesize", "filesize"),
-        ("digest", "digest"),
+        ("digest", "digests"),
     ],
 )
 
@@ -39,6 +39,6 @@ class AcquireHashPlugin(Plugin):
                 yield AcquireHashRecord(
                     path=self.target.fs.path((row["path"])),
                     filesize=row["file-size"],
-                    digest=(row["md5"] or None, row["sha1"] or None, row["sha256"] or None),
+                    digests=(row["md5"] or None, row["sha1"] or None, row["sha256"] or None),
                     _target=self.target,
                 )

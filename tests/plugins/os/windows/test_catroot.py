@@ -84,11 +84,11 @@ def test_catroot_files(
 
     sorted_file_hints = sorted(file_hints)
     # Make sure the order is constant by sorting on digest
-    for cat_hash, record in zip(sorted(hashes), sorted(records, key=lambda r: r.digest.sha256)):
+    for cat_hash, record in zip(sorted(hashes), sorted(records, key=lambda r: r.digests.sha256)):
         assert str(record.source) == "sysvol" + file_location
         assert record.catroot_name == filename
         assert sorted(record.hints) == sorted_file_hints
-        assert record.digest.sha256 == cat_hash
+        assert record.digests.sha256 == cat_hash
 
 
 def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
@@ -109,10 +109,10 @@ def test_catroot_catdb(target_win: Target, fs_win: VirtualFilesystem) -> None:
     # Make sure the order is constant by sorting on digest
     for expected_digest, record in zip(
         sorted(hashes, key=lambda d: d.sha1 or d.sha256),
-        sorted(records, key=lambda r: r.digest.sha1 or r.digest.sha256),
+        sorted(records, key=lambda r: r.digests.sha1 or r.digests.sha256),
     ):
         assert record.catroot_name == "Containers-ApplicationGuard-Package~31bf3856ad364e35~amd64~~10.0.19041.1288.cat"
         assert record.source == "sysvol\\windows\\system32\\catroot2\\{ID}\\catdb"
         assert record.hints == []
         # No direct comparison available, but representation comparison suffices.
-        assert str(expected_digest) == str(record.digest)
+        assert str(expected_digest) == str(record.digests)

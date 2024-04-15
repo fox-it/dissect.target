@@ -22,7 +22,7 @@ DIGEST_NEEDLES = {
 CatrootRecord = TargetRecordDescriptor(
     "windows/catroot",
     [
-        ("digest", "digest"),
+        ("digest", "digests"),
         ("string[]", "hints"),
         ("string", "catroot_name"),
         ("path", "source"),
@@ -98,7 +98,7 @@ class CatrootPlugin(Plugin):
         Yields CatrootRecords with the following fields:
             hostname (string): The target hostname.
             domain (string): The target domain.
-            digest (digest): The parsed digest.
+            digests (digest): The parsed digest.
             hints (string[]): File hints, if present.
             catroot_name (string): Catroot name.
             source (path): Source of the catroot record.
@@ -177,7 +177,7 @@ class CatrootPlugin(Plugin):
                 # TODO: find the correlation between the file hints and the digests in catroot files.
                 for file_digest in digests:
                     yield CatrootRecord(
-                        digest=file_digest,
+                        digests=file_digest,
                         hints=hints,
                         catroot_name=file.name,
                         source=file,
@@ -224,7 +224,7 @@ class CatrootPlugin(Plugin):
 
                         for catroot_name in catroot_names:
                             yield CatrootRecord(
-                                digest=file_digest,
+                                digests=file_digest,
                                 hints=None,
                                 catroot_name=catroot_name,
                                 source=ese_file,
