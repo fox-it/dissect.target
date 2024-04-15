@@ -128,7 +128,7 @@ def test_remote_loader_stream(
         assert data == expected
 
 
-def test_mqtt_loader_prefetch(mock_broker: MagicMock) -> None:
+def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
     from dissect.target.loaders.mqtt import MQTTConnection
 
     connection = MQTTConnection(mock_broker, "")
