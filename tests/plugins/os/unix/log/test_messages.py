@@ -112,14 +112,14 @@ def test_unix_messages_cloud_init(target_unix_users: Target, fs_unix: VirtualFil
     messages = """
     2005-08-09 11:55:21,000 - foo.py[DEBUG]: This is a cloud-init message!
     2005-08-09 11:55:21,001 - util.py[DEBUG]: Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds.
-    """
+    """  # noqa: E501
     fs_unix.map_file_fh("/var/log/installer/cloud-init.log", BytesIO(textwrap.dedent(messages).encode()))
 
     target_unix_users.add_plugin(MessagesPlugin)
 
     results = list(target_unix_users.messages())
     assert len(results) == 2
-    assert results[0].ts == dt.fromtimestamp(1_1_2_3_5_8_13_21)
+    assert results[0].ts == dt(2005, 8, 9, 11, 55, 21)
     assert results[0].daemon == "foo.py"
     assert results[0].pid is None
     assert results[0].message == "This is a cloud-init message!"
