@@ -115,9 +115,8 @@ class MQTTConnection:
         self.broker.seek(self.host, disk_id, offset, flength, optimization_strategy)
         attempts = 0
         while True:
-            message = self.broker.read(self.host, disk_id, offset, length)
-            # don't waste time with sleep if we have a response
-            if message:
+            if message := self.broker.read(self.host, disk_id, offset, length):
+                # don't waste time with sleep if we have a response
                 break
 
             attempts += 1
@@ -188,7 +187,7 @@ class Broker:
 
         for i in range(self.factor):
             sublength = int(read_length / self.factor)
-            start = int(i * sublength)
+            start = i * sublength
             key = f"{hostname}-{disk_id}-{seek_address+start}-{sublength}"
             if key in self.index:
                 continue
