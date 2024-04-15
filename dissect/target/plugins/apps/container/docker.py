@@ -192,7 +192,7 @@ class DockerPlugin(Plugin):
                 yield DockerContainerRecord(
                     container_id=container_id,
                     image=config.get("Config").get("Image"),
-                    image_id=config.get("Image").replace("sha256:", ""),
+                    image_id=config.get("Image").split(":")[-1],
                     command=config.get("Config").get("Cmd"),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
