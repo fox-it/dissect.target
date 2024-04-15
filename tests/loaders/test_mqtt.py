@@ -83,7 +83,7 @@ def mock_client(mock_paho: MagicMock) -> Iterator[MagicMock]:
 
 
 @pytest.fixture
-def mock_broker() -> Iterator[MagicMock]:
+def mock_broker() -> Iterator[MockBroker]:
     yield MockBroker()
 
 
