@@ -22,17 +22,16 @@ from dissect.target.target import Target
 class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
 
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self.keychain = cache(self.keychain)
-
-    # This matches master key file names
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
 
     SECURITY_POLICY_KEY = "HKEY_LOCAL_MACHINE\\SECURITY\\Policy"
     SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
 
     SYSTEM_USERNAME = "System"
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.keychain = cache(self.keychain)
 
     def check_compatible(self) -> None:
         if not HAS_CRYPTO:

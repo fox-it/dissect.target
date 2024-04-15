@@ -147,6 +147,9 @@ def test_unix_firefox_password_plugin_with_primary_password(
 
     for record in records:
         assert record.browser == "firefox"
+        assert record.username == "root"
+        assert record.user_home == "/root"
+
         assert record.decrypted_username == "username"
         assert record.decrypted_password == "password"
 

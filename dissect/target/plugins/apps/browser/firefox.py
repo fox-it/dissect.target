@@ -3,7 +3,6 @@ import json
 import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
-from pathlib import Path
 from typing import Iterator, Optional
 
 from dissect.sql import sqlite3
@@ -24,6 +23,7 @@ from dissect.target.plugins.apps.browser.browser import (
     BrowserPlugin,
     try_idna,
 )
+from dissect.target.plugins.general.users import UserDetails
 
 try:
     from asn1crypto import algos, core
@@ -82,19 +82,19 @@ class FirefoxPlugin(BrowserPlugin):
 
     def __init__(self, target):
         super().__init__(target)
-        self.users_dirs = []
+        self.users_dirs: list[tuple[UserDetails, TargetPath]] = []
         for user_details in self.target.user_details.all_with_home():
             for directory in self.DIRS:
                 cur_dir = user_details.home_path.joinpath(directory)
                 if not cur_dir.exists():
                     continue
-                self.users_dirs.append((user_details.user, cur_dir))
+                self.users_dirs.append((user_details, cur_dir))
 
     def check_compatible(self) -> None:
         if not len(self.users_dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 
-    def _iter_profiles(self) -> Iterator[tuple[str, Path, Path]]:
+    def _iter_profiles(self) -> Iterator[tuple[UserDetails, TargetPath, TargetPath]]:
         """Yield user directories."""
         for user, cur_dir in self.users_dirs:
             for profile_dir in cur_dir.iterdir():
@@ -102,7 +102,7 @@ class FirefoxPlugin(BrowserPlugin):
                     continue
                 yield user, cur_dir, profile_dir
 
-    def _iter_db(self, filename: str) -> Iterator[SQLite3]:
+    def _iter_db(self, filename: str) -> Iterator[tuple[UserDetails, SQLite3]]:
         """Yield opened history database files of all users.
 
         Args:
@@ -174,7 +174,7 @@ class FirefoxPlugin(BrowserPlugin):
                         from_url=try_idna(from_place.url) if from_place else None,
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -216,7 +216,7 @@ class FirefoxPlugin(BrowserPlugin):
                         is_http_only=bool(cookie.isHttpOnly),
                         same_site=bool(cookie.sameSite),
                         source=db_file,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
@@ -300,7 +300,7 @@ class FirefoxPlugin(BrowserPlugin):
                         state=state,
                         source=db_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user.user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -372,7 +372,7 @@ class FirefoxPlugin(BrowserPlugin):
                         decrypted_password=decrypted_password,
                         source=login_file,
                         _target=self.target,
-                        _user=user,
+                        _user=user.user,
                     )
 
             except FileNotFoundError:
@@ -619,24 +619,19 @@ def retrieve_master_key(primary_password: bytes, key4_file: TargetPath) -> tuple
         raise ValueError("No primary password provided")
 
     if not decrypted_password_check:
-        raise ValueError("Encountered unknown algorithm %s while decrypting master key." % algorithm)
+        raise ValueError(f"Encountered unknown algorithm {algorithm} while decrypting master key")
 
     expected_password_check = b"password-check\x02\x02"
     if decrypted_password_check != b"password-check\x02\x02":
         log.debug("Expected %s but got %s", expected_password_check, decrypted_password_check)
-        raise ValueError(
-            "Master key decryption failed. Either the master key is protected by a "
-            "primary password which you did not supply, or the primary password you provided was incorrect."
-        )
+        raise ValueError("Master key decryption failed. Provided password could be missing or incorrect")
 
     master_key, master_key_cka = query_master_key(key4_file)
     if master_key == b"":
-        raise ValueError("Password master key is not defined.")
+        raise ValueError("Password master key is not defined")
 
     if master_key_cka != CKA_ID:
-        raise ValueError(
-            "Password master key CKA_ID '%s' is not equal to expected value '%s'." % (master_key_cka, CKA_ID)
-        )
+        raise ValueError(f"Password master key CKA_ID '{master_key_cka}' is not equal to expected value '{CKA_ID}'")
 
     decoded_master_key = core.load(master_key)
     decrypted, algorithm = decrypt_master_key(decoded_master_key, primary_password, global_salt)
@@ -650,7 +645,7 @@ def decrypt_field(key: bytes, field: tuple[bytes, bytes, bytes]) -> bytes:
     cka, iv, ciphertext = field
 
     if cka != CKA_ID:
-        raise ValueError("Expected cka to equal '%s' but got '%s'" % (CKA_ID, cka))
+        raise ValueError(f"Expected cka to equal '{CKA_ID}' but got '{cka}'")
 
     return unpad(DES3.new(key, DES3.MODE_CBC, iv).decrypt(ciphertext), 8)
 
@@ -691,6 +686,4 @@ def decrypt(
             return username.decode(), password.decode()
 
     except ValueError as e:
-        raise ValueError(
-            "Failed to decrypt password using keyfile %s and password '%s'" % (key4_file, primary_password)
-        ) from e
+        raise ValueError(f"Failed to decrypt password using keyfile: {key4_file}, password: {primary_password}") from e
