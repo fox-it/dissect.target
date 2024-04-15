@@ -186,7 +186,7 @@ class Broker:
         seek_address = int(tokens[4], 16)
         read_length = int(tokens[5], 16)
 
-        for i in range(0, self.factor):
+        for i in range(self.factor):
             sublength = int(read_length / self.factor)
             start = int(i * sublength)
             key = f"{hostname}-{disk_id}-{seek_address+start}-{sublength}"
