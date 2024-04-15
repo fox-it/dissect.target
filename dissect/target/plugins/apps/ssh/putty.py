@@ -224,7 +224,7 @@ def construct_public_key(key_type: str, iv: str) -> str:
     """
 
     if not HAS_CRYPTO:
-        log.warning("Could not reconstruct public key: missing pycryptodome dependency.")
+        log.warning("Could not reconstruct public key: missing pycryptodome dependency")
         return iv
 
     if key_type == "ssh-ed25519":

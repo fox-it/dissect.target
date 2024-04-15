@@ -1,4 +1,4 @@
-from functools import lru_cache
+from functools import cache
 
 from dissect.target.helpers import keychain
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -104,7 +104,7 @@ class BrowserPlugin(NamespacePlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.keychain = lru_cache(4096)(self.keychain)
+        self.keychain = cache(self.keychain)
 
     def keychain(self) -> set:
         """Retrieve a set of passphrases to use for decrypting saved browser credentials.
