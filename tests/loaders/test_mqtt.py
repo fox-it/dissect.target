@@ -56,7 +56,7 @@ class MockBroker(MagicMock):
     def seek(self, *args) -> None:
         self._seek = True
 
-    def read(self, *args) -> bytes:
+    def read(self, *args) -> MockSeekMessage | None:
         if self._seek:
             self._seek = False
             return MockSeekMessage(data=b"010101")
