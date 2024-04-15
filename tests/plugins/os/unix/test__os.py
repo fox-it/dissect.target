@@ -83,25 +83,16 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
     mock_fs.volume = mock_vol
     mock_fs.exists.return_value = False
 
-    with patch(
-        "dissect.target.plugins.os.unix._os.parse_fstab",
-        return_value=[(None, "test-volume", "/mnt", "auto", "default")],
-    ):
-        target = Target()
-        target.filesystems.add(mock_fs)
-        UnixPlugin.create(target, fs_unix)
+    for expected_volume_name in ["test-volume", "ext-volume"]:
+        with patch(
+            "dissect.target.plugins.os.unix._os.parse_fstab",
+            return_value=[(None, expected_volume_name, "/mnt", "auto", "default")],
+        ):
+            target = Target()
+            target.filesystems.add(mock_fs)
+            UnixPlugin.create(target, fs_unix)
 
-        assert target.fs.mounts["/mnt"] == mock_fs
-
-    with patch(
-        "dissect.target.plugins.os.unix._os.parse_fstab",
-        return_value=[(None, "ext-volume", "/mnt", "auto", "default")],
-    ):
-        target = Target()
-        target.filesystems.add(mock_fs)
-        UnixPlugin.create(target, fs_unix)
-
-        assert target.fs.mounts["/mnt"] == mock_fs
+            assert target.fs.mounts["/mnt"] == mock_fs
 
 
 @pytest.mark.parametrize(
