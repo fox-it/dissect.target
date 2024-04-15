@@ -55,7 +55,6 @@ class MockBroker(MagicMock):
 
     def seek(self, *args) -> None:
         self._seek = True
-        return None
 
     def read(self, *args) -> bytes:
         if self._seek:
