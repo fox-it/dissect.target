@@ -12,7 +12,7 @@ class DockerChildTargetPlugin(ChildTargetPlugin):
         if not self.target.has_function("docker"):
             raise UnsupportedPluginError("No Docker data root folder(s) found!")
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for container in self.target.docker.containers():
             if container.mount_path:
                 yield ChildTargetRecord(
