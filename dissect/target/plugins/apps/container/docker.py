@@ -26,7 +26,7 @@ DockerContainerRecord = TargetRecordDescriptor(
         ("string", "image_id"),
         ("string", "command"),
         ("datetime", "created"),
-        ("string", "running"),
+        ("boolean", "running"),
         ("varint", "pid"),
         ("datetime", "started"),
         ("datetime", "finished"),

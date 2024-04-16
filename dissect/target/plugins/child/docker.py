@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
