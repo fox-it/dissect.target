@@ -1,12 +1,16 @@
 import textwrap
 from io import BytesIO
 
+import pytest
+
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.network_managers import NetworkManager
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from tests._utils import absolute_path
 
 
-def test_ips_dhcp_plugin(target_unix_users, fs_unix):
+def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test DHCP lease messages from /var/log/syslog."""
 
     messages = """
@@ -26,10 +30,11 @@ def test_ips_dhcp_plugin(target_unix_users, fs_unix):
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips
     results.reverse()
-    assert results == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4", "2001:db8::"]
+    assert len(results) == 5
+    assert sorted(results) == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4", "2001:db8::"]
 
 
-def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
+def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test cloud-init dhcp.py lease messages."""
 
     messages = """
@@ -43,10 +48,12 @@ def test_ips_cloud_init_plugin(target_unix_users, fs_unix):
 
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips
+
+    assert len(results) == 1
     assert results == ["10.13.37.5"]
 
 
-def test_ips_static_plugin(target_unix_users, fs_unix):
+def test_ips_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 and ipv6 addresses in /etc/network/interfaces."""
 
     fs_unix.map_file("/etc/network/interfaces", absolute_path("_data/plugins/os/unix/_os/ips/interfaces"))
@@ -56,7 +63,7 @@ def test_ips_static_plugin(target_unix_users, fs_unix):
     assert sorted(results) == sorted(["10.13.37.6", "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"])
 
 
-def test_ips_wicked_static_plugin(target_unix_users, fs_unix):
+def test_ips_wicked_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 addresses in /etc/wicked/ifconfig/."""
 
     fs_unix.map_file("/etc/wicked/ifconfig/eth0.xml", absolute_path("_data/plugins/os/unix/_os/ips/eth0.xml"))
@@ -66,7 +73,7 @@ def test_ips_wicked_static_plugin(target_unix_users, fs_unix):
     assert sorted(results) == sorted(["10.13.37.2", "2001:db8:ffff:ffff:ffff:ffff:ffff:fffe"])
 
 
-def test_dns_static_plugin(target_unix_users, fs_unix):
+def test_dns_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """Test statically defined ipv4 and ipv6 dns-nameservers in /etc/network/interfaces."""
 
     fs_unix.map_file("/etc/network/interfaces", absolute_path("_data/plugins/os/unix/_os/ips/interfaces"))
@@ -76,25 +83,77 @@ def test_dns_static_plugin(target_unix_users, fs_unix):
     assert results == [{"10.13.37.1", "10.13.37.2", "2001:db8::", "2001:db9::"}]
 
 
-def test_clean_ips():
+def test_ips_netplan_static(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test statically defined ipv4 and ipv6 ip addresses in /etc/netplan/*.yaml"""
+
+    config = """
+    # This file describes the network interfaces available on your system
+    # For more information, see netplan(5).
+    network:
+        version: 2
+        renderer: networkd
+        ethernets:
+            enp0s3:
+                dhcp4: no
+                addresses: [192.168.1.123/24]
+                gateway4: 192.168.1.1
+                nameservers:
+                    addresses: [1.2.3.4, 5.6.7.8]
+    """
+
+    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+    target_unix_users.add_plugin(LinuxPlugin)
+    assert target_unix_users.ips == ["192.168.1.123"]
+
+
+@pytest.mark.parametrize(
+    "config, expected_output",
+    [
+        ("", []),
+        ("network:", []),
+        ("network:\n    ethernets:\n", []),
+        ("network:\n    ethernets:\n        eth0:\n", []),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: []\n", []),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: [1.2.3.4/24]\n", ["1.2.3.4"]),
+        ("network:\n    ethernets:\n        eth0:\n            addresses: ['1.2.3.4']\n", ["1.2.3.4"]),
+    ],
+)
+def test_ips_netplan_static_invalid(
+    target_unix_users: Target, fs_unix: VirtualFilesystem, config: str, expected_output: list
+) -> None:
+    fs_unix.map_file_fh("/etc/netplan/02-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+    target_unix_users.add_plugin(LinuxPlugin)
+    assert target_unix_users.ips == expected_output
+
+
+def test_ips_netplan_static_empty_regression(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(b""))
+    target_unix_users.add_plugin(LinuxPlugin)
+    assert target_unix_users.ips == []
+
+
+@pytest.mark.parametrize(
+    "input, expected_output",
+    [
+        # 'invalid' or input that should be filtered
+        ("0.0.0.0", set()),
+        ("127.0.0.1", set()),
+        ("127.0.0.1/8", set()),
+        ("0.0.0.0/24", set()),
+        ("::1", set()),
+        ("::", set()),
+        ("0:0:0:0:0:0:0:1", set()),
+        # valid input
+        ("::ffff:192.0.2.128", {"::ffff:192.0.2.128"}),
+        ("2001:db8::2:1", {"2001:db8::2:1"}),
+        ("10.13.37.1", {"10.13.37.1"}),
+        ("10.13.37.2/24", {"10.13.37.2"}),
+        ("  10.13.37.3  ", {"10.13.37.3"}),
+        ("2001:db8::", {"2001:db8::"}),
+        ("2001:db8:ffff:ffff:ffff:ffff:ffff:ffff", {"2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"}),
+    ],
+)
+def test_clean_ips(input: str, expected_output: set) -> None:
     """Test the cleaning of dirty ip addresses."""
 
-    ips = {
-        "0.0.0.0": set(),
-        "127.0.0.1": set(),
-        "127.0.0.1/8": set(),
-        "0.0.0.0/24": set(),
-        "::1": set(),
-        "::": set(),
-        "0:0:0:0:0:0:0:1": set(),
-        "::ffff:192.0.2.128": {"::ffff:192.0.2.128"},
-        "2001:db8::2:1": {"2001:db8::2:1"},
-        "10.13.37.1": {"10.13.37.1"},
-        "10.13.37.2/24": {"10.13.37.2"},
-        "  10.13.37.3  ": {"10.13.37.3"},
-        "2001:db8::": {"2001:db8::"},
-        "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff": {"2001:db8:ffff:ffff:ffff:ffff:ffff:ffff"},
-    }
-
-    for input_ip, expected_ip in ips.items():
-        assert NetworkManager.clean_ips({input_ip}) == expected_ip
+    assert NetworkManager.clean_ips({input}) == expected_output
