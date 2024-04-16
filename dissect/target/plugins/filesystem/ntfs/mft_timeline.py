@@ -51,7 +51,7 @@ FORMAT_INFO = {
 
 def _update_extras(extras: Extras, record: MftRecord, fs: NtfsFilesystem) -> None:
     in_use = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
-    resident = False
+    resident = None
     size = None
     owner, _ = get_owner_and_group(record, fs)
 
