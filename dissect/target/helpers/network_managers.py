@@ -7,7 +7,7 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional
+from typing import Any, Callable, Iterable, Iterator, Match, Optional
 
 from defusedxml import ElementTree
 
@@ -509,14 +509,15 @@ class LinuxNetworkManager:
         return values
 
 
-def parse_unix_dhcp_log_messages(target) -> list[str]:
+def parse_unix_dhcp_log_messages(target, iter_all: bool = False) -> list[str]:
     """Parse local syslog, journal and cloud init-log files for DHCP lease IPs.
 
     Args:
         target: Target to discover and obtain network information from.
+        iter_all: Parse limited amount of journal messages (first 10000) or all of them.
 
     Returns:
-        List of DHCP ip addresses.
+        List of found DHCP IP addresses.
     """
     ips = set()
     messages = set()
@@ -530,7 +531,14 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
     if not messages:
         target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
 
-    for record in messages:
+    def messages_enumerate(iterable: Iterable) -> Iterator[tuple[int, Any]]:
+        n = 0
+        for rec in iterable:
+            if rec._desc.name == "linux/log/journal":
+                n += 1
+            yield n, rec
+
+    for count, record in messages_enumerate(messages):
         line = record.message
 
         # Ubuntu cloud-init
@@ -576,9 +584,10 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
             ips.add(ip)
             continue
 
-        # Journals and syslogs can be large and slow to iterate,
-        # so we stop if we have some results and have reached the journal plugin.
-        if len(ips) >= 2 and record._desc.name == "linux/log/journal":
+        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries.
+        if not iter_all and (ips or count > 10_000):
+            if not ips:
+                log.warning("No DHCP IP addresses found in first 10000 journal entries.")
             break
 
     return ips
