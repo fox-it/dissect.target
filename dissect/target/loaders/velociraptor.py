@@ -75,10 +75,7 @@ class VelociraptorLoader(DirLoader):
         {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
-    ntfs_vss and auto. The loader only supports a collection where a single accessor is used, which can be forced by
-    using the following configuration::
-
-        {"Windows.KapeFiles.Targets":{"VSSAnalysisAge":"1000","_SANS_Triage":"Y"}}
+    ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
 
     References:
         - https://www.rapid7.com/products/velociraptor/
