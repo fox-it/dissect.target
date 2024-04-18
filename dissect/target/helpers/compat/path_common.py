@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import posixpath
 import stat
+import sys
 from typing import IO, TYPE_CHECKING, Iterator, Literal, Optional
 
 if TYPE_CHECKING:
@@ -27,11 +28,24 @@ try:
             self._fs = path._fs
             self._flavour = path._flavour
 
-        def __getitem__(self, idx: int) -> TargetPath:
-            result = super().__getitem__(idx)
-            result._fs = self._fs
-            result._flavour = self._flavour
-            return result
+        if sys.version_info >= (3, 10):
+
+            def __getitem__(self, idx: int) -> TargetPath:
+                result = super().__getitem__(idx)
+                result._fs = self._fs
+                result._flavour = self._flavour
+                return result
+
+        else:
+
+            def __getitem__(self, idx: int) -> TargetPath:
+                if idx < 0:
+                    idx = len(self) + idx
+
+                result = super().__getitem__(idx)
+                result._fs = self._fs
+                result._flavour = self._flavour
+                return result
 
 except ImportError:
     pass

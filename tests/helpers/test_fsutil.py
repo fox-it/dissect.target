@@ -256,6 +256,7 @@ def test_target_path_parents(path_fs: VirtualFilesystem) -> None:
     assert parents == [path_fs.path("/some/dir"), path_fs.path("/some"), path_fs.path("/")]
     assert [p.exists() for p in parents]
     assert all([p._fs == path_fs for p in parents])
+    assert path.parents[1] == path.parents[-2] == path_fs.path("/some")
 
 
 def test_target_path_name(path_fs: VirtualFilesystem) -> None:
@@ -697,7 +698,9 @@ def test_reverse_readlines() -> None:
     ]
 
     vfs.map_file_fh("file_multi_long_single", io.BytesIO((("🦊" * 8000) + ("a" * 200)).encode()))
-    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [("🦊" * 8000) + ("a" * 200)]
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [
+        ("🦊" * 8000) + ("a" * 200)
+    ]
 
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
