@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import zipfile
+from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -49,7 +50,7 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
         alt_separator = "\\"
         case_sensitive = False
 
-    drive_letter_map = {}
+    drive_letter_map = defaultdict(list)
     for path in dirs:
         drive_letter = None
         if isinstance(path, tuple):
@@ -62,7 +63,7 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
         else:
             dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 
-        drive_letter_map.setdefault(drive_letter, []).append(dfs)
+        drive_letter_map[drive_letter].append(dfs)
 
     fs_to_add = []
     for drive_letter, dfs in drive_letter_map.items():
