@@ -7,6 +7,7 @@ from dissect.target.exceptions import (
     FilesystemError,
     IsADirectoryError,
     NotADirectoryError,
+    NotASymlinkError,
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
@@ -55,6 +56,8 @@ class DirectoryFilesystem(Filesystem):
 
 
 class DirectoryFilesystemEntry(FilesystemEntry):
+    entry: Path
+
     def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return self.fs.get(path)
@@ -113,7 +116,17 @@ class DirectoryFilesystemEntry(FilesystemEntry):
             return False
 
     def readlink(self) -> str:
-        return os.readlink(self.entry)  # Python 3.7 compatibility
+        if not self.is_symlink():
+            raise NotASymlinkError()
+
+        # We want to get the "truest" form of the symlink
+        # If we use the readlink() of pathlib.Path directly, it gets thrown into the path parsing of pathlib
+        # Because DirectoryFilesystem may also be used with TargetPath, we specifically handle that case here
+        # and use os.readlink for host paths
+        if isinstance(self.entry, fsutil.TargetPath):
+            return self.entry.get().readlink()
+        else:
+            return os.readlink(self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()

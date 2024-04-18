@@ -7,7 +7,7 @@ import pytest
 from dissect.target.filesystems.dir import DirectoryFilesystem, DirectoryFilesystemEntry
 
 
-def test_filesystem_dir_symlink_to_file(tmp_path):
+def test_symlink_to_file(tmp_path: pathlib.Path) -> None:
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(b"dummy")
         tf.close()
@@ -35,7 +35,7 @@ def test_filesystem_dir_symlink_to_file(tmp_path):
         assert list(symlink_entry.stat()) == list(tmpfile_path.lstat())
 
 
-def test_filesystem_dir_symlink_to_dir(tmp_path):
+def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
     nested_path = tmp_path.joinpath("nested")
     nested_path.mkdir()
     nested_path.joinpath("file1").touch()
@@ -65,17 +65,17 @@ def test_filesystem_dir_symlink_to_dir(tmp_path):
 
 
 @pytest.fixture
-def dirfs_entry():
+def dirfs_entry() -> DirectoryFilesystemEntry:
     return DirectoryFilesystemEntry(Mock(), "/some/path", Mock())
 
 
-def test_directory_filesystem_entry_attr(dirfs_entry):
+def test_entry_attr(dirfs_entry: DirectoryFilesystemEntry) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         dirfs_entry.attr()
         fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=True)
 
 
-def test_directory_filesystem_entry_lattr(dirfs_entry):
+def test_entry_lattr(dirfs_entry: DirectoryFilesystemEntry) -> None:
     with patch("dissect.target.helpers.fsutil.fs_attrs", autospec=True) as fs_attrs:
         dirfs_entry.lattr()
         fs_attrs.assert_called_with(dirfs_entry.entry, follow_symlinks=False)
