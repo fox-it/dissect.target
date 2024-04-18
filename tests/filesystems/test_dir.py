@@ -1,5 +1,4 @@
 import pathlib
-import platform
 import tempfile
 from unittest.mock import Mock, patch
 
@@ -17,7 +16,7 @@ def test_symlink_to_file(tmp_path: pathlib.Path) -> None:
         symlink_path = tmp_path.joinpath("symlink")
         symlink_path.symlink_to(f"/{tmpfile_path.name}")
 
-        fs = DirectoryFilesystem(path=tmp_path, alt_separator="\\" if platform.system().lower() == "windows" else "")
+        fs = DirectoryFilesystem(path=tmp_path)
         symlink_entry = fs.get("symlink")
 
         assert symlink_entry.is_symlink()
@@ -45,7 +44,7 @@ def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
     symlink_path = tmp_path.joinpath("symlink")
     symlink_path.symlink_to("/nested")
 
-    fs = DirectoryFilesystem(path=tmp_path, alt_separator="\\" if platform.system().lower() == "windows" else "")
+    fs = DirectoryFilesystem(path=tmp_path)
     symlink_entry = fs.get("symlink")
 
     assert symlink_entry.is_symlink()

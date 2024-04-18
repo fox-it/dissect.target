@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import BinaryIO, Iterator
 
@@ -117,7 +118,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError()
-        return fsutil.normalize(str(self.entry.readlink()), alt_separator=self.fs.alt_separator)
+        return os.readlink(self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
