@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import operator
 import struct
 from typing import Any, Iterator, Optional
 
@@ -40,7 +41,7 @@ class WindowsPlugin(OSPlugin):
 
         if not sysvol.exists("boot/BCD"):
             for fs in target.filesystems:
-                if fs.exists("boot") and fs.exists("boot/BCD"):
+                if fs.exists("boot/BCD") or fs.exists("EFI/Microsoft/Boot/BCD"):
                     target.fs.mount("efi", fs)
 
         return cls(target)
@@ -76,6 +77,14 @@ class WindowsPlugin(OSPlugin):
         except Exception as e:
             self.target.log.warning("Failed to map drive letters")
             self.target.log.debug("", exc_info=e)
+
+        # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
+        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts["sysvol"]) == 1:
+            if "c:" not in self.target.fs.mounts:
+                self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
+                self.target.fs.mount("c:", self.target.fs.mounts["sysvol"])
+            else:
+                self.target.log.warning("Unknown drive letter for sysvol")
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
