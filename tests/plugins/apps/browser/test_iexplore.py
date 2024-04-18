@@ -8,6 +8,8 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import iexplore
 from tests._utils import absolute_path
 
+# NOTE: Missing cookies, extensions and passwords tests.
+
 
 @pytest.fixture
 def target_iexplore(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
@@ -28,6 +30,7 @@ def test_iexplore_history(target_iexplore: Target) -> None:
     records = list(target_iexplore.iexplore.history())
     assert len(records) == 41
 
+    # Test namespaced plugin
     records = list(target_iexplore.browser.history())
     assert len(records) == 41
 
