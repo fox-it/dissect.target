@@ -115,7 +115,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError()
-        return str(self.entry.readlink())
+        return fsutil.normalize(str(self.entry.readlink()), alt_separator=self.fs.alt_separator)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
