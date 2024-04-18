@@ -118,7 +118,15 @@ class DirectoryFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         if not self.is_symlink():
             raise NotASymlinkError()
-        return os.readlink(self.entry)
+
+        # We want to get the "truest" form of the symlink
+        # If we use the readlink() of pathlib.Path directly, it gets thrown into the path parsing of pathlib
+        # Because DirectoryFilesystem may also be used with TargetPath, we specifically handle that case here
+        # and use os.readlink for host paths
+        if isinstance(self.entry, fsutil.TargetPath):
+            return self.entry.get().readlink()
+        else:
+            return os.readlink(self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()
