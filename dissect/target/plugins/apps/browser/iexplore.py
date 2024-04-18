@@ -26,7 +26,7 @@ class WebCache:
         self.target = target
         self.db = esedb.EseDB(fh)
 
-    def find_containers(self, name: str) -> table.Table:
+    def find_containers(self, name: str) -> Iterator[table.Table]:
         """Look up all ``ContainerId`` values for a given container name.
 
         Args:
