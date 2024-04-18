@@ -55,6 +55,8 @@ class DirectoryFilesystem(Filesystem):
 
 
 class DirectoryFilesystemEntry(FilesystemEntry):
+    entry: Path
+
     def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
         return self.fs.get(path)
