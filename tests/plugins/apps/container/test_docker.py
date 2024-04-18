@@ -1,23 +1,20 @@
 import datetime
 import operator
 from io import BytesIO
-from pathlib import Path
 from typing import Iterator
 
 import pytest
+from flow.record.fieldtypes import path
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.plugins.apps.container.docker import (
     DockerPlugin,
     convert_timestamp,
     find_installs,
     strip_log,
 )
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from tests._utils import absolute_path
-from tests.conftest import make_mock_target
 
 
 @pytest.fixture
@@ -25,25 +22,6 @@ def target_linux_docker_logs(target_linux: Target, fs_linux: VirtualFilesystem) 
     docker_containers = absolute_path("_data/plugins/apps/container/docker/logs")
     fs_linux.map_dir("/var/lib/docker/containers", docker_containers)
     yield target_linux
-
-
-@pytest.fixture
-def fs_docker() -> Iterator[TarFilesystem]:
-    docker_tar = Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
-    fh = docker_tar.open("rb")
-    docker_fs = TarFilesystem(fh)
-    yield docker_fs
-
-
-@pytest.fixture
-def target_linux_docker(tmp_path: Path, fs_docker: TarFilesystem) -> Iterator[Target]:
-    mock_target = next(make_mock_target(tmp_path))
-    mock_target._os_plugin = LinuxPlugin
-
-    mock_target.filesystems.add(fs_docker)
-    mock_target.fs.mount("/", fs_docker)
-    mock_target.apply()
-    yield mock_target
 
 
 def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -97,14 +75,16 @@ def test_docker_plugin_containers(target_unix_users: Target, fs_unix: VirtualFil
 
     assert result.container_id == id
     assert result.image == "exampleimage:1.33.7"
+    assert result.image_id == "d3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33fd3adb33f"
     assert result.created == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)
     assert bool(result.running) is True
     assert result.started == datetime.datetime(2022, 12, 19, 13, 37, 1, 247519, tzinfo=datetime.timezone.utc)
     assert result.finished == datetime.datetime(1, 1, 1, 00, 00, 00, 000000, tzinfo=datetime.timezone.utc)
     assert result.ports == str({"1234/tcp": "0.0.0.0:1234", "5678/tcp": "0.0.0.0:5678"})
     assert result.names == "example_container_name"
-    assert result.source == f"/var/lib/docker/containers/{id}/config.v2.json"
     assert result.volumes == ["/tmp/test:/test"]
+    assert result.config_path == path.from_posix(f"/var/lib/docker/containers/{id}/config.v2.json")
+    assert result.mount_path == path.from_posix(f"/var/lib/docker/image/overlay2/layerdb/mounts/{id}")
 
 
 def test_docker_plugin_logs(target_linux_docker_logs: Target) -> None:
