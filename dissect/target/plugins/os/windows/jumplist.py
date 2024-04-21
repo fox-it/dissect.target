@@ -82,8 +82,9 @@ class AutomaticDestinationFile:
                     yield Lnk(io.BytesIO(item))
                 except StructError:
                     continue
-                except Exception:
-                    log.exception("Failed to parse LNK file from directory number %s", dir_name)
+                except Exception as e:
+                    log.warning("Failed to parse LNK file from directory %s", dir_name)
+                    log.debug("", exc_info=e)
                     continue
 
 
@@ -120,7 +121,8 @@ class CustomerDestinationFile:
                 lnk = Lnk(io.BytesIO(buf[offset + len(LNK_GUID) :]))
                 yield lnk
             except Exception as e:
-                log.exception("Failed to parse LNK file from a CustomDestination file", exc=e)
+                log.warning("Failed to parse LNK file from a CustomDestination file")
+                log.debug("", exc_info=e)
                 continue
 
 
@@ -160,13 +162,17 @@ class JumpListPlugin(Plugin):
             try:
                 custom_destination = CustomerDestinationFile(fh)
             except EOFError:
-                self.target.log.warning("Unable to parse CustomDestination header: %s", destination)
+                continue
             except NotImplementedError:
                 self.target.log.warning(
                     "The value_type (%i) of the CustomDestination file is not implemented: %s",
                     custom_destination.header.value_type,
                     destination,
                 )
+                continue
+            except Exception as e:
+                self.target.log.warning("Failed to parse CustomDestination header: %s", destination)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             if not custom_destination.MAGIC_FOOTER == custom_destination.magic:
@@ -206,26 +212,27 @@ class JumpListPlugin(Plugin):
 
             try:
                 automatic_destination = AutomaticDestinationFile(fh)
-
-                for lnk in automatic_destination:
-                    lnk = parse_lnk_file(self.target, lnk, destination)
-
-                    if lnk is None:
-                        continue
-
-                    yield JumpListRecord(
-                        type=type,
-                        application_name=application_name,
-                        application_id=application_id,
-                        **lnk._asdict(),
-                        _user=user,
-                        _target=self.target,
-                    )
             except OleError:
                 continue
             except Exception as e:
-                self.target.log.warning("Failed to parse AutomaticDestination file (%s)", destination, exc_info=e)
+                self.target.log.warning("Failed to parse AutomaticDestination file: %s", destination)
+                self.target.log.debug("", exc_info=e)
                 continue
+
+            for lnk in automatic_destination:
+                lnk = parse_lnk_file(self.target, lnk, destination)
+
+                if lnk is None:
+                    continue
+
+                yield JumpListRecord(
+                    type=type,
+                    application_name=application_name,
+                    application_id=application_id,
+                    **lnk._asdict(),
+                    _user=user,
+                    _target=self.target,
+                )
 
     @export(record=JumpListRecord)
     def jumplist(self) -> Iterator[JumpListRecord]:
