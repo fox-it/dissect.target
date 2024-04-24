@@ -19,6 +19,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
     try_idna,
@@ -43,6 +44,10 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
+FIREFOX_EXTENSION_RECORD_FIELDS = [
+    ("uri", "sourceURI"),
+    ("string[]", "optionalPermissions")
+]
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +83,10 @@ class FirefoxPlugin(BrowserPlugin):
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
+    )
+
+    BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/extension", GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS
     )
 
     def __init__(self, target):
@@ -305,6 +314,73 @@ class FirefoxPlugin(BrowserPlugin):
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
 
+    @export(record=BrowserExtensionRecord)
+    def extensions(self) -> Iterator[BrowserExtensionRecord]:
+        """Return browser extension records for Firefox.
+
+        Yields:
+            Records with the following fields:
+                ts_install (datetime): Extension install timestamp.
+                ts_update (datetime): Extension update timestamp.
+                browser (string): The browser from which the records are generated.
+                id (string): Extension unique identifier.
+                name (string): Name of the extension.
+                short_name (string): Short name of the extension.
+                default_title (string): Default title of the extension.
+                description (string): Description of the extension.
+                version (string): Version of the extension.
+                ext_path (path): Relative path of the extension.
+                from_webstore (boolean): Extension from webstore.
+                permissions (string[]): Permissions of the extension.
+                manifest (varint): Version of the extensions' manifest.
+                optionalPermissions (string[]): Optional permissions of the extension.
+                sourceURI (path): Source path from which the extension was downloaded. 
+                source (path): The source file of the download record.
+        """
+        for user, _, profile_dir in self._iter_profiles():
+            extension_file = profile_dir.joinpath("extensions.json")
+
+            if not extension_file.exists():
+                self.target.log.warning(
+                    "No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir
+                )
+                continue
+
+            try:
+                extensions = json.load(extension_file.open())
+
+                for extension in extensions.get("addons", []):
+                    try:
+                        yield self.BrowserExtensionRecord(
+                            ts_install = extension.get("installDate", 0) // 1000,
+                            ts_update = extension.get("updateDate", 0) // 1000,
+                            browser = "firefox",
+                            id = extension.get("id"),
+                            name = extension.get("defaultLocale").get("name"),
+                            short_name = None,
+                            default_title = None,
+                            description = extension.get("defaultLocale").get("description"),
+                            version = extension.get("version"),
+                            ext_path = extension.get("path"),
+                            from_webstore = None,
+                            permissions = extension.get("userPermissions").get("permissions"),
+                            manifest_version = extension.get("manifestVersion"),
+                            sourceURI = extension.get("sourceURI"),
+                            optionalPermissions = extension.get("optionalPermissions").get("permissions"),
+                            source = extension_file,
+                            _target = self.target,
+                            _user = user.user
+                        )
+                    except (AttributeError, KeyError) as e:
+                        self.target.log.info("No browser extensions found in: %s", extension_file, exc_info=e)
+
+            except FileNotFoundError:
+                self.target.log.info("No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir)
+            except json.JSONDecodeError:
+                self.target.log.warning(
+                    "extensions.json file in directory %s is malformed, consider inspecting the file manually", profile_dir
+                )
+
     @export(record=BrowserPasswordRecord)
     def passwords(self) -> Iterator[BrowserPasswordRecord]:
         """Return Firefox browser password records.
@@ -381,7 +457,6 @@ class FirefoxPlugin(BrowserPlugin):
                 self.target.log.warning(
                     "logins.json file in directory %s is malformed, consider inspecting the file manually", profile_dir
                 )
-
 
 # Define separately because it is not defined in asn1crypto
 pbeWithSha1AndTripleDES_CBC = "1.2.840.113549.1.12.5.1.3"
