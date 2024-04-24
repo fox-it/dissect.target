@@ -19,8 +19,6 @@ from dissect.target.plugins.apps.browser.firefox import (
 )
 from tests._utils import absolute_path
 
-# NOTE: Missing extensions tests for Firefox.
-
 
 @pytest.fixture
 def target_firefox_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
@@ -106,6 +104,38 @@ def test_firefox_cookies(target_platform: Target, request: pytest.FixtureRequest
         "_lr_retry_request",
         "_uc_referrer",
         "_uc_referrer",
+    ]
+
+
+@pytest.mark.parametrize(
+    "target_platform",
+    ["target_firefox_win", "target_firefox_unix"],
+)
+def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequest) -> None:
+    target_platform = request.getfixturevalue(target_platform)
+
+    records = list(target_platform.firefox.extensions())
+
+    assert set(["firefox"]) == set(record.browser for record in records)
+    assert len(records) == 2
+    assert records[0].id == "uBlock0@raymondhill.net"
+    assert records[0].ts_install == dt("2024-04-23 07:07:21+00:00")
+    assert records[0].ts_update == dt("2024-04-23 07:07:21+00:00")
+    assert (
+        records[0].ext_path == "C:\\Users\\Win11\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles"
+        "\\9nxit8q0.default-release\\extensions\\uBlock0@raymondhill.net.xpi"
+    )
+    assert records[0].permissions == [
+        "alarms",
+        "dns",
+        "menus",
+        "privacy",
+        "storage",
+        "tabs",
+        "unlimitedStorage",
+        "webNavigation",
+        "webRequest",
+        "webRequestBlocking",
     ]
 
 
