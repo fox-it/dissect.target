@@ -285,6 +285,7 @@ class ChromiumMixin:
             browser_name: The name of the browser as a string.
 
         Yields::
+
             Records with the following fields:
                 ts_start (datetime): Download start timestamp.
                 ts_end (datetime): Download end timestamp.
@@ -345,6 +346,7 @@ class ChromiumMixin:
             browser_name (str): Name of the browser to scan for extensions.
 
         Yields::
+
             Records with the following fields:
                 ts_install (datetime): Extension install timestamp.
                 ts_update (datetime): Extension update timestamp.

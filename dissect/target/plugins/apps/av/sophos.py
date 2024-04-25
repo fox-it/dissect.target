@@ -86,6 +86,7 @@ class SophosPlugin(Plugin):
         """Return log history records from Sophos Home.
 
         Yields SophosLogRecord with the following fields::
+
             ts (datetime): Timestamp.
             description (string): Short description of the alert.
             path (path): Path to the infected file (if available).
