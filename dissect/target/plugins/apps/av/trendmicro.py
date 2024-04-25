@@ -70,7 +70,8 @@ class TrendMicroPlugin(Plugin):
     def wflogs(self) -> Iterator[TrendMicroWFLogRecord]:
         """Return Trend Micro Worry-free log history records.
 
-        Yields TrendMicroWFLogRecord with the following fields:
+        Yields TrendMicroWFLogRecord with the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.
@@ -93,7 +94,8 @@ class TrendMicroPlugin(Plugin):
     def wffirewall(self) -> Iterator[TrendMicroWFFirewallRecord]:
         """Return Trend Micro Worry-free firewall log history records.
 
-        Yields TrendMicroWFFirewallRecord with the following fields:
+        Yields TrendMicroWFFirewallRecord with the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.

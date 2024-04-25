@@ -46,7 +46,8 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
             - https://serverfault.com/questions/441050/what-are-the-differences-between-windows-evt-and-evtx-log-files
 
         Yields dynamically created records based on the fields in the event.
-        At least contains the following fields:
+        At least contains the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.

@@ -257,7 +257,8 @@ class PrefetchPlugin(Plugin):
         References:
             - https://www.geeksforgeeks.org/prefetch-files-in-windows/
 
-        Yields PrefetchRecords with fields:
+        Yields PrefetchRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Run timestamp.
@@ -268,7 +269,8 @@ class PrefetchPlugin(Plugin):
 
         with --grouped:
 
-        Yields PrefetchRecords with fields:
+        Yields PrefetchRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Run timestamp.

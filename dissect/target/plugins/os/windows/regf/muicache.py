@@ -47,7 +47,8 @@ class MuiCachePlugin(Plugin):
             - https://www.magnetforensics.com/blog/forensic-analysis-of-muicache-files-in-windows/
             - https://forensafe.com/blogs/muicache.html
 
-        Yields MuiCacheRecords with fields:
+        Yields MuiCacheRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             index (varint): The index of the entry.

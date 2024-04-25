@@ -26,7 +26,8 @@ class EnvironPlugin(Plugin):
         If the process modified its environment (e.g., by calling functions such as putenv(3) or modifying
         the environ(7) variable directly), this plugin will not reflect those changes.
 
-        Yields EnvironmentVariableRecord with the following fields:
+        Yields EnvironmentVariableRecord with the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The modification timestamp of the processes' environ file.

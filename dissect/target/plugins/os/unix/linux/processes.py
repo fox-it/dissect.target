@@ -28,7 +28,8 @@ class ProcProcesses(Plugin):
         There is a numerical subdirectory for each running process; the subdirectory is named by the process ID.
         Each ``/proc/[pid]`` subdirectory contains various pseudo-files.
 
-        Yields ProcProcessRecord with the following fields:
+        Yields ProcProcessRecord with the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The start time of the process.

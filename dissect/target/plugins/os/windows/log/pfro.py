@@ -40,7 +40,8 @@ class PfroPlugin(Plugin):
             - https://social.technet.microsoft.com/Forums/en-US/9b66a7b0-16d5-4d22-be4e-51df12db9f80/issue-understanding-pfro-log
             - https://community.ccleaner.com/topic/49106-pending-file-rename-operations-log/
 
-        Yields PfroRecords with fields:
+        Yields PfroRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.

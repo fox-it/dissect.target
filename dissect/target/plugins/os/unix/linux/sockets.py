@@ -77,7 +77,8 @@ class NetSocketPlugin(Plugin):
     def packet(self) -> Iterator[PacketSocketRecord]:
         """This plugin yields the packet sockets and available stats associated with them.
 
-        Yields PacketSocketRecord with the following fields:
+        Yields PacketSocketRecord with the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (int): The captured protocol i.e. 0003 is ETH_P_ALL
@@ -100,7 +101,7 @@ class NetSocketPlugin(Plugin):
     def unix(self) -> Iterator[UnixSocketRecord]:
         """This plugin yields the unix sockets and available stats associated with them.
 
-        Yields UnixSocketRecord with the following fields:
+        Yields UnixSocketRecord with the following fields::
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -116,7 +117,7 @@ class NetSocketPlugin(Plugin):
     def raw(self) -> Iterator[NetSocketRecord]:
         """This plugin yields the raw and raw6 sockets and available stats associated with them.
 
-        Yields NetSocketRecord with the following fields:
+        Yields NetSocketRecord with the following fields::
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -139,7 +140,7 @@ class NetSocketPlugin(Plugin):
     def udp(self) -> Iterator[NetSocketRecord]:
         """This plugin yields the udp and udp6 sockets and available stats associated with them.
 
-        Yields NetSocketRecord with the following fields:
+        Yields NetSocketRecord with the following fields::
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -162,7 +163,7 @@ class NetSocketPlugin(Plugin):
     def tcp(self) -> Iterator[NetSocketRecord]:
         """This plugin yields the tcp and tcp6 sockets and available stats associated with them.
 
-        Yields NetSocketRecord with the following fields:
+        Yields NetSocketRecord with the following fields::
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.

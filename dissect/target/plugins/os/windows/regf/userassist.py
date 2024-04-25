@@ -71,7 +71,8 @@ class UserAssistPlugin(Plugin):
             - https://www.magnetforensics.com/blog/artifact-profile-userassist/
             - https://www.aldeid.com/wiki/Windows-userassist-keys
 
-        Yields UserAssistRecords with fields:
+        Yields UserAssistRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The entry timestamp.

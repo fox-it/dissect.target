@@ -71,7 +71,8 @@ class ServicesPlugin(Plugin):
         References:
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ServicesAndDrivers.html
 
-        Yields ServiceRecords with fields:
+        Yields ServiceRecords with fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datatime): The last modified timestamp of the registry key.

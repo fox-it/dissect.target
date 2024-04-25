@@ -25,7 +25,8 @@ class FirewallPlugin(Plugin):
         For a Windows operating system, the Firewall rules are stored in the
         HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules registry key.
 
-        Yields dynamic records with usually the following fields:
+        Yields dynamic records with usually the following fields::
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             key (string): The rule key name.

@@ -60,7 +60,8 @@ class TrustedDocumentsPlugin(Plugin):
         Therefore, this may reveal if macros have been enabled for a malicious Office document.
 
         Yields records based on the values within the TrustRecords registry keys.
-        At least contains the following fields:
+        At least contains the following fields::
+
             application (string): Application name of the Office product that produced the TrustRecords registry key.
             document_path (path): Path to the document for which a TrustRecords entry is created.
             ts (datetime): The created time of the TrustRecord registry key.

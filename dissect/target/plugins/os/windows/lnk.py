@@ -50,7 +50,8 @@ class LnkPlugin(Plugin):
     def lnk(self, directory: Optional[str] = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
-        Yields a LnkRecord record with the following fields:
+        Yields a LnkRecord record with the following fields::
+
             lnk_path (path): Path of the link (.lnk) file.
             lnk_name (string): Name of the link (.lnk) file.
             lnk_mtime (datetime): Modification time of the link (.lnk) file.
