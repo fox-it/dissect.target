@@ -25,51 +25,69 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
 # required for recovering text from these files.
 
 c_def = """
-struct header {
+struct file_header {
     char        magic[2]; // NP
-    uint8       unk0;
-    uint8       fileState; // 0 if unsaved, 1 if saved
+    uleb128     updateNumber; // increases on every settings update when fileType=9, 
+                              // doesn't seem to change on fileType 0 or 1
+    uleb128     fileType; // 0 if unsaved, 1 if saved, 9 if contains settings?
 }
 
-struct header_saved_tab {
+struct tab_header_saved {
     uleb128     filePathLength;
     wchar       filePath[filePathLength];
-    uleb128     fileSize;
+    uleb128     fileSize; // likely similar to fixedSizeBlockLength
     uleb128     encoding;
     uleb128     carriageReturnType;
     uleb128     timestamp; // Windows Filetime format (not unix timestamp)
     char        sha256[32];
-    char        unk[6];
+    char        unk0;
+    char        unk1;
+    uleb128     fixedSizeBlockLength;
+    uleb128     fixedSizeBlockLengthDuplicate;
+    uint8       wordWrap; // 1 if wordwrap enabled, 0 if disabled
+    uint8       rightToLeft;
+    uint8       showUnicode;
+    uint8       optionsVersion;
 };
 
-struct header_unsaved_tab {
-    uint8       unk0;
-    uleb128     fileSize;
-    uleb128     fileSizeDuplicate;
+struct tab_header_unsaved {
+    char        unk0;
+    uleb128     fixedSizeBlockLength; // will always be 00 when unsaved because size is not yet known
+    uleb128     fixedSizeBlockLengthDuplicate; // will always be 00 when unsaved because size is not yet known
+    uint8       wordWrap; // 1 if wordwrap enabled, 0 if disabled
+    uint8       rightToLeft;
+    uint8       showUnicode;
+    uint8       optionsVersion;
+};
+
+struct tab_header_crc32_stub {
     char        unk1;
     char        unk2;
+    char        crc32[4];
 };
 
-struct single_data_block {
-    uleb128     offset;
-    uleb128     nDeleted;
+struct fixed_size_data_block {
     uleb128     nAdded;
     wchar       data[nAdded];
-    char        unk[1];
+    uint8       hasRemainingVariableDataBlocks; // indicates whether after this single-data block more data will follow
     char        crc32[4];
 };
 
-struct multi_data_extra_header {
-    char        unk[4];
-    char        crc32[4];
-};
-
-struct multi_data_block {
+struct variable_size_data_block {
     uleb128     offset;
     uleb128     nDeleted;
     uleb128     nAdded;
     wchar       data[nAdded];
     char        crc32[4];
+};
+
+struct options_v1 {
+    uleb128     unk;
+};
+
+struct options_v2 {
+    uleb128     unk1; // likely autocorrect or spellcheck
+    uleb128     unk2; // likely autocorrect or spellcheck
 };
 """
 
@@ -108,24 +126,67 @@ class WindowsNotepadTabContent:
         """
         with file.open("rb") as fh:
             # Header is the same for all types
-            header = c_windowstab.header(fh)
+            file_header = c_windowstab.file_header(fh)
 
-            # File can be saved, or unsaved. Depending on the file state, different header fields are present
-            # Currently, no information in the header is used in the outputted records, only the contents of the tab
-            tab = (
-                c_windowstab.header_saved_tab(fh)
-                if header.fileState == 0x01  # 0x00 is unsaved, 0x01 is saved
-                else c_windowstab.header_unsaved_tab(fh)
+            # Tabs can be saved to a file with a filename on disk, or unsaved (kept in the TabState folder).
+            # Depending on the file's saved state, different header fields are present
+            tab_header = (
+                c_windowstab.tab_header_saved(fh)
+                if file_header.fileType == 0x01  # 0x00 is unsaved, 0x01 is saved, 0x09 is settings?
+                else c_windowstab.tab_header_unsaved(fh)
             )
 
-            # In the case that the file size is known up front, then this fileSize is set to a nonzero value
-            # This means that the data is stored in one block
-            if tab.fileSize != 0:
-                # So we only parse one block
-                data_entry = c_windowstab.single_data_block(fh)
+            # There appears to be a optionsVersion field that specifies the options that are passed.
+            # At the moment of writing, it is not sure whether this specifies a version or a number of bytes
+            # that is parsed, so just going with the 'optionsVersion' type for now.
+            # We don't use the options, but since they are required for the CRC32 checksum
+            # we store the byte representation
+            if tab_header.optionsVersion == 0:
+                # No options specified
+                options = b""
+            elif tab_header.optionsVersion == 1:
+                options = c_windowstab.options_v1(fh).dumps()
+            elif tab_header.optionsVersion == 2:
+                options = c_windowstab.options_v2(fh).dumps()
+            else:
+                # Raise an error, since we don't know how many bytes future optionVersions will occupy.
+                # Now knowing how many bytes to parse can mess up the alignment and structs.
+                raise Exception("Unknown option version")
 
-                # The header (minus the magic) plus all data (including the extra byte)  is included in the checksum
-                actual_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + data_entry.dumps()[:-4])
+            # If the file is not saved to disk and no fixedSizeBlockLength is present, an extra checksum stub
+            # is present. So parse that first
+            if file_header.fileType == 0 and tab_header.fixedSizeBlockLength == 0:
+                # Two unknown bytes before the CRC32
+                tab_header_crc32_stub = c_windowstab.tab_header_crc32_stub(fh)
+
+                # Calculate CRC32 of the header and check if it matches
+                actual_header_crc32 = _calc_crc32(
+                    file_header.dumps()[3:] + tab_header.dumps() + options + tab_header_crc32_stub.dumps()[:-4]
+                )
+                if tab_header_crc32_stub.crc32 != actual_header_crc32:
+                    logging.warning(
+                        "CRC32 mismatch in header of file: %s (expected=%s, actual=%s)",
+                        file.name,
+                        tab_header_crc32_stub.crc32.hex(),
+                        actual_header_crc32.hex(),
+                    )
+
+            # Used to store the final content
+            content = ""
+
+            # After a fixed_size_data_block, some more variable_size_data_blocks can be present. This boolean
+            # keeps track of whether more data is still present.
+            has_remaining_data = False
+
+            # In the case that a fixedSizeDataBlock is present, this value is set to a nonzero value
+            if tab_header.fixedSizeBlockLength > 0:
+                # So we parse the fixed size data block
+                data_entry = c_windowstab.fixed_size_data_block(fh)
+
+                # The header (minus the magic) plus all data is included in the checksum
+                actual_crc32 = _calc_crc32(
+                    file_header.dumps()[3:] + tab_header.dumps() + options + data_entry.dumps()[:-4]
+                )
 
                 if data_entry.crc32 != actual_crc32:
                     logging.warning(
@@ -135,45 +196,42 @@ class WindowsNotepadTabContent:
                         actual_crc32.hex(),
                     )
 
-                text = data_entry.data
+                # Add the content of the fixed size data block to the tab content
+                content += data_entry.data
 
-            else:
-                # Here, the fileSize is zeroed, meaning that the size is not known up front.
-                # Data may be stored in multiple, variable-length blocks. This happens, for example, when several
+                # The hasRemainingVariableDataBlocks indicates whether more data will follow after this single block
+                if data_entry.hasRemainingVariableDataBlocks == 1:
+                    has_remaining_data = True
+
+            # If fixedSizeBlockLength in the header has a value of zero, this means that the entire file consists of
+            # variable-length blocks. Furthermore, if there is any remaining data after the
+            # first fixed size blocks, also continue we also want to continue parsing
+            if tab_header.fixedSizeBlockLength == 0 or has_remaining_data:
+                # Here, data is stored in variable-length blocks. This happens, for example, when several
                 # additions and deletions of characters have been recorded and these changes have not been 'flushed'
-                mdeh = c_windowstab.multi_data_extra_header(fh)
-
-                # Calculate CRC32 of the header and check if it matches
-                actual_header_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + mdeh.unk)
-                if mdeh.crc32 != actual_header_crc32:
-                    logging.warning(
-                        "CRC32 mismatch in header of multi-block file: %s " "expected=%s, actual=%s",
-                        file.name,
-                        mdeh.crc32.hex(),
-                        actual_header_crc32.hex(),
-                    )
 
                 # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
                 # a list is used to easily insert text at offsets
                 text = []
 
+                # Used to store the deleted content, if available and requested
                 deleted_content = ""
 
                 while True:
                     # Unfortunately, there is no way of determining how many blocks there are. So just try to parse
                     # until we reach EOF, after which we stop.
                     try:
-                        data_entry = c_windowstab.multi_data_block(fh)
+                        data_entry = c_windowstab.variable_size_data_block(fh)
                     except EOFError:
                         break
 
                     # Either the nAdded is nonzero, or the nDeleted
                     if data_entry.nAdded > 0:
                         # Check the CRC32 checksum for this block
-                        actual_crc32 = _calc_crc32(data_entry.dumps())
+                        actual_crc32 = _calc_crc32(data_entry.dumps()[:-4])
                         if data_entry.crc32 != actual_crc32:
                             logging.warning(
-                                "CRC32 mismatch in multi-block file: %s " "expected=%s, actual=%s",
+                                "CRC32 mismatch in multi-block file: %s (expected=%s, actual=%s)",
                                 file.name,
                                 data_entry.crc32.hex(),
                                 actual_crc32.hex(),
@@ -192,14 +250,18 @@ class WindowsNotepadTabContent:
                             )
                         text = text[: data_entry.offset] + text[data_entry.offset + data_entry.nDeleted :]
 
-                # Join all the characters to reconstruct the original text
+                # Join all the characters to reconstruct the original text within the variable-length data blocks
                 text = "".join(text)
 
+                # Add the deleted content, if specified
                 if include_deleted_content:
                     text += " --- DELETED-CONTENT: "
                     text += deleted_content
 
-        return WindowsNotepadTabContentRecord(content=text, path=file)
+                # Finally, add the reconstructed text to the tab content
+                content += text
+
+        return WindowsNotepadTabContentRecord(content=content, path=file)
 
 
 class WindowsNotepadPlugin(TexteditorPlugin):
@@ -242,5 +304,5 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             # Parse the file
             r: WindowsNotepadTabContentRecord = WindowsNotepadTabContent(file, include_deleted_content)
 
-            # Add user- and target specific information to the content record record
+            # Add user- and target specific information to the content record
             yield WindowsNotepadTabRecord(content=r.content, path=r.path, _target=self.target, _user=user)

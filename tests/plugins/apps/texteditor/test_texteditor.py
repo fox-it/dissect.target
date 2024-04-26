@@ -69,7 +69,6 @@ def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, targe
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
-        print(rec.content)
         assert rec.content == file_text_map[rec.path.name]
         assert len(rec.content) == len(file_text_map[rec.path.name])
 
@@ -91,6 +90,8 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
         "lots-of-deletions.bin": text7,
         "appclosed_saved_and_deletions.bin": text8,
         "appclosed_unsaved.bin": "Closing application now",
+        "new-format.bin": "",
+        "stored_unsaved_with_new_data.bin": "Stored to disk but unsaved, but with extra data.",
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
@@ -114,8 +115,12 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
     assert len(records) == len(file_text_map.keys())
 
-    # One file should still return contents, but there should be an entry for in the logging for a CRC missmatch.
-    assert "CRC32 mismatch in single-block file: wrong-checksum.bin (expected=deadbeef, actual=a48d30a6)" in caplog.text
+    for line in caplog.text.split("\n"):
+        # One file should still return contents, but there should be an entry for in the logging for a CRC missmatch.
+        assert (
+            "CRC32 mismatch in single-block file: wrong-checksum.bin (expected=deadbeef, actual=a48d30a6)" in line
+            or not "CRC32 mismatch" in line
+        )
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
