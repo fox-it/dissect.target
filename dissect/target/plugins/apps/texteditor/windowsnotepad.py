@@ -46,15 +46,30 @@ struct header_unsaved_tab {
     uint8       unk0;
     uleb128     fileSize;
     uleb128     fileSizeDuplicate;
-    uint8       unk1;
-    uint8       unk2;
+    char        unk1;
+    char        unk2;
 };
 
-struct data_block {
+struct single_data_block {
     uleb128     offset;
     uleb128     nDeleted;
     uleb128     nAdded;
     wchar       data[nAdded];
+    char        unk[1];
+    char        crc32[4];
+};
+
+struct multi_data_extra_header {
+    char        unk[4];
+    char        crc32[4];
+};
+
+struct multi_data_block {
+    uleb128     offset;
+    uleb128     nDeleted;
+    uleb128     nAdded;
+    wchar       data[nAdded];
+    char        crc32[4];
 };
 """
 
@@ -107,22 +122,16 @@ class WindowsNotepadTabContent:
             # This means that the data is stored in one block
             if tab.fileSize != 0:
                 # So we only parse one block
-                data_entry = c_windowstab.data_block(fh)
-
-                # An extra byte is appended to the single block, not yet sure where this is defined and/or used for
-                extra_byte = fh.read(1)
-
-                # The CRC32 value is appended after the extra byte in big-endian
-                defined_crc32 = fh.read(4)
+                data_entry = c_windowstab.single_data_block(fh)
 
                 # The header (minus the magic) plus all data (including the extra byte)  is included in the checksum
-                actual_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + data_entry.dumps() + extra_byte)
+                actual_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + data_entry.dumps()[:-4])
 
-                if defined_crc32 != actual_crc32:
+                if data_entry.crc32 != actual_crc32:
                     logging.warning(
                         "CRC32 mismatch in single-block file: %s (expected=%s, actual=%s)",
                         file.name,
-                        defined_crc32.hex(),
+                        data_entry.crc32.hex(),
                         actual_crc32.hex(),
                     )
 
@@ -132,21 +141,15 @@ class WindowsNotepadTabContent:
                 # Here, the fileSize is zeroed, meaning that the size is not known up front.
                 # Data may be stored in multiple, variable-length blocks. This happens, for example, when several
                 # additions and deletions of characters have been recorded and these changes have not been 'flushed'
-
-                # First, parse 4 unknown bytes. These likely
-                # hold some addition information about the tab (view options etc.)
-                unknown_bytes = fh.read(4)
-
-                # In this multi-block variant, the header itself has a CRC32 value in big-endian as well
-                defined_header_crc32 = fh.read(4)
+                mdeh = c_windowstab.multi_data_extra_header(fh)
 
                 # Calculate CRC32 of the header and check if it matches
-                actual_header_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + unknown_bytes)
-                if defined_header_crc32 != actual_header_crc32:
+                actual_header_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + mdeh.unk)
+                if mdeh.crc32 != actual_header_crc32:
                     logging.warning(
                         "CRC32 mismatch in header of multi-block file: %s " "expected=%s, actual=%s",
                         file.name,
-                        defined_header_crc32.hex(),
+                        mdeh.crc32.hex(),
                         actual_header_crc32.hex(),
                     )
 
@@ -160,18 +163,15 @@ class WindowsNotepadTabContent:
                     # Unfortunately, there is no way of determining how many blocks there are. So just try to parse
                     # until we reach EOF, after which we stop.
                     try:
-                        data_entry = c_windowstab.data_block(fh)
+                        data_entry = c_windowstab.multi_data_block(fh)
                     except EOFError:
                         break
-
-                    # Each block has a CRC32 value in big-endian appended to the block
-                    defined_crc32 = fh.read(4)
 
                     # Either the nAdded is nonzero, or the nDeleted
                     if data_entry.nAdded > 0:
                         # Check the CRC32 checksum for this block
                         actual_crc32 = _calc_crc32(data_entry.dumps())
-                        if defined_crc32 != actual_crc32:
+                        if data_entry.crc32 != actual_crc32:
                             logging.warning(
                                 "CRC32 mismatch in multi-block file: %s " "expected=%s, actual=%s",
                                 file.name,
