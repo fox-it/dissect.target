@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import zlib
 from typing import Iterator
 
@@ -13,7 +14,7 @@ from dissect.target.helpers.record import (
     WindowsUserRecord,
     create_extended_descriptor,
 )
-from dissect.target.plugin import export
+from dissect.target.plugin import arg, export
 from dissect.target.plugins.apps.texteditor.texteditor import (
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
     TexteditorPlugin,
@@ -60,8 +61,12 @@ struct data_block {
 c_windowstab = cstruct()
 c_windowstab.load(c_def)
 
-TextEditorTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+WindowsNotepadTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+)
+
+WindowsNotepadTabContentRecord = create_extended_descriptor([])(
+    "texteditor/windowsnotepad/tab_content", GENERIC_TAB_CONTENTS_RECORD_FIELDS
 )
 
 
@@ -70,29 +75,14 @@ def _calc_crc32(data: bytes) -> bytes:
     return zlib.crc32(data).to_bytes(length=4, byteorder="big")
 
 
-class WindowsNotepadPlugin(TexteditorPlugin):
-    """Windows notepad tab content plugin."""
+class WindowsNotepadTabContent:
+    """Windows notepad tab parser"""
 
-    __namespace__ = "windowsnotepad"
+    def __new__(cls, file: TargetPath, include_deleted_content=False) -> WindowsNotepadTabContentRecord:
+        return cls._process_tab_file(file, include_deleted_content)
 
-    GLOB = "AppData/Local/Packages/Microsoft.WindowsNotepad_*/LocalState/TabState/*.bin"
-
-    def __init__(self, target):
-        super().__init__(target)
-        self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
-
-        for user_details in self.target.user_details.all_with_home():
-            for tab_file in user_details.home_path.glob(self.GLOB):
-                if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
-                    continue
-
-                self.users_tabs.append((tab_file, user_details.user))
-
-    def check_compatible(self) -> None:
-        if not self.users_tabs:
-            raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
-
-    def _process_tab_file(self, file: TargetPath, user: UnixUserRecord | WindowsUserRecord) -> TextEditorTabRecord:
+    @staticmethod
+    def _process_tab_file(file: TargetPath, include_deleted_content: bool) -> WindowsNotepadTabContentRecord:
         """Parse a binary tab file and reconstruct the contents.
 
         Args:
@@ -129,7 +119,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 actual_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + data_entry.dumps() + extra_byte)
 
                 if defined_crc32 != actual_crc32:
-                    self.target.log.warning(
+                    logging.warning(
                         "CRC32 mismatch in single-block file: %s (expected=%s, actual=%s)",
                         file.name,
                         defined_crc32.hex(),
@@ -153,7 +143,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Calculate CRC32 of the header and check if it matches
                 actual_header_crc32 = _calc_crc32(header.dumps()[3:] + tab.dumps() + unknown_bytes)
                 if defined_header_crc32 != actual_header_crc32:
-                    self.target.log.warning(
+                    logging.warning(
                         "CRC32 mismatch in header of multi-block file: %s " "expected=%s, actual=%s",
                         file.name,
                         defined_header_crc32.hex(),
@@ -163,6 +153,8 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                 # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
                 # a list is used to easily insert text at offsets
                 text = []
+
+                deleted_content = ""
 
                 while True:
                     # Unfortunately, there is no way of determining how many blocks there are. So just try to parse
@@ -180,7 +172,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                         # Check the CRC32 checksum for this block
                         actual_crc32 = _calc_crc32(data_entry.dumps())
                         if defined_crc32 != actual_crc32:
-                            self.target.log.warning(
+                            logging.warning(
                                 "CRC32 mismatch in multi-block file: %s " "expected=%s, actual=%s",
                                 file.name,
                                 data_entry.crc32.hex(),
@@ -194,15 +186,52 @@ class WindowsNotepadPlugin(TexteditorPlugin):
                     elif data_entry.nDeleted > 0:
                         # Create a new slice. Include everything up to the offset,
                         # plus everything after the nDeleted following bytes
+                        if include_deleted_content:
+                            deleted_content += "".join(
+                                text[data_entry.offset : data_entry.offset + data_entry.nDeleted]
+                            )
                         text = text[: data_entry.offset] + text[data_entry.offset + data_entry.nDeleted :]
 
                 # Join all the characters to reconstruct the original text
                 text = "".join(text)
 
-        return TextEditorTabRecord(content=text, path=file, _target=self.target, _user=user)
+                if include_deleted_content:
+                    text += " --- DELETED-CONTENT: "
+                    text += deleted_content
 
-    @export(record=TextEditorTabRecord)
-    def tabs(self) -> Iterator[TextEditorTabRecord]:
+        return WindowsNotepadTabContentRecord(content=text, path=file)
+
+
+class WindowsNotepadPlugin(TexteditorPlugin):
+    """Windows notepad tab content plugin."""
+
+    __namespace__ = "windowsnotepad"
+
+    GLOB = "AppData/Local/Packages/Microsoft.WindowsNotepad_*/LocalState/TabState/*.bin"
+
+    def __init__(self, target):
+        super().__init__(target)
+        self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
+        for user_details in self.target.user_details.all_with_home():
+            for tab_file in user_details.home_path.glob(self.GLOB):
+                if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
+                    continue
+
+                self.users_tabs.append((tab_file, user_details.user))
+
+    def check_compatible(self) -> None:
+        if not self.users_tabs:
+            raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
+
+    @arg(
+        "--include-deleted-content",
+        type=bool,
+        default=False,
+        required=False,
+        help="Include deleted but recoverable content.",
+    )
+    @export(record=WindowsNotepadTabRecord)
+    def tabs(self, include_deleted_content) -> Iterator[WindowsNotepadTabRecord]:
         """Return contents from Windows 11 temporary Notepad tabs.
 
         Yields TextEditorTabRecord with the following fields:
@@ -210,4 +239,8 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             path (path): The path the content originates from.
         """
         for file, user in self.users_tabs:
-            yield self._process_tab_file(file, user)
+            # Parse the file
+            r: WindowsNotepadTabContentRecord = WindowsNotepadTabContent(file, include_deleted_content)
+
+            # Add user- and target specific information to the content record record
+            yield WindowsNotepadTabRecord(content=r.content, path=r.path, _target=self.target, _user=user)

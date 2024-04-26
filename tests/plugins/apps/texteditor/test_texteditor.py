@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dissect.target.plugins.apps.texteditor import windowsnotepad
 from tests._utils import absolute_path
@@ -24,7 +25,56 @@ text8 = (
 loremipsum = """Lorem ipsum dolor sit amet. Eum error blanditiis eum pariatur delectus ut consequuntur officiis a excepturi dignissimos et doloribus quia 33 perspiciatis soluta nam perspiciatis dolor. Ut repudiandae quidem cum sint modi qui sint consequatur. Aut autem quidem eum enim consequatur qui voluptate consequatur non similique voluptate. A vitae modi vel sint provident ut galisum tenetur sit voluptatem amet. Est impedit perspiciatis est repudiandae voluptates ut fugit alias! Eum magni esse aut velit illum qui excepturi aperiam. Ex dolores asperiores ut debitis omnis qui consequuntur dolore. Est voluptatem mollitia et quibusdam unde ea accusamus fuga. Cum quis galisum et impedit sunt qui aliquam perspiciatis sed modi quidem qui nisi molestias. Aut temporibus architecto ut neque voluptatem et consequatur deleniti sed accusantium quibusdam et omnis dignissimos ad rerum ipsam et rerum quia. Ut nihil repellat et eaque molestias quo iusto ipsum At optio sint eos quidem earum?\r\rEx deleniti unde eum tenetur rerum ea dolore numquam? Eos aperiam officiis et neque explicabo et enim atque ut eaque omnis non illum eveniet est molestias itaque et ratione voluptatem. Ea deserunt nemo et quos tempora et nostrum aperiam sit necessitatibus illo sit culpa placeat. Vel tempore quibusdam ut velit voluptate aut odio facere non voluptas earum est odio galisum et voluptas harum. Et blanditiis sapiente et nostrum laborum aut voluptatem explicabo a quasi assumenda. Est voluptatem quia eum minima galisum quo totam excepturi aut facilis enim vel voluptate repudiandae sit distinctio laboriosam. Quo possimus molestiae et molestiae accusantium est voluptas omnis sed obcaecati natus. Non vitae asperiores qui nostrum enim id saepe fugiat et incidunt quasi.\r\rEos ipsa facilis aut excepturi voluptatem a omnis magni vel magni iste. Sed ipsum consequatur qui reprehenderit deleniti et soluta molestiae. Ut vero assumenda id dolor ipsum in deleniti voluptatem aut quis quisquam sed repudiandae temporibus ab quia inventore. Sed velit fugit vel facere cumque et delectus ullam sed eaque impedit. Est veritatis dignissimos aut doloribus dolorem vel pariatur repellendus sit nesciunt similique eum architecto quia. Ea expedita veritatis eum dolorem molestiae ut enim fugit aut beatae quibusdam. Aut voluptas natus in quidem deleniti aut animi iure est incidunt tenetur qui culpa maiores! Et nostrum quaerat qui consequatur consequatur aut aliquam atque aut praesentium rerum et consequuntur exercitationem. Non accusantium ipsa vel consectetur vitae ut magnam autem et natus rerum ut consectetur inventore est doloremque temporibus 33 dolores doloribus! Aut perferendis optio et nostrum repellendus et fugit itaque ut nisi neque sed sint quaerat. Aut placeat architecto et eius sapiente eum molestiae quam. Quo mollitia sapiente non Quis neque non tempora laudantium. Quo distinctio quos et molestias natus sit veritatis consequuntur aut repellendus neque a porro galisum cum numquam nesciunt et animi earum? Aut dolorum dolore non assumenda omnis et molestiae amet id sint vero est eligendi harum sit temporibus magnam aut ipsam quos.\r\r"""  # noqa: E501
 
 
-def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplog):
+def test_windows_tab_parsing(tmp_path):
+    # Standalone parsing of tab files, so not using the plugin
+    tab_files = Path(absolute_path("_data/plugins/apps/texteditor/windowsnotepad/"))
+    content_record = windowsnotepad.WindowsNotepadTabContent(tab_files / "unsaved-with-deletions.bin")
+    assert content_record.content == "Not saved aasdflasd"
+    content_record_with_deletions = windowsnotepad.WindowsNotepadTabContent(
+        tab_files / "unsaved-with-deletions.bin", include_deleted_content=True
+    )
+    assert content_record_with_deletions.content == "Not saved aasdflasd --- DELETED-CONTENT: snUlltllafds tjkf"
+
+
+def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, target_win_users, caplog):
+    file_text_map = {
+        "unsaved-with-deletions.bin": "Not saved aasdflasd --- DELETED-CONTENT: snUlltllafds tjkf",
+        "lots-of-deletions.bin": "This a text, which is nothing special. But I am going to modify it a bit. "
+        "For example, I have removed quote some stuff. "
+        "Adding a word in the beginning now... "
+        "At this point, I've edited it quite a lot. --- DELETED-CONTENT: "
+        "b a ,elpmac ydaerlae already thi laiceps emos",
+    }
+
+    tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
+
+    user = target_win_users.user_details.find(username="John")
+    tab_dir = user.home_path.joinpath(
+        "AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState"
+    )
+
+    fs_win.map_dir("Users\\John", tmp_path)
+
+    for file in file_text_map.keys():
+        tab_file = str(tab_dir.joinpath(file))[3:]
+        fs_win.map_file(tab_file, os.path.join(tabcache, file))
+
+    target_win.add_plugin(windowsnotepad.WindowsNotepadPlugin)
+
+    records = list(target_win.windowsnotepad.tabs(include_deleted_content=True))
+
+    # Check the amount of files
+    assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
+    assert len(records) == len(file_text_map.keys())
+
+    # The recovered content in the records should match the original data, as well as the length
+    for rec in records:
+        print(rec.content)
+        assert rec.content == file_text_map[rec.path.name]
+        assert len(rec.content) == len(file_text_map[rec.path.name])
+
+
+def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_users, caplog):
     file_text_map = {
         "c515e86f-08b3-4d76-844a-cddfcd43fcbb.bin": text1,
         "85167c9d-aac2-4469-ae44-db5dccf8f7f4.bin": text2,
@@ -58,7 +108,7 @@ def test_texteditor_plugin(target_win, fs_win, tmp_path, target_win_users, caplo
 
     target_win.add_plugin(windowsnotepad.WindowsNotepadPlugin)
 
-    records = list(target_win.windowsnotepad.tabs())
+    records = list(target_win.windowsnotepad.tabs(include_deleted_content=False))
 
     # Check the amount of files
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
