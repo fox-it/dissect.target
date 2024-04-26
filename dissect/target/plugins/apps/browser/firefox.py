@@ -316,24 +316,23 @@ class FirefoxPlugin(BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Firefox.
 
-        Yields:
-            Records with the following fields:
-                ts_install (datetime): Extension install timestamp.
-                ts_update (datetime): Extension update timestamp.
-                browser (string): The browser from which the records are generated.
-                id (string): Extension unique identifier.
-                name (string): Name of the extension.
-                short_name (string): Short name of the extension.
-                default_title (string): Default title of the extension.
-                description (string): Description of the extension.
-                version (string): Version of the extension.
-                ext_path (path): Relative path of the extension.
-                from_webstore (boolean): Extension from webstore.
-                permissions (string[]): Permissions of the extension.
-                manifest (varint): Version of the extensions' manifest.
-                optionalPermissions (string[]): Optional permissions of the extension.
-                sourceURI (path): Source path from which the extension was downloaded.
-                source (path): The source file of the download record.
+        Yields BrowserExtensionRecord with the following fields::
+            ts_install (datetime): Extension install timestamp.
+            ts_update (datetime): Extension update timestamp.
+            browser (string): The browser from which the records are generated.
+            id (string): Extension unique identifier.
+            name (string): Name of the extension.
+            short_name (string): Short name of the extension.
+            default_title (string): Default title of the extension.
+            description (string): Description of the extension.
+            version (string): Version of the extension.
+            ext_path (path): Relative path of the extension.
+            from_webstore (boolean): Extension from webstore.
+            permissions (string[]): Permissions of the extension.
+            manifest (varint): Version of the extensions' manifest.
+            optional_permissions (string[]): Optional permissions of the extension.
+            source_uri (path): Source path from which the extension was downloaded.
+            source (path): The source file of the download record.
         """
         for user, _, profile_dir in self._iter_profiles():
             extension_file = profile_dir.joinpath("extensions.json")
@@ -348,29 +347,26 @@ class FirefoxPlugin(BrowserPlugin):
                 extensions = json.load(extension_file.open())
 
                 for extension in extensions.get("addons", []):
-                    try:
-                        yield self.BrowserExtensionRecord(
-                            ts_install=extension.get("installDate", 0) // 1000,
-                            ts_update=extension.get("updateDate", 0) // 1000,
-                            browser="firefox",
-                            id=extension.get("id"),
-                            name=extension.get("defaultLocale", {}).get("name"),
-                            short_name=None,
-                            default_title=None,
-                            description=extension.get("defaultLocale", {}).get("description"),
-                            version=extension.get("version"),
-                            ext_path=extension.get("path"),
-                            from_webstore=None,
-                            permissions=extension.get("userPermissions", {}).get("permissions"),
-                            manifest_version=extension.get("manifestVersion"),
-                            source_uri=extension.get("sourceURI"),
-                            optional_permissions=extension.get("optionalPermissions", {}).get("permissions"),
-                            source=extension_file,
-                            _target=self.target,
-                            _user=user.user,
-                        )
-                    except (AttributeError, KeyError) as e:
-                        self.target.log.info("No browser extensions found in: %s", extension_file, exc_info=e)
+                    yield self.BrowserExtensionRecord(
+                        ts_install=extension.get("installDate", 0) // 1000,
+                        ts_update=extension.get("updateDate", 0) // 1000,
+                        browser="firefox",
+                        id=extension.get("id"),
+                        name=extension.get("defaultLocale", {}).get("name"),
+                        short_name=None,
+                        default_title=None,
+                        description=extension.get("defaultLocale", {}).get("description"),
+                        version=extension.get("version"),
+                        ext_path=extension.get("path"),
+                        from_webstore=None,
+                        permissions=extension.get("userPermissions", {}).get("permissions"),
+                        manifest_version=extension.get("manifestVersion"),
+                        source_uri=extension.get("sourceURI"),
+                        optional_permissions=extension.get("optionalPermissions", {}).get("permissions"),
+                        source=extension_file,
+                        _target=self.target,
+                        _user=user.user,
+                    )
 
             except FileNotFoundError:
                 self.target.log.info(
