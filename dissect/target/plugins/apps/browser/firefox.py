@@ -78,13 +78,14 @@ class FirefoxPlugin(BrowserPlugin):
         "browser/firefox/download", GENERIC_DOWNLOAD_RECORD_FIELDS
     )
 
+    BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/firefox/extension", GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS
+    )
+
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
-    BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/extension", GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS
-    )
 
     def __init__(self, target):
         super().__init__(target)
