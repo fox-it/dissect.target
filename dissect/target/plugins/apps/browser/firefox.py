@@ -86,7 +86,6 @@ class FirefoxPlugin(BrowserPlugin):
         "browser/firefox/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
-
     def __init__(self, target):
         super().__init__(target)
         self.users_dirs: list[tuple[UserDetails, TargetPath]] = []
