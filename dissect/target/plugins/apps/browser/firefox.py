@@ -44,7 +44,7 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-FIREFOX_EXTENSION_RECORD_FIELDS = [("uri", "sourceURI"), ("string[]", "optionalPermissions")]
+FIREFOX_EXTENSION_RECORD_FIELDS = [("uri", "source_uri"), ("string[]", "optional_permissions")]
 
 log = logging.getLogger(__name__)
 
@@ -353,17 +353,17 @@ class FirefoxPlugin(BrowserPlugin):
                             ts_update=extension.get("updateDate", 0) // 1000,
                             browser="firefox",
                             id=extension.get("id"),
-                            name=extension.get("defaultLocale").get("name"),
+                            name=extension.get("defaultLocale", {}).get("name"),
                             short_name=None,
                             default_title=None,
-                            description=extension.get("defaultLocale").get("description"),
+                            description=extension.get("defaultLocale", {}).get("description"),
                             version=extension.get("version"),
                             ext_path=extension.get("path"),
                             from_webstore=None,
-                            permissions=extension.get("userPermissions").get("permissions"),
+                            permissions=extension.get("userPermissions", {}).get("permissions"),
                             manifest_version=extension.get("manifestVersion"),
-                            sourceURI=extension.get("sourceURI"),
-                            optionalPermissions=extension.get("optionalPermissions").get("permissions"),
+                            source_uri=extension.get("sourceURI"),
+                            optional_permissions=extension.get("optionalPermissions", {}).get("permissions"),
                             source=extension_file,
                             _target=self.target,
                             _user=user.user,
