@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
+from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
 
 
@@ -33,9 +34,16 @@ class ProxmoxLoader(Loader):
             vm_disk = _get_vm_disk_name(config_value)
 
             if _is_disk_device(option) and vm_disk is not None:
+                disk_interface = option
                 vm_id = self.path.stem
                 name = parsed_config['name']
+                storage_id = _get_storage_ID(config_value)
 
+                path = self.path.joinpath("/dev/pve/", vm_disk)
+                try:
+                    target.disks.add(RawContainer(path.open("rb")))
+                except Exception:
+                    target.log.exception("Failed to load block device: %s", vm_disk)
         
     def _parse_vm_configuration(self, conf) -> list:
         lines = conf.read_text().split("\n")
@@ -56,3 +64,7 @@ def _get_vm_disk_name(config_value: str) -> str | None:
     """Retrieves the disk device name from vm"""
     disk = re.search(r"vm-[0-9]+-disk-[0-9]+(,|.+?,)", config_value)
     return disk.group(0).replace(",", "") if disk else None
+
+def _get_storage_ID(config_value: str) -> str | None:
+    storage_id = config_value.split(":")
+    return storage_id[0] if storage_id else None

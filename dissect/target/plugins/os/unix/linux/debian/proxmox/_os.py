@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import pathlib
 import logging
@@ -13,6 +14,8 @@ from dissect.target.plugins.os.unix._os import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.target import Target
+
+import ipdb
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +42,7 @@ class ProxmoxPlugin(LinuxPlugin):
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
         for fs in target.filesystems:
+            # [REMINDER FOR REPORT] both filesystems are checked for redundancy (in case fs is damaged/missing stuff)
             if (fs.exists("/etc/pve") or fs.exists("/var/lib/pve")):
                 return fs
         return None
@@ -49,6 +53,7 @@ class ProxmoxPlugin(LinuxPlugin):
         obj = super().create(target, sysvol)
         pmxcfs = _create_pmxcfs(sysvol.path(PMXCFS_DATABASE_PATH).open("rb"))
         target.fs.mount("/etc/pve", pmxcfs)
+        # ipdb.set_trace()
 
         return obj
 
@@ -67,12 +72,27 @@ class ProxmoxPlugin(LinuxPlugin):
 
     @export(record=VirtualMachineRecord)
     def vm_list(self) -> Iterator[VirtualMachineRecord]:
+        import ipdb
         configs = self.target.fs.path(VM_CONFIG_PATH)
         for config in configs.iterdir():
             yield VirtualMachineRecord(
                 id=pathlib.Path(config).stem,
                 config_path=config,
             )
+            # ipdb.set_trace()
+            # parsed_config = _parse_vm_configuration(config)
+            # for option in parsed_config:
+            #     config_value = parsed_config[option].decode()
+            #     vm_disk = _get_vm_disk_name(config_value)
+            #     if _is_disk_device(option.decode()) and vm_disk is not None:
+            #         vm_id = pathlib.Path(config).stem
+            #         yield VirtualMachineRecord(
+            #             id=vm_id,
+            #             name=parsed_config[b'name'].decode(),
+            #             storage_id=_get_storage_ID(config_value),
+            #             disk=vm_disk, # TODO: Maybe remove
+            #             config_path=config,
+            #         )
 
 def _create_pmxcfs(fh) -> VirtualFilesystem:
     db = sqlite3.SQLite3(fh)
@@ -99,17 +119,3 @@ def _create_pmxcfs(fh) -> VirtualFilesystem:
                     vfs.map_file_fh(f"/{path}", BytesIO(content or b""))
 
     return  vfs
-
-
-
-def _is_disk_device(config_value: str) -> str | None:
-    disk = re.match(r"^(sata|scsi|ide)[0-9]+$", config_value)
-    return True if disk else None 
-
-def _get_storage_ID(config_value: str) -> str | None:
-    storage_id = config_value.split(":")
-    return storage_id[0] if storage_id else None
-
-def _get_disk_name(config_value: str) -> str | None:
-    disk = re.search(r"vm-[0-9]+-disk-[0-9]+", config_value)
-    return disk.group(0) if disk else None
