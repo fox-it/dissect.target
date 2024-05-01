@@ -86,7 +86,7 @@ class VelociraptorLoader(DirLoader):
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path)
-        # FIXME:
+        # FIXME: the current loader does not work with ZIP files
         if path.suffix == ".zip":
             log.warning(
                 f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
