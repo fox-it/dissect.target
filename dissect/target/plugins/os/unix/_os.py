@@ -238,13 +238,9 @@ class UnixPlugin(OSPlugin):
     def _add_lvm_devices(self) -> None:
         """Parses and mounts lvm devices from external target to local target fs"""
         vfs = VirtualFilesystem()
-        for volume in self.target.volumes.entries:
+        for volume in self.target.volumes:
             if isinstance(volume.vs, lvm.LvmVolumeSystem) and "disk" in volume.name:
-                vg_name =  volume.vs.lvm.vg.name
-
-                for logical_volume in volume.vs.lvm.vg.lv:
-                    lv_name = logical_volume.name
-                    vfs.map_file_fh(f"/{vg_name}/{lv_name}", BufferedStream(volume))
+                vfs.map_file_fh(f"{volume.raw.vg.name}/{volume.raw.name}", BufferedStream(volume))
     
         self.target.fs.mount("/dev", vfs)
                     
