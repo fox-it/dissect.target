@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional
 
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
+from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
 if TYPE_CHECKING:
     from dissect.target import Target
@@ -85,7 +86,7 @@ class VelociraptorLoader(DirLoader):
 
     def __init__(self, path: Path, **kwargs):
         super().__init__(path)
-
+        # FIXME:
         if path.suffix == ".zip":
             log.warning(
                 f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
@@ -127,3 +128,16 @@ class VelociraptorLoader(DirLoader):
             )
         else:
             map_dirs(target, dirs, os_type)
+
+        # Map artifact results collected by Velociraptor
+        target.fs.makedirs(VELOCIRAPTOR_RESULTS)
+
+        # FIXME: The files exist in this target, but when using the velociraptor plugin these files do not exist
+        # results = self.root.joinpath("results")
+        # if results.exists() and results.is_dir():
+        #     for artifact in results.glob("*.json"):
+        #         target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), artifact)
+
+        uploads = self.root.joinpath("uploads.json")
+        if uploads.exists() and uploads.is_file():
+            target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), uploads)
