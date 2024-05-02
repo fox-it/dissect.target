@@ -79,21 +79,20 @@ class VelociraptorPlugin(Plugin):
             - https://docs.velociraptor.app/docs/vql/artifacts/
         """
         for artifact in self.results.glob("*.json"):
-            with self.target.fs.path(artifact).open("rt") as fh:
-                # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
-                artifact_name = (
-                    urllib.parse.unquote(artifact.name.rstrip(".json")).split("/")[0].lower().replace(".", "_")
-                )
-                velociraptor_record_builder = VelociraptorRecordBuilder(self.target.os, artifact_name)
+            fh = self.target.fs.path(artifact).open("rt")
 
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
+            # "Windows.KapeFiles.Targets%2FAll\ File\ Metadata.json" becomes "windows_kapefiles_targets"
+            artifact_name = urllib.parse.unquote(artifact.name.rstrip(".json")).split("/")[0].lower().replace(".", "_")
+            velociraptor_record_builder = VelociraptorRecordBuilder(self.target.os, artifact_name)
 
-                    try:
-                        object = json.loads(line)
-                        yield velociraptor_record_builder.read_record(object, self.target)
-                    except json.decoder.JSONDecodeError:
-                        self.target.log.warning("Could not decode Velociraptor JSON log line: %s (%s)", line, artifact)
-                        continue
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    object = json.loads(line)
+                    yield velociraptor_record_builder.read_record(object, self.target)
+                except json.decoder.JSONDecodeError:
+                    self.target.log.warning("Could not decode Velociraptor JSON log line: %s (%s)", line, artifact)
+                    continue
