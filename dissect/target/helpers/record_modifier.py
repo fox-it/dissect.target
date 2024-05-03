@@ -62,12 +62,15 @@ MODIFIER_MAPPING = {
 
 def _resolve_path_types(target: Target, record: Record) -> Iterator[tuple[str, TargetPath]]:
     for field_name, field_type in record._field_types.items():
-        if not issubclass(field_type, fieldtypes.path):
+        if not issubclass(field_type, (fieldtypes.path, fieldtypes.command)):
             continue
 
         path = getattr(record, field_name, None)
         if path is None:
             continue
+
+        if isinstance(path, fieldtypes.command):
+            path = path.executable
 
         yield field_name, target.resolve(str(path))
 
