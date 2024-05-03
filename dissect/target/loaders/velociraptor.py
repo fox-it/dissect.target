@@ -131,12 +131,12 @@ class VelociraptorLoader(DirLoader):
         # Map artifact results collected by Velociraptor
         target.fs.makedirs(VELOCIRAPTOR_RESULTS)
 
-        # FIXME: The files exist in this target, but when using the velociraptor plugin these files do not exist
-        # results = self.root.joinpath("results")
-        # if results.exists() and results.is_dir():
-        #     for artifact in results.glob("*.json"):
-        #         target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), artifact)
+        results = self.root.joinpath("results")
+        if results.exists() and results.is_dir():
+            # FIXME: The files do exists but can't be found: dissect.target.exceptions.FileNotFoundError
+            for artifact in results.glob("*.json"):
+                target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(artifact.name)), str(artifact))
 
         uploads = self.root.joinpath("uploads.json")
         if uploads.exists() and uploads.is_file():
-            target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), uploads)
+            target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), str(uploads))
