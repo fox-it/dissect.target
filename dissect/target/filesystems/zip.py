@@ -57,7 +57,10 @@ class ZipFilesystem(Filesystem):
 
             entry_cls = ZipFilesystemDirectoryEntry if member.is_dir() else ZipFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
-            self._fs.map_file_entry(rel_name, file_entry)
+            try:
+                self._fs.map_file_entry(rel_name, file_entry)
+            except Exception:
+                log.warning("Failed to map %s into VFS", file_entry)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
