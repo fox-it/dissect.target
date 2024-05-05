@@ -77,8 +77,8 @@ class VelociraptorLoader(DirLoader):
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
 
-    The filesystem entries collected by Velociraptor are URL-encoded, which are decoded by the ZIP loader in order to
-    prevent errors when executing plugins.
+    The names of the filesystem entries collected by Velociraptor are URL-encoded, which are decoded by the ZIP loader
+    in order to prevent errors when executing plugins.
 
     References:
         - https://www.rapid7.com/products/velociraptor/
