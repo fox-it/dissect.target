@@ -5,6 +5,7 @@ import stat
 import zipfile
 from datetime import datetime, timezone
 from typing import BinaryIO, Optional
+from urllib.parse import unquote
 
 from dissect.util.stream import BufferedStream
 
@@ -34,6 +35,7 @@ class ZipFilesystem(Filesystem):
         self,
         fh: BinaryIO,
         base: Optional[str] = None,
+        decode_name: bool = False,
         *args,
         **kwargs,
     ):
@@ -57,6 +59,10 @@ class ZipFilesystem(Filesystem):
 
             entry_cls = ZipFilesystemDirectoryEntry if member.is_dir() else ZipFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
+
+            if decode_name:
+                rel_name = unquote(rel_name)
+
             try:
                 self._fs.map_file_entry(rel_name, file_entry)
             except Exception:

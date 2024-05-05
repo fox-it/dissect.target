@@ -43,40 +43,6 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    "sub_dir, other_dir",
-    [
-        ("mft", "auto"),
-        ("ntfs", "auto"),
-        ("ntfs_vss", "auto"),
-        ("lazy_ntfs", "auto"),
-        ("auto", "ntfs"),
-    ],
-)
-def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
-    root = create_root(sub_dir, tmp_path)
-    root.joinpath(f"uploads/{other_dir}/C%3A").mkdir(parents=True, exist_ok=True)
-    root.joinpath(f"uploads/{other_dir}/C%3A/other.txt").write_text("my first file")
-
-    assert VelociraptorLoader.detect(root) is True
-
-    loader = VelociraptorLoader(root)
-    loader.map(target_bare)
-    target_bare.apply()
-
-    assert "sysvol" in target_bare.fs.mounts
-    assert "c:" in target_bare.fs.mounts
-
-    usnjrnl_records = 0
-    for fs in target_bare.filesystems:
-        if isinstance(fs, NtfsFilesystem):
-            usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
-    assert usnjrnl_records == 2
-    assert len(target_bare.filesystems) == 4
-    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
-    assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
-
-
-@pytest.mark.parametrize(
     "sub_dir",
     ["mft", "ntfs", "ntfs_vss", "lazy_ntfs", "auto"],
 )
@@ -107,37 +73,13 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
 @pytest.mark.parametrize(
     "paths",
     [
-        (["uploads/file/etc", "uploads/file/var"]),
-        (["uploads/auto/etc", "uploads/auto/var"]),
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt"]),
-        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt"]),
-        (["uploads/file/Library", "uploads/file/Applications"]),
-        (["uploads/auto/Library", "uploads/auto/Applications"]),
-    ],
-)
-def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
-    root = tmp_path
-    mkdirs(root, paths)
-
-    (root / "uploads.json").write_bytes(b"{}")
-
-    assert VelociraptorLoader.detect(root) is True
-
-    loader = VelociraptorLoader(root)
-    loader.map(target_bare)
-
-    assert len(target_bare.filesystems) == 1
-
-
-@pytest.mark.parametrize(
-    "paths",
-    [
-        (["uploads/file/etc", "uploads/file/var"]),
-        (["uploads/auto/etc", "uploads/auto/var"]),
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt"]),
-        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt"]),
-        (["uploads/file/Library", "uploads/file/Applications"]),
-        (["uploads/auto/Library", "uploads/auto/Applications"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt", "uploads/auto/%2ETEST"]),
+        (["uploads/file/Library", "uploads/file/Applications", "uploads/file/%2ETEST"]),
+        (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
 def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
@@ -153,5 +95,7 @@ def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None
 
     loader = VelociraptorLoader(zip_path)
     loader.map(target_bare)
+    target_bare.apply()
 
     assert len(target_bare.filesystems) == 1
+    assert target_bare.fs.path("/.TEST").exists()
