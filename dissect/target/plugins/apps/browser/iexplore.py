@@ -26,7 +26,7 @@ class WebCache:
         self.target = target
         self.db = esedb.EseDB(fh)
 
-    def find_containers(self, name: str) -> table.Table:
+    def find_containers(self, name: str) -> Iterator[table.Table]:
         """Look up all ``ContainerId`` values for a given container name.
 
         Args:
@@ -212,7 +212,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
-                    path=self.target.fs.path(down_path),
+                    path=self.target.fs.path(down_path) if down_path else None,
                     url=down_url,
                     size=None,
                     state=None,

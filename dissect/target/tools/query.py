@@ -173,8 +173,7 @@ def main():
         collected_plugins = {}
 
         if targets:
-            for target in targets:
-                plugin_target = Target.open(target)
+            for plugin_target in Target.open_all(targets, args.children):
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
