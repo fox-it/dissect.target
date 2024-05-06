@@ -3,6 +3,7 @@ from __future__ import annotations
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import NamespacePlugin
+from dissect.target.helpers.record import TargetRecordDescriptor
 
 GENERIC_LOG_RECORD_FIELDS = [
     ("datetime", "ts"),
@@ -24,7 +25,23 @@ RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtensio
 RemoteAccessFileTransferRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "remoteaccess/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
 )
-
+RemoteAccessIncomingConnectionRecord = TargetRecordDescriptor(
+    "application/log/remoteaccess",
+    [
+        
+        ("string", "tool"),
+        ("path", "logfile"),
+        ("string", "remote_tvid"),
+        ("string", "tv_user_host"),
+        ("string", "tv_user_host"),
+        ("datetime", "start_time"),
+        #("string","host"),
+        ("datetime", "end_time"),
+        ("string", "user_context"),
+        ("string", "connection_type"),
+        ("string", "connection_guid"),
+    ],
+)
 
 class RemoteAccessPlugin(NamespacePlugin):
     """General Remote Access plugin.
