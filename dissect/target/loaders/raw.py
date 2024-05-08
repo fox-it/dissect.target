@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from dissect.target import container
-from dissect.target.exceptions import TargetError
+from dissect.target.exceptions import TargetPathNotFoundError
 from dissect.target.loader import Loader
 from dissect.target.target import Target
 
@@ -11,7 +11,7 @@ class RawLoader(Loader):
 
     def __init__(self, path: Path, **kwargs):
         if not path.exists():
-            raise TargetError(f"Provided path '{path}' does not exist")
+            raise TargetPathNotFoundError("Provided target path does not exist")
 
         super().__init__(path, **kwargs)
 
