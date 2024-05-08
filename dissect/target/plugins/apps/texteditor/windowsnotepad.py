@@ -5,11 +5,16 @@ import zlib
 from typing import Iterator
 
 from dissect.cstruct import cstruct
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.descriptor_extensions import (
+    RecordDescriptorExtensionBase,
+    UserRecordDescriptorExtension,
+)
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import (
+    DynamicDescriptor,
     UnixUserRecord,
     WindowsUserRecord,
     create_extended_descriptor,
@@ -27,7 +32,7 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
 c_def = """
 struct file_header {
     char        magic[2]; // NP
-    uleb128     updateNumber; // increases on every settings update when fileType=9, 
+    uleb128     updateNumber; // increases on every settings update when fileType=9,
                               // doesn't seem to change on fileType 0 or 1
     uleb128     fileType; // 0 if unsaved, 1 if saved, 9 if contains settings?
 }
@@ -91,16 +96,58 @@ struct options_v2 {
 };
 """
 
+WINDOWS_SAVED_TABS_EXTRA_FIELDS = [("datetime", "modification_time"), ("string", "sha256"), ("path", "saved_path")]
+
+
+class WindowsSavedTabRecordDescriptorExtension(RecordDescriptorExtensionBase):
+    """RecordDescriptorExtension used to add extra fields to tabs that are saved to disk and contain more info."""
+
+    _default_fields = WINDOWS_SAVED_TABS_EXTRA_FIELDS
+
+    _input_fields = ("_saved",)
+
+    def _fill_default_fields(self, record_kwargs):
+        r: WindowsNotepadSavedTabContentRecord = record_kwargs.get("_saved", None)
+
+        modification_time = None
+        saved_path = None
+        sha256 = None
+
+        if r:
+            modification_time = r.modification_time
+            sha256 = r.sha256
+            saved_path = r.saved_path
+
+        record_kwargs.update({"modification_time": modification_time, "sha256": sha256, "saved_path": saved_path})
+        return record_kwargs
+
+
+# Different Record types for both saved/unsaved tabs, and with/without UserRecordDescriptor so that the
+# plugin can be used as a standalone tool as well
+
+
+WindowsNotepadUnsavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "texteditor/windowsnotepad/tab/unsaved",
+    GENERIC_TAB_CONTENTS_RECORD_FIELDS,
+)
+
+WindowsNotepadSavedTabRecord = create_extended_descriptor(
+    [UserRecordDescriptorExtension, WindowsSavedTabRecordDescriptorExtension]
+)(
+    "texteditor/windowsnotepad/tab/saved",
+    GENERIC_TAB_CONTENTS_RECORD_FIELDS,
+)
+
+WindowsNotepadUnsavedTabContentRecord = create_extended_descriptor([])(
+    "texteditor/windowsnotepad/tab_content/unsaved", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+)
+
+WindowsNotepadSavedTabContentRecord = create_extended_descriptor([])(
+    "texteditor/windowsnotepad/tab_content/saved", GENERIC_TAB_CONTENTS_RECORD_FIELDS + WINDOWS_SAVED_TABS_EXTRA_FIELDS
+)
+
 c_windowstab = cstruct()
 c_windowstab.load(c_def)
-
-WindowsNotepadTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "texteditor/windowsnotepad/tab", GENERIC_TAB_CONTENTS_RECORD_FIELDS
-)
-
-WindowsNotepadTabContentRecord = create_extended_descriptor([])(
-    "texteditor/windowsnotepad/tab_content", GENERIC_TAB_CONTENTS_RECORD_FIELDS
-)
 
 
 def _calc_crc32(data: bytes) -> bytes:
@@ -109,13 +156,17 @@ def _calc_crc32(data: bytes) -> bytes:
 
 
 class WindowsNotepadTabContent:
-    """Windows notepad tab parser"""
+    """Windows notepad tab content parser"""
 
-    def __new__(cls, file: TargetPath, include_deleted_content=False) -> WindowsNotepadTabContentRecord:
+    def __new__(
+        cls, file: TargetPath, include_deleted_content=False
+    ) -> WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord:
         return cls._process_tab_file(file, include_deleted_content)
 
     @staticmethod
-    def _process_tab_file(file: TargetPath, include_deleted_content: bool) -> WindowsNotepadTabContentRecord:
+    def _process_tab_file(
+        file: TargetPath, include_deleted_content: bool
+    ) -> WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord:
         """Parse a binary tab file and reconstruct the contents.
 
         Args:
@@ -132,7 +183,7 @@ class WindowsNotepadTabContent:
             # Depending on the file's saved state, different header fields are present
             tab_header = (
                 c_windowstab.tab_header_saved(fh)
-                if file_header.fileType == 0x01  # 0x00 is unsaved, 0x01 is saved, 0x09 is settings?
+                if file_header.fileType == 1  # 0 is unsaved, 1 is saved, 9 is settings?
                 else c_windowstab.tab_header_unsaved(fh)
             )
 
@@ -261,7 +312,16 @@ class WindowsNotepadTabContent:
                 # Finally, add the reconstructed text to the tab content
                 content += text
 
-        return WindowsNotepadTabContentRecord(content=content, path=file)
+        if file_header.fileType == 0:
+            return WindowsNotepadUnsavedTabContentRecord(content=content, path=file)
+        else:
+            return WindowsNotepadSavedTabContentRecord(
+                content=content,
+                path=file,
+                modification_time=wintimestamp(tab_header.timestamp),
+                sha256=tab_header.sha256.hex(),
+                saved_path=tab_header.filePath,
+            )
 
 
 class WindowsNotepadPlugin(TexteditorPlugin):
@@ -276,6 +336,8 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
         for user_details in self.target.user_details.all_with_home():
             for tab_file in user_details.home_path.glob(self.GLOB):
+                # These files seem to contain information on different settings / configurations,
+                # and are skipped for now
                 if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
                     continue
 
@@ -292,8 +354,8 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         required=False,
         help="Include deleted but recoverable content.",
     )
-    @export(record=WindowsNotepadTabRecord)
-    def tabs(self, include_deleted_content) -> Iterator[WindowsNotepadTabRecord]:
+    @export(record=DynamicDescriptor(["path", "datetime", "string"]))
+    def tabs(self, include_deleted_content) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
         """Return contents from Windows 11 temporary Notepad tabs.
 
         Yields TextEditorTabRecord with the following fields:
@@ -302,7 +364,14 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         """
         for file, user in self.users_tabs:
             # Parse the file
-            r: WindowsNotepadTabContentRecord = WindowsNotepadTabContent(file, include_deleted_content)
+            r: WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord = WindowsNotepadTabContent(
+                file, include_deleted_content
+            )
 
-            # Add user- and target specific information to the content record
-            yield WindowsNotepadTabRecord(content=r.content, path=r.path, _target=self.target, _user=user)
+            # If the modification_time attribute is present, this means that it's a WindowsNotepadSavedTabContentRecord
+            if hasattr(r, "modification_time"):
+                yield WindowsNotepadSavedTabRecord(
+                    content=r.content, path=r.path, _saved=r, _target=self.target, _user=user
+                )
+            else:
+                yield WindowsNotepadUnsavedTabRecord(content=r.content, path=r.path, _target=self.target, _user=user)

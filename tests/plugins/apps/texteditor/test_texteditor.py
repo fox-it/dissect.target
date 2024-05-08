@@ -1,7 +1,12 @@
 import os
 from pathlib import Path
 
-from dissect.target.plugins.apps.texteditor import windowsnotepad
+from flow.record.fieldtypes import datetime as dt
+
+from dissect.target.plugins.apps.texteditor.windowsnotepad import (
+    WindowsNotepadPlugin,
+    WindowsNotepadTabContent,
+)
 from tests._utils import absolute_path
 
 text1 = "This is an unsaved tab, UTF-8 encoded with Windows (CRLF). It's only 88 characters long."
@@ -27,12 +32,11 @@ loremipsum = """Lorem ipsum dolor sit amet. Eum error blanditiis eum pariatur de
 
 def test_windows_tab_parsing(tmp_path):
     # Standalone parsing of tab files, so not using the plugin
-    tab_files = Path(absolute_path("_data/plugins/apps/texteditor/windowsnotepad/"))
-    content_record = windowsnotepad.WindowsNotepadTabContent(tab_files / "unsaved-with-deletions.bin")
+    tab_file = Path(absolute_path("_data/plugins/apps/texteditor/windowsnotepad/unsaved-with-deletions.bin"))
+    content_record = WindowsNotepadTabContent(tab_file)
     assert content_record.content == "Not saved aasdflasd"
-    content_record_with_deletions = windowsnotepad.WindowsNotepadTabContent(
-        tab_files / "unsaved-with-deletions.bin", include_deleted_content=True
-    )
+
+    content_record_with_deletions = WindowsNotepadTabContent(tab_file, include_deleted_content=True)
     assert content_record_with_deletions.content == "Not saved aasdflasd --- DELETED-CONTENT: snUlltllafds tjkf"
 
 
@@ -59,7 +63,7 @@ def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, targe
         tab_file = str(tab_dir.joinpath(file))[3:]
         fs_win.map_file(tab_file, os.path.join(tabcache, file))
 
-    target_win.add_plugin(windowsnotepad.WindowsNotepadPlugin)
+    target_win.add_plugin(WindowsNotepadPlugin)
 
     records = list(target_win.windowsnotepad.tabs(include_deleted_content=True))
 
@@ -107,7 +111,7 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
         tab_file = str(tab_dir.joinpath(file))[3:]
         fs_win.map_file(tab_file, os.path.join(tabcache, file))
 
-    target_win.add_plugin(windowsnotepad.WindowsNotepadPlugin)
+    target_win.add_plugin(WindowsNotepadPlugin)
 
     records = list(target_win.windowsnotepad.tabs(include_deleted_content=False))
 
@@ -119,10 +123,57 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
         # One file should still return contents, but there should be an entry for in the logging for a CRC missmatch.
         assert (
             "CRC32 mismatch in single-block file: wrong-checksum.bin (expected=deadbeef, actual=a48d30a6)" in line
-            or not "CRC32 mismatch" in line
+            or "CRC32 mismatch" not in line
         )
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
         assert rec.content == file_text_map[rec.path.name]
         assert len(rec.content) == len(file_text_map[rec.path.name])
+
+
+def test_windows_saved_tab_plugin_extra_fields(target_win, fs_win, tmp_path, target_win_users, caplog):
+    file_text_map = {
+        "saved.bin": (
+            "Saved!",
+            "C:\\Users\\user\\Desktop\\Saved!.txt",
+            dt(2024, 3, 28, 13, 7, 55, 482183),
+            "ed9b760289e614c9dc8776e7280abe870be0a85019a32220b35acc54c0ecfbc1",
+        ),
+        "appclosed_saved_and_deletions.bin": (
+            text8,
+            "C:\\Users\\user\\Desktop\\Saved.txt",
+            dt(2024, 3, 28, 13, 16, 21, 158279),
+            "8d0533144aa42e2d81e7474332bdef6473e42b699041528d55a62e5391e914ce",
+        ),
+    }
+
+    tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
+
+    user = target_win_users.user_details.find(username="John")
+    tab_dir = user.home_path.joinpath(
+        "AppData/Local/Packages/Microsoft.WindowsNotepad_8wekyb3d8bbwe/LocalState/TabState"
+    )
+
+    fs_win.map_dir("Users\\John", tmp_path)
+
+    for file in file_text_map.keys():
+        tab_file = str(tab_dir.joinpath(file))[3:]
+        fs_win.map_file(tab_file, os.path.join(tabcache, file))
+
+    target_win.add_plugin(WindowsNotepadPlugin)
+
+    records = list(target_win.windowsnotepad.tabs(include_deleted_content=False))
+
+    # Check the amount of files
+    assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
+    assert len(records) == len(file_text_map.keys())
+
+    # The recovered content in the records should match the original data, as well as the length and all the
+    # other saved metadata
+    for rec in records:
+        assert len(rec.content) == len(file_text_map[rec.path.name][0])
+        assert rec.content == file_text_map[rec.path.name][0]
+        assert rec.saved_path == file_text_map[rec.path.name][1]
+        assert rec.modification_time == file_text_map[rec.path.name][2]
+        assert rec.sha256 == file_text_map[rec.path.name][3]
