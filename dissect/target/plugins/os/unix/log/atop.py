@@ -269,7 +269,9 @@ class AtopPlugin(Plugin):
         References:
             - https://diablohorn.com/2022/11/17/parsing-atop-files-with-python-dissect-cstruct/
 
-        Yields AtopRecord with fields::
+        Yields AtopRecord with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             process (string): The process name.

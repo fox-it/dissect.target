@@ -124,7 +124,9 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         """Parse Windows Eventlog files (*.evt).
 
         Yields dynamically created records based on the fields in the event.
-        At least contains the following fields::
+        At least contains the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

@@ -131,7 +131,9 @@ class FirefoxPlugin(BrowserPlugin):
     def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records from Firefox.
 
-        Yields BrowserHistoryRecord with the following fields::
+        Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
 
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
@@ -193,7 +195,9 @@ class FirefoxPlugin(BrowserPlugin):
         Args:
             browser_name: The name of the browser as a string.
 
-        Yields::
+        Yields:
+
+        .. code-block:: text
 
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
@@ -233,7 +237,9 @@ class FirefoxPlugin(BrowserPlugin):
     def downloads(self) -> Iterator[BrowserDownloadRecord]:
         """Return browser download records from Firefox.
 
-        Yields BrowserDownloadRecord with the following fields::
+        Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
 
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.

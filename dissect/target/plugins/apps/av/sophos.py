@@ -55,7 +55,9 @@ class SophosPlugin(Plugin):
     def hitmanlogs(self) -> Iterator[HitmanAlertRecord]:
         """Return alert log records from Sophos Hitman Pro/Alert.
 
-        Yields HitmanAlertRecord with the following fields::
+        Yields HitmanAlertRecord with the following fields:
+
+        .. code-block:: text
 
             ts (datetime): Timestamp.
             alert (string): Type of Alert.
@@ -85,7 +87,8 @@ class SophosPlugin(Plugin):
     def sophoshomelogs(self) -> Iterator[SophosLogRecord]:
         """Return log history records from Sophos Home.
 
-        Yields SophosLogRecord with the following fields::
+        Yields SophosLogRecord with the following fields:
+        .. code-block:: text
 
             ts (datetime): Timestamp.
             description (string): Short description of the alert.

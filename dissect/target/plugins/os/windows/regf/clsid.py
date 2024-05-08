@@ -54,7 +54,9 @@ class CLSIDPlugin(Plugin):
         """Iterate all CLSID keys from HKEY_CURRENT_USER\\Software\\Classes\\CLSID and
         HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID.
 
-        Yields CLSIDRecords with fields::
+        Yields CLSIDRecords with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

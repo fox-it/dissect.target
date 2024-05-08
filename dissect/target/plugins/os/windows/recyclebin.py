@@ -65,7 +65,9 @@ class RecyclebinPlugin(Plugin):
         """
         Return files located in the recycle bin ($Recycle.Bin).
 
-        Yields RecycleBinRecords with fields::
+        Yields RecycleBinRecords with fields:
+
+        .. code-block:: text
 
           hostname (string): The target hostname
           domain (string): The target domain

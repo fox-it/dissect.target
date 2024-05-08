@@ -154,7 +154,9 @@ class WindowsErrorReportingPlugin(Plugin):
             - https://medium.com/dfir-dudes/amcache-is-not-alone-using-wer-files-to-hunt-evil-86bdfdb216d7
 
         Yields dynamically created records based on the fields in the files. A record at least contains the following
-        fields::
+        fields:
+
+        .. code-block:: text
 
             ts (datetime): The moment in time when the error event took place.
             version (string): WER file version.

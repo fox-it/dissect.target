@@ -76,7 +76,9 @@ class ActivitiesCachePlugin(Plugin):
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ActivitiesCacheDatabase.html
             - https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
 
-        Yields ActivitiesCacheRecords with the following fields::
+        Yields ActivitiesCacheRecords with the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

@@ -92,7 +92,9 @@ class UsbPlugin(Plugin):
         Use the registry to find information about USB devices that have been attached to the system, for example the
         HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR registry key.
 
-        Yields UsbRegistryRecord with fields::
+        Yields UsbRegistryRecord with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname
             domain (string): The target domain

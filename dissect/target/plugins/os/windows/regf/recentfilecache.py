@@ -44,7 +44,9 @@ class RecentFileCachePlugin(Plugin):
     def recentfilecache(self):
         """Parse RecentFileCache.bcf.
 
-        Yields RecentFileCacheRecords with fields::
+        Yields RecentFileCacheRecords with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

@@ -355,7 +355,9 @@ class SamPlugin(Plugin):
         References:
             - https://en.wikipedia.org/wiki/Security_Account_Manager
 
-        Yields SamRecords with fields::
+        Yields SamRecords with fields:
+
+        .. code-block:: text
 
             rid (uint32): The RID.
             fullname (string): Parsed fullname.

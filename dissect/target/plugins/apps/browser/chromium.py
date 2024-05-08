@@ -148,6 +148,9 @@ class ChromiumMixin:
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts (datetime): Visit timestamp.
                 browser (string): The browser from which the records are generated from.
@@ -208,7 +211,9 @@ class ChromiumMixin:
         Args:
             browser_name: The name of the browser as a string.
 
-        Yields::
+        Yields:
+
+        .. code-block:: text
 
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
@@ -284,7 +289,9 @@ class ChromiumMixin:
         Args:
             browser_name: The name of the browser as a string.
 
-        Yields::
+        Yields:
+
+        .. code-block:: text
 
             Records with the following fields:
                 ts_start (datetime): Download start timestamp.
@@ -345,7 +352,9 @@ class ChromiumMixin:
         Args:
             browser_name (str): Name of the browser to scan for extensions.
 
-        Yields::
+        Yields:
+
+        .. code-block:: text
 
             Records with the following fields:
                 ts_install (datetime): Extension install timestamp.

@@ -48,7 +48,9 @@ class RegfPlugin(Plugin):
 
         Yields RegistryKeyRecords and RegistryValueRecords
 
-        RegistryKeyRecord fields::
+        RegistryKeyRecord fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.
@@ -57,7 +59,9 @@ class RegfPlugin(Plugin):
             key (string): The key name.
             source (string): The hive file path.
 
-        RegistryValueRecord fields::
+        RegistryValueRecord fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

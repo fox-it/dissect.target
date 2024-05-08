@@ -85,7 +85,9 @@ class AppxDebugKeysPlugin(Plugin):
         References:
             - https://oddvar.moe/2018/09/06/persistence-using-universal-windows-platform-apps-appx/
 
-        Yields AppXDebugKeyRecords with fields::
+        Yields AppXDebugKeyRecords with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

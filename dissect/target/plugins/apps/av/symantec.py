@@ -292,7 +292,9 @@ class SymantecPlugin(Plugin):
     def logs(self) -> Iterator[SEPLogRecord]:
         """Return log records.
 
-        Yields SEPLogRecord with the following fields::
+        Yields SEPLogRecord with the following fields:
+
+        .. code-block:: text
 
             ts (datetime): Timestamp associated with the event.
             virus (string): Name of the virus.
@@ -326,7 +328,9 @@ class SymantecPlugin(Plugin):
     def firewall(self) -> Iterator[SEPFirewallRecord]:
         """Return log firewall records.
 
-        Yields SEPFirewallRecord with the following fields::
+        Yields SEPFirewallRecord with the following fields:
+
+        .. code-block:: text
 
             ts (datetime): Timestamp associated with the event.
             protocol (string): Protocol name associated with the firewall record.

@@ -104,7 +104,9 @@ class CatrootPlugin(Plugin):
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
-        Yields CatrootRecords with the following fields::
+        Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.
@@ -210,7 +212,9 @@ class CatrootPlugin(Plugin):
             - https://www.thewindowsclub.com/catroot-catroot2-folder-reset-windows
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
-        Yields CatrootRecords with the following fields::
+        Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

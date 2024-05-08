@@ -70,7 +70,9 @@ class McAfeePlugin(Plugin):
     def msc(self) -> Iterator[McAfeeMscLogRecord]:
         """Return msc log history records from McAfee.
 
-        Yields McAfeeMscLogRecord with the following fields::
+        Yields McAfeeMscLogRecord with the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

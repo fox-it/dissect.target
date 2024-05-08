@@ -40,7 +40,9 @@ class BamDamPlugin(Plugin):
     def bam(self):
         """Parse bam and dam registry keys.
 
-        Yields BamDamRecords with fields::
+        Yields BamDamRecords with fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.

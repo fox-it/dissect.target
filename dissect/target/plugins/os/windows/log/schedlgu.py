@@ -129,7 +129,9 @@ class SchedLgUPlugin(Plugin):
 
         Adversaries may use malicious ``.job`` files to gain persistence on a system.
 
-        Yields SchedLgURecord with fields::
+        Yields SchedLgURecord with fields:
+
+        .. code-block:: text
 
             ts (datetime): The timestamp of the event.
             job (str): The name of the ``.job`` file.

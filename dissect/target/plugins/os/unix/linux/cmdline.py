@@ -28,7 +28,9 @@ class CmdlinePlugin(Plugin):
 
         Think of this output as the command line that the process wants you to see.
 
-        Yields CmdlineRecord with the following fields::
+        Yields CmdlineRecord with the following fields:
+
+        .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.
