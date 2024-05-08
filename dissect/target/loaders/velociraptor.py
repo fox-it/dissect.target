@@ -77,9 +77,6 @@ class VelociraptorLoader(DirLoader):
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
 
-    The names of the filesystem entries collected by Velociraptor are URL-encoded, which are decoded by the ZIP loader
-    in order to prevent errors when executing plugins.
-
     References:
         - https://www.rapid7.com/products/velociraptor/
         - https://docs.velociraptor.app/
@@ -97,6 +94,8 @@ class VelociraptorLoader(DirLoader):
                     f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
                     "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
                 )
+        else:
+            self.root = path
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -111,15 +110,19 @@ class VelociraptorLoader(DirLoader):
         if path.suffix == ".zip":  # novermin
             path = zipfile.Path(path)
 
-            if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
-                _, dirs = find_fs_directories(path)
-                return bool(dirs)
+        if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
+            _, dirs = find_fs_directories(path)
+            return bool(dirs)
 
         return False
 
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
         if os_type == OperatingSystem.WINDOWS:
-            map_dirs(target, dirs, os_type, decode_name=True)
+            if self.path.suffix == ".zip":
+                map_dirs(target, dirs, os_type, decode_name=True)
+            else:
+                # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
+                map_dirs(target, dirs, os_type, usnjrnl_path="$Extend/$UsnJrnl%3A$J", sds_path="$Secure%3A$SDS")
         else:
             map_dirs(target, dirs, os_type, decode_name=True)
