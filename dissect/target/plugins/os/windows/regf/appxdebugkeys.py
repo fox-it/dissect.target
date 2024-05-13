@@ -95,7 +95,7 @@ class AppxDebugKeysPlugin(Plugin):
             name (string): The AppX debug key name.
             debug_info (string): The AppX debug info.
             regf_hive_path (string): The hive file that contains the registry key.
-            regf_key_path (string): The key\'s full path in the registry.
+            regf_key_path (string): The key's full path in the registry.
             username (string): The name of the user this key belongs to.
             user_id (string): The id of the user this key belongs to.
             user_group (string): The group of the user this key belongs to.

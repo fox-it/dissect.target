@@ -88,6 +88,7 @@ class SophosPlugin(Plugin):
         """Return log history records from Sophos Home.
 
         Yields SophosLogRecord with the following fields:
+
         .. code-block:: text
 
             ts (datetime): Timestamp.
