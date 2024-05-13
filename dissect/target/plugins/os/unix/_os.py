@@ -149,7 +149,7 @@ class UnixPlugin(OSPlugin):
             paths (list): list of paths
         """
         redhat_legacy_path = "/etc/sysconfig/network"
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", redhat_legacy_path]
+        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/proc/sys/kernel/hostname", redhat_legacy_path]
         hostname_dict = {"hostname": None, "domain": None}
 
         for path in paths:
