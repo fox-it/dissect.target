@@ -113,6 +113,7 @@ class TargetCmd(cmd.Cmd):
     def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
+        self.debug = False
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -278,6 +279,14 @@ class TargetCmd(cmd.Cmd):
     def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
         return True
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -1241,7 +1250,12 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
             pass
         except Exception as e:
-            log.exception(e)
+            if cli.debug:
+                log.exception(e)
+            else:
+                log.info(e)
+                print(f"*** Unhandled error: {e}")
+                print("If you wish to see the full debug trace, enable debug mode.")
             pass
 
 
