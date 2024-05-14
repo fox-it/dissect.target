@@ -3,7 +3,7 @@ from unittest.mock import Mock, mock_open, patch
 
 import pytest
 from flow.record import Record
-from flow.record.fieldtypes import digest, path
+from flow.record.fieldtypes import command, digest, path
 
 from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, IsADirectoryError
@@ -32,6 +32,7 @@ def resolve_function() -> ModifierFunc:
         ({"name": path}, 2),
         ({"name": path, "test": path}, 3),
         ({"name": path, "test": str}, 2),
+        ({"name": command}, 2),
     ],
 )
 @patch("flow.record.Record")
