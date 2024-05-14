@@ -4,7 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional, Union
 
-from Crypto.PublicKey import ECC, RSA
+try:
+    from Crypto.PublicKey import ECC, RSA
+
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
 from flow.record.fieldtypes import posix_path, windows_path
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
@@ -225,6 +231,9 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
         - https://pycryptodome.readthedocs.io/en/latest/src/public_key/ecc.html
         - https://github.com/mkorthof/reg2kh
     """
+    if not HAS_CRYPTO:
+        log.warning("Could not reconstruct public key: missing pycryptodome dependency")
+        return iv
 
     if not isinstance(key_type, str) or not isinstance(iv, str):
         raise ValueError("Invalid key_type or iv")
