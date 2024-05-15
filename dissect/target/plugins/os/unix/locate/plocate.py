@@ -136,9 +136,9 @@ class PLocateFile:
         else:
             reader = self.ctx.stream_reader(self.buf)
 
-        # NOTE: The end of a zstandard frame does not include a final 0x00.
-        # This causes the plocate `file` struct to parse the last and the first path on the next frame as one path.
-        # Since it will read across the frame boundary. We take a less optimal approach to avoid this issue.
+        # NOTE: The end of a zstandard frame does not include a final `0x00`.
+        # This causes the c_plocate `file` struct to parse the last path, and the first path on the next frame as one,
+        # since cstruct will read it across frame boundaries waiting for a `0x00`.
         while chunk := reader.read(DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE):
             for path in chunk.split(b"\x00"):
                 yield path.decode(errors="surrogateescape")
