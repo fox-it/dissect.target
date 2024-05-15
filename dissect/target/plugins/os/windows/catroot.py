@@ -1,13 +1,19 @@
 from typing import Iterator, Optional
 
-from asn1crypto.cms import ContentInfo
-from asn1crypto.core import Sequence
 from dissect.esedb import EseDB
 from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+try:
+    from asn1crypto.cms import ContentInfo
+    from asn1crypto.core import Sequence
+
+    HAS_ASN1 = True
+except ImportError:
+    HAS_ASN1 = False
 
 HINT_NEEDLE = b"\x1e\x08\x00H\x00i\x00n\x00t"
 PACKAGE_NAME_NEEDLE = b"\x06\n+\x06\x01\x04\x01\x827\x0c\x02\x01"
@@ -77,6 +83,9 @@ class CatrootPlugin(Plugin):
         self.catroot2_dir = self.target.fs.path("sysvol/windows/system32/catroot2")
 
     def check_compatible(self) -> None:
+        if not HAS_ASN1:
+            raise UnsupportedPluginError("Missing asn1crypto dependency")
+
         if next(self.catroot2_dir.rglob("catdb"), None) is None and next(self.catroot_dir.rglob("*.cat"), None) is None:
             raise UnsupportedPluginError("No catroot files or catroot ESE databases found")
 

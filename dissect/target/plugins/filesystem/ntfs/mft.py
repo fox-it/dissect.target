@@ -154,7 +154,7 @@ class MftPlugin(Plugin):
                     try:
                         inuse = bool(record.header.Flags & FILE_RECORD_SEGMENT_IN_USE)
                         owner, _ = get_owner_and_group(record, fs)
-                        resident = None
+                        resident = False
                         size = None
 
                         if not record.is_dir():

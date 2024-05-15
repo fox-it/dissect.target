@@ -61,6 +61,10 @@ def extract_drive_letter(name: str) -> Optional[str]:
     if len(name) == 14 and name.startswith("%5C%5C.%5C") and name.endswith("%3A"):
         return name[10].lower()
 
+    # X: in URL encoding
+    if len(name) == 4 and name.endswith("%3A"):
+        return name[0].lower()
+
 
 class VelociraptorLoader(DirLoader):
     """Load Rapid7 Velociraptor forensic image files.
@@ -71,10 +75,7 @@ class VelociraptorLoader(DirLoader):
         {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
-    ntfs_vss and auto. The loader only supports a collection where a single accessor is used, which can be forced by
-    using the following configuration::
-
-        {"Windows.KapeFiles.Targets":{"VSSAnalysisAge":"1000","_SANS_Triage":"Y"}}
+    ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
 
     References:
         - https://www.rapid7.com/products/velociraptor/
