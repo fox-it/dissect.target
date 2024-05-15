@@ -22,8 +22,8 @@ log = logging.getLogger(__name__)
 PROXMOX_PACKAGE_NAME="proxmox-ve"
 FILETREE_TABLE_NAME="tree"
 PMXCFS_DATABASE_PATH="/var/lib/pve-cluster/config.db"
-# TODO: Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
-VM_CONFIG_PATH="/etc/pve/qemu-server"
+# VM_CONFIG_PATH="/etc/pve/qemu-server" # TODO: Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
+VM_CONFIG_PATH="/etc/pve/" # TODO: properly implement pmxcfs creation and revert to propper path
 
 
 VirtualMachineRecord = TargetRecordDescriptor(
@@ -71,10 +71,11 @@ class ProxmoxPlugin(LinuxPlugin):
     def vm_list(self) -> Iterator[VirtualMachineRecord]:
         configs = self.target.fs.path(VM_CONFIG_PATH)
         for config in configs.iterdir():
-            yield VirtualMachineRecord(
-                id=pathlib.Path(config).stem,
-                config_path=config,
-            )
+            if pathlib.Path(config).suffix == ".conf": # TODO: Remove if statement once pmxcfs is propperly implemented
+                yield VirtualMachineRecord(
+                    id=pathlib.Path(config).stem,
+                    config_path=config,
+                )
 
 def _create_pmxcfs(fh) -> VirtualFilesystem:
     db = sqlite3.SQLite3(fh)
@@ -94,7 +95,7 @@ def _create_pmxcfs(fh) -> VirtualFilesystem:
         else:
             entry_chain = _get_entry_parent_chain(fs_entries, entry)
             path = _create_fs_path(entry_chain)
-            vfs.map_file_fh(f"/{path}", BytesIO(content or b""))
+            vfs.map_file_fh(f"{path}", BytesIO(content or b"")) # TODO: revert root (/) on string once pmxcfs has been propperly implemented
 
     return  vfs
 
