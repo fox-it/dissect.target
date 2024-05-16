@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import atexit
 import logging
+import math
+import os
 import ssl
+import sys
 import time
 import urllib
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from struct import pack, unpack_from
+from threading import Thread
 from typing import Any, Callable, Iterator, Optional, Union
 
 import paho.mqtt.client as mqtt
@@ -62,12 +67,79 @@ class MQTTStream(AlignedStream):
         return data
 
 
+class MQTTDiagnosticLine:
+    def __init__(self, connection: MQTTConnection, total_peers: int):
+        self.connection = connection
+        self.total_peers = total_peers
+        self._columns, self._rows = os.get_terminal_size(0)
+        atexit.register(self._detach)
+        self._attach()
+
+    def _attach(self) -> None:
+        sys.stderr.write(f"\0337\033[r\0338\033D\033M\0337\033[1;{self._rows - 1}r\0338")
+
+    def _detach(self) -> None:
+        sys.stderr.write(f"\0337\033[{self._rows};1H\033[K\033[r\0338")
+        sys.stderr.flush()
+
+    def display(self) -> None:
+        prefix = "\x1b[44m\x1b[37m\r"
+        suffix = "\x1b[0m"
+        separator = "\x1b[41m\x1b[1m"
+        logo = "TARGETD"
+        start = time.time()
+        t2 = start
+        mark = start
+        _bytes = 0
+        subtract = 0
+        while True:
+            time.sleep(0.05)
+            peers = "?"
+            try:
+                peers = len(self.connection.broker.peers(self.connection.host))
+            except Exception:
+                pass
+            total = self.total_peers
+            recv = self.connection.broker.bytes_received
+            now = time.time()
+
+            # to avoid endless countdowns if no data is transferred in reality anymore.
+            if (now - mark) > 3 and not _bytes:
+                _bytes = recv
+                t2 = now
+            if (now - mark) > 9 and _bytes:
+                subtract = _bytes
+                _bytes = 0
+                mark = t2
+
+            recv -= subtract
+            failures = self.connection.retries
+            transfer = (recv / (now - mark)) / 1000
+            seconds_elapsed = round(now - start) % 60
+            minutes_elapsed = math.floor(seconds_elapsed / 60) % 60
+            hours_elapsed = math.floor(minutes_elapsed / 60)
+            timer = f"{hours_elapsed:02d}:{minutes_elapsed:02d}:{seconds_elapsed:02d}"
+            display = f"{timer} {peers}/{total} peers {transfer:>8.2f} KB p/s {failures:>4} failures"
+            rest = self._columns - len(display)
+            padding = (rest - len(logo) - 1) * " "
+            sys.stderr.write(f"\0337\033[{self._rows};1H\033[?7l\033[0m")
+            sys.stderr.write(prefix + display + padding + separator + logo + suffix)
+            sys.stderr.write("\033[?7h\0338")
+            sys.stderr.flush()
+
+    def start(self) -> None:
+        t = Thread(target=self.display)
+        t.daemon = True
+        t.start()
+
+
 class MQTTConnection:
     broker = None
     host = None
     prev = -1
     factor = 1
     prefetch_factor_inc = 10
+    retries = 0
 
     def __init__(self, broker: Broker, host: str):
         self.broker = broker
@@ -125,6 +197,7 @@ class MQTTConnection:
                 # message might have not reached agent, resend...
                 self.broker.seek(self.host, disk_id, offset, flength, optimization_strategy)
                 attempts = 0
+                self.retries += 1
 
         return message.data
 
@@ -138,6 +211,7 @@ class Broker:
     mqtt_client = None
     connected = False
     case = None
+    bytes_received = 0
 
     diskinfo = {}
     index = {}
@@ -217,6 +291,8 @@ class Broker:
         if casename != self.case:
             return
 
+        self.bytes_received += sys.getsizeof(msg.payload)
+
         if response == "DISKS":
             self._on_disk(hostname, msg.payload)
         elif response == "READ":
@@ -238,9 +314,12 @@ class Broker:
         self.mqtt_client.publish(f"{self.case}/{host}/INFO")
 
     def topology(self, host: str) -> None:
-        self.topo[host] = []
+        if host not in self.topo:
+            self.topo[host] = []
         self.mqtt_client.subscribe(f"{self.case}/{host}/ID")
         time.sleep(1)  # need some time to avoid race condition, i.e. MQTT might react too fast
+        # send a simple clear command (invalid, just clears the prev. msg) just in case TOPO is stale
+        self.mqtt_client.publish(f"{self.case}/{host}/CLR")
         self.mqtt_client.publish(f"{self.case}/{host}/TOPO")
 
     def connect(self) -> None:
@@ -272,6 +351,7 @@ class Broker:
 @arg("--mqtt-crt", dest="crt", help="client certificate file")
 @arg("--mqtt-ca", dest="ca", help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
+@arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
@@ -292,6 +372,7 @@ class MQTTLoader(Loader):
     def find_all(path: Path, **kwargs) -> Iterator[str]:
         cls = MQTTLoader
         num_peers = 1
+
         if cls.broker is None:
             if (uri := kwargs.get("parsed_path")) is None:
                 raise LoaderError("No URI connection details have been passed.")
@@ -299,8 +380,12 @@ class MQTTLoader(Loader):
             cls.broker = Broker(**options)
             cls.broker.connect()
             num_peers = int(options.get("peers", 1))
+            cls.connection = MQTTConnection(cls.broker, path)
+            if options.get("diag", None):
+                MQTTDiagnosticLine(cls.connection, num_peers).start()
+        else:
+            cls.connection = MQTTConnection(cls.broker, path)
 
-        cls.connection = MQTTConnection(cls.broker, path)
         cls.peers = cls.connection.topo(num_peers)
         yield from cls.peers
 
