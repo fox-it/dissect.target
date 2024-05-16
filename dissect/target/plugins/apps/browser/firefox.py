@@ -324,7 +324,10 @@ class FirefoxPlugin(BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Firefox.
 
-        Yields BrowserExtensionRecord with the following fields::
+        Yields BrowserExtensionRecord with the following fields:
+
+        .. code-block:: text
+
             ts_install (datetime): Extension install timestamp.
             ts_update (datetime): Extension update timestamp.
             browser (string): The browser from which the records are generated.
