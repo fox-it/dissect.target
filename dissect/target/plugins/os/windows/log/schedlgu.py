@@ -134,7 +134,7 @@ class SchedLgUPlugin(Plugin):
         .. code-block:: text
 
             ts (datetime): The timestamp of the event.
-            job (str): The name of the ``.job`` file.
+            job (str): The name of the .job file.
             command (str): The command executed.
             status (str): The status of the event (finished, completed, exited, stopped).
             exit_code (int): The exit code of the event.
