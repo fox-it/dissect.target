@@ -72,6 +72,9 @@ class UserAssistPlugin(Plugin):
             - https://www.aldeid.com/wiki/Windows-userassist-keys
 
         Yields UserAssistRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The entry timestamp.
