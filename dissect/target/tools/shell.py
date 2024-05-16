@@ -180,25 +180,22 @@ class TargetCmd(cmd.Cmd):
             lexer.whitespace_split = True
             argparts = list(lexer)
 
-        try:
-            if "|" in argparts:
-                pipeidx = argparts.index("|")
-                argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
-                try:
-                    with build_pipe_stdout(pipeparts) as pipe_stdin:
-                        return func(argparts, pipe_stdin)
-                except OSError as e:
-                    # in case of a failure in a subprocess
-                    print(e)
-            else:
-                ctx = contextlib.nullcontext()
-                if self.target.props.get("cyber") and not no_cyber:
-                    ctx = cyber.cyber(color=None, run_at_end=True)
+        if "|" in argparts:
+            pipeidx = argparts.index("|")
+            argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
+            try:
+                with build_pipe_stdout(pipeparts) as pipe_stdin:
+                    return func(argparts, pipe_stdin)
+            except OSError as e:
+                # in case of a failure in a subprocess
+                print(e)
+        else:
+            ctx = contextlib.nullcontext()
+            if self.target.props.get("cyber") and not no_cyber:
+                ctx = cyber.cyber(color=None, run_at_end=True)
 
-                with ctx:
-                    return func(argparts, sys.stdout)
-        except IOError:
-            pass
+            with ctx:
+                return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> Optional[bool]:
         """Command execution helper for ``cmd_`` commands."""
