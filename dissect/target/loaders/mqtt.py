@@ -212,6 +212,7 @@ class Broker:
     connected = False
     case = None
     bytes_received = 0
+    monitor = False
 
     diskinfo = {}
     index = {}
@@ -291,7 +292,8 @@ class Broker:
         if casename != self.case:
             return
 
-        self.bytes_received += sys.getsizeof(msg.payload)
+        if self.monitor:
+            self.bytes_received += len(msg.payload)
 
         if response == "DISKS":
             self._on_disk(hostname, msg.payload)
@@ -382,6 +384,7 @@ class MQTTLoader(Loader):
             num_peers = int(options.get("peers", 1))
             cls.connection = MQTTConnection(cls.broker, path)
             if options.get("diag", None):
+                cls.broker.monitor = True
                 MQTTDiagnosticLine(cls.connection, num_peers).start()
         else:
             cls.connection = MQTTConnection(cls.broker, path)
