@@ -71,6 +71,9 @@ class TrendMicroPlugin(Plugin):
         """Return Trend Micro Worry-free log history records.
 
         Yields TrendMicroWFLogRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.
@@ -94,6 +97,9 @@ class TrendMicroPlugin(Plugin):
         """Return Trend Micro Worry-free firewall log history records.
 
         Yields TrendMicroWFFirewallRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.

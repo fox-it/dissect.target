@@ -105,6 +105,9 @@ class CatrootPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
         Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             digest (digest): The parsed digest.
@@ -210,6 +213,9 @@ class CatrootPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
         Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             digest (digest): The parsed digest.

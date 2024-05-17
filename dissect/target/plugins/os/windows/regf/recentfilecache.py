@@ -45,6 +45,9 @@ class RecentFileCachePlugin(Plugin):
         """Parse RecentFileCache.bcf.
 
         Yields RecentFileCacheRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             path (uri): The parsed path.
