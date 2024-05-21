@@ -1,6 +1,7 @@
 from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from tests._utils import absolute_path
+from tests.plugins.os.windows.test__os import map_version_value
 
 SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
 POLICY_KEY_PATH = "SECURITY\\Policy\\PolEKList"
@@ -34,6 +35,8 @@ def test_dpapi_decrypt_blob(target_win_users, fs_win, hive_hklm):
         "Windows/System32/Microsoft/Protect/S-1-5-18/d8ef5e00-328a-4919-9ab6-c058f493a6e3",
         absolute_path("_data/plugins/os/windows/dpapi/master_keys/d8ef5e00-328a-4919-9ab6-c058f493a6e3"),
     )
+
+    map_version_value(target_win_users, "CurrentVersion", 10.0)
 
     target_win_users.add_plugin(DPAPIPlugin)
 
