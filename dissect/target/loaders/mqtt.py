@@ -56,6 +56,34 @@ class SeekMessage:
     data: bytes = b""
 
 
+class MQTTTransferRatePerSecond:
+    def __init__(self, window_size: int = 10):
+        self.window_size = window_size
+        self.timestamps = []
+        self.bytes = []
+
+    def record(self, timestamp: float, byte_count: int) -> MQTTTransferRatePerSecond:
+        while self.timestamps and (timestamp - self.timestamps[0] > self.window_size):
+            self.timestamps.pop(0)
+            self.bytes.pop(0)
+
+        self.timestamps.append(timestamp)
+        self.bytes.append(byte_count)
+        return self
+
+    def value(self, current_time: float) -> float:
+        if not self.timestamps:
+            return 0
+
+        elapsed_time = current_time - self.timestamps[0]
+        if elapsed_time == 0:
+            return 0
+
+        total_bytes = self.bytes[-1] - self.bytes[0]
+
+        return total_bytes / elapsed_time
+
+
 class MQTTStream(AlignedStream):
     def __init__(self, stream: MQTTConnection, disk_id: int, size: Optional[int] = None):
         self.stream = stream
@@ -76,24 +104,48 @@ class MQTTDiagnosticLine:
         self._attach()
 
     def _attach(self) -> None:
-        sys.stderr.write(f"\0337\033[r\0338\033D\033M\0337\033[1;{self._rows - 1}r\0338")
+        # save cursor position
+        sys.stderr.write("\0337")
+        # set top and bottom margins of the scrolling region to default
+        sys.stderr.write("\033[r")
+        # restore cursor position
+        sys.stderr.write("\0338")
+        # move cursor down one line in the same column; if at the bottom, the screen scrolls up
+        sys.stderr.write("\033D")
+        # move cursor up one line in the same column; if at the top, screen scrolls down
+        sys.stderr.write("\033M")
+        # save cursor position again
+        sys.stderr.write("\0337")
+        # restrict scrolling to a region from the first line to one before the last line
+        sys.stderr.write(f"\033[1;{self._rows - 1}r")
+        # restore cursor position after setting scrolling region
+        sys.stderr.write("\0338")
 
     def _detach(self) -> None:
-        sys.stderr.write(f"\0337\033[{self._rows};1H\033[K\033[r\0338")
+        # save cursor position
+        sys.stderr.write("\0337")
+        # move cursor to the specified position (last line, first column)
+        sys.stderr.write(f"\033[{self._rows};1H")
+        # clear from cursor to end of the line
+        sys.stderr.write("\033[K")
+        # reset scrolling region to include the entire display
+        sys.stderr.write("\033[r")
+        # restore cursor position
+        sys.stderr.write("\0338")
+        # ensure the written content is displayed (flush output)
         sys.stderr.flush()
 
     def display(self) -> None:
+        # prepare: set background color to blue and text color to white at the beginning of the line
         prefix = "\x1b[44m\x1b[37m\r"
+        # reset all attributes (colors, styles) to their defaults afterwards
         suffix = "\x1b[0m"
+        # separator to set background color to red and text style to bold
         separator = "\x1b[41m\x1b[1m"
         logo = "TARGETD"
 
         start = time.time()
-        t2 = start
-        mark = start
-
-        _bytes = 0
-        subtract = 0
+        transfer_rate = MQTTTransferRatePerSecond(window_size=7)
 
         while True:
             time.sleep(0.05)
@@ -102,31 +154,34 @@ class MQTTDiagnosticLine:
                 peers = len(self.connection.broker.peers(self.connection.host))
             except Exception:
                 pass
+
             recv = self.connection.broker.bytes_received
             now = time.time()
-
-            # to avoid endless countdowns if no data is transferred in reality anymore.
-            if (now - mark) > 3 and not _bytes:
-                _bytes = recv
-                t2 = now
-            if (now - mark) > 9 and _bytes:
-                subtract = _bytes
-                _bytes = 0
-                mark = t2
-
-            recv -= subtract
+            transfer = transfer_rate.record(now, recv).value(now) / 1000  # convert to KB/s
             failures = self.connection.retries
-            transfer = (recv / (now - mark)) / 1000
             seconds_elapsed = round(now - start) % 60
             minutes_elapsed = math.floor(seconds_elapsed / 60) % 60
             hours_elapsed = math.floor(minutes_elapsed / 60)
             timer = f"{hours_elapsed:02d}:{minutes_elapsed:02d}:{seconds_elapsed:02d}"
             display = f"{timer} {peers}/{self.total_peers} peers {transfer:>8.2f} KB p/s {failures:>4} failures"
             rest = self._columns - len(display)
-            padding = (rest - len(logo) - 1) * " "
-            sys.stderr.write(f"\0337\033[{self._rows};1H\033[?7l\033[0m")
+            padding = (rest - len(logo)) * " "
+
+            # save cursor position
+            sys.stderr.write("\0337")
+            # move cursor to specified position (last line, first column)
+            sys.stderr.write(f"\033[{self._rows};1H")
+            # disable line wrapping
+            sys.stderr.write("\033[?7l")
+            # reset all attributes
+            sys.stderr.write("\033[0m")
+            # write the display line with prefix, calculated display content, padding, separator, and logo
             sys.stderr.write(prefix + display + padding + separator + logo + suffix)
-            sys.stderr.write("\033[?7h\0338")
+            # enable line wrapping again
+            sys.stderr.write("\033[?7h")
+            # restore cursor position
+            sys.stderr.write("\0338")
+            # flush output to ensure it is displayed
             sys.stderr.flush()
 
     def start(self) -> None:
