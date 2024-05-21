@@ -102,7 +102,6 @@ class MQTTDiagnosticLine:
                 peers = len(self.connection.broker.peers(self.connection.host))
             except Exception:
                 pass
-            total = self.total_peers
             recv = self.connection.broker.bytes_received
             now = time.time()
 
