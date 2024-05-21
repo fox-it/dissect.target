@@ -160,8 +160,8 @@ class MQTTDiagnosticLine:
             transfer = transfer_rate.record(now, recv).value(now) / 1000  # convert to KB/s
             failures = self.connection.retries
             seconds_elapsed = round(now - start) % 60
-            minutes_elapsed = math.floor(seconds_elapsed / 60) % 60
-            hours_elapsed = math.floor(minutes_elapsed / 60)
+            minutes_elapsed = math.floor((now - start) / 60) % 60
+            hours_elapsed = math.floor((now - start) / 60**2)
             timer = f"{hours_elapsed:02d}:{minutes_elapsed:02d}:{seconds_elapsed:02d}"
             display = f"{timer} {peers}/{self.total_peers} peers {transfer:>8.2f} KB p/s {failures:>4} failures"
             rest = self._columns - len(display)
