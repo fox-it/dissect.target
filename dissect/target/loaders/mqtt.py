@@ -119,7 +119,7 @@ class MQTTDiagnosticLine:
             minutes_elapsed = math.floor(seconds_elapsed / 60) % 60
             hours_elapsed = math.floor(minutes_elapsed / 60)
             timer = f"{hours_elapsed:02d}:{minutes_elapsed:02d}:{seconds_elapsed:02d}"
-            display = f"{timer} {peers}/{total} peers {transfer:>8.2f} KB p/s {failures:>4} failures"
+            display = f"{timer} {peers}/{self.total_peers} peers {transfer:>8.2f} KB p/s {failures:>4} failures"
             rest = self._columns - len(display)
             padding = (rest - len(logo) - 1) * " "
             sys.stderr.write(f"\0337\033[{self._rows};1H\033[?7l\033[0m")
