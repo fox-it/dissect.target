@@ -87,11 +87,14 @@ class MQTTDiagnosticLine:
         suffix = "\x1b[0m"
         separator = "\x1b[41m\x1b[1m"
         logo = "TARGETD"
+
         start = time.time()
         t2 = start
         mark = start
+
         _bytes = 0
         subtract = 0
+
         while True:
             time.sleep(0.05)
             peers = "?"
