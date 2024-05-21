@@ -210,7 +210,7 @@ struct SAM_HASH_AES {  /* size: >=24 */
 c_sam = cstruct().load(sam_def)
 
 SamRecord = TargetRecordDescriptor(
-    "windows/registry/sam",
+    "windows/credential/sam",
     [
         ("uint32", "rid"),
         ("string", "fullname"),
@@ -374,7 +374,7 @@ class SamPlugin(Plugin):
             nt (string): Parsed NT-hash.
         """
 
-        syskey = self.target.dpapi.syskey  # aka. bootkey
+        syskey = self.target.lsa.syskey  # aka. bootkey
         samkey = self.calculate_samkey(syskey)  # aka. hashed bootkey or hbootkey
 
         almpassword = b"LMPASSWORD\0"

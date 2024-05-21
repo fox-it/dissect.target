@@ -9,6 +9,7 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.plugins.apps.browser.chrome import ChromePlugin
 from tests._utils import absolute_path
+from tests.plugins.os.windows.test__os import map_version_value
 
 
 @pytest.fixture
@@ -162,6 +163,8 @@ def test_windows_chrome_passwords_dpapi(
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
     )
 
+    map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
+
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
     keychain.KEYCHAIN.clear()
@@ -187,6 +190,8 @@ def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: Vi
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
     )
+
+    map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 

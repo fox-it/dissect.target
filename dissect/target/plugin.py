@@ -970,7 +970,7 @@ class NamespacePlugin(Plugin):
                 continue
 
             # The method needs to output records
-            if getattr(subplugin_func, "__output__", None) != "record":
+            if getattr(subplugin_func, "__output__", None) not in ["record", "yield"]:
                 continue
 
             # The method may not be part of a parent class.
@@ -1054,6 +1054,10 @@ class NamespacePlugin(Plugin):
             cls.__init_subclass_subplugin__(cls, **kwargs)
         else:
             cls.__init_subclass_namespace__(cls, **kwargs)
+
+
+class InternalNamespacePlugin(NamespacePlugin):
+    pass
 
 
 class InternalPlugin(Plugin):

@@ -6,7 +6,7 @@ from dissect.target.helpers.regutil import VirtualKey
 try:
     from Crypto.Hash import MD4
 
-    from dissect.target.plugins.os.windows.sam import SamPlugin
+    from dissect.target.plugins.os.windows.credential.sam import SamPlugin
 
     HAS_CRYPTO = True
 except ImportError:
