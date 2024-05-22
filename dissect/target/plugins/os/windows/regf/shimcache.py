@@ -318,6 +318,9 @@ class ShimcachePlugin(Plugin):
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
 
         Yields ShimcacheRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             last_modified (datetime): The last modified date.
