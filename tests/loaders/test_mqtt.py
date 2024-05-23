@@ -44,6 +44,8 @@ class MQTTMock(MagicMock):
             begin = int(tokens[4], 16)
             end = int(tokens[5], 16)
             response.payload = self.disks[int(tokens[3])][begin : begin + end]
+        else:
+            return
         self.on_message(self, None, response)
 
 
