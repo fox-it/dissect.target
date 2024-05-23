@@ -1,18 +1,8 @@
-import hashlib
 import re
 from functools import cache, cached_property
 from pathlib import Path
 
-try:
-    from Crypto.Cipher import AES
-
-    HAS_CRYPTO = True
-except ImportError:
-    HAS_CRYPTO = False
-
-
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import keychain
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
@@ -23,10 +13,6 @@ class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
 
     MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
-
-    SECURITY_POLICY_KEY = "HKEY_LOCAL_MACHINE\\SECURITY\\Policy"
-    SYSTEM_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\LSA"
-
     SYSTEM_USERNAME = "System"
 
     def __init__(self, target: Target):
@@ -34,54 +20,11 @@ class DPAPIPlugin(InternalPlugin):
         self.keychain = cache(self.keychain)
 
     def check_compatible(self) -> None:
-        if not HAS_CRYPTO:
-            raise UnsupportedPluginError("Missing pycryptodome dependency")
-
-        if not list(self.target.registry.keys(self.SYSTEM_KEY)):
-            raise UnsupportedPluginError(f"Registry key not found: {self.SYSTEM_KEY}")
+        if not self.target.has_function("lsa"):
+            raise UnsupportedPluginError("Windows registry and LSA plugins are required for DPAPI decryption")
 
     def keychain(self) -> set:
-        passwords = set()
-
-        for key in keychain.get_keys_for_provider("user") + keychain.get_keys_without_provider():
-            if key.key_type == keychain.KeyType.PASSPHRASE:
-                passwords.add(key.value)
-
-        # It is possible to encrypt using an empty passphrase.
-        passwords.add("")
-        return passwords
-
-    @cached_property
-    def syskey(self) -> bytes:
-        lsa = self.target.registry.key(self.SYSTEM_KEY)
-        syskey_keys = ["JD", "Skew1", "GBG", "Data"]
-        # This magic value rotates the order of the data
-        alterator = [0x8, 0x5, 0x4, 0x2, 0xB, 0x9, 0xD, 0x3, 0x0, 0x6, 0x1, 0xC, 0xE, 0xA, 0xF, 0x7]
-
-        r = bytes.fromhex("".join([lsa.subkey(key).class_name for key in syskey_keys]))
-        return bytes(r[i] for i in alterator)
-
-    @cached_property
-    def lsakey(self) -> bytes:
-        policy_key = "PolEKList"
-
-        encrypted_key = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey(policy_key).value("(Default)").value
-
-        lsa_key = _decrypt_aes(encrypted_key, self.syskey)
-
-        return lsa_key[68:100]
-
-    @cached_property
-    def secrets(self) -> dict[str, bytes]:
-        result = {}
-
-        reg_secrets = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets")
-        for subkey in reg_secrets.subkeys():
-            enc_data = subkey.subkey("CurrVal").value("(Default)").value
-            secret = _decrypt_aes(enc_data, self.lsakey)
-            result[subkey.name] = secret
-
-        return result
+        return set(self.target.dpapi_keyprovider.keys())
 
     @cached_property
     def master_keys(self) -> dict[str, dict[str, MasterKeyFile]]:
@@ -97,11 +40,19 @@ class DPAPIPlugin(InternalPlugin):
             user_mks = self._load_master_keys_from_path(self.SYSTEM_USERNAME, dir)
             result[self.SYSTEM_USERNAME].update(user_mks)
 
+        PROTECT_DIRS = [
+            # Windows Vista and newer
+            "AppData/Roaming/Microsoft/Protect",
+            # Windows XP
+            "Application Data/Microsoft/Protect",
+        ]
+
         for user in self.target.user_details.all_with_home():
-            path = user.home_path.joinpath("AppData/Roaming/Microsoft/Protect").joinpath(user.user.sid)
-            user_mks = self._load_master_keys_from_path(user.user.name, path)
-            if user_mks:
-                result[user.user.name] = user_mks
+            for protect_dir in PROTECT_DIRS:
+                path = user.home_path.joinpath(protect_dir).joinpath(user.user.sid)
+                user_mks = self._load_master_keys_from_path(user.user.name, path)
+                if user_mks:
+                    result[user.user.name] = user_mks
 
         return result
 
@@ -119,8 +70,17 @@ class DPAPIPlugin(InternalPlugin):
                 with file.open() as fh:
                     mkf = MasterKeyFile(fh)
 
+                # Decrypt SYSTEM master key
                 if username == self.SYSTEM_USERNAME:
-                    dpapi_system = CredSystem(self.secrets["DPAPI_SYSTEM"][16:])
+                    # Windows XP
+                    if float(self.target._os._nt_version()) < 6.0:
+                        secret_offset = 8
+
+                    # Windows Vista and newer
+                    else:
+                        secret_offset = 16
+
+                    dpapi_system = CredSystem(self.target.lsa.secrets["DPAPI_SYSTEM"][secret_offset:])
 
                     if not mkf.decrypt_with_key(dpapi_system.machine_key):
                         mkf.decrypt_with_key(dpapi_system.user_key)
@@ -129,8 +89,9 @@ class DPAPIPlugin(InternalPlugin):
                     if not mkf.decrypted:
                         raise Exception("Failed to decrypt System master key")
 
+                # Decrypt user master key
                 if user := self._users.get(username):
-                    for mk_pass in self.keychain():
+                    for provider, mk_pass in self.keychain():
                         if mkf.decrypt_with_password(user["sid"], mk_pass):
                             break
 
@@ -173,22 +134,3 @@ class DPAPIPlugin(InternalPlugin):
                     return blob.clear_text
 
         raise ValueError("Failed to decrypt blob")
-
-
-def _decrypt_aes(data: bytes, key: bytes) -> bytes:
-    ctx = hashlib.sha256()
-    ctx.update(key)
-
-    tmp = data[28:60]
-    for _ in range(1, 1000 + 1):
-        ctx.update(tmp)
-
-    aeskey = ctx.digest()
-    iv = b"\x00" * 16
-
-    result = []
-    for i in range(60, len(data), 16):
-        cipher = AES.new(aeskey, AES.MODE_CBC, iv)
-        result.append(cipher.decrypt(data[i : i + 16].ljust(16, b"\x00")))
-
-    return b"".join(result)

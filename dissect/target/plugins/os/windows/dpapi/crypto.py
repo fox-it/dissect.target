@@ -5,7 +5,7 @@ import hmac
 from typing import Optional, Union
 
 try:
-    from Crypto.Cipher import AES, ARC4
+    from Crypto.Cipher import AES, ARC4, DES3
 
     HAS_CRYPTO = True
 except ImportError:
@@ -35,17 +35,23 @@ class CipherAlgorithm:
         return CIPHER_ALGORITHMS[name]()
 
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
-        """Mimics the corresponding native Microsoft function."""
+        """Mimics the corresponding native Microsoft function.
+
+        Resources:
+            - https://github.com/tijldeneut/DPAPIck3/blob/main/dpapick3/crypto.py#L185
+        """
         if len(key) > hash_algorithm.block_length:
             key = hashlib.new(hash_algorithm.name, key).digest()
 
-        if len(key) >= hash_algorithm.digest_length:
+        if len(key) >= self.key_length:
             return key
 
         key = key.ljust(hash_algorithm.block_length, b"\x00")
-        pad1 = bytes(c ^ 0x36 for c in key)
-        pad2 = bytes(c ^ 0x5C for c in key)
-        return hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
+        pad1 = bytes(c ^ 0x36 for c in key)[: hash_algorithm.block_length]
+        pad2 = bytes(c ^ 0x5C for c in key)[: hash_algorithm.block_length]
+        key = hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
+        key = self.fixup_key(key)
+        return key
 
     def decrypt_with_hmac(
         self, data: bytes, key: bytes, iv: bytes, hash_algorithm: HashAlgorithm, rounds: int
@@ -57,6 +63,9 @@ class CipherAlgorithm:
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
         raise NotImplementedError()
+
+    def fixup_key(self, key: bytes) -> bytes:
+        return key
 
 
 class _AES(CipherAlgorithm):
@@ -108,6 +117,37 @@ class _RC4(CipherAlgorithm):
         return cipher.decrypt(data)
 
 
+class _DES3(CipherAlgorithm):
+    id = 0x6603
+    name = "DES3"
+    key_length = 192 // 8
+    iv_length = 64 // 8
+    block_length = 64 // 8
+
+    def fixup_key(self, key: bytes) -> bytes:
+        nkey = bytearray()
+        for byte in key:
+            parity_bit = 0
+            for i in range(8):
+                parity_bit ^= (byte >> i) & 1
+
+            if parity_bit == 0:
+                nkey.append(byte)
+            else:
+                nkey.append(byte | 1)
+        return nkey
+
+    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+        if not HAS_CRYPTO:
+            raise RuntimeError("Missing pycryptodome dependency")
+
+        if len(key) != 24:
+            raise ValueError("invalid key length %s" % len(key))
+
+        cipher = DES3.new(key, mode=DES3.MODE_CBC, iv=iv if iv else b"\x00" * 8)
+        return cipher.decrypt(data)
+
+
 class HashAlgorithm:
     id: int
     name: str
@@ -148,7 +188,7 @@ class _HMAC(_SHA1):
 
 
 class _SHA256(HashAlgorithm):
-    id = 0x8004
+    id = 0x800C
     name = "sha256"
     digest_length = 256 // 8
     block_length = 512 // 8
