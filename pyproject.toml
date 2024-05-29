@@ -26,14 +26,14 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml",
-    "dissect.cstruct>=3.0.dev,<4.0.dev",
-    "dissect.eventlog>=3.0.dev,<4.0.dev",
-    "dissect.evidence>=3.0.dev,<4.0.dev",
-    "dissect.hypervisor>=3.0.dev,<4.0.dev",
-    "dissect.ntfs>=3.4.dev,<4.0.dev",
-    "dissect.regf>=3.3.dev,<4.0.dev",
-    "dissect.util>=3.0.dev,<4.0.dev",
-    "dissect.volume>=3.0.dev,<4.0.dev",
+    "dissect.cstruct>=4.dev,<5",
+    "dissect.eventlog>=3,<4",
+    "dissect.evidence>=3,<4",
+    "dissect.hypervisor>=3,<4",
+    "dissect.ntfs>=3.4,<4",
+    "dissect.regf>=3.3,<4",
+    "dissect.util>=3,<4",
+    "dissect.volume>=2,<4",
     "flow.record~=3.15.0",
     "structlog",
 ]
@@ -47,6 +47,45 @@ repository = "https://github.com/fox-it/dissect.target"
 [project.optional-dependencies]
 full = [
     "asn1crypto",
+    "dissect.btrfs>=1,<2",
+    "dissect.cim>=3,<4",
+    "dissect.clfs>=1,<2",
+    "dissect.esedb>=3,<4",
+    "dissect.etl>=3,<4",
+    "dissect.extfs>=3,<4",
+    "dissect.fat>=3,<4",
+    "dissect.ffs>=3,<4",
+    "dissect.jffs>=1,<2",
+    "dissect.shellitem>=3,<4",
+    "dissect.squashfs>=1,<2",
+    "dissect.sql>=3,<4",
+    "dissect.thumbcache>=1,<2",
+    "dissect.vmfs>=3,<4",
+    "dissect.xfs>=3,<4",
+    "ipython",
+    "fusepy",
+    "pycryptodome",
+    "ruamel.yaml",
+    "tomli; python_version<'3.11'",
+    # dissect.target's caching uses flow.record functionlity which depends on the
+    # zstandard module being available. However flow.record does not define
+    # zstandard as a dependency, nor does it allow zstandard to be installed
+    # through extras.
+    #
+    # Until such time that this dependency can be installed through
+    # flow.record, we define it as a dependency of dissect.target.
+    "zstandard",
+]
+dev = [
+    "dissect.target[full]",
+    "dissect.cstruct>=4.0.dev,<5.0.dev",
+    "dissect.eventlog>=3.0.dev,<4.0.dev",
+    "dissect.evidence>=3.0.dev,<4.0.dev",
+    "dissect.hypervisor>=3.0.dev,<4.0.dev",
+    "dissect.ntfs>=3.4.dev,<4.0.dev",
+    "dissect.regf>=3.3.dev,<4.0.dev",
+    "dissect.util>=3.0.dev,<4.0.dev",
+    "dissect.volume>=3.0.dev,<4.0.dev",
     "dissect.btrfs>=1.0.dev,<2.0.dev",
     "dissect.cim>=3.0.dev,<4.0.dev",
     "dissect.clfs>=1.0.dev,<2.0.dev",
@@ -62,19 +101,6 @@ full = [
     "dissect.thumbcache>=1.0.dev,<2.0.dev",
     "dissect.vmfs>=3.0.dev,<4.0.dev",
     "dissect.xfs>=3.0.dev,<4.0.dev",
-    "ipython",
-    "fusepy",
-    "pycryptodome",
-    "ruamel.yaml",
-    "tomli; python_version<'3.11'",
-    # dissect.target's caching uses flow.record functionlity which depends on the
-    # zstandard module being available. However flow.record does not define
-    # zstandard as a dependency, nor does it allow zstandard to be installed
-    # through extras.
-    #
-    # Until such time that this dependency can be installed through
-    # flow.record, we define it as a dependency of dissect.target.
-    "zstandard",
 ]
 yara = [
     # Grab the dependencies for dissect.target
