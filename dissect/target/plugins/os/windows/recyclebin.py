@@ -17,7 +17,7 @@ RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         ("path", "path"),
         ("filesize", "filesize"),
         ("path", "deleted_path"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -87,22 +87,26 @@ class RecyclebinPlugin(Plugin):
         )
 
         for recyclebin in recyclebin_paths:
-            yield from self.read_recycle_bin(recyclebin)
+            yield from self.read_recycle_file(recyclebin)
 
-    def _is_recycle_file(self, path: TargetPath) -> bool:
+    def _is_recycle_meta_file(self, path: TargetPath) -> bool:
         """Check wether the path is a recycle bin metadata file"""
         return path.name and path.name.lower().startswith("$i")
 
-    def read_recycle_bin(self, bin_path: TargetPath) -> Generator[RecycleBinRecord, None, None]:
-        if self._is_recycle_file(bin_path):
-            yield self.read_bin_file(bin_path)
+    def read_recycle_file(self, path: TargetPath) -> Generator[RecycleBinRecord, None, None]:
+        if self._is_recycle_meta_file(path):
+            yield self.read_recycle_meta_file(path)
             return
 
-        if bin_path.is_dir():
-            for new_file in bin_path.iterdir():
-                yield from self.read_recycle_bin(new_file)
+        if path.is_dir() and path.name.startswith("$R"):
+            yield from self.read_recycle_deleted_folder(path)
+            return
 
-    def read_bin_file(self, bin_path: TargetPath) -> RecycleBinRecord:
+        if path.is_dir():
+            for new_file in path.iterdir():
+                yield from self.read_recycle_file(new_file)
+
+    def read_recycle_meta_file(self, bin_path: TargetPath) -> RecycleBinRecord:
         data = bin_path.read_bytes()
 
         header = self.select_header(data)
@@ -110,7 +114,7 @@ class RecyclebinPlugin(Plugin):
 
         sid = self.find_sid(bin_path)
         source_path = str(bin_path).lstrip("/")
-        deleted_path = str(bin_path.parent / bin_path.name.replace("/$i", "/$r")).lstrip("/")
+        deleted_path = str(bin_path.parent / bin_path.name.replace("$I", "$R")).lstrip("/")
 
         user_details = self.target.user_details.find(sid=sid)
         user = user_details.user if user_details else None
@@ -124,6 +128,44 @@ class RecyclebinPlugin(Plugin):
             _target=self.target,
             _user=user,
         )
+
+    def read_recycle_deleted_folder(self, folder_path: TargetPath) -> RecycleBinRecord:
+        """
+        Generally speaking when deleting a file, the $R* file is the actual renamed deleted file.
+        This is however also the case for deleted folders. When a folder is deleted,
+        it is also renamed and placed here (with original recursive content).
+
+        This function will create RecycleBin records for each file in a deleted folder.
+        """
+
+        meta_file = self.target.fs.path(str(folder_path.parent / folder_path.name.replace("$R", "$I")).lstrip("/"))
+        if not meta_file.exists():
+            return
+
+        meta_data = meta_file.read_bytes()
+        header = self.select_header(meta_data)
+        entry = header(meta_data)
+
+        sid = self.find_sid(folder_path)
+        original_folder_path = self.target.fs.path(entry.filename.rstrip("\x00"))
+
+        user_details = self.target.user_details.find(sid=sid)
+        user = user_details.user if user_details else None
+        for parent_path, _, childs in folder_path.walk():
+            for child in childs:
+                child_path = self.target.fs.path(f"{str(parent_path).lstrip('/')}/{child}")
+                original_parent_of_child = original_folder_path / str(parent_path).split(folder_path.name)[1].lstrip(
+                    "/"
+                )
+                yield RecycleBinRecord(
+                    ts=wintimestamp(entry.timestamp),
+                    path=original_parent_of_child / child,
+                    source=meta_file,
+                    filesize=child_path.stat().st_size,
+                    deleted_path=child_path,
+                    _target=self.target,
+                    _user=user,
+                )
 
     def find_sid(self, path: TargetPath) -> str:
         parent_path = path.parent

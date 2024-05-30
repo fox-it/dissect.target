@@ -33,8 +33,8 @@ def test_read_recycle_bin(target_win):
 
     mocked_file.is_file.return_value = True
     mocked_file.is_dir.return_value = False
-    with patch.object(RecyclebinPlugin, "read_bin_file") as mocked_bin_file:
-        assert [mocked_bin_file.return_value] == list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file))
+    with patch.object(RecyclebinPlugin, "read_recycle_meta_file") as mocked_bin_file:
+        assert [mocked_bin_file.return_value] == list(RecyclebinPlugin(target_win).read_recycle_file(mocked_file))
 
 
 def test_filtered_name(target_win):
@@ -44,7 +44,7 @@ def test_filtered_name(target_win):
 
     mocked_file.name = "hello"
 
-    assert [] == list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file))
+    assert [] == list(RecyclebinPlugin(target_win).read_recycle_file(mocked_file))
 
 
 def test_read_recycle_bin_directory(target_win):
@@ -56,12 +56,12 @@ def test_read_recycle_bin_directory(target_win):
     mocked_file = Mock()
     mocked_file.is_file.return_value = True
     mocked_file.is_dir.return_value = False
-    mocked_file.name = "$ihello"
+    mocked_file.name = "$Ihello"
 
     mocked_dir.iterdir.return_value = [mocked_file] * 3
 
-    with patch.object(RecyclebinPlugin, "read_bin_file", return_value=mocked_file):
-        data = list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_dir))
+    with patch.object(RecyclebinPlugin, "read_recycle_meta_file", return_value=mocked_file):
+        data = list(RecyclebinPlugin(target_win).read_recycle_file(mocked_dir))
 
         assert data == [mocked_file] * 3
 
@@ -98,7 +98,7 @@ def test_read_bin_file_unknown(target_win, path):
     with patch.object(Path, "open", mock_open(read_data=header_1.dumps())):
         normal_path = Path(path)
 
-        output = recycle_plugin.read_bin_file(normal_path)
+        output = recycle_plugin.read_recycle_meta_file(normal_path)
 
     assert output.filesize == 0x20
     assert output.path == "hello_world"
@@ -110,7 +110,7 @@ def test_recyclebin_plugin_file(target_win, recycle_bin):
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
-    with patch.object(RecyclebinPlugin, "read_bin_file") as mocked_bin_file:
+    with patch.object(RecyclebinPlugin, "read_recycle_meta_file") as mocked_bin_file:
         recycle_bin_entries = list(target_win.recyclebin())
         assert recycle_bin_entries == [mocked_bin_file.return_value]
 
@@ -120,7 +120,7 @@ def test_recyclebin_plugin_wrong_prefix(target_win, recycle_bin):
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
-    with patch.object(RecyclebinPlugin, "read_bin_file"):
+    with patch.object(RecyclebinPlugin, "read_recycle_meta_file"):
         recycle_bin_entries = list(target_win.recyclebin())
         assert recycle_bin_entries == []
 
