@@ -59,14 +59,14 @@ c_prefetch = """
         uint32 volumes_information_offset;
         uint32 number_of_volumes;
         uint32 volumes_information_size;
-        uint32 unknown[2];
+        uint32 unknown0[2];
         uint64 last_run_time;
         uint64 last_run_remains[7];
-        uint64 unknown[2];
+        uint64 unknown1[2];
         uint32 run_count;
-        uint32 unknown;
-        uint32 unknown;
-        char unknown[88];
+        uint32 unknown2;
+        uint32 unknown3;
+        char unknown4[88];
     };
 
     struct FILE_INFORMATION_17 {
@@ -80,9 +80,9 @@ c_prefetch = """
         uint32 number_of_volumes;
         uint32 volumes_information_size;
         uint32 last_run_time;
-        uint32 unknown;
+        uint32 unknown0;
         uint32 run_count;
-        uint32 unknown;
+        uint32 unknown1;
     };
 
     struct FILE_INFORMATION_23 {
@@ -99,9 +99,9 @@ c_prefetch = """
         uint64 last_run_time;
         uint64 last_run_remains[2];
         uint32 run_count;
-        uint32 unknown;
-        uint32 unknown;
-        char unknown[80];
+        uint32 unknown0;
+        uint32 unknown1;
+        char unknown2[80];
     };
 
     struct VOLUME_INFORMATION_17 {
@@ -125,19 +125,19 @@ c_prefetch = """
         uint32 file_reference_size;
         uint32 directory_strings_array_offset;
         uint32 number_of_directory_strings;
-        char unknown[4];
-        char unknown[24];
-        char unknown[4];
-        char unknown[24];
-        char unknown[4];
+        char unknown0[4];
+        char unknown1[24];
+        char unknown2[4];
+        char unknown3[24];
+        char unknown4[4];
     };
 
     struct TRACE_CHAIN_ARRAY_ENTRY_17 {
         uint32 next_array_entry_index;
         uint32 total_block_load_count;
-        uint32 unknown;
-        uint32 unknown;
-        uint32 unknown;
+        uint32 unknown0;
+        uint32 unknown1;
+        uint32 unknown2;
     };
 
     struct FILE_METRICS_ARRAY_ENTRY_17 {

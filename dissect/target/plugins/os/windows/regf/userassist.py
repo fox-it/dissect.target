@@ -14,13 +14,13 @@ from dissect.target.plugin import Plugin, export
 
 userassist_def = """
 struct VERSION5_ENTRY {
-    char padding[4];
+    char padding0[4];
     uint32 number_of_executions;
     uint32 application_focus_count;
     uint32 application_focus_duration;
-    char padding[44];
+    char padding1[44];
     uint64 timestamp;
-    char padding[4];
+    char padding2[4];
 };
 
 struct VERSION3_ENTRY {

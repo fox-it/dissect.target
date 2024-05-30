@@ -166,7 +166,7 @@ struct DOMAIN_ACCOUNT_F {
   uint16 min_password_length;               /* 0x50 */
   uint16 password_history_length;           /* 0x52 */
   uint16 lockout_threshold;                 /* 0x54 */
-  uint16 unknown1_1;                        /* 0x56 */
+  uint16 unknown1_3;                        /* 0x56 */
   uint32 server_state;                      /* 0x58 */
   uint16 server_role;                       /* 0x5c */
   uint16 uas_compability_required;          /* 0x5e */

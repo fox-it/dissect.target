@@ -29,7 +29,7 @@ struct DomainKey {
     DWORD   accessCheckLen;
     char    guid[16];
     char    encryptedSecret[secretLen];
-    char    accessCheckLen[accessCheckLen];
+    char    accessCheck[accessCheckLen];
 };
 
 struct CredHist {
