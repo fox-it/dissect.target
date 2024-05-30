@@ -525,7 +525,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     subdir = resource.resource_id[0:2]
                     resourcedata_location = resourcedata_directory.joinpath(subdir).joinpath(resource.resource_id)
                     if not resourcedata_location.exists():
-                        self.target.log.warning(f"Could not find a ResourceData file for {entry.resource_id}.")
+                        self.target.log.warning(f"Could not find a ResourceData file for {resource.resource_id}.")
                         continue
                     if not resourcedata_location.is_file():
                         self.target.log.warning(f"{resourcedata_location} is not a file!")
