@@ -46,7 +46,7 @@ c_utmp = """
 
 typedef uint32 pid_t;
 
-enum Type : char {
+enum Type : uint8_t {
     EMPTY           = 0x0,
     RUN_LVL         = 0x1,
     BOOT_TIME       = 0x2,
@@ -124,8 +124,8 @@ class UtmpFile:
                 entry = utmp.entry(byte_stream)
 
                 r_type = ""
-                if entry.ut_type in utmp.Type.reverse:
-                    r_type = utmp.Type.reverse[entry.ut_type]
+                if entry.ut_type in utmp.Type:
+                    r_type = utmp.Type(entry.ut_type).name
 
                 ut_host = entry.ut_host.decode(errors="surrogateescape").strip("\x00")
                 ut_addr = None

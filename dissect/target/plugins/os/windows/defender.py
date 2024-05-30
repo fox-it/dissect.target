@@ -380,7 +380,7 @@ class QuarantineEntryResource:
             self.last_access_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
         elif field.Identifier == FIELD_IDENTIFIER.LastWriteTime:
             self.last_write_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
-        elif field.Identifier not in FIELD_IDENTIFIER.values.values():
+        elif field.Identifier not in FIELD_IDENTIFIER:
             self.unknown_fields.append(field)
 
 
