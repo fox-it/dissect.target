@@ -237,8 +237,7 @@ struct QuarantineEntryResourceField {
 };
 """
 
-c_defender = cstruct()
-c_defender.load(defender_def)
+c_defender = cstruct().load(defender_def)
 
 STREAM_ID = c_defender.STREAM_ID
 STREAM_ATTRIBUTES = c_defender.STREAM_ATTRIBUTES

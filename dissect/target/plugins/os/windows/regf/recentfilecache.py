@@ -1,4 +1,4 @@
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -18,8 +18,7 @@ c_recent_files_def = """
         wchar   path[length + 1];
     };
     """
-c_recent_files = cstruct.cstruct()
-c_recent_files.load(c_recent_files_def)
+c_recent_files = cstruct().load(c_recent_files_def)
 
 RecentFileCacheRecord = TargetRecordDescriptor(
     "windows/recentfilecache",

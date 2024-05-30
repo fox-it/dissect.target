@@ -1,6 +1,6 @@
 import codecs
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
@@ -29,8 +29,7 @@ struct VERSION3_ENTRY {
     uint64  timestamp;
 };
 """
-c_userassist = cstruct.cstruct()
-c_userassist.load(userassist_def)
+c_userassist = cstruct().load(userassist_def)
 
 UserAssistRecordDescriptor = create_extended_descriptor(
     [

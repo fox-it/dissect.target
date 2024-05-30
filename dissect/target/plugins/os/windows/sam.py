@@ -9,7 +9,7 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -207,8 +207,7 @@ struct SAM_HASH_AES {  /* size: >=24 */
 };
 """
 
-c_sam = cstruct.cstruct()
-c_sam.load(c_sam_def)
+c_sam = cstruct().load(c_sam_def)
 
 SamRecord = TargetRecordDescriptor(
     "windows/registry/sam",

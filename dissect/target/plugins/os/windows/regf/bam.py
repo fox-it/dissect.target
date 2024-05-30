@@ -10,8 +10,7 @@ c_bamdef = """
         uint64 ts;
     };
     """
-c_bam = cstruct()
-c_bam.load(c_bamdef)
+c_bam = cstruct().load(c_bamdef)
 
 BamDamRecord = TargetRecordDescriptor(
     "windows/registry/bam",

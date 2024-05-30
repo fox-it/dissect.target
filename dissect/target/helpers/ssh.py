@@ -1,7 +1,7 @@
 import base64
 import binascii
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 c_rfc4716_def = """
 struct ssh_string {
@@ -23,8 +23,7 @@ struct ssh_private_key {
 }
 """
 
-c_rfc4716 = cstruct.cstruct(endian=">")
-c_rfc4716.load(c_rfc4716_def)
+c_rfc4716 = cstruct(endian=">").load(c_rfc4716_def)
 
 RFC4716_MARKER_START = b"-----BEGIN OPENSSH PRIVATE KEY-----"
 RFC4716_MARKER_END = b"-----END OPENSSH PRIVATE KEY-----"

@@ -1,13 +1,12 @@
 import io
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_adtev = cstruct.cstruct()
-c_adtev.load(
+c_adtev = cstruct().load(
     """
 struct header {
     uint16  unk0;

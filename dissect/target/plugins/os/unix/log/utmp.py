@@ -84,8 +84,7 @@ struct entry {
 };
 """  # noqa: E501
 
-utmp = cstruct()
-utmp.load(c_utmp)
+utmp = cstruct().load(c_utmp)
 
 UTMP_ENTRY = namedtuple(
     "UTMPRecord",

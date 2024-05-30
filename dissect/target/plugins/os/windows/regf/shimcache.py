@@ -99,8 +99,7 @@ struct WIN10_ENTRY_DATA {
     uint64 ts;
 };
 """
-c_shim = cstruct()
-c_shim.load(c_shimdef)
+c_shim = cstruct().load(c_shimdef)
 
 MAGIC_NT61 = 0xBADC0FEE
 MAGIC_NT52 = 0xBADC0FFE

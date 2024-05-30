@@ -68,8 +68,7 @@ MLocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_mlocate = cstruct(endian=">")
-c_mlocate.load(mlocate_def)
+c_mlocate = cstruct(endian=">").load(mlocate_def)
 
 
 class MLocateFile:

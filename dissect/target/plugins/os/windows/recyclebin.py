@@ -1,6 +1,6 @@
 from typing import Generator
 
-from dissect import cstruct
+from dissect.cstruct import Structure, cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target import Target
@@ -43,8 +43,7 @@ class RecyclebinPlugin(Plugin):
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-        self.recyclebin_parser = cstruct.cstruct()
-        self.recyclebin_parser.load(c_recyclebin_i)
+        self.recyclebin_parser = cstruct().load(c_recyclebin_i)
 
     def check_compatible(self) -> None:
         for fs_entry in self.target.fs.path("/").iterdir():
@@ -131,7 +130,7 @@ class RecyclebinPlugin(Plugin):
             return "unknown"
         return parent_path.name
 
-    def select_header(self, data: bytes) -> cstruct.Structure:
+    def select_header(self, data: bytes) -> Structure:
         """Selects the correct header based on the version field in the header"""
 
         header_version = self.recyclebin_parser.uint64(data[:8])

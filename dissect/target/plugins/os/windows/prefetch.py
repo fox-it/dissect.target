@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
 from dissect.util.ts import wintimestamp
 
@@ -158,8 +158,7 @@ c_prefetch = """
         uint64 ntfs_reference;
     };
     """
-prefetch = cstruct.cstruct()
-prefetch.load(c_prefetch)
+prefetch = cstruct().load(c_prefetch)
 
 prefetch_version_structs = {
     17: (prefetch.FILE_INFORMATION_17, prefetch.FILE_METRICS_ARRAY_ENTRY_17),

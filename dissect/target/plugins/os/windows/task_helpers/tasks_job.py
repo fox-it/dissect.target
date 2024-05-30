@@ -2,7 +2,7 @@ import datetime
 import warnings
 from typing import Iterator, Optional
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
@@ -135,8 +135,7 @@ struct ATJOB_DATA {
 //      uint8       job_signature[64 * s_ver * c_ver];  /*      - calculated job signature. */
 };
 """
-atjob = cstruct.cstruct()
-atjob.load(atjob_def)
+atjob = cstruct().load(atjob_def)
 
 
 class AtTask:

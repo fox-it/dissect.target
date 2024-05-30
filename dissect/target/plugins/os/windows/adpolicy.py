@@ -1,7 +1,7 @@
 from struct import unpack
 
 from defusedxml import ElementTree
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.regf.c_regf import (
     REG_BINARY,
     REG_DWORD,
@@ -24,8 +24,7 @@ struct registry_policy_header {
     uint32   version;
 };
 """
-c_adpolicy = cstruct.cstruct()
-c_adpolicy.load(c_def)
+c_adpolicy = cstruct().load(c_def)
 
 ADPolicyRecord = TargetRecordDescriptor(
     "windows/adpolicy",

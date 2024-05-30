@@ -1,8 +1,8 @@
 import lzma
-from typing import BinaryIO, Callable, Iterator
+from typing import Any, BinaryIO, Callable, Iterator
 
 import zstandard
-from dissect.cstruct import Instance, cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
 
@@ -252,8 +252,7 @@ struct EntryArrayObject_Compact {
 };
 """  # noqa: E501
 
-c_journal = cstruct()
-c_journal.load(journal_def)
+c_journal = cstruct().load(journal_def)
 
 
 def get_optional(value: str, to_type: Callable):
@@ -314,7 +313,7 @@ class JournalFile:
 
         return key, value
 
-    def __iter__(self) -> Iterator[Instance]:
+    def __iter__(self) -> Iterator[dict[str, Any]]:
         "Iterate over the entry objects to read payloads."
 
         for offset in self.entry_object_offsets():
