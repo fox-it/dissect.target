@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import logging
 import lzma
 import struct
 import subprocess
@@ -38,7 +37,6 @@ VirtualMachineRecord = TargetRecordDescriptor(
     ],
 )
 
-log = logging.getLogger(__name__)
 
 class ESXiPlugin(UnixPlugin):
     """ESXi OS plugin
@@ -72,7 +70,7 @@ class ESXiPlugin(UnixPlugin):
 
     def _cfg(self, path: str) -> Optional[str]:
         if not self._config:
-            log.warning("No ESXi config!")
+            self.target.log.warning("No ESXi config!")
             return None
 
         value_name = path.strip("/").split("/")[-1]
