@@ -1,5 +1,5 @@
 import lzma
-from typing import Any, BinaryIO, Callable, Iterator
+from typing import BinaryIO, Callable, Iterator
 
 import zstandard
 from dissect.cstruct import cstruct

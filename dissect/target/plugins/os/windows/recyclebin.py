@@ -1,6 +1,6 @@
 from typing import Generator
 
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target import Target

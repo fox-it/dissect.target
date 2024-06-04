@@ -3,7 +3,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Dict, Tuple
 
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import (
     RegistryError,
