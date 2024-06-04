@@ -39,7 +39,7 @@ WtmpRecord = TargetRecordDescriptor(
     ],
 )
 
-c_utmp = """
+utmp_def = """
 #define UT_LINESIZE     32
 #define UT_NAMESIZE     32
 #define UT_HOSTSIZE     256
@@ -84,7 +84,7 @@ struct entry {
 };
 """  # noqa: E501
 
-utmp = cstruct().load(c_utmp)
+c_utmp = cstruct().load(utmp_def)
 
 UTMP_ENTRY = namedtuple(
     "UTMPRecord",
@@ -121,11 +121,11 @@ class UtmpFile:
 
         while True:
             try:
-                entry = utmp.entry(byte_stream)
+                entry = c_utmp.entry(byte_stream)
 
                 r_type = ""
-                if entry.ut_type in utmp.Type:
-                    r_type = utmp.Type(entry.ut_type).name
+                if entry.ut_type in c_utmp.Type:
+                    r_type = c_utmp.Type(entry.ut_type).name
 
                 ut_host = entry.ut_host.decode(errors="surrogateescape").strip("\x00")
                 ut_addr = None

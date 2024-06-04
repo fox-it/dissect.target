@@ -21,7 +21,7 @@ ShimcacheRecord = TargetRecordDescriptor(
     ],
 )
 
-c_shimdef = """
+shim_def = """
 struct NT61_HEADER {
     uint32 magic;
     uint32 num_entries;
@@ -99,7 +99,7 @@ struct WIN10_ENTRY_DATA {
     uint64 ts;
 };
 """
-c_shim = cstruct().load(c_shimdef)
+c_shim = cstruct().load(shim_def)
 
 MAGIC_NT61 = 0xBADC0FEE
 MAGIC_NT52 = 0xBADC0FFE

@@ -18,13 +18,13 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_def = """
+policy_def = """
 struct registry_policy_header {
     uint32   signature;
     uint32   version;
 };
 """
-c_adpolicy = cstruct().load(c_def)
+c_adpolicy = cstruct().load(policy_def)
 
 ADPolicyRecord = TargetRecordDescriptor(
     "windows/adpolicy",

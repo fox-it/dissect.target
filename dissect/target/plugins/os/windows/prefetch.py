@@ -33,7 +33,7 @@ GroupedPrefetchRecord = TargetRecordDescriptor(
 )
 
 
-c_prefetch = """
+prefetch_def = """
     struct PREFETCH_HEADER_DETECT {
         char signature[4];
         uint32 size;
@@ -158,24 +158,24 @@ c_prefetch = """
         uint64 ntfs_reference;
     };
     """
-prefetch = cstruct().load(c_prefetch)
+c_prefetch = cstruct().load(prefetch_def)
 
 prefetch_version_structs = {
-    17: (prefetch.FILE_INFORMATION_17, prefetch.FILE_METRICS_ARRAY_ENTRY_17),
-    23: (prefetch.FILE_INFORMATION_23, prefetch.FILE_METRICS_ARRAY_ENTRY_23),
-    30: (prefetch.FILE_INFORMATION_26, prefetch.FILE_METRICS_ARRAY_ENTRY_23),
+    17: (c_prefetch.FILE_INFORMATION_17, c_prefetch.FILE_METRICS_ARRAY_ENTRY_17),
+    23: (c_prefetch.FILE_INFORMATION_23, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
+    30: (c_prefetch.FILE_INFORMATION_26, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
 }
 
 
 class Prefetch:
     def __init__(self, fh):
-        header_detect = prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
+        header_detect = c_prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
         if header_detect.signature == b"MAM\x04":
             fh = BytesIO(lzxpress_huffman.decompress(fh))
 
         self.fh = fh
         self.fh.seek(0)
-        self.header = prefetch.PREFETCH_HEADER(self.fh)
+        self.header = c_prefetch.PREFETCH_HEADER(self.fh)
         self.version = self.identify()
         self.volumes = None
         self.metrics = None

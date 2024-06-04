@@ -16,7 +16,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_sam_def = """
+sam_def = """
 struct user_F {
   char      unknown1[8];
   uint64    t_last_login;           /* Time of last login */
@@ -207,7 +207,7 @@ struct SAM_HASH_AES {  /* size: >=24 */
 };
 """
 
-c_sam = cstruct().load(c_sam_def)
+c_sam = cstruct().load(sam_def)
 
 SamRecord = TargetRecordDescriptor(
     "windows/registry/sam",

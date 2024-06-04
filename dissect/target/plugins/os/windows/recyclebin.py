@@ -21,7 +21,7 @@ RecycleBinRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     ],
 )
 
-c_recyclebin_def = """
+recyclebin_def = """
 struct header_v1 {
     int64    version;
     int64    file_size;
@@ -37,7 +37,7 @@ struct header_v2 {
 };
 """
 
-c_recyclebin = cstruct().load(c_recyclebin_def)
+c_recyclebin = cstruct().load(recyclebin_def)
 
 
 class RecyclebinPlugin(Plugin):
