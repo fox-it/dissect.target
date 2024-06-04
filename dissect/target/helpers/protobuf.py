@@ -8,8 +8,7 @@ from dissect.cstruct.types.base import BaseType
 class ProtobufVarint(BaseType):
     """Implements a protobuf integer type for dissect.cstruct that can span a variable amount of bytes.
 
-    Mainly follows the cstruct BytesInteger implementation with minor tweaks
-    to support protobuf's msb varint implementation.
+    Supports protobuf's msb varint implementation.
 
     Resources:
         - https://protobuf.dev/programming-guides/encoding/
