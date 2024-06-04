@@ -313,7 +313,7 @@ class JournalFile:
 
         return key, value
 
-    def __iter__(self) -> Iterator[dict[str, Any]]:
+    def __iter__(self) -> Iterator[dict[str, int | str]]:
         "Iterate over the entry objects to read payloads."
 
         for offset in self.entry_object_offsets():
