@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import lzma
 from typing import BinaryIO, Callable, Iterator
 
