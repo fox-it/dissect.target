@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import from_unix
 
 from dissect.target import Target
@@ -47,8 +47,7 @@ struct firewall_entry {
     char      _pad3[10];
 };
 """
-c_pfwlog = cstruct.cstruct()
-c_pfwlog.load(pfwlog_def)
+c_pfwlog = cstruct().load(pfwlog_def)
 
 
 class TrendMicroPlugin(Plugin):

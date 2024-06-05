@@ -243,8 +243,7 @@ struct EXTENSION_BLOCK_HEADER {
     uint32  signature;
 };
 """
-c_bag = cstruct()
-c_bag.load(bag_def)
+c_bag = cstruct().load(bag_def)
 
 DELEGATE_ITEM_IDENTIFIER = b"\x74\x1a\x59\x5e\x96\xdf\xd3\x48\x8d\x67\x17\x33\xbc\xee\x28\xba"
 

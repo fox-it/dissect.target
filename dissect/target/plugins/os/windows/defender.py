@@ -237,8 +237,7 @@ struct QuarantineEntryResourceField {
 };
 """
 
-c_defender = cstruct()
-c_defender.load(defender_def)
+c_defender = cstruct().load(defender_def)
 
 STREAM_ID = c_defender.STREAM_ID
 STREAM_ATTRIBUTES = c_defender.STREAM_ATTRIBUTES
@@ -381,7 +380,7 @@ class QuarantineEntryResource:
             self.last_access_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
         elif field.Identifier == FIELD_IDENTIFIER.LastWriteTime:
             self.last_write_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
-        elif field.Identifier not in FIELD_IDENTIFIER.values.values():
+        elif field.Identifier not in FIELD_IDENTIFIER:
             self.unknown_fields.append(field)
 
 
@@ -526,7 +525,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     subdir = resource.resource_id[0:2]
                     resourcedata_location = resourcedata_directory.joinpath(subdir).joinpath(resource.resource_id)
                     if not resourcedata_location.exists():
-                        self.target.log.warning(f"Could not find a ResourceData file for {entry.resource_id}.")
+                        self.target.log.warning(f"Could not find a ResourceData file for {resource.resource_id}.")
                         continue
                     if not resourcedata_location.is_file():
                         self.target.log.warning(f"{resourcedata_location} is not a file!")

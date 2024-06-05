@@ -65,8 +65,7 @@ PLocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_plocate = cstruct()
-c_plocate.load(plocate_def)
+c_plocate = cstruct().load(plocate_def)
 
 
 class PLocateFile:

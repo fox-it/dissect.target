@@ -3,7 +3,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Dict, Tuple
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -34,8 +34,7 @@ typedef struct _REG_TZI_FORMAT {
     SYSTEMTIME DaylightDate;
 } REG_TZI_FORMAT;
 """
-c_tz = cstruct.cstruct()
-c_tz.load(tz_def)
+c_tz = cstruct().load(tz_def)
 
 
 # Althoug calendar.SUNDAY is only officially documented since Python 3.10, it
@@ -63,7 +62,7 @@ ZERO = timedelta(0)
 HOUR = timedelta(hours=1)
 
 
-def parse_systemtime_transition(systemtime: cstruct.Instance, year: int) -> datetime:
+def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> datetime:
     """Return the transition datetime for a given year using the SYSTEMTIME of a STD or DST transition date.
 
     The SYSTEMTIME date of a TZI structure needs to be used to calculate the actual date for a given year.
