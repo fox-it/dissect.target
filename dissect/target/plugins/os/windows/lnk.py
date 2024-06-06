@@ -134,6 +134,9 @@ class LnkPlugin(Plugin):
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
+
+        .. code-block:: text
+
             lnk_path (path): Path of the link (.lnk) file.
             lnk_name (string): Name of the link (.lnk) file.
             lnk_mtime (datetime): Modification time of the link (.lnk) file.

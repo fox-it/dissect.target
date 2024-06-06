@@ -55,6 +55,9 @@ class CLSIDPlugin(Plugin):
         HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID.
 
         Yields CLSIDRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Last modified timestamp of the registry key.

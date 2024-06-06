@@ -7,14 +7,14 @@ import dissect.target.plugins.os.windows.prefetch as prefetch
 
 @pytest.fixture()
 def mocked_cstruct(version):
-    with patch.object(prefetch, "prefetch") as mocked_cstruct:
+    with patch.object(prefetch, "c_prefetch") as mocked_cstruct:
         mocked_cstruct.PREFETCH_HEADER.return_value.version = version
         yield mocked_cstruct
 
 
 @pytest.fixture()
 def mocked_prefetch():
-    with patch.object(prefetch, "prefetch"):
+    with patch.object(prefetch, "c_prefetch"):
         with patch.multiple(prefetch.Prefetch, identify=Mock(), parse=Mock()):
             return prefetch.Prefetch(Mock())
 

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import sys
 import time
+from dataclasses import dataclass
 from struct import pack
 from typing import Iterator
 from unittest.mock import MagicMock, patch
@@ -41,7 +44,27 @@ class MQTTMock(MagicMock):
             begin = int(tokens[4], 16)
             end = int(tokens[5], 16)
             response.payload = self.disks[int(tokens[3])][begin : begin + end]
+        else:
+            return
         self.on_message(self, None, response)
+
+
+@dataclass
+class MockSeekMessage:
+    data: bytes = b""
+
+
+class MockBroker(MagicMock):
+    _seek = False
+
+    def seek(self, *args) -> None:
+        self._seek = True
+
+    def read(self, *args) -> MockSeekMessage | None:
+        if self._seek:
+            self._seek = False
+            return MockSeekMessage(data=b"010101")
+        return None
 
 
 @pytest.fixture
@@ -60,6 +83,11 @@ def mock_client(mock_paho: MagicMock) -> Iterator[MagicMock]:
     mock_client = MQTTMock()
     mock_paho.mqtt.client.Client.return_value = mock_client
     yield mock_client
+
+
+@pytest.fixture
+def mock_broker() -> Iterator[MockBroker]:
+    yield MockBroker()
 
 
 @pytest.mark.parametrize(
@@ -102,3 +130,21 @@ def test_remote_loader_stream(
         target.disks[disk].seek(seek)
         data = target.disks[disk].read(read)
         assert data == expected
+
+
+def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
+    from dissect.target.loaders.mqtt import MQTTConnection
+
+    connection = MQTTConnection(mock_broker, "")
+    connection.prefetch_factor_inc = 10
+    assert connection.factor == 1
+    assert connection.prev == -1
+    connection.read(1, 0, 100, 0)
+    assert connection.factor == 1
+    assert connection.prev == 0
+    connection.read(1, 100, 100, 0)
+    assert connection.factor == connection.prefetch_factor_inc + 1
+    assert connection.prev == 100
+    connection.read(1, 1200, 100, 0)
+    assert connection.factor == (connection.prefetch_factor_inc * 2) + 1
+    assert connection.prev == 1200
