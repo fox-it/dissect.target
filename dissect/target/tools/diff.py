@@ -13,12 +13,7 @@ from fnmatch import fnmatch, translate
 from io import BytesIO
 from typing import Iterable, Iterator, TextIO
 
-from flow.record import (
-    IGNORE_FIELDS_FOR_COMPARISON,
-    Record,
-    RecordOutput,
-    set_ignored_fields_for_comparison,
-)
+from flow.record import Record, RecordOutput, ignore_fields_for_comparison
 
 from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError
@@ -309,26 +304,24 @@ class TargetComparison:
         records. There is no equivalent for the FileModifiedRecord. For files and directories, we can use the path to
         reliably track changes from one target to the next. There is no equivalent for plugin outputs, so we just assume
         that all records are either deleted (only on src), created (only on dst) or unchanged (on both)."""
-        old_ignored_values = IGNORE_FIELDS_FOR_COMPARISON
-        set_ignored_fields_for_comparison(["_generated", "_source", "hostname", "domain"])
+        with ignore_fields_for_comparison(["_generated", "_source", "hostname", "domain"]):
+            src_records = set(get_plugin_output_records(plugin_name, plugin_arg_parts, self.src_target))
+            src_records_seen = set()
 
-        src_records = set(get_plugin_output_records(plugin_name, plugin_arg_parts, self.src_target))
-        src_records_seen = set()
-
-        for dst_record in get_plugin_output_records(plugin_name, plugin_arg_parts, self.dst_target):
-            if dst_record in src_records:
-                src_records_seen.add(dst_record)
-                yield RecordUnchangedRecord(
-                    src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
+            for dst_record in get_plugin_output_records(plugin_name, plugin_arg_parts, self.dst_target):
+                if dst_record in src_records:
+                    src_records_seen.add(dst_record)
+                    yield RecordUnchangedRecord(
+                        src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
+                    )
+                else:
+                    yield RecordCreatedRecord(
+                        src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
+                    )
+            for record in src_records - src_records_seen:
+                yield RecordDeletedRecord(
+                    src_target=self.src_target.path, dst_target=self.dst_target.path, record=record
                 )
-            else:
-                yield RecordCreatedRecord(
-                    src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
-                )
-        for record in src_records - src_records_seen:
-            yield RecordDeletedRecord(src_target=self.src_target.path, dst_target=self.dst_target.path, record=record)
-
-        set_ignored_fields_for_comparison(old_ignored_values)
 
 
 class DifferentialCli(ExtendedCmd):
