@@ -13,6 +13,7 @@ from fnmatch import fnmatch, translate
 from io import BytesIO
 from typing import Iterable, Iterator, TextIO
 
+from dissect.cstruct import hexdump
 from flow.record import Record, RecordOutput, ignore_fields_for_comparison
 
 from dissect.target import Target
@@ -299,7 +300,9 @@ class TargetComparison:
                     continue
             yield from self.walkdir(subdirectory.path, exclude, already_iterated)
 
-    def differentiate_plugin_outputs(self, plugin_name: str, plugin_arg_parts: list[str]) -> Iterator[Record]:
+    def differentiate_plugin_outputs(
+        self, plugin_name: str, plugin_arg_parts: list[str], only_changed: bool = False
+    ) -> Iterator[Record]:
         """Run a plugin on the source and destination targets and yield RecordUnchanged, RecordCreated and RecordDeleted
         records. There is no equivalent for the FileModifiedRecord. For files and directories, we can use the path to
         reliably track changes from one target to the next. There is no equivalent for plugin outputs, so we just assume
@@ -311,9 +314,10 @@ class TargetComparison:
             for dst_record in get_plugin_output_records(plugin_name, plugin_arg_parts, self.dst_target):
                 if dst_record in src_records:
                     src_records_seen.add(dst_record)
-                    yield RecordUnchangedRecord(
-                        src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
-                    )
+                    if not only_changed:
+                        yield RecordUnchangedRecord(
+                            src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
+                        )
                 else:
                     yield RecordCreatedRecord(
                         src_target=self.src_target.path, dst_target=self.dst_target.path, record=dst_record
@@ -580,6 +584,7 @@ class DifferentialCli(ExtendedCmd):
         print(f"File {name} not found.")
 
     @arg("path", nargs="?")
+    @arg("--hex", action="store_true", default=False)
     def cmd_diff(self, args: argparse.Namespace, stdout: TextIO):
         """Output the difference in file contents between two targets."""
         stdout = stdout.buffer
@@ -589,8 +594,19 @@ class DifferentialCli(ExtendedCmd):
         directory_differential = self.comparison.scandir(base_dir)
         for entry in directory_differential.modified:
             if entry.name == name:
-                primary_fh_lines = entry.src_target_entry.open().readlines()
-                secondary_fh_lines = entry.dst_target_entry.open().readlines()
+                if args.hex:
+                    primary_fh_lines = [
+                        line.encode()
+                        for line in hexdump(entry.src_target_entry.open().read(), output="string").split("\n")
+                    ]
+                    secondary_fh_lines = [
+                        line.encode()
+                        for line in hexdump(entry.dst_target_entry.open().read(), output="string").split("\n")
+                    ]
+                else:
+                    primary_fh_lines = entry.src_target_entry.open().readlines()
+                    secondary_fh_lines = entry.dst_target_entry.open().readlines()
+
                 for chunk in diff_bytes(unified_diff, primary_fh_lines, secondary_fh_lines):
                     if chunk.startswith(b"@@"):
                         chunk = fmt_ls_colors("ln", chunk.decode()).encode()
@@ -600,7 +616,12 @@ class DifferentialCli(ExtendedCmd):
                         chunk = fmt_ls_colors("or", chunk.decode()).encode()
 
                     shutil.copyfileobj(BytesIO(chunk), stdout)
+
+                    if args.hex:
+                        stdout.write(b"\n")
+
                     stdout.flush()
+
                 print("")
                 return
 
@@ -778,14 +799,14 @@ def differentiate_target_filesystems(
 
 
 def differentiate_target_plugin_outputs(
-    *targets: tuple[Target], absolute: bool = False, plugin: str, plugin_args: str = ""
+    *targets: tuple[Target], absolute: bool = False, only_changed: bool = False, plugin: str, plugin_args: str = ""
 ) -> Iterator[Record]:
     """Given a list of targets, yielding records indicating which records from this plugin are new, unmodified or
     deleted."""
     for target_pair in make_target_pairs(targets, absolute):
         src_target, dst_target = target_pair
         comparison = TargetComparison(src_target, dst_target)
-        yield from comparison.differentiate_plugin_outputs(plugin, plugin_args)
+        yield from comparison.differentiate_plugin_outputs(plugin, plugin_args, only_changed)
 
 
 @catch_sigpipe
@@ -864,6 +885,12 @@ def main() -> None:
             "target that came before it."
         ),
     )
+    query_mode.add_argument(
+        "--only-changed",
+        action="store_true",
+        help="Do not output unchanged records",
+        default=False,
+    )
 
     configure_generic_arguments(parser)
 
@@ -889,6 +916,7 @@ def main() -> None:
             iterator = differentiate_target_plugin_outputs(
                 *target_list,
                 absolute=args.absolute,
+                only_changed=args.only_changed,
                 plugin=args.plugin,
                 plugin_args=arg_str_to_arg_list(args.parameters),
             )
