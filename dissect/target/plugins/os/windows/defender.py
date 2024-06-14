@@ -1,7 +1,8 @@
+import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator, Union
+from typing import Any, BinaryIO, Generator, Iterable, Iterator, TextIO, Union
 
 import dissect.util.ts as ts
 from dissect.cstruct import Structure, cstruct
@@ -10,6 +11,27 @@ from flow.record import Record
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.os.windows.defender_helpers.defender_patterns import (
+    DEFENDER_MPLOG_BLOCK_PATTERNS,
+    DEFENDER_MPLOG_LINE,
+    DEFENDER_MPLOG_PATTERNS,
+)
+from dissect.target.plugins.os.windows.defender_helpers.defender_records import (
+    DefenderMPLogBMTelemetryRecord,
+    DefenderMPLogDetectionAddRecord,
+    DefenderMPLogDetectionEventRecord,
+    DefenderMPLogEMSRecord,
+    DefenderMPLogExclusionRecord,
+    DefenderMPLogLowfiRecord,
+    DefenderMPLogMinFilBlockedFileRecord,
+    DefenderMPLogMinFilUSSRecord,
+    DefenderMPLogOriginalFileNameRecord,
+    DefenderMPLogProcessImageRecord,
+    DefenderMPLogResourceScanRecord,
+    DefenderMPLogRTPRecord,
+    DefenderMPLogThreatActionRecord,
+    DefenderMPLogThreatRecord,
+)
 
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
@@ -73,6 +95,7 @@ DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
+DEFENDER_MPLOG_DIR = "sysvol/programdata/microsoft/windows defender/support"
 DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
@@ -493,6 +516,197 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                         type=exclusion_type,
                         value=exclusion_value,
                     )
+
+    def _mplog_processimage(self, data: str) -> Iterator[DefenderMPLogProcessImageRecord]:
+        yield DefenderMPLogProcessImageRecord(_target=self.target, **data)
+
+    def _mplog_minfiluss(self, data: str) -> Iterator[DefenderMPLogMinFilUSSRecord]:
+        yield DefenderMPLogMinFilUSSRecord(_target=self.target, **data)
+
+    def _mplog_blockedfile(self, data: str) -> Iterator[DefenderMPLogMinFilBlockedFileRecord]:
+        yield DefenderMPLogMinFilBlockedFileRecord(_target=self.target, **data)
+
+    def _mplog_bmtelemetry(self, data: str) -> Iterator[DefenderMPLogBMTelemetryRecord]:
+        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+        yield DefenderMPLogBMTelemetryRecord(_target=self.target, **data)
+
+    def _mplog_ems(self, data: str) -> Iterator[DefenderMPLogEMSRecord]:
+        yield DefenderMPLogEMSRecord(_target=self.target, **data)
+
+    def _mplog_originalfilename(self, data: str) -> Iterator[DefenderMPLogOriginalFileNameRecord]:
+        yield DefenderMPLogOriginalFileNameRecord(_target=self.target, **data)
+
+    def _mplog_exclusion(self, data: str) -> Iterator[DefenderMPLogExclusionRecord]:
+        yield DefenderMPLogExclusionRecord(_target=self.target, **data)
+
+    def _mplog_lowfi(self, data: str) -> Iterator[DefenderMPLogLowfiRecord]:
+        yield DefenderMPLogLowfiRecord(_target=self.target, **data)
+
+    def _mplog_detectionadd(self, data: str) -> Iterator[DefenderMPLogDetectionAddRecord]:
+        yield DefenderMPLogDetectionAddRecord(_target=self.target, **data)
+
+    def _mplog_threat(self, data: str) -> Iterator[DefenderMPLogThreatRecord]:
+        yield DefenderMPLogThreatRecord(_target=self.target, **data)
+
+    def _mplog_resourcescan(self, data: str) -> Iterator[DefenderMPLogResourceScanRecord]:
+        data["start_time"] = datetime.strptime(data["start_time"], "%m-%d-%Y %H:%M:%S")
+        data["end_time"] = datetime.strptime(data["end_time"], "%m-%d-%Y %H:%M:%S")
+        data["ts"] = data["start_time"]
+        rest = data.pop("rest")
+        yield DefenderMPLogResourceScanRecord(
+            _target=self.target,
+            threats=re.findall("Threat Name:([^\n]+)", rest),
+            resources=re.findall("Resource Path:([^\n]+)", rest),
+            **data,
+        )
+
+    def _mplog_threataction(self, data: str) -> Iterator[DefenderMPLogThreatActionRecord]:
+        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+        rest = data.pop("rest")
+        yield DefenderMPLogThreatActionRecord(
+            _target=self.target,
+            threats=re.findall("Threat Name:([^\n]+)", rest),
+            resources=re.findall("(?:Path|File Name):([^\n]+)", rest),
+            actions=re.findall("Action:([^\n]+)", rest),
+            **data,
+        )
+
+    def _mplog_rtp(self, data: str) -> Iterator[DefenderMPLogRTPRecord]:
+        times = {}
+        for dtkey in ["ts", "last_perf", "first_rtp_scan"]:
+            try:
+                times[dtkey] = datetime.strptime(data[dtkey], "%m-%d-%Y %H:%M:%S")
+            except ValueError:
+                pass
+
+        yield DefenderMPLogRTPRecord(
+            _target=self.target,
+            **times,
+            plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
+            process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),
+            path_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["path_exclusions"]),
+            ext_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["ext_exclusions"]),
+        )
+
+    def _mplog_detectionevent(self, data: str) -> Iterator[DefenderMPLogDetectionEventRecord]:
+        yield DefenderMPLogDetectionEventRecord(_target=self.target, **data)
+
+    def _mplog_line(
+        self, mplog_line: str
+    ) -> Iterator[
+        Union[
+            DefenderMPLogProcessImageRecord,
+            DefenderMPLogMinFilUSSRecord,
+            DefenderMPLogMinFilBlockedFileRecord,
+            DefenderMPLogEMSRecord,
+            DefenderMPLogOriginalFileNameRecord,
+            DefenderMPLogExclusionRecord,
+            DefenderMPLogLowfiRecord,
+            DefenderMPLogDetectionAddRecord,
+            DefenderMPLogThreatRecord,
+            DefenderMPLogDetectionEventRecord,
+        ]
+    ]:
+        for pattern, record in DEFENDER_MPLOG_PATTERNS:
+            if match := pattern.match(mplog_line):
+                yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(match.groupdict())
+
+    def _mplog_block(
+        self, mplog_line: str, mplog: TextIO
+    ) -> Iterator[
+        Union[
+            DefenderMPLogBMTelemetryRecord,
+            DefenderMPLogResourceScanRecord,
+            DefenderMPLogThreatActionRecord,
+            DefenderMPLogRTPRecord,
+        ]
+    ]:
+        block = ""
+        for prefix, suffix, pattern, record in DEFENDER_MPLOG_BLOCK_PATTERNS:
+            if prefix.search(mplog_line):
+                block += mplog_line
+                break
+        if block:
+            while mplog_line := mplog.readline():
+                block += mplog_line
+                if suffix.search(mplog_line):
+                    break
+            match = pattern.match(block)
+            yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(match.groupdict())
+
+    def _mplog(
+        self, mplog: TextIO
+    ) -> Iterator[
+        Union[
+            DefenderMPLogProcessImageRecord,
+            DefenderMPLogMinFilUSSRecord,
+            DefenderMPLogMinFilBlockedFileRecord,
+            DefenderMPLogBMTelemetryRecord,
+            DefenderMPLogEMSRecord,
+            DefenderMPLogOriginalFileNameRecord,
+            DefenderMPLogExclusionRecord,
+            DefenderMPLogLowfiRecord,
+            DefenderMPLogDetectionAddRecord,
+            DefenderMPLogThreatRecord,
+            DefenderMPLogDetectionEventRecord,
+            DefenderMPLogResourceScanRecord,
+            DefenderMPLogThreatActionRecord,
+            DefenderMPLogRTPRecord,
+        ]
+    ]:
+        while mplog_line := mplog.readline():
+            yield from self._mplog_line(mplog_line)
+            yield from self._mplog_block(mplog_line, mplog)
+
+    @plugin.export(
+        record=[
+            DefenderMPLogProcessImageRecord,
+            DefenderMPLogMinFilUSSRecord,
+            DefenderMPLogMinFilBlockedFileRecord,
+            DefenderMPLogBMTelemetryRecord,
+            DefenderMPLogEMSRecord,
+            DefenderMPLogOriginalFileNameRecord,
+            DefenderMPLogExclusionRecord,
+            DefenderMPLogLowfiRecord,
+            DefenderMPLogDetectionAddRecord,
+            DefenderMPLogThreatRecord,
+            DefenderMPLogDetectionEventRecord,
+            DefenderMPLogResourceScanRecord,
+            DefenderMPLogThreatActionRecord,
+            DefenderMPLogRTPRecord,
+        ]
+    )
+    def mplog(
+        self,
+    ) -> Iterator[
+        Union[
+            DefenderMPLogProcessImageRecord,
+            DefenderMPLogMinFilUSSRecord,
+            DefenderMPLogMinFilBlockedFileRecord,
+            DefenderMPLogBMTelemetryRecord,
+            DefenderMPLogEMSRecord,
+            DefenderMPLogOriginalFileNameRecord,
+            DefenderMPLogExclusionRecord,
+            DefenderMPLogLowfiRecord,
+            DefenderMPLogDetectionAddRecord,
+            DefenderMPLogThreatRecord,
+            DefenderMPLogDetectionEventRecord,
+            DefenderMPLogResourceScanRecord,
+            DefenderMPLogThreatActionRecord,
+            DefenderMPLogRTPRecord,
+        ]
+    ]:
+        mplog_directory = self.target.fs.path(DEFENDER_MPLOG_DIR)
+        if mplog_directory.exists() and mplog_directory.is_dir():
+            for mplog_file in mplog_directory.iterdir():
+                if mplog_file.name.startswith("MPLog-"):
+                    for encoding in ["UTF-16", "UTF-8"]:
+                        try:
+                            with mplog_file.open("rt", encoding=encoding) as mplog:
+                                yield from self._mplog(mplog)
+                            break
+                        except UnicodeError:
+                            continue
 
     @plugin.arg(
         "--output",
