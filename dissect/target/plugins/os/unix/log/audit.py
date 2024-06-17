@@ -24,6 +24,8 @@ AUDIT_REGEX = re.compile(r"^type=(?P<audit_type>.*) msg=audit\((?P<ts>.*):(?P<au
 
 
 class AuditPlugin(Plugin):
+    """Unix audit log plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self.log_paths = self.get_log_paths()
@@ -51,7 +53,7 @@ class AuditPlugin(Plugin):
 
         return log_paths
 
-    @export(record=[AuditRecord])
+    @export(record=AuditRecord)
     def audit(self) -> Iterator[AuditRecord]:
         """Return CentOS and RedHat audit information stored in /var/log/audit*.
 

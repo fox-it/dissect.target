@@ -1,4 +1,5 @@
 import io
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 
@@ -138,7 +139,7 @@ class AuditpolPlugin(Plugin):
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 
     @export(record=AuditPolicyRecord)
-    def auditpol(self):
+    def auditpol(self) -> Iterator[AuditPolicyRecord]:
         """Return audit policy settings from the registry.
 
         For Windows, the audit policy settings are stored in the HKEY_LOCAL_MACHINE\\Security\\Policy\\PolAdtEv registry

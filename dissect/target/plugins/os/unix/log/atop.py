@@ -247,6 +247,8 @@ class AtopFile:
 
 
 class AtopPlugin(Plugin):
+    """Unix atop plugin."""
+
     ATOP_GLOB = "atop_*"
     ATOP_MAGIC = 0xFEEDBEEF
     ATOP_PATH = "/var/log/atop"

@@ -65,9 +65,7 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
 
 
 class PeekableIterator:
-    """Source gotten from:
-    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
-    """
+    """Source: https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable"""
 
     def __init__(self, iterable):
         self._iterator = iter(iterable)
@@ -191,6 +189,8 @@ class Default(ConfigurationParser):
 
     This parser splits only on the first ``separator`` it finds:
 
+    .. code-block::
+
         key<separator>value     -> {"key": "value"}
 
         key<separator>value\n
@@ -304,7 +304,7 @@ class Txt(ConfigurationParser):
 
 
 class Xml(ConfigurationParser):
-    """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser`."""
+    """Parses an XML file. Ignores any constructor parameters passed from ``ConfigurationParser``."""
 
     def _tree(self, tree: ElementTree, root: bool = False) -> dict:
         """Very simple but robust xml -> dict implementation, see comments."""
@@ -383,8 +383,9 @@ class ListUnwrapper:
     def unwrap(data: Union[dict, list]) -> Union[dict, list]:
         """Transforms a list with dictionaries to a dictionary.
 
-        The order of the list is preserved. If no dictionary is found,
-        the list remains untouched:
+        The order of the list is preserved. If no dictionary is found, the list remains untouched:
+
+        .. code-block::
 
             ["value1", "value2"]    -> ["value1", "value2"]
 
@@ -540,6 +541,8 @@ class Indentation(Default):
 
     The parser parses this as the following:
 
+    .. code-block::
+
       key value
         key2 value2
                        -> {"key value": {"key2": "value2"}}
@@ -562,7 +565,7 @@ class Indentation(Default):
         Args:
             manager: A :class:`ScopeManager` that contains the logic to ``push`` and ``pop`` scopes. And keeps state.
             line: The line to be parsed.
-            key: The key that should be updated during a :method:`ScopeManager.push``.
+            key: The key that should be updated during a :method:`ScopeManager.push`.
             next_line: The next line to be parsed.
 
         Returns:
@@ -612,26 +615,28 @@ class SystemD(Indentation):
     """A :class:`ConfigurationParser` that specifically parses systemd configuration files.
 
     Examples:
-        >>> systemd_data = textwrap.dedent(
-                '''
-                [Section1]
-                Key=Value
-                [Section2]
-                Key2=Value 2\\
-                    Value 2 continued
-                '''
-            )
-        >>> parser = SystemD(io.StringIO(systemd_data))
-        >>> parser.parser_items
-        {
-            "Section1": {
-                "Key": "Value
-            },
-            "Section2": {
-                "Key2": "Value2 Value 2 continued
-            }
-        }
 
+        .. code-block::
+
+            >>> systemd_data = textwrap.dedent(
+                    '''
+                    [Section1]
+                    Key=Value
+                    [Section2]
+                    Key2=Value 2\\
+                        Value 2 continued
+                    '''
+                )
+            >>> parser = SystemD(io.StringIO(systemd_data))
+            >>> parser.parser_items
+            {
+                "Section1": {
+                    "Key": "Value
+                },
+                "Section2": {
+                    "Key2": "Value2 Value 2 continued
+                }
+            }
     """
 
     def _change_scope(

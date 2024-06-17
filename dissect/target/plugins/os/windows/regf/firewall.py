@@ -1,4 +1,5 @@
 import re
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -19,7 +20,7 @@ class FirewallPlugin(Plugin):
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 
     @export(record=DynamicDescriptor(["uri"]))
-    def firewall(self):
+    def firewall(self) -> Iterator[DynamicDescriptor]:
         """Return firewall rules saved in the registry.
 
         For a Windows operating system, the Firewall rules are stored in the

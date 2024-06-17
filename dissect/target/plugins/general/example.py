@@ -69,7 +69,7 @@ class ExamplePlugin(Plugin):
         """
         pass
 
-    @export
+    @export(output="default")
     @arg("--flag", action="store_true", help="optional example flag")
     def example(self, flag: bool = False) -> str:
         """Example plugin function.
@@ -117,7 +117,7 @@ class ExamplePlugin(Plugin):
         To include registry or user information in a record, you must create a new record descriptor using
         :func:`~dissect.target.helpers.record.create_extended_descriptor` with
         :class:`~dissect.target.helpers.descriptor_extensions.RegistryRecordDescriptorExtension` and/or
-        :class:`~dissect.target.helpers.descriptor_extensions.UserRecordDescriptorExtension as extensions.
+        :class:`~dissect.target.helpers.descriptor_extensions.UserRecordDescriptorExtension` as extensions.
         """
         for key in self.target.registry.keys("HKCU\\SOFTWARE"):
             user = self.target.registry.get_user(key)

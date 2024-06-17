@@ -51,6 +51,8 @@ c_pfwlog = cstruct().load(pfwlog_def)
 
 
 class TrendMicroPlugin(Plugin):
+    """TrendMicro antivirus plugin."""
+
     __namespace__ = "trendmicro"
 
     LOG_FOLDER = "sysvol/Program Files (x86)/Trend Micro/Security Agent"

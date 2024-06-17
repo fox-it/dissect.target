@@ -8,6 +8,8 @@ NETSTAT_TEMPLATE = "{protocol:<12}{receive_queue:<10}{transmit_queue:<11}{local_
 
 
 class NetstatPlugin(Plugin):
+    """Linux volatile netstat plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 

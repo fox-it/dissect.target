@@ -122,6 +122,8 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
+    """NTFS MFT plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self.ntfs_filesystems = {index: fs for index, fs in enumerate(self.target.filesystems) if fs.__type__ == "ntfs"}

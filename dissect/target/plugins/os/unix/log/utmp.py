@@ -168,6 +168,8 @@ class UtmpFile:
 
 
 class UtmpPlugin(Plugin):
+    """Unix utmp log plugin."""
+
     WTMP_GLOB = "/var/log/wtmp*"
     BTMP_GLOB = "/var/log/btmp*"
 
@@ -180,7 +182,7 @@ class UtmpPlugin(Plugin):
         ):
             raise UnsupportedPluginError("No WTMP or BTMP log files found")
 
-    @export(record=[BtmpRecord])
+    @export(record=BtmpRecord)
     def btmp(self) -> Iterator[BtmpRecord]:
         """Return failed login attempts stored in the btmp file.
 
@@ -207,7 +209,7 @@ class UtmpPlugin(Plugin):
                     _target=self.target,
                 )
 
-    @export(record=[WtmpRecord])
+    @export(record=WtmpRecord)
     def wtmp(self) -> Iterator[WtmpRecord]:
         """Return the content of the wtmp log files.
 

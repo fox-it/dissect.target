@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 from functools import reduce
 from pathlib import Path
@@ -600,7 +599,8 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         return
 
     # Plugin method should specify what it returns
-    assert func.output_type in ["record", "yield", "text", "none"]
+    # NOTE: "text" should probably be "default"
+    assert func.output_type in ["record", "yield", "default", "none", "text"]
 
     py_func = getattr(func.class_object, func.method_name)
     annotations = None
@@ -614,6 +614,8 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
     # Plugin method should have a return annotation
     if not annotations or "return" not in annotations.keys():
         raise ValueError(f"No return type annotation for function {func}")
+
+    # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
     method_doc_str = py_func.__doc__
