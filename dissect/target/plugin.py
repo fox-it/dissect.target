@@ -1138,6 +1138,9 @@ class PluginFunction:
     method_name: str
     plugin_desc: PluginDescriptor = field(hash=False)
 
+    def __repr__(self) -> str:
+        return self.path
+
 
 def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDescriptor], set[str]]:
     """Returns an index-list for plugins.

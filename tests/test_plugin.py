@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from functools import reduce
 from pathlib import Path
@@ -5,6 +6,8 @@ from typing import Iterator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
+from docutils.core import publish_string
+from docutils.utils import SystemMessage
 from flow.record import Record
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -18,6 +21,7 @@ from dissect.target.plugin import (
     OSPlugin,
     Plugin,
     alias,
+    PluginFunction,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -580,3 +584,63 @@ def test_plugin_alias(target_bare: Target) -> None:
     assert target_bare.has_function("bar")
     assert target_bare.has_function("baz")
     assert list(target_bare.foo()) == list(target_bare.bar()) == list(target_bare.baz())
+
+
+@pytest.mark.parametrize(
+    "func_path, func",
+    [(func.path, func) for func in find_plugin_functions(Target(), "*", compatibility=False, show_hidden=True)[0]],
+)
+def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
+    """This test checks plugin style guide conformity for all exported plugins.
+    Resources: https://docs.dissect.tools/en/latest/contributing/style-guide.html
+    """
+
+    # Ignore DefaultPlugin and NamespacePlugin instances
+    if func.class_object.__name__ == "DefaultPlugin" or func.class_object.__base__.__name__ == "NamespacePlugin":
+        return
+
+    # Plugin method should specify what it returns
+    assert func.output_type in ["record", "yield", "text", "none"]
+
+    py_func = getattr(func.class_object, func.method_name)
+    annotations = None
+
+    if hasattr(py_func, "__annotations__"):
+        annotations = py_func.__annotations__
+
+    elif isinstance(py_func, property):
+        annotations = py_func.fget.__annotations__
+
+    # Plugin method should have a return annotation
+    if not annotations or "return" not in annotations.keys():
+        raise ValueError(f"No return type annotation for function {func}")
+
+    # Plugin method should have a docstring
+    method_doc_str = py_func.__doc__
+    assert isinstance(method_doc_str, str)
+    assert method_doc_str != ""
+
+    # The method docstring should compile to rst without warnings
+    try:
+        publish_string(method_doc_str, settings_overrides={"halt_level": 2})
+
+    except SystemMessage as e:
+        # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
+        # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
+        if "Unknown interpreted text role" not in str(e):
+            raise
+
+    # Plugin class should have a docstring
+    class_doc_str = func.class_object.__doc__
+    assert isinstance(class_doc_str, str)
+    assert class_doc_str != ""
+
+    # The class docstring should compile to rst without warnings
+    try:
+        publish_string(class_doc_str, settings_overrides={"halt_level": 2})
+
+    except SystemMessage as e:
+        # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
+        # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
+        if "Unknown interpreted text role" not in str(e):
+            raise
