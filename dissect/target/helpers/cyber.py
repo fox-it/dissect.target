@@ -52,6 +52,8 @@ MATRIX_REVEAL_SECONDS = 4
 
 
 class Color(Enum):
+    """Cyber colors"""
+
     BLACK = 30
     RED = 31
     GREEN = 32

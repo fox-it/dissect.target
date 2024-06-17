@@ -1,3 +1,5 @@
+from typing import Iterator, Union
+
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -37,7 +39,7 @@ class RegfPlugin(Plugin):
             raise UnsupportedPluginError("Registry plugin not loaded")
 
     @export(record=[RegistryKeyRecord, RegistryValueRecord])
-    def regf(self):
+    def regf(self) -> Iterator[Union[RegistryKeyRecord, RegistryValueRecord]]:
         """Return all registry keys and values.
 
         The Windows Registry is a hierarchical database that stores low-level settings for the Windows operating system

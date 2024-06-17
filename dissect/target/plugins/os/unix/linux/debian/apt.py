@@ -7,16 +7,19 @@ from zoneinfo import ZoneInfo
 from dissect.target import Target, plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.os.unix.packagemanager import (
+from dissect.target.plugins.os.unix.linux.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
+    PackageManagerPlugin,
 )
 
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 REGEX_PACKAGE_NAMES = re.compile(r"(.*?\)),?")
 
 
-class AptPlugin(plugin.Plugin):
+class AptPlugin(PackageManagerPlugin):
+    """Apt package manager plugin."""
+
     __namespace__ = "apt"
 
     LOG_DIR_PATH = "/var/log/apt"

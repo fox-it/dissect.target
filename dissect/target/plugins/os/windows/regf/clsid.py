@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
@@ -50,7 +52,7 @@ class CLSIDPlugin(Plugin):
         if not len(list(self.target.registry.keys(list(self.KEYS.values())))) > 0:
             raise UnsupportedPluginError("No CLSID key found")
 
-    def create_records(self, keys):
+    def create_records(self, keys) -> Iterator[CLSIDRecord]:
         """Iterate all CLSID keys from HKEY_CURRENT_USER\\Software\\Classes\\CLSID and
         HKEY_LOCAL_MACHINE\\SOFTWARE\\Classes\\CLSID.
 
@@ -98,11 +100,11 @@ class CLSIDPlugin(Plugin):
                         )
 
     @export(record=CLSIDRecord)
-    def user(self):
+    def user(self) -> Iterator[CLSIDRecord]:
         """Return only the user CLSID registry keys."""
         yield from self.create_records(self.KEYS["user"])
 
     @export(record=CLSIDRecord)
-    def machine(self):
+    def machine(self) -> Iterator[CLSIDRecord]:
         """Return only the machine CLSID registry keys."""
         yield from self.create_records(self.KEYS["machine"])

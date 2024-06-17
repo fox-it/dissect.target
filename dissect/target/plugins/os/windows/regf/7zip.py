@@ -1,3 +1,5 @@
+from typing import Iterator, Union
+
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -48,6 +50,8 @@ FolderHistoryRecord = TargetRecordDescriptor(
 
 
 class SevenZipPlugin(Plugin):
+    """Windows 7-Zip GUI plugin."""
+
     KEY = "HKCU\\Software\\7-Zip"
 
     def check_compatible(self) -> None:
@@ -71,7 +75,9 @@ class SevenZipPlugin(Plugin):
             pass
 
     @export(record=[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord])
-    def sevenzip(self):
+    def sevenzip(
+        self,
+    ) -> Iterator[Union[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord]]:
         """Return 7-Zip history information from the registry.
 
         7-Zip is an open source file archiver. If the HKCU\\Software\\7-Zip registry key exists, it checks for

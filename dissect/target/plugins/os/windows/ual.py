@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import ual
 
@@ -165,14 +167,14 @@ class UalPlugin(Plugin):
         if not any([path.exists() for path in self.mdb_paths]):
             raise UnsupportedPluginError("No MDB files found")
 
-    def find_mdb_files(self):
+    def find_mdb_files(self) -> list:
         return [
             path
             for path in self.target.fs.path("/").glob(self.LOG_DB_GLOB)
             if path.exists() and path.name != self.IDENTITY_DB_FILENAME
         ]
 
-    def populate_role_guid_map(self):
+    def populate_role_guid_map(self) -> None:
         identity_db = self.target.fs.path(self.IDENTITY_DB_PATH)
         if not identity_db.exists():
             return
@@ -192,7 +194,7 @@ class UalPlugin(Plugin):
                 "role_name": record.get("RoleName"),
             }
 
-    def read_table_records(self, table_name):
+    def read_table_records(self, table_name) -> Iterator[tuple]:
         for mdb_path in self.mdb_paths:
             fh = mdb_path.open()
             try:
@@ -206,7 +208,7 @@ class UalPlugin(Plugin):
                 yield mdb_path, values
 
     @export(record=ClientAccessRecord)
-    def client_access(self):
+    def client_access(self) -> Iterator[ClientAccessRecord]:
         """Return client access data within the User Access Logs."""
         for path, client_record in self.read_table_records("CLIENTS"):
             common_values = {k: v for k, v in client_record.items() if k != "activity_counts"}
@@ -224,7 +226,7 @@ class UalPlugin(Plugin):
                 )
 
     @export(record=RoleAccessRecord)
-    def role_access(self):
+    def role_access(self) -> Iterator[RoleAccessRecord]:
         """Return role access data within the User Access Logs."""
         for path, record in self.read_table_records("ROLE_ACCESS"):
             role_guid_data = self.role_guid_map.get(record.get("role_guid"), {})
@@ -237,19 +239,19 @@ class UalPlugin(Plugin):
             )
 
     @export(record=VirtualMachineRecord)
-    def virtual_machines(self):
+    def virtual_machines(self) -> Iterator[VirtualMachineRecord]:
         """Return virtual machine data within the User Access Logs."""
         for path, record in self.read_table_records("VIRTUALMACHINES"):
             yield VirtualMachineRecord(path=path, _target=self.target, **record)
 
     @export(record=DomainSeenRecord)
-    def domains_seen(self):
+    def domains_seen(self) -> Iterator[DomainSeenRecord]:
         """Return DNS data within the User Access Logs."""
         for path, record in self.read_table_records("DNS"):
             yield DomainSeenRecord(path=path, _target=self.target, **record)
 
     @export(record=SystemIdentityRecord)
-    def system_identities(self):
+    def system_identities(self) -> Iterator[SystemIdentityRecord]:
         """Return system identity data within the User Access Logs."""
         if not self.identity_db_parser:
             return

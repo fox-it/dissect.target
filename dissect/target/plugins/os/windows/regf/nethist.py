@@ -1,5 +1,6 @@
 import datetime
 import struct
+from typing import Iterator
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -22,6 +23,8 @@ NetworkHistoryRecord = TargetRecordDescriptor(
 
 
 class NethistPlugin(Plugin):
+    """Windows network history plugin."""
+
     KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Signatures"
     PROFILE_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Profiles"
 
@@ -30,7 +33,7 @@ class NethistPlugin(Plugin):
             raise UnsupportedPluginError("No Networklist registry keys found")
 
     @export(record=NetworkHistoryRecord)
-    def network_history(self):
+    def network_history(self) -> Iterator[NetworkHistoryRecord]:
         """Return attached network history.
 
         The HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Networklist\\Signatures and

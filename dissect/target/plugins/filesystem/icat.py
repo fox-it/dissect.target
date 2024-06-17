@@ -27,24 +27,26 @@ class ICatPlugin(Plugin):
     )
     @arg("--ads", type=str, default="", help="Alternate Data Stream name")
     @export(output="none")
-    def icat(self, inum, fs, ads):
+    def icat(self, inum, fs, ads) -> None:
         """Output the contents of a file based on its MFT segment or inode number. Supports Alternate Data Streams
 
         Example:
-            # outputs contents of segment defaults to 'sysvol'
-            target-query <TARGET> -f icat --segment 96997
+            .. code-block::
 
-            # outputs contents of inode defaults to '/'
-            target-query <TARGET> -f icat --inode 50947
+                # outputs contents of segment defaults to 'sysvol'
+                target-query <TARGET> -f icat --segment 96997
 
-            # outputs contents of segment's ADS
-            target-query <TARGET> -f icat --segment 96997 --ads Zone.Identifier
+                # outputs contents of inode defaults to '/'
+                target-query <TARGET> -f icat --inode 50947
 
-            # outputs contents of segment in filesystem 3 of target
-            target-query <TARGET> -f icat --fs 3 --segment 96997
+                # outputs contents of segment's ADS
+                target-query <TARGET> -f icat --segment 96997 --ads Zone.Identifier
 
-            # outputs contents of inode in filesystem 2 of target
-            target-query <TARGET> -f icat --fs 2 --inode 50947
+                # outputs contents of segment in filesystem 3 of target
+                target-query <TARGET> -f icat --fs 3 --segment 96997
+
+                # outputs contents of inode in filesystem 2 of target
+                target-query <TARGET> -f icat --fs 2 --inode 50947
         """
 
         open_as = None

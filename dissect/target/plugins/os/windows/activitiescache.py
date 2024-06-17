@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Iterator, Optional
+
 from dissect.sql import sqlite3
 from dissect.util.ts import from_unix
 
@@ -62,7 +65,7 @@ class ActivitiesCachePlugin(Plugin):
             raise UnsupportedPluginError("No ActiviesCache.db files found")
 
     @export(record=ActivitiesCacheRecord)
-    def activitiescache(self):
+    def activitiescache(self) -> Iterator[ActivitiesCacheRecord]:
         """Return ActivitiesCache.db database content.
 
         The Windows Activities Cache database keeps track of activity on a device, such as application and services
@@ -143,7 +146,7 @@ class ActivitiesCachePlugin(Plugin):
                 )
 
 
-def mkts(ts):
+def mkts(ts: int) -> Optional[datetime]:
     """Timestamps inside ActivitiesCache.db are stored in a Unix-like format.
 
     Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/

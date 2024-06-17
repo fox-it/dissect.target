@@ -31,6 +31,8 @@ def find_sshd_directory(target: Target) -> TargetPath:
 
 
 class OpenSSHPlugin(SSHPlugin):
+    """OpenSSH Plugin."""
+
     __namespace__ = "openssh"
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]
