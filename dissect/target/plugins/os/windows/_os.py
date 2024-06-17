@@ -80,7 +80,7 @@ class WindowsPlugin(OSPlugin):
 
         sysvol = self.target.fs.mounts.get("sysvol")
         # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
-        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts.get("sysvol", None)) == 1:
+        if operator.countOf(self.target.fs.mounts.values(), sysvol) == 1:
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
                 self.target.fs.mount("c:", sysvol)
