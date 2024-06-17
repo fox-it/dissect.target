@@ -21,7 +21,7 @@ class WindowsPlugin(OSPlugin):
         self.add_mounts()
 
         target.props["sysvol_drive"] = next(
-            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts["sysvol"] and mnt != "sysvol"),
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts.get("sysvol", None) and mnt != "sysvol"),
             None,
         )
 
@@ -79,10 +79,10 @@ class WindowsPlugin(OSPlugin):
             self.target.log.debug("", exc_info=e)
 
         # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
-        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts["sysvol"]) == 1:
+        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts.get("sysvol", None)) == 1:
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
-                self.target.fs.mount("c:", self.target.fs.mounts["sysvol"])
+                self.target.fs.mount("c:", self.target.fs.mounts.get("sysvol", None))
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
 
