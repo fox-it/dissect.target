@@ -1,9 +1,12 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
 
 
-def find_vm_inventory(target):
+def find_vm_inventory(target) -> Iterator[TargetPath]:
     for user_details in target.user_details.all_with_home():
         inv_file = user_details.home_path.joinpath("AppData/Roaming/VMware/inventory.vmls")
         if inv_file.exists():
@@ -23,7 +26,7 @@ class WorkstationChildTargetPlugin(ChildTargetPlugin):
         if not len(self.inventories):
             raise UnsupportedPluginError("No VMWare inventories found")
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for inv in self.inventories:
             for line in inv.open("rt"):
                 line = line.strip()

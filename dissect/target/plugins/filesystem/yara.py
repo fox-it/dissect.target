@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Iterator
 
 try:
     import yara
@@ -32,7 +33,7 @@ class YaraPlugin(Plugin):
     @arg("--scan-path", default="/", help="path to recursively scan")
     @arg("--max-size", "-m", default=DEFAULT_MAX_SIZE, help="maximum file size in bytes to scan")
     @export(record=YaraMatchRecord)
-    def yara(self, rule_files, scan_path="/", max_size=DEFAULT_MAX_SIZE):
+    def yara(self, rule_files, scan_path="/", max_size=DEFAULT_MAX_SIZE) -> Iterator[YaraMatchRecord]:
         """Scan files up to a given maximum size with a local YARA rule file.
 
         Example:

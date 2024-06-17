@@ -1,6 +1,7 @@
 import struct
 from enum import IntEnum
 from io import BytesIO
+from typing import Iterator
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -86,7 +87,7 @@ class CapabilityPlugin(Plugin):
             raise UnsupportedPluginError("Unsupported plugin")
 
     @export(record=CapabilityRecord)
-    def capability_binaries(self):
+    def capability_binaries(self) -> Iterator[CapabilityRecord]:
         """Find all files that have capabilities set."""
         for path_entries, _, files in self.target.fs.walk_ext("/"):
             entries = [path_entries[-1]] + files

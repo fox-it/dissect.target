@@ -115,6 +115,8 @@ class MLocateFile:
 
 
 class MLocatePlugin(BaseLocatePlugin):
+    """Unix mlocate plugin."""
+
     __namespace__ = "mlocate"
 
     path = "/var/lib/mlocate/mlocate.db"

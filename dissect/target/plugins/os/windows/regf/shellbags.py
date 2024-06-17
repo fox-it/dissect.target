@@ -1,6 +1,7 @@
 import io
 import logging
 import uuid
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import dostimestamp
@@ -286,7 +287,7 @@ class ShellBagsPlugin(Plugin):
             raise UnsupportedPluginError("No shellbags found")
 
     @export(record=ShellBagRecord)
-    def shellbags(self):
+    def shellbags(self) -> Iterator[ShellBagRecord]:
         """Return Windows Shellbags.
 
         Shellbags are registry keys to improve user experience when using Windows Explorer. It stores information about

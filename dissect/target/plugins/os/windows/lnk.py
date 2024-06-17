@@ -35,6 +35,8 @@ LnkRecord = TargetRecordDescriptor(
 
 
 class LnkPlugin(Plugin):
+    """Windows lnk plugin."""
+
     def __init__(self, target: Target) -> None:
         super().__init__(target)
         self.folders = ["programdata", "users", "windows"]

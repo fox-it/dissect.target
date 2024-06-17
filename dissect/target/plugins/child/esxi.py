@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -12,7 +14,7 @@ class ESXiChildTargetPlugin(ChildTargetPlugin):
         if self.target.os != "esxi":
             raise UnsupportedPluginError("Not an ESXi operating system")
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for vm in self.target.vm_inventory():
             yield ChildTargetRecord(
                 type=self.__type__,

@@ -1,5 +1,5 @@
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix.packagemanager import PackageManagerPlugin
+from dissect.target.plugins.os.unix.linux.packagemanager import PackageManagerPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 

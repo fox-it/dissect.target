@@ -163,6 +163,8 @@ class PLocateFile:
 
 
 class PLocatePlugin(BaseLocatePlugin):
+    """Unix plocate plugin."""
+
     __namespace__ = "plocate"
 
     path = "/var/lib/plocate/plocate.db"
@@ -177,7 +179,7 @@ class PLocatePlugin(BaseLocatePlugin):
             )
 
     @export(record=PLocateRecord)
-    def locate(self) -> PLocateRecord:
+    def locate(self) -> Iterator[PLocateRecord]:
         """Yield file and directory names from the plocate.db.
 
         ``plocate`` is the default package on Ubuntu 22 and newer to locate files.

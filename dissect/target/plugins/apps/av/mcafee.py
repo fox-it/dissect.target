@@ -40,6 +40,8 @@ re_strip_tags = re.compile(r"<[^!][^>]*>")
 
 
 class McAfeePlugin(Plugin):
+    """McAfee antivirus Plugin."""
+
     __namespace__ = "mcafee"
 
     DIRS = [

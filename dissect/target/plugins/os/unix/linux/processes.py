@@ -18,6 +18,8 @@ ProcProcessRecord = TargetRecordDescriptor(
 
 
 class ProcProcesses(Plugin):
+    """Linux ``/proc`` process volatile plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 

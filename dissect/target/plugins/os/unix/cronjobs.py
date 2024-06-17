@@ -1,4 +1,5 @@
 import re
+from typing import Iterator, Union
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -28,10 +29,12 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
 
 
 class CronjobPlugin(Plugin):
+    """Unix cronjob plugin."""
+
     def check_compatible(self) -> None:
         pass
 
-    def parse_crontab(self, file_path):
+    def parse_crontab(self, file_path) -> Iterator[Union[CronjobRecord, EnvironmentVariableRecord]]:
         for line in file_path.open("rt"):
             line = line.strip()
             if line.startswith("#") or not len(line):
@@ -67,9 +70,8 @@ class CronjobPlugin(Plugin):
                 )
 
     @export(record=[CronjobRecord, EnvironmentVariableRecord])
-    def cronjobs(self):
-        """
-        Return all cronjobs.
+    def cronjobs(self) -> Iterator[Union[CronjobRecord, EnvironmentVariableRecord]]:
+        """Yield cronjobs on the unix system.
 
         A cronjob is a scheduled task/command on a Unix based system. Adversaries may use cronjobs to gain
         persistence on the system.

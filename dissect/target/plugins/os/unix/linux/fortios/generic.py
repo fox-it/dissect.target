@@ -9,6 +9,8 @@ from dissect.target.plugins.os.unix.generic import calculate_last_activity
 
 
 class GenericPlugin(Plugin):
+    """Generic FortiOS plugin."""
+
     def check_compatible(self) -> None:
         if self.target.os != "fortios":
             raise UnsupportedPluginError("FortiOS specific plugin loaded on non-FortiOS target")
