@@ -83,7 +83,7 @@ class WindowsPlugin(OSPlugin):
         if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts.get("sysvol", None)) == 1:
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
-                self.target.fs.mount("c:", self.target.fs.mounts.get("sysvol", None))
+                self.target.fs.mount("c:", sysvol)
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
 
