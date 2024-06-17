@@ -697,16 +697,18 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         ]
     ]:
         mplog_directory = self.target.fs.path(DEFENDER_MPLOG_DIR)
-        if mplog_directory.exists() and mplog_directory.is_dir():
-            for mplog_file in mplog_directory.iterdir():
-                if mplog_file.name.startswith("MPLog-"):
-                    for encoding in ["UTF-16", "UTF-8"]:
-                        try:
-                            with mplog_file.open("rt", encoding=encoding) as mplog:
-                                yield from self._mplog(mplog)
-                            break
-                        except UnicodeError:
-                            continue
+
+        if not (mplog_directory.exists() and mplog_directory.is_dir()):
+            return
+
+        for mplog_file in mplog_directory.glob("MPLog-*"):
+            for encoding in ["UTF-16", "UTF-8"]:
+                try:
+                    with mplog_file.open("rt", encoding=encoding) as mplog:
+                        yield from self._mplog(mplog)
+                    break
+                except UnicodeError:
+                    continue
 
     @plugin.arg(
         "--output",
