@@ -78,6 +78,7 @@ class WindowsPlugin(OSPlugin):
             self.target.log.warning("Failed to map drive letters")
             self.target.log.debug("", exc_info=e)
 
+        sysvol = self.target.fs.mounts.get("sysvol")
         # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
         if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts.get("sysvol", None)) == 1:
             if "c:" not in self.target.fs.mounts:
