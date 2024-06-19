@@ -571,7 +571,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             **data,
         )
 
-    def _mplog_rtp(self, data: dict) -> Iterator[DefenderMPLogRTPRecord]:
+    def _mplog_rtp_log(self, data: dict) -> Iterator[DefenderMPLogRTPRecord]:
         times = {}
         for dtkey in ["ts", "last_perf", "first_rtp_scan"]:
             try:
