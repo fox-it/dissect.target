@@ -1,10 +1,3 @@
-rule test_rule_name : tag1 tag2 tag3 {
-    meta:
-        foo = "bar"
-
-    strings:
-        $ = "test string" // some comment
-
-    condition:
-        any of them
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:26aec270fa7eae93b25f247415ce30463190bceed50adecf2804c9e65f1698e1
+size 162

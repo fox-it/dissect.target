@@ -7,7 +7,7 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin
+from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin, is_valid_yara
 from tests._utils import absolute_path
 
 if HAS_YARA:
@@ -42,16 +42,20 @@ def test_yara_plugin(target_yara: Target) -> None:
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
 @pytest.mark.parametrize(
-    "rules,expected_hits",
+    "rules,expected_hits,should_be_valid",
     [
-        (["/does/not/exist"], 0),
-        ([rule_file, rule_file], 2),
-        ([rule_file, another_rule_file], 4),
-        ([rule_dir], 4),
-        ([invalid_rule], 0),
+        (["/does/not/exist"], 0, False),
+        ([rule_file, rule_file], 2, True),
+        ([rule_file, another_rule_file], 4, True),
+        ([rule_dir], 4, False),  # contains invalid.yar
+        ([invalid_rule], 0, False),
     ],
 )
-def test_yara_plugin_invalid_rules(target_yara: Target, rules: list[str | Path], expected_hits: int) -> None:
+def test_yara_plugin_invalid_rules(
+    target_yara: Target, rules: list[str | Path], expected_hits: int, should_be_valid: bool
+) -> None:
+    assert is_valid_yara(files={str(file): file for file in rules}) == should_be_valid
+
     results = list(target_yara.yara(rules=rules, check=True))
     assert len(results) == expected_hits
 

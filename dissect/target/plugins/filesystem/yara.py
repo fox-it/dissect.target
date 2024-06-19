@@ -146,23 +146,34 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
                 compiled_rules = compile_yara(file, is_compiled=True)
                 break
 
-        elif check and not compile_yara({"check_namespace": file}):
+        elif check and not is_valid_yara({"check_namespace": file}):
             log.warning("File %s contains invalid rule(s)!", file)
             files.remove(file)
             continue
 
     if files and not compiled_rules:
-        compiled_rules = compile_yara({md5(file.as_posix().encode("utf-8")).digest().hex(): file for file in files})
+        try:
+            compiled_rules = compile_yara({md5(file.as_posix().encode("utf-8")).digest().hex(): file for file in files})
+        except yara.Error as e:
+            log.error("Failed to compile YARA file(s): %s", e)
 
     return compiled_rules
 
 
 def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> Optional[yara.Rules]:
+    """Compile or load the given YARA file(s) to rules."""
+    if is_compiled and isinstance(files, Path):
+        return yara.load(files.as_posix())
+    else:
+        return yara.compile(filepaths={ns: Path(path).as_posix() for ns, path in files.items()})
+
+
+def is_valid_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> bool:
+    """Determine if the given YARA file(s) compile without errors or warnings."""
     try:
-        if is_compiled and isinstance(files, Path):
-            return yara.load(files.as_posix())
-        else:
-            return yara.compile(filepaths={ns: Path(path).as_posix() for ns, path in files.items()})
+        compile_yara(files, is_compiled)
+        return True
+
     except (yara.SyntaxError, yara.WarningError, yara.Error) as e:
-        log.debug("Rule file is invalid: %s", e)
-        return None
+        log.debug("Rule file(s) '%s' invalid: %s", files, e)
+        return False
