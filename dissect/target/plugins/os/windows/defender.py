@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator, Union
+from typing import Any, BinaryIO, Iterable, Iterator, Union
 
 import dissect.util.ts as ts
 from dissect.cstruct import Structure, cstruct
@@ -368,7 +368,7 @@ class QuarantineEntryResource:
             # Move pointer
             offset += 4 + field.Size
 
-    def _add_field(self, field: Structure):
+    def _add_field(self, field: Structure) -> None:
         if field.Identifier == FIELD_IDENTIFIER.CQuaResDataID_File:
             self.resource_id = field.Data.hex().upper()
         elif field.Identifier == FIELD_IDENTIFIER.PhysicalPath:
@@ -409,7 +409,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No Defender objects found")
 
     @plugin.export(record=DefenderLogRecord)
-    def evtx(self) -> Generator[Record, None, None]:
+    def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files"""
 
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]

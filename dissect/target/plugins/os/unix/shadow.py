@@ -25,6 +25,8 @@ UnixShadowRecord = TargetRecordDescriptor(
 
 
 class ShadowPlugin(Plugin):
+    """Unix shadow passwords plugin."""
+
     def check_compatible(self) -> None:
         if not self.target.fs.path("/etc/shadow").exists():
             raise UnsupportedPluginError("No shadow file found")

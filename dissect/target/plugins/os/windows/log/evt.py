@@ -1,7 +1,7 @@
 import fnmatch
 import re
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, List, Optional
+from typing import Any, BinaryIO, Generator, Iterator, List, Optional
 
 from dissect.eventlog import evt
 from flow.record import Record
@@ -112,6 +112,8 @@ class WindowsEventlogsMixin:
 
 
 class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
+    """Windows ``.evt`` event log plugin."""
+
     LOGS_DIR_PATH = "sysvol/windows/system32/config"
 
     NEEDLE = b"LfLe"
@@ -120,8 +122,8 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=EvtRecordDescriptor)
-    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: Optional[str] = None) -> Generator[Record, None, None]:
-        """Parse Windows Eventlog files (*.evt).
+    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: Optional[str] = None) -> Iterator[EvtRecordDescriptor]:
+        """Parse Windows Eventlog files (``*.evt``).
 
         Yields dynamically created records based on the fields in the event.
         At least contains the following fields:
@@ -174,7 +176,7 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         )
 
     @plugin.export(record=EvtRecordDescriptor)
-    def scraped_evt(self) -> Generator[Record, None, None]:
+    def scraped_evt(self) -> Iterator[EvtRecordDescriptor]:
         """Yields EVT log file records scraped from target disks"""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,

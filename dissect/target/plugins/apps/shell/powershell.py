@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -14,6 +16,8 @@ ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExten
 
 
 class PowerShellHistoryPlugin(Plugin):
+    """Windows PowerShell history plugin."""
+
     PATHS = [
         "AppData/Roaming/Microsoft/Windows/PowerShell/psreadline",
         ".local/share/powershell/PSReadLine",
@@ -35,10 +39,10 @@ class PowerShellHistoryPlugin(Plugin):
             raise UnsupportedPluginError("No ConsoleHost_history.txt files found")
 
     @export(record=ConsoleHostHistoryRecord)
-    def powershell_history(self):
+    def powershell_history(self) -> Iterator[ConsoleHostHistoryRecord]:
         """Return PowerShell command history for all users.
 
-        The PowerShell ConsoleHost_history.txt file contains information about the commands executed with PowerShell in
+        The PowerShell ``ConsoleHost_history.txt`` file contains information about the commands executed with PowerShell in
         a terminal. No data is recorded from terminal-less PowerShell sessions. Commands are saved to disk after the process has completed.
         PSReadLine does not save commands containing 'password', 'asplaintext', 'token', 'apikey' or 'secret'.
 

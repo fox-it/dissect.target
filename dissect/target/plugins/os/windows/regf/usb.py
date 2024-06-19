@@ -1,4 +1,5 @@
 import struct
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
@@ -36,7 +37,7 @@ USB_DEVICE_PROPERTY_KEYS = {
 
 
 class UsbPlugin(Plugin):
-    """USB plugin."""
+    """Windows USB plugin."""
 
     # USB device locations
     USB_STOR = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR"
@@ -52,9 +53,11 @@ class UsbPlugin(Plugin):
 
     @internal
     def unpack_timestamps(self, usb_reg_properties):
-        """
+        """Unpack timestamps from the provided registry object.
+
         Params:
             usb_reg_properties (Regf): A registry object with USB properties
+
         Returns:
             timestamps (Dict): A dict containing parsed timestamps within passed registry object
         """
@@ -86,7 +89,7 @@ class UsbPlugin(Plugin):
         return dict(device_type=device_type, vendor=vendor, product=product, version=version)
 
     @export(record=UsbRegistryRecord)
-    def usb(self):
+    def usb(self) -> Iterator[UsbRegistryRecord]:
         """Return information about attached USB devices.
 
         Use the registry to find information about USB devices that have been attached to the system, for example the

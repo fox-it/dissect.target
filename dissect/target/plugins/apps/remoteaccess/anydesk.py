@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import export
@@ -52,7 +53,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
             raise UnsupportedPluginError("No Anydesk logs found")
 
     @export(record=RemoteAccessRecord)
-    def logs(self):
+    def logs(self) -> Iterator[RemoteAccessRecord]:
         """Return the content of the AnyDesk logs.
 
         AnyDesk is a remote desktop application and can be used by adversaries to get (persistent) access to a machine.

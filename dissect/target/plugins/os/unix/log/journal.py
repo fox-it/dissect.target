@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import lzma
-from typing import BinaryIO, Callable, Iterator
+from typing import Any, BinaryIO, Callable, Iterator, Optional
 
 import zstandard
 from dissect.cstruct import cstruct
@@ -257,7 +257,7 @@ struct EntryArrayObject_Compact {
 c_journal = cstruct().load(journal_def)
 
 
-def get_optional(value: str, to_type: Callable):
+def get_optional(value: str, to_type: Callable) -> Optional[Any]:
     """Return the value if True, otherwise return None."""
     return to_type(value) if value else None
 
@@ -370,6 +370,8 @@ class JournalFile:
 
 
 class JournalPlugin(Plugin):
+    """Unix journal log plugin."""
+
     JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
     JOURNAL_SIGNATURE = "LPKSHHRH"
