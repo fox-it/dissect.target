@@ -18,6 +18,7 @@ DefenderMPLogMinFilUSSRecord = TargetRecordDescriptor(
     "windows/defender/mplog/minfiluss",
     [
         ("datetime", "ts"),
+        ("path", "path"),
         ("string", "process"),
         ("string", "status"),
         ("string", "state"),

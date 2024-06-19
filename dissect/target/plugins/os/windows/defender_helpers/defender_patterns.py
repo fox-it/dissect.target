@@ -44,7 +44,7 @@ DEFENDER_MPLOG_PATTERNS = [
             "".join(
                 [
                     DEFENDER_MPLOG_TS_PATTERN,
-                    r"\[Mini-filter\] (Unsuccessful scan status)[^:]*: (.+) ",
+                    r"\[Mini-filter\] (Unsuccessful scan status)[^:]*: (?P<path>.+) ",
                     r"Process: (?P<process>.+), ",
                     r"Status: (?P<status>.+), ",
                     r"State: (?P<state>.+), ",
