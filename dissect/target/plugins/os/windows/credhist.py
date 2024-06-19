@@ -53,8 +53,7 @@ struct entry {
 };
 """
 
-c_credhist = cstruct()
-c_credhist.load(credhist_def)
+c_credhist = cstruct().load(credhist_def)
 
 
 @dataclass
