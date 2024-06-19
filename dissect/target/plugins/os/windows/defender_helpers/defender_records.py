@@ -163,7 +163,7 @@ DefenderMPLogThreatActionRecord = TargetRecordDescriptor(
 )
 
 DefenderMPLogRTPRecord = TargetRecordDescriptor(
-    "windows/defender/mplog/rtp",
+    "windows/defender/mplog/rtp_log",
     [
         ("datetime", "ts"),
         ("datetime", "last_perf"),
