@@ -354,7 +354,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CIT_RECORDS = [
+CITRecords = Union[
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
@@ -643,8 +643,8 @@ class CITPlugin(Plugin):
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No CIT registry key found")
 
-    @export(record=CIT_RECORDS)
-    def cit(self) -> Iterator[CIT_RECORDS]:
+    @export(record=CITRecords)
+    def cit(self) -> Iterator[CITRecords]:
         """Return CIT data from the registry for executed executable information.
 
         CIT data is stored at HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\System.
