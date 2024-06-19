@@ -4,6 +4,7 @@ DefenderMPLogProcessImageRecord = TargetRecordDescriptor(
     "windows/defender/mplog/processimage",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "process_image_name"),
         ("varint", "pid"),
         ("varint", "total_time"),
@@ -18,6 +19,7 @@ DefenderMPLogMinFilUSSRecord = TargetRecordDescriptor(
     "windows/defender/mplog/minfiluss",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("path", "path"),
         ("string", "process"),
         ("string", "status"),
@@ -38,6 +40,7 @@ DefenderMPLogMinFilBlockedFileRecord = TargetRecordDescriptor(
     "windows/defender/mplog/blockedfile",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "blocked_file"),
         ("string", "process"),
         ("string", "status"),
@@ -59,6 +62,7 @@ DefenderMPLogBMTelemetryRecord = TargetRecordDescriptor(
     "windows/defender/mplog/bmtelemetry",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "guid"),
         ("varint", "signature_id"),
         ("string", "sigsha"),
@@ -76,6 +80,7 @@ DefenderMPLogEMSRecord = TargetRecordDescriptor(
     "windows/defender/mplog/ems",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "process"),
         ("varint", "pid"),
         ("string", "sigseq"),
@@ -88,6 +93,7 @@ DefenderMPLogOriginalFileNameRecord = TargetRecordDescriptor(
     "windows/defender/mplog/originalfilename",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "original_file_name"),
         ("path", "full_path"),
         ("string", "hr"),
@@ -98,6 +104,7 @@ DefenderMPLogExclusionRecord = TargetRecordDescriptor(
     "windows/defender/mplog/exclusion",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("path", "full_path_with_drive_letter"),
         ("path", "full_path_with_device_path"),
     ],
@@ -107,6 +114,7 @@ DefenderMPLogLowfiRecord = TargetRecordDescriptor(
     "windows/defender/mplog/lowfi",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("command", "lowfi"),
     ],
 )
@@ -115,6 +123,7 @@ DefenderMPLogDetectionAddRecord = TargetRecordDescriptor(
     "windows/defender/mplog/detectionadd",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "detection"),
     ],
 )
@@ -124,6 +133,7 @@ DefenderMPLogThreatRecord = TargetRecordDescriptor(
     "windows/defender/mplog/threat",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("command", "threat"),
     ],
 )
@@ -132,6 +142,7 @@ DefenderMPLogDetectionEventRecord = TargetRecordDescriptor(
     "windows/defender/mplog/detectionevent",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "threat_type"),
         ("command", "command"),
     ],
@@ -141,6 +152,7 @@ DefenderMPLogResourceScanRecord = TargetRecordDescriptor(
     "windows/defender/mplog/resourcescan",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string", "scan_id"),
         ("varint", "scan_source"),
         ("datetime", "start_time"),
@@ -157,6 +169,7 @@ DefenderMPLogThreatActionRecord = TargetRecordDescriptor(
     "windows/defender/mplog/threataction",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("string[]", "threats"),
         ("path[]", "resources"),
         ("string[]", "actions"),
@@ -167,6 +180,7 @@ DefenderMPLogRTPRecord = TargetRecordDescriptor(
     "windows/defender/mplog/rtp_log",
     [
         ("datetime", "ts"),
+        ("path", "source_log"),
         ("datetime", "last_perf"),
         ("datetime", "first_rtp_scan"),
         ("string", "plugin_states"),

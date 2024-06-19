@@ -592,7 +592,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         yield DefenderMPLogDetectionEventRecord(**data)
 
     def _mplog_line(
-        self, mplog_line: str
+        self, mplog_line: str, source: Path
     ) -> Iterator[
         DefenderMPLogProcessImageRecord
         | DefenderMPLogMinFilUSSRecord
@@ -609,10 +609,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             if match := pattern.match(mplog_line):
                 data = match.groupdict()
                 data["_target"] = self.target
+                data["source_log"] = source
                 yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
 
     def _mplog_block(
-        self, mplog_line: str, mplog: TextIO
+        self, mplog_line: str, mplog: TextIO, source: Path
     ) -> Iterator[DefenderMPLogResourceScanRecord | DefenderMPLogThreatActionRecord | DefenderMPLogRTPRecord]:
         block = ""
         for prefix, suffix, pattern, record in DEFENDER_MPLOG_BLOCK_PATTERNS:
@@ -627,10 +628,11 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             match = pattern.match(block)
             data = match.groupdict()
             data["_target"] = self.target
+            data["source_log"] = source
             yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
 
     def _mplog(
-        self, mplog: TextIO
+        self, mplog: TextIO, source: Path
     ) -> Iterator[
         DefenderMPLogProcessImageRecord
         | DefenderMPLogMinFilUSSRecord
@@ -648,8 +650,8 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         | DefenderMPLogRTPRecord
     ]:
         while mplog_line := mplog.readline():
-            yield from self._mplog_line(mplog_line)
-            yield from self._mplog_block(mplog_line, mplog)
+            yield from self._mplog_line(mplog_line, source)
+            yield from self._mplog_block(mplog_line, mplog, source)
 
     @plugin.export(
         record=[
@@ -696,7 +698,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             for encoding in ["UTF-16", "UTF-8"]:
                 try:
                     with mplog_file.open("rt", encoding=encoding) as mplog:
-                        yield from self._mplog(mplog)
+                        yield from self._mplog(mplog, Path(mplog_file))
                     break
                 except UnicodeError:
                     continue
