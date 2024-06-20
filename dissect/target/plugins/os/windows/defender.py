@@ -581,6 +581,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
 
         yield DefenderMPLogRTPRecord(
             _target=self.target,
+            source_log=data["source_log"],
             **times,
             plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
             process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),

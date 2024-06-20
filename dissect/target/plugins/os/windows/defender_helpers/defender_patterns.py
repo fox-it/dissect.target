@@ -19,6 +19,8 @@ from dissect.target.plugins.os.windows.defender_helpers.defender_records import 
 
 DEFENDER_MPLOG_TS_PATTERN = r"(?P<ts>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z) "
 
+# Loosely based on https://github.com/Intrinsec/mplog_parser but feel free to add patterns
+
 DEFENDER_MPLOG_PATTERNS = [
     # Process Image
     (

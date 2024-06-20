@@ -169,6 +169,7 @@ def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path
 
 def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "rtp").pop()
+    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2021-05-04 09:54:06+00:00")
     assert record.last_perf == dt("2021-05-04 09:54:06+00:00")
     assert record.first_rtp_scan == dt("2021-05-04 09:54:06+00:00")
@@ -182,6 +183,7 @@ def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_
 
 def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "resourcescan").pop()
+    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2023-01-01 00:00:00+00:00")
     assert record.scan_id == "{1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D}"
     assert record.scan_source == 4
@@ -218,7 +220,7 @@ def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesy
 
 def test_defender_mplogs_threat_actions(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "threatactions").pop()
-
+    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2017-12-25 16:30:45+00:00")
     assert record.threats == ["Worm:Win32/RandomName.X"]
     for item in [
@@ -239,6 +241,7 @@ def test_defender_mplogs_threat_actions(target_win: Target, fs_win: VirtualFiles
 
 def test_defender_mplogs_bmtelemetry(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     record = _mplog_records(target_win, fs_win, tmp_path, "bmtelemetry").pop()
+    assert record.source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert record.ts == dt("2024-07-15 11:45:22+00:00")
     assert record.guid == "{1D3E4F07-89AB-45C2-923D-E5F6789A1B2C}"
     assert record.signature_id == 123456789012345
@@ -256,6 +259,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert len(records) == 10
 
     # Process Image
+    assert records[0].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[0].ts == dt("2024-07-13 14:42:19.659000+00:00")
     assert records[0].process_image_name == "randomapp.exe"
     assert records[0].pid == 5832
@@ -266,6 +270,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[0].estimated_impact == 4
 
     # Lowfi
+    assert records[1].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[1].ts == dt("2023-01-20 08:45:40.321000+00:00")
     assert records[1].lowfi == command(
         "".join(
@@ -277,6 +282,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     )
 
     # Detection Add
+    assert records[2].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[2].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert records[2].detection == "".join(
         [
@@ -286,20 +292,24 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     )
 
     # Threat
+    assert records[3].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[3].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert records[3].threat == command("C:\\Users\\user987\\Documents\\executable.exe")
 
     # Detection event
+    assert records[4].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[4].ts == dt("2023-01-27 15:33:07.698000+00:00")
     assert records[4].threat_type == "MSIL/RndGen!MD5"
     assert records[4].command == command("C:\\Users\\user987\\Documents\\executable.exe")
 
     # Exclusion
+    assert records[5].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[5].ts == dt("2024-08-17 17:35:22.614000+00:00")
     assert records[5].full_path_with_drive_letter == "C:\\example.txt"
     assert records[5].full_path_with_device_path == "example.txt"
 
     # Mini-filter unsuccesful scan
+    assert records[6].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[6].path == "".join(
         [
             "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\",
@@ -322,6 +332,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[6].backing_file_info == "0x0, 0x0, 0x0:0\\0x0:0"
 
     # Mini-filter blocked file
+    assert records[7].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[7].ts == dt("2024-07-13 14:38:15.272000+00:00")
     assert records[7].blocked_file == "".join(
         [
@@ -343,6 +354,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[7].backing_file_info == "0x0, 0x0, 0x0:0\\0x0:0"
 
     # EMS
+    assert records[8].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[8].ts == dt("2024-09-05 10:21:39.417000+00:00")
     assert records[8].process == "sysproc"
     assert records[8].pid == 2820
@@ -351,6 +363,7 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[8].source == 4
 
     # Original Filename
+    assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[9].ts == dt("2024-09-03 18:12:05.364000+00:00")
     assert records[9].original_file_name == "RandomData0123_static.dll"
     assert records[9].full_path == "".join(
