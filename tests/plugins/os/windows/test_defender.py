@@ -300,9 +300,12 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[5].full_path_with_device_path == "example.txt"
 
     # Mini-filter unsuccesful scan
-    assert (
-        records[6].path
-        == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."
+    assert records[6].path == "".join(
+        [
+            "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\",
+            "Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\",
+            "ANWebView\\Default\\Popular URLs.",
+        ]
     )
     assert records[6].ts == dt("2024-07-13 14:38:15.272000+00:00")
     assert records[6].process == "(unknown)"
