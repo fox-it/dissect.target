@@ -690,6 +690,13 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
         | DefenderMPLogThreatActionRecord
         | DefenderMPLogRTPRecord
     ]:
+        """Return the contents of the Defender MPLog file.
+
+        References:
+            - https://www.crowdstrike.com/blog/how-to-use-microsoft-protection-logging-for-forensic-investigations/
+            - https://www.intrinsec.com/hunt-mplogs/
+            - https://github.com/Intrinsec/mplog_parser
+        """
         mplog_directory = self.target.fs.path(DEFENDER_MPLOG_DIR)
 
         if not (mplog_directory.exists() and mplog_directory.is_dir()):
