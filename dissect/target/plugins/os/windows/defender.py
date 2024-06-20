@@ -706,7 +706,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             for encoding in ["UTF-16", "UTF-8"]:
                 try:
                     with mplog_file.open("rt", encoding=encoding) as mplog:
-                        yield from self._mplog(mplog, Path(mplog_file))
+                        yield from self._mplog(mplog, self.target.fs.path(mplog_file))
                     break
                 except UnicodeError:
                     continue
