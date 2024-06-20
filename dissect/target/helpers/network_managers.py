@@ -541,6 +541,9 @@ def parse_unix_dhcp_log_messages(target, iter_all: bool = False) -> list[str]:
     for count, record in messages_enumerate(messages):
         line = record.message
 
+        if not line:
+            continue
+
         # Ubuntu cloud-init
         if "Received dhcp lease on" in line:
             interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
