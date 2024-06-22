@@ -6,12 +6,16 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
-from dissect.target.filesystem import Filesystem
+from dissect.util.stream import BufferedStream
+
+from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
+
+from dissect.target.volumes import lvm
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +24,7 @@ class UnixPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
+        self._add_lvm_devices()
         self._hostname_dict = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
@@ -230,6 +235,15 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
+    def _add_lvm_devices(self) -> None:
+        """Parses and mounts lvm devices from external target to local target fs"""
+        vfs = VirtualFilesystem()
+        for volume in self.target.volumes:
+            if isinstance(volume.vs, lvm.LvmVolumeSystem) and "disk" in volume.name:
+                vfs.map_file_fh(f"{volume.raw.vg.name}/{volume.raw.name}", BufferedStream(volume))
+    
+        self.target.fs.mount("/dev", vfs)
+                    
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
         """Parse files containing Unix version information.
 
