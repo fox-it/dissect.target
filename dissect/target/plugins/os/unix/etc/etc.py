@@ -57,11 +57,8 @@ class EtcTree(ConfigurationTreePlugin):
 
     @export(record=UnixConfigTreeRecord)
     @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    @arg(
-        "--root", dest="root", required=False, default=Path("/"), type=Path, help="Starting point in configuration tree"
-    )
-    def etc(self, pattern: str, root: Path) -> Iterator[UnixConfigTreeRecord]:
-        for entry, subs, items in self.config_fs.walk(str(root)):
+    def etc(self, pattern: str) -> Iterator[UnixConfigTreeRecord]:
+        for entry, subs, items in self.config_fs.walk("/"):
             for item in items:
                 try:
                     config_object = self.get(str(Path(entry) / Path(item)))
