@@ -270,19 +270,25 @@ class Broker:
     case = None
     bytes_received = 0
     monitor = False
+    username = None
+    password = None
 
     diskinfo = {}
     index = {}
     topo = {}
     factor = 1
 
-    def __init__(self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, **kwargs):
+    def __init__(
+        self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
+    ):
         self.broker_host = broker
         self.broker_port = int(port)
         self.private_key_file = key
         self.certificate_file = crt
         self.cacert_file = ca
         self.case = case
+        self.username = username
+        self.password = password
         self.command = kwargs.get("command", None)
 
     def clear_cache(self) -> None:
@@ -393,6 +399,7 @@ class Broker:
             tls_version=ssl.PROTOCOL_TLS,
             ciphers=None,
         )
+        self.mqtt_client.username_pw_set(self.username, self.password)
         self.mqtt_client.tls_insecure_set(True)  # merely having the correct cert is ok
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_message = self._on_message
@@ -411,6 +418,8 @@ class Broker:
 @arg("--mqtt-ca", dest="ca", help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
+@arg("--mqtt-username", dest="username", help="Username for connection")
+@arg("--mqtt-password", dest="password", help="Password for connection")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
