@@ -33,8 +33,10 @@ class EtcTree(ConfigurationTreePlugin):
 
     def _sub(self, items: ConfigurationEntry, entry: Path, pattern: str) -> Iterator[UnixConfigTreeRecord]:
         index = 0
+        config_entry = items
         if not isinstance(items, dict):
             items = items.as_dict()
+
         for raw_key, value in items.items():
             key = re.sub(r"[\n\r\t]", "", raw_key)
             path = Path(entry) / Path(key)
@@ -47,7 +49,7 @@ class EtcTree(ConfigurationTreePlugin):
                 value = [str(value)]
 
             if fnmatch.fnmatch(path, pattern):
-                data = {"_target": self.target, "source": entry, "path": path, "key": key, "value": value}
+                data = {"_target": self.target, "source": self.target.fs.path(config_entry.entry.path), "path": path, "key": key, "value": value}
                 if value == [""]:
                     data["key"] = index
                     data["value"] = [key]
