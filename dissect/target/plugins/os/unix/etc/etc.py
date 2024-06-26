@@ -49,7 +49,13 @@ class EtcTree(ConfigurationTreePlugin):
                 value = [str(value)]
 
             if fnmatch.fnmatch(path, pattern):
-                data = {"_target": self.target, "source": self.target.fs.path(config_entry.entry.path), "path": path, "key": key, "value": value}
+                data = {
+                    "_target": self.target,
+                    "source": self.target.fs.path(config_entry.entry.path),
+                    "path": path,
+                    "key": key,
+                    "value": value,
+                }
                 if value == [""]:
                     data["key"] = index
                     data["value"] = [key]
