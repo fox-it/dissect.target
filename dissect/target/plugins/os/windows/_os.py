@@ -247,13 +247,21 @@ class WindowsPlugin(OSPlugin):
         if any(map(lambda value: value is not None, version_parts.values())):
             version = []
 
-            prodcut_name = _part_str(version_parts, "ProductName")
-            version.append(prodcut_name)
-
             nt_version = _part_str(version_parts, "CurrentVersion")
+            build_version = _part_str(version_parts, "CurrentBuildNumber")
+            prodcut_name = _part_str(version_parts, "ProductName")
+
+            # CurrentBuildNumber >= 22000 on NT 10.0 indicates Windows 11.
+            # https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+            try:
+                if nt_version == "10.0" and int(build_version) >= 22_000:
+                    prodcut_name = prodcut_name.replace("Windows 10", "Windows 11")
+            except ValueError:
+                pass
+
+            version.append(prodcut_name)
             version.append(f"(NT {nt_version})")
 
-            build_version = _part_str(version_parts, "CurrentBuildNumber")
             ubr = version_parts["UBR"]
             if ubr:
                 build_version = f"{build_version}.{ubr}"
