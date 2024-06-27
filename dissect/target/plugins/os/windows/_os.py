@@ -21,7 +21,7 @@ class WindowsPlugin(OSPlugin):
         self.add_mounts()
 
         target.props["sysvol_drive"] = next(
-            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts["sysvol"] and mnt != "sysvol"),
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts.get("sysvol") and mnt != "sysvol"),
             None,
         )
 
@@ -78,13 +78,16 @@ class WindowsPlugin(OSPlugin):
             self.target.log.warning("Failed to map drive letters")
             self.target.log.debug("", exc_info=e)
 
+        sysvol_drive = self.target.fs.mounts.get("sysvol")
         # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
-        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts["sysvol"]) == 1:
+        if sysvol_drive and operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
-                self.target.fs.mount("c:", self.target.fs.mounts["sysvol"])
+                self.target.fs.mount("c:", sysvol_drive)
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
+        else:
+            self.target.log.warning("No sysvol drive found")
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
