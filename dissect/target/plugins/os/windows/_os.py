@@ -251,7 +251,7 @@ class WindowsPlugin(OSPlugin):
             # CurrentBuildNumber >= 22000 on NT 10.0 indicates Windows 11.
             # https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
             try:
-                if float(nt_version) == 10.0 and int(build_version) >= 22_000:
+                if nt_version == "10.0" and int(build_version) >= 22_000:
                     prodcut_name = prodcut_name.replace("Windows 10", "Windows 11")
             except ValueError:
                 pass
