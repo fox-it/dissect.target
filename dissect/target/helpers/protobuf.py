@@ -3,29 +3,25 @@ from __future__ import annotations
 from typing import Any, BinaryIO
 
 from dissect.cstruct.types.base import BaseType
-from dissect.cstruct.types.bytesinteger import BytesInteger
 
 
-class ProtobufVarint(BytesInteger):
+class ProtobufVarint(BaseType):
     """Implements a protobuf integer type for dissect.cstruct that can span a variable amount of bytes.
 
-    Mainly follows the cstruct BytesInteger implementation with minor tweaks
-    to support protobuf's msb varint implementation.
+    Supports protobuf's msb varint implementation.
 
     Resources:
         - https://protobuf.dev/programming-guides/encoding/
         - https://github.com/protocolbuffers/protobuf/blob/main/python/google/protobuf/internal/decoder.py
     """
 
-    def _read(self, stream: BinaryIO, context: dict[str, Any] = None) -> int:
+    @classmethod
+    def _read(cls, stream: BinaryIO, context: dict[str, Any] = None) -> int:
         return decode_varint(stream)
 
-    def _write(self, stream: BinaryIO, data: int) -> int:
+    @classmethod
+    def _write(cls, stream: BinaryIO, data: int) -> int:
         return stream.write(encode_varint(data))
-
-    _read_array = BaseType._read_array
-
-    _write_array = BaseType._write_array
 
 
 def decode_varint(stream: BinaryIO) -> int:
