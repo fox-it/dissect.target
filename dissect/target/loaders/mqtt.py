@@ -10,6 +10,7 @@ import time
 import urllib
 from dataclasses import dataclass
 from functools import lru_cache
+from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
@@ -419,7 +420,7 @@ class Broker:
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
 @arg("--mqtt-username", dest="username", help="Username for connection")
-@arg("--mqtt-password", dest="password", help="Password for connection")
+@arg("--mqtt-password", action="store_true", dest="password", help="Ask for password before connecting")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
@@ -445,6 +446,8 @@ class MQTTLoader(Loader):
             if (uri := kwargs.get("parsed_path")) is None:
                 raise LoaderError("No URI connection details have been passed.")
             options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
+            if options.get("password"):
+                options["password"] = getpass()
             cls.broker = Broker(**options)
             cls.broker.connect()
             num_peers = int(options.get("peers", 1))
