@@ -17,7 +17,12 @@ from dissect.sql import sqlite3
 from dissect.target.helpers.fsutil import TargetPath
 
 try:
-    from dissect.hypervisor.util.envelope import Envelope, KeyStore, HAS_PYCRYPTODOME, HAS_PYSTANDALONE
+    from dissect.hypervisor.util.envelope import (
+        HAS_PYCRYPTODOME,
+        HAS_PYSTANDALONE,
+        Envelope,
+        KeyStore,
+    )
 
     HAS_ENVELOPE = HAS_PYCRYPTODOME or HAS_PYSTANDALONE
 except ImportError:
