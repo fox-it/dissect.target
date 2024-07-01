@@ -36,7 +36,9 @@ def find_entry_path(path: Path) -> str | None:
             return prefix
 
 
-def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, **kwargs) -> None:
+def map_dirs(
+    target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, decode_name: bool = False, **kwargs
+) -> None:
     """Map directories as filesystems into the given target.
 
     Args:
@@ -59,7 +61,13 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
             drive_letter = path.name[0]
 
         if isinstance(path, zipfile.Path):
-            dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = ZipFilesystem(
+                path.root.fp,
+                path.at,
+                alt_separator=alt_separator,
+                case_sensitive=case_sensitive,
+                decode_name=decode_name,
+            )
         else:
             dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 
