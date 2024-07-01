@@ -5,6 +5,7 @@ from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.utils import findall
 from dissect.target.plugin import Plugin, export
 
 try:
@@ -34,17 +35,6 @@ CatrootRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
-
-
-def findall(buf: bytes, needle: bytes) -> Iterator[int]:
-    offset = 0
-    while True:
-        offset = buf.find(needle, offset)
-        if offset == -1:
-            break
-
-        yield offset
-        offset += 1
 
 
 def _get_package_name(sequence: Sequence) -> str:
