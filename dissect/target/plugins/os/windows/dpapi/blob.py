@@ -36,8 +36,7 @@ struct DPAPIBlob {
 };
 """
 
-c_blob = cstruct()
-c_blob.load(blob_def)
+c_blob = cstruct().load(blob_def)
 
 
 class Blob:

@@ -2,7 +2,7 @@ import datetime
 import warnings
 from typing import Iterator, Optional
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
@@ -135,8 +135,7 @@ struct ATJOB_DATA {
 //      uint8       job_signature[64 * s_ver * c_ver];  /*      - calculated job signature. */
 };
 """
-atjob = cstruct.cstruct()
-atjob.load(atjob_def)
+c_atjob = cstruct().load(atjob_def)
 
 
 class AtTask:
@@ -149,7 +148,7 @@ class AtTask:
 
     def __init__(self, job_file: TargetPath, target: Target):
         try:
-            self.at_data = atjob.ATJOB_DATA(job_file.open())
+            self.at_data = c_atjob.ATJOB_DATA(job_file.open())
         except Exception as e:
             raise InvalidTaskError(e)
 
