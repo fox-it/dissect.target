@@ -350,7 +350,7 @@ class FirefoxPlugin(BrowserPlugin):
 
             if not extension_file.exists():
                 self.target.log.warning(
-                    "No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir
+                    "No 'extensions.json' addon file found for user %s in directory %s", user.user.name, profile_dir
                 )
                 continue
 
@@ -363,17 +363,25 @@ class FirefoxPlugin(BrowserPlugin):
                         ts_update=extension.get("updateDate", 0) // 1000,
                         browser="firefox",
                         id=extension.get("id"),
-                        name=extension.get("defaultLocale", {}).get("name"),
+                        name=None
+                        if extension.get("defaultLocale") is None
+                        else extension.get("defaultLocale", {}).get("name"),
                         short_name=None,
                         default_title=None,
-                        description=extension.get("defaultLocale", {}).get("description"),
+                        description=None
+                        if extension.get("defaultLocale") is None
+                        else extension.get("defaultLocale", {}).get("description"),
                         version=extension.get("version"),
                         ext_path=extension.get("path"),
                         from_webstore=None,
-                        permissions=extension.get("userPermissions", {}).get("permissions"),
+                        permissions=None
+                        if extension.get("userPermissions") is None
+                        else extension.get("userPermissions", {}).get("permissions"),
                         manifest_version=extension.get("manifestVersion"),
                         source_uri=extension.get("sourceURI"),
-                        optional_permissions=extension.get("optionalPermissions", {}).get("permissions"),
+                        optional_permissions=None
+                        if extension.get("optionalPermissions") is None
+                        else extension.get("optionalPermissions", {}).get("permissions"),
                         source=extension_file,
                         _target=self.target,
                         _user=user.user,
@@ -381,7 +389,7 @@ class FirefoxPlugin(BrowserPlugin):
 
             except FileNotFoundError:
                 self.target.log.info(
-                    "No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir
+                    "No 'extensions.json' addon file found for user %s in directory %s", user.user.name, profile_dir
                 )
             except json.JSONDecodeError:
                 self.target.log.warning(
