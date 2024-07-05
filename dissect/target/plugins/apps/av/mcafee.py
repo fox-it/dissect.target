@@ -71,6 +71,9 @@ class McAfeePlugin(Plugin):
         """Return msc log history records from McAfee.
 
         Yields McAfeeMscLogRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): timestamp.

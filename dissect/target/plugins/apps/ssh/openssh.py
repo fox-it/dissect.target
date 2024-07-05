@@ -1,3 +1,4 @@
+import base64
 import re
 from itertools import product
 from pathlib import Path
@@ -14,6 +15,7 @@ from dissect.target.plugins.apps.ssh.ssh import (
     PrivateKeyRecord,
     PublicKeyRecord,
     SSHPlugin,
+    calculate_fingerprints,
 )
 
 
@@ -143,12 +145,14 @@ class OpenSSHPlugin(SSHPlugin):
                 continue
 
             key_type, public_key, comment = parse_ssh_public_key_file(file_path)
+            fingerprints = calculate_fingerprints(base64.b64decode(public_key))
 
             yield PublicKeyRecord(
                 mtime_ts=file_path.stat().st_mtime,
                 key_type=key_type,
                 public_key=public_key,
                 comment=comment,
+                fingerprint=fingerprints,
                 path=file_path,
                 _target=self.target,
                 _user=user,
