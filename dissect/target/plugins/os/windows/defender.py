@@ -627,6 +627,9 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                 if suffix.search(mplog_line):
                     break
             match = pattern.match(block)
+            if not match:
+                return
+
             data = match.groupdict()
             data["_target"] = self.target
             data["source_log"] = source
