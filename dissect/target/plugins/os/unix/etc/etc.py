@@ -1,5 +1,4 @@
 import fnmatch
-import logging
 import re
 from pathlib import Path
 from typing import Iterator
@@ -21,8 +20,6 @@ UnixConfigTreeRecord = TargetRecordDescriptor(
         ("string[]", "value"),
     ],
 )
-
-log = logging.getLogger(__name__)
 
 
 class EtcTree(ConfigurationTreePlugin):
@@ -73,5 +70,5 @@ class EtcTree(ConfigurationTreePlugin):
                     if isinstance(config_object, ConfigurationEntry):
                         yield from self._sub(config_object, Path(entry) / Path(item), pattern)
                 except Exception:
-                    log.warning("Could not open configuration item: %s", item)
+                    self.target.log.warning("Could not open configuration item: %s", item)
                     pass
