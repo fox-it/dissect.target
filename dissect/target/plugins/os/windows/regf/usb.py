@@ -93,6 +93,9 @@ class UsbPlugin(Plugin):
         HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR registry key.
 
         Yields UsbRegistryRecord with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname
             domain (string): The target domain
             type (string): Type of USB device

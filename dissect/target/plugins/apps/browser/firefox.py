@@ -132,6 +132,9 @@ class FirefoxPlugin(BrowserPlugin):
         """Return browser history records from Firefox.
 
         Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -193,6 +196,9 @@ class FirefoxPlugin(BrowserPlugin):
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
                 ts_last_accessed (datetime): Cookie last accessed timestamp.
@@ -232,6 +238,9 @@ class FirefoxPlugin(BrowserPlugin):
         """Return browser download records from Firefox.
 
         Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
+
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
@@ -315,7 +324,10 @@ class FirefoxPlugin(BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Firefox.
 
-        Yields BrowserExtensionRecord with the following fields::
+        Yields BrowserExtensionRecord with the following fields:
+
+        .. code-block:: text
+
             ts_install (datetime): Extension install timestamp.
             ts_update (datetime): Extension update timestamp.
             browser (string): The browser from which the records are generated.

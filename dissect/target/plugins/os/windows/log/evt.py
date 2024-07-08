@@ -125,6 +125,9 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
         Yields dynamically created records based on the fields in the event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
