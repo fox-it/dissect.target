@@ -62,7 +62,7 @@ def _is_disk_device(config_value: str) -> bool | None:
 
 def _get_vm_disk_name(config_value: str) -> str | None:
     """Retrieves the disk device name from vm"""
-    disk = re.search(r"vm-[0-9]+-disk-[0-9]+(,|.+?,)", config_value)
+    disk = re.search(r"vm-[0-9]+-disk-[0-9]+", config_value)
     return disk.group(0).replace(",", "") if disk else None
 
 def _get_storage_ID(config_value: str) -> str | None:

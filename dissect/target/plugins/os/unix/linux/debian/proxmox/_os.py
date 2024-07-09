@@ -116,31 +116,6 @@ def _create_pmxcfs(fh) -> VirtualFilesystem:
 
     return  vfs
 
-def _get_entry_parent_chain(fs_entries: list, entry: sqlite3[Row]) -> list[sqlite3[Row]]:
-    """Looks through the list of inodes (fs_entries) and retrieves parent inode of each node until root is found."""
-
-    inode_chain = [entry]
-    target = entry
-    for entry in fs_entries:
-        if target.inode != 0:
-            inode_chain.append(entry)
-            target = entry
-        else:
-            return inode_chain
-
-def _create_fs_path(entry_chain: list[sqlite3[Row]]) -> str:
-    """Creates a full path out of a sorted list of file entries"""
-    
-    entry_chain.sort(key=lambda entry: (entry.parent))
-    entry_names = []
-    for entry in entry_chain:
-        if entry.inode != 0:
-            entry_names.append(entry.name)
-
-    path = "/".join(entry_names)
-
-    return path
-
 
 class ProxmoxConfigFileEntry(VirtualFile):
     def open(self) -> BinaryIO:
