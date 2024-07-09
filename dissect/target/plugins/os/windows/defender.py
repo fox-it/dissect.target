@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, BinaryIO, Generator, Iterable, Iterator, TextIO, Union
 
 import dissect.util.ts as ts
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 from flow.record import Record
 
 from dissect.target import plugin
@@ -357,7 +357,7 @@ class QuarantineEntry:
         resource_info = c_defender.QuarantineEntrySection2(resource_buf)
 
         # List holding all quarantine entry resources that belong to this quarantine entry.
-        self.resources = []
+        self.resources: list[QuarantineEntryResource] = []
 
         for offset in resource_info.EntryOffsets:
             resource_buf.seek(offset)
@@ -393,7 +393,7 @@ class QuarantineEntryResource:
             # Move pointer
             offset += 4 + field.Size
 
-    def _add_field(self, field: Structure):
+    def _add_field(self, field: c_defender.QuarantineEntryResourceField) -> None:
         if field.Identifier == FIELD_IDENTIFIER.CQuaResDataID_File:
             self.resource_id = field.Data.hex().upper()
         elif field.Identifier == FIELD_IDENTIFIER.PhysicalPath:
