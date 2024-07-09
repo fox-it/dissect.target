@@ -17,15 +17,13 @@ from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.target import Target
 
-import ipdb
 
 log = logging.getLogger(__name__)
 
 PROXMOX_PACKAGE_NAME="proxmox-ve"
 FILETREE_TABLE_NAME="tree"
 PMXCFS_DATABASE_PATH="/var/lib/pve-cluster/config.db"
-# VM_CONFIG_PATH="/etc/pve/qemu-server" # TODO: Change to /etc/pve/nodes/pve/qemu-server once pmxcfs func has been reworked to properly map fs
-VM_CONFIG_PATH="/etc/pve/" # TODO: properly implement pmxcfs creation and revert to propper path
+PROXMOX_NODES_PATH="/etc/pve/nodes"
 
 
 VirtualMachineRecord = TargetRecordDescriptor(
@@ -71,13 +69,18 @@ class ProxmoxPlugin(LinuxPlugin):
 
     @export(record=VirtualMachineRecord)
     def vm_list(self) -> Iterator[VirtualMachineRecord]:
-        configs = self.target.fs.path(VM_CONFIG_PATH)
+        configs = self.target.fs.path(self.vm_configs_path)
         for config in configs.iterdir():
-            if pathlib.Path(config).suffix == ".conf": # TODO: Remove if statement once pmxcfs is propperly implemented
-                yield VirtualMachineRecord(
-                    id=pathlib.Path(config).stem,
-                    config_path=config,
-                )
+            yield VirtualMachineRecord(
+                id=pathlib.Path(config).stem,
+                config_path=config,
+            )
+
+    @export(property=True)
+    def vm_configs_path(self) -> str:
+        """Returns path containing VM configurations of the target pve node"""
+
+        return f"{PROXMOX_NODES_PATH}/{self.hostname}/qemu-server"
 
 def _create_pmxcfs(fh) -> VirtualFilesystem:
     db = sqlite3.SQLite3(fh)
