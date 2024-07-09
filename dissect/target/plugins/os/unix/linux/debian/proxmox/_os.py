@@ -84,21 +84,22 @@ def _create_pmxcfs(fh) -> VirtualFilesystem:
     filetree_table = db.table(FILETREE_TABLE_NAME)
     rows = filetree_table.rows()
     fs_entries = {}
+
+    # index entries on their inodes
     for row in rows:
         fs_entries[row.inode] = row
-    # fs_entries.sort(key=lambda entry: (entry.parent, entry.inode))
 
     vfs = VirtualFilesystem()
     for entry in fs_entries.values():
         if entry.parent == 0: # Root entries do not require parent check
             path = entry.name
         else:
-            # import ipdb; ipdb.set_trace()
             parts = []
             current = entry
             while current.parent != 0:
                 parts.append(current.name)
                 current = fs_entries[current.parent]
+            parts.append(current.name) # appends the missing root parent
 
             path = "/".join(parts[::-1])
         if entry.type == 4:
