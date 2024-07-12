@@ -14,6 +14,7 @@ from dissect.target.exceptions import (
     PluginError,
     PluginNotFoundError,
     TargetError,
+    TargetPathNotFoundError,
     UnsupportedPluginError,
     VolumeSystemError,
 )
@@ -284,7 +285,11 @@ class Target:
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
                     except Exception as e:
-                        getlogger(sub_entry).error("Failed to initiate loader: %s", e)
+                        message = "Failed to initiate loader: %s"
+                        if isinstance(e, TargetPathNotFoundError):
+                            message = "%s"
+
+                        getlogger(sub_entry).error(message, e)
                         getlogger(sub_entry).debug("", exc_info=e)
                         continue
 

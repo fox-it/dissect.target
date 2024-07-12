@@ -137,7 +137,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_
 
                 if (
                     ("\n" in char or "\r\n" in char)
-                    or (not mask_space and char == " " and not is_indent and not mask_indent)
+                    or (not mask_space and char == " " and not is_indent)
                     or (not mask_indent and is_indent)
                 ):
                     if "\n" in char:
@@ -189,7 +189,7 @@ def nms(buf: str, color: Optional[Color] = None, mask_space: bool = False, mask_
 
                     if (
                         ("\n" in char or "\r\n" in char)
-                        or (not mask_space and char == " " and not is_indent and not mask_indent)
+                        or (not mask_space and char == " " and not is_indent)
                         or (not mask_indent and is_indent)
                     ):
                         if "\n" in char:
@@ -268,6 +268,8 @@ def matrix(buf: str, color: Optional[Color] = None, **kwargs) -> None:
 
             if cur_ansi:
                 char = cur_ansi + char + "\033[0m"
+                if end_ansi:
+                    cur_ansi = ""
 
             if "\n" in char or "\r\n" in char:
                 char = " " + char

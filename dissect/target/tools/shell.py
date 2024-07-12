@@ -113,6 +113,7 @@ class TargetCmd(cmd.Cmd):
     def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
+        self.debug = False
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -179,25 +180,22 @@ class TargetCmd(cmd.Cmd):
             lexer.whitespace_split = True
             argparts = list(lexer)
 
-        try:
-            if "|" in argparts:
-                pipeidx = argparts.index("|")
-                argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
-                try:
-                    with build_pipe_stdout(pipeparts) as pipe_stdin:
-                        return func(argparts, pipe_stdin)
-                except OSError as e:
-                    # in case of a failure in a subprocess
-                    print(e)
-            else:
-                ctx = contextlib.nullcontext()
-                if self.target.props.get("cyber") and not no_cyber:
-                    ctx = cyber.cyber(color=None, run_at_end=True)
+        if "|" in argparts:
+            pipeidx = argparts.index("|")
+            argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
+            try:
+                with build_pipe_stdout(pipeparts) as pipe_stdin:
+                    return func(argparts, pipe_stdin)
+            except OSError as e:
+                # in case of a failure in a subprocess
+                print(e)
+        else:
+            ctx = contextlib.nullcontext()
+            if self.target.props.get("cyber") and not no_cyber:
+                ctx = cyber.cyber(color=None, run_at_end=True)
 
-                with ctx:
-                    return func(argparts, sys.stdout)
-        except IOError:
-            pass
+            with ctx:
+                return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> Optional[bool]:
         """Command execution helper for ``cmd_`` commands."""
@@ -278,6 +276,14 @@ class TargetCmd(cmd.Cmd):
     def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
         return True
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -1241,7 +1247,12 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
             pass
         except Exception as e:
-            log.exception(e)
+            if cli.debug:
+                log.exception(e)
+            else:
+                log.info(e)
+                print(f"*** Unhandled error: {e}")
+                print("If you wish to see the full debug trace, enable debug mode.")
             pass
 
 

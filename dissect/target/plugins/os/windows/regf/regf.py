@@ -49,6 +49,9 @@ class RegfPlugin(Plugin):
         Yields RegistryKeyRecords and RegistryValueRecords
 
         RegistryKeyRecord fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified time.
@@ -57,6 +60,9 @@ class RegfPlugin(Plugin):
             source (string): The hive file path.
 
         RegistryValueRecord fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified time.

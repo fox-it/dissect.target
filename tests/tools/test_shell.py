@@ -266,7 +266,7 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
         ("hello", "world.txt"),  # Latin
         ("ħēļľŏ", "ŵőřŀđ.txt"),  # Latin Extended-A
         ("مرحبًا", "عالم.txt"),  # Arabic
-        ("你好", "世界.txt"),  # Chineese Simplified
+        ("你好", "世界.txt"),  # Chinese Simplified
         ("привет", "мир.txt"),  # Cyrillic
         ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
     ],
