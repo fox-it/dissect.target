@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterator, Optional, TextIO
+from typing import Iterator, Optional
 
 from dissect.target.filesystem import Filesystem
+from dissect.target.helpers import configutil
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
@@ -16,7 +17,7 @@ class AndroidPlugin(LinuxPlugin):
 
         self.props = {}
         if (build_prop := self.target.fs.path("/build.prop")).exists():
-            self.props = _read_props(build_prop.open("rt"))
+            self.props = configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
@@ -58,18 +59,3 @@ class AndroidPlugin(LinuxPlugin):
     @export(record=EmptyRecord)
     def users(self) -> Iterator[EmptyRecord]:
         yield from ()
-
-
-def _read_props(fh: TextIO) -> dict[str, str]:
-    result = {}
-
-    for line in fh:
-        line = line.strip()
-
-        if not line or line.startswith("#"):
-            continue
-
-        k, v = line.split("=")
-        result[k] = v
-
-    return result
