@@ -38,7 +38,7 @@ def test_capability_plugin(target_unix, fs_unix):
     results = list(target_unix.capability_binaries())
     assert len(results) == 3
 
-    assert results[0].record.path == "/path/to/xattr1/file"
+    assert results[0].path == "/path/to/xattr1/file"
     assert results[0].permitted == [
         "CAP_NET_RAW",
         "CAP_SYS_PACCT",
@@ -61,9 +61,9 @@ def test_capability_plugin(target_unix, fs_unix):
         "CAP_MKNOD",
     ]
     assert results[0].effective
-    assert results[0].rootid is None
+    assert results[0].root_id is None
 
-    assert results[1].record.path == "/path/to/xattr2/file"
+    assert results[1].path == "/path/to/xattr2/file"
     assert results[1].permitted == [
         "CAP_NET_RAW",
         "CAP_SYS_PACCT",
@@ -96,10 +96,10 @@ def test_capability_plugin(target_unix, fs_unix):
         "CAP_CHECKPOINT_RESTORE",
     ]
     assert results[1].effective
-    assert results[1].rootid is None
+    assert results[1].root_id is None
 
-    assert results[2].record.path == "/path/to/xattr3/file"
+    assert results[2].path == "/path/to/xattr3/file"
     assert results[2].permitted == ["CAP_NET_RAW"]
     assert results[2].inheritable == []
     assert not results[2].effective
-    assert results[2].rootid == 1337
+    assert results[2].root_id == 1337

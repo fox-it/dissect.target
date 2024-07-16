@@ -228,10 +228,9 @@ class Filesystem:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[str]:
-        """Walk a directory pointed to by ``path``, returning the string representation of both files and directories.
-
-        It walks across all the files inside ``path`` recursively.
+    ) -> Iterator[tuple[str, str, str]]:
+        """Recursively walk a directory pointed to by ``path``, returning the string representation of both files
+        and directories.
 
         Args:
             path: The path to walk on the filesystem.
@@ -250,10 +249,9 @@ class Filesystem:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[FilesystemEntry]:
-        """Walk a directory pointed to by ``path``, returning FilesystemEntry's of both files and directories.
-
-        It walks across all the files inside ``path`` recursively.
+    ) -> Iterator[tuple[list[FilesystemEntry], list[FilesystemEntry], list[FilesystemEntry]]]:
+        """Recursively walk a directory pointed to by ``path``, returning :class:`FilesystemEntry` of files
+        and directories.
 
         Args:
             path: The path to walk on the filesystem.
@@ -265,6 +263,19 @@ class Filesystem:
             An iterator of directory entries as FilesystemEntry's.
         """
         return self.get(path).walk_ext(topdown, onerror, followlinks)
+
+    def walk_ng(self, path: str) -> Iterator[FilesystemEntry]:
+        """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
+
+        Does not follow symbolic links.
+
+        Args:
+            path: The path to recursively walk on the target filesystem.
+
+        Returns:
+            An iterator of :class:`FilesystemEntry`.
+        """
+        return self.get(path).walk_ng()
 
     def glob(self, pattern: str) -> Iterator[str]:
         """Iterate over the directory part of ``pattern``, returning entries matching ``pattern`` as strings.
@@ -578,10 +589,9 @@ class FilesystemEntry:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[str]:
-        """Walk a directory and list its contents as strings.
-
-        It walks across all the files inside the entry recursively.
+    ) -> Iterator[tuple[str, str, str]]:
+        """Recursively walk a directory and yield its contents as strings split in a tuple
+        of lists of files, directories and symlinks.
 
         These contents include::
           - files
@@ -603,15 +613,9 @@ class FilesystemEntry:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[FilesystemEntry]:
-        """Walk a directory and show its contents as :class:`FilesystemEntry`.
-
-        It walks across all the files inside the entry recursively.
-
-        These contents include::
-          - files
-          - directories
-          - symboliclinks
+    ) -> Iterator[tuple[list[FilesystemEntry], list[FilesystemEntry], list[FilesystemEntry]]]:
+        """Recursively walk a directory and yield its contents as :class:`FilesystemEntry` split in a tuple of
+        lists of files, directories and symlinks.
 
         Args:
             topdown: ``True`` puts this entry at the top of the list, ``False`` puts this entry at the bottom.
@@ -619,9 +623,20 @@ class FilesystemEntry:
             followlinks: ``True`` if we want to follow any symbolic link
 
         Returns:
-            An iterator of :class:`FilesystemEntry`.
+            An iterator of tuples :class:`FilesystemEntry`.
         """
         yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
+
+    def walk_ng(self) -> Iterator[FilesystemEntry]:
+        """Recursively walk a directory and yield its contents as :class:`FilesystemEntry`.
+
+        Does not follow symbolic links.
+
+        Returns:
+            An iterator of :class:`FilesystemEntry`.
+        """
+        yield self
+        yield from fsutil.walk_ng(self)
 
     def glob(self, pattern: str) -> Iterator[str]:
         """Iterate over this directory part of ``patern``, returning entries matching ``pattern`` as strings.
