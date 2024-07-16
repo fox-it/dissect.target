@@ -907,17 +907,20 @@ class EXTENSION_BLOCK_BEEF0004(EXTENSION_BLOCK):  # noqa
             self.file_reference = c_bag.uint64(fh)
             c_bag.uint64(fh)
         if version >= 3:
-            long_len = c_bag.uint16(fh)
+            # Start of strings
+            localized_name_offset = c_bag.uint16(fh)
         if version >= 9:
             c_bag.uint32(fh)
         if version >= 8:
             c_bag.uint32(fh)
         if version >= 3:
             self.long_name = c_bag.wchar[None](fh)
-        if 3 <= version < 7 and long_len > 0:
-            self.localized_name = c_bag.char[long_len](fh)
-        if version >= 7 and long_len > 0:
-            self.localized_name = c_bag.wchar[long_len](fh)
+
+        if 3 <= version < 7 and localized_name_offset > 0:
+            self.localized_name = c_bag.char[None](fh)
+
+        if version >= 7 and localized_name_offset > 0:
+            self.localized_name = c_bag.wchar[None](fh)
 
 
 class EXTENSION_BLOCK_BEEF0005(EXTENSION_BLOCK):  # noqa

@@ -748,12 +748,12 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
         FileNotFoundError: If the ``path`` is not a file.
     """
 
-    if not path.is_file(follow_symlinks=True):
-        raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
-
     entry = path
     if isinstance(path, TargetPath):
         entry = path.get()
+
+    if not entry.is_file(follow_symlinks=True):
+        raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
 
