@@ -29,7 +29,7 @@ struct DomainKey {
     DWORD   accessCheckLen;
     char    guid[16];
     char    encryptedSecret[secretLen];
-    char    accessCheckLen[accessCheckLen];
+    char    accessCheck[accessCheckLen];
 };
 
 struct CredHist {
@@ -66,8 +66,7 @@ struct MasterKeyFileHeader {
     QWORD   qwDomainKeySize;
 };
 """
-c_master_key = cstruct()
-c_master_key.load(master_key_def)
+c_master_key = cstruct().load(master_key_def)
 
 
 class MasterKey:

@@ -1,7 +1,7 @@
 from struct import unpack
 
 from defusedxml import ElementTree
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.regf.c_regf import (
     REG_BINARY,
     REG_DWORD,
@@ -18,14 +18,13 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_def = """
+policy_def = """
 struct registry_policy_header {
     uint32   signature;
     uint32   version;
 };
 """
-c_adpolicy = cstruct.cstruct()
-c_adpolicy.load(c_def)
+c_adpolicy = cstruct().load(policy_def)
 
 ADPolicyRecord = TargetRecordDescriptor(
     "windows/adpolicy",
