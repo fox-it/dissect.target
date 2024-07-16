@@ -43,11 +43,10 @@ class AnydeskPlugin(RemoteAccessPlugin):
         ".anydesk_ad_*/*.trace",
     ]
 
-    trace_files: set[tuple[TargetPath, UserDetails]] = set()
-
     def __init__(self, target):
         super().__init__(target)
 
+        self.trace_files: set[tuple[TargetPath, UserDetails]] = set()
         # Service globs
         user = None
         for trace_glob in self.SERVICE_GLOBS:
