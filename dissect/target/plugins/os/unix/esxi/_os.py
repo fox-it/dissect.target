@@ -17,9 +17,14 @@ from dissect.sql import sqlite3
 from dissect.target.helpers.fsutil import TargetPath
 
 try:
-    from dissect.hypervisor.util.envelope import Envelope, KeyStore
+    from dissect.hypervisor.util.envelope import (
+        HAS_PYCRYPTODOME,
+        HAS_PYSTANDALONE,
+        Envelope,
+        KeyStore,
+    )
 
-    HAS_ENVELOPE = True
+    HAS_ENVELOPE = HAS_PYCRYPTODOME or HAS_PYSTANDALONE
 except ImportError:
     HAS_ENVELOPE = False
 
@@ -70,7 +75,8 @@ class ESXiPlugin(UnixPlugin):
 
     def _cfg(self, path: str) -> Optional[str]:
         if not self._config:
-            raise ValueError("No ESXi config!")
+            self.target.log.warning("No ESXi config!")
+            return None
 
         value_name = path.strip("/").split("/")[-1]
         obj = _traverse(path, self._config)
@@ -95,12 +101,12 @@ class ESXiPlugin(UnixPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> ESXiPlugin:
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
+        # Mount all the visor tars in individual filesystem layers
+        _mount_modules(target, sysvol, cfg)
+
         # Create a root layer for the "local state" filesystem
         # This stores persistent configuration data
         local_layer = target.fs.append_layer()
-
-        # Mount all the visor tars in individual filesystem layers
-        _mount_modules(target, sysvol, cfg)
 
         # Mount the local.tgz to the local state layer
         _mount_local(target, local_layer)

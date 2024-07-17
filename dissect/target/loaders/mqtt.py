@@ -10,6 +10,7 @@ import time
 import urllib
 from dataclasses import dataclass
 from functools import lru_cache
+from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
@@ -270,19 +271,25 @@ class Broker:
     case = None
     bytes_received = 0
     monitor = False
+    username = None
+    password = None
 
     diskinfo = {}
     index = {}
     topo = {}
     factor = 1
 
-    def __init__(self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, **kwargs):
+    def __init__(
+        self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
+    ):
         self.broker_host = broker
         self.broker_port = int(port)
         self.private_key_file = key
         self.certificate_file = crt
         self.cacert_file = ca
         self.case = case
+        self.username = username
+        self.password = password
         self.command = kwargs.get("command", None)
 
     def clear_cache(self) -> None:
@@ -393,6 +400,7 @@ class Broker:
             tls_version=ssl.PROTOCOL_TLS,
             ciphers=None,
         )
+        self.mqtt_client.username_pw_set(self.username, self.password)
         self.mqtt_client.tls_insecure_set(True)  # merely having the correct cert is ok
         self.mqtt_client.on_connect = self._on_connect
         self.mqtt_client.on_message = self._on_message
@@ -411,6 +419,8 @@ class Broker:
 @arg("--mqtt-ca", dest="ca", help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
+@arg("--mqtt-username", dest="username", help="Username for connection")
+@arg("--mqtt-password", action="store_true", dest="password", help="Ask for password before connecting")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
 
@@ -435,7 +445,10 @@ class MQTTLoader(Loader):
         if cls.broker is None:
             if (uri := kwargs.get("parsed_path")) is None:
                 raise LoaderError("No URI connection details have been passed.")
+
             options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
+            if options.get("password"):
+                options["password"] = getpass()
             cls.broker = Broker(**options)
             cls.broker.connect()
             num_peers = int(options.get("peers", 1))

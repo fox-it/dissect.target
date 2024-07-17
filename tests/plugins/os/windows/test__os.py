@@ -202,6 +202,26 @@ def test_windowsplugin__nt_version(
             ],
             "<Unknown ProductName> (NT <Unknown CurrentVersion>) <Unknown CurrentBuildNumber> 5678",
         ),
+        (
+            [
+                ("ProductName", "Windows 10 Pro"),
+                ("CurrentMajorVersionNumber", 10),
+                ("CurrentMinorVersionNumber", 0),
+                ("CurrentBuildNumber", 19_045),
+                ("UBR", 1234),
+            ],
+            "Windows 10 Pro (NT 10.0) 19045.1234",
+        ),
+        (
+            [
+                ("ProductName", "Windows 10 Enterprise"),
+                ("CurrentMajorVersionNumber", 10),
+                ("CurrentMinorVersionNumber", 0),
+                ("CurrentBuildNumber", 22_000),
+                ("UBR", 1234),
+            ],
+            "Windows 11 Enterprise (NT 10.0) 22000.1234",
+        ),
     ],
 )
 def test_windowsplugin_version(

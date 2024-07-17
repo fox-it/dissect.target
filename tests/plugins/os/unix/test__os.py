@@ -1,12 +1,13 @@
 import tempfile
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix._os import parse_fstab
+from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
 from dissect.target.target import Target
 
 FSTAB_CONTENT = """
@@ -44,7 +45,7 @@ LABEL=foo                                 /foo         auto    default          
 """  # noqa
 
 
-def test_parse_fstab(tmp_path):
+def test_parse_fstab(tmp_path: Path) -> None:
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(FSTAB_CONTENT.encode("ascii"))
         tf.close()
@@ -69,6 +70,29 @@ def test_parse_fstab(tmp_path):
         (None, "vg--main-lv--data", "/data", "auto", "default"),
         (None, "foo", "/foo", "auto", "default"),
     }
+
+
+def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
+    mock_fs = Mock()
+    mock_vol = Mock()
+
+    mock_vol.name = "test-volume"
+
+    mock_fs.__type__ = "ext"
+    mock_fs.extfs.volume_name = "ext-volume"
+    mock_fs.volume = mock_vol
+    mock_fs.exists.return_value = False
+
+    for expected_volume_name in ["test-volume", "ext-volume"]:
+        with patch(
+            "dissect.target.plugins.os.unix._os.parse_fstab",
+            return_value=[(None, expected_volume_name, "/mnt", "auto", "default")],
+        ):
+            target = Target()
+            target.filesystems.add(mock_fs)
+            UnixPlugin.create(target, fs_unix)
+
+            assert target.fs.mounts["/mnt"] == mock_fs
 
 
 @pytest.mark.parametrize(
