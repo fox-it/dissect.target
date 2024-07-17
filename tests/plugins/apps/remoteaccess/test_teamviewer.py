@@ -18,7 +18,6 @@ def test_teamviewer_plugin_global_log(target_win_users, fs_win):
 
     record = records[0]
     assert record.ts == datetime(2021, 11, 11, 12, 34, 56, tzinfo=timezone.utc)
-    assert record.tool == "teamviewer"
     assert record.message == "Strip the headers, trace the source!"
     assert record.source == target_logfile_name
     assert record.username is None
@@ -40,7 +39,6 @@ def test_teamviewer_plugin_user_log(target_win_users, fs_win):
     assert len(records) == 4
 
     record = records[0]
-    assert record.tool == "teamviewer"
     assert record.ts == datetime(2021, 11, 11, 12, 34, 56, tzinfo=timezone.utc)
     assert record.message == "Strip the headers, trace the source!"
     assert record.source == target_logfile_name

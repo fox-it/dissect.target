@@ -4,7 +4,6 @@ from dissect.target.plugin import NamespacePlugin
 
 GENERIC_LOG_RECORD_FIELDS = [
     ("datetime", "ts"),
-    ("string", "tool"),
     ("string", "message"),
     ("path", "source"),
 ]

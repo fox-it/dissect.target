@@ -115,7 +115,6 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
                     yield self.RemoteAccessLogRecord(
                         ts=timestamp,
-                        tool="teamviewer",
                         message=message,
                         source=logfile,
                         _target=self.target,

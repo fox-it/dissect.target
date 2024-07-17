@@ -98,7 +98,6 @@ class AnydeskPlugin(RemoteAccessPlugin):
 
                     yield self.RemoteAccessLogRecord(
                         ts=timestamp,
-                        tool="anydesk",
                         message=message,
                         source=trace_file,
                         _target=self.target,
