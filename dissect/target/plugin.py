@@ -1237,7 +1237,7 @@ def find_plugin_functions(
                         path=index_name,
                         class_object=loaded_plugin_object,
                         method_name=method_name,
-                        output_type=getattr(fobject, "__output__", "text"),
+                        output_type=getattr(fobject, "__output__", "none"),
                         plugin_desc=func,
                     )
                 )
@@ -1282,7 +1282,7 @@ def find_plugin_functions(
                         path=f"{description['module']}.{funcname}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
-                        output_type=getattr(fobject, "__output__", "text"),
+                        output_type=getattr(fobject, "__output__", "none"),
                         plugin_desc=description,
                     )
                 )

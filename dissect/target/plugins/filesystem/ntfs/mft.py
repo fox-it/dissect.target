@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Callable, Iterator, Union
+from typing import Callable, Iterator
 
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
@@ -123,12 +125,7 @@ class MftPlugin(Plugin):
     def mft(
         self, compact: bool = False
     ) -> Iterator[
-        Union[
-            FilesystemStdRecord,
-            FilesystemFilenameRecord,
-            FilesystemStdCompactRecord,
-            FilesystemFilenameCompactRecord,
-        ]
+        FilesystemStdRecord | FilesystemFilenameRecord | FilesystemStdCompactRecord | FilesystemFilenameCompactRecord
     ]:
         """Return the MFT records of all NTFS filesystems.
 
