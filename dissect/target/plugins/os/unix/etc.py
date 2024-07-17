@@ -3,6 +3,8 @@ from dissect.target.plugins.general.config import ConfigurationTreePlugin
 
 
 class EtcTree(ConfigurationTreePlugin):
+    """Unix etc configuration tree plugin."""
+
     __namespace__ = "etc"
 
     def __init__(self, target: Target):
