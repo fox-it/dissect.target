@@ -259,7 +259,11 @@ c_journal = cstruct().load(journal_def)
 
 def get_optional(value: str, to_type: Callable):
     """Return the value if True, otherwise return None."""
-    return to_type(value) if value and value != 'None' else None
+    return to_type(value) if value else None
+
+# Sometimes stringy None is inserted by external tools like Ansible    
+def int_or_none(value: str):
+    return int(value) if value and value != "None" else None
 
 
 class JournalFile:
