@@ -118,6 +118,6 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                         tool="teamviewer",
                         message=message,
                         source=logfile,
-                        _user=user_details.user if user_details else None,
                         _target=self.target,
+                        _user=user_details.user if user_details else None,
                     )
