@@ -1,13 +1,10 @@
-# Resources:
-# - generaltel.dll
-# - win32k.sys (Windows 7)
-# - win32kbase.sys (Windows 10)
+from __future__ import annotations
 
 import datetime
 import struct
 from binascii import crc32
 from io import BytesIO
-from typing import Iterator, Union
+from typing import Iterator, Union, get_args
 
 from dissect.cstruct import cstruct
 from dissect.util.compression import lznt1
@@ -21,6 +18,10 @@ from dissect.target.helpers.record import (
 )
 from dissect.target.plugin import Plugin, export
 
+# Resources:
+# - generaltel.dll
+# - win32k.sys (Windows 7)
+# - win32kbase.sys (Windows 10)
 cit_def = """
 typedef QWORD FILETIME;
 
@@ -643,7 +644,7 @@ class CITPlugin(Plugin):
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No CIT registry key found")
 
-    @export(record=CITRecords)
+    @export(record=get_args(CITRecords))
     def cit(self) -> Iterator[CITRecords]:
         """Return CIT data from the registry for executed executable information.
 
@@ -824,7 +825,7 @@ class CITPlugin(Plugin):
                 )
 
     @export(record=[CITDPRecord, CITDPDurationRecord])
-    def dp(self) -> Iterator[Union[CITDPRecord, CITDPDurationRecord]]:
+    def dp(self) -> Iterator[CITDPRecord | CITDPDurationRecord]:
         """Parse CIT DP data from the registry.
 
         Generally only available since Windows 10.

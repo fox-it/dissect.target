@@ -1,7 +1,7 @@
 import datetime
 import re
 from functools import lru_cache
-from typing import Any, Generator, Iterator, Optional
+from typing import Any, Iterator, Optional
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
@@ -85,7 +85,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
             chunk_parser=self._parse_chunk,
         )
 
-    def _parse_chunk(self, _, chunk: bytes) -> Generator[Any, None, None]:
+    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
         chnk = evtx.ElfChnk(chunk)
         try:
             for event in chnk.read():

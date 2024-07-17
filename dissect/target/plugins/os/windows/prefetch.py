@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
-from typing import Iterator, Union
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
@@ -250,7 +252,7 @@ class PrefetchPlugin(Plugin):
 
     @export(record=[PrefetchRecord, GroupedPrefetchRecord])
     @arg("--grouped", action="store_true", help="Group the prefetch record")
-    def prefetch(self, grouped=False) -> Iterator[Union[PrefetchRecord, GroupedPrefetchRecord]]:
+    def prefetch(self, grouped=False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
         """Return the content of all prefetch files.
 
         Prefetch is a memory management feature in Windows. It contains information (for example run count and

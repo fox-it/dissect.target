@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from dissect.target import Target, plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.os.unix.linux.packagemanager import (
+from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
     PackageManagerPlugin,

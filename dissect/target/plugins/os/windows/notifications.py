@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import datetime
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -432,7 +434,7 @@ class NotificationsPlugin(Plugin):
                         yield toast_record
 
     @export(record=[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord])
-    def wpndatabase(self) -> Iterator[Union[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord]]:
+    def wpndatabase(self) -> Iterator[WpnDatabaseNotificationRecord | WpnDatabaseNotificationHandlerRecord]:
         """Returns Windows Notifications from wpndatabase.db (post Windows 10 Anniversary).
 
         References:

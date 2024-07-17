@@ -4,7 +4,7 @@ from typing import Iterator
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
-from dissect.target.plugins.os.unix.linux.packagemanager import (
+from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
     PackageManagerPlugin,

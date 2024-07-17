@@ -599,8 +599,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         return
 
     # Plugin method should specify what it returns
-    # NOTE: "text" should probably be "default"
-    assert func.output_type in ["record", "yield", "default", "none", "text"]
+    assert func.output_type in ["record", "yield", "default", "none"]
 
     py_func = getattr(func.class_object, func.method_name)
     annotations = None
