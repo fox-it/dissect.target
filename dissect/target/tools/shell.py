@@ -157,7 +157,7 @@ class TargetCmd(cmd.Cmd):
         except AttributeError:
             pass
 
-        if plugins := find_and_filter_plugins(self.target, command, []):
+        if plugins := list(find_and_filter_plugins(self.target, command, [])):
             return self._exec_target(plugins, command_args_str)
 
         return cmd.Cmd.default(self, line)
