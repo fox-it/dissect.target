@@ -249,8 +249,11 @@ class TargetCmd(cmd.Cmd):
         for func in funcs:
             try:
                 result = self._exec(_exec_, command_args_str)
-            except PluginError:
-                traceback.print_exc()
+            except PluginError as err:
+                if self.debug:
+                    raise err
+                self.target.log.error(err)
+
         return result
 
     def do_python(self, line: str) -> Optional[bool]:
