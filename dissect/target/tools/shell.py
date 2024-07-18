@@ -16,7 +16,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import traceback
 from contextlib import contextmanager
 from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
 
