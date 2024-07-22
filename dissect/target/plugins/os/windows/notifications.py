@@ -91,8 +91,7 @@ typedef struct {
 } Chunk;                               // size: 0x23810
 """
 
-c_appdb = cstruct(endian="<")
-c_appdb.load(appdb_def)
+c_appdb = cstruct(endian="<").load(appdb_def)
 
 APPDB_MAGIC = b"DNPW"
 NUM_APPDB_CHUNKS = 256

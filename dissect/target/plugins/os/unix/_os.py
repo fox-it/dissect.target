@@ -202,8 +202,9 @@ class UnixPlugin(OSPlugin):
                 fs_id = None
                 fs_subvol = None
                 fs_subvolid = None
-                fs_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
                 fs_last_mount = None
+                fs_volume_name = None
+                vol_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
 
                 if fs.__type__ == "xfs":
                     fs_id = fs.xfs.uuid
@@ -224,8 +225,9 @@ class UnixPlugin(OSPlugin):
 
                 if (
                     (fs_id and (fs_id == dev_id and (subvol == fs_subvol or subvolid == fs_subvolid)))
-                    or (fs_volume_name and (fs_volume_name == volume_name))
                     or (fs_last_mount and (fs_last_mount == mount_point))
+                    or (fs_volume_name and (fs_volume_name == volume_name))
+                    or (vol_volume_name and (vol_volume_name == volume_name))
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)

@@ -1,14 +1,12 @@
 import io
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_adtev = cstruct.cstruct()
-c_adtev.load(
-    """
+adtev_def = """
 struct header {
     uint16  unk0;
     uint16  unk1;
@@ -18,7 +16,8 @@ struct header {
     uint16  unk3;
 };
 """
-)
+
+c_adtev = cstruct().load(adtev_def)
 
 POLICY_CATEGORIES = [
     "System",

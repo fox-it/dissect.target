@@ -148,12 +148,10 @@ def test_pipe_symbol_parsing(capfd, target_bare):
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_exec_target_command(capfd, target_default):
     cli = TargetCli(target_default)
-    command = "users"
     # `users` from the general OSPlugin does not ouput any records, but as the
     # ouput is piped to, the records are transformed to a binary record stream,
     # so we pipe it through rdump to get a correct count of 0 from wc.
-    command_args_str = "| rdump | wc -l"
-    cli._exec_target(command, command_args_str)
+    cli.default("users | rdump | wc -l")
 
     sys.stdout.flush()
     sys.stderr.flush()
