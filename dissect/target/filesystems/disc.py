@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import BinaryIO, Iterator
 
 from dissect.disc import disc
-from dissect.disc.c_iso_9660 import c_iso
+import dissect.disc.exceptions as disc_exceptions
+from dissect.disc.iso.c_iso_9660 import c_iso
+from dissect.disc.udf.c_udf import UDF_MAGICS
 from dissect.util.ts import to_unix
 
 from dissect.target.exceptions import (
@@ -27,12 +29,14 @@ class DiscFilesystem(Filesystem):
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         fh.seek(c_iso.SYSTEM_AREA_SIZE + 1)  # First byte of the first volume descriptor is reserved for the type
-        return fh.read(5) == b"CD001"
+        magic = fh.read(5)
 
-    def get(self, path: str):
+        return magic == b"CD001" or magic in UDF_MAGICS
+
+    def get(self, path: str) -> DiscFilesystemEntry:
         try:
-            return DiscFilesystemEntry(self, path, self.fs.get_entry(path))
-        except disc.FileNotFoundError:
+            return DiscFilesystemEntry(self, path, self.fs.get(path))
+        except disc_exceptions.FileNotFoundError:
             raise FileNotFoundError(path)
 
 
@@ -41,7 +45,7 @@ class DiscFilesystemEntry(FilesystemEntry):
         absolute_path = fsutil.join(self.path, path)
         try:
             return DiscFilesystemEntry(self.fs, absolute_path, self.entry.get(path))
-        except disc.FileNotFoundError:
+        except disc_exceptions.FileNotFoundError:
             raise FileNotFoundError(absolute_path)
 
     def open(self) -> BinaryIO:
@@ -55,7 +59,7 @@ class DiscFilesystemEntry(FilesystemEntry):
         if self.is_symlink():
             yield from self.readlink_ext().iterdir()
         else:
-            for entry in self.entry.scandir():
+            for entry in self.entry.iterdir():
                 if entry.name in [".", ".."]:
                     continue
                 yield entry.name
@@ -67,7 +71,7 @@ class DiscFilesystemEntry(FilesystemEntry):
         if self.is_symlink():
             yield from self.readlink_ext().scandir()
         else:
-            for entry in self.entry.scandir():
+            for entry in self.entry.iterdir():
                 if entry.name in [".", ".."]:
                     continue
                 path = fsutil.join(self.path, entry.name)
@@ -88,6 +92,7 @@ class DiscFilesystemEntry(FilesystemEntry):
             return False
 
     def is_symlink(self) -> bool:
+        """Return whether this filesystem entry is a symlink."""
         return self.entry.is_symlink()
 
     def readlink(self) -> str:
@@ -105,10 +110,10 @@ class DiscFilesystemEntry(FilesystemEntry):
                 self.entry.mode,
                 self.entry.inode,
                 id(self.fs),
-                self.entry.links,
-                self.entry.user_id,
-                self.entry.group_id,
-                self.entry.record.size,
+                self.entry.nlinks,
+                self.entry.uid,
+                self.entry.gid,
+                self.entry.size,
                 to_unix(self.entry.atime),
                 to_unix(self.entry.mtime),
                 to_unix(self.entry.ctime),
