@@ -23,9 +23,9 @@ from dissect.target.target import Target
 try:
     from Crypto.Cipher import AES, ChaCha20
 
-    HAS_PYCRYPTODOME = True
+    HAS_CRYPTO = True
 except ImportError:
-    HAS_PYCRYPTODOME = False
+    HAS_CRYPTO = False
 
 FortiOSUserRecord = TargetRecordDescriptor(
     "fortios/user",
@@ -113,7 +113,7 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.add_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
         target.log.warning("Attempting to load XZ files, this can take a while.")
@@ -127,11 +127,11 @@ class FortiOSPlugin(LinuxPlugin):
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
                 fh = xz.repair_checksum(tar.open("rb"))
-                target.fs.add_layer().mount("/", TarFilesystem(fh))
+                target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
-            target.fs.add_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
+            target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
 
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
@@ -442,8 +442,8 @@ def decrypt_password(input: str) -> str:
         - https://www.fortiguard.com/psirt/FG-IR-19-007
     """
 
-    if not HAS_PYCRYPTODOME:
-        raise RuntimeError("PyCryptodome module not available")
+    if not HAS_CRYPTO:
+        raise RuntimeError("Missing pycryptodome dependency")
 
     if input[:3] in ["SH2", "AK1"]:
         raise ValueError("Password is a hash (SHA-256 or SHA-1) and cannot be decrypted.")
@@ -511,8 +511,8 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
         RuntimeError: When PyCryptodome is not available.
     """
 
-    if not HAS_PYCRYPTODOME:
-        raise RuntimeError("PyCryptodome module not available")
+    if not HAS_CRYPTO:
+        raise RuntimeError("Missing pycryptodome dependency")
 
     # First 8 bytes = counter, last 8 bytes = nonce
     # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple

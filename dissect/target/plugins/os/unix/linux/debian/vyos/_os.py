@@ -24,7 +24,7 @@ class VyosPlugin(LinuxPlugin):
         self._version, rootpath = latest
 
         # VyOS does some additional magic with base system files
-        layer = target.fs.add_layer()
+        layer = target.fs.append_layer()
         layer.map_file_entry("/", target.fs.root.get(f"/boot/{self._version}/{rootpath}"))
         super().__init__(target)
 

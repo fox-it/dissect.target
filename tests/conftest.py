@@ -7,6 +7,7 @@ from typing import Callable, Iterator, Optional
 import pytest
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
@@ -21,6 +22,7 @@ from dissect.target.plugins.os.unix.linux.redhat._os import RedHat
 from dissect.target.plugins.os.unix.linux.suse._os import SuSEPlugin
 from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
+from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -351,6 +353,70 @@ def target_win_users(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: 
     yield target_win
 
 
+SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
+POLICY_KEY_PATH = "SECURITY\\Policy\\PolEKList"
+DPAPI_KEY_PATH = "SECURITY\\Policy\\Secrets\\DPAPI_SYSTEM\\CurrVal"
+
+
+@pytest.fixture
+def target_win_users_dpapi(
+    hive_hklm: VirtualHive, hive_hku: VirtualHive, fs_win: VirtualFilesystem, target_win: Target
+) -> Iterator[Target]:
+    # Add User
+    profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
+    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
+
+    sid_local_system = "S-1-5-18"
+    profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
+    profile1_key.add_value(
+        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
+    )
+
+    sid_user = "S-1-5-21-1342509979-482553916-3960431919-1000"
+    profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_user}")
+    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\user"))
+
+    profile_list_key.add_subkey(sid_local_system, profile1_key)
+    profile_list_key.add_subkey(sid_user, profile2_key)
+
+    hive_hklm.map_key(profile_list_key_name, profile_list_key)
+
+    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_user}", hive_hku, TargetPath(target_win.fs, ""))
+
+    # Add system dpapi files
+    fs_win.map_dir(
+        "Windows/System32/Microsoft/Protect", absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_System32")
+    )
+
+    # Add user dpapi files
+    fs_win.map_dir(
+        "Users/User/AppData/Roaming/Microsoft/Protect",
+        absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_User"),
+    )
+
+    # Add registry dpapi keys
+    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
+    system_key.add_subkey("Data", VirtualKey(hive_hklm, "Data", class_name="8fa8e1fb"))
+    system_key.add_subkey("GBG", VirtualKey(hive_hklm, "GBG", class_name="a6e23eb8"))
+    system_key.add_subkey("JD", VirtualKey(hive_hklm, "JD", class_name="fe5ffdaf"))
+    system_key.add_subkey("Skew1", VirtualKey(hive_hklm, "Skew1", class_name="6e289261"))
+    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
+
+    policy_key = VirtualKey(hive_hklm, POLICY_KEY_PATH)
+    policy_key_value = b"\x00\x00\x00\x01\xec\xff\xe1{*\x99t@\xaa\x93\x9a\xdb\xff&\xf1\xfc\x03\x00\x00\x00\x00\x00\x00\x00goX67\xc3\xe0\xe7\xb9\xed\xf4;;)\xb1\xd0\xd2L\xb6\xbf\xc6\x0e\x0f\xc4\xdcDn}$M053\xb9\n+\xd72\xfc\xf9\x85t\x8a\x89\x17\xae\xa7>\x9d\x0b)\x0e\xe4\xba/S\xe6\xa9\xa0\xac\x9b<\x9b&\xe7!\xb0\x1bzl\x1f\x92\xb5\x17\xe2\xa3?_m\xe7\xf76qg\x93\xb1\x98r\x05\x95\x95\xe6\xb4\xdc\x88\x8d\x19\xd1\xd6\x15\xd6\x02\xbe\xd5SG\x8cA\x1d/\xed\x04V\x02\xdd\xbbZ\xdc1\xc9\x90\x10!\xad3\x9b\xca6\x8b\xdbUO\xfe\x07JptR\x8d^\x9d\xcb\xb4g"  # noqa
+    policy_key.add_value("(Default)", policy_key_value)
+    hive_hklm.map_key(POLICY_KEY_PATH, policy_key)
+
+    secrets_key = VirtualKey(hive_hklm, DPAPI_KEY_PATH)
+    secrets_key_value = b"\x00\x00\x00\x01|>q\xec\xa8\xfbN\xed\x03\xeaCa\xfb\xc7\x83\x87\x03\x00\x00\x00\x00\x00\x00\x00\xafd\xca2\xa1PY\xf8\xe3\x8f2\x8a_\x16\xd0c\x93\x9b\xdb\xb92\x1b\xa1Y\xdc\xaf\xd9\xcd\xf3\x16\xd8/\x89\xa8)\xd7X\x02K'm\t\x9e\xf2)\x0c\xa4o\xc7\xb2cUhP\x0b\xf2\xd3\x1e\xd8\xce\x1e\x0304\\\xca^\xf3\xe8\xd1\x83\x99\xa2*\xe8\x8d\xb1(r\xee[\xb0\xc1\xf0\xdd;\x83\x06bi\xd0\xd9a\x8b\x19\xbb"  # noqa
+    secrets_key.add_value("(Default)", secrets_key_value)
+    hive_hklm.map_key(DPAPI_KEY_PATH, secrets_key)
+
+    target_win.add_plugin(DPAPIPlugin)
+
+    yield target_win
+
+
 @pytest.fixture
 def target_win_tzinfo(hive_hklm: VirtualHive, target_win: Target) -> Iterator[Target]:
     tz_info_path = "SYSTEM\\ControlSet001\\Control\\TimeZoneInformation"
@@ -436,3 +502,22 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
     yield target_osx
+
+
+@pytest.fixture
+def fs_docker() -> Iterator[TarFilesystem]:
+    docker_tar = pathlib.Path(absolute_path("_data/plugins/apps/container/docker/docker.tgz"))
+    fh = docker_tar.open("rb")
+    docker_fs = TarFilesystem(fh)
+    yield docker_fs
+
+
+@pytest.fixture
+def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Iterator[Target]:
+    mock_target = next(make_mock_target(tmp_path))
+    mock_target._os_plugin = LinuxPlugin
+
+    mock_target.filesystems.add(fs_docker)
+    mock_target.fs.mount("/", fs_docker)
+    mock_target.apply()
+    yield mock_target

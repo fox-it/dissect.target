@@ -48,6 +48,9 @@ class MuiCachePlugin(Plugin):
             - https://forensafe.com/blogs/muicache.html
 
         Yields MuiCacheRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             index (varint): The index of the entry.

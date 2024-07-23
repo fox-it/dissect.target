@@ -16,7 +16,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import traceback
 from contextlib import contextmanager
 from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
 
@@ -31,14 +30,17 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry, RootFilesystemEntry
+from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import arg
+from dissect.target.plugin import PluginFunction, arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
+    execute_function_on_target,
+    find_and_filter_plugins,
     generate_argparse_for_bound_method,
     process_generic_arguments,
 )
@@ -112,6 +114,8 @@ class TargetCmd(cmd.Cmd):
     def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
+        self.debug = False
+        self.identchars += "."
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -152,8 +156,8 @@ class TargetCmd(cmd.Cmd):
         except AttributeError:
             pass
 
-        if self.target.has_function(command):
-            return self._exec_target(command, command_args_str)
+        if plugins := list(find_and_filter_plugins(self.target, command, [])):
+            return self._exec_target(plugins, command_args_str)
 
         return cmd.Cmd.default(self, line)
 
@@ -178,25 +182,22 @@ class TargetCmd(cmd.Cmd):
             lexer.whitespace_split = True
             argparts = list(lexer)
 
-        try:
-            if "|" in argparts:
-                pipeidx = argparts.index("|")
-                argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
-                try:
-                    with build_pipe_stdout(pipeparts) as pipe_stdin:
-                        return func(argparts, pipe_stdin)
-                except OSError as e:
-                    # in case of a failure in a subprocess
-                    print(e)
-            else:
-                ctx = contextlib.nullcontext()
-                if self.target.props.get("cyber") and not no_cyber:
-                    ctx = cyber.cyber(color=None, run_at_end=True)
+        if "|" in argparts:
+            pipeidx = argparts.index("|")
+            argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
+            try:
+                with build_pipe_stdout(pipeparts) as pipe_stdin:
+                    return func(argparts, pipe_stdin)
+            except OSError as e:
+                # in case of a failure in a subprocess
+                print(e)
+        else:
+            ctx = contextlib.nullcontext()
+            if self.target.props.get("cyber") and not no_cyber:
+                ctx = cyber.cyber(color=None, run_at_end=True)
 
-                with ctx:
-                    return func(argparts, sys.stdout)
-        except IOError:
-            pass
+            with ctx:
+                return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> Optional[bool]:
         """Command execution helper for ``cmd_`` commands."""
@@ -214,24 +215,15 @@ class TargetCmd(cmd.Cmd):
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
 
-    def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
+    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
-        attr = self.target
-        for part in func.split("."):
-            attr = getattr(attr, part)
 
         def _exec_(argparts: list[str], stdout: TextIO) -> Optional[bool]:
-            if callable(attr):
-                argparser = generate_argparse_for_bound_method(attr)
-                try:
-                    args = argparser.parse_args(argparts)
-                except SystemExit:
-                    return False
-                value = attr(**vars(args))
-            else:
-                value = attr
+            try:
+                output, value, _ = execute_function_on_target(self.target, func, argparts)
+            except SystemExit:
+                return False
 
-            output = getattr(attr, "__output__", "default")
             if output == "record":
                 # if the command results are piped to another process,
                 # the process will receive Record objects
@@ -252,10 +244,16 @@ class TargetCmd(cmd.Cmd):
             else:
                 print(value, file=stdout)
 
-        try:
-            return self._exec(_exec_, command_args_str)
-        except PluginError:
-            traceback.print_exc()
+        result = None
+        for func in funcs:
+            try:
+                result = self._exec(_exec_, command_args_str)
+            except PluginError as err:
+                if self.debug:
+                    raise err
+                self.target.log.error(err)
+
+        return result
 
     def do_python(self, line: str) -> Optional[bool]:
         """drop into a Python shell"""
@@ -277,6 +275,14 @@ class TargetCmd(cmd.Cmd):
     def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
         return True
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -468,7 +474,7 @@ class TargetCli(TargetCmd):
                 # If we happen to scan an NTFS filesystem see if any of the
                 # entries has an alternative data stream and also list them.
                 entry = file_.get()
-                if isinstance(entry, RootFilesystemEntry):
+                if isinstance(entry, LayerFilesystemEntry):
                     if entry.entries.fs.__type__ == "ntfs":
                         attrs = entry.lattr()
                         for data_stream in attrs.DATA:
@@ -511,34 +517,66 @@ class TargetCli(TargetCmd):
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
     @arg("-h", "--human-readable", action="store_true")
+    @arg("-R", "--recursive", action="store_true", help="recursively list subdirectories encountered")
+    @arg("-c", action="store_true", dest="use_ctime", help="show time when file status was last changed")
+    @arg("-u", action="store_true", dest="use_atime", help="show time of last access")
     def cmd_ls(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
         """list directory contents"""
 
         path = self.resolve_path(args.path)
 
+        if args.use_ctime and args.use_atime:
+            print("can't specify -c and -u at the same time")
+            return
+
         if not path or not path.exists():
             return
+
+        self._print_ls(args, path, 0, stdout)
+
+    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> None:
+        path = self.resolve_path(path)
+        subdirs = []
 
         if path.is_dir():
             contents = self.scandir(path, color=True)
         elif path.is_file():
             contents = [(path, path.name)]
 
+        if depth > 0:
+            print(f"\n{str(path)}:", file=stdout)
+
         if not args.l:
-            print("\n".join([name for _, name in contents]), file=stdout)
+            for target_path, name in contents:
+                print(name, file=stdout)
+                if target_path.is_dir():
+                    subdirs.append(target_path)
         else:
             if len(contents) > 1:
                 print(f"total {len(contents)}", file=stdout)
             for target_path, name in contents:
-                self.print_extensive_file_stat(stdout=stdout, target_path=target_path, name=name)
+                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
+                if target_path.is_dir():
+                    subdirs.append(target_path)
 
-    def print_extensive_file_stat(self, stdout: TextIO, target_path: fsutil.TargetPath, name: str) -> None:
+        if args.recursive and subdirs:
+            for subdir in subdirs:
+                self._print_ls(args, subdir, depth + 1, stdout)
+
+    def print_extensive_file_stat(
+        self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str
+    ) -> None:
         """Print the file status."""
         try:
             entry = target_path.get()
             stat = entry.lstat()
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.datetime.utcfromtimestamp(stat.st_mtime).isoformat()
+            show_time = stat.st_mtime
+            if args.use_ctime:
+                show_time = stat.st_ctime
+            elif args.use_atime:
+                show_time = stat.st_atime
+            utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
 
             print(
                 f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
@@ -1208,7 +1246,12 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
             pass
         except Exception as e:
-            log.exception(e)
+            if cli.debug:
+                log.exception(e)
+            else:
+                log.info(e)
+                print(f"*** Unhandled error: {e}")
+                print("If you wish to see the full debug trace, enable debug mode.")
             pass
 
 
@@ -1223,10 +1266,17 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
+    parser.add_argument(
+        "-L",
+        "--loader",
+        action="store",
+        default=None,
+        help="select a specific loader (i.e. vmx, raw)",
+    )
 
     configure_generic_arguments(parser)
-    args = parser.parse_args()
-
+    args, rest = parser.parse_known_args()
+    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
     process_generic_arguments(args)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL

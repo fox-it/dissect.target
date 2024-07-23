@@ -26,7 +26,7 @@ class WebCache:
         self.target = target
         self.db = esedb.EseDB(fh)
 
-    def find_containers(self, name: str) -> table.Table:
+    def find_containers(self, name: str) -> Iterator[table.Table]:
         """Look up all ``ContainerId`` values for a given container name.
 
         Args:
@@ -131,6 +131,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser history records from Internet Explorer.
 
         Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -183,6 +186,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser downloads records from Internet Explorer.
 
         Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
+
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
@@ -212,7 +218,7 @@ class InternetExplorerPlugin(BrowserPlugin):
                     ts_end=ts_end,
                     browser="iexplore",
                     id=container_record.EntryId,
-                    path=self.target.fs.path(down_path),
+                    path=self.target.fs.path(down_path) if down_path else None,
                     url=down_url,
                     size=None,
                     state=None,

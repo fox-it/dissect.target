@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+import logging
 import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
+from itertools import chain
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional, Union
+from typing import Any, Callable, Iterable, Match, Optional
 
 from defusedxml import ElementTree
 
@@ -11,12 +15,14 @@ from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.target import Target
 
-try:
-    import yaml
+log = logging.getLogger(__name__)
 
-    PY_YAML = True
+try:
+    from ruamel.yaml import YAML
+
+    HAS_YAML = True
 except ImportError:
-    PY_YAML = False
+    HAS_YAML = False
 
 IGNORED_IPS = [
     "0.0.0.0",
@@ -49,7 +55,7 @@ class Template:
         """Sets the name of the the used parsing template to the name of the discovered network manager."""
         self.name = name
 
-    def create_config(self, path: TargetPath) -> Union[dict, None]:
+    def create_config(self, path: TargetPath) -> Optional[dict]:
         """Create a network config dictionary based on the configured template and supplied path.
 
         Args:
@@ -60,7 +66,7 @@ class Template:
         """
 
         if not path.exists() or path.is_dir():
-            self.target.log.debug("Failed to get config file %s", path)
+            log.debug("Failed to get config file %s", path)
             config = None
 
         if self.name == "netplan":
@@ -73,26 +79,26 @@ class Template:
             config = self._parse_configparser_config(path)
         return config
 
-    def _parse_netplan_config(self, fh: TargetPath) -> Union[dict, None]:
+    def _parse_netplan_config(self, path: TargetPath) -> Optional[dict]:
         """Internal function to parse a netplan YAML based configuration file into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            fh: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed YAML based configuration file.
         """
-        if PY_YAML:
-            return self.parser(stream=fh.open(), Loader=yaml.FullLoader)
+        if HAS_YAML:
+            return self.parser(path.open("rb"))
         else:
-            self.target.log.error("Failed to parse %s. Cannot import PyYAML", self.name)
+            log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
             return None
 
-    def _parse_wicked_config(self, fh: TargetPath) -> dict:
+    def _parse_wicked_config(self, path: TargetPath) -> dict:
         """Internal function to parse a wicked XML based configuration file into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            fh: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed xml based Linux network manager based configuration file.
@@ -101,44 +107,43 @@ class Template:
         # we have to replace the ":" for this with "___" (three underscores) to make the xml config non-namespaced.
         pattern = compile(r"(?<=\n)\s+(<.+?>)")
         replace_match: Callable[[Match]] = lambda match: match.group(1).replace(":", "___")
-        text = sub(pattern, replace_match, fh.open("rt").read())
+        text = sub(pattern, replace_match, path.open("rt").read())
 
         xml = self.parser.parse(StringIO(text))
         return self._parse_xml_config(xml, self.sections, self.options)
 
-    def _parse_configparser_config(self, fh: TargetPath) -> dict:
+    def _parse_configparser_config(self, path: TargetPath) -> dict:
         """Internal function to parse ConfigParser compatible configuration files into a dict.
 
         Args:
-            fh: A file-like object to the configuration file to be parsed.
+            path: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary containing the parsed ConfigParser compatible configuration file.
         """
         try:
-            self.parser.read_string(fh.open("rt").read(), fh.name)
+            self.parser.read_string(path.open("rt").read(), path.name)
             return self.parser._sections
         except MissingSectionHeaderError:
             # configparser does like config files without headers, so we inject a header to make it work.
-            self.parser.read_string(f"[{self.name}]\n" + fh.open("rt").read(), fh.name)
+            self.parser.read_string(f"[{self.name}]\n" + path.open("rt").read(), path.name)
             return self.parser._sections
 
-    def _parse_text_config(self, comments: str, delim: str, fh: TargetPath) -> dict:
+    def _parse_text_config(self, comments: str, delim: str, path: TargetPath) -> dict:
         """Internal function to parse a basic plain text based configuration file into a dict.
 
         Args:
             comments: A string value defining the comment style of the configuration file.
             delim: A string value defining the delimiters used in the configuration file.
-            fh: A file-like object to the configuration file to be parsed.
+            path: A path to the configuration file to be parsed.
 
         Returns:
             Dictionary with a parsed plain text based Linux network manager configuration file.
         """
         config = defaultdict(dict)
         option_dict = {}
-        fh = fh.open("rt")
 
-        for line in fh.readlines():
+        for line in path.open("rt"):
             line = line.strip()
 
             if not line or line.startswith(comments):
@@ -279,7 +284,7 @@ class Parser:
             if option in translation_values and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Union[str, Callable]:
+    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Optional[str | Callable]:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
 
         Args:
@@ -290,8 +295,14 @@ class Parser:
         Returns:
             Value(s) corrensponding to that network configuration option.
         """
+        if not config:
+            log.error("Cannot get option %s: No config to parse", option)
+            return
+
         if section:
-            config = config[section]
+            # account for values of sections which are None
+            config = config.get(section, {}) or {}
+
         for key, value in config.items():
             if key == option:
                 return value
@@ -365,7 +376,7 @@ class NetworkManager:
         if self.registered:
             self.config = self.parser.parse()
         else:
-            self.target.log.error("Network manager %s is not registered. Cannot parse config.", self.name)
+            log.error("Network manager %s is not registered. Cannot parse config.", self.name)
 
     @property
     def interface(self) -> set:
@@ -499,7 +510,7 @@ class LinuxNetworkManager:
 
 
 def parse_unix_dhcp_log_messages(target) -> list[str]:
-    """Parse local syslog and cloud init log files for DHCP lease IPs.
+    """Parse local syslog, journal and cloud init-log files for DHCP lease IPs.
 
     Args:
         target: Target to discover and obtain network information from.
@@ -507,53 +518,68 @@ def parse_unix_dhcp_log_messages(target) -> list[str]:
     Returns:
         List of DHCP ip addresses.
     """
-    ips = []
+    ips = set()
+    messages = set()
 
-    # Search through parsed syslogs for DHCP leases.
-    try:
-        messages = target.messages()
-        for record in messages:
-            line = record.message
+    for log_func in ["messages", "journal"]:
+        try:
+            messages = chain(messages, getattr(target, log_func)())
+        except PluginError:
+            target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
 
-            # Ubuntu DHCP
-            if ("DHCPv4" in line or "DHCPv6" in line) and " address " in line and " via " in line:
-                ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
-                if ip not in ips:
-                    ips.append(ip)
+    if not messages:
+        target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
 
-            # Ubuntu DHCP NetworkManager
-            elif "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line) and "=> '" in line:
-                ip = line.split("=> '")[1].replace("'", "").strip()
-                if ip not in ips:
-                    ips.append(ip)
+    for record in messages:
+        line = record.message
 
-            # Debian and CentOS dhclient
-            elif record.daemon == "dhclient" and "bound to" in line:
-                ip = line.split("bound to")[1].split(" ")[1].strip()
-                if ip not in ips:
-                    ips.append(ip)
+        # Ubuntu cloud-init
+        if "Received dhcp lease on" in line:
+            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            ips.add(ip)
+            continue
 
-            # CentOS DHCP and general NetworkManager
-            elif " address " in line and ("dhcp4" in line or "dhcp6" in line):
-                ip = line.split(" address ")[1].strip()
-                if ip not in ips:
-                    ips.append(ip)
+        # Ubuntu DHCP
+        if ("DHCPv4" in line or "DHCPv6" in line) and " address " in line and " via " in line:
+            ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
+            ips.add(ip)
+            continue
 
-    except PluginError:
-        target.log.debug("Can not search for DHCP leases in syslog files as they does not exist.")
+        # Ubuntu DHCP NetworkManager
+        if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line) and "=> '" in line:
+            ip = line.split("=> '")[1].replace("'", "").strip()
+            ips.add(ip)
+            continue
 
-    # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).
-    if (path := target.fs.path("/var/log/cloud-init.log")).exists():
-        for line in path.open("rt"):
-            # We are interested in the following log line:
-            # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
-            if "Received dhcp lease on" in line:
-                interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
-                if ip not in ips:
-                    ips.append(ip)
+        # Debian and CentOS dhclient
+        if hasattr(record, "daemon") and record.daemon == "dhclient" and "bound to" in line:
+            ip = line.split("bound to")[1].split(" ")[1].strip()
+            ips.add(ip)
+            continue
 
-    if not path and not messages:
-        target.log.warning("Can not search for DHCP leases in syslog or cloud-init.log files as they does not exist.")
+        # CentOS DHCP and general NetworkManager
+        if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+            ip = line.split(" address ")[1].strip()
+            ips.add(ip)
+            continue
+
+        # Ubuntu/Debian DHCP networkd (Journal)
+        if (
+            hasattr(record, "code_func")
+            and record.code_func == "dhcp_lease_acquired"
+            and " address " in line
+            and " via " in line
+        ):
+            interface, ip, netmask, gateway = re.search(
+                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
+            ).groups()
+            ips.add(ip)
+            continue
+
+        # Journals and syslogs can be large and slow to iterate,
+        # so we stop if we have some results and have reached the journal plugin.
+        if len(ips) >= 2 and record._desc.name == "linux/log/journal":
+            break
 
     return ips
 
@@ -631,7 +657,9 @@ TEMPLATES = {
         ["netctl"],
         ["address", "gateway", "dns", "ip"],
     ),
-    "netplan": Template("netplan", yaml.load if PY_YAML else None, ["network"], ["addresses", "dhcp4", "gateway4"]),
+    "netplan": Template(
+        "netplan", YAML(typ="safe").load if HAS_YAML else None, ["network"], ["addresses", "dhcp4", "gateway4"]
+    ),
     "NetworkManager": Template(
         "NetworkManager",
         ConfigParser(delimiters=("="), comment_prefixes="#", dict_type=dict),

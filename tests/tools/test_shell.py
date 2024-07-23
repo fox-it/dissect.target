@@ -148,12 +148,10 @@ def test_pipe_symbol_parsing(capfd, target_bare):
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_exec_target_command(capfd, target_default):
     cli = TargetCli(target_default)
-    command = "users"
     # `users` from the general OSPlugin does not ouput any records, but as the
     # ouput is piped to, the records are transformed to a binary record stream,
     # so we pipe it through rdump to get a correct count of 0 from wc.
-    command_args_str = "| rdump | wc -l"
-    cli._exec_target(command, command_args_str)
+    cli.default("users | rdump | wc -l")
 
     sys.stdout.flush()
     sys.stderr.flush()
@@ -182,8 +180,10 @@ def test_target_cli_print_extensive_file_stat(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.return_value = mock_entry
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo\n"
@@ -198,8 +198,10 @@ def test_target_cli_print_extensive_file_stat_symlink(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.return_value = mock_entry
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo -> bar\n"
@@ -209,8 +211,10 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
     mock_path = MagicMock(spec_set=TargetPath)
     mock_path.get.side_effect = FileNotFoundError("ERROR")
 
+    mock_args = MagicMock()
+
     cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(sys.stdout, mock_path, "foo")
+    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
 
     captured = capsys.readouterr()
     assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"
@@ -260,7 +264,7 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
         ("hello", "world.txt"),  # Latin
         ("ħēļľŏ", "ŵőřŀđ.txt"),  # Latin Extended-A
         ("مرحبًا", "عالم.txt"),  # Arabic
-        ("你好", "世界.txt"),  # Chineese Simplified
+        ("你好", "世界.txt"),  # Chinese Simplified
         ("привет", "мир.txt"),  # Cyrillic
         ("🕵🕵🕵", "👀👀👀.txt"),  # Emoji
     ],

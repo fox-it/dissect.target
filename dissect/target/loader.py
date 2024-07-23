@@ -77,7 +77,7 @@ class Loader:
         raise NotImplementedError()
 
     @staticmethod
-    def find_all(path: Path) -> Iterator[Path]:
+    def find_all(path: Path, **kwargs) -> Iterator[Path]:
         """Finds all targets to load from ``path``.
 
         This can be used to open multiple targets from a target path that doesn't necessarily map to files on a disk.
@@ -176,6 +176,7 @@ def open(item: Union[str, Path], *args, **kwargs) -> Loader:
 
 register("local", "LocalLoader")
 register("remote", "RemoteLoader")
+register("mqtt", "MQTTLoader")
 register("targetd", "TargetdLoader")
 register("asdf", "AsdfLoader")
 register("tar", "TarLoader")
@@ -198,6 +199,7 @@ register("target", "TargetLoader")
 register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536
 # register("res", "ResLoader")
+register("overlay", "Overlay2Loader")
 register("phobos", "PhobosLoader")
 register("velociraptor", "VelociraptorLoader")
 register("smb", "SmbLoader")

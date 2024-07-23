@@ -8,6 +8,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
 from dissect.target.plugins.apps.browser.chromium import (
@@ -27,6 +28,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         ".var/app/com.microsoft.Edge/config/microsoft-edge/Default",
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",
+        "AppData/Local/Microsoft/Edge/User Data/Snapshots/*/Default",
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
     ]
@@ -45,6 +47,10 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "browser/edge/extension", GENERIC_EXTENSION_RECORD_FIELDS
+    )
+
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/edge/password", GENERIC_PASSWORD_RECORD_FIELDS
     )
 
     @export(record=BrowserHistoryRecord)
@@ -66,3 +72,8 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Microsoft Edge."""
         yield from super().extensions("edge")
+
+    @export(record=BrowserPasswordRecord)
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
+        """Return browser password records for Microsoft Edge."""
+        yield from super().passwords("edge")

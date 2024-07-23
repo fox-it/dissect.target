@@ -26,6 +26,7 @@ from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
+    find_and_filter_plugins,
     generate_argparse_for_bound_method,
     generate_argparse_for_plugin_class,
     generate_argparse_for_unbound_method,
@@ -172,8 +173,7 @@ def main():
         collected_plugins = {}
 
         if targets:
-            for target in targets:
-                plugin_target = Target.open(target)
+            for plugin_target in Target.open_all(targets, args.children):
                 if isinstance(plugin_target._loader, ProxyLoader):
                     parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
@@ -270,25 +270,13 @@ def main():
             basic_entries = []
             yield_entries = []
 
-            # Keep a set of plugins that were already executed on the target.
-            executed_plugins = set()
-
             first_seen_output_type = default_output_type
             cli_params_unparsed = rest
 
-            func_defs, _ = find_plugin_functions(target, args.function, compatibility=False)
             excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
             excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
-            for func_def in func_defs:
-                if func_def.path in excluded_func_paths:
-                    continue
-
-                # Avoid executing same plugin for multiple OSes (like hostname)
-                if func_def.name in executed_plugins:
-                    continue
-                executed_plugins.add(func_def.name)
-
+            for func_def in find_and_filter_plugins(target, args.function, excluded_func_paths):
                 # If the default type is record (meaning we skip everything else)
                 # and actual output type is not record, continue.
                 # We perform this check here because plugins that require output files/dirs

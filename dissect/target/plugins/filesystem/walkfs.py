@@ -3,7 +3,7 @@ from typing import Iterable
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import RootFilesystemEntry
+from dissect.target.filesystem import LayerFilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -50,7 +50,7 @@ def generate_record(target: Target, path: TargetPath) -> FilesystemRecord:
     stat = path.lstat()
     btime = from_unix(stat.st_birthtime) if stat.st_birthtime else None
     entry = path.get()
-    if isinstance(entry, RootFilesystemEntry):
+    if isinstance(entry, LayerFilesystemEntry):
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
     else:
         fs_types = [entry.fs.__type__]
