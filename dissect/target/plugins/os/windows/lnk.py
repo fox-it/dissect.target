@@ -168,7 +168,18 @@ class LnkPlugin(Plugin):
 
     def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
         if path:
-            yield self.target.fs.path(path)
+            target_path = self.target.fs.path(path)
+            if not target_path.exists():
+                self.target.log.error("Provided path does not exist on target")
+                return
+            if target_path.is_file() and target_path.suffix.lower() != ".lnk":
+                self.target.log.error("Provided file should have suffix '.lnk'")
+                return
+
+            if target_path.is_file():
+                yield target_path
+            else:
+                yield from target_path.rglob("*.lnk")
         else:
             for folder in self.folders:
                 yield from self.target.fs.path("sysvol").joinpath(folder).rglob("*.lnk")
