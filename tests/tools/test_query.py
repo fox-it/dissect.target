@@ -160,6 +160,7 @@ def mock_find_plugin_function(
             PluginFunction(
                 name=pattern,
                 output_type="record",
+                output_def=None,
                 path=pattern,
                 class_object=MagicMock(),
                 method_name=pattern,

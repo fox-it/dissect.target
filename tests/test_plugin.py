@@ -5,7 +5,7 @@ from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
-from flow.record import Record
+from flow.record import Record, RecordDescriptor, RecordField
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -137,6 +137,28 @@ def test_find_plugin_function_linux(target_linux: Target) -> None:
     assert len(found) == 1
     assert found[0].name == "services"
     assert found[0].path == "os.unix.linux.services.services"
+
+
+def test_find_plugin_function_record_def(target_linux: Target) -> None:
+    """test if found plugins have an output_def attribute with a RecordDescriptor inside"""
+
+    # Plugins yielding records should have a RecordDescriptor in the output_def attribute.
+    found, _ = find_plugin_functions(target_linux, "users")
+    assert len(found) == 1
+    users_plugin = found[0]
+    assert users_plugin.output_type == "record"
+    assert hasattr(users_plugin, "output_def")
+    assert isinstance(users_plugin.output_def, RecordDescriptor)
+    assert hasattr(users_plugin.output_def, "fields")
+    assert isinstance(users_plugin.output_def.fields, dict)
+    assert isinstance(users_plugin.output_def.fields.get("hostname"), RecordField)
+
+    # Plugins yielding non-records should have a falsy output_def attribute.
+    found, _ = find_plugin_functions(target_linux, "os")
+    assert len(found) == 1
+    os_plugin = found[0]
+    assert os_plugin.output_type == "text"
+    assert os_plugin.output_def is None
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
