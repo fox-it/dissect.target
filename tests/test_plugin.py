@@ -15,6 +15,7 @@ from dissect.target.plugin import (
     NamespacePlugin,
     OSPlugin,
     Plugin,
+    PluginFunction,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -159,6 +160,21 @@ def test_find_plugin_function_record_def(target_linux: Target) -> None:
     os_plugin = found[0]
     assert os_plugin.output_type == "text"
     assert os_plugin.output_def is None
+
+
+@pytest.mark.parametrize(
+    "func_path, func",
+    [
+        (func.path, func)
+        for func in find_plugin_functions(Target(), "*", compatibility=False, show_hidden=True)[0]
+        if func.output_type == "record"
+    ],
+)
+def test_exported_plugin_record_def(func_path: str, func: PluginFunction) -> None:
+    """test if every exported plugin yielding records has defined a RecordDescriptor"""
+    assert isinstance(func.output_def, RecordDescriptor) or (
+        isinstance(func.output_def, list) and all([isinstance(f, RecordDescriptor) for f in func.output_def])
+    )
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
