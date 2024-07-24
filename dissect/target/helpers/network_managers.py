@@ -13,6 +13,8 @@ from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.plugins.os.unix.log.journal import JournalRecord
+from dissect.target.plugins.os.unix.log.messages import MessagesRecord
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -587,7 +589,8 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             ips.add(ip)
             continue
 
-        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries.
+        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries,
+        # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
         if not iter_all and (ips or count > 10_000):
             if not ips:
                 log.warning("No DHCP IP addresses found in first 10000 journal entries.")
