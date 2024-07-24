@@ -509,7 +509,7 @@ class LinuxNetworkManager:
         return values
 
 
-def parse_unix_dhcp_log_messages(target, iter_all: bool = False) -> list[str]:
+def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[str]:
     """Parse local syslog, journal and cloud init-log files for DHCP lease IPs.
 
     Args:
@@ -517,7 +517,7 @@ def parse_unix_dhcp_log_messages(target, iter_all: bool = False) -> list[str]:
         iter_all: Parse limited amount of journal messages (first 10000) or all of them.
 
     Returns:
-        List of found DHCP IP addresses.
+        A set of found DHCP IP addresses.
     """
     ips = set()
     messages = set()
@@ -531,14 +531,14 @@ def parse_unix_dhcp_log_messages(target, iter_all: bool = False) -> list[str]:
     if not messages:
         target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
 
-    def messages_enumerate(iterable: Iterable) -> Iterator[tuple[int, Any]]:
-        n = 0
+    def records_enumerate(iterable: Iterable) -> Iterator[tuple[int, JournalRecord | MessagesRecord]]:
+        count = 0
         for rec in iterable:
             if rec._desc.name == "linux/log/journal":
-                n += 1
-            yield n, rec
+                count += 1
+            yield count, rec
 
-    for count, record in messages_enumerate(messages):
+    for count, record in records_enumerate(messages):
         line = record.message
 
         if not line:
