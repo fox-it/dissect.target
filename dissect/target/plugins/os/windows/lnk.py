@@ -45,9 +45,9 @@ class LnkPlugin(Plugin):
                 return None
         raise UnsupportedPluginError("No folders containing link files found")
 
-    @arg("--directory", "-d", dest="directory", default=None, help="Path to .lnk file in target")
+    @arg("--path", "-p", dest="path", default=None, help="Path to directory or .lnk file in target")
     @export(record=LnkRecord)
-    def lnk(self, directory: Optional[str] = None) -> Iterator[LnkRecord]:
+    def lnk(self, path: Optional[str] = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
@@ -77,7 +77,7 @@ class LnkPlugin(Plugin):
         # we need to get the active codepage from the system to properly decode some values
         codepage = self.target.codepage or "ascii"
 
-        for entry in self.lnk_entries(directory):
+        for entry in self.lnk_entries(path):
             lnk_file = Lnk(entry.open())
             lnk_net_name = lnk_device_name = None
 
@@ -170,10 +170,7 @@ class LnkPlugin(Plugin):
         if path:
             target_path = self.target.fs.path(path)
             if not target_path.exists():
-                self.target.log.error("Provided path does not exist on target")
-                return
-            if target_path.is_file() and target_path.suffix.lower() != ".lnk":
-                self.target.log.error("Provided file should have suffix '.lnk'")
+                self.target.log.error("Provided path %s does not exist on target", target_path)
                 return
 
             if target_path.is_file():

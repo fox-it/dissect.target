@@ -1,16 +1,27 @@
+from typing import Optional
+
+import pytest
 from flow.record.fieldtypes import datetime
 
 from dissect.target.plugins.os.windows.lnk import LnkPlugin, LnkRecord
 from tests._utils import absolute_path
 
 
-def test_lnk(target_win, fs_win):
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param(None, id="No directory provided"),
+        pytest.param("sysvol/users/", id="Directory provided"),
+        pytest.param("sysvol/users/pestudio.lnk", id="File provided"),
+    ],
+)
+def test_lnk(target_win, fs_win, path: Optional[str]):
     lnk_file = absolute_path("_data/plugins/os/windows/lnk/pestudio.lnk")
     fs_win.map_file("Users/pestudio.lnk", lnk_file)
 
     target_win.add_plugin(LnkPlugin)
 
-    records = list(target_win.lnk(None))
+    records = list(target_win.lnk(path))
 
     assert len(records) == 1
 
