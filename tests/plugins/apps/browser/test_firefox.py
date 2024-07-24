@@ -137,6 +137,7 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
         "webRequest",
         "webRequestBlocking",
     ]
+    assert records[1].permissions == []
 
 
 @pytest.mark.parametrize(
