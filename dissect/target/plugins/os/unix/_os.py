@@ -40,12 +40,18 @@ class UnixPlugin(OSPlugin):
     @export(record=UnixUserRecord)
     @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")
     def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
-        """Recover users from /etc/passwd, /etc/master.passwd or /var/log/syslog session logins."""
+        """Yield unix user records from passwd files or syslog session logins.
+
+        Resources:
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
+        """
+
+        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
 
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in ["/etc/passwd", "/etc/master.passwd"]:
+        for passwd_file in PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt"):
                     line = line.strip()
@@ -53,6 +59,11 @@ class UnixPlugin(OSPlugin):
                         continue
 
                     pwent = dict(enumerate(line.split(":")))
+
+                    current_user = (pwent.get(0), pwent.get(5), pwent.get(6))
+                    if current_user in seen_users:
+                        continue
+
                     seen_users.add((pwent.get(0), pwent.get(5), pwent.get(6)))
                     yield UnixUserRecord(
                         name=pwent.get(0),
