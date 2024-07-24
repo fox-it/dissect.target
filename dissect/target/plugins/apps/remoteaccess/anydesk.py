@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -93,7 +93,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
                 try:
                     level, ts_date, ts_time, message = line.split(" ", 3)
 
-                    timestamp = datetime.strptime(f"{ts_date} {ts_time}", "%Y-%m-%d %H:%M:%S.%f")
+                    timestamp = datetime.strptime(f"{ts_date} {ts_time}", "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
                     message = re.sub(r"\s\s+", " ", f"{level} {message}")
 
                     yield self.RemoteAccessLogRecord(
