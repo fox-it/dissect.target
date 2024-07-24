@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import export
@@ -15,7 +15,7 @@ class CredHistKeyProviderPlugin(KeyProviderPlugin):
             raise UnsupportedPluginError("CREDHIST plugin not available on target")
 
     @export(output="yield")
-    def keys(self) -> Iterator[Optional[tuple[str, str]]]:
+    def keys(self) -> Iterator[tuple[str, str]]:
         for credhist in self.target.credhist():
             if value := getattr(credhist, "sha1"):
                 yield self.__namespace__, value

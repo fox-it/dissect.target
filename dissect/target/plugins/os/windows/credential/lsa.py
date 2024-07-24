@@ -1,9 +1,11 @@
 import hashlib
 from functools import cached_property
 from struct import unpack
+from typing import Iterator, Optional
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import InternalPlugin
+from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugin import Plugin, export
 
 try:
     from Crypto.Cipher import AES, ARC4, DES
@@ -13,13 +15,25 @@ except ImportError:
     HAS_CRYPTO = False
 
 
-class LSAPlugin(InternalPlugin):
-    """Windows LSA Plugin.
+LSASecretRecord = TargetRecordDescriptor(
+    "windows/credential/lsa",
+    [
+        ("datetime", "ts"),
+        ("string", "name"),
+        ("string", "value"),
+    ],
+)
+
+
+class LSAPlugin(Plugin):
+    """Windows Local Security Authority (LSA) plugin.
 
     Resources:
+        - https://learn.microsoft.com/en-us/windows/win32/secauthn/lsa-authentication
         - https://moyix.blogspot.com/2008/02/decrypting-lsa-secrets.html (Windows XP)
         - https://github.com/fortra/impacket/blob/master/impacket/examples/secretsdump.py
     """
+
     __namespace__ = "lsa"
 
     SECURITY_POLICY_KEY = "HKEY_LOCAL_MACHINE\\SECURITY\\Policy"
@@ -48,7 +62,7 @@ class LSAPlugin(InternalPlugin):
         """Decrypt and return the LSA key of the Windows system."""
         security_pol = self.target.registry.key(self.SECURITY_POLICY_KEY)
 
-        # Windows Vista and newer
+        # Windows Vista or newer
         if key := security_pol.subkeys().mapping.get("PolEKList"):
             enc_key = key.value("(Default)").value
             lsa_key = _decrypt_aes(enc_key, self.syskey)
@@ -63,8 +77,11 @@ class LSAPlugin(InternalPlugin):
         raise ValueError("Unable to determine LSA policy key location in registry")
 
     @cached_property
-    def secrets(self) -> dict[str, bytes]:
+    def _secrets(self) -> Optional[dict[str, bytes]]:
         """Return dict of Windows system decrypted LSA secrets."""
+        if not self.target.ntversion:
+            raise ValueError("Unable to determine Windows NT version")
+
         result = {}
 
         reg_secrets = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets")
@@ -72,7 +89,7 @@ class LSAPlugin(InternalPlugin):
             enc_data = subkey.subkey("CurrVal").value("(Default)").value
 
             # Windows Vista or newer
-            if float(self.target._os._nt_version()) >= 6.0:
+            if float(self.target.ntversion) >= 6.0:
                 secret = _decrypt_aes(enc_data, self.lsakey)
 
             # Windows XP
@@ -83,26 +100,32 @@ class LSAPlugin(InternalPlugin):
 
         return result
 
+    @export(record=LSASecretRecord)
+    def secrets(self) -> Iterator[LSASecretRecord]:
+        """Yield decrypted LSA secrets from a Windows target."""
+        for key, value in self._secrets.items():
+            yield LSASecretRecord(
+                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets").subkeys().mapping.get(key).ts,
+                name=key,
+                value=value.hex(),
+                _target=self.target,
+            )
+
 
 def _decrypt_aes(data: bytes, key: bytes) -> bytes:
     ctx = hashlib.sha256()
     ctx.update(key)
-
-    tmp = data[28:60]
     for _ in range(1, 1000 + 1):
-        ctx.update(tmp)
+        ctx.update(data[28:60])
 
-    aeskey = ctx.digest()
-    iv = b"\x00" * 16
+    ciphertext = data[60:]
+    plaintext = b""
 
-    result = []
+    for i in range(0, len(ciphertext), 16):
+        cipher = AES.new(key=ctx.digest(), mode=AES.MODE_CBC, iv=b"\x00" * 16)
+        plaintext += cipher.decrypt(ciphertext[i : i + 16].ljust(16, b"\x00"))
 
-    # TODO: use Crypto.Util.Padding.pad
-    for i in range(60, len(data), 16):
-        cipher = AES.new(aeskey, AES.MODE_CBC, iv)
-        result.append(cipher.decrypt(data[i : i + 16].ljust(16, b"\x00")))
-
-    return b"".join(result)
+    return plaintext
 
 
 def _decrypt_rc4(data: bytes, key: bytes) -> bytes:
@@ -140,18 +163,9 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
 
 
 def transform_key(key: bytes) -> bytes:
-    # TODO: simplify this function
     new_key = []
-    new_key.append(chr(ord(key[0:1]) >> 0x01))
-    new_key.append(chr(((ord(key[0:1]) & 0x01) << 6) | (ord(key[1:2]) >> 2)))
-    new_key.append(chr(((ord(key[1:2]) & 0x03) << 5) | (ord(key[2:3]) >> 3)))
-    new_key.append(chr(((ord(key[2:3]) & 0x07) << 4) | (ord(key[3:4]) >> 4)))
-    new_key.append(chr(((ord(key[3:4]) & 0x0F) << 3) | (ord(key[4:5]) >> 5)))
-    new_key.append(chr(((ord(key[4:5]) & 0x1F) << 2) | (ord(key[5:6]) >> 6)))
-    new_key.append(chr(((ord(key[5:6]) & 0x3F) << 1) | (ord(key[6:7]) >> 7)))
-    new_key.append(chr(ord(key[6:7]) & 0x7F))
-
-    for i in range(8):
-        new_key[i] = chr((ord(new_key[i]) << 1) & 0xFE)
-
-    return ("".join(new_key)).encode("latin-1")
+    new_key.append(((key[0] >> 0x01) << 1) & 0xFE)
+    for i in range(0, 6):
+        new_key.append((((key[i] & ((1 << (i + 1)) - 1)) << (6 - i) | (key[i + 1] >> (i + 2))) << 1) & 0xFE)
+    new_key.append(((key[6] & 0x7F) << 1) & 0xFE)
+    return bytes(new_key)

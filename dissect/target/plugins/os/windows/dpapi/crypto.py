@@ -40,6 +40,7 @@ class CipherAlgorithm:
         Resources:
             - https://github.com/tijldeneut/DPAPIck3/blob/main/dpapick3/crypto.py#L185
         """
+
         if len(key) > hash_algorithm.block_length:
             key = hashlib.new(hash_algorithm.name, key).digest()
 
@@ -53,6 +54,9 @@ class CipherAlgorithm:
         key = self.fixup_key(key)
         return key
 
+    def fixup_key(self, key: bytes) -> bytes:
+        return key
+
     def decrypt_with_hmac(
         self, data: bytes, key: bytes, iv: bytes, hash_algorithm: HashAlgorithm, rounds: int
     ) -> bytes:
@@ -63,9 +67,6 @@ class CipherAlgorithm:
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
         raise NotImplementedError()
-
-    def fixup_key(self, key: bytes) -> bytes:
-        return key
 
 
 class _AES(CipherAlgorithm):
@@ -135,14 +136,14 @@ class _DES3(CipherAlgorithm):
                 nkey.append(byte)
             else:
                 nkey.append(byte | 1)
-        return nkey
+        return bytes(nkey[0 : self.key_length])
 
     def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
         if not HAS_CRYPTO:
             raise RuntimeError("Missing pycryptodome dependency")
 
         if len(key) != 24:
-            raise ValueError("invalid key length %s" % len(key))
+            raise ValueError(f"Invalid DES3 CBC key length {len(key)}")
 
         cipher = DES3.new(key, mode=DES3.MODE_CBC, iv=iv if iv else b"\x00" * 8)
         return cipher.decrypt(data)
@@ -258,6 +259,7 @@ def crypt_session_key_type1(
         strong_password: Optional password used for decryption or the blob itself.
         smart_card_secret: Optional MS Next Gen Crypto secret (e.g. from PIN code).
         verify_blob: Optional encrypted blob used for integrity check.
+
     Returns:
         decryption key
     """

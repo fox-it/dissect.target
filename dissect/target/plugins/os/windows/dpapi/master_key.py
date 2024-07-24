@@ -95,6 +95,9 @@ class MasterKey:
 
     def decrypt_with_password(self, user_sid: str, pwd: str) -> bool:
         """Decrypts the master key with the given user's password and SID."""
+        if self.decrypted:
+            return True
+
         pwd = pwd.encode("utf-16-le")
 
         for algo in ["sha1", "md4"]:

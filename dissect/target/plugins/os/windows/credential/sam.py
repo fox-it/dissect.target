@@ -303,6 +303,9 @@ class SamPlugin(Plugin):
         if not HAS_CRYPTO:
             raise UnsupportedPluginError("Missing pycryptodome dependency")
 
+        if not self.target.has_function("lsa"):
+            raise UnsupportedPluginError("LSA plugin is required for SAM plugin")
+
         if not len(list(self.target.registry.keys(self.SAM_KEY))) > 0:
             raise UnsupportedPluginError(f"Registry key not found: {self.SAM_KEY}")
 
