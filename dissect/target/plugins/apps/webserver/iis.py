@@ -76,7 +76,6 @@ class IISLogsPlugin(WebserverPlugin):
         if not self.log_dirs:
             raise UnsupportedPluginError("No IIS log files found")
 
-    @plugin.internal
     def get_log_dirs(self) -> list[tuple[str, Path]]:
         log_paths = set()
 
@@ -113,13 +112,11 @@ class IISLogsPlugin(WebserverPlugin):
 
         return list(log_paths)
 
-    @plugin.internal
     def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
         for log_format, log_dir_path in self.log_dirs:
             for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
 
-    @plugin.internal
     def parse_autodetect_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         first_line = path.open().readline().decode("utf-8", errors="backslashreplace").strip()
         if first_line.startswith("#"):
@@ -127,7 +124,6 @@ class IISLogsPlugin(WebserverPlugin):
         else:
             yield from self.parse_iis_format_log(path)
 
-    @plugin.internal
     def parse_iis_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         """Parse log file in IIS format and stream log records.
 
@@ -189,7 +185,6 @@ class IISLogsPlugin(WebserverPlugin):
     def _create_extended_descriptor(self, extra_fields: tuple[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIELDS + list(extra_fields))
 
-    @plugin.internal
     def parse_w3c_format_log(self, path: Path) -> Iterator[TargetRecordDescriptor]:
         """Parse log file in W3C format and stream log records.
 
