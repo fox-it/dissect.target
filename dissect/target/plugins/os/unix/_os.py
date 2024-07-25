@@ -64,7 +64,7 @@ class UnixPlugin(OSPlugin):
                     if current_user in seen_users:
                         continue
 
-                    seen_users.add((pwent.get(0), pwent.get(5), pwent.get(6)))
+                    seen_users.add(current_user)
                     yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
