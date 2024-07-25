@@ -41,7 +41,6 @@ WebserverErrorLogRecord = TargetRecordDescriptor(
 
 class WebserverPlugin(NamespacePlugin):
     __namespace__ = "webserver"
-    __findable__ = False
 
     @export(record=[WebserverAccessLogRecord, WebserverErrorLogRecord])
     def logs(self) -> Iterator[Union[WebserverAccessLogRecord, WebserverErrorLogRecord]]:

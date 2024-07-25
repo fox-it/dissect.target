@@ -6,11 +6,12 @@ import logging
 import pathlib
 import sys
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional
 
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record.base import AbstractWriter
 
-from dissect.target import Target
+from dissect.target import Target, plugin
 from dissect.target.exceptions import (
     FatalError,
     PluginNotFoundError,
@@ -20,6 +21,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers import cache, record_modifier
 from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
+from dissect.target.plugins.general.plugins import generate_function_overview
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
     args_to_uri,
@@ -42,7 +44,7 @@ logging.raiseExceptions = False
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
-def record_output(strings=False, json=False):
+def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
     if json:
         return RecordWriter("jsonfile://-")
 
@@ -54,8 +56,41 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
+def list_plugins(
+    targets: Optional[list[str]] = None,
+    patterns: str = "",
+    include_children: bool = False,
+    argv: Optional[list[str]] = None,
+) -> None:
+    collected = set()
+    if targets:
+        for target in Target.open_all(targets, include_children):
+            if isinstance(target._loader, ProxyLoader):
+                raise TargetError("can't list compatible plugins for remote targets")
+
+            funcs, _ = find_plugin_functions(patterns, target, compatibility=True, show_hidden=True)
+            collected.update(funcs)
+    else:
+        funcs, _ = find_plugin_functions(patterns, Target(), show_hidden=True)
+        collected.update(funcs)
+
+    # Display in a user friendly manner
+    target = Target()
+    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
+    fargs, rest = fparser.parse_known_args(argv or [])
+
+    if collected:
+        print(generate_function_overview(collected, include_docs=fargs.print_docs))
+
+    # No real targets specified, show the available loaders
+    if not targets:
+        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
+        fargs, rest = fparser.parse_known_args(rest)
+        target.loaders(**vars(fargs))
+
+
 @catch_sigpipe
-def main():
+def main() -> None:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -150,14 +185,17 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions, _ = find_plugin_functions(None, args.function, compatibility=False)
+        found_functions, _ = find_plugin_functions(args.function)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
+
         func = found_functions[0]
-        if issubclass(func.class_object, OSPlugin):
+        plugin_class = plugin.load(func)
+        if issubclass(plugin_class, OSPlugin):
             obj = getattr(OSPlugin, func.method_name)
         else:
-            obj = getattr(func.class_object, func.method_name)
+            obj = getattr(plugin_class, func.method_name)
+
         if isinstance(obj, type) and issubclass(obj, Plugin):
             parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
         elif isinstance(obj, Callable) or isinstance(obj, property):
@@ -170,33 +208,7 @@ def main():
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list:
-        collected_plugins = {}
-
-        if targets:
-            for plugin_target in Target.open_all(targets, args.children):
-                if isinstance(plugin_target._loader, ProxyLoader):
-                    parser.error("can't list compatible plugins for remote targets.")
-                funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
-                for func in funcs:
-                    collected_plugins[func.path] = func.plugin_desc
-        else:
-            funcs, _ = find_plugin_functions(Target(), args.list, compatibility=False, show_hidden=True)
-            for func in funcs:
-                collected_plugins[func.path] = func.plugin_desc
-
-        # Display in a user friendly manner
-        target = Target()
-        fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
-        fargs, rest = fparser.parse_known_args(rest)
-
-        if collected_plugins:
-            target.plugins(list(collected_plugins.values()))
-
-        # No real targets specified, show the available loaders
-        if not targets:
-            fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
-            fargs, rest = fparser.parse_known_args(rest)
-            target.loaders(**vars(fargs))
+        list_plugins(targets, args.list, args.children, rest)
         parser.exit()
 
     if not targets:
@@ -204,6 +216,19 @@ def main():
 
     if not args.function:
         parser.error("argument -f/--function is required")
+
+    if args.report_dir and not args.report_dir.is_dir():
+        parser.error(f"--report-dir {args.report_dir} is not a valid directory")
+
+    funcs, invalid_funcs = find_plugin_functions(args.function)
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
+
+    excluded_funcs, invalid_excluded_funcs = find_plugin_functions(args.excluded_functions)
+    if any(invalid_excluded_funcs):
+        parser.error(
+            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
+        )
 
     # Verify uniformity of output types, otherwise default to records.
     # Note that this is a heuristic, the targets are not opened yet because of
@@ -218,28 +243,12 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    funcs, invalid_funcs = find_plugin_functions(None, args.function, compatibility=False)
-
-    if any(invalid_funcs):
-        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
-
-    excluded_funcs, invalid_excluded_funcs = find_plugin_functions(
-        None,
-        args.excluded_functions,
-        compatibility=False,
-    )
-
-    if any(invalid_excluded_funcs):
-        parser.error(
-            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
-        )
-
     excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
     for func in funcs:
         if func.path in excluded_func_paths:
             continue
-        output_types.add(func.output_type)
+        output_types.add(func.output)
 
     default_output_type = None
 
@@ -247,9 +256,6 @@ def main():
         # Give this warning beforehand, if mixed, set default to record (no errors)
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
         default_output_type = "record"
-
-    if args.report_dir and not args.report_dir.is_dir():
-        parser.error(f"--report-dir {args.report_dir} is not a valid directory")
 
     execution_report = ExecutionReport()
     execution_report.set_cli_args(args)
@@ -271,18 +277,14 @@ def main():
             yield_entries = []
 
             first_seen_output_type = default_output_type
-            cli_params_unparsed = rest
 
-            excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
-            excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
-
-            for func_def in find_and_filter_plugins(target, args.function, excluded_func_paths):
+            for func_def in find_and_filter_plugins(args.function, target, excluded_func_paths):
                 # If the default type is record (meaning we skip everything else)
                 # and actual output type is not record, continue.
                 # We perform this check here because plugins that require output files/dirs
                 # will exit if we attempt to exec them without (because they are implied by the wildcard).
                 # Also this saves cycles of course.
-                if default_output_type == "record" and func_def.output_type != "record":
+                if default_output_type == "record" and func_def.output != "record":
                     continue
 
                 if args.dry_run:
@@ -290,9 +292,7 @@ def main():
                     continue
 
                 try:
-                    output_type, result, cli_params_unparsed = execute_function_on_target(
-                        target, func_def, cli_params_unparsed
-                    )
+                    output_type, result, rest = execute_function_on_target(target, func_def, rest)
                 except UnsupportedPluginError as e:
                     target.log.error(
                         "Unsupported plugin for %s: %s",
@@ -309,7 +309,10 @@ def main():
                     fatal.emit_last_message(target.log.error)
                     parser.exit(1)
                 except Exception:
-                    target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
+                    target.log.error(
+                        "Exception while executing function `%s` (`%s`)", func_def.name, func_def.path, exc_info=True
+                    )
+                    target.log.debug("Function info: %s", func_def)
                     continue
 
                 if first_seen_output_type and output_type != first_seen_output_type:

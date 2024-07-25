@@ -23,8 +23,6 @@ class OSInfoPlugin(plugin.Plugin):
     @plugin.export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
         for os_func in self.target._os.__functions__:
-            if os_func in ["is_compatible", "get_all_records"]:
-                continue
             value = getattr(self.target._os, os_func)
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):

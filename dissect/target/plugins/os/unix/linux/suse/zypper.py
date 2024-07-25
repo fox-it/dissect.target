@@ -1,16 +1,17 @@
 from datetime import datetime
 from typing import Iterator
 
-from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
+    PackageManagerPlugin,
 )
 
 
-class ZypperPlugin(plugin.Plugin):
+class ZypperPlugin(PackageManagerPlugin):
     __namespace__ = "zypper"
 
     LOG_DIR_PATH = "/var/log/zypp"
@@ -21,7 +22,7 @@ class ZypperPlugin(plugin.Plugin):
         if not len(log_files):
             raise UnsupportedPluginError("No zypper files found")
 
-    @plugin.export(record=PackageManagerLogRecord)
+    @export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Package manager log parser for SuSE's Zypper.
 

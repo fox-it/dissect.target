@@ -158,8 +158,7 @@ def test_logrotate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file("var/log/apache2/access.log.2", data_file)
     fs_unix.map_file("var/log/apache2/access.log.3", data_file)
 
-    target_unix.add_plugin(ApachePlugin)
-    access_log_paths, error_log_paths = target_unix.apache.get_log_paths()
+    access_log_paths, error_log_paths = ApachePlugin(target_unix).get_log_paths()
 
     assert len(access_log_paths) == 4
     assert len(error_log_paths) == 0
@@ -172,8 +171,7 @@ def test_custom_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh("custom/log/location/access.log.2", BytesIO(b"Foo2"))
     fs_unix.map_file_fh("custom/log/location/access.log.3", BytesIO(b"Foo3"))
 
-    target_unix.add_plugin(ApachePlugin)
-    access_log_paths, error_log_paths = target_unix.apache.get_log_paths()
+    access_log_paths, error_log_paths = ApachePlugin(target_unix).get_log_paths()
 
     assert len(access_log_paths) == 4
     assert len(error_log_paths) == 0
@@ -192,9 +190,8 @@ def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) 
     fs_unix.map_file_fh("custom/log/location/old.log", BytesIO(b"Old"))
     fs_unix.map_file_fh("custom/log/location/old_error.log", BytesIO(b"Old"))
     fs_unix.map_file_fh("custom/log/location/new_error.log", BytesIO(b"New"))
-    target_unix.add_plugin(ApachePlugin)
 
-    access_log_paths, error_log_paths = target_unix.apache.get_log_paths()
+    access_log_paths, error_log_paths = ApachePlugin(target_unix).get_log_paths()
 
     # Log paths are returned in alphabetical order
     assert str(access_log_paths[0]) == "/custom/log/location/new.log"
