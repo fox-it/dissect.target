@@ -93,7 +93,9 @@ class AnydeskPlugin(RemoteAccessPlugin):
                 try:
                     level, ts_date, ts_time, message = line.split(" ", 3)
 
-                    timestamp = datetime.strptime(f"{ts_date} {ts_time}", "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
+                    timestamp = datetime.strptime(f"{ts_date} {ts_time}", "%Y-%m-%d %H:%M:%S.%f").replace(
+                        tzinfo=timezone.utc
+                    )
                     message = re.sub(r"\s\s+", " ", f"{level} {message}")
 
                     yield self.RemoteAccessLogRecord(
@@ -104,6 +106,6 @@ class AnydeskPlugin(RemoteAccessPlugin):
                         _user=user,
                     )
 
-                except (IndexError, ValueError) as e:
+                except ValueError as e:
                     self.target.log.warning("Could not parse log line in file %s: '%s'", trace_file, line)
                     self.target.log.debug("", exc_info=e)

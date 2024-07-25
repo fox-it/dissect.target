@@ -111,7 +111,9 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     if ts_day.count("/") == 2 and len(ts_day.split("/")[0]) == 2:
                         ts_day = "20" + ts_day
 
-                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S").replace(
+                        tzinfo=timezone.utc
+                    )
 
                     yield self.RemoteAccessLogRecord(
                         ts=timestamp,
