@@ -196,7 +196,6 @@ class ApachePlugin(WebserverPlugin):
         if not len(self.access_log_paths) and not len(self.error_log_paths):
             raise UnsupportedPluginError("No Apache directories found")
 
-    @plugin.internal
     def get_log_paths(self) -> tuple[list[Path], list[Path]]:
         """
         Discover any present Apache log paths on the target system.

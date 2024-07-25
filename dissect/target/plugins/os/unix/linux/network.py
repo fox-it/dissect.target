@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
-from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
     from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface

@@ -49,8 +49,7 @@ class WindowsEventlogsMixin:
     EVENTLOG_REGISTRY_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Eventlog"
     LOGS_DIR_PATH = None
 
-    @plugin.internal
-    def get_logs(self, filename_glob="*") -> list[Path]:
+    def get_logs(self, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
 
@@ -67,7 +66,6 @@ class WindowsEventlogsMixin:
 
         return file_paths
 
-    @plugin.internal
     def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         logs_dir = self.target.fs.path(logs_dir)
@@ -77,7 +75,6 @@ class WindowsEventlogsMixin:
         self.target.log.debug("Log files found in '%s': %d", self.LOGS_DIR_PATH, len(file_paths))
         return file_paths
 
-    @plugin.internal
     def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
         # compile glob into case-insensitive regex
         filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)

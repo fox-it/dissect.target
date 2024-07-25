@@ -295,8 +295,7 @@ class RegistryPlugin(Plugin):
     @internal
     def iterkeys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
         warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning)
-        for key in self.keys(keys):
-            yield key
+        yield from self.keys(keys)
 
     @internal
     def keys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
@@ -308,9 +307,7 @@ class RegistryPlugin(Plugin):
 
         for key in self._iter_controlset_keypaths(keys):
             try:
-                res = self.key(key)
-                for r in res:
-                    yield r
+                yield from self.key(key)
             except RegistryKeyNotFoundError:
                 pass
             except HiveUnavailableError:

@@ -5,7 +5,7 @@ from unittest.mock import call, patch
 
 import pytest
 
-from dissect.target.plugin import PLUGINS, find_py_files, load_modules_from_paths
+from dissect.target.plugin import _find_py_files, load_modules_from_paths
 
 
 @pytest.fixture
@@ -26,13 +26,13 @@ def copy_different_plugin_files(path: Path, file_name: str) -> None:
 
 
 def test_load_environment_variable_empty_string() -> None:
-    with patch("dissect.target.plugin.find_py_files") as mocked_find_py_files:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
         load_modules_from_paths([])
         mocked_find_py_files.assert_not_called()
 
 
 def test_load_environment_variable_comma_seperated_string() -> None:
-    with patch("dissect.target.plugin.find_py_files") as mocked_find_py_files:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
         load_modules_from_paths([Path(""), Path("")])
         mocked_find_py_files.assert_has_calls(calls=[call(Path(""))])
 
@@ -41,14 +41,14 @@ def test_filter_file(tmp_path: Path) -> None:
     file = tmp_path / "hello.py"
     file.touch()
 
-    assert list(find_py_files(file)) == [file]
+    assert list(_find_py_files(file)) == [file]
 
     test_file = tmp_path / "non_existent_file"
-    assert list(find_py_files(test_file)) == []
+    assert list(_find_py_files(test_file)) == []
 
     test_file = tmp_path / "__init__.py"
     test_file.touch()
-    assert list(find_py_files(test_file)) == []
+    assert list(_find_py_files(test_file)) == []
 
 
 @pytest.mark.parametrize(
@@ -65,21 +65,25 @@ def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool) -> No
     file.touch()
 
     if empty_list:
-        assert list(find_py_files(tmp_path)) == []
+        assert list(_find_py_files(tmp_path)) == []
     else:
-        assert file in list(find_py_files(tmp_path))
+        assert file in list(_find_py_files(tmp_path))
 
 
 def test_new_plugin_registration(environment_path: Path) -> None:
     copy_different_plugin_files(environment_path, "plugin.py")
-    load_modules_from_paths([environment_path])
 
-    assert "plugin" in PLUGINS
+    with patch("dissect.target.plugin.register") as mock_register:
+        load_modules_from_paths([environment_path])
+
+        mock_register.assert_called_once()
+        assert mock_register.call_args[0][0].__name__ == "TestPlugin"
 
 
 def test_loader_registration(environment_path: Path) -> None:
-    with patch("dissect.target.loader.LOADERS", []) as mocked_loaders, patch(
-        "dissect.target.loader.LOADERS_BY_SCHEME", {}
+    with (
+        patch("dissect.target.loader.LOADERS", []) as mocked_loaders,
+        patch("dissect.target.loader.LOADERS_BY_SCHEME", {}),
     ):
         copy_different_plugin_files(environment_path, "loader.py")
         load_modules_from_paths([environment_path])

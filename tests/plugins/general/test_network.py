@@ -7,7 +7,7 @@ from dissect.target.helpers.record import (
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugins.general.network import InterfaceRecord, NetworkPlugin
+from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
 from dissect.target.target import Target
 
 

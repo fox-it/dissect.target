@@ -27,7 +27,7 @@ from dissect.target.tools.dump.utils import (
     cached_sink_writers,
 )
 from dissect.target.tools.utils import (
-    PluginFunction,
+    FunctionDescriptor,
     configure_generic_arguments,
     execute_function_on_target,
     find_and_filter_plugins,
@@ -52,7 +52,7 @@ def get_targets(targets: list[str]) -> Iterator[Target]:
         yield target
 
 
-def execute_function(target: Target, function: PluginFunction) -> TargetRecordDescriptor:
+def execute_function(target: Target, function: FunctionDescriptor) -> TargetRecordDescriptor:
     """
     Execute function `function` on provided target `target` and return a generator
     with the records produced.
@@ -91,7 +91,7 @@ def produce_target_func_pairs(
     targets: Iterable[Target],
     functions: str,
     state: DumpState,
-) -> Iterator[tuple[Target, PluginFunction]]:
+) -> Iterator[tuple[Target, FunctionDescriptor]]:
     """
     Return a generator with target and function pairs for execution.
 
@@ -102,7 +102,7 @@ def produce_target_func_pairs(
         pairs_to_skip.update((str(sink.target_path), sink.func) for sink in state.finished_sinks)
 
     for target in targets:
-        for func_def in find_and_filter_plugins(target, functions):
+        for func_def in find_and_filter_plugins(functions, target):
             if state and (target.path, func_def.name) in pairs_to_skip:
                 log.info(
                     "Skipping target/func pair since its marked as done in provided state",
