@@ -18,6 +18,8 @@ LinuxServiceRecord = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS)
 
 
 class ServicesPlugin(Plugin):
+    """Linux services plugin."""
+
     SYSTEMD_PATHS = [
         "/etc/systemd/system",
         "/lib/systemd/system",

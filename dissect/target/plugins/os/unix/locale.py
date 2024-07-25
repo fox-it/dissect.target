@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Iterator, Optional
 
 from dissect.target.helpers.localeutil import normalize_language
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -26,11 +27,13 @@ def timezone_from_path(path: Path) -> str:
 
 
 class LocalePlugin(Plugin):
+    """Unix locale plugin."""
+
     def check_compatible(self) -> None:
         pass
 
     @export(property=True)
-    def timezone(self):
+    def timezone(self) -> Optional[str]:
         """Get the timezone of the system."""
 
         # /etc/timezone should contain a simple timezone string
@@ -62,7 +65,7 @@ class LocalePlugin(Plugin):
                     return timezone_from_path(path)
 
     @export(property=True)
-    def language(self):
+    def language(self) -> Optional[str]:
         """Get the configured locale(s) of the system."""
         # Although this purports to be a generic function for Unix targets,
         # these paths are Linux specific.
@@ -79,7 +82,7 @@ class LocalePlugin(Plugin):
         return found_languages
 
     @export(record=UnixKeyboardRecord)
-    def keyboard(self):
+    def keyboard(self) -> Iterator[UnixKeyboardRecord]:
         """Get the keyboard layout(s) of the system."""
 
         paths = ["/etc/default/keyboard", "/etc/vconsole.conf"] + list(

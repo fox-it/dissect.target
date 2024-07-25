@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import logging
-from typing import Callable
+from typing import Callable, Iterator
 
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
@@ -104,6 +106,8 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
+    """NTFS MFT plugin."""
+
     def check_compatible(self) -> None:
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
         if not len(ntfs_filesystems):
@@ -118,7 +122,11 @@ class MftPlugin(Plugin):
         ]
     )
     @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
-    def mft(self, compact: bool = False):
+    def mft(
+        self, compact: bool = False
+    ) -> Iterator[
+        FilesystemStdRecord | FilesystemFilenameRecord | FilesystemStdCompactRecord | FilesystemFilenameCompactRecord
+    ]:
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.

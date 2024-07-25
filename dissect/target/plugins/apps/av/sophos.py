@@ -30,6 +30,8 @@ SophosLogRecord = TargetRecordDescriptor(
 
 
 class SophosPlugin(Plugin):
+    """Sophos antivirus Plugin."""
+
     __namespace__ = "sophos"
 
     LOG_SOPHOS_HOME = "sysvol/ProgramData/Sophos/Clean/Logs/Clean.log"

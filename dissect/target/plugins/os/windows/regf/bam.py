@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
@@ -36,7 +38,7 @@ class BamDamPlugin(Plugin):
             raise UnsupportedPluginError("No bam or dam registry keys not found")
 
     @export(record=BamDamRecord)
-    def bam(self):
+    def bam(self) -> Iterator[BamDamRecord]:
         """Parse bam and dam registry keys.
 
         Yields BamDamRecords with fields:

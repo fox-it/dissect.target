@@ -22,14 +22,13 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-TARGETD_AVAILABLE = False
 try:
     from flow import remoting
     from targetd.clients import Client
 
     TARGETD_AVAILABLE = True
 except Exception:
-    pass
+    TARGETD_AVAILABLE = False
 
 
 class TargetdLoader(ProxyLoader):

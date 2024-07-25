@@ -7,10 +7,13 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
+    PackageManagerPlugin,
 )
 
 
-class ZypperPlugin(plugin.Plugin):
+class ZypperPlugin(PackageManagerPlugin):
+    """Zypper package manager plugin."""
+
     __namespace__ = "zypper"
 
     LOG_DIR_PATH = "/var/log/zypp"
