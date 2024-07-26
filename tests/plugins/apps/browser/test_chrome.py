@@ -32,9 +32,21 @@ def target_chrome_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
     yield target_unix_users
 
 
+@pytest.fixture
+def target_chrome_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+    fs_win.map_dir(
+        "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
+        absolute_path("_data/plugins/apps/browser/chrome/"),
+    )
+
+    target_win_users.add_plugin(ChromePlugin)
+
+    yield target_win_users
+
+
 @pytest.mark.parametrize(
     "target_platform",
-    ["target_chrome_win", "target_chrome_unix"],
+    ["target_chrome_win", "target_chrome_unix", "target_chrome_win_snapshot"],
 )
 def test_chrome_history(target_platform: Target, request: pytest.FixtureRequest) -> None:
     target_platform = request.getfixturevalue(target_platform)
@@ -54,7 +66,7 @@ def test_chrome_history(target_platform: Target, request: pytest.FixtureRequest)
 
 @pytest.mark.parametrize(
     "target_platform",
-    ["target_chrome_win", "target_chrome_unix"],
+    ["target_chrome_win", "target_chrome_unix", "target_chrome_win_snapshot"],
 )
 def test_chrome_downloads(target_platform: Target, request: pytest.FixtureRequest) -> None:
     target_platform = request.getfixturevalue(target_platform)
@@ -71,7 +83,7 @@ def test_chrome_downloads(target_platform: Target, request: pytest.FixtureReques
 
 @pytest.mark.parametrize(
     "target_platform",
-    ["target_chrome_win", "target_chrome_unix"],
+    ["target_chrome_win", "target_chrome_unix", "target_chrome_win_snapshot"],
 )
 def test_chrome_extensions(target_platform: Target, request: pytest.FixtureRequest) -> None:
     target_platform = request.getfixturevalue(target_platform)
@@ -204,3 +216,39 @@ def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: Vi
         "GPS": "1",
         "PREF": "tz=Europe.Berlin",
     }
+
+
+def test_chrome_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
+    base_dir = "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Default"
+    snapshot_dirs = [
+        "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\116.0.5038.150\\Default",
+        "Users\\John\\AppData\\Local\\Google\\Chrome\\User Data\\Snapshots\\119.0.7845.119\\Default",
+    ]
+    profile_dirs = [base_dir] + snapshot_dirs
+
+    for dir in profile_dirs:
+        fs_win.map_dir(
+            dir,
+            absolute_path("_data/plugins/apps/browser/chrome/"),
+        )
+
+    target_win_users.add_plugin(ChromePlugin)
+
+    records_list = [
+        list(target_win_users.chrome.history()),
+        list(target_win_users.chrome.extensions()),
+        list(target_win_users.chrome.downloads()),
+    ]
+
+    # Loop over the different types of records and verify we have the same amount of records in each profile directory.
+    for records in records_list:
+        assert set(["chrome"]) == set(record.browser for record in records)
+
+        base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]
+
+        for snapshot_dir in snapshot_dirs:
+            # Retrieve records that are in the snapshot's directory.
+            snapshot_records = [r for r in records if str(r.source.parent).endswith(snapshot_dir)]
+
+            # We map the same files in each of the snapshot directories.
+            assert len(base_path_records) == len(snapshot_records)
