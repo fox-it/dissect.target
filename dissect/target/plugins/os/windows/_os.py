@@ -79,15 +79,15 @@ class WindowsPlugin(OSPlugin):
             self.target.log.debug("", exc_info=e)
 
         sysvol_drive = self.target.fs.mounts.get("sysvol")
-        # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
-        if sysvol_drive and operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
+        if not sysvol_drive:
+            self.target.log.warning("No sysvol drive found")
+        elif operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
+            # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
                 self.target.fs.mount("c:", sysvol_drive)
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
-        else:
-            self.target.log.warning("No sysvol drive found")
 
     @export(property=True)
     def hostname(self) -> Optional[str]:
