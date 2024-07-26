@@ -130,13 +130,11 @@ class RecyclebinPlugin(Plugin):
         )
 
     def read_recycle_deleted_folder(self, folder_path: TargetPath) -> RecycleBinRecord:
-        """
-        Generally speaking when deleting a file, the $R* file is the actual renamed deleted file.
-        This is however also the case for deleted folders. When a folder is deleted,
-        it is also renamed and placed here (with original recursive content).
-
-        This function will create RecycleBin records for each file in a deleted folder.
-        """
+        # Generally speaking when deleting a file, the $R* file is the actual renamed deleted file.
+        # This is however also the case for deleted folders. When a folder is deleted,
+        # it is also renamed and placed here (with original recursive content).
+        #
+        # This function will create RecycleBin records for each file in a deleted folder.
 
         meta_file = self.target.fs.path(str(folder_path.parent / folder_path.name.replace("$R", "$I")).lstrip("/"))
         if not meta_file.exists():
