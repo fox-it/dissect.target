@@ -762,7 +762,10 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "lsb-release": ParserConfig(Default),
     "catalog": ParserConfig(Xml),
     "fstab": ParserConfig(
-        Csvish, separator=(r"\s",), comment_prefixes=("#",), fields=("device", "mount", "type", "options", "dump", "pass")
+        Csvish,
+        separator=(r"\s",),
+        comment_prefixes=("#",),
+        fields=("device", "mount", "type", "options", "dump", "pass"),
     ),
     "crontab": ParserConfig(
         Csvish,
