@@ -93,7 +93,7 @@ class RecyclebinPlugin(Plugin):
         """Check wether the path is a recycle bin metadata file"""
         return path.name and path.name.lower().startswith("$i")
 
-    def read_recycle_file(self, path: TargetPath) -> Generator[RecycleBinRecord, None, None]:
+    def read_recycle_file(self, path: TargetPath) -> Iterator[RecycleBinRecord]:
         if self._is_recycle_meta_file(path):
             yield self.read_recycle_meta_file(path)
             return
