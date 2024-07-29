@@ -100,9 +100,7 @@ class AndroidBackupLoader(Loader):
                 vfs.map_file_entry(path, entry)
 
         target.filesystems.add(vfs)
-
-        target.fs.mount("/", vfs)
-        target._os_plugin = AndroidPlugin(target)
+        target._os_plugin = AndroidPlugin.create(target, vfs)
 
 
 class AndroidBackup:
