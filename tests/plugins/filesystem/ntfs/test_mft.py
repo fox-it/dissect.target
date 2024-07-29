@@ -5,6 +5,7 @@ import pytest
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
 
+from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugins.filesystem.ntfs.mft import MftPlugin
@@ -168,6 +169,22 @@ def test_mft_plugin_entries(target_win, compact):
     load_mft_plugin(target_win)
     mft_data = list(target_win.mft(compact))
     assert len(mft_data) == check_output_amount(76, compact)
+
+
+def test_mft_plugin_mcab(target_win: Target) -> None:
+    load_mft_plugin(target_win)
+    mft_data = list(target_win.mft(mcab=True))
+    path = None
+    ts = None
+    mcab = None
+    field = "MCAB/MCAB/MCAB"
+    for record in mft_data:
+        assert record.mcab != mcab or record.ts != ts or record.path != path
+        for bit in [0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 12]:
+            assert record.mcab[bit:1] in (field[bit:1], ".")
+        path = record.path
+        mcab = record.mcab
+        ts = record.ts
 
 
 def test_mft_plugin_disk_label(target_win):
