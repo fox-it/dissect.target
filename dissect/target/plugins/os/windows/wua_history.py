@@ -857,6 +857,10 @@ class WuaHistoryPlugin(Plugin):
                             record_data["result"] = "Failed"
                             record_data["result_string"] = WUA_ERROR_CODES_MAP[value][0]
                             record_data["result_description"] = WUA_ERROR_CODES_MAP[value][1]
+                        else:
+                            record_data["result"] = "Unknown"
+                            record_data["result_string"] = "Unknown error"
+                            record_data["result_description"] = "Unknown error"
                 elif column.name == "Title":
                     kb = re.search(r"(KB.[0-9]*)", value)
                     if kb:
