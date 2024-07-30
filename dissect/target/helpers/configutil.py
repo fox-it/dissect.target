@@ -251,9 +251,8 @@ class CSVish(Default):
 
     def parse_file(self, fh: TextIO) -> None:
         information_dict = {}
-        i = 0
 
-        for raw_line in self.line_reader(fh, strip_comments=True):
+        for i, raw_line in enumerate(self.line_reader(fh, strip_comments=True)):
             line = raw_line.strip()
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
@@ -264,7 +263,6 @@ class CSVish(Default):
                 data = dict(zip(self.fields, columns))
 
             information_dict[str(i)] = data
-            i += 1
 
         self.parsed_data = information_dict
 
