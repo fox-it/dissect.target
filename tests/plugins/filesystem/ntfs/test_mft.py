@@ -177,11 +177,11 @@ def test_mft_plugin_mcab(target_win: Target) -> None:
     path = None
     ts = None
     mcab = None
-    field = "MCAB/MCAB/MCAB"
+    field = "MACB/MACB/MACB"
     for record in mft_data:
         assert record.mcab != mcab or record.ts != ts or record.path != path
         for bit in [0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 12]:
-            assert record.mcab[bit:1] in (field[bit:1], ".")
+            assert record.mcab[bit:bit+1] in (field[bit:bit+1], ".")
         path = record.path
         mcab = record.mcab
         ts = record.ts

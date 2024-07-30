@@ -316,7 +316,7 @@ def mcab_aggr(records: list[Record]) -> Iterator[Record]:
         offset_std = int(record._desc.name == "filesystem/ntfs/mft/std") * 5
         offset_ads = (int(record.ads) * 10) if offset_std == 0 else 0
 
-        field = "MCAB".find(record.ts_type) + offset_std + offset_ads
+        field = "MACB".find(record.ts_type) + offset_std + offset_ads
         for mcab in mcabs:
             if mcab.ts == record.ts:
                 mcab.mcab = mcab_set(mcab.mcab, field, record.ts_type)
