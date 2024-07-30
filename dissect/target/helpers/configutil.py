@@ -240,7 +240,7 @@ class Default(ConfigurationParser):
         self.parsed_data = information_dict
 
 
-class Csvish(Default):
+class CSVish(Default):
     """Parses CSV-ish config files (does not confirm to CSV standard!)"""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -762,19 +762,19 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "lsb-release": ParserConfig(Default),
     "catalog": ParserConfig(Xml),
     "fstab": ParserConfig(
-        Csvish,
+        CSVish,
         separator=(r"\s",),
         comment_prefixes=("#",),
         fields=("device", "mount", "type", "options", "dump", "pass"),
     ),
     "crontab": ParserConfig(
-        Csvish,
+        CSVish,
         separator=(r"\s",),
         comment_prefixes=("#",),
         fields=("minute", "hour", "day", "month", "weekday", "user", "command"),
     ),
     "shadow": ParserConfig(
-        Csvish,
+        CSVish,
         separator=(r"\:",),
         comment_prefixes=("#",),
         fields=(
@@ -790,12 +790,12 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
         ),
     ),
     "passwd": ParserConfig(
-        Csvish,
+        CSVish,
         separator=(r"\:",),
         comment_prefixes=("#",),
         fields=("username", "password", "uid", "gid", "gecos", "homedir", "shell"),
     ),
-    "mime.types": ParserConfig(Csvish, separator=(r"\s+",), comment_prefixes=("#",), fields=("name", "extensions")),
+    "mime.types": ParserConfig(CSVish, separator=(r"\s+",), comment_prefixes=("#",), fields=("name", "extensions")),
 }
 
 

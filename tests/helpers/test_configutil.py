@@ -10,7 +10,7 @@ import pytest
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
     ConfigurationParser,
-    Csvish,
+    CSVish,
     Default,
     Indentation,
     Json,
@@ -283,7 +283,7 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
     ],
 )
 def test_csv_syntax(fields, separator, comment, data_string: str, expected_data: dict) -> None:
-    parser = Csvish(fields=fields, separator=separator, comment_prefixes=comment)
+    parser = CSVish(fields=fields, separator=separator, comment_prefixes=comment)
     parser.parse_file(StringIO(data_string))
     assert parser.parsed_data == expected_data
 
