@@ -23,8 +23,16 @@ def test_wua_history_plugin(target_win, fs_win):
     assert record.server_id == "9482f4b4-e343-43b6-b170-9a65bc822c77"
     assert record.flags == 1
     assert record.client_id == "UpdateOrchestrator"
-    assert record.title == "Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.415.74.0) - Current Channel (Broad)"  # noqa: E501
-    assert record.description == "Install this update to revise the files that are used to detect viruses, spyware, and other potentially unwanted software. Once you have installed this item, it cannot be removed."  # noqa: E501
+    assert (
+        record.title
+        == "Security Intelligence Update for Microsoft Defender Antivirus - KB2267602 (Version 1.415.74.0) - Current "
+        "Channel (Broad)"
+    )
+    assert (
+        record.description
+        == "Install this update to revise the files that are used to detect viruses, spyware, and other potentially "
+        "unwanted software. Once you have installed this item, it cannot be removed."
+    )
     assert record.support_url == "https://go.microsoft.com/fwlink/?LinkId=52661"
     assert record.categories == "Microsoft Defender Antivirus"
     assert record.more_info_url == "https://go.microsoft.com/fwlink/?linkid=2007160"
