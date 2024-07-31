@@ -131,6 +131,7 @@ class UsbPlugin(Plugin):
 
                     # We can check if any HKCU hive(s) are populated with the Volume GUID of the USB storage device.
                     # If a user has interacted with the mounted volume using explorer.exe we will get a match.
+                    volumes = list(self.find_volumes(serial))
                     mounts = list(self.find_mounts(serial))
                     users = [
                         u.user.name for u in self.find_users([m[10:] for m in mounts if m.startswith("\\??\\Volume{")])
@@ -142,7 +143,7 @@ class UsbPlugin(Plugin):
                         container_id=container_id,
                         **device_info,
                         **timestamps,
-                        volumes=list(self.find_volumes(serial)),
+                        volumes=volumes,
                         mounts=mounts,
                         users=users,
                         source=self.USB_STOR,
