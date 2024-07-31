@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
 
 from dissect.target.plugins.os.windows.wua_history import WuaHistoryPlugin
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_wua_history_plugin(target_win, fs_win):
+def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     wua_history_dir = absolute_path("_data/plugins/os/windows/wua_history/DataStore.edb.gz")
     fs_win.map_file("Windows/SoftwareDistribution/DataStore/DataStore.edb", wua_history_dir, compression="gzip")
     target_win.add_plugin(WuaHistoryPlugin)

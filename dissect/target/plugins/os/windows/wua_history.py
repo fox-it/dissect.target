@@ -3,7 +3,6 @@ from typing import Iterator
 
 from dissect.esedb.c_esedb import RecordValue, decode_guid
 from dissect.esedb.esedb import EseDB
-from dissect.esedb.exceptions import Error
 from dissect.util.ts import oatimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -811,6 +810,7 @@ class WuaHistoryPlugin(Plugin):
     References:
         - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Update.asciidoc
         - https://www.nirsoft.net/articles/extract-windows-updates-list-external-drive.html
+        - https://learn.microsoft.com/en-us/windows/deployment/update/windows-update-error-reference
     """
 
     DATASTORE_PATH = "sysvol/windows/softwaredistribution/datastore/datastore.edb"
@@ -820,26 +820,23 @@ class WuaHistoryPlugin(Plugin):
         super().__init__(target)
 
         self._datastore = None
-        datastore_path = target.fs.path(self.DATASTORE_PATH)
-        if datastore_path.exists():
+        self._update_table = None
+
+        if (path := target.fs.path(self.DATASTORE_PATH)).exists():
             try:
-                self._datastore = EseDB(datastore_path.open())
-            except Error as e:
-                self.target.log.warning("Error opening Windows DataStore database", exc_info=e)
+                self._datastore = EseDB(path.open())
+                self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
+            except Exception as e:
+                self.target.log.warning("Error opening Windows Update Agent datastore.", exc_info=e)
 
     def check_compatible(self) -> None:
-        if not self._datastore:
-            raise UnsupportedPluginError("No Windows DataStore found")
+        if not self._datastore or not self._update_table:
+            raise UnsupportedPluginError("No Windows Update Agent data found.")
 
     def get_table_records(self) -> Iterator[dict[str, RecordValue]]:
-        try:
-            table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
-        except KeyError:
-            return None
-
-        for record in table.records():
+        for record in self._update_table.records():
             record_data = {}
-            for column in table.columns:
+            for column in self._update_table.columns:
                 value = record.get(column.name)
 
                 if column.name == "Date":
@@ -862,18 +859,21 @@ class WuaHistoryPlugin(Plugin):
                             record_data["result_string"] = "Unknown error"
                             record_data["result_description"] = "Unknown error"
                 elif column.name == "Title":
-                    kb = re.search(r"(KB.[0-9]*)", value)
-                    if kb:
-                        record_data["kb"] = kb.group(0)
+                    if kb := re.search(r"(KB.[0-9]*)", value):
+                        record_data["kb"] = kb.group()
                 record_data[column.name] = value
             yield record_data
 
     @export(record=WuaHistoryRecord)
-    def wua_history(self):
+    def wua_history(self) -> Iterator[WuaHistoryRecord]:
         """Return the historical data of the Windows Update Agent from the DataStore.edb file.
 
         Gives insight into the patch process and level of the system.
         """
         for record in self.get_table_records():
             values = {TBHISTORY_NAME_MAP.get(key, key): value for key, value in record.items()}
-            yield WuaHistoryRecord(path=self.target.fs.path(self.DATASTORE_PATH), _target=self.target, **values)
+            yield WuaHistoryRecord(
+                **values,
+                path=self.target.fs.path(self.DATASTORE_PATH),
+                _target=self.target,
+            )
