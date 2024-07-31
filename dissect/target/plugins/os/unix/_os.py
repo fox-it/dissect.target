@@ -219,6 +219,7 @@ class UnixPlugin(OSPlugin):
 
                 if fs.__type__ == "xfs":
                     fs_id = fs.xfs.uuid
+                    fs_volume_name = fs.xfs.name
                 elif fs.__type__ == "ext":
                     fs_id = fs.extfs.uuid
                     fs_last_mount = fs.extfs.last_mount
