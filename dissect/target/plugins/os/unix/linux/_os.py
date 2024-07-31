@@ -41,7 +41,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             for ip in ip_set:
                 ips.append(ip)
 
-        for ip in parse_unix_dhcp_log_messages(self.target, dhcp_all=False):
+        for ip in parse_unix_dhcp_log_messages(self.target, iter_all=False):
             if ip not in ips:
                 ips.append(ip)
 

@@ -58,7 +58,9 @@ def test_ips_dhcp(
     "flag, expected_out",
     [
         (None, "['10.13.37.2']"),
-        ("--dhcp-all", "['10.13.37.2', '10.13.37.1']"),
+        # ("--dhcp-all", "['10.13.37.2', '10.13.37.1']"),
+        # Temporarily disabled behaviour, for discussion see:
+        # https://github.com/fox-it/dissect.target/pull/687#discussion_r1698515269
     ],
 )
 def test_ips_dhcp_arg(
