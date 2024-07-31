@@ -6,7 +6,7 @@ from dissect.target.helpers.network_managers import (
     LinuxNetworkManager,
     parse_unix_dhcp_log_messages,
 )
-from dissect.target.plugin import OperatingSystem, arg, export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.target import Target
 
@@ -33,8 +33,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         return None
 
     @export(property=True)
-    @arg("--dhcp-all", action="store_true", help="parse all syslog, messages and journal files for DHCP IP addresses")
-    def ips(self, dhcp_all: bool = False) -> list[str]:
+    def ips(self) -> list[str]:
         """Returns a list of static IP addresses and DHCP lease IP addresses found on the host system."""
         ips = []
 
@@ -42,7 +41,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             for ip in ip_set:
                 ips.append(ip)
 
-        for ip in parse_unix_dhcp_log_messages(self.target, dhcp_all):
+        for ip in parse_unix_dhcp_log_messages(self.target, dhcp_all=False):
             if ip not in ips:
                 ips.append(ip)
 
