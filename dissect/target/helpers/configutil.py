@@ -243,8 +243,8 @@ class Default(ConfigurationParser):
 class CSVish(Default):
     """Parses CSV-ish config files (does not confirm to CSV standard!)"""
 
-    def __init__(self, *args, fields: tuple[str],**kwargs) -> None:
-        self.fields = kwargs.pop("fields")
+    def __init__(self, *args, fields: tuple[str], **kwargs) -> None:
+        self.fields = fields
         self.num_fields = len(self.fields)
         self.maxsplit = self.num_fields - 1
         super().__init__(*args, **kwargs)
