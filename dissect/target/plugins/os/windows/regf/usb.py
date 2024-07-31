@@ -43,6 +43,8 @@ USB_DEVICE_PROPERTY_KEYS = {
     "last_removal": ("0067", "00000067"),  # Windows 8 and higer. USB device last removal date.
 }
 
+RE_DEVICE_NAME = re.compile(r"^(?P<type>.+?)&Ven_(?P<vendor>.+?)&Prod_(?P<product>.+?)(&Rev_(?P<revision>.+?))?$")
+
 
 class UsbPlugin(Plugin):
     """Windows USB history plugin.
@@ -128,7 +130,6 @@ class UsbPlugin(Plugin):
 
                     try:
                         timestamps = unpack_timestamps(usb_device.subkey("Properties"))
-
                     except RegistryValueNotFoundError as e:
                         self.target.log.warning("Unable to parse USBSTOR registry properties for serial: %s", serial)
                         self.target.log.debug("", exc_info=e)
@@ -160,7 +161,7 @@ class UsbPlugin(Plugin):
 
         try:
             for device in self.target.registry.key(self.PORTABLE_DEVICES).subkeys():
-                if serial in device.name.lower():
+                if serial.lower() in device.name.lower():
                     yield device.value("FriendlyName").value
         except RegistryKeyNotFoundError:
             pass
@@ -171,7 +172,7 @@ class UsbPlugin(Plugin):
         try:
             for mount in self.target.registry.key(self.MOUNT_LETTER_MAP).values():
                 try:
-                    if serial in mount.value.decode("utf-16-le").lower():
+                    if serial.lower() in mount.value.decode("utf-16-le").lower():
                         yield mount.name.replace("\\DosDevices\\", "")
                 except UnicodeDecodeError:
                     pass
@@ -220,10 +221,8 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
 def parse_device_name(device_name: str) -> dict[str, str]:
     """Parse a registry device name into components."""
 
-    RE_DEVICE_NAME = re.compile(r"^(?P<type>.+?)&Ven_(?P<vendor>.+?)&Prod_(?P<product>.+?)(&Rev_(?P<revision>.+?))?$")
-
     match = RE_DEVICE_NAME.match(device_name)
     if not match:
-        raise ValueError("Unable to parse USB device name: %s", device_name)
+        raise ValueError(f"Unable to parse USB device name: {device_name}")
 
     return match.groupdict()
