@@ -48,8 +48,13 @@ class UsbPlugin(Plugin):
     """Windows USB history plugin.
 
     Parses Windows registry data about attached USB devices. Does not parse EVTX EventIDs
-    or ``C:\\Windows\\inf\\setupapi(.dev).log``. To get a full picture of USB history you
-    should parse the relevant EventIDs using the evtx plugin.
+    or ``C:\\Windows\\inf\\setupapi(.dev).log``.
+
+    To get a full picture of the USB history on a Windows machine, you should parse the
+    relevant EventIDs using the evtx plugin. For more research on event log USB forensics, see:
+        - https://www.researchgate.net/publication/318514858
+        - https://dfir.pubpub.org/pub/h78di10n/release/2
+        - https://www.senturean.com/posts/19_08_03_usb_storage_forensics_1/#1-system-events
 
     Resources:
         - https://hatsoffsecurity.com/2014/06/05/usb-forensics-pt-1-serial-number/
