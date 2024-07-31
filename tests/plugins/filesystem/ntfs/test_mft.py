@@ -193,7 +193,7 @@ def test_mft_plugin_macb(target_win: Target) -> None:
         ts = record.ts
 
 
-def test_mft_plugin_macb_nodup(target_win: Target) -> None:
+def test_mft_plugin_macb_nodup() -> None:
     # test whether you can never have duplicates
 
     def makets(tss: set) -> int:
