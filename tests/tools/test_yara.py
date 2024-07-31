@@ -11,7 +11,7 @@ from tests._utils import absolute_path
 
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
-def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
+def test_yara(target_default: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     vfs = VirtualFilesystem()
     vfs.map_file_fh("test_file", BytesIO(b"hello there this is a test string!"))
     vfs.map_file_fh("/test/dir/to/test_file", BytesIO(b"this is another test string for YARA testing."))

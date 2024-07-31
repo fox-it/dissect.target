@@ -1,8 +1,8 @@
+import hashlib
 import logging
-from hashlib import md5
 from io import BytesIO
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.target.helpers import hashutil
 
@@ -16,7 +16,7 @@ except ImportError:
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import InternalPlugin
+from dissect.target.plugin import Plugin, arg, export
 
 log = logging.getLogger(__name__)
 
@@ -34,13 +34,18 @@ YaraMatchRecord = TargetRecordDescriptor(
 DEFAULT_MAX_SCAN_SIZE = 10 * 1024 * 1024
 
 
-class YaraPlugin(InternalPlugin):
+class YaraPlugin(Plugin):
     """Plugin to scan files against a local YARA rules file."""
 
     def check_compatible(self) -> None:
         if not HAS_YARA:
             raise UnsupportedPluginError("Please install 'yara-python' to use the yara plugin.")
 
+    @arg("-r", "--rules", required=True, nargs="*", help="path(s) to YARA rule file(s) or folder(s)")
+    @arg("-p", "--path", default="/", help="path on target(s) to recursively scan")
+    @arg("-m", "--max-size", default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
+    @arg("-c", "--check", default=False, action="store_true", help="check if every YARA rule is valid")
+    @export(record=YaraMatchRecord)
     def yara(
         self,
         rules: list[str | Path],
@@ -82,11 +87,11 @@ class YaraPlugin(InternalPlugin):
                         )
                         continue
 
-                    file_content = file.open().read()
-                    for match in compiled_rules.match(data=file_content):
+                    buf = file.open().read()
+                    for match in compiled_rules.match(data=buf):
                         yield YaraMatchRecord(
                             path=self.target.fs.path(file.path),
-                            digest=hashutil.common(BytesIO(file_content)),
+                            digest=hashutil.common(BytesIO(buf)),
                             rule=match.rule,
                             tags=match.tags,
                             namespace=match.namespace,
@@ -102,7 +107,7 @@ class YaraPlugin(InternalPlugin):
                     self.target.log.debug("", exc_info=e)
 
 
-def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara.Rules]:
+def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | None:
     """Generate compiled YARA rules from the given path(s).
 
     Provide path to one (compiled) YARA file or directory containing YARA files.
@@ -153,14 +158,14 @@ def process_rules(paths: list[str | Path], check: bool = False) -> Optional[yara
 
     if files and not compiled_rules:
         try:
-            compiled_rules = compile_yara({md5(file.as_posix().encode("utf-8")).digest().hex(): file for file in files})
+            compiled_rules = compile_yara({hashlib.md5(file.as_posix().encode()).hexdigest(): file for file in files})
         except yara.Error as e:
             log.error("Failed to compile YARA file(s): %s", e)
 
     return compiled_rules
 
 
-def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> Optional[yara.Rules]:
+def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> yara.Rules | None:
     """Compile or load the given YARA file(s) to rules."""
     if is_compiled and isinstance(files, Path):
         return yara.load(files.as_posix())
