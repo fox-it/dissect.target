@@ -72,7 +72,7 @@ class YaraPlugin(Plugin):
             return
 
         if hasattr(compiled_rules, "warnings") and (num_warns := len(compiled_rules.warnings)) > 0:
-            self.target.log.warning("Yara generated %s warnings while compiling rules", num_warns)
+            self.target.log.warning("YARA generated %s warnings while compiling rules", num_warns)
             for warning in compiled_rules.warnings:
                 self.target.log.debug(warning)
 
