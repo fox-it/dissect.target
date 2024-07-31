@@ -10,6 +10,7 @@ import pytest
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
     ConfigurationParser,
+    CSVish,
     Default,
     Indentation,
     Json,
@@ -265,6 +266,25 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
     parser = Json()
     parser.parse_file(StringIO(data_string))
 
+    assert parser.parsed_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "fields, separator, comment, data_string, expected_data",
+    [
+        (["a", "b"], (r"\s+",), ("#",), "1 2", {"0": {"a": "1", "b": "2"}}),  # SSV
+        (["a", "b"], (r"\s+",), ("#",), "1 2\n3 4", {"0": {"a": "1", "b": "2"}, "1": {"a": "3", "b": "4"}}),  # SSV-2
+        (["a", "b"], (r"\s+",), ("#",), "1\t2", {"0": {"a": "1", "b": "2"}}),  # TSV
+        (["a", "b"], (r",",), ("#",), "1,2", {"0": {"a": "1", "b": "2"}}),  # CSV
+        (["a", "b"], (r"\|",), ("#",), "1|2", {"0": {"a": "1", "b": "2"}}),  # DSV
+        (["a", "b"], (r"\|",), ("#",), "#9|9\n1|2", {"0": {"a": "1", "b": "2"}}),  # comments
+        (["a", "b"], (r"\s+",), ("#",), "#9 9\n1 2 3", {"0": {"a": "1", "b": "2 3"}}),  # trailing column
+        (["a", "b"], (r"\s+",), ("#",), "x", {"0": {"line": "x"}}),  # unparsed
+    ],
+)
+def test_csv_syntax(fields, separator, comment, data_string: str, expected_data: dict) -> None:
+    parser = CSVish(fields=fields, separator=separator, comment_prefixes=comment)
+    parser.parse_file(StringIO(data_string))
     assert parser.parsed_data == expected_data
 
 
