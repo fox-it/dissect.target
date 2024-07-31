@@ -1,4 +1,5 @@
 import re
+from random import randrange
 from unittest.mock import Mock
 
 import pytest
@@ -8,7 +9,12 @@ from dissect.ntfs.exceptions import Error
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.plugins.filesystem.ntfs.mft import MftPlugin
+from dissect.target.plugins.filesystem.ntfs.mft import (
+    FilesystemFilenameRecord,
+    FilesystemStdRecord,
+    MftPlugin,
+    macb_aggr,
+)
 from dissect.target.plugins.filesystem.ntfs.mft_timeline import MftTimelinePlugin
 from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
@@ -185,6 +191,24 @@ def test_mft_plugin_macb(target_win: Target) -> None:
         path = record.path
         macb = record.macb
         ts = record.ts
+
+
+def test_mft_plugin_macb_nodup(target_win: Target) -> None:
+    # test whether you can never have duplicates
+
+    def makets(tss: set) -> int:
+        ts = randrange(1, 10)
+        tss.add(ts)
+        return ts
+
+    for i in range(0, 100):
+        tss = set()
+        records = []
+        for ts_type in ["M", "A", "C", "B"]:
+            records.append(FilesystemStdRecord(path="a.txt", ts=makets(tss), ts_type=ts_type))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=makets(tss), ts_type=ts_type, ads=False))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=makets(tss), ts_type=ts_type, ads=True))
+        assert len(list(macb_aggr(records))) == len(tss)
 
 
 def test_mft_plugin_disk_label(target_win):
