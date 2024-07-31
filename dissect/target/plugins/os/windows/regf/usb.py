@@ -81,8 +81,8 @@ class UsbPlugin(Plugin):
         if not list(self.target.registry.keys(self.USB_STOR)):
             raise UnsupportedPluginError(f"Registry key not found: {self.USB_STOR}")
 
-    @export(record=USBRegistryRecord)
-    def usb(self) -> Iterator[USBRegistryRecord]:
+    @export(record=UsbRegistryRecord)
+    def usb(self) -> Iterator[UsbRegistryRecord]:
         """Yields information about (historically) attached USB storage devices on Windows.
 
         Uses the registry to find information about USB storage devices that have been attached to the system.
@@ -95,7 +95,7 @@ class UsbPlugin(Plugin):
                 try:
                     device_info = parse_device_name(usb_type.name)
                 except ValueError:
-                    self.target.log.warning(f"Unable to parse USB device name: {usb_type.name}")
+                    self.target.log.warning("Unable to parse USB device name: %s", usb_type.name)
                     device_info = {"type": None, "vendor": None, "product": None, "revision": None}
 
                 for usb_device in usb_type.subkeys():
@@ -109,24 +109,34 @@ class UsbPlugin(Plugin):
                         "last_removal": None,
                     }
 
-                    values = [v.name for v in usb_device.values()]
-                    if "FriendlyName" in values:
+                    try:
                         friendly_name = usb_device.value("FriendlyName").value
+                    except RegistryValueNotFoundError:
+                        self.target.log.warning("No FriendlyName for USB with serial: %s", serial)
+                        pass
 
-                    if "ContainerID" in values:
+                    try:
                         container_id = usb_device.value("ContainerID").value
+                    except RegistryValueNotFoundError:
+                        self.target.log.warning("No ContainerID for USB with serial: %s", serial)
+                        pass
 
                     try:
                         timestamps = unpack_timestamps(usb_device.subkey("Properties"))
 
                     except RegistryValueNotFoundError as e:
-                        self.target.log.warning(f"Unable to parse USBSTOR registry properties for serial {serial}")
+                        self.target.log.warning("Unable to parse USBSTOR registry properties for serial: %s", serial)
                         self.target.log.debug("", exc_info=e)
                         pass
 
+                    # We can check if any HKCU hive(s) are populated with the Volume GUID of the USB storage device.
+                    # If a user has interacted with the mounted volume using explorer.exe we will get a match.
                     mounts = list(self.find_mounts(serial))
+                    users = [
+                        u.user.name for u in self.find_users([m[10:] for m in mounts if m.startswith("\\??\\Volume{")])
+                    ]
 
-                    yield USBRegistryRecord(
+                    yield UsbRegistryRecord(
                         friendly_name=friendly_name,
                         serial=serial,
                         container_id=container_id,
@@ -134,10 +144,7 @@ class UsbPlugin(Plugin):
                         **timestamps,
                         volumes=list(self.find_volumes(serial)),
                         mounts=mounts,
-                        users=[
-                            u.user.name
-                            for u in self.find_users([m[10:] for m in mounts if m.startswith("\\??\\Volume{")])
-                        ],
+                        users=users,
                         source=self.USB_STOR,
                         _target=self.target,
                     )

@@ -3,7 +3,7 @@ from unittest.mock import patch
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.regf.usb import USBPlugin
+from dissect.target.plugins.os.windows.regf.usb import UsbPlugin
 from dissect.target.target import Target
 
 
@@ -66,7 +66,7 @@ def test_windows_usb(target_win_users: Target, hive_hklm: VirtualHive, hive_hku:
     mountpoints2 = VirtualKey(hive_hku, mountpoints2_name)
     hive_hku.map_key(mountpoints2_name, mountpoints2)
 
-    target_win_users.add_plugin(USBPlugin)
+    target_win_users.add_plugin(UsbPlugin)
 
     with patch("dissect.target.plugins.os.windows.registry.RegistryPlugin.get_user_details") as mock_reg_user_details:
         mock_reg_user_details.return_value = target_win_users.user_details.find(username="John")
