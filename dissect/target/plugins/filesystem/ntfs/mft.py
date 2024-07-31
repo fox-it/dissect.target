@@ -159,10 +159,13 @@ class MftPlugin(Plugin):
             yield from records
 
         aggr = noaggr
-        if macb:
-            aggr = macb_aggr
+
+        if compact and macb:
+            raise ValueError("--macb and --compact are mutually exclusive")
         elif compact:
             record_formatter = compacted_formatter
+        elif macb:
+            aggr = macb_aggr
 
         for fs in self.target.filesystems:
             if fs.__type__ != "ntfs":
