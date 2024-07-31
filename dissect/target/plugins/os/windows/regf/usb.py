@@ -15,7 +15,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.regutil import VirtualKey
 from dissect.target.plugin import Plugin, export
 
-USBRegistryRecord = TargetRecordDescriptor(
+UsbRegistryRecord = TargetRecordDescriptor(
     "windows/registry/usb",
     [
         ("string", "type"),
@@ -44,12 +44,12 @@ USB_DEVICE_PROPERTY_KEYS = {
 }
 
 
-class USBPlugin(Plugin):
+class UsbPlugin(Plugin):
     """Windows USB history plugin.
 
     Parses Windows registry data about attached USB devices. Does not parse EVTX EventIDs
     or ``C:\\Windows\\inf\\setupapi(.dev).log``. To get a full picture of USB history you
-    should parse the according EventIDs using the evtx plugin.
+    should parse the relevant EventIDs using the evtx plugin.
 
     Resources:
         - https://hatsoffsecurity.com/2014/06/05/usb-forensics-pt-1-serial-number/
@@ -90,8 +90,8 @@ class USBPlugin(Plugin):
         with them using ``explorer.exe``.
         """
 
-        for k in self.target.registry.keys(self.USB_STOR):
-            for usb_type in k.subkeys():
+        for key in self.target.registry.keys(self.USB_STOR):
+            for usb_type in key.subkeys():
                 try:
                     device_info = parse_device_name(usb_type.name)
                 except ValueError:
@@ -143,7 +143,7 @@ class USBPlugin(Plugin):
                     )
 
     def find_volumes(self, serial: str) -> Iterator[str]:
-        """Attempts to find mounted volume names for the given serial"""
+        """Attempts to find mounted volume names for the given serial."""
 
         try:
             for device in self.target.registry.key(self.PORTABLE_DEVICES).subkeys():
@@ -153,7 +153,7 @@ class USBPlugin(Plugin):
             pass
 
     def find_mounts(self, serial: str) -> Iterator[str]:
-        """Attempts to find drive letters the given serial has been mounted on"""
+        """Attempts to find drive letters the given serial has been mounted on."""
 
         try:
             for mount in self.target.registry.key(self.MOUNT_LETTER_MAP).values():
@@ -166,7 +166,7 @@ class USBPlugin(Plugin):
             pass
 
     def find_users(self, volume_guids: list[str]) -> Iterator[str]:
-        """Attempt to find Windows users that have interacted with the given volume guid(s)"""
+        """Attempt to find Windows users that have interacted with the given volume GUIDs."""
 
         for volume_guid in volume_guids:
             try:
@@ -180,10 +180,10 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
     """Unpack relevant Windows timestamps from the provided USB registry properties subkey.
 
     Args:
-        usb_reg_properties (VirtualKey): A registry object with USB properties
+        usb_reg_properties: A registry object with USB properties.
 
     Returns:
-        timestamps (dict): A dict containing parsed timestamps within passed registry object
+        A dict containing parsed timestamps within passed registry object.
     """
 
     usb_reg_properties = usb_reg_properties.subkey("{83da6326-97a6-4088-9453-a1923f573b29}")
@@ -204,7 +204,7 @@ def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
     return timestamps
 
 
-def parse_device_name(device_name: str) -> dict[str]:
+def parse_device_name(device_name: str) -> dict[str, str]:
     """Parse a registry device name into components."""
 
     RE_DEVICE_NAME = re.compile(r"^(?P<type>.+?)&Ven_(?P<vendor>.+?)&Prod_(?P<product>.+?)(&Rev_(?P<revision>.+?))?$")
