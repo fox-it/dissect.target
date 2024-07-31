@@ -71,11 +71,12 @@ def test_yara_plugin_invalid_rule_warn(target_yara: Target, caplog: pytest.Captu
 
 @pytest.mark.skipif(not HAS_YARA, reason="requires python-yara")
 def test_yara_plugin_compiled_rule(target_yara: Target, tmp_path: str) -> None:
-    with tempfile.NamedTemporaryFile(mode="w", dir=tmp_path) as tmp_file:
+    with tempfile.NamedTemporaryFile(mode="w", dir=tmp_path, delete=False) as tf:
         rules = yara.compile(rule_file)
-        rules.save(tmp_file.name)
+        rules.save(tf.name)
+        tf.close()
 
-        results = list(target_yara.yara(rules=[tmp_file.name]))
+        results = list(target_yara.yara(rules=[tf.name]))
 
         assert len(results) == 2
 
