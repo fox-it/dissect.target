@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from dissect.target.plugins.os.windows.wua_history import WuaHistoryPlugin
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.plugins.os.windows.wua_history import WuaHistoryPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
