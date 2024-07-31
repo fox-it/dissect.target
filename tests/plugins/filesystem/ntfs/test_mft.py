@@ -171,7 +171,7 @@ def test_mft_plugin_entries(target_win, compact):
     assert len(mft_data) == check_output_amount(76, compact)
 
 
-def test_mft_plugin_mcab(target_win: Target) -> None:
+def test_mft_plugin_macb(target_win: Target) -> None:
     load_mft_plugin(target_win)
     mft_data = list(target_win.mft(macb=True))
     path = None
