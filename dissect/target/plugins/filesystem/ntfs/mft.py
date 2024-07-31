@@ -90,11 +90,11 @@ FilesystemFilenameRecord = TargetRecordDescriptor(
     ],
 )
 
-FilesystemMCABRecord = TargetRecordDescriptor(
-    "filesystem/ntfs/mft/mcab",
+FilesystemMACBRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/macb",
     [
         ("datetime", "ts"),
-        ("string", "mcab"),
+        ("string", "macb"),
         ("uint32", "filename_index"),
         ("uint32", "segment"),
         ("path", "path"),
@@ -134,11 +134,11 @@ class MftPlugin(Plugin):
     )
     @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
     @arg(
-        "--mcab",
+        "--macb",
         action="store_true",
-        help="compacts the MFT entry timestamps into aggregated records with MCAB bitfield",
+        help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
     )
-    def mft(self, compact: bool = False, mcab: bool = False):
+    def mft(self, compact: bool = False, macb: bool = False):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -159,8 +159,8 @@ class MftPlugin(Plugin):
             yield from records
 
         aggr = noaggr
-        if mcab:
-            aggr = mcab_aggr
+        if macb:
+            aggr = macb_aggr
         elif compact:
             record_formatter = compacted_formatter
 
@@ -305,11 +305,11 @@ def formatter(attr: Attribute, record_type: InformationType, **kwargs):
         yield record_desc(ts=timestamp, ts_type=type, **kwargs)
 
 
-def mcab_aggr(records: list[Record]) -> Iterator[Record]:
-    def mcab_set(bitfield, index, letter):
+def macb_aggr(records: list[Record]) -> Iterator[Record]:
+    def macb_set(bitfield, index, letter):
         return bitfield[:index] + letter + bitfield[index + 1 :]
 
-    mcabs = []
+    macbs = []
     for record in records:
         found = False
 
@@ -317,19 +317,19 @@ def mcab_aggr(records: list[Record]) -> Iterator[Record]:
         offset_ads = (int(record.ads) * 10) if offset_std == 0 else 0
 
         field = "MACB".find(record.ts_type) + offset_std + offset_ads
-        for mcab in mcabs:
-            if mcab.ts == record.ts:
-                mcab.mcab = mcab_set(mcab.mcab, field, record.ts_type)
+        for macb in macbs:
+            if macb.ts == record.ts:
+                macb.macb = macb_set(macb.macb, field, record.ts_type)
                 found = True
                 break
 
         if found:
             continue
 
-        mcab = FilesystemMCABRecord.init_from_record(record)
-        mcab.mcab = "..../..../...."
-        mcab.mcab = mcab_set(mcab.mcab, field, record.ts_type)
+        macb = FilesystemMACBRecord.init_from_record(record)
+        macb.macb = "..../..../...."
+        macb.macb = macb_set(macb.macb, field, record.ts_type)
 
-        mcabs.append(mcab)
+        macbs.append(macb)
 
-    yield from mcabs
+    yield from macbs
