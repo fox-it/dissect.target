@@ -6,7 +6,7 @@ import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.windows.recyclebin import RecyclebinPlugin
+from dissect.target.plugins.os.windows.recyclebin import RecyclebinPlugin, c_recyclebin
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def test_parse_header(target_win, version_number, expected_header):
     recycle_plugin = RecyclebinPlugin(target_win)
 
     header = recycle_plugin.select_header(version_number)
-    assert header is recycle_plugin.recyclebin_parser.__getattr__(expected_header)
+    assert header is getattr(c_recyclebin, expected_header)
 
 
 @pytest.mark.parametrize(
@@ -91,9 +91,7 @@ def test_parse_header(target_win, version_number, expected_header):
 def test_read_bin_file_unknown(target_win, path):
     recycle_plugin = RecyclebinPlugin(target_win)
 
-    header_1 = recycle_plugin.recyclebin_parser.header_v1(
-        version=0, file_size=0x20, timestamp=0x20, filename="hello_world" + "\x00" * 249
-    )
+    header_1 = c_recyclebin.header_v1(version=0, file_size=0x20, timestamp=0x20, filename="hello_world" + "\x00" * 249)
 
     with patch.object(Path, "open", mock_open(read_data=header_1.dumps())):
         normal_path = Path(path)

@@ -26,8 +26,7 @@ GNULocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_gnulocate = cstruct()
-c_gnulocate.load(gnulocate_def)
+c_gnulocate = cstruct().load(gnulocate_def)
 
 
 class GNULocateFile:
