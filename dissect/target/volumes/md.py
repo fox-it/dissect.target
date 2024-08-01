@@ -1,8 +1,7 @@
 from collections import defaultdict
 from typing import BinaryIO, Iterator, Union
 
-from dissect.volume.md import MD, MDPhysicalDisk
-from dissect.volume.md.md import find_super_block
+from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
