@@ -25,12 +25,12 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
-def human_size(bytes, units=["", "K", "M", "G", "T", "P", "E"]):
-    """Helper function to return the human readable string representation of bytes"""
+def human_size(bytes: int, units: list[str] = ["", "K", "M", "G", "T", "P", "E"]) -> str:
+    """Helper function to return the human readable string representation of bytes."""
     return str(bytes) + units[0] if bytes < 1024 else human_size(bytes >> 10, units[1:])
 
 
-def ls(t, path, args):
+def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     if args.use_ctime and args.use_atime:
         log.error("Can't specify -c and -u at the same time")
         return
@@ -52,58 +52,63 @@ def _print_ls(args: argparse.Namespace, path: TargetPath, depth: int) -> None:
         print(f"\n{str(path)}:")
 
     if not args.l:
-        for target_path in contents:
-            print(target_path.name)
-            if target_path.is_dir():
-                subdirs.append(target_path)
+        for entry in contents:
+            print(entry.name)
+
+            if entry.is_dir():
+                subdirs.append(entry)
     else:
         if len(contents) > 1:
             print(f"total {len(contents)}")
-        for target_path in contents:
-            _print_extensive_file_stat(args=args, target_path=target_path, name=target_path.name)
-            if target_path.is_dir():
-                subdirs.append(target_path)
+
+        for entry in contents:
+            _print_extensive_file_stat(args, entry, entry.name)
+
+            if entry.is_dir():
+                subdirs.append(entry)
 
     if args.recursive and subdirs:
         for subdir in subdirs:
             _print_ls(args, subdir, depth + 1)
 
 
-def _print_extensive_file_stat(args: argparse.Namespace, target_path: TargetPath, name: str) -> None:
+def _print_extensive_file_stat(args: argparse.Namespace, path: TargetPath, name: str) -> None:
     try:
-        entry = target_path.get()
+        entry = path.get()
         stat = entry.lstat()
         symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
         show_time = stat.st_mtime
+
         if args.use_ctime:
             show_time = stat.st_ctime
         elif args.use_atime:
             show_time = stat.st_atime
+
         utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
 
         if args.human_readable:
             size = human_size(stat.st_size)
         else:
             size = stat.st_size
-        print(f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {size:>6s} {utc_time} {name}{symlink}")
 
+        print(f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {size:>6s} {utc_time} {name}{symlink}")
     except FileNotFoundError:
         print(f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}")
 
 
-def cat(t, path, args):
+def cat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     stdout = sys.stdout
     if hasattr(stdout, "buffer"):
         stdout = stdout.buffer
     shutil.copyfileobj(path.open(), stdout)
 
 
-def walk(t, path, args):
+def walk(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     for e in path.rglob("*"):
         print(str(e))
 
 
-def cp(t, path, args):
+def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     output = os.path.abspath(os.path.expanduser(args.output))
     if path.is_file():
         _extract_path(path, os.path.join(output, path.name))
@@ -138,7 +143,7 @@ def _extract_path(path: TargetPath, output_path: str) -> None:
 
 
 @catch_sigpipe
-def main():
+def main() -> None:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -148,9 +153,9 @@ def main():
     parser.add_argument("target", type=pathlib.Path, help="Target to load", metavar="TARGET")
 
     baseparser = argparse.ArgumentParser(add_help=False)
-    baseparser.add_argument("path", type=str, help="Path to perform an action on", metavar="PATH")
+    baseparser.add_argument("path", type=str, help="path to perform an action on", metavar="PATH")
 
-    subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands for performing various actions")
+    subparsers = parser.add_subparsers(dest="subcommand", help="subcommands for performing various actions")
     parser_ls = subparsers.add_parser(
         "ls", help="Show a directory listing", parents=[baseparser], conflict_handler="resolve"
     )
@@ -164,18 +169,18 @@ def main():
     parser_ls.add_argument("-u", action="store_true", dest="use_atime", help="show time of last access")
     parser_ls.set_defaults(handler=ls)
 
-    parser_cat = subparsers.add_parser("cat", help="Dump file contents", parents=[baseparser])
+    parser_cat = subparsers.add_parser("cat", help="dump file contents", parents=[baseparser])
     parser_cat.set_defaults(handler=cat)
 
-    parser_find = subparsers.add_parser("walk", help="Perform a walk", parents=[baseparser])
+    parser_find = subparsers.add_parser("walk", help="perform a walk", parents=[baseparser])
     parser_find.set_defaults(handler=walk)
 
     parser_cp = subparsers.add_parser(
         "cp",
-        help="Copy multiple files to a directory specified by --output",
+        help="copy multiple files to a directory specified by --output",
         parents=[baseparser],
     )
-    parser_cp.add_argument("-o", "--output", type=str, default=".", help="Output directory")
+    parser_cp.add_argument("-o", "--output", type=str, default=".", help="output directory")
     parser_cp.set_defaults(handler=cp)
 
     configure_generic_arguments(parser)
