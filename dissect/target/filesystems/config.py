@@ -96,7 +96,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
-            return entry
+            relative_path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
+            return ConfigurationEntry(self, relative_path, entry, None)
 
         entry = self._convert_entry(entry, *args, **kwargs)
 
@@ -119,7 +120,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
         entry = file_entry
         try:
             config_parser = parse(entry, *args, **kwargs)
-            entry = ConfigurationEntry(self, entry.path, entry, config_parser)
+            path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
+            entry = ConfigurationEntry(self, path, entry, config_parser)
         except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
@@ -166,7 +168,7 @@ class ConfigurationEntry(FilesystemEntry):
         fs: Filesystem,
         path: str,
         entry: FilesystemEntry,
-        parser_items: Optional[Union[dict, ConfigurationParser, str, list]] = None,
+        parser_items: dict | ConfigurationParser | str | list | None = None,
     ) -> None:
         super().__init__(fs, path, entry)
         self.parser_items = parser_items
@@ -182,7 +184,7 @@ class ConfigurationEntry(FilesystemEntry):
 
         return f"<{self.__class__.__name__} {output}"
 
-    def get(self, key, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any, None]:
+    def get(self, key, default: Any | None = None) -> ConfigurationEntry | Any | None:
         """Gets the dictionary key that belongs to this entry using ``key``.
         Behaves like ``dictionary.get()``.
 
@@ -196,6 +198,10 @@ class ConfigurationEntry(FilesystemEntry):
         # Check for path in config entry
         if not key:
             raise TypeError("key should be defined")
+
+        if self.entry.is_dir():
+            path = fsutil.join(self.path, key, alt_separator=self.alt_separator)
+            return ConfigurationEntry(self.fs, path, self.entry.get(key), None)
 
         if key in self.parser_items:
             return ConfigurationEntry(
