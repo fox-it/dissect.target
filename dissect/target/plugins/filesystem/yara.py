@@ -47,6 +47,7 @@ class YaraPlugin(Plugin):
     @arg("-p", "--path", default="/", help="path on target(s) to recursively scan")
     @arg("-m", "--max-size", default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
     @arg("-c", "--check", default=False, action="store_true", help="check if every YARA rule is valid")
+    @arg("--children", action="store_true", help="include children")
     @export(record=YaraMatchRecord)
     def yara(
         self,
@@ -76,16 +77,17 @@ class YaraPlugin(Plugin):
         if hasattr(compiled_rules, "warnings") and (num_warns := len(compiled_rules.warnings)) > 0:
             self.target.log.warning("YARA generated %s warnings while compiling rules", num_warns)
             for warning in compiled_rules.warnings:
-                self.target.log.debug(warning)
+                self.target.log.info(warning)
 
         self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
 
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
                 try:
-                    if file_size := file.stat().st_size > max_size:
-                        self.target.log.debug(
-                            "Skipping file '%s' as it is larger than %s bytes (size is %s)", file, file_size, max_size
+                    if (file_size := file.stat().st_size) > max_size:
+                        self.target.log.info(
+                            "Not scanning file of %s MB: '%s'",
+                            (file_size // 1024 // 1024), file
                         )
                         continue
 

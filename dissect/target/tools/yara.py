@@ -45,8 +45,8 @@ def main():
         parser.exit(1)
 
     try:
-        for target in Target.open_all(args.targets):
-            target.log.info("Scanning target")
+        for target in Target.open_all(args.targets, args.children):
+            target.log.info("Scanning target %s", target)
             rs = record_output(args.strings, False)
             for record in target.yara(args.rules, args.path, args.max_size, args.check):
                 rs.write(record)
