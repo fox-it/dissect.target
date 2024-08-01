@@ -85,10 +85,7 @@ class YaraPlugin(Plugin):
             for file in files:
                 try:
                     if (file_size := file.stat().st_size) > max_size:
-                        self.target.log.info(
-                            "Not scanning file of %s MB: '%s'",
-                            (file_size // 1024 // 1024), file
-                        )
+                        self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
                         continue
 
                     buf = file.open().read()
