@@ -3,11 +3,11 @@ from __future__ import annotations
 import io
 import textwrap
 from logging import getLogger
-from typing import Any, BinaryIO, Iterator, Optional, Union
+from typing import Any, BinaryIO, Iterator, Optional
 
 from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
-from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
+from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
 
@@ -46,7 +46,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
         super().__init__(**kwargs)
         self.root.top = target.fs.get(path)
 
-    def _get_till_file(self, path: str, relentry: FilesystemEntry) -> tuple[list[str], FilesystemEntry]:
+    def _get_till_file(self, path: str, relentry: FilesystemEntry | None) -> tuple[list[str], FilesystemEntry]:
         """Searches for the file entry that is pointed to by ``path``.
 
         The ``path`` could contain ``key`` entries too, so it searches for the entry from
@@ -56,11 +56,13 @@ class ConfigurationFilesystem(VirtualFilesystem):
             A list of ``parts`` containing keys: [keys, into, the, file].
             And the resolved entry: Entry(filename)
         """
-        path = fsutil.relpath(path, self.root.top.path, alt_separator=self.alt_separator)
 
         entry = relentry or self.root
+        root_path = relentry.path if relentry else self.root.top.path
 
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        # Calculate the relative path
+        relpath = fsutil.relpath(path, root_path, alt_separator=self.alt_separator)
+        path = fsutil.normalize(relpath, alt_separator=self.alt_separator).strip("/")
 
         if not path:
             return [], entry
@@ -163,7 +165,7 @@ class ConfigurationEntry(FilesystemEntry):
 
     def __init__(
         self,
-        fs: Filesystem,
+        fs: ConfigurationFilesystem,
         path: str,
         entry: FilesystemEntry,
         parser_items: dict | ConfigurationParser | str | list | None = None,
@@ -197,17 +199,19 @@ class ConfigurationEntry(FilesystemEntry):
         if not key:
             raise TypeError("key should be defined")
 
-        if self.entry.is_dir():
-            path = fsutil.join(self.path, key, alt_separator=self.alt_separator)
-            return ConfigurationEntry(self.fs, path, self.entry.get(key), None)
+        path = fsutil.join(self.path, key, alt_separator=self.fs.alt_separator)
 
-        if key in self.parser_items:
+        if self.parser_items and key in self.parser_items:
             return ConfigurationEntry(
                 self.fs,
-                fsutil.join(self.path, key, alt_separator=self.fs.alt_separator),
+                path,
                 self.entry,
                 self.parser_items[key],
             )
+
+        if self.entry.is_dir():
+            return self.fs.get(path, self.entry)
+
         return default
 
     def _write_value_mapping(self, values: dict[str, Any], indentation_nr: int = 0) -> str:
