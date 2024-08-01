@@ -7,11 +7,7 @@ from dissect.target.tools.info import main as target_info
 
 @pytest.mark.parametrize(
     "output_type, options",
-    [
-        ("json", ["-j"]),
-        ("json", ["-J", "-L", "tar"]),
-        ("record", ["-r", "-s"])
-    ],
+    [("json", ["-j"]), ("json", ["-J", "-L", "tar"]), ("record", ["-r", "-s"])],
 )
 def test_target_info(
     capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch, output_type: str, options: list
