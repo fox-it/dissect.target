@@ -126,14 +126,12 @@ class UsbPlugin(Plugin):
                         container_id = usb_device.value("ContainerID").value
                     except RegistryValueNotFoundError:
                         self.target.log.warning("No ContainerID for USB with serial: %s", serial)
-                        pass
 
                     try:
                         timestamps = unpack_timestamps(usb_device.subkey("Properties"))
                     except RegistryValueNotFoundError as e:
                         self.target.log.warning("Unable to parse USBSTOR registry properties for serial: %s", serial)
                         self.target.log.debug("", exc_info=e)
-                        pass
 
                     # We can check if any HKCU hive(s) are populated with the Volume GUID of the USB storage device.
                     # If a user has interacted with the mounted volume using explorer.exe we will get a match.
@@ -158,21 +156,21 @@ class UsbPlugin(Plugin):
 
     def find_volumes(self, serial: str) -> Iterator[str]:
         """Attempts to find mounted volume names for the given serial."""
-
+        serial = serial.lower()
         try:
             for device in self.target.registry.key(self.PORTABLE_DEVICES).subkeys():
-                if serial.lower() in device.name.lower():
+                if serial in device.name.lower():
                     yield device.value("FriendlyName").value
         except RegistryKeyNotFoundError:
             pass
 
     def find_mounts(self, serial: str) -> Iterator[str]:
         """Attempts to find drive letters the given serial has been mounted on."""
-
+        serial = serial.lower()
         try:
             for mount in self.target.registry.key(self.MOUNT_LETTER_MAP).values():
                 try:
-                    if serial.lower() in mount.value.decode("utf-16-le").lower():
+                    if serial in mount.value.decode("utf-16-le").lower():
                         yield mount.name.replace("\\DosDevices\\", "")
                 except UnicodeDecodeError:
                     pass
