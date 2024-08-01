@@ -593,7 +593,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
         # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
         if not iter_all and (ips or count > 10_000):
             if not ips:
-                log.warning("No DHCP IP addresses found in first 10000 journal entries.")
+                target.log.warning("No DHCP IP addresses found in first 10000 journal entries.")
             break
 
     return ips
