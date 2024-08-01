@@ -27,6 +27,7 @@ def main():
 
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to load")
     parser.add_argument("-s", "--strings", default=False, action="store_true", help="print output as string")
+    parser.add_argument("--children", action="store_true", help="include children")
 
     for args, kwargs in getattr(YaraPlugin.yara, "__args__", []):
         parser.add_argument(*args, **kwargs)
@@ -46,7 +47,6 @@ def main():
 
     try:
         for target in Target.open_all(args.targets, args.children):
-            target.log.info("Scanning target %s", target)
             rs = record_output(args.strings, False)
             for record in target.yara(args.rules, args.path, args.max_size, args.check):
                 rs.write(record)

@@ -47,7 +47,6 @@ class YaraPlugin(Plugin):
     @arg("-p", "--path", default="/", help="path on target(s) to recursively scan")
     @arg("-m", "--max-size", default=DEFAULT_MAX_SCAN_SIZE, help="maximum file size in bytes to scan")
     @arg("-c", "--check", default=False, action="store_true", help="check if every YARA rule is valid")
-    @arg("--children", action="store_true", help="include children")
     @export(record=YaraMatchRecord)
     def yara(
         self,
