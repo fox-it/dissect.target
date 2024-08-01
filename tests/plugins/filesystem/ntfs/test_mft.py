@@ -196,18 +196,18 @@ def test_mft_plugin_macb(target_win: Target) -> None:
 def test_mft_plugin_macb_nodup() -> None:
     # test whether you can never have duplicates
 
-    def makets(tss: set) -> int:
+    def make_ts(tss: set) -> int:
         ts = randrange(1, 10)
         tss.add(ts)
         return ts
 
-    for i in range(0, 100):
+    for _ in range(0, 100):
         tss = set()
         records = []
         for ts_type in ["M", "A", "C", "B"]:
-            records.append(FilesystemStdRecord(path="a.txt", ts=makets(tss), ts_type=ts_type))
-            records.append(FilesystemFilenameRecord(path="a.txt", ts=makets(tss), ts_type=ts_type, ads=False))
-            records.append(FilesystemFilenameRecord(path="a.txt", ts=makets(tss), ts_type=ts_type, ads=True))
+            records.append(FilesystemStdRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=False))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=True))
         assert len(list(macb_aggr(records))) == len(tss)
 
 
