@@ -56,6 +56,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
             A list of ``parts`` containing keys: [keys, into, the, file].
             And the resolved entry: Entry(filename)
         """
+        path = fsutil.relpath(path, self.root.top.path, alt_separator=self.alt_separator)
+
         entry = relentry or self.root
 
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
@@ -85,10 +87,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return parts[idx:], entry
 
-    def get(
-        self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs
-    ) -> Union[FilesystemEntry, ConfigurationEntry]:
-        """Retrieve a :class:`ConfigurationEntry` or :class:`.FilesystemEntry` relative to the root or ``relentry``.
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs) -> ConfigurationEntry:
+        """Retrieve a :class:`ConfigurationEntry` relative to the root or ``relentry``.
 
         Raises:
             FileNotFoundError: if it could not find the entry.
@@ -96,8 +96,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
-            relative_path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
-            return ConfigurationEntry(self, relative_path, entry, None)
+            # relative_path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
+            return ConfigurationEntry(self, entry.path, entry, None)
 
         entry = self._convert_entry(entry, *args, **kwargs)
 
@@ -109,24 +109,22 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return entry
 
-    def _convert_entry(
-        self, file_entry: FilesystemEntry, *args, **kwargs
-    ) -> Union[ConfigurationEntry, FilesystemEntry]:
+    def _convert_entry(self, file_entry: FilesystemEntry, *args, **kwargs) -> ConfigurationEntry:
         """Creates a :class:`ConfigurationEntry` from a ``file_entry``.
 
         If an error occurs during the parsing of the file contents,
         the original ``file_entry`` is returned.
         """
         entry = file_entry
+        config_parser = None
         try:
             config_parser = parse(entry, *args, **kwargs)
-            path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
-            entry = ConfigurationEntry(self, path, entry, config_parser)
         except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
-        return entry
+        # path = fsutil.relpath(self.root.top.path, entry.path, alt_separator=self.alt_separator)
+        return ConfigurationEntry(self, entry.path, entry, config_parser)
 
 
 class ConfigurationEntry(FilesystemEntry):
@@ -263,6 +261,11 @@ class ConfigurationEntry(FilesystemEntry):
         if self.is_file():
             raise NotADirectoryError()
 
+        if self.parser_items is None and self.entry.is_dir():
+            for x in self.entry.scandir():
+                yield ConfigurationEntry(self.fs, x.name, x, None)
+            return
+
         for key, values in self.parser_items.items():
             yield ConfigurationEntry(self.fs, key, self.entry, values)
 
@@ -272,7 +275,7 @@ class ConfigurationEntry(FilesystemEntry):
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Returns whether this :class:`ConfigurationEntry` can be considered a directory."""
         # if self.parser_items has keys (thus sub-values), we can consider it a directory.
-        return hasattr(self.parser_items, "keys")
+        return (self.parser_items is None and self.entry.is_dir()) or hasattr(self.parser_items, "keys")
 
     def is_symlink(self) -> bool:
         """Return whether this :class:`ConfigurationEntry` is a symlink or not.
@@ -290,7 +293,7 @@ class ConfigurationEntry(FilesystemEntry):
         Returns:
             Whether the ``entry`` and ``key`` exists
         """
-        return self.entry.exists() and key in self.parser_items
+        return self.parser_items and self.entry.exists() and key in self.parser_items
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Returns the stat from the underlying :class:`.FilesystemEntry` :attr:`entry`."""
