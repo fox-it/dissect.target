@@ -220,18 +220,20 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
 
 def _mount_local(target: Target, local_layer: VirtualFilesystem):
     local_tgz = target.fs.path("local.tgz")
+    local_tgz_ve = target.fs.path("local.tgz.ve")
     local_fs = None
 
     if local_tgz.exists():
         local_fs = tar.TarFilesystem(local_tgz.open())
-    else:
-        local_tgz_ve = target.fs.path("local.tgz.ve")
+    elif local_tgz_ve.exists():
         # In the case "encryption.info" does not exist, but ".#encryption.info" does
         encryption_info = next(target.fs.path("/").glob("*encryption.info"), None)
         if not local_tgz_ve.exists() or not encryption_info.exists():
             raise ValueError("Unable to find valid configuration archive")
 
         local_fs = _create_local_fs(target, local_tgz_ve, encryption_info)
+    else:
+        target.log.warning("No local.tgz or local.tgz.ve found, skipping local state")
 
     if local_fs:
         local_layer.mount("/", local_fs)
