@@ -48,7 +48,7 @@ class EtcTree(ConfigurationTreePlugin):
             if fnmatch.fnmatch(path, pattern):
                 data = {
                     "_target": self.target,
-                    "source": self.target.fs.path(config_entry.entry.path),
+                    "source": self.target.fs.path(config_entry.entry.path if hasattr(config_entry,"entry") else path),
                     "path": path,
                     "key": key,
                     "value": value,
