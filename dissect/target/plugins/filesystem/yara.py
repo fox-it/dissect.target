@@ -76,17 +76,15 @@ class YaraPlugin(Plugin):
         if hasattr(compiled_rules, "warnings") and (num_warns := len(compiled_rules.warnings)) > 0:
             self.target.log.warning("YARA generated %s warnings while compiling rules", num_warns)
             for warning in compiled_rules.warnings:
-                self.target.log.debug(warning)
+                self.target.log.info(warning)
 
         self.target.log.warning("Will not scan files larger than %s MB", max_size // 1024 // 1024)
 
         for _, _, files in self.target.fs.walk_ext(path):
             for file in files:
                 try:
-                    if file_size := file.stat().st_size > max_size:
-                        self.target.log.debug(
-                            "Skipping file '%s' as it is larger than %s bytes (size is %s)", file, file_size, max_size
-                        )
+                    if (file_size := file.stat().st_size) > max_size:
+                        self.target.log.info("Not scanning file of %s MB: '%s'", (file_size // 1024 // 1024), file)
                         continue
 
                     buf = file.open().read()
