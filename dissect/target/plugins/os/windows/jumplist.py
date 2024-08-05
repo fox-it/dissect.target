@@ -84,7 +84,7 @@ class AutomaticDestinationFile:
                     continue
 
 
-class CustomerDestinationFile:
+class CustomDestinationFile:
     """Parse Jump List CustomDestination file."""
 
     MAGIC_FOOTER = 0xBABFFBAB
@@ -106,7 +106,15 @@ class CustomerDestinationFile:
         elif self.header.value_type in [1, 2]:
             self.header_end = c_custom_destination.header_end(self.fh)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(
+                f"The value_type ({self.header.value_type}) of the CustomDestination file is not implemented"
+            )
+
+        if self.version not in self.VERSIONS:
+            raise NotImplementedError(f"The CustomDestination file has an unsupported version: {self.version}")
+
+        if not self.MAGIC_FOOTER == self.magic:
+            raise ValueError(f"The CustomDestination file has an invalid magic footer: {self.magic}")
 
     def __iter__(self) -> Iterator[Lnk]:
         # Searches for all LNK GUID's because the number of entries in the header is not always correct.
@@ -116,6 +124,8 @@ class CustomerDestinationFile:
             try:
                 lnk = Lnk(io.BytesIO(buf[offset + len(LNK_GUID) :]))
                 yield lnk
+            except EOFError:
+                break
             except Exception as e:
                 log.warning("Failed to parse LNK file from a CustomDestination file")
                 log.debug("", exc_info=e)
@@ -170,31 +180,10 @@ class JumpListPlugin(NamespacePlugin):
             fh = destination.open("rb")
 
             try:
-                custom_destination = CustomerDestinationFile(fh)
-            except EOFError:
-                continue
-            except NotImplementedError:
-                self.target.log.warning(
-                    "The value_type (%i) of the CustomDestination file is not implemented: %s",
-                    custom_destination.header.value_type,
-                    destination,
-                )
-                continue
+                custom_destination = CustomDestinationFile(fh)
             except Exception as e:
                 self.target.log.warning("Failed to parse CustomDestination header: %s", destination)
                 self.target.log.debug("", exc_info=e)
-                continue
-
-            if not custom_destination.MAGIC_FOOTER == custom_destination.magic:
-                self.target.log.warning("The CustomDestination file has an invalid magic footer: %s", destination)
-                continue
-
-            if custom_destination.version not in custom_destination.VERSIONS:
-                self.target.log.warning(
-                    "The CustomDestination file has an unsupported version %i: %s",
-                    destination,
-                    custom_destination.version,
-                )
                 continue
 
             application_name, application_id, application_type = self.name(destination.name)
