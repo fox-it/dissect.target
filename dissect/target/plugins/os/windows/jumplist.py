@@ -50,10 +50,6 @@ struct header_end_0 {
     int     number_of_entries;
 }
 
-struct entry_header {
-    char guid[16];
-}
-
 struct footer {
     char magic[4];
 }
