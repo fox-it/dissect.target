@@ -204,7 +204,7 @@ class JumpListPlugin(Plugin):
                     _target=self.target,
                 )
 
-    def automatic_destination(self):
+    def automatic_destination(self) -> Iterator[JumpListRecord]:
         for destination, user in self.automatic_destinations:
             fh = destination.open("rb")
 
