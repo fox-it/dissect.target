@@ -395,6 +395,10 @@ def register(plugincls: type[Plugin]) -> None:
     exports = []
     functions = []
     module_path = _module_path(plugincls)
+
+    if module_path.endswith("._plugin"):
+        module_path = module_path[:-8]
+
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
     if not issubclass(plugincls, ChildTargetPlugin):
