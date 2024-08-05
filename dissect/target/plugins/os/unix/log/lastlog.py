@@ -1,6 +1,6 @@
 from typing import BinaryIO
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -36,8 +36,7 @@ struct entry {
 };
 """
 
-c_lastlog = cstruct.cstruct()
-c_lastlog.load(lastlog_def)
+c_lastlog = cstruct().load(lastlog_def)
 
 
 class LastLogFile:

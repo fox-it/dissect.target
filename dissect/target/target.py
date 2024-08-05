@@ -14,6 +14,7 @@ from dissect.target.exceptions import (
     PluginError,
     PluginNotFoundError,
     TargetError,
+    TargetPathNotFoundError,
     UnsupportedPluginError,
     VolumeSystemError,
 )
@@ -284,7 +285,11 @@ class Target:
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
                     except Exception as e:
-                        getlogger(sub_entry).error("Failed to initiate loader: %s", e)
+                        message = "Failed to initiate loader: %s"
+                        if isinstance(e, TargetPathNotFoundError):
+                            message = "%s"
+
+                        getlogger(sub_entry).error(message, e)
                         getlogger(sub_entry).debug("", exc_info=e)
                         continue
 
@@ -339,7 +344,7 @@ class Target:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
             except Exception:
                 self.log.exception(
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
