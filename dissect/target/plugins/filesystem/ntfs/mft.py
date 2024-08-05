@@ -183,7 +183,7 @@ class MftPlugin(Plugin):
 
             yield from self.segments(filesystem, record_formatter, aggr, start, end)
         else:
-            for filesystem in self.ntfs_filesystems:
+            for filesystem in self.ntfs_filesystems.values():
                 yield from self.segments(filesystem, record_formatter, aggr, start, end)
 
     def segments(self, fs: NtfsFilesystem, record_formatter: Callable, aggr: Callable, start: int, end: int):
