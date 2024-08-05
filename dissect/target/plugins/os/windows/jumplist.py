@@ -14,7 +14,7 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.shell_application_ids import APPLICATION_IDENTIFIERS
 from dissect.target.helpers.utils import findall
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import NamespacePlugin, export
 from dissect.target.plugins.os.windows.lnk import LnkRecord, parse_lnk_file
 
 log = logging.getLogger(__name__)
@@ -126,7 +126,19 @@ class CustomerDestinationFile:
                 continue
 
 
-class JumpListPlugin(Plugin):
+class JumpListPlugin(NamespacePlugin):
+    """Jump List is a Windows feature introduced in Windows 7. It contains information about recently accessed
+    applications and files. There are two kind of Jump Lists. The AutomaticDestinations are created automatically
+    when a user opens an application or file. The CustomDestination is created when a user pins an application or
+        a file in a Jump List.
+
+    References:
+        - https://forensics.wiki/jump_lists
+        - https://github.com/libyal/dtformats/blob/main/documentation/Jump%20lists%20format.asciidoc
+    """
+
+    __namespace__ = "jumplist"
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.automatic_destinations = []
@@ -155,7 +167,9 @@ class JumpListPlugin(Plugin):
 
         return application_name, application_id, application_type
 
+    @export(record=JumpListRecord)
     def custom_destination(self) -> Iterator[JumpListRecord]:
+        """Return the content of custom destination Windows Jump Lists."""
         for destination, user in self.custom_destinations:
             fh = destination.open("rb")
 
@@ -204,7 +218,9 @@ class JumpListPlugin(Plugin):
                     _target=self.target,
                 )
 
+    @export(record=JumpListRecord)
     def automatic_destination(self) -> Iterator[JumpListRecord]:
+        """Return the content of automatic destination Windows Jump Lists."""
         for destination, user in self.automatic_destinations:
             fh = destination.open("rb")
 
@@ -233,23 +249,3 @@ class JumpListPlugin(Plugin):
                     _user=user,
                     _target=self.target,
                 )
-
-    @export(record=JumpListRecord)
-    def jumplist(self) -> Iterator[JumpListRecord]:
-        """Return the content of Windows Jump List files.
-
-        Jump List is a Windows feature introduced in Windows 7. It contains information about recently accessed
-        applications and files. There are two kind of Jump Lists. The AutomaticDestinations are created automatically
-        when a user opens an application or file. The CustomDestination is created when a user pins an application or
-         a file in a Jump List.
-
-        References:
-            - https://forensics.wiki/jump_lists
-            - https://github.com/libyal/dtformats/blob/main/documentation/Jump%20lists%20format.asciidoc
-        """
-
-        for entry in self.custom_destination():
-            yield entry
-
-        for entry in self.automatic_destination():
-            yield entry
