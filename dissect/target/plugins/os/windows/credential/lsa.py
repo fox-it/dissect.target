@@ -1,7 +1,6 @@
 import hashlib
 from functools import cached_property
-from struct import unpack
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -77,15 +76,13 @@ class LSAPlugin(Plugin):
         raise ValueError("Unable to determine LSA policy key location in registry")
 
     @cached_property
-    def _secrets(self) -> Optional[dict[str, bytes]]:
+    def _secrets(self) -> dict[str, bytes] | None:
         """Return dict of Windows system decrypted LSA secrets."""
         if not self.target.ntversion:
             raise ValueError("Unable to determine Windows NT version")
 
         result = {}
-
-        reg_secrets = self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets")
-        for subkey in reg_secrets.subkeys():
+        for subkey in self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets").subkeys():
             enc_data = subkey.subkey("CurrVal").value("(Default)").value
 
             # Windows Vista or newer
@@ -105,7 +102,7 @@ class LSAPlugin(Plugin):
         """Yield decrypted LSA secrets from a Windows target."""
         for key, value in self._secrets.items():
             yield LSASecretRecord(
-                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets").subkeys().mapping.get(key).ts,
+                ts=self.target.registry.key(f"{self.SECURITY_POLICY_KEY}\\Secrets\\{key}").ts,
                 name=key,
                 value=value.hex(),
                 _target=self.target,
@@ -119,13 +116,13 @@ def _decrypt_aes(data: bytes, key: bytes) -> bytes:
         ctx.update(data[28:60])
 
     ciphertext = data[60:]
-    plaintext = b""
+    plaintext = []
 
     for i in range(0, len(ciphertext), 16):
-        cipher = AES.new(key=ctx.digest(), mode=AES.MODE_CBC, iv=b"\x00" * 16)
-        plaintext += cipher.decrypt(ciphertext[i : i + 16].ljust(16, b"\x00"))
+        cipher = AES.new(ctx.digest(), AES.MODE_CBC, iv=b"\x00" * 16)
+        plaintext.append(cipher.decrypt(ciphertext[i : i + 16].ljust(16, b"\x00")))
 
-    return plaintext
+    return b"".join(plaintext)
 
 
 def _decrypt_rc4(data: bytes, key: bytes) -> bytes:
@@ -140,9 +137,9 @@ def _decrypt_rc4(data: bytes, key: bytes) -> bytes:
 
 
 def _decrypt_des(data: bytes, key: bytes) -> bytes:
-    plaintext = b""
+    plaintext = []
 
-    enc_size = unpack("<I", data[:4])[0]
+    enc_size = int.from_bytes(data[:4], "little")
     data = data[len(data) - enc_size :]
 
     key0 = key
@@ -151,7 +148,7 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
         block_key = transform_key(key0[:7])
 
         cipher = DES.new(block_key, DES.MODE_ECB)
-        plaintext += cipher.decrypt(ciphertext)
+        plaintext.append(cipher.decrypt(ciphertext))
 
         key0 = key0[7:]
         data = data[8:]
@@ -159,7 +156,7 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
         if len(key0) < 7:
             key0 = key[len(key0) :]
 
-    return plaintext
+    return b"".join(plaintext)
 
 
 def transform_key(key: bytes) -> bytes:

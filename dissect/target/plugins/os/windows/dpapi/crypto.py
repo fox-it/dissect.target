@@ -126,26 +126,23 @@ class _DES3(CipherAlgorithm):
     block_length = 64 // 8
 
     def fixup_key(self, key: bytes) -> bytes:
-        nkey = bytearray()
+        nkey = []
         for byte in key:
             parity_bit = 0
             for i in range(8):
                 parity_bit ^= (byte >> i) & 1
 
-            if parity_bit == 0:
-                nkey.append(byte)
-            else:
-                nkey.append(byte | 1)
-        return bytes(nkey[0 : self.key_length])
+            nkey.append(byte if parity_bit == 0 else byte | 1)
+        return bytes(nkey[: self.key_length])
 
-    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+    def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
         if not HAS_CRYPTO:
             raise RuntimeError("Missing pycryptodome dependency")
 
         if len(key) != 24:
             raise ValueError(f"Invalid DES3 CBC key length {len(key)}")
 
-        cipher = DES3.new(key, mode=DES3.MODE_CBC, iv=iv if iv else b"\x00" * 8)
+        cipher = DES3.new(key, DES3.MODE_CBC, iv=iv if iv else b"\x00" * 8)
         return cipher.decrypt(data)
 
 

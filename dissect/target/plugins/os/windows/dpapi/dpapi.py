@@ -23,7 +23,7 @@ class DPAPIPlugin(InternalPlugin):
 
     __namespace__ = "dpapi"
 
-    MASTER_KEY_REGEX = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
+    RE_MASTER_KEY = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
     SYSTEM_USERNAME = "System"
 
     def __init__(self, target: Target):
@@ -96,7 +96,7 @@ class DPAPIPlugin(InternalPlugin):
 
             # Decrypt SYSTEM master key using the DPAPI_SYSTEM LSA secret.
             if username == self.SYSTEM_USERNAME:
-                if not self.target.lsa._secrets.get("DPAPI_SYSTEM"):
+                if "DPAPI_SYSTEM" not in self.target.lsa._secrets:
                     self.target.log.warning("Unable to decrypt SYSTEM master key: LSA secret missing")
                     continue
 
