@@ -2,7 +2,7 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.jumplist import JumpListPlugin
 from dissect.target.target import Target
 
-from ._utils import absolute_path
+from tests._utils import absolute_path
 
 
 def test_os_windows_jumplist(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
