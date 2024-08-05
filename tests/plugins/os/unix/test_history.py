@@ -5,6 +5,8 @@ import pytest
 from dissect.util.ts import from_unix
 from flow.record.fieldtypes import datetime as dt
 
+from dissect.target import Target
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.history import CommandHistoryPlugin
 
 
@@ -214,3 +216,22 @@ def test_commandhistory_database_history(target_unix_users, fs_unix, db_type, db
         assert results[i].command == line
         assert results[i].shell == db_type
         assert results[i].source.as_posix() == f"/root/{db_file}"
+
+
+def test_commandhistory_is_directory(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    commandhistory_data = """test"""
+
+    fs_unix.map_file_fh(
+        "/root/.zsh_history",
+        BytesIO(textwrap.dedent(commandhistory_data).encode()),
+    )
+
+    fs_unix.makedirs("/root/.bash_history")
+    results = list(target_unix_users.commandhistory())
+
+    assert len(results) == 1
+
+    assert results[0].ts is None
+    assert results[0].command == "test"
+    assert results[0].shell == "zsh"
+    assert results[0].source.as_posix() == "/root/.zsh_history"

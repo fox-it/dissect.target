@@ -41,6 +41,9 @@ class PfroPlugin(Plugin):
             - https://community.ccleaner.com/topic/49106-pending-file-rename-operations-log/
 
         Yields PfroRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.
