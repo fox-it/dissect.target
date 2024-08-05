@@ -98,7 +98,6 @@ class ConfigurationFilesystem(VirtualFilesystem):
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
-            # relative_path = fsutil.relpath(entry.path, self.root.top.path, alt_separator=self.alt_separator)
             return ConfigurationEntry(self, entry.path, entry, None)
 
         entry = self._convert_entry(entry, *args, **kwargs)
@@ -125,7 +124,6 @@ class ConfigurationFilesystem(VirtualFilesystem):
             # If a parsing error gets created, it should return the `entry`
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
-        # path = fsutil.relpath(self.root.top.path, entry.path, alt_separator=self.alt_separator)
         return ConfigurationEntry(self, entry.path, entry, config_parser)
 
 
@@ -266,8 +264,8 @@ class ConfigurationEntry(FilesystemEntry):
             raise NotADirectoryError()
 
         if self.parser_items is None and self.entry.is_dir():
-            for x in self.entry.scandir():
-                yield ConfigurationEntry(self.fs, x.name, x, None)
+            for entry in self.entry.scandir():
+                yield ConfigurationEntry(self.fs, entry.name, entry, None)
             return
 
         for key, values in self.parser_items.items():
