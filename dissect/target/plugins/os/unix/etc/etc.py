@@ -32,7 +32,6 @@ class EtcTree(ConfigurationTreePlugin):
         self, items: Union[ConfigurationEntry, dict], entry: Path, orig_path: Path, pattern: str
     ) -> Iterator[UnixConfigTreeRecord]:
         index = 0
-        config_entry = items
         if not isinstance(items, dict):
             items = items.as_dict()
 
