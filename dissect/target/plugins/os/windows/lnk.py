@@ -157,9 +157,6 @@ class LnkPlugin(Plugin):
             target_ctime (datetime): Creation time of the target (linked) file.
         """
 
-        # we need to get the active codepage from the system to properly decode some values
-        codepage = self.target.codepage or "ascii"
-
         for entry in self.lnk_entries(path):
             lnk_file = Lnk(entry.open())
             yield parse_lnk_file(self.target, lnk_file, entry)
