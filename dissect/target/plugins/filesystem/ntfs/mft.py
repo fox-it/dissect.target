@@ -107,7 +107,7 @@ COMPACT_RECORD_TYPES = {
 class MftPlugin(Plugin):
     def __init__(self, target):
         super().__init__(target)
-        self.ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
+        self.ntfs_filesystems = {index: fs for index, fs in enumerate(self.target.filesystems) if fs.__type__ == "ntfs"}
 
     def check_compatible(self) -> None:
         if not len(self.ntfs_filesystems):
@@ -148,8 +148,8 @@ class MftPlugin(Plugin):
         if fs is not None:
             try:
                 filesystem = self.ntfs_filesystems[fs]
-            except IndexError:
-                self.target.log.exception("%s does not have a filesystem with index number: %s", self.target, fs)
+            except KeyError:
+                self.target.log.error("NTFS filesystem with the index number (%s) does not exists", fs)
                 return
 
             yield from self.segments(filesystem, record_formatter, start, end)
