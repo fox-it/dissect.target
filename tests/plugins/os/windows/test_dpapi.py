@@ -158,7 +158,7 @@ def test_dpapi_decrypt_blob_win_10(
             identifier=None,
             provider="user",
         )
-        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, "user")
+        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, sid="S-1-5-21-1555088973-3915578919-3195617063-1003")
     elif user_type == "system":
         # test decrypting dpapi system blob
         decrypted = target_win.dpapi.decrypt_system_blob(enc_data)
@@ -282,7 +282,7 @@ def test_dpapi_decrypt_blob_win_7(
 
     if user_type == "user":
         # test decrypting dpapi blob using user DefaultPassword lsa secret
-        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, "user")
+        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, sid="S-1-5-21-2423314426-1454842194-222297899-1000")
 
     elif user_type == "system":
         # test decrypting dpapi blob using DPAPI_SYSTEM lsa secret
@@ -406,7 +406,7 @@ def test_dpapi_decrypt_blob_win_vista(
 
     if user_type == "user":
         # test decrypting dpapi blob using user DefaultPassword lsa secret
-        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, "user")
+        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, username="user")
     elif user_type == "system":
         # test decrypting dpapi blob using DPAPI_SYSTEM lsa secret
         decrypted = target_win.dpapi.decrypt_system_blob(enc_data)
@@ -506,7 +506,9 @@ def test_dpapi_decrypt_blob_win_xp(
     target_win.add_plugin(DPAPIPlugin)
 
     # make sure the user master key is decrypted without providing a password (empty keyprovider)
-    user_mk = target_win.dpapi.master_keys.get("user", {}).get("e1245b49-43d9-465f-b161-eab88c27620d")
+    user_mk = target_win.dpapi.master_keys.get("S-1-5-21-1960408961-57989841-725345543-1003", {}).get(
+        "e1245b49-43d9-465f-b161-eab88c27620d"
+    )
     assert isinstance(user_mk, MasterKeyFile)
     assert user_mk.decrypted
 
@@ -522,7 +524,7 @@ def test_dpapi_decrypt_blob_win_xp(
 
     if user_type == "user":
         # test decrypting dpapi blob using user master key
-        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, "user")
+        decrypted = target_win.dpapi.decrypt_user_blob(enc_data, username="user")
 
     elif user_type == "system":
         # test decrypting dpapi blob using DPAPI_SYSTEM lsa secret

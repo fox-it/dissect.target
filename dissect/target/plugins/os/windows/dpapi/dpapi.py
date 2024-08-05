@@ -24,7 +24,7 @@ class DPAPIPlugin(InternalPlugin):
     __namespace__ = "dpapi"
 
     RE_MASTER_KEY = re.compile("^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
-    SYSTEM_USERNAME = "System"
+    SYSTEM_SID = "S-1-5-18"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -43,21 +43,16 @@ class DPAPIPlugin(InternalPlugin):
         master_keys = {}
 
         # Search for SYSTEM master keys
-        #
-        # We assume there is no user named "System" as this username is reserved for the actual SYSTEM user.
-        # https://support.microsoft.com/en-us/help/909264#table-of-reserved-words
-        master_keys[self.SYSTEM_USERNAME] = {}
+        master_keys[self.SYSTEM_SID] = {}
 
-        system_master_key_path = self.target.fs.path("sysvol/Windows/System32/Microsoft/Protect/S-1-5-18")
+        system_master_key_path = self.target.fs.path(f"sysvol/Windows/System32/Microsoft/Protect/{self.SYSTEM_SID}")
         system_user_master_key_path = system_master_key_path.joinpath("User")
 
         for dir in [system_master_key_path, system_user_master_key_path]:
-            user_mks = self._load_master_keys_from_path(self.SYSTEM_USERNAME, dir)
-            master_keys[self.SYSTEM_USERNAME].update(user_mks)
+            user_mks = self._load_master_keys_from_path(self.SYSTEM_SID, dir)
+            master_keys[self.SYSTEM_SID].update(user_mks)
 
-        # Search for user master keys
-        #
-        # Generally located at $HOME/AppData/Roaming/Microsoft/Protect/{user_sid}/{mk_guid}
+        # Search for user master keys, generally located at $HOME/AppData/Roaming/Microsoft/Protect/{user_sid}/{mk_guid}
         PROTECT_DIRS = [
             # Windows Vista and newer
             "AppData/Roaming/Microsoft/Protect",
@@ -65,37 +60,33 @@ class DPAPIPlugin(InternalPlugin):
             "Application Data/Microsoft/Protect",
         ]
 
-        # TODO: We should probably identify users with their SID instead of username.
         for user in self.target.user_details.all_with_home():
-            master_keys.setdefault(user.user.name, {})
+            sid = user.user.sid
+            master_keys.setdefault(sid, {})
 
             for protect_dir in PROTECT_DIRS:
-                path = user.home_path.joinpath(protect_dir).joinpath(user.user.sid)
-                if user_mks := self._load_master_keys_from_path(user.user.name, path):
-                    master_keys[user.user.name] |= user_mks
+                path = user.home_path.joinpath(protect_dir).joinpath(sid)
+                if user_mks := self._load_master_keys_from_path(sid, path):
+                    master_keys[sid] |= user_mks
 
         return master_keys
 
-    @cached_property
-    def _users(self) -> dict[str, dict[str, str]]:
-        return {u.name: {"sid": u.sid} for u in self.target.users()}
-
-    def _load_master_keys_from_path(self, username: str, path: Path) -> Iterator[tuple[str, MasterKeyFile]]:
-        """Iterate over the provided ``path`` and search for master key files for the given user."""
+    def _load_master_keys_from_path(self, sid: str, path: Path) -> Iterator[tuple[str, MasterKeyFile]]:
+        """Iterate over the provided ``path`` and search for master key files for the given user SID."""
 
         if not path.exists():
             self.target.log.info(f"Unable to load master keys from path {path}: does not exist")
             return
 
         for file in path.iterdir():
-            if not self.MASTER_KEY_REGEX.findall(file.name):
+            if not self.RE_MASTER_KEY.findall(file.name):
                 continue
 
             with file.open() as fh:
                 mkf = MasterKeyFile(fh)
 
             # Decrypt SYSTEM master key using the DPAPI_SYSTEM LSA secret.
-            if username == self.SYSTEM_USERNAME:
+            if sid == self.SYSTEM_SID:
                 if "DPAPI_SYSTEM" not in self.target.lsa._secrets:
                     self.target.log.warning("Unable to decrypt SYSTEM master key: LSA secret missing")
                     continue
@@ -120,51 +111,63 @@ class DPAPIPlugin(InternalPlugin):
                 yield file.name, mkf
 
             # Decrypt user master key
-            elif user := self._users.get(username):
+            else:
                 # Iterate over every master key password we have from the keychain
                 for provider, mk_pass in self.keychain():
                     try:
-                        if mkf.decrypt_with_password(user["sid"], mk_pass):
+                        if mkf.decrypt_with_password(sid, mk_pass):
                             self.target.log.info(
-                                f"Decrypted user master key with password '{mk_pass}' from provider {provider}"
+                                "Decrypted user master key with password '%s' from provider %s", mk_pass, provider
                             )
                             break
                     except ValueError:
                         pass
 
                     try:
-                        if mkf.decrypt_with_hash(user["sid"], bytes.fromhex(mk_pass)):
+                        if mkf.decrypt_with_hash(sid, bytes.fromhex(mk_pass)):
                             self.target.log.info(
-                                f"Decrypted user master key with hash '{mk_pass}' from provider {provider}"
+                                "Decrypted SID %s master key with hash '%s' from provider %s", sid, mk_pass, provider
                             )
                             break
                     except ValueError:
                         pass
 
                 if not mkf.decrypted:
-                    self.target.log.warning(f"Could not decrypt master key '{file.name}' for username '{username}'")
+                    self.target.log.warning("Could not decrypt master key '%s' for SID '%s'", file.name, sid)
 
                 yield file.name, mkf
 
-            else:
-                self.target.log.warning(f"User does not exist on this target: {username}")
+    @cached_property
+    def _users(self) -> dict:
+        """Cached map of SID to username"""
+        return {user.name: user.sid for user in self.target.users()}
 
     def decrypt_system_blob(self, data: bytes) -> bytes:
         """Decrypt the given bytes using the SYSTEM master key."""
-        return self.decrypt_user_blob(data, self.SYSTEM_USERNAME)
+        return self.decrypt_user_blob(data, sid=self.SYSTEM_SID)
 
-    def decrypt_user_blob(self, data: bytes, username: str) -> bytes:
-        """Decrypt the given bytes using the master key of the given user."""
+    def decrypt_user_blob(self, data: bytes, username: str | None = None, sid: str | None = None) -> bytes:
+        """Decrypt the given bytes using the master key of the given SID or username."""
+
+        if not sid and not username:
+            raise ValueError("Either sid or username argument is required")
+
+        if not sid and username:
+            sid = self._users.get(username)
+
+        if not sid:
+            raise ValueError("No SID provided or no SID found")
+
         try:
             blob = DPAPIBlob(data)
         except EOFError as e:
             raise ValueError(f"Failed to parse DPAPI blob: {e}")
 
-        if not (mk := self.master_keys.get(username, {}).get(blob.guid)):
-            raise ValueError(f"Blob is encrypted using master key {blob.guid} that we do not have for user {username}")
+        if not (mk := self.master_keys.get(sid, {}).get(blob.guid)):
+            raise ValueError(f"Blob is encrypted using master key {blob.guid} that we do not have for SID {sid}")
 
         if not blob.decrypt(mk.key):
-            raise ValueError(f"Failed to decrypt blob for user {username}")
+            raise ValueError(f"Failed to decrypt blob for SID {sid}")
 
         return blob.clear_text
 
