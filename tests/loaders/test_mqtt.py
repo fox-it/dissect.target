@@ -114,7 +114,7 @@ def test_remote_loader_stream(
 ) -> None:
     from dissect.target.loaders.mqtt import Broker
 
-    broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1")
+    broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1", "user", "pass")
     broker.connect()
     broker.mqtt_client.fill_disks(disks)
     broker.mqtt_client.hostnames = hosts

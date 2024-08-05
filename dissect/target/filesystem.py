@@ -6,7 +6,6 @@ import logging
 import os
 import pathlib
 import stat
-import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Iterator, Optional, Type
 
@@ -66,15 +65,6 @@ class Filesystem:
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
-
-    @classmethod
-    @property
-    def __fstype__(cls) -> str:
-        warnings.warn(
-            "The __fstype__ attribute is deprecated and will be removed in dissect.target 3.15. Use __type__ instead",
-            category=DeprecationWarning,
-        )
-        return cls.__type__
 
     def path(self, *args) -> fsutil.TargetPath:
         """Instantiate a new path-like object on this filesystem."""

@@ -240,6 +240,33 @@ class Default(ConfigurationParser):
         self.parsed_data = information_dict
 
 
+class CSVish(Default):
+    """Parses CSV-ish config files (does not confirm to CSV standard!)"""
+
+    def __init__(self, *args, fields: tuple[str], **kwargs) -> None:
+        self.fields = fields
+        self.num_fields = len(self.fields)
+        self.maxsplit = self.num_fields - 1
+        super().__init__(*args, **kwargs)
+
+    def parse_file(self, fh: TextIO) -> None:
+        information_dict = {}
+
+        for i, raw_line in enumerate(self.line_reader(fh, strip_comments=True)):
+            line = raw_line.strip()
+            columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
+
+            if len(columns) < self.num_fields:
+                # keep unparsed lines separate (often env vars)
+                data = {"line": line}
+            else:
+                data = dict(zip(self.fields, columns))
+
+            information_dict[str(i)] = data
+
+        self.parsed_data = information_dict
+
+
 class Ini(ConfigurationParser):
     """Parses an ini file according using the built-in python ConfigParser"""
 
@@ -688,11 +715,12 @@ class ParserConfig:
     collapse_inverse: Optional[bool] = None
     separator: Optional[tuple[str]] = None
     comment_prefixes: Optional[tuple[str]] = None
+    fields: Optional[tuple[str]] = None
 
     def create_parser(self, options: Optional[ParserOptions] = None) -> ConfigurationParser:
         kwargs = {}
 
-        for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes"]:
+        for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes", "fields"]:
             value = getattr(options, field_name, None) or getattr(self, field_name)
             if value:
                 kwargs.update({field_name: value})
@@ -721,6 +749,7 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "toml": ParserConfig(Toml),
 }
 
+
 KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "ulogd.conf": ParserConfig(Ini),
     "sshd_config": ParserConfig(Indentation, separator=(r"\s",)),
@@ -730,6 +759,41 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
     "catalog": ParserConfig(Xml),
+    "fstab": ParserConfig(
+        CSVish,
+        separator=(r"\s",),
+        comment_prefixes=("#",),
+        fields=("device", "mount", "type", "options", "dump", "pass"),
+    ),
+    "crontab": ParserConfig(
+        CSVish,
+        separator=(r"\s",),
+        comment_prefixes=("#",),
+        fields=("minute", "hour", "day", "month", "weekday", "user", "command"),
+    ),
+    "shadow": ParserConfig(
+        CSVish,
+        separator=(r"\:",),
+        comment_prefixes=("#",),
+        fields=(
+            "username",
+            "password",
+            "lastchange",
+            "minpassage",
+            "maxpassage",
+            "warning",
+            "inactive",
+            "expire",
+            "rest",
+        ),
+    ),
+    "passwd": ParserConfig(
+        CSVish,
+        separator=(r"\:",),
+        comment_prefixes=("#",),
+        fields=("username", "password", "uid", "gid", "gecos", "homedir", "shell"),
+    ),
+    "mime.types": ParserConfig(CSVish, separator=(r"\s+",), comment_prefixes=("#",), fields=("name", "extensions")),
 }
 
 
@@ -748,12 +812,12 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
         FileNotFoundError: If the ``path`` is not a file.
     """
 
-    if not path.is_file(follow_symlinks=True):
-        raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
-
     entry = path
     if isinstance(path, TargetPath):
         entry = path.get()
+
+    if not entry.is_file(follow_symlinks=True):
+        raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
 
