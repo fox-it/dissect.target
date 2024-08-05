@@ -50,9 +50,7 @@ class EtcTree(ConfigurationTreePlugin):
             if fnmatch.fnmatch(path, pattern):
                 data = {
                     "_target": self.target,
-                    "source": self.target.fs.path(
-                        config_entry.entry.path if hasattr(config_entry, "entry") else orig_path
-                    ),
+                    "source": self.target.fs.path(orig_path),
                     "path": path,
                     "key": key,
                     "value": value,
@@ -72,7 +70,8 @@ class EtcTree(ConfigurationTreePlugin):
                 try:
                     config_object = self.get(str(Path(entry) / Path(item)))
                     if isinstance(config_object, ConfigurationEntry):
-                        yield from self._sub(config_object, Path(entry) / Path(item), Path(entry) / Path(item), pattern)
+                        orig_path = Path(entry) / Path(item)
+                        yield from self._sub(config_object, orig_path, orig_path, pattern)
                 except Exception:
                     self.target.log.warning("Could not open configuration item: %s", item)
                     pass
