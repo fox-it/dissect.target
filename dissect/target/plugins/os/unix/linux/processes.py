@@ -29,6 +29,9 @@ class ProcProcesses(Plugin):
         Each ``/proc/[pid]`` subdirectory contains various pseudo-files.
 
         Yields ProcProcessRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The start time of the process.

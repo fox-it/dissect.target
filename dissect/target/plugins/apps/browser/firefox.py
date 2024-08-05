@@ -3,6 +3,7 @@ import json
 import logging
 from base64 import b64decode
 from hashlib import pbkdf2_hmac, sha1
+from itertools import chain
 from typing import Iterator, Optional
 
 from dissect.sql import sqlite3
@@ -14,7 +15,7 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.plugin import export
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.browser.browser import (
     GENERIC_COOKIE_FIELDS,
     GENERIC_DOWNLOAD_RECORD_FIELDS,
@@ -24,7 +25,7 @@ from dissect.target.plugins.apps.browser.browser import (
     BrowserPlugin,
     try_idna,
 )
-from dissect.target.plugins.general.users import UserDetails
+from dissect.target.plugins.general.users import UserRecord
 
 try:
     from asn1crypto import algos, core
@@ -44,7 +45,10 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-FIREFOX_EXTENSION_RECORD_FIELDS = [("uri", "source_uri"), ("string[]", "optional_permissions")]
+FIREFOX_EXTENSION_RECORD_FIELDS = [
+    ("uri", "source_uri"),
+    ("string[]", "optional_permissions"),
+]
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +58,7 @@ class FirefoxPlugin(BrowserPlugin):
 
     __namespace__ = "firefox"
 
-    DIRS = [
+    USER_DIRS = [
         # Windows
         "AppData/Roaming/Mozilla/Firefox/Profiles",
         "AppData/local/Mozilla/Firefox/Profiles",
@@ -64,6 +68,10 @@ class FirefoxPlugin(BrowserPlugin):
         ".var/app/org.mozilla.firefox/.mozilla/firefox",
         # macOS
         "Library/Application Support/Firefox",
+    ]
+
+    SYSTEM_DIRS = [
+        "/data/data/org.mozilla.vrbrowser/files/mozilla",
     ]
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -79,7 +87,8 @@ class FirefoxPlugin(BrowserPlugin):
     )
 
     BrowserExtensionRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "browser/firefox/extension", GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS
+        "browser/firefox/extension",
+        GENERIC_EXTENSION_RECORD_FIELDS + FIREFOX_EXTENSION_RECORD_FIELDS,
     )
 
     BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -88,27 +97,32 @@ class FirefoxPlugin(BrowserPlugin):
 
     def __init__(self, target):
         super().__init__(target)
-        self.users_dirs: list[tuple[UserDetails, TargetPath]] = []
+        self.dirs: list[tuple[UserRecord, TargetPath]] = []
+
         for user_details in self.target.user_details.all_with_home():
-            for directory in self.DIRS:
+            for directory in self.USER_DIRS:
                 cur_dir = user_details.home_path.joinpath(directory)
                 if not cur_dir.exists():
                     continue
-                self.users_dirs.append((user_details, cur_dir))
+                self.dirs.append((user_details.user, cur_dir))
+
+        for directory in self.SYSTEM_DIRS:
+            if (cur_dir := target.fs.path(directory)).exists():
+                self.dirs.append((None, cur_dir))
 
     def check_compatible(self) -> None:
-        if not len(self.users_dirs):
+        if not len(self.dirs):
             raise UnsupportedPluginError("No Firefox directories found")
 
-    def _iter_profiles(self) -> Iterator[tuple[UserDetails, TargetPath, TargetPath]]:
+    def _iter_profiles(self) -> Iterator[tuple[UserRecord, TargetPath, TargetPath]]:
         """Yield user directories."""
-        for user, cur_dir in self.users_dirs:
+        for user, cur_dir in self.dirs:
             for profile_dir in cur_dir.iterdir():
                 if not profile_dir.is_dir():
                     continue
                 yield user, cur_dir, profile_dir
 
-    def _iter_db(self, filename: str) -> Iterator[tuple[UserDetails, SQLite3]]:
+    def _iter_db(self, filename: str) -> Iterator[tuple[UserRecord, SQLite3]]:
         """Yield opened history database files of all users.
 
         Args:
@@ -117,12 +131,24 @@ class FirefoxPlugin(BrowserPlugin):
         Yields:
             Opened SQLite3 databases.
         """
-        for user, cur_dir, profile_dir in self._iter_profiles():
-            db_file = profile_dir.joinpath(filename)
+        iter_system = ((None, system_dir, None) for user, system_dir in self.dirs if user is None)
+
+        for user, cur_dir, profile_dir in chain(iter_system, self._iter_profiles()):
+            if user is None and profile_dir is None:
+                db_file = cur_dir.parent.joinpath(filename)
+                # On some Android variants, some files may exist in the base directory (places.sqlite) but others
+                # in a nested profile directory (cookies.sqlite)
+                # /data/data/org.mozilla.vrbrowser/files/places.sqlite
+                # /data/data/org.mozilla.vrbrowser/files/mozilla/xxxxxx.default/cookies.sqlite
+                if not db_file.exists():
+                    continue
+            else:
+                db_file = profile_dir.joinpath(filename)
+
             try:
                 yield user, db_file, sqlite3.SQLite3(db_file.open())
             except FileNotFoundError:
-                self.target.log.warning("Could not find %s file: %s", filename, db_file)
+                self.target.log.info("Could not find %s file: %s", filename, db_file)
             except SQLError as e:
                 self.target.log.warning("Could not open %s file: %s", filename, db_file)
                 self.target.log.debug("", exc_info=e)
@@ -132,6 +158,9 @@ class FirefoxPlugin(BrowserPlugin):
         """Return browser history records from Firefox.
 
         Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -148,6 +177,11 @@ class FirefoxPlugin(BrowserPlugin):
             from_url (uri): URL of the "from" visit.
             source: (path): The source file of the history record.
         """
+        if self.target.os == OperatingSystem.ANDROID:
+            from_timestamp = from_unix_ms
+        else:
+            from_timestamp = from_unix_us
+
         for user, db_file, db in self._iter_db("places.sqlite"):
             try:
                 places = {row.id: row for row in db.table("moz_places").rows()}
@@ -164,7 +198,7 @@ class FirefoxPlugin(BrowserPlugin):
                         from_visit, from_place = None, None
 
                     yield self.BrowserHistoryRecord(
-                        ts=from_unix_us(row.visit_date),
+                        ts=from_timestamp(row.visit_date),
                         browser="firefox",
                         id=row.id,
                         url=try_idna(place.url),
@@ -180,7 +214,7 @@ class FirefoxPlugin(BrowserPlugin):
                         from_url=try_idna(from_place.url) if from_place else None,
                         source=db_file,
                         _target=self.target,
-                        _user=user.user,
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -193,6 +227,9 @@ class FirefoxPlugin(BrowserPlugin):
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
                 ts_last_accessed (datetime): Cookie last accessed timestamp.
@@ -222,7 +259,8 @@ class FirefoxPlugin(BrowserPlugin):
                         is_http_only=bool(cookie.isHttpOnly),
                         same_site=bool(cookie.sameSite),
                         source=db_file,
-                        _user=user.user,
+                        _target=self.target,
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing cookie file: %s", db_file, exc_info=e)
@@ -232,6 +270,9 @@ class FirefoxPlugin(BrowserPlugin):
         """Return browser download records from Firefox.
 
         Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
+
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.
@@ -245,7 +286,10 @@ class FirefoxPlugin(BrowserPlugin):
         for user, db_file, db in self._iter_db("places.sqlite"):
             try:
                 places = {row.id: row for row in db.table("moz_places").rows()}
-                attributes = {row.id: row.name for row in db.table("moz_anno_attributes").rows()}
+                if not (moz_anno_attributes := db.table("moz_anno_attributes")):
+                    continue
+
+                attributes = {row.id: row.name for row in moz_anno_attributes.rows()}
                 annotations = {}
 
                 for row in db.table("moz_annos"):
@@ -306,7 +350,7 @@ class FirefoxPlugin(BrowserPlugin):
                         state=state,
                         source=db_file,
                         _target=self.target,
-                        _user=user.user,
+                        _user=user,
                     )
             except SQLError as e:
                 self.target.log.warning("Error processing history file: %s", db_file, exc_info=e)
@@ -315,7 +359,10 @@ class FirefoxPlugin(BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Firefox.
 
-        Yields BrowserExtensionRecord with the following fields::
+        Yields BrowserExtensionRecord with the following fields:
+
+        .. code-block:: text
+
             ts_install (datetime): Extension install timestamp.
             ts_update (datetime): Extension update timestamp.
             browser (string): The browser from which the records are generated.
@@ -338,7 +385,9 @@ class FirefoxPlugin(BrowserPlugin):
 
             if not extension_file.exists():
                 self.target.log.warning(
-                    "No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir
+                    "No 'extensions.json' addon file found for user %s in directory %s",
+                    user.name,
+                    profile_dir,
                 )
                 continue
 
@@ -347,29 +396,31 @@ class FirefoxPlugin(BrowserPlugin):
 
                 for extension in extensions.get("addons", []):
                     yield self.BrowserExtensionRecord(
-                        ts_install=extension.get("installDate", 0) // 1000,
-                        ts_update=extension.get("updateDate", 0) // 1000,
+                        ts_install=from_unix_ms(extension.get("installDate", 0)),
+                        ts_update=from_unix_ms(extension.get("updateDate", 0)),
                         browser="firefox",
                         id=extension.get("id"),
-                        name=extension.get("defaultLocale", {}).get("name"),
+                        name=(extension.get("defaultLocale", {}) or {}).get("name"),
                         short_name=None,
                         default_title=None,
-                        description=extension.get("defaultLocale", {}).get("description"),
+                        description=(extension.get("defaultLocale", {}) or {}).get("description"),
                         version=extension.get("version"),
                         ext_path=extension.get("path"),
                         from_webstore=None,
-                        permissions=extension.get("userPermissions", {}).get("permissions"),
+                        permissions=(extension.get("userPermissions", {}) or {}).get("permissions"),
                         manifest_version=extension.get("manifestVersion"),
                         source_uri=extension.get("sourceURI"),
-                        optional_permissions=extension.get("optionalPermissions", {}).get("permissions"),
+                        optional_permissions=(extension.get("optionalPermissions", {}) or {}).get("permissions"),
                         source=extension_file,
                         _target=self.target,
-                        _user=user.user,
+                        _user=user,
                     )
 
             except FileNotFoundError:
                 self.target.log.info(
-                    "No 'extensions.json' addon file found for user %s in directory %s", user, profile_dir
+                    "No 'extensions.json' addon file found for user %s in directory %s",
+                    user.name,
+                    profile_dir,
                 )
             except json.JSONDecodeError:
                 self.target.log.warning(
@@ -397,7 +448,9 @@ class FirefoxPlugin(BrowserPlugin):
 
             if not login_file.exists():
                 self.target.log.warning(
-                    "No 'logins.json' password file found for user %s in directory %s", user, profile_dir
+                    "No 'logins.json' password file found for user %s in directory %s",
+                    user.name,
+                    profile_dir,
                 )
                 continue
 
@@ -432,9 +485,9 @@ class FirefoxPlugin(BrowserPlugin):
                             break
 
                     yield self.BrowserPasswordRecord(
-                        ts_created=login.get("timeCreated", 0) // 1000,
-                        ts_last_used=login.get("timeLastUsed", 0) // 1000,
-                        ts_last_changed=login.get("timePasswordChanged", 0) // 1000,
+                        ts_created=from_unix_ms(login.get("timeCreated", 0)),
+                        ts_last_used=from_unix_ms(login.get("timeLastUsed", 0)),
+                        ts_last_changed=from_unix_ms(login.get("timePasswordChanged", 0)),
                         browser="firefox",
                         id=login.get("id"),
                         url=login.get("hostname"),
@@ -444,14 +497,19 @@ class FirefoxPlugin(BrowserPlugin):
                         decrypted_password=decrypted_password,
                         source=login_file,
                         _target=self.target,
-                        _user=user.user,
+                        _user=user,
                     )
 
             except FileNotFoundError:
-                self.target.log.info("No password file found for user %s in directory %s", user, profile_dir)
+                self.target.log.info(
+                    "No password file found for user %s in directory %s",
+                    user.name,
+                    profile_dir,
+                )
             except json.JSONDecodeError:
                 self.target.log.warning(
-                    "logins.json file in directory %s is malformed, consider inspecting the file manually", profile_dir
+                    "logins.json file in directory %s is malformed, consider inspecting the file manually",
+                    profile_dir,
                 )
 
 

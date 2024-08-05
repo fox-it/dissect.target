@@ -1,9 +1,10 @@
 import logging
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional
 
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
+from flow.record import Record
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -54,7 +55,6 @@ FilesystemStdRecord = TargetRecordDescriptor(
     ],
 )
 
-
 FilesystemFilenameCompactRecord = TargetRecordDescriptor(
     "filesystem/ntfs/mft/filename/compact",
     [
@@ -91,6 +91,21 @@ FilesystemFilenameRecord = TargetRecordDescriptor(
     ],
 )
 
+FilesystemMACBRecord = TargetRecordDescriptor(
+    "filesystem/ntfs/mft/macb",
+    [
+        ("datetime", "ts"),
+        ("string", "macb"),
+        ("uint32", "filename_index"),
+        ("uint32", "segment"),
+        ("path", "path"),
+        ("string", "owner"),
+        ("filesize", "filesize"),
+        ("boolean", "resident"),
+        ("boolean", "inuse"),
+        ("string", "volume_uuid"),
+    ],
+)
 
 RECORD_TYPES = {
     InformationType.STANDARD_INFORMATION: FilesystemStdRecord,
@@ -125,7 +140,12 @@ class MftPlugin(Plugin):
     @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
-    def mft(self, compact: bool = False, fs: Optional[int] = None, start: int = 0, end: int = -1):
+    @arg(
+        "--macb",
+        action="store_true",
+        help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
+    )
+    def mft(self, compact: bool = False, fs: Optional[int] = None, start: int = 0, end: int = -1, macb: bool = False):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -140,10 +160,19 @@ class MftPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
         """
 
-        if compact:
+        record_formatter = formatter
+
+        def noaggr(records: list[Record]) -> Iterator[Record]:
+            yield from records
+
+        aggr = noaggr
+
+        if compact and macb:
+            raise ValueError("--macb and --compact are mutually exclusive")
+        elif compact:
             record_formatter = compacted_formatter
-        else:
-            record_formatter = formatter
+        elif macb:
+            aggr = macb_aggr
 
         if fs is not None:
             try:
@@ -152,12 +181,12 @@ class MftPlugin(Plugin):
                 self.target.log.error("NTFS filesystem with the index number (%s) does not exists", fs)
                 return
 
-            yield from self.segments(filesystem, record_formatter, start, end)
+            yield from self.segments(filesystem, record_formatter, aggr, start, end)
         else:
             for filesystem in self.ntfs_filesystems:
-                yield from self.segments(filesystem, record_formatter, start, end)
+                yield from self.segments(filesystem, record_formatter, aggr, start, end)
 
-    def segments(self, fs: NtfsFilesystem, record_formatter: Callable, start: int, end: int):
+    def segments(self, fs: NtfsFilesystem, record_formatter: Callable, aggr: Callable, start: int, end: int):
         # If this filesystem is a "fake" NTFS filesystem, used to enhance a
         # VirtualFilesystem, The driveletter (more accurate mount point)
         # returned will be that of the VirtualFilesystem. This makes sure
@@ -183,17 +212,19 @@ class MftPlugin(Plugin):
 
                     for path in record.full_paths():
                         path = f"{drive_letter}{path}"
-                        yield from self.mft_records(
-                            drive_letter=drive_letter,
-                            record=record,
-                            segment=record.segment,
-                            path=path,
-                            owner=owner,
-                            size=size,
-                            resident=resident,
-                            inuse=inuse,
-                            volume_uuid=volume_uuid,
-                            record_formatter=record_formatter,
+                        yield from aggr(
+                            self.mft_records(
+                                drive_letter=drive_letter,
+                                record=record,
+                                segment=record.segment,
+                                path=path,
+                                owner=owner,
+                                size=size,
+                                resident=resident,
+                                inuse=inuse,
+                                volume_uuid=volume_uuid,
+                                record_formatter=record_formatter,
+                            )
                         )
                 except Exception as e:
                     self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
@@ -291,3 +322,33 @@ def formatter(attr: Attribute, record_type: InformationType, **kwargs):
         ("A", attr.last_access_time),
     ]:
         yield record_desc(ts=timestamp, ts_type=type, **kwargs)
+
+
+def macb_aggr(records: list[Record]) -> Iterator[Record]:
+    def macb_set(bitfield, index, letter):
+        return bitfield[:index] + letter + bitfield[index + 1 :]
+
+    macbs = []
+    for record in records:
+        found = False
+
+        offset_std = int(record._desc.name == "filesystem/ntfs/mft/std") * 5
+        offset_ads = (int(record.ads) * 10) if offset_std == 0 else 0
+
+        field = "MACB".find(record.ts_type) + offset_std + offset_ads
+        for macb in macbs:
+            if macb.ts == record.ts:
+                macb.macb = macb_set(macb.macb, field, record.ts_type)
+                found = True
+                break
+
+        if found:
+            continue
+
+        macb = FilesystemMACBRecord.init_from_record(record)
+        macb.macb = "..../..../...."
+        macb.macb = macb_set(macb.macb, field, record.ts_type)
+
+        macbs.append(macb)
+
+    yield from macbs

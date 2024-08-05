@@ -147,7 +147,9 @@ class Cache:
             if os.access(cache_file, os.R_OK, effective_ids=bool(os.supports_effective_ids)):
                 if os.stat(cache_file).st_size != 0:
                     try:
-                        return self.open_reader(cache_file, output)
+                        reader = self.open_reader(cache_file, output)
+                        target.log.info("Using cache for function: %s", self.fname)
+                        return reader
                     except Exception as e:
                         target.log.warning("Cache will NOT be used. Error opening cache file: %s", cache_file)
                         target.log.debug("", exc_info=e)

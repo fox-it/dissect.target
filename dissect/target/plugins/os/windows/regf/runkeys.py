@@ -61,6 +61,9 @@ class RunKeysPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
 
         Yields RunKeyRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified timestamp.

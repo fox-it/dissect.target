@@ -8,7 +8,7 @@ import subprocess
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
-from typing import Any, BinaryIO, Iterator, Optional, TextIO
+from typing import Any, BinaryIO, Iterator, TextIO
 
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
@@ -17,9 +17,14 @@ from dissect.sql import sqlite3
 from dissect.target.helpers.fsutil import TargetPath
 
 try:
-    from dissect.hypervisor.util.envelope import Envelope, KeyStore
+    from dissect.hypervisor.util.envelope import (
+        HAS_PYCRYPTODOME,
+        HAS_PYSTANDALONE,
+        Envelope,
+        KeyStore,
+    )
 
-    HAS_ENVELOPE = True
+    HAS_ENVELOPE = HAS_PYCRYPTODOME or HAS_PYSTANDALONE
 except ImportError:
     HAS_ENVELOPE = False
 
@@ -68,9 +73,10 @@ class ESXiPlugin(UnixPlugin):
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
 
-    def _cfg(self, path: str) -> Optional[str]:
+    def _cfg(self, path: str) -> str | None:
         if not self._config:
-            raise ValueError("No ESXi config!")
+            self.target.log.warning("No ESXi config!")
+            return None
 
         value_name = path.strip("/").split("/")[-1]
         obj = _traverse(path, self._config)
@@ -81,7 +87,7 @@ class ESXiPlugin(UnixPlugin):
         return obj.get(value_name) if obj else None
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         bootbanks = [
             fs for fs in target.filesystems if fs.path("boot.cfg").exists() and list(fs.path("/").glob("*.v00"))
         ]
@@ -95,12 +101,12 @@ class ESXiPlugin(UnixPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> ESXiPlugin:
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
+        # Mount all the visor tars in individual filesystem layers
+        _mount_modules(target, sysvol, cfg)
+
         # Create a root layer for the "local state" filesystem
         # This stores persistent configuration data
         local_layer = target.fs.append_layer()
-
-        # Mount all the visor tars in individual filesystem layers
-        _mount_modules(target, sysvol, cfg)
 
         # Mount the local.tgz to the local state layer
         _mount_local(target, local_layer)
@@ -122,7 +128,7 @@ class ESXiPlugin(UnixPlugin):
         return "localhost"
 
     @export(property=True)
-    def domain(self) -> Optional[str]:
+    def domain(self) -> str | None:
         if hostname := self._cfg("/adv/Misc/HostName"):
             return hostname.partition(".")[2]
 
@@ -140,7 +146,7 @@ class ESXiPlugin(UnixPlugin):
         return list(result)
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         boot_cfg = self.target.fs.path("/bootbank/boot.cfg")
         if not boot_cfg.exists():
             return None
@@ -181,11 +187,11 @@ class ESXiPlugin(UnixPlugin):
         return self._configstore
 
     @export(property=True)
-    def os(self):
+    def os(self) -> str:
         return OperatingSystem.ESXI.value
 
 
-def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
+def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
     modules = [m.strip() for m in cfg["modules"].split("---")]
 
     for module in modules:
@@ -212,20 +218,22 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
             target.fs.append_layer().mount("/", tfs)
 
 
-def _mount_local(target: Target, local_layer: VirtualFilesystem):
+def _mount_local(target: Target, local_layer: VirtualFilesystem) -> None:
     local_tgz = target.fs.path("local.tgz")
+    local_tgz_ve = target.fs.path("local.tgz.ve")
     local_fs = None
 
     if local_tgz.exists():
         local_fs = tar.TarFilesystem(local_tgz.open())
-    else:
-        local_tgz_ve = target.fs.path("local.tgz.ve")
+    elif local_tgz_ve.exists():
         # In the case "encryption.info" does not exist, but ".#encryption.info" does
         encryption_info = next(target.fs.path("/").glob("*encryption.info"), None)
         if not local_tgz_ve.exists() or not encryption_info.exists():
             raise ValueError("Unable to find valid configuration archive")
 
         local_fs = _create_local_fs(target, local_tgz_ve, encryption_info)
+    else:
+        target.log.warning("No local.tgz or local.tgz.ve found, skipping local state")
 
     if local_fs:
         local_layer.mount("/", local_fs)
@@ -239,7 +247,7 @@ def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> 
     return local_tgz
 
 
-def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
+def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
     """Decrypt ``local.tgz.ve`` using ESXi ``crypto-util``.
 
     We write to stdout, but this results in ``crypto-util`` exiting with a non-zero return code
@@ -258,9 +266,7 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> Optional[BytesIO]:
     return BytesIO(result.stdout)
 
 
-def _create_local_fs(
-    target: Target, local_tgz_ve: TargetPath, encryption_info: TargetPath
-) -> Optional[tar.TarFilesystem]:
+def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: TargetPath) -> tar.TarFilesystem | None:
     local_tgz = None
 
     if HAS_ENVELOPE:
@@ -286,7 +292,7 @@ def _create_local_fs(
         return tar.TarFilesystem(local_tgz)
 
 
-def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
+def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
     version = cfg["build"]
 
     osdata_fs = None
@@ -365,7 +371,7 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]):
         target.fs.symlink(f"/vmfs/volumes/LOCKER-{locker_fs.vmfs.uuid}", "/locker")
 
 
-def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin):
+def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -> None:
     version = cfg["build"]
 
     # Don't really know how ESXi does this, but let's just take a shortcut for now
@@ -435,7 +441,7 @@ def parse_esx_conf(fh: TextIO) -> dict[str, Any]:
     return config
 
 
-def _traverse(path: str, obj: dict[str, Any], create: bool = False):
+def _traverse(path: str, obj: dict[str, Any], create: bool = False) -> dict[str, Any] | None:
     parts = path.strip("/").split("/")
     path_parts = parts[:-1]
     for part in path_parts:

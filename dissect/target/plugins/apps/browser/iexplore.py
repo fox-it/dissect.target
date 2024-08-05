@@ -131,6 +131,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser history records from Internet Explorer.
 
         Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -183,6 +186,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser downloads records from Internet Explorer.
 
         Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
+
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.

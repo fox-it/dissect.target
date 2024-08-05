@@ -21,7 +21,7 @@ class WindowsPlugin(OSPlugin):
         self.add_mounts()
 
         target.props["sysvol_drive"] = next(
-            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts["sysvol"] and mnt != "sysvol"),
+            (mnt for mnt, fs in target.fs.mounts.items() if fs is target.fs.mounts.get("sysvol") and mnt != "sysvol"),
             None,
         )
 
@@ -78,11 +78,14 @@ class WindowsPlugin(OSPlugin):
             self.target.log.warning("Failed to map drive letters")
             self.target.log.debug("", exc_info=e)
 
-        # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
-        if operator.countOf(self.target.fs.mounts.values(), self.target.fs.mounts["sysvol"]) == 1:
+        sysvol_drive = self.target.fs.mounts.get("sysvol")
+        if not sysvol_drive:
+            self.target.log.warning("No sysvol drive found")
+        elif operator.countOf(self.target.fs.mounts.values(), sysvol_drive) == 1:
+            # Fallback mount the sysvol to C: if we didn't manage to mount it to any other drive letter
             if "c:" not in self.target.fs.mounts:
                 self.target.log.debug("Unable to determine drive letter of sysvol, falling back to C:")
-                self.target.fs.mount("c:", self.target.fs.mounts["sysvol"])
+                self.target.fs.mount("c:", sysvol_drive)
             else:
                 self.target.log.warning("Unknown drive letter for sysvol")
 
@@ -244,13 +247,21 @@ class WindowsPlugin(OSPlugin):
         if any(map(lambda value: value is not None, version_parts.values())):
             version = []
 
-            prodcut_name = _part_str(version_parts, "ProductName")
-            version.append(prodcut_name)
-
             nt_version = _part_str(version_parts, "CurrentVersion")
+            build_version = _part_str(version_parts, "CurrentBuildNumber")
+            prodcut_name = _part_str(version_parts, "ProductName")
+
+            # CurrentBuildNumber >= 22000 on NT 10.0 indicates Windows 11.
+            # https://learn.microsoft.com/en-us/windows/release-health/windows11-release-information
+            try:
+                if nt_version == "10.0" and int(build_version) >= 22_000:
+                    prodcut_name = prodcut_name.replace("Windows 10", "Windows 11")
+            except ValueError:
+                pass
+
+            version.append(prodcut_name)
             version.append(f"(NT {nt_version})")
 
-            build_version = _part_str(version_parts, "CurrentBuildNumber")
             ubr = version_parts["UBR"]
             if ubr:
                 build_version = f"{build_version}.{ubr}"
