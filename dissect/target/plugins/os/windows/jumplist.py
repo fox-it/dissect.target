@@ -133,10 +133,9 @@ class CustomDestinationFile:
 
 
 class JumpListPlugin(NamespacePlugin):
-    """Jump List is a Windows feature introduced in Windows 7. It contains information about recently accessed
-    applications and files. There are two kind of Jump Lists. The AutomaticDestinations are created automatically
-    when a user opens an application or file. The CustomDestination is created when a user pins an application or
-        a file in a Jump List.
+    """Jump List is a Windows feature introduced in Windows 7.
+
+    It stores information about recently accessed applications and files.
 
     References:
         - https://forensics.wiki/jump_lists
@@ -175,7 +174,11 @@ class JumpListPlugin(NamespacePlugin):
 
     @export(record=JumpListRecord)
     def custom_destination(self) -> Iterator[JumpListRecord]:
-        """Return the content of custom destination Windows Jump Lists."""
+        """Return the content of custom destination Windows Jump Lists.
+
+        These are created when a user pins an application or a file in a Jump List.
+        """
+
         for destination, user in self.custom_destinations:
             fh = destination.open("rb")
 
@@ -205,7 +208,10 @@ class JumpListPlugin(NamespacePlugin):
 
     @export(record=JumpListRecord)
     def automatic_destination(self) -> Iterator[JumpListRecord]:
-        """Return the content of automatic destination Windows Jump Lists."""
+        """Return the content of automatic destination Windows Jump Lists.
+
+        These are created automatically when a user opens an application or file.
+        """
         for destination, user in self.automatic_destinations:
             fh = destination.open("rb")
 
