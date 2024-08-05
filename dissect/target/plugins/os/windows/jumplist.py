@@ -76,7 +76,7 @@ class AutomaticDestinationFile:
         self.ole = OLE(self.fh)
 
     def __iter__(self) -> Iterator[Lnk]:
-        for dir_name in self.ole.listdir():
+        for dir_name in self.ole.root.listdir():
             if dir_name == "DestList":
                 continue
 
