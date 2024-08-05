@@ -62,7 +62,7 @@ class EtcTree(ConfigurationTreePlugin):
 
     @export(record=UnixConfigTreeRecord)
     @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    @arg("--root", dest="root", required=False, default="/", type=str, help="Root of the filesystem to walk")
+    @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
     def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
         for entry, subs, items in self.config_fs.walk(root):
             for item in items:
