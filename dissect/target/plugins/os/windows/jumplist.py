@@ -59,11 +59,20 @@ c_custom_destination = cstruct()
 c_custom_destination.load(custom_destination_def)
 
 
+def parse_name(name: str) -> tuple[Any, str, str]:
+    application_id, application_type = name.split(".")
+    application_type = application_type.split("-")[0]
+    application_name = APPLICATION_IDENTIFIERS.get(application_id)
+
+    return application_name, application_id, application_type
+
+
 class AutomaticDestinationFile:
     """Parse Jump List AutomaticDestination file."""
 
-    def __init__(self, fh: BinaryIO):
+    def __init__(self, fh: BinaryIO, file_name: str):
         self.fh = fh
+        self.file_name = file_name
         self.ole = OLE(self.fh)
 
     def __iter__(self) -> Iterator[Lnk]:
@@ -83,6 +92,10 @@ class AutomaticDestinationFile:
                     log.debug("", exc_info=e)
                     continue
 
+    @property
+    def name(self) -> tuple[Any, str, str]:
+        return parse_name(self.file_name)
+
 
 class CustomDestinationFile:
     """Parse Jump List CustomDestination file."""
@@ -90,8 +103,9 @@ class CustomDestinationFile:
     MAGIC_FOOTER = 0xBABFFBAB
     VERSIONS = [2]
 
-    def __init__(self, fh: BinaryIO):
+    def __init__(self, fh: BinaryIO, file_name: str):
         self.fh = fh
+        self.file_name = file_name
 
         self.fh.seek(-4, io.SEEK_END)
         self.footer = c_custom_destination.footer(self.fh.read(4))
@@ -131,6 +145,10 @@ class CustomDestinationFile:
                 log.debug("", exc_info=e)
                 continue
 
+    @property
+    def name(self) -> tuple[Any, str, str]:
+        return parse_name(self.file_name)
+
 
 class JumpListPlugin(NamespacePlugin):
     """Jump List is a Windows feature introduced in Windows 7.
@@ -165,13 +183,6 @@ class JumpListPlugin(NamespacePlugin):
         if not any([self.automatic_destinations, self.custom_destinations]):
             raise UnsupportedPluginError("No Jump List files found")
 
-    def name(self, name: str) -> tuple[Any, str, str]:
-        application_id, application_type = name.split(".")
-        application_type = application_type.split("-")[0]
-        application_name = APPLICATION_IDENTIFIERS.get(application_id)
-
-        return application_name, application_id, application_type
-
     @export(record=JumpListRecord)
     def custom_destination(self) -> Iterator[JumpListRecord]:
         """Return the content of custom destination Windows Jump Lists.
@@ -183,13 +194,13 @@ class JumpListPlugin(NamespacePlugin):
             fh = destination.open("rb")
 
             try:
-                custom_destination = CustomDestinationFile(fh)
+                custom_destination = CustomDestinationFile(fh, destination.name)
             except Exception as e:
                 self.target.log.warning("Failed to parse CustomDestination header: %s", destination)
                 self.target.log.debug("", exc_info=e)
                 continue
 
-            application_name, application_id, application_type = self.name(destination.name)
+            application_name, application_id, application_type = custom_destination.name
 
             for lnk in custom_destination:
                 lnk = parse_lnk_file(self.target, lnk, destination)
@@ -215,16 +226,16 @@ class JumpListPlugin(NamespacePlugin):
         for destination, user in self.automatic_destinations:
             fh = destination.open("rb")
 
-            application_name, application_id, type = self.name(destination.name)
-
             try:
-                automatic_destination = AutomaticDestinationFile(fh)
+                automatic_destination = AutomaticDestinationFile(fh, destination.name)
             except OleError:
                 continue
             except Exception as e:
                 self.target.log.warning("Failed to parse AutomaticDestination file: %s", destination)
                 self.target.log.debug("", exc_info=e)
                 continue
+
+            application_name, application_id, type = automatic_destination.name
 
             for lnk in automatic_destination:
                 lnk = parse_lnk_file(self.target, lnk, destination)
