@@ -171,7 +171,7 @@ class ConfigurationParser:
         try:
             self.parse_file(fh)
         except Exception as e:
-            raise ConfigurationParsingError(*e.args) from e
+            raise ConfigurationParsingError(e.args) from e
 
         if self.collapse_all or self.collapse:
             self.parsed_data = self._collapse_dict(self.parsed_data)
