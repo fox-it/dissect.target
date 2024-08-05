@@ -1,5 +1,5 @@
 import logging
-from typing import Callable
+from typing import Callable, Optional
 
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
@@ -122,10 +122,10 @@ class MftPlugin(Plugin):
         ]
     )
     @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
-    @arg("--fs", type=int, default=-1, help="optional filesystem index, zero indexed")
+    @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
-    def mft(self, compact: bool = False, fs: int = -1, start: int = 0, end: int = -1):
+    def mft(self, compact: bool = False, fs: Optional[int] = None, start: int = 0, end: int = -1):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -145,7 +145,7 @@ class MftPlugin(Plugin):
         else:
             record_formatter = formatter
 
-        if fs:
+        if fs is not None:
             try:
                 filesystem = self.ntfs_filesystems[fs]
             except IndexError:
