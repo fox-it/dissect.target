@@ -15,6 +15,8 @@ from dissect.target.loaders.log import LogLoader
         ("/dir/*.evt*", None, "/dir/test.evtx", "/sysvol/windows/system32/winevt/logs/test.evtx"),
         ("/dir/*.evt*", None, "/dir/test.evt", "/sysvol/windows/system32/config/test.evt"),
         ("/source/iis.log", "log:///dir/with/files/*.log?hint=iis", "/source/iis.log", "/sysvol/files/logs/iis.log"),
+        ("/source/", "log://?path=/var/log", "/source/test.log", "/var/log/test.log"),
+        ("/source/test.log", "log://test.log?path=/var/log/test.log", "/source/test.log", "/var/log/test.log"),
     ],
 )
 def test_log_loader(target_default: Target, path: str, uri: str, input_file: str, expected_mapping: str) -> None:
