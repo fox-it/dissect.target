@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import urllib
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING
+from unittest.mock import Mock, patch
 
 import pytest
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.loaderutil import extract_path_info
+from dissect.target.helpers.loaderutil import (
+    add_virtual_ntfs_filesystem,
+    extract_path_info,
+)
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
@@ -36,6 +44,102 @@ from dissect.target.helpers.loaderutil import extract_path_info
     ],
 )
 def test_extract_path_info(
-    path: Path | str, expected: tuple[Optional[Path], Optional[urllib.parse.ParseResult[str]]]
+    path: Path | str, expected: tuple[Path | None, urllib.parse.ParseResult[str] | None]
 ) -> None:
     assert extract_path_info(path) == expected
+
+
+@pytest.mark.parametrize(
+    "boot, mft, expected_logs",
+    [
+        (None, None, []),
+        (
+            None,
+            False,
+            [
+                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+            ],
+        ),
+        (None, True, []),
+        (
+            False,
+            None,
+            [
+                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
+                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+            ],
+        ),
+        (
+            False,
+            False,
+            [
+                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
+                "Failed to load NTFS filesystem from <VirtualFilesystem> without $Boot file, skipping",
+            ],
+        ),
+        (
+            False,
+            True,
+            [
+                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
+            ],
+        ),
+        (
+            True,
+            None,
+            [
+                "Opened NTFS filesystem from <VirtualFilesystem> but could not find $MFT, skipping",
+            ],
+        ),
+        (
+            True,
+            False,
+            [
+                "Failed to load NTFS filesystem from <VirtualFilesystem>, retrying without $Boot file",
+                "Failed to load NTFS filesystem from <VirtualFilesystem> without $Boot file, skipping",
+            ],
+        ),
+        (True, True, []),
+    ],
+)
+def test_virtual_ntfs_resiliency(
+    boot: bool | None,
+    mft: bool | None,
+    expected_logs: list[str],
+    target_default: Target,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sentinels = {
+        None: None,
+        False: Mock(),
+        True: Mock(),
+    }
+
+    def _try_open(fs, path):
+        state = None
+        if path == "$Boot":
+            state = boot
+        elif path == "$MFT":
+            state = mft
+        return sentinels[state]
+
+    def NtfsFilesystem(boot=None, mft=None, **kwargs):
+        if boot is sentinels[False] or mft is sentinels[False]:
+            raise Exception("Oopsiewoopsie")
+
+        fake_ntfs = Mock()
+        fake_ntfs.ntfs.mft = None
+
+        if mft is sentinels[True]:
+            fake_ntfs.ntfs.mft = Mock()
+
+        return fake_ntfs
+
+    vfs = VirtualFilesystem()
+    with patch("dissect.target.helpers.loaderutil._try_open", new=_try_open), patch(
+        "dissect.target.helpers.loaderutil.NtfsFilesystem", new=NtfsFilesystem
+    ):
+        add_virtual_ntfs_filesystem(target_default, vfs)
+
+    assert caplog.messages == expected_logs
+    assert hasattr(vfs, "ntfs") == (True if mft else False)
