@@ -58,6 +58,7 @@ try:
 except ImportError:
     # Readline is not available on Windows
     log.warning("Readline module is not available")
+    readline = None
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
@@ -116,6 +117,21 @@ class TargetCmd(cmd.Cmd):
         self.target = target
         self.debug = False
         self.identchars += "."
+
+        self.DEFAULT_HISTFILE = "~/.dissect_history"
+        self.DEFAULT_HISTFILESIZE = 10_000
+
+        self.HISTFILE = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
+        self.HISTFILESIZE = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
+
+    def preloop(self) -> None:
+        if readline and self.HISTFILE.exists():
+            readline.read_history_file(self.HISTFILE)
+
+    def postloop(self) -> None:
+        if readline:
+            readline.set_history_length(self.HISTFILESIZE)
+            readline.write_history_file(self.HISTFILE)
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
