@@ -344,7 +344,7 @@ class Target:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
             except Exception:
                 self.log.exception(
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
