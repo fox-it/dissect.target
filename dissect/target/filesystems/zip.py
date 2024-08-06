@@ -63,10 +63,7 @@ class ZipFilesystem(Filesystem):
             if decode_name:
                 rel_name = unquote(rel_name)
 
-            try:
-                self._fs.map_file_entry(rel_name, file_entry)
-            except Exception:
-                log.warning("Failed to map %s into VFS", file_entry)
+            self._fs.map_file_entry(rel_name, file_entry)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
