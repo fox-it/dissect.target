@@ -138,8 +138,8 @@ class DPAPIPlugin(InternalPlugin):
                 yield file.name, mkf
 
     @cached_property
-    def _users(self) -> dict:
-        """Cached map of SID to username"""
+    def _users(self) -> dict[str, str]:
+        """Cached map of username to SID."""
         return {user.name: user.sid for user in self.target.users()}
 
     def decrypt_system_blob(self, data: bytes) -> bytes:

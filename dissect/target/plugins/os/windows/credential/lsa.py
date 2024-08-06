@@ -145,7 +145,7 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
     key0 = key
     for _ in range(0, len(data), 8):
         ciphertext = data[:8]
-        block_key = transform_key(key0[:7])
+        block_key = _transform_key(key0[:7])
 
         cipher = DES.new(block_key, DES.MODE_ECB)
         plaintext.append(cipher.decrypt(ciphertext))
@@ -159,7 +159,7 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
     return b"".join(plaintext)
 
 
-def transform_key(key: bytes) -> bytes:
+def _transform_key(key: bytes) -> bytes:
     new_key = []
     new_key.append(((key[0] >> 0x01) << 1) & 0xFE)
     for i in range(0, 6):
