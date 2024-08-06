@@ -114,3 +114,7 @@ class RegistryCorruptError(RegistryError):
 
 class ConfigurationParsingError(Error):
     """An error occurred during configuration parsing."""
+
+
+class TargetPathNotFoundError(TargetError):
+    """The path to the target does not exist."""

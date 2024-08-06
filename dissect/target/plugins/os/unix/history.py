@@ -52,7 +52,7 @@ class CommandHistoryPlugin(Plugin):
         for user_details in self.target.user_details.all_with_home():
             for shell, history_relative_path in self.COMMAND_HISTORY_RELATIVE_PATHS:
                 history_path = user_details.home_path.joinpath(history_relative_path)
-                if history_path.exists():
+                if history_path.is_file():
                     history_files.append((shell, history_path, user_details.user))
         return history_files
 

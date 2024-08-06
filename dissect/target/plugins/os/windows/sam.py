@@ -9,14 +9,14 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_sam_def = """
+sam_def = """
 struct user_F {
   char      unknown1[8];
   uint64    t_last_login;           /* Time of last login */
@@ -166,7 +166,7 @@ struct DOMAIN_ACCOUNT_F {
   uint16 min_password_length;               /* 0x50 */
   uint16 password_history_length;           /* 0x52 */
   uint16 lockout_threshold;                 /* 0x54 */
-  uint16 unknown1_1;                        /* 0x56 */
+  uint16 unknown1_3;                        /* 0x56 */
   uint32 server_state;                      /* 0x58 */
   uint16 server_role;                       /* 0x5c */
   uint16 uas_compability_required;          /* 0x5e */
@@ -207,8 +207,7 @@ struct SAM_HASH_AES {  /* size: >=24 */
 };
 """
 
-c_sam = cstruct.cstruct()
-c_sam.load(c_sam_def)
+c_sam = cstruct().load(sam_def)
 
 SamRecord = TargetRecordDescriptor(
     "windows/registry/sam",
@@ -356,6 +355,9 @@ class SamPlugin(Plugin):
             - https://en.wikipedia.org/wiki/Security_Account_Manager
 
         Yields SamRecords with fields:
+
+        .. code-block:: text
+
             rid (uint32): The RID.
             fullname (string): Parsed fullname.
             username (string): Parsed username.

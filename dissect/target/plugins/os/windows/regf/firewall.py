@@ -26,6 +26,9 @@ class FirewallPlugin(Plugin):
         HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules registry key.
 
         Yields dynamic records with usually the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             key (string): The rule key name.

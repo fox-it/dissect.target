@@ -155,6 +155,9 @@ class WindowsErrorReportingPlugin(Plugin):
 
         Yields dynamically created records based on the fields in the files. A record at least contains the following
         fields:
+
+        .. code-block:: text
+
             ts (datetime): The moment in time when the error event took place.
             version (string): WER file version.
             event_type (string): WER file event type.

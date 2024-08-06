@@ -16,7 +16,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import traceback
 from contextlib import contextmanager
 from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
 
@@ -33,13 +32,15 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import arg
+from dissect.target.plugin import PluginFunction, arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
+    execute_function_on_target,
+    find_and_filter_plugins,
     generate_argparse_for_bound_method,
     process_generic_arguments,
 )
@@ -113,6 +114,8 @@ class TargetCmd(cmd.Cmd):
     def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
+        self.debug = False
+        self.identchars += "."
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -153,8 +156,8 @@ class TargetCmd(cmd.Cmd):
         except AttributeError:
             pass
 
-        if self.target.has_function(command):
-            return self._exec_target(command, command_args_str)
+        if plugins := list(find_and_filter_plugins(self.target, command, [])):
+            return self._exec_target(plugins, command_args_str)
 
         return cmd.Cmd.default(self, line)
 
@@ -179,25 +182,22 @@ class TargetCmd(cmd.Cmd):
             lexer.whitespace_split = True
             argparts = list(lexer)
 
-        try:
-            if "|" in argparts:
-                pipeidx = argparts.index("|")
-                argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
-                try:
-                    with build_pipe_stdout(pipeparts) as pipe_stdin:
-                        return func(argparts, pipe_stdin)
-                except OSError as e:
-                    # in case of a failure in a subprocess
-                    print(e)
-            else:
-                ctx = contextlib.nullcontext()
-                if self.target.props.get("cyber") and not no_cyber:
-                    ctx = cyber.cyber(color=None, run_at_end=True)
+        if "|" in argparts:
+            pipeidx = argparts.index("|")
+            argparts, pipeparts = argparts[:pipeidx], argparts[pipeidx + 1 :]
+            try:
+                with build_pipe_stdout(pipeparts) as pipe_stdin:
+                    return func(argparts, pipe_stdin)
+            except OSError as e:
+                # in case of a failure in a subprocess
+                print(e)
+        else:
+            ctx = contextlib.nullcontext()
+            if self.target.props.get("cyber") and not no_cyber:
+                ctx = cyber.cyber(color=None, run_at_end=True)
 
-                with ctx:
-                    return func(argparts, sys.stdout)
-        except IOError:
-            pass
+            with ctx:
+                return func(argparts, sys.stdout)
 
     def _exec_command(self, command: str, command_args_str: str) -> Optional[bool]:
         """Command execution helper for ``cmd_`` commands."""
@@ -215,24 +215,15 @@ class TargetCmd(cmd.Cmd):
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
 
-    def _exec_target(self, func: str, command_args_str: str) -> Optional[bool]:
+    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
-        attr = self.target
-        for part in func.split("."):
-            attr = getattr(attr, part)
 
         def _exec_(argparts: list[str], stdout: TextIO) -> Optional[bool]:
-            if callable(attr):
-                argparser = generate_argparse_for_bound_method(attr)
-                try:
-                    args = argparser.parse_args(argparts)
-                except SystemExit:
-                    return False
-                value = attr(**vars(args))
-            else:
-                value = attr
+            try:
+                output, value, _ = execute_function_on_target(self.target, func, argparts)
+            except SystemExit:
+                return False
 
-            output = getattr(attr, "__output__", "default")
             if output == "record":
                 # if the command results are piped to another process,
                 # the process will receive Record objects
@@ -253,10 +244,16 @@ class TargetCmd(cmd.Cmd):
             else:
                 print(value, file=stdout)
 
-        try:
-            return self._exec(_exec_, command_args_str)
-        except PluginError:
-            traceback.print_exc()
+        result = None
+        for func in funcs:
+            try:
+                result = self._exec(_exec_, command_args_str)
+            except PluginError as err:
+                if self.debug:
+                    raise err
+                self.target.log.error(err)
+
+        return result
 
     def do_python(self, line: str) -> Optional[bool]:
         """drop into a Python shell"""
@@ -278,6 +275,14 @@ class TargetCmd(cmd.Cmd):
     def do_exit(self, line: str) -> Optional[bool]:
         """exit shell"""
         return True
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -1241,7 +1246,12 @@ def run_cli(cli: cmd.Cmd) -> None:
             print()
             pass
         except Exception as e:
-            log.exception(e)
+            if cli.debug:
+                log.exception(e)
+            else:
+                log.info(e)
+                print(f"*** Unhandled error: {e}")
+                print("If you wish to see the full debug trace, enable debug mode.")
             pass
 
 
