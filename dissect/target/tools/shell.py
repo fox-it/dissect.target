@@ -131,7 +131,6 @@ class TargetCmd(cmd.Cmd):
             self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
                 self.histdirfmt.format(uid=os.getuid(), target=target.name)
             )
-
         else:
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
