@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import Optional, Union
 
 try:
     from Crypto.Cipher import AES, ARC4, DES3
@@ -11,8 +10,8 @@ try:
 except ImportError:
     HAS_CRYPTO = False
 
-CIPHER_ALGORITHMS: dict[Union[int, str], CipherAlgorithm] = {}
-HASH_ALGORITHMS: dict[Union[int, str], HashAlgorithm] = {}
+CIPHER_ALGORITHMS: dict[int | str, CipherAlgorithm] = {}
+HASH_ALGORITHMS: dict[int | str, HashAlgorithm] = {}
 
 
 class CipherAlgorithm:
@@ -65,7 +64,7 @@ class CipherAlgorithm:
 
         return self.decrypt(data, key, iv)
 
-    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+    def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
         raise NotImplementedError()
 
 
@@ -76,7 +75,7 @@ class _AES(CipherAlgorithm):
     iv_length = 128 // 8
     block_length = 128 // 8
 
-    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+    def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
         if not HAS_CRYPTO:
             raise RuntimeError("Missing pycryptodome dependency")
 
@@ -110,7 +109,7 @@ class _RC4(CipherAlgorithm):
     iv_length = 128 // 8
     block_length = 1 // 8
 
-    def decrypt(self, data: bytes, key: bytes, iv: Optional[bytes] = None) -> bytes:
+    def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
         if not HAS_CRYPTO:
             raise RuntimeError("Missing pycryptodome dependency")
 
@@ -161,7 +160,7 @@ class HashAlgorithm:
         return HASH_ALGORITHMS[id]()
 
     @classmethod
-    def from_name(cls, name: str) -> Optional[HashAlgorithm]:
+    def from_name(cls, name: str) -> HashAlgorithm | None:
         return HASH_ALGORITHMS[name]()
 
 
@@ -235,12 +234,12 @@ def dpapi_hmac(pwd_hash: bytes, hmac_salt: bytes, value: bytes, hash_algorithm: 
 
 def crypt_session_key_type1(
     master_key: bytes,
-    nonce: Optional[bytes],
+    nonce: bytes | None,
     hash_algorithm: HashAlgorithm,
-    entropy: Optional[bytes] = None,
-    strong_password: Optional[str] = None,
-    smart_card_secret: Optional[bytes] = None,
-    verify_blob: Optional[bytes] = None,
+    entropy: bytes | None = None,
+    strong_password: str | None = None,
+    smart_card_secret: bytes | None = None,
+    verify_blob: bytes | None = None,
 ) -> bytes:
     """Computes the decryption key for Type1 DPAPI blob, given the master key and optional information.
 
@@ -297,10 +296,10 @@ def crypt_session_key_type2(
     masterkey: bytes,
     nonce: bytes,
     hash_algorithm: HashAlgorithm,
-    entropy: Optional[bytes] = None,
-    strong_password: Optional[str] = None,
-    smart_card_secret: Optional[bytes] = None,
-    verify_blob: Optional[bytes] = None,
+    entropy: bytes | None = None,
+    strong_password: str | None = None,
+    smart_card_secret: bytes | None = None,
+    verify_blob: bytes | None = None,
 ) -> bytes:
     """Computes the decryption key for Type2 DPAPI blob, given the masterkey and optional information.
 

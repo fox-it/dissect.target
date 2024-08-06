@@ -99,18 +99,6 @@ def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
     }
 
 
-def test_lsa_secrets_win_7(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows 7 system"""
-    # NOTE: Implicitly tested by ``test_dpapi_decrypt_blob_win_vista``
-    pass
-
-
-def test_lsa_secrets_win_vista(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows Vista system"""
-    # NOTE: Implicitly tested by ``test_dpapi_decrypt_blob_win_7``
-    pass
-
-
 def test_lsa_secrets_win_xp(target_win: Target, hive_hklm: VirtualHive) -> None:
     """test decrypting LSA secrets of a Windows XP system"""
 
