@@ -48,6 +48,15 @@ class ZipFilesystem(Filesystem):
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
+        self.map_members(decode_name)
+
+    @staticmethod
+    def _detect(fh: BinaryIO) -> bool:
+        """Detect a zip file on a given file-like object."""
+        return zipfile.is_zipfile(fh)
+
+    def map_members(self, decode_name: bool) -> None:
+        """Map members of the zip file into the VFS."""
         for member in self.zip.infolist():
             mname = member.filename.strip("/")
             if not mname.startswith(self.base) or mname == ".":
@@ -65,10 +74,6 @@ class ZipFilesystem(Filesystem):
 
             self._fs.map_file_entry(rel_name, file_entry)
 
-    @staticmethod
-    def _detect(fh: BinaryIO) -> bool:
-        """Detect a zip file on a given file-like object."""
-        return zipfile.is_zipfile(fh)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
