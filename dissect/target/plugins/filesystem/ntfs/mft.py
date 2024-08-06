@@ -178,7 +178,7 @@ class MftPlugin(Plugin):
             try:
                 filesystem = self.ntfs_filesystems[fs]
             except KeyError:
-                self.target.log.error("NTFS filesystem with the index number (%s) does not exists", fs)
+                self.target.log.error("NTFS filesystem with index number %s does not exist", fs)
                 return
 
             yield from self.segments(filesystem, record_formatter, aggr, start, end)
