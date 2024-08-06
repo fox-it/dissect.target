@@ -87,11 +87,13 @@ class VelociraptorLoader(DirLoader):
         super().__init__(path)
 
         if path.suffix == ".zip":
-            log.warning(
-                f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
-                "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
-            )
             self.root = zipfile.Path(path)
+            compression_type = zipfile.ZipFile(str(path)).getinfo("uploads.json").compress_type
+            if compression_type > 0:
+                log.warning(
+                    f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
+                    "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
+                )
         else:
             self.root = path
 
@@ -117,13 +119,10 @@ class VelociraptorLoader(DirLoader):
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
         if os_type == OperatingSystem.WINDOWS:
-            # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
-            map_dirs(
-                target,
-                dirs,
-                os_type,
-                usnjrnl_path="$Extend/$UsnJrnl%3A$J",
-                sds_path="$Secure%3A$SDS",
-            )
+            if self.path.suffix == ".zip":
+                map_dirs(target, dirs, os_type, decode_name=True)
+            else:
+                # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
+                map_dirs(target, dirs, os_type, usnjrnl_path="$Extend/$UsnJrnl%3A$J", sds_path="$Secure%3A$SDS")
         else:
-            map_dirs(target, dirs, os_type)
+            map_dirs(target, dirs, os_type, decode_name=True)
