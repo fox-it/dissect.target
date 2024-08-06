@@ -112,26 +112,37 @@ class TargetCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
 
+    DEFAULT_HISTFILE = "~/.dissect_history"
+    DEFAULT_HISTFILESIZE = 10_000
+    DEFAULT_HISTDIR = None
+    DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+
     def __init__(self, target: Target):
         cmd.Cmd.__init__(self)
         self.target = target
         self.debug = False
         self.identchars += "."
 
-        self.DEFAULT_HISTFILE = "~/.dissect_history"
-        self.DEFAULT_HISTFILESIZE = 10_000
+        self.histfilesize = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
+        self.histdir = getattr(target._config, "HISTDIR", self.DEFAULT_HISTDIR)
 
-        self.HISTFILE = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
-        self.HISTFILESIZE = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
+        if self.histdir:
+            self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
+            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
+                self.histdirfmt.format(uid=os.getuid(), target=target.name)
+            )
+
+        else:
+            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
     def preloop(self) -> None:
-        if readline and self.HISTFILE.exists():
-            readline.read_history_file(self.HISTFILE)
+        if readline and self.histfile.exists():
+            readline.read_history_file(self.histfile)
 
     def postloop(self) -> None:
         if readline:
-            readline.set_history_length(self.HISTFILESIZE)
-            readline.write_history_file(self.HISTFILE)
+            readline.set_history_length(self.histfilesize)
+            readline.write_history_file(self.histfile)
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -1257,10 +1268,15 @@ def run_cli(cli: cmd.Cmd) -> None:
             # Print an empty newline on exit
             print()
             return
+
         except KeyboardInterrupt:
             # Add a line when pressing ctrl+c, so the next one starts at a new line
             print()
-            pass
+
+        except PermissionError as e:
+            log.error(e)
+            break
+
         except Exception as e:
             if cli.debug:
                 log.exception(e)
@@ -1268,7 +1284,6 @@ def run_cli(cli: cmd.Cmd) -> None:
                 log.info(e)
                 print(f"*** Unhandled error: {e}")
                 print("If you wish to see the full debug trace, enable debug mode.")
-            pass
 
 
 @catch_sigpipe
