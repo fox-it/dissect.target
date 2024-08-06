@@ -1,19 +1,28 @@
+from __future__ import annotations
+
 import textwrap
 from io import StringIO
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import pytest
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
     ConfigurationParser,
+    CSVish,
     Default,
     Indentation,
     Json,
     ScopeManager,
     SystemD,
+    parse,
 )
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target import Target
+    from dissect.target.filesystem import VirtualFilesystem
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs) -> dict:
@@ -258,3 +267,40 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
     parser.parse_file(StringIO(data_string))
 
     assert parser.parsed_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "fields, separator, comment, data_string, expected_data",
+    [
+        (["a", "b"], (r"\s+",), ("#",), "1 2", {"0": {"a": "1", "b": "2"}}),  # SSV
+        (["a", "b"], (r"\s+",), ("#",), "1 2\n3 4", {"0": {"a": "1", "b": "2"}, "1": {"a": "3", "b": "4"}}),  # SSV-2
+        (["a", "b"], (r"\s+",), ("#",), "1\t2", {"0": {"a": "1", "b": "2"}}),  # TSV
+        (["a", "b"], (r",",), ("#",), "1,2", {"0": {"a": "1", "b": "2"}}),  # CSV
+        (["a", "b"], (r"\|",), ("#",), "1|2", {"0": {"a": "1", "b": "2"}}),  # DSV
+        (["a", "b"], (r"\|",), ("#",), "#9|9\n1|2", {"0": {"a": "1", "b": "2"}}),  # comments
+        (["a", "b"], (r"\s+",), ("#",), "#9 9\n1 2 3", {"0": {"a": "1", "b": "2 3"}}),  # trailing column
+        (["a", "b"], (r"\s+",), ("#",), "x", {"0": {"line": "x"}}),  # unparsed
+    ],
+)
+def test_csv_syntax(fields, separator, comment, data_string: str, expected_data: dict) -> None:
+    parser = CSVish(fields=fields, separator=separator, comment_prefixes=comment)
+    parser.parse_file(StringIO(data_string))
+    assert parser.parsed_data == expected_data
+
+
+def test_parse(target_linux: Target, fs_linux: VirtualFilesystem, tmp_path: Path) -> None:
+    # File does not exist on the system in the first place
+    with pytest.raises(FileNotFoundError):
+        parse(target_linux.fs.path("/path/to/file"))
+
+    file_path = tmp_path.joinpath("path/to/file")
+    file_path.parent.mkdir(parents=True)
+    file_path.touch()
+
+    fs_linux.map_dir("/", tmp_path.absolute())
+
+    # Trying to read a directory
+    with pytest.raises(FileNotFoundError):
+        parse(target_linux.fs.path("/path/to"))
+
+    parse(target_linux.fs.path("/path/to/file"))
