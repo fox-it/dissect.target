@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator
 
 from dissect.ntfs.attr import Attribute
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
@@ -145,7 +145,7 @@ class MftPlugin(Plugin):
         action="store_true",
         help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
     )
-    def mft(self, compact: bool = False, fs: Optional[int] = None, start: int = 0, end: int = -1, macb: bool = False):
+    def mft(self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False):
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
