@@ -75,7 +75,7 @@ class DPAPIPlugin(InternalPlugin):
         """Iterate over the provided ``path`` and search for master key files for the given user SID."""
 
         if not path.exists():
-            self.target.log.info(f"Unable to load master keys from path {path}: does not exist")
+            self.target.log.info("Unable to load master keys from path as it does not exist: %s", path)
             return
 
         for file in path.iterdir():
