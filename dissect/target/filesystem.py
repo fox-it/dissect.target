@@ -1152,6 +1152,9 @@ class VirtualFilesystem(Filesystem):
 
             directory = directory[part]
 
+            if not isinstance(directory, VirtualDirectory):
+                raise NotADirectoryError(f"'{directory}' is not a directory")
+
         return directory
 
     def map_fs(self, vfspath: str, fs: Filesystem) -> None:

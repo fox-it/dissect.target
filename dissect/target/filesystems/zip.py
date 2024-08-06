@@ -8,7 +8,7 @@ from typing import BinaryIO, Optional
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import (
     Filesystem,
     FilesystemEntry,
@@ -57,7 +57,12 @@ class ZipFilesystem(Filesystem):
 
             entry_cls = ZipFilesystemDirectoryEntry if member.is_dir() else ZipFilesystemEntry
             file_entry = entry_cls(self, rel_name, member)
-            self._fs.map_file_entry(rel_name, file_entry)
+
+            try:
+                self._fs.map_file_entry(rel_name, file_entry)
+            except NotADirectoryError:
+                log.warning(f"'{member.filename}' is part of a symbolic link, which is not supported")
+                continue
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
