@@ -26,11 +26,10 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
                 fs.exists("/var")
                 and fs.exists("/etc")
                 and fs.exists("/opt")
-                or (fs.exists("/sys") or fs.exists("/proc"))
-                and not fs.exists("/Library")
+                or (fs.exists("/proc") or fs.exists("/sys"))
             ):
-                return fs
-        return None
+                if not (fs.exists("/windows") or fs.exists("/$MFT")) and not fs.exists("/Library"):
+                    return fs
 
     @export(property=True)
     def ips(self) -> list[str]:

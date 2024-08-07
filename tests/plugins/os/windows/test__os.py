@@ -1,11 +1,15 @@
-from typing import Any, Optional
+import pathlib
+from typing import Any, Iterator, Optional
 
 import pytest
 
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
+from tests.conftest import make_mock_target
 
 
 def current_version_key() -> str:
@@ -29,6 +33,17 @@ def version_target(target_win: Target) -> Target:
 @pytest.fixture
 def win_plugin(version_target: Target):
     return WindowsPlugin(version_target)
+
+
+@pytest.fixture
+def target_win_linux_folders(tmp_path: pathlib.Path, fs_win: Filesystem, fs_linux_sys: Filesystem) -> Iterator[Target]:
+    root_fs = fs_win
+    root_fs.mount("/", fs_linux_sys)
+
+    mock_target = next(make_mock_target(tmp_path))
+    mock_target.filesystems.add(root_fs)
+
+    yield mock_target
 
 
 def map_version_value(target: Target, name: Optional[str], value: Any):
@@ -235,3 +250,11 @@ def test_windowsplugin_version(
     result = win_plugin.version
 
     assert_value(result, value)
+
+
+def test_windows_os_detection_with_linux_folders(target_win_linux_folders: Target) -> None:
+    fs_linux = LinuxPlugin.detect(target_win_linux_folders)
+    fs_windows = WindowsPlugin.detect(target_win_linux_folders)
+
+    assert fs_linux is None
+    assert fs_windows is not None
