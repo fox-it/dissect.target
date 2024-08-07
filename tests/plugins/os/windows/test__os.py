@@ -1,4 +1,3 @@
-import pathlib
 from typing import Any, Iterator, Optional
 
 import pytest
@@ -9,7 +8,6 @@ from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
-from tests.conftest import make_mock_target
 
 
 def current_version_key() -> str:
@@ -36,14 +34,9 @@ def win_plugin(version_target: Target):
 
 
 @pytest.fixture
-def target_win_linux_folders(tmp_path: pathlib.Path, fs_win: Filesystem, fs_linux_sys: Filesystem) -> Iterator[Target]:
-    root_fs = fs_win
-    root_fs.mount("/", fs_linux_sys)
-
-    mock_target = next(make_mock_target(tmp_path))
-    mock_target.filesystems.add(root_fs)
-
-    yield mock_target
+def target_win_linux_folders(target_win: Filesystem, fs_linux_sys: Filesystem) -> Iterator[Target]:
+    target_win.fs.mount("/", fs_linux_sys)
+    yield target_win
 
 
 def map_version_value(target: Target, name: Optional[str], value: Any):

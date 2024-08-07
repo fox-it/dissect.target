@@ -28,8 +28,11 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
                 and fs.exists("/opt")
                 or (fs.exists("/proc") or fs.exists("/sys"))
             ):
-                if not (fs.exists("/windows") or fs.exists("/$MFT")) and not fs.exists("/Library"):
-                    return fs
+                # If the target has registry function, it is most likely not a Linux system
+                if target.has_function("registry") or fs.exists("/Library"):
+                    return
+
+                return fs
 
     @export(property=True)
     def ips(self) -> list[str]:
