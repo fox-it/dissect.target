@@ -127,6 +127,12 @@ def fs_suse() -> Iterator[VirtualFilesystem]:
 
 
 @pytest.fixture
+def fs_linux_sys(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
+    fs_linux.makedirs("sys")
+    yield fs_linux
+
+
+@pytest.fixture
 def fs_linux_proc(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
     fs = fs_linux
 
