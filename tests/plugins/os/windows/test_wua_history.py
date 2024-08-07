@@ -18,11 +18,18 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert record.ts == datetime(2024, 7, 13, 16, 49, 9, 0, tzinfo=timezone.utc)
     assert record.id_event == 80
     assert record.status == 1
-    assert record.server_selection == 3
+    assert record.status_mapped == "Success"
+    assert record.server_selection == 2
+    assert record.server_selection_mapped == "ssWindowsUpdate"
     assert record.mapped_result == "0x0"
+    assert record.mapped_result_string == "Success"
+    assert record.mapped_result_description == "Success"
     assert record.unmapped_result == "0x0"
+    assert record.unmapped_result_string == "Success"
+    assert record.unmapped_result_description == "Success"
     assert record.update_id == "71156214-2cb8-4c44-b11c-3ec1a0366f55"
     assert record.server_id == "9482f4b4-e343-43b6-b170-9a65bc822c77"
+    assert record.server_id_mapped == "Windows Update"
     assert record.flags == 1
     assert record.client_id == "UpdateOrchestrator"
     assert (
@@ -41,7 +48,5 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert record.id_user == 0
     assert record.is_service_is_additional == "False"
     assert record.classification == "e0789628-ce08-4437-be74-2495b842f43b"
-    assert record.result == "Succeeded"
-    assert record.result_string == "Succeeded"
-    assert record.result_description == "Succeeded"
+    assert record.classification_mapped == "Definitionupdates"
     assert record.kb == "KB2267602"
