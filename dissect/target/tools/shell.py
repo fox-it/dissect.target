@@ -136,12 +136,18 @@ class TargetCmd(cmd.Cmd):
 
     def preloop(self) -> None:
         if readline and self.histfile.exists():
-            readline.read_history_file(self.histfile)
+            try:
+                readline.read_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error reading history file: %s", e)
 
     def postloop(self) -> None:
         if readline:
             readline.set_history_length(self.histfilesize)
-            readline.write_history_file(self.histfile)
+            try:
+                readline.write_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error writing history file: %s", e)
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -1271,10 +1277,6 @@ def run_cli(cli: cmd.Cmd) -> None:
         except KeyboardInterrupt:
             # Add a line when pressing ctrl+c, so the next one starts at a new line
             print()
-
-        except PermissionError as e:
-            log.error(e)
-            break
 
         except Exception as e:
             if cli.debug:
