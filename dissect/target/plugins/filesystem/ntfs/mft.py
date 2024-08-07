@@ -147,7 +147,9 @@ class MftPlugin(Plugin):
         action="store_true",
         help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
     )
-    def mft(self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False):
+    def mft(
+        self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
+    ) -> Iterator[Record]:
         """Return the MFT records of all NTFS filesystems.
 
         The Master File Table (MFT) contains primarily metadata about every file and folder on a NFTS filesystem.
@@ -188,7 +190,9 @@ class MftPlugin(Plugin):
             for filesystem in self.ntfs_filesystems.values():
                 yield from self.segments(filesystem, record_formatter, aggr, start, end)
 
-    def segments(self, fs: NtfsFilesystem, record_formatter: Callable, aggr: Callable, start: int, end: int):
+    def segments(
+        self, fs: NtfsFilesystem, record_formatter: Callable, aggr: Callable, start: int, end: int
+    ) -> Iterator[Record]:
         # If this filesystem is a "fake" NTFS filesystem, used to enhance a
         # VirtualFilesystem, The driveletter (more accurate mount point)
         # returned will be that of the VirtualFilesystem. This makes sure
@@ -247,7 +251,7 @@ class MftPlugin(Plugin):
         inuse: bool,
         volume_uuid: str,
         record_formatter: Callable,
-    ):
+    ) -> Iterator[Record]:
         for attr in record.attributes.STANDARD_INFORMATION:
             yield from record_formatter(
                 attr=attr,
@@ -304,7 +308,7 @@ class MftPlugin(Plugin):
             )
 
 
-def compacted_formatter(attr: Attribute, record_type: InformationType, **kwargs):
+def compacted_formatter(attr: Attribute, record_type: InformationType, **kwargs) -> Iterator[Record]:
     record_desc = COMPACT_RECORD_TYPES.get(record_type)
     yield record_desc(
         creation_time=attr.creation_time,
@@ -315,7 +319,7 @@ def compacted_formatter(attr: Attribute, record_type: InformationType, **kwargs)
     )
 
 
-def formatter(attr: Attribute, record_type: InformationType, **kwargs):
+def formatter(attr: Attribute, record_type: InformationType, **kwargs) -> Iterator[Record]:
     record_desc = RECORD_TYPES.get(record_type)
     for type, timestamp in [
         ("B", attr.creation_time),
