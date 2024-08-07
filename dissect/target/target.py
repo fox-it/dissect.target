@@ -87,9 +87,10 @@ class Target:
         self._applied = False
 
         try:
-            self._config = config.load(self.path)
+            self._config = config.load([self.path, os.getcwd()])
         except Exception as e:
-            self.log.debug("Error loading config file", exc_info=e)
+            self.log.warning("Error loading config file: %s", self.path)
+            self.log.debug("", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
         # Fill the disks and/or volumes and/or filesystems and apply() will
