@@ -5,7 +5,10 @@ from Crypto.Hash import MD4
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
-from dissect.target.plugins.os.windows.credhist import CredHistFile, CredHistPlugin
+from dissect.target.plugins.os.windows.credential.credhist import (
+    CredHistFile,
+    CredHistPlugin,
+)
 from tests._utils import absolute_path
 
 

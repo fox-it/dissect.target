@@ -7,8 +7,18 @@ from flow.record.fieldtypes import datetime as dt
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
+from dissect.target.helpers.regutil import VirtualHive
 from dissect.target.plugins.apps.browser.chrome import ChromePlugin
+from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from tests._utils import absolute_path
+from tests.conftest import add_win_user
+from tests.plugins.os.windows.credential.test_lsa import (
+    POLICY_KEY_PATH_NT6,
+    map_lsa_polkey,
+    map_lsa_secrets,
+    map_lsa_system_keys,
+)
+from tests.plugins.os.windows.test__os import map_version_value
 
 
 @pytest.fixture
@@ -147,6 +157,62 @@ def test_unix_chrome_passwords_gnome_plugin(target_unix_users: Target, fs_unix: 
     assert records[0].url == "https://test.com/"
 
 
+@pytest.fixture
+def target_win_users_dpapi(
+    hive_hklm: VirtualHive, hive_hku: VirtualHive, fs_win: VirtualFilesystem, target_win: Target
+) -> Iterator[Target]:
+    # Add users
+    add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
+    add_win_user(
+        hive_hklm,
+        hive_hku,
+        target_win,
+        sid="S-1-5-21-1342509979-482553916-3960431919-1000",
+        home="C:\\Users\\user",
+    )
+
+    # Add system dpapi files
+    fs_win.map_dir(
+        "Windows/System32/Microsoft/Protect",
+        absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_System32"),
+    )
+
+    # Add user dpapi files
+    fs_win.map_dir(
+        "Users/User/AppData/Roaming/Microsoft/Protect",
+        absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_User"),
+    )
+
+    # Add registry dpapi keys
+    map_lsa_system_keys(hive_hklm, {"Data": "8fa8e1fb", "GBG": "a6e23eb8", "JD": "fe5ffdaf", "Skew1": "6e289261"})
+    map_lsa_polkey(
+        hive_hklm,
+        POLICY_KEY_PATH_NT6,
+        bytes.fromhex(
+            "00000001ecffe17b2a997440aa939adbff26f1fc0300000000000000676f5836"
+            "37c3e0e7b9edf43b3b29b1d0d24cb6bfc60e0fc4dc446e7d244d303533b90a2b"
+            "d732fcf985748a8917aea73e9d0b290ee4ba2f53e6a9a0ac9b3c9b26e721b01b"
+            "7a6c1f92b517e2a33f5f6de7f736716793b19872059595e6b4dc888d19d1d615"
+            "d602bed553478c411d2fed045602ddbb5adc31c9901021ad339bca368bdb554f"
+            "fe074a7074528d5e9dcbb467"
+        ),
+    )
+    map_lsa_secrets(
+        hive_hklm,
+        {
+            "DPAPI_SYSTEM": bytes.fromhex(
+                "000000017c3e71eca8fb4eed03ea4361fbc783870300000000000000af64ca32"
+                "a15059f8e38f328a5f16d063939bdbb9321ba159dcafd9cdf316d82f89a829d7"
+                "58024b276d099ef2290ca46fc7b2635568500bf2d31ed8ce1e0330345cca5ef3"
+                "e8d18399a22ae88db12872ee5bb0c1f0dd3b83066269d0d9618b19bb"
+            )
+        },
+    )
+
+    target_win.add_plugin(DPAPIPlugin)
+    yield target_win
+
+
 @pytest.mark.parametrize(
     "keychain_value, expected_password",
     [
@@ -161,6 +227,8 @@ def test_windows_chrome_passwords_dpapi(
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
     )
+
+    map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
@@ -187,6 +255,8 @@ def test_windows_chrome_cookies_dpapi(target_win_users_dpapi: Target, fs_win: Vi
         "Users/user/AppData/Local/Google/Chrome/User Data",
         absolute_path("_data/plugins/apps/browser/chrome/dpapi/User_Data"),
     )
+
+    map_version_value(target_win_users_dpapi, "CurrentVersion", 10.0)
 
     target_win_users_dpapi.add_plugin(ChromePlugin)
 
