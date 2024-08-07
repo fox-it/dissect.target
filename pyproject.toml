@@ -56,6 +56,7 @@ full = [
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
     "dissect.jffs>=1,<2",
+    "dissect.ole>=3,<4",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.sql>=3,<4",
