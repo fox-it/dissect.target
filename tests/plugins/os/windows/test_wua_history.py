@@ -48,5 +48,5 @@ def test_wua_history_plugin(target_win: Target, fs_win: VirtualFilesystem) -> No
     assert record.id_user == 0
     assert record.is_service_is_additional == "False"
     assert record.classification == "e0789628-ce08-4437-be74-2495b842f43b"
-    assert record.classification_mapped == "Definitionupdates"
+    assert record.classification_mapped == "DefinitionUpdates"
     assert record.kb == "KB2267602"
