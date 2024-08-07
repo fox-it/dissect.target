@@ -142,3 +142,41 @@ EmptyRecord = RecordDescriptor(
     "empty",
     [],
 )
+
+COMMON_INTERFACE_ELEMENTS = [
+    ("string", "name"),
+    ("string", "type"),
+    ("boolean", "enabled"),
+    ("string", "mac"),
+    ("net.ipaddress", "ip"),
+    ("net.ipaddress", "gateway"),
+    ("string", "source"),
+]
+
+
+UnixInterfaceRecord = TargetRecordDescriptor(
+    "unix/interface",
+    COMMON_INTERFACE_ELEMENTS,
+)
+
+WindowsInterfaceRecord = TargetRecordDescriptor(
+    "windows/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("string", "vlan"),
+        ("string", "dns_server"),
+        ("string", "metric"),
+        ("datetime", "last_connected"),
+    ],
+)
+
+MacInterfaceRecord = TargetRecordDescriptor(
+    "macos/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("string", "vlan"),
+        ("string", "dns_server"),
+        ("string", "proxy"),
+        ("varint", "interface_service_order"),
+    ],
+)
