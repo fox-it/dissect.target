@@ -1,10 +1,14 @@
 from functools import partial
-from typing import Callable, Iterable, Iterator
+from typing import Callable, Iterable, Iterator, Optional
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
 from dissect.target import Target
-from dissect.target.exceptions import FilesystemError
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    FilesystemError,
+    IsADirectoryError,
+)
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.hashutil import common
 from dissect.target.helpers.utils import StrEnum
@@ -43,8 +47,14 @@ def _resolve_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     return _create_modified_record("filesystem/file/resolved", field_name, type_info)
 
 
-def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
+def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Optional[Record]:
     """Hash files from path fields inside the record."""
+
+    if not resolved_path.exists():
+        raise FileNotFoundError("File not found: '%s'" % resolved_path)
+
+    if not resolved_path.is_file():
+        raise IsADirectoryError("Not a file: '%s'" % resolved_path)
 
     with resolved_path.open() as fh:
         path_hash = common(fh)
@@ -81,8 +91,14 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
     for field_name, resolved_path in _resolve_path_types(target, record):
         try:
             _record = modifier_function(field_name, resolved_path)
-        except FilesystemError:
-            pass
+        except FilesystemError as e:
+            target.log.warning(
+                "Unable to modify record '%s' with function '%s': %s",
+                record._desc.name,
+                modifier_function.__name__,
+                e,
+            )
+            target.log.debug("", exc_info=e)
         else:
             additional_records.append(_record)
 
