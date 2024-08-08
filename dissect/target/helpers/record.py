@@ -164,7 +164,7 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
     "windows/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
-        ("string", "vlan"),
+        ("varint", "vlan"),
         ("string", "metric"),
         ("datetime", "last_connected"),
     ],
@@ -174,7 +174,7 @@ MacInterfaceRecord = TargetRecordDescriptor(
     "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
-        ("string", "vlan"),
+        ("varint", "vlan"),
         ("string", "proxy"),
         ("varint", "interface_service_order"),
     ],
