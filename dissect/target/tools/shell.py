@@ -1,7 +1,6 @@
 import argparse
 import cmd
 import contextlib
-import datetime
 import fnmatch
 import io
 import itertools
@@ -13,7 +12,6 @@ import random
 import re
 import shlex
 import shutil
-import stat
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -23,17 +21,17 @@ from dissect.cstruct import hexdump
 from flow.record import RecordOutput
 
 from dissect.target.exceptions import (
-    FileNotFoundError,
     PluginError,
     RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
+from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.plugin import PluginFunction, arg
 from dissect.target.target import Target
+from dissect.target.tools.fsutils import fmt_ls_colors, ls_scandir, print_ls, print_stat
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     args_to_uri,
@@ -59,37 +57,6 @@ except ImportError:
     # Readline is not available on Windows
     log.warning("Readline module is not available")
     readline = None
-
-# ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
-STAT_TEMPLATE = """  File: {path} {symlink}
-  Size: {size}          {filetype}
- Inode: {inode}   Links: {nlink}
-Access: ({modeord}/{modestr})  Uid: ( {uid} )   Gid: ( {gid} )
-Access: {atime}
-Modify: {mtime}
-Change: {ctime}"""
-
-FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32"  # noqa: E501
-
-
-def prepare_ls_colors() -> dict[str, str]:
-    """Parse the LS_COLORS environment variable so we can use it later."""
-    d = {}
-    ls_colors = os.environ.get("LS_COLORS", FALLBACK_LS_COLORS)
-    for line in ls_colors.split(":"):
-        if not line:
-            continue
-
-        ft, _, value = line.partition("=")
-        if ft.startswith("*"):
-            ft = ft[1:]
-
-        d[ft] = f"\x1b[{value}m{{}}\x1b[0m"
-
-    return d
-
-
-LS_COLORS = prepare_ls_colors()
 
 
 class TargetCmd(cmd.Cmd):
@@ -419,7 +386,7 @@ class TargetCli(TargetCmd):
         path = line[:begidx].rsplit(" ")[-1]
         textlower = text.lower()
 
-        r = [fname for _, fname in self.scandir(path) if fname.lower().startswith(textlower)]
+        r = [fname for _, fname in ls_scandir(path) if fname.lower().startswith(textlower)]
         return r
 
     def resolve_path(self, path: str) -> fsutil.TargetPath:
@@ -485,39 +452,6 @@ class TargetCli(TargetCmd):
         if path := self.check_dir(path):
             self.cwd = path
 
-    def scandir(self, path: str, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
-        """List a directory for the given path."""
-        path = self.resolve_path(path)
-        result = []
-
-        if path.exists() and path.is_dir():
-            for file_ in path.iterdir():
-                file_type = None
-                if color:
-                    if file_.is_symlink():
-                        file_type = "ln"
-                    elif file_.is_dir():
-                        file_type = "di"
-                    elif file_.is_file():
-                        file_type = "fi"
-
-                result.append((file_, fmt_ls_colors(file_type, file_.name) if color else file_.name))
-
-                # If we happen to scan an NTFS filesystem see if any of the
-                # entries has an alternative data stream and also list them.
-                entry = file_.get()
-                if isinstance(entry, LayerFilesystemEntry):
-                    if entry.entries.fs.__type__ == "ntfs":
-                        attrs = entry.lattr()
-                        for data_stream in attrs.DATA:
-                            if data_stream.name != "":
-                                name = f"{file_.name}:{data_stream.name}"
-                                result.append((file_, fmt_ls_colors(file_type, name) if color else name))
-
-            result.sort(key=lambda e: e[0].name)
-
-        return result
-
     def do_cd(self, line: str) -> Optional[bool]:
         """change directory"""
         self.chdir(line)
@@ -564,62 +498,7 @@ class TargetCli(TargetCmd):
         if not path or not path.exists():
             return
 
-        self._print_ls(args, path, 0, stdout)
-
-    def _print_ls(self, args: argparse.Namespace, path: fsutil.TargetPath, depth: int, stdout: TextIO) -> None:
-        path = self.resolve_path(path)
-        subdirs = []
-
-        if path.is_dir():
-            contents = self.scandir(path, color=True)
-        elif path.is_file():
-            contents = [(path, path.name)]
-
-        if depth > 0:
-            print(f"\n{str(path)}:", file=stdout)
-
-        if not args.l:
-            for target_path, name in contents:
-                print(name, file=stdout)
-                if target_path.is_dir():
-                    subdirs.append(target_path)
-        else:
-            if len(contents) > 1:
-                print(f"total {len(contents)}", file=stdout)
-            for target_path, name in contents:
-                self.print_extensive_file_stat(args=args, stdout=stdout, target_path=target_path, name=name)
-                if target_path.is_dir():
-                    subdirs.append(target_path)
-
-        if args.recursive and subdirs:
-            for subdir in subdirs:
-                self._print_ls(args, subdir, depth + 1, stdout)
-
-    def print_extensive_file_stat(
-        self, args: argparse.Namespace, stdout: TextIO, target_path: fsutil.TargetPath, name: str
-    ) -> None:
-        """Print the file status."""
-        try:
-            entry = target_path.get()
-            stat = entry.lstat()
-            symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            show_time = stat.st_mtime
-            if args.use_ctime:
-                show_time = stat.st_ctime
-            elif args.use_atime:
-                show_time = stat.st_atime
-            utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
-
-            print(
-                f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {stat.st_size:6d} {utc_time} {name}{symlink}",
-                file=stdout,
-            )
-
-        except FileNotFoundError:
-            print(
-                f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}",
-                file=stdout,
-            )
+        print_ls(path, 0, stdout, args.l, args.human_readable, args.recursive, args.use_ctime, args.use_atime)
 
     @arg("path", nargs="?")
     @arg("-name", default="*")
@@ -648,26 +527,7 @@ class TargetCli(TargetCmd):
         if not path:
             return
 
-        symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
-
-        s = path.stat() if args.dereference else path.lstat()
-
-        res = STAT_TEMPLATE.format(
-            path=path,
-            symlink=symlink,
-            size=s.st_size,
-            filetype="",
-            inode=s.st_ino,
-            nlink=s.st_nlink,
-            modeord=oct(stat.S_IMODE(s.st_mode)),
-            modestr=stat_modestr(s),
-            uid=s.st_uid,
-            gid=s.st_gid,
-            atime=datetime.datetime.utcfromtimestamp(s.st_atime).isoformat(),
-            mtime=datetime.datetime.utcfromtimestamp(s.st_mtime).isoformat(),
-            ctime=datetime.datetime.utcfromtimestamp(s.st_ctime).isoformat(),
-        )
-        print(res, file=stdout)
+        print_stat(path, stdout, args.dereference)
 
     @arg("path")
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:
@@ -1120,21 +980,6 @@ class RegistryCli(TargetCmd):
         print(repr(value.value), file=stdout)
 
 
-def fmt_ls_colors(ft: str, name: str) -> str:
-    """Helper method to colorize strings according to LS_COLORS."""
-    try:
-        return LS_COLORS[ft].format(name)
-    except KeyError:
-        pass
-
-    try:
-        return LS_COLORS[fsutil.splitext(name)[1]].format(name)
-    except KeyError:
-        pass
-
-    return name
-
-
 @contextmanager
 def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Iterator[tuple[TextIO, BinaryIO]]:
     """
@@ -1198,14 +1043,6 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
     """
     with build_pipe(pipe_parts, pipe_stdout=None) as (pipe_stdin, _):
         yield pipe_stdin
-
-
-def stat_modestr(st: fsutil.stat_result) -> str:
-    """Helper method for generating a mode string from a numerical mode value."""
-    is_dir = "d" if stat.S_ISDIR(st.st_mode) else "-"
-    dic = {"7": "rwx", "6": "rw-", "5": "r-x", "4": "r--", "0": "---"}
-    perm = str(oct(st.st_mode)[-3:])
-    return is_dir + "".join(dic.get(x, x) for x in perm)
 
 
 def open_shell(targets: list[Union[str, pathlib.Path]], python: bool, registry: bool) -> None:

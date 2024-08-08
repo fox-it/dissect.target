@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import datetime
 import logging
-import operator
 import os
 import pathlib
 import shutil
@@ -13,7 +11,7 @@ import sys
 from dissect.target import Target
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.tools.shell import stat_modestr
+from dissect.target.tools.fsutils import print_ls
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -25,11 +23,6 @@ logging.lastResort = None
 logging.raiseExceptions = False
 
 
-def human_size(bytes: int, units: list[str] = ["", "K", "M", "G", "T", "P", "E"]) -> str:
-    """Helper function to return the human readable string representation of bytes."""
-    return str(bytes) + units[0] if bytes < 1024 else human_size(bytes >> 10, units[1:])
-
-
 def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     if args.use_ctime and args.use_atime:
         log.error("Can't specify -c and -u at the same time")
@@ -37,63 +30,20 @@ def ls(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     if not path or not path.exists():
         return
 
-    _print_ls(args, path, 0)
+    # Only output with colors if stdout is a tty
+    use_colors = sys.stdout.buffer.isatty()
 
-
-def _print_ls(args: argparse.Namespace, path: TargetPath, depth: int) -> None:
-    subdirs = []
-
-    if path.is_dir():
-        contents = sorted(path.iterdir(), key=operator.attrgetter("name"))
-    elif path.is_file():
-        contents = [path]
-
-    if depth > 0:
-        print(f"\n{str(path)}:")
-
-    if not args.l:
-        for entry in contents:
-            print(entry.name)
-
-            if entry.is_dir():
-                subdirs.append(entry)
-    else:
-        if len(contents) > 1:
-            print(f"total {len(contents)}")
-
-        for entry in contents:
-            _print_extensive_file_stat(args, entry, entry.name)
-
-            if entry.is_dir():
-                subdirs.append(entry)
-
-    if args.recursive and subdirs:
-        for subdir in subdirs:
-            _print_ls(args, subdir, depth + 1)
-
-
-def _print_extensive_file_stat(args: argparse.Namespace, path: TargetPath, name: str) -> None:
-    try:
-        entry = path.get()
-        stat = entry.lstat()
-        symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-        show_time = stat.st_mtime
-
-        if args.use_ctime:
-            show_time = stat.st_ctime
-        elif args.use_atime:
-            show_time = stat.st_atime
-
-        utc_time = datetime.datetime.utcfromtimestamp(show_time).isoformat()
-
-        if args.human_readable:
-            size = human_size(stat.st_size)
-        else:
-            size = stat.st_size
-
-        print(f"{stat_modestr(stat)} {stat.st_uid:4d} {stat.st_gid:4d} {size:>6s} {utc_time} {name}{symlink}")
-    except FileNotFoundError:
-        print(f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}")
+    print_ls(
+        path,
+        0,
+        sys.stdout,
+        args.l,
+        args.human_readable,
+        args.recursive,
+        args.use_ctime,
+        args.use_atime,
+        use_colors,
+    )
 
 
 def cat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
