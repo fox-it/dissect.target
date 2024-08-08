@@ -264,7 +264,7 @@ class Filesystem:
         """
         return self.get(path).walk_ext(topdown, onerror, followlinks)
 
-    def walk_ng(self, path: str) -> Iterator[FilesystemEntry]:
+    def recurse(self, path: str) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield contents as :class:`FilesystemEntry`.
 
         Does not follow symbolic links.
@@ -275,7 +275,7 @@ class Filesystem:
         Returns:
             An iterator of :class:`FilesystemEntry`.
         """
-        return self.get(path).walk_ng()
+        return self.get(path).recurse()
 
     def glob(self, pattern: str) -> Iterator[str]:
         """Iterate over the directory part of ``pattern``, returning entries matching ``pattern`` as strings.
@@ -627,7 +627,7 @@ class FilesystemEntry:
         """
         yield from fsutil.walk_ext(self, topdown, onerror, followlinks)
 
-    def walk_ng(self) -> Iterator[FilesystemEntry]:
+    def recurse(self) -> Iterator[FilesystemEntry]:
         """Recursively walk a directory and yield its contents as :class:`FilesystemEntry`.
 
         Does not follow symbolic links.
@@ -635,8 +635,7 @@ class FilesystemEntry:
         Returns:
             An iterator of :class:`FilesystemEntry`.
         """
-        yield self
-        yield from fsutil.walk_ng(self)
+        yield from fsutil.recurse(self)
 
     def glob(self, pattern: str) -> Iterator[str]:
         """Iterate over this directory part of ``patern``, returning entries matching ``pattern`` as strings.
