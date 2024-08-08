@@ -1077,6 +1077,7 @@ class PluginFunction:
     name: str
     path: str
     output_type: str
+    output_def: Optional[RecordDescriptor]
     class_object: type[Plugin]
     method_name: str
     plugin_desc: PluginDescriptor = field(hash=False)
@@ -1236,6 +1237,7 @@ def find_plugin_functions(
                         class_object=loaded_plugin_object,
                         method_name=method_name,
                         output_type=getattr(fobject, "__output__", "text"),
+                        output_def=getattr(fobject, "__record__", None),
                         plugin_desc=func,
                     )
                 )
@@ -1281,6 +1283,7 @@ def find_plugin_functions(
                         class_object=loaded_plugin_object,
                         method_name=funcname,
                         output_type=getattr(fobject, "__output__", "text"),
+                        output_def=getattr(fobject, "__record__", None),
                         plugin_desc=description,
                     )
                 )
