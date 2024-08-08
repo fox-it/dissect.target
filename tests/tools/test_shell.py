@@ -3,10 +3,11 @@ import platform
 import sys
 from io import BytesIO, StringIO
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
-from dissect.target.helpers.fsutil import normalize
+from dissect.target.helpers.fsutil import TargetPath, normalize
 from dissect.target.tools import fsutils
 from dissect.target.tools.shell import (
     TargetCli,
@@ -101,21 +102,30 @@ def test_targethubcli_autocomplete_enter(make_mock_targets):
 def test_targetcli_autocomplete(target_bare, monkeypatch):
     target_cli = TargetCli(target_bare)
 
-    base_path = "/base-path/"
-    subpath_match = "subpath1"
+    mock_subfolder = MagicMock(spec_set=TargetPath)
+    mock_subfolder.is_dir.return_value = True
+    mock_subfile = MagicMock(spec_set=TargetPath)
+    mock_subfile.is_dir.return_value = False
+
+    base_path = "/base-path"
+
+    subfolder_name = "subfolder"
+    subfile_name = "subfile"
     subpath_mismatch = "mismatch"
 
-    def dummy_scandir(path):
-        assert path == base_path
+    def dummy_scandir(path: TargetPath):
+        assert str(path) == base_path
         return [
-            (None, subpath_match),
+            (mock_subfolder, subfolder_name),
+            (mock_subfile, subfile_name),
             (None, subpath_mismatch),
         ]
 
     monkeypatch.setattr("dissect.target.tools.shell.ls_scandir", dummy_scandir)
+    suggestions = target_cli.completedefault("sub", f"ls {base_path}/sub", 3 + len(base_path), 3 + len(base_path) + 3)
 
-    suggestions = target_cli.completedefault("sub", f"ls {base_path}sub", 3 + len(base_path), 3 + len(base_path) + 3)
-    assert suggestions == [subpath_match]
+    # We expect folder suggestions to be trailed with a '/'
+    assert suggestions == [f"{subfolder_name}/", subfile_name]
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")

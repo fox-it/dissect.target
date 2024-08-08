@@ -401,11 +401,18 @@ class TargetCli(TargetCmd):
         return f"{self.prompt_base} {self.cwd}> "
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int):
-        path = line[:begidx].rsplit(" ")[-1]
+        path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
         textlower = text.lower()
 
-        r = [fname for _, fname in ls_scandir(path) if fname.lower().startswith(textlower)]
-        return r
+        suggestions = []
+        for fpath, fname in ls_scandir(path):
+            if not fname.lower().startswith(textlower):
+                continue
+
+            # Add a trailing slash to directories, to allow for easier traversal of the filesystem
+            suggestion = f"{fname}/" if fpath.is_dir() else fname
+            suggestions.append(suggestion)
+        return suggestions
 
     def resolve_path(self, path: str) -> fsutil.TargetPath:
         if not path:
