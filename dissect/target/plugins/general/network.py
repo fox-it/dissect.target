@@ -1,42 +1,19 @@
-from functools import lru_cache
-from typing import Iterator, Union
+from typing import Any, Iterator, Union
+
+from flow.record.fieldtypes.net import IPAddress
 
 from dissect.target.helpers.record import (
     MacInterfaceRecord,
-    TargetRecordDescriptor,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugin import Plugin, Record, export, internal
-from dissect.target.target import Target
+from dissect.target.plugin import Plugin, export, internal
 
-# Using this notation as it didn't like the pipe symbol
 InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
-
-
-@lru_cache
-def create_record(record: InterfaceRecord, name: str) -> Record:
-    """Create a new record using the `record` name as its base.
-
-    Also retrieves the typename from the record, so everything has the correct one.
-    """
-    record_descriptor = f"{record._desc.name}/{name}"
-    field_type = record._desc.fields.get(name)
-    field_type = field_type.typename if field_type else "string"
-
-    record_fields = [
-        ("string", "source"),
-        (field_type, name),
-    ]
-
-    return TargetRecordDescriptor(record_descriptor, record_fields)
 
 
 class NetworkPlugin(Plugin):
     __namespace__ = "network"
-
-    def __init__(self, target: Target):
-        super().__init__(target)
 
     def check_compatible(self) -> None:
         pass
@@ -45,33 +22,29 @@ class NetworkPlugin(Plugin):
     def find_interfaces(self) -> list[InterfaceRecord]:
         yield from ()
 
-    def _get_record_type(self, field_name: str) -> Iterator[Record]:
+    def _get_record_type(self, field_name: str) -> list[Any]:
+        output_list = []
         for record in self.find_interfaces():
-            type_record = create_record(record, field_name)
-            yield type_record(
-                source=record.source,
-                **{
-                    field_name: getattr(record, field_name, None),
-                },
-                _target=self.target,
-            )
+            if output := getattr(record, field_name, None):
+                output_list.append(output)
+        return output_list
 
-    @export(output="record", export=InterfaceRecord)
+    @export(record=InterfaceRecord)
     def interfaces(self) -> Iterator[InterfaceRecord]:
         yield from self.find_interfaces()
 
-    @export(output="record", export=Record)
-    def ips(self) -> Iterator[Record]:
-        yield from self._get_record_type("ip")
+    @export
+    def ips(self) -> list[IPAddress]:
+        return self._get_record_type("ip")
 
-    @export(output="record", export=Record)
-    def gateways(self) -> Iterator[Record]:
-        yield from self._get_record_type("gateway")
+    @export
+    def gateways(self) -> list[IPAddress]:
+        return self._get_record_type("gateway")
 
-    @export(output="record", export=Record)
-    def macs(self) -> Iterator[Record]:
-        yield from self._get_record_type("mac")
+    @export
+    def macs(self) -> list[str]:
+        return self._get_record_type("mac")
 
-    @export(output="record", export=Record)
-    def dns(self) -> Iterator[Record]:
-        yield from self._get_record_type("dns")
+    @export
+    def dns(self) -> list[str]:
+        return self._get_record_type("dns")

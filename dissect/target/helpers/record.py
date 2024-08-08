@@ -155,12 +155,12 @@ COMMON_INTERFACE_ELEMENTS = [
 
 
 UnixInterfaceRecord = TargetRecordDescriptor(
-    "unix/interface",
+    "unix/network/interface",
     COMMON_INTERFACE_ELEMENTS,
 )
 
 WindowsInterfaceRecord = TargetRecordDescriptor(
-    "windows/interface",
+    "windows/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("string", "vlan"),
@@ -171,7 +171,7 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
 )
 
 MacInterfaceRecord = TargetRecordDescriptor(
-    "macos/interface",
+    "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("string", "vlan"),
