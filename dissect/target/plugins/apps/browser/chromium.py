@@ -279,6 +279,7 @@ class ChromiumMixin:
                         is_http_only=bool(cookie.is_httponly),
                         same_site=bool(cookie.samesite),
                         source=db_file,
+                        _target=self.target,
                         _user=user.user,
                     )
             except SQLError as e:
