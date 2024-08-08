@@ -66,6 +66,7 @@ class OperatingSystem(StrEnum):
     IOS = "ios"
     FORTIOS = "fortios"
     CITRIX = "citrix-netscaler"
+    PROXMOX = "proxmox"
 
 
 def export(*args, **kwargs) -> Callable:
