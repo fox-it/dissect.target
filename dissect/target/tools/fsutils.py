@@ -72,8 +72,8 @@ def stat_modestr(st: fsutil.stat_result) -> str:
 def print_extensive_file_stat_listing(
     stdout: TextIO,
     name: str,
-    entry: Optional[FilesystemEntry] = None,
-    timestamp: Optional[datetime] = None,
+    entry: FilesystemEntry | None = None,
+    timestamp: datetime | None = None,
     human_readable: bool = False,
 ) -> None:
     """Print the file status as a single line"""
