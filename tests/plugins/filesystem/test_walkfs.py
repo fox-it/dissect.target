@@ -1,8 +1,9 @@
-from dissect.target.filesystem import VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.plugins.filesystem.walkfs import WalkFSPlugin
+from dissect.target.target import Target
 
 
-def test_walkfs_plugin(target_unix, fs_unix):
+def test_walkfs_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_entry("/path/to/some/file", VirtualFile(fs_unix, "file", None))
     fs_unix.map_file_entry("/path/to/some/other/file.ext", VirtualFile(fs_unix, "file.ext", None))
     fs_unix.map_file_entry("/root_file", VirtualFile(fs_unix, "root_file", None))
