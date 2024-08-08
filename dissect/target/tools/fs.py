@@ -11,7 +11,7 @@ import sys
 from dissect.target import Target
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.tools.fsutils import print_ls
+from dissect.target.tools.fsutils import print_ls, print_stat
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -70,6 +70,13 @@ def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
         print("[!] Failed, unsuported file type: %s" % path)
 
 
+def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
+    """display file status"""
+    if not path or not path.exists():
+        return
+    print_stat(path, sys.stdout, args.dereference)
+
+
 def _extract_path(path: TargetPath, output_path: str) -> None:
     print("%s -> %s" % (path, output_path))
 
@@ -121,6 +128,10 @@ def main() -> None:
 
     parser_cat = subparsers.add_parser("cat", help="dump file contents", parents=[baseparser])
     parser_cat.set_defaults(handler=cat)
+
+    parser_stat = subparsers.add_parser("stat", help="display file status", parents=[baseparser])
+    parser_stat.add_argument("-L", "--dereference", action="store_true")
+    parser_stat.set_defaults(handler=stat)
 
     parser_find = subparsers.add_parser("walk", help="perform a walk", parents=[baseparser])
     parser_find.set_defaults(handler=walk)
