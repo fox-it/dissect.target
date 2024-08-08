@@ -31,7 +31,13 @@ from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.plugin import PluginFunction, arg
 from dissect.target.target import Target
-from dissect.target.tools.fsutils import fmt_ls_colors, ls_scandir, print_ls, print_stat
+from dissect.target.tools.fsutils import (
+    fmt_ls_colors,
+    ls_scandir,
+    print_ls,
+    print_stat,
+    print_xattr,
+)
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     args_to_uri,
@@ -553,6 +559,23 @@ class TargetCli(TargetCmd):
             return
 
         print_stat(path, stdout, args.dereference)
+
+    @arg("path")
+    @arg("-d", "--dump", action="store_true")
+    @arg("-R", "--recursive", action="store_true")
+    def cmd_getfattr(self, args: argparse.Namespace, stdout: TextIO) -> None:
+        """display file xattrs"""
+        path = self.resolve_path(args.path)
+        if not path:
+            return
+
+        if args.recursive:
+            for child in path.rglob("*"):
+                if child_attr := child.get().attr():
+                    print_xattr(child, child_attr, stdout)
+                    print()
+        elif attr := path.get().attr():
+            print_xattr(path.name, attr, stdout)
 
     @arg("path")
     def cmd_file(self, args: argparse.Namespace, stdout: TextIO) -> Optional[bool]:

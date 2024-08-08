@@ -1,11 +1,12 @@
 import os
 import stat
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.fsutil import TargetPath
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
@@ -14,7 +15,8 @@ STAT_TEMPLATE = """  File: {path} {symlink}
 Access: ({modeord}/{modestr})  Uid: ( {uid} )   Gid: ( {gid} )
 Access: {atime}
 Modify: {mtime}
-Change: {ctime}"""
+Change: {ctime}
+ Birth: {btime}"""
 
 FALLBACK_LS_COLORS = "rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32"  # noqa: E501
 
@@ -68,7 +70,11 @@ def stat_modestr(st: fsutil.stat_result) -> str:
 
 
 def print_extensive_file_stat_listing(
-    stdout: TextIO, name: str, entry: Optional[FilesystemEntry] = None, timestamp: Optional[datetime] = None
+    stdout: TextIO,
+    name: str,
+    entry: Optional[FilesystemEntry] = None,
+    timestamp: Optional[datetime] = None,
+    human_readable: bool = False,
 ) -> None:
     """Print the file status as a single line"""
     if entry is not None:
@@ -77,11 +83,12 @@ def print_extensive_file_stat_listing(
             if timestamp is None:
                 timestamp = entry_stat.st_mtime
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.utcfromtimestamp(timestamp).isoformat()
+            utc_time = datetime.fromtimestamp(timestamp, tz=UTC).isoformat(timespec="microseconds")
+            size = f"{human_size(entry_stat.st_size):5s}" if human_readable else f"{entry_stat.st_size:10d}"
 
             print(
                 (
-                    f"{stat_modestr(entry_stat)} {entry_stat.st_uid:4d} {entry_stat.st_gid:4d} {entry_stat.st_size:6d} "
+                    f"{stat_modestr(entry_stat)} {entry_stat.st_uid:4d} {entry_stat.st_gid:4d} {size} "
                     f"{utc_time} {name}{symlink}"
                 ),
                 file=stdout,
@@ -89,7 +96,7 @@ def print_extensive_file_stat_listing(
             return
         except FileNotFoundError:
             pass
-    print(f"??????????    ?    ?      ? ????-??-??T??:??:??.?????? {name}", file=stdout)
+    print(f"??????????    ?    ?          ? ????-??-??T??:??:??.?????? {name}", file=stdout)
 
 
 def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
@@ -167,7 +174,7 @@ def print_ls(
             except FileNotFoundError:
                 entry = None
                 show_time = None
-            print_extensive_file_stat_listing(stdout, name, entry, show_time)
+            print_extensive_file_stat_listing(stdout, name, entry, show_time, human_readable)
             if target_path.is_dir():
                 subdirs.append(target_path)
 
@@ -176,24 +183,48 @@ def print_ls(
             print_ls(subdir, depth + 1, stdout, long_listing, human_readable, recursive, use_ctime, use_atime, color)
 
 
-def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = False):
+def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = False) -> None:
     """Print file status"""
     symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
     s = path.stat() if dereference else path.lstat()
+
+    def filetype(path: TargetPath) -> str:
+        if path.is_dir():
+            return "directory"
+        elif path.is_symlink():
+            return "symbolic link"
+        elif path.is_file():
+            return "regular file"
 
     res = STAT_TEMPLATE.format(
         path=path,
         symlink=symlink,
         size=s.st_size,
-        filetype="",
+        filetype=filetype(path),
         inode=s.st_ino,
         nlink=s.st_nlink,
         modeord=oct(stat.S_IMODE(s.st_mode)),
         modestr=stat_modestr(s),
         uid=s.st_uid,
         gid=s.st_gid,
-        atime=datetime.utcfromtimestamp(s.st_atime).isoformat(),
-        mtime=datetime.utcfromtimestamp(s.st_mtime).isoformat(),
-        ctime=datetime.utcfromtimestamp(s.st_ctime).isoformat(),
+        atime=datetime.fromtimestamp(s.st_atime, tz=UTC).isoformat(timespec="microseconds"),
+        mtime=datetime.fromtimestamp(s.st_mtime, tz=UTC).isoformat(timespec="microseconds"),
+        ctime=datetime.fromtimestamp(s.st_ctime, tz=UTC).isoformat(timespec="microseconds"),
+        btime=datetime.fromtimestamp(s.st_birthtime, tz=UTC).isoformat(timespec="microseconds")
+        if hasattr(s, "st_birthtime")
+        else None,
+    )
+    print(res, file=stdout)
+
+    if xattr := path.get().attr():
+        print("  Attr:")
+        print_xattr(path.name, xattr, stdout)
+
+
+def print_xattr(basename: str, xattr: list, stdout: TextIO) -> None:
+    """Mimics getfattr -d {file} behaviour"""
+    XATTR_TEMPLATE = "# file: {basename}\n{attrs}"
+    res = XATTR_TEMPLATE.format(
+        basename=basename, attrs="\n".join([f'{attr.name}="{attr.value.decode()}"' for attr in xattr])
     )
     print(res, file=stdout)

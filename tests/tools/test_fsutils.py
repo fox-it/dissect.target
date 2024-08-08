@@ -16,7 +16,7 @@ def test_target_cli_print_extensive_file_stat(target_win, capsys):
     print_extensive_file_stat_listing(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
-    assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo\n"
+    assert captured.out == "-rwxrwxrwx 1337 7331        999 1970-01-01T00:00:00.000000+00:00 foo\n"
 
 
 def test_print_extensive_file_stat_symlink(target_win, capsys):
@@ -29,7 +29,7 @@ def test_print_extensive_file_stat_symlink(target_win, capsys):
     print_extensive_file_stat_listing(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
-    assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo -> bar\n"
+    assert captured.out == "-rwxrwxrwx 1337 7331        999 1970-01-01T00:00:00.000000+00:00 foo -> bar\n"
 
 
 def test_print_extensive_file_stat_fail(target_win, capsys):
@@ -38,4 +38,4 @@ def test_print_extensive_file_stat_fail(target_win, capsys):
     print_extensive_file_stat_listing(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
-    assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"
+    assert captured.out == "??????????    ?    ?          ? ????-??-??T??:??:??.?????? foo\n"
