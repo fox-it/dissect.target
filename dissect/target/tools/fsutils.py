@@ -1,7 +1,7 @@
 import os
 import stat
 from datetime import UTC, datetime
-from typing import Optional, TextIO
+from typing import TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry

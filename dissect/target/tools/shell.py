@@ -85,10 +85,10 @@ class ExtendedCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
 
-    def __init__(self, start_in_cyber: bool = False):
+    def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
         self.debug = False
-        self.cyber = start_in_cyber
+        self.cyber = cyber
         self.identchars += "."
 
     def __getattr__(self, attr: str) -> Any:
@@ -118,8 +118,11 @@ class ExtendedCmd(cmd.Cmd):
         return names
 
     def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
-        """Check whether custom handling of the cmd can be performed and if so, do it. Returns a tuple containing a
-        boolean whether or not a custom command execution was performed, and the result of said execution."""
+        """Check whether custom handling of the cmd can be performed and if so, do it. 
+        
+        Returns a tuple containing a boolean whether or not a custom command execution was performed, and
+        the result of said execution.
+        """
         if line == "EOF":
             return True, True
 
@@ -220,7 +223,6 @@ class TargetCmd(ExtendedCmd):
 
     def __init__(self, target: Target):
         self.target = target
-        start_in_cyber = self.target.props.get("cyber")
 
         self.histfilesize = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
         self.histdir = getattr(target._config, "HISTDIR", self.DEFAULT_HISTDIR)
@@ -233,7 +235,7 @@ class TargetCmd(ExtendedCmd):
         else:
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
-        super().__init__(start_in_cyber)
+        super().__init__(self.target.props.get("cyber"))
 
     def preloop(self) -> None:
         if readline and self.histfile.exists():

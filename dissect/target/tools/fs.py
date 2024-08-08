@@ -71,7 +71,6 @@ def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
 
 
 def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
-    """display file status"""
     if not path or not path.exists():
         return
     print_stat(path, sys.stdout, args.dereference)
