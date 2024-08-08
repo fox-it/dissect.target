@@ -12,14 +12,15 @@ from dissect.target.target import Target
 
 
 @pytest.fixture(params=[MacInterfaceRecord, WindowsInterfaceRecord, UnixInterfaceRecord])
-def network_record(request) -> InterfaceRecord:
+def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
     return request.param(
         name="interface_name",
         type="physical",
         enabled=True,
         mac="DE:AD:BE:EF:00:00",
-        ip="10.42.42.10",
-        gateway="10.42.42.1",
+        ip=["10.42.42.10"],
+        gateway=["10.42.42.1"],
+        dns=["8.8.8.8", "1.1.1.1"],
         source="some_file",
     )
 
@@ -33,4 +34,4 @@ def test_base_network_plugin(target_bare: Target, network_record: InterfaceRecor
         assert network.ips() == ["10.42.42.10"]
         assert network.gateways() == ["10.42.42.1"]
         assert network.macs() == ["DE:AD:BE:EF:00:00"]
-        assert network.dns() == []
+        assert network.dns() == ["8.8.8.8", "1.1.1.1"]

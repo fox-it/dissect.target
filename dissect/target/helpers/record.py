@@ -148,8 +148,9 @@ COMMON_INTERFACE_ELEMENTS = [
     ("string", "type"),
     ("boolean", "enabled"),
     ("string", "mac"),
-    ("net.ipaddress", "ip"),
-    ("net.ipaddress", "gateway"),
+    ("net.ipaddress[]", "dns"),
+    ("net.ipaddress[]", "ip"),
+    ("net.ipaddress[]", "gateway"),
     ("string", "source"),
 ]
 
@@ -164,7 +165,6 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("string", "vlan"),
-        ("string", "dns_server"),
         ("string", "metric"),
         ("datetime", "last_connected"),
     ],
@@ -175,7 +175,6 @@ MacInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("string", "vlan"),
-        ("string", "dns_server"),
         ("string", "proxy"),
         ("varint", "interface_service_order"),
     ],

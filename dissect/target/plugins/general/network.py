@@ -23,11 +23,15 @@ class NetworkPlugin(Plugin):
         yield from ()
 
     def _get_record_type(self, field_name: str) -> list[Any]:
-        output_list = []
         for record in self.find_interfaces():
-            if output := getattr(record, field_name, None):
-                output_list.append(output)
-        return output_list
+            output = getattr(record, field_name, None)
+            if output is None:
+                continue
+
+            if isinstance(output, list):
+                yield from output
+            else:
+                yield output
 
     @export(record=InterfaceRecord)
     def interfaces(self) -> Iterator[InterfaceRecord]:
@@ -35,16 +39,16 @@ class NetworkPlugin(Plugin):
 
     @export
     def ips(self) -> list[IPAddress]:
-        return self._get_record_type("ip")
+        return list(self._get_record_type("ip"))
 
     @export
     def gateways(self) -> list[IPAddress]:
-        return self._get_record_type("gateway")
+        return list(self._get_record_type("gateway"))
 
     @export
     def macs(self) -> list[str]:
-        return self._get_record_type("mac")
+        return list(self._get_record_type("mac"))
 
     @export
     def dns(self) -> list[str]:
-        return self._get_record_type("dns")
+        return list(self._get_record_type("dns"))
