@@ -32,7 +32,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import PluginFunction, arg
+from dissect.target.plugin import FunctionDescriptor, arg
 from dissect.target.target import Target
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
@@ -188,8 +188,8 @@ class TargetCmd(cmd.Cmd):
         except AttributeError:
             pass
 
-        if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return self._exec_target(plugins, command_args_str)
+        if functions := list(find_and_filter_plugins(command, self.target)):
+            return self._exec_target(functions, command_args_str)
 
         return cmd.Cmd.default(self, line)
 
@@ -247,7 +247,7 @@ class TargetCmd(cmd.Cmd):
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
 
-    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> Optional[bool]:
+    def _exec_target(self, funcs: list[FunctionDescriptor], command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
 
         def _exec_(argparts: list[str], stdout: TextIO) -> Optional[bool]:

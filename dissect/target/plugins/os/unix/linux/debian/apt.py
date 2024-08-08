@@ -4,19 +4,21 @@ from datetime import datetime
 from typing import Iterator
 from zoneinfo import ZoneInfo
 
-from dissect.target import Target, plugin
+from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
+    PackageManagerPlugin,
 )
 
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 REGEX_PACKAGE_NAMES = re.compile(r"(.*?\)),?")
 
 
-class AptPlugin(plugin.Plugin):
+class AptPlugin(PackageManagerPlugin):
     __namespace__ = "apt"
 
     LOG_DIR_PATH = "/var/log/apt"
@@ -27,7 +29,7 @@ class AptPlugin(plugin.Plugin):
         if not len(log_files):
             raise UnsupportedPluginError("No APT files found")
 
-    @plugin.export(record=PackageManagerLogRecord)
+    @export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Package manager log parser for Apt.
 
