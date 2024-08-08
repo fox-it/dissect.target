@@ -59,7 +59,7 @@ except ImportError:
     readline = None
 
 
-class TargetCmd(cmd.Cmd):
+class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
 
     Add new simple commands by implementing:
@@ -79,42 +79,11 @@ class TargetCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
 
-    DEFAULT_HISTFILE = "~/.dissect_history"
-    DEFAULT_HISTFILESIZE = 10_000
-    DEFAULT_HISTDIR = None
-    DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
-
-    def __init__(self, target: Target):
+    def __init__(self, start_in_cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.target = target
         self.debug = False
+        self.cyber = start_in_cyber
         self.identchars += "."
-
-        self.histfilesize = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
-        self.histdir = getattr(target._config, "HISTDIR", self.DEFAULT_HISTDIR)
-
-        if self.histdir:
-            self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
-            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
-                self.histdirfmt.format(uid=os.getuid(), target=target.name)
-            )
-        else:
-            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
-
-    def preloop(self) -> None:
-        if readline and self.histfile.exists():
-            try:
-                readline.read_history_file(self.histfile)
-            except Exception as e:
-                log.debug("Error reading history file: %s", e)
-
-    def postloop(self) -> None:
-        if readline:
-            readline.set_history_length(self.histfilesize)
-            try:
-                readline.write_history_file(self.histfile)
-            except Exception as e:
-                log.debug("Error writing history file: %s", e)
 
     def __getattr__(self, attr: str) -> Any:
         if attr.startswith("help_"):
@@ -142,22 +111,24 @@ class TargetCmd(cmd.Cmd):
 
         return names
 
-    def default(self, line: str) -> Optional[bool]:
+    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
+        """Check whether custom handling of the cmd can be performed and if so, do it. Returns a tuple containing a
+        boolean whether or not a custom command execution was performed, and the result of said execution."""
         if line == "EOF":
-            return True
+            return True, True
 
-        # Override default command execution to first attempt complex
-        # command execution, and then target plugin command execution
+        # Override default command execution to first attempt complex command execution
         command, command_args_str, line = self.parseline(line)
 
-        try:
-            return self._exec_command(command, command_args_str)
-        except AttributeError:
-            pass
+        if hasattr(self, self.CMD_PREFIX + command):
+            return True, self._exec_command(command, command_args_str)
 
-        if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return self._exec_target(plugins, command_args_str)
+        return False, None
 
+    def default(self, line: str):
+        handled, response = self.check_custom_command_execution(line)
+        if handled:
+            return response
         return cmd.Cmd.default(self, line)
 
     def emptyline(self) -> None:
@@ -176,10 +147,7 @@ class TargetCmd(cmd.Cmd):
 
         argparts = []
         if command_args_str is not None:
-            lexer = shlex.shlex(command_args_str, posix=True, punctuation_chars=True)
-            lexer.wordchars += "$"
-            lexer.whitespace_split = True
-            argparts = list(lexer)
+            argparts = arg_str_to_arg_list(command_args_str)
 
         if "|" in argparts:
             pipeidx = argparts.index("|")
@@ -192,7 +160,7 @@ class TargetCmd(cmd.Cmd):
                 print(e)
         else:
             ctx = contextlib.nullcontext()
-            if self.target.props.get("cyber") and not no_cyber:
+            if self.cyber and not no_cyber:
                 ctx = cyber.cyber(color=None, run_at_end=True)
 
             with ctx:
@@ -213,6 +181,81 @@ class TargetCmd(cmd.Cmd):
         # These commands enter a subshell, which doesn't work well with cyber
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
+
+    def do_clear(self, line: str) -> Optional[bool]:
+        """clear the terminal screen"""
+        os.system("cls||clear")
+
+    def do_exit(self, line: str) -> Optional[bool]:
+        """exit shell"""
+        return True
+
+    def do_cyber(self, line: str):
+        """cyber"""
+        self.cyber = not self.cyber
+        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[self.cyber]
+        with cyber.cyber(color=color):
+            print(f"C Y B E R - M O D E - {word} G A G E D")
+
+    def do_debug(self, line: str) -> Optional[bool]:
+        """toggle debug mode"""
+        self.debug = not self.debug
+        if self.debug:
+            print("Debug mode on")
+        else:
+            print("Debug mode off")
+
+
+class TargetCmd(ExtendedCmd):
+    DEFAULT_HISTFILE = "~/.dissect_history"
+    DEFAULT_HISTFILESIZE = 10_000
+    DEFAULT_HISTDIR = None
+    DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+
+    def __init__(self, target: Target):
+        self.target = target
+        start_in_cyber = self.target.props.get("cyber")
+
+        self.histfilesize = getattr(target._config, "HISTFILESIZE", self.DEFAULT_HISTFILESIZE)
+        self.histdir = getattr(target._config, "HISTDIR", self.DEFAULT_HISTDIR)
+
+        if self.histdir:
+            self.histdirfmt = getattr(target._config, "HISTDIRFMT", self.DEFAULT_HISTDIRFMT)
+            self.histfile = pathlib.Path(self.histdir).resolve() / pathlib.Path(
+                self.histdirfmt.format(uid=os.getuid(), target=target.name)
+            )
+        else:
+            self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
+
+        super().__init__(start_in_cyber)
+
+    def preloop(self) -> None:
+        if readline and self.histfile.exists():
+            try:
+                readline.read_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error reading history file: %s", e)
+
+    def postloop(self) -> None:
+        if readline:
+            readline.set_history_length(self.histfilesize)
+            try:
+                readline.write_history_file(self.histfile)
+            except Exception as e:
+                log.debug("Error writing history file: %s", e)
+
+    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
+        handled, response = super().check_custom_command_execution(line)
+        if handled:
+            return handled, response
+
+        # The parent class has already attempted complex command execution, we now attempt target plugin command
+        # execution
+        command, command_args_str, line = self.parseline(line)
+
+        if plugins := list(find_and_filter_plugins(self.target, command, [])):
+            return True, self._exec_target(plugins, command_args_str)
+        return False, None
 
     def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> Optional[bool]:
         """Command exection helper for target plugins."""
@@ -257,31 +300,6 @@ class TargetCmd(cmd.Cmd):
     def do_python(self, line: str) -> Optional[bool]:
         """drop into a Python shell"""
         python_shell([self.target])
-
-    def do_clear(self, line: str) -> Optional[bool]:
-        """clear the terminal screen"""
-        os.system("cls||clear")
-
-    def do_cyber(self, line: str) -> Optional[bool]:
-        """cyber"""
-        self.target.props["cyber"] = not bool(self.target.props.get("cyber"))
-        word, color = {False: ("D I S E N", cyber.Color.RED), True: ("E N", cyber.Color.YELLOW)}[
-            self.target.props["cyber"]
-        ]
-        with cyber.cyber(color=color):
-            print(f"C Y B E R - M O D E - {word} G A G E D")
-
-    def do_exit(self, line: str) -> Optional[bool]:
-        """exit shell"""
-        return True
-
-    def do_debug(self, line: str) -> Optional[bool]:
-        """toggle debug mode"""
-        self.debug = not self.debug
-        if self.debug:
-            print("Debug mode on")
-        else:
-            print("Debug mode off")
 
 
 class TargetHubCli(cmd.Cmd):
@@ -978,6 +996,14 @@ class RegistryCli(TargetCmd):
             return
 
         print(repr(value.value), file=stdout)
+
+
+def arg_str_to_arg_list(args: str) -> list[str]:
+    """Convert a commandline string to a list of command line arguments."""
+    lexer = shlex.shlex(args, posix=True, punctuation_chars=True)
+    lexer.wordchars += "$"
+    lexer.whitespace_split = True
+    return list(lexer)
 
 
 @contextmanager
