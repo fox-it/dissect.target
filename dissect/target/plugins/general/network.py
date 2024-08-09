@@ -64,7 +64,7 @@ class NetworkPlugin(Plugin):
 
     def interface_with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
         for interface in self.interfaces():
-            if interface.ip == mac:
+            if interface.mac == mac:
                 yield interface
 
     def interface_in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
