@@ -14,16 +14,16 @@ InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfac
 
 class NetworkPlugin(Plugin):
     __namespace__ = "network"
+    _interface_list: list = None
 
     def check_compatible(self) -> None:
         pass
 
-    @internal
-    def find_interfaces(self) -> list[InterfaceRecord]:
+    def _interfaces(self) -> Iterator[InterfaceRecord]:
         yield from ()
 
-    def _get_record_type(self, field_name: str) -> list[Any]:
-        for record in self.find_interfaces():
+    def _get_record_type(self, field_name: str) -> Iterator[Any]:
+        for record in self.interfaces():
             output = getattr(record, field_name, None)
             if output is None:
                 continue
@@ -35,7 +35,11 @@ class NetworkPlugin(Plugin):
 
     @export(record=InterfaceRecord)
     def interfaces(self) -> Iterator[InterfaceRecord]:
-        yield from self.find_interfaces()
+        # Only search for the interfaces once
+        if self._interface_list is None:
+            self._interface_list = list(self._interfaces)
+
+        yield from self._interface_list
 
     @export
     def ips(self) -> list[IPAddress]:
