@@ -241,5 +241,6 @@ def test_target_query_dry_run(capsys: pytest.CaptureFixture, monkeypatch: pytest
         assert out == (
             f"Dry run on: <Target {target_file}>\n"
             "  execute: users (general.default.users)\n"
+            "  execute: network.interfaces (general.network.interfaces)\n"
             "  execute: osinfo (general.osinfo.osinfo)\n"
         )
