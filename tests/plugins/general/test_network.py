@@ -26,7 +26,7 @@ def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
 
 
 def test_base_network_plugin(target_bare: Target, network_record: InterfaceRecord) -> None:
-    with patch.object(NetworkPlugin, "find_interfaces", return_value=[network_record]):
+    with patch.object(NetworkPlugin, "_interfaces", return_value=[network_record]):
         network = NetworkPlugin(target_bare)
         interfaces = list(network.interfaces())
         assert len(interfaces) == 1

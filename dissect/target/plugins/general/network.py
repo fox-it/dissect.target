@@ -37,7 +37,7 @@ class NetworkPlugin(Plugin):
     def interfaces(self) -> Iterator[InterfaceRecord]:
         # Only search for the interfaces once
         if self._interface_list is None:
-            self._interface_list = list(self._interfaces)
+            self._interface_list = list(self._interfaces())
 
         yield from self._interface_list
 
