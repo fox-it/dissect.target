@@ -12,7 +12,7 @@ class LibvirtLoader(Loader):
 
     def __init__(self, path: Path, **kwargs):
         path = path.resolve()
-
+        self.base_dir = path.parent
         super().__init__(path)
 
     @staticmethod
@@ -21,11 +21,26 @@ class LibvirtLoader(Loader):
             return False
 
         with path.open("rb") as fh:
-            return b"<domain>" in fh.read(512)
+            part_xml_data = fh.read(512).split(b"\n")
+            # From what I've seen, these are are always at the start of the file
+            # If its generated using virt-install
+            needles = [b"<domain", b"<name>", b"<uuid>"]
+
+            output = []
+            for needle in needles:
+                output.append(any(needle in line for line in part_xml_data))
+
+            return all(output)
 
     def map(self, target: Target) -> None:
         xml_data = ElementTree.XML(self.path.read_text())
         for disk in xml_data.findall("devices/disk/source"):
-            if file := disk.get("file"):
-                target_file = self.path.joinpath(file)
-                target.disks.add(container.open(target_file))
+            if not (file := disk.get("file")):
+                continue
+
+            path = Path(file)
+
+            for part in [path.name, file]:
+                if (target_file := self.base_dir.joinpath(part)).exists():
+                    target.disks.add(container.open(target_file))
+                    break

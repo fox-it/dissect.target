@@ -11,11 +11,12 @@ def test_compatible(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     with pytest.raises(UnsupportedPluginError):
         QemuChildTargetPlugin(target_linux).check_compatible()
 
-    fs_linux.map_file_fh("/etc/libvirt/qemu", None)
+    qemu_xml = absolute_path("_data/loaders/libvirt/qemu.xml")
+    fs_linux.map_file("/etc/libvirt/qemu/qemu.xml", qemu_xml)
     QemuChildTargetPlugin(target_linux).check_compatible()
 
 
-def test_list_children(target_linux: Target, fs_linux: VirtualFilesystem):
+def test_list_children(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     qemu_xml = absolute_path("_data/loaders/libvirt/qemu.xml")
     fs_linux.map_file("/etc/libvirt/qemu/linux2022.xml", qemu_xml)
     fs_linux.map_file("/etc/libvirt/qemu/linux2024.xml", qemu_xml)
