@@ -7,7 +7,7 @@ from dissect.target.helpers.record import (
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import Plugin, export
 
 InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
 
@@ -24,8 +24,7 @@ class NetworkPlugin(Plugin):
 
     def _get_record_type(self, field_name: str) -> Iterator[Any]:
         for record in self.interfaces():
-            output = getattr(record, field_name, None)
-            if output is None:
+            if (output := getattr(record, field_name, None)) is None:
                 continue
 
             if isinstance(output, list):
