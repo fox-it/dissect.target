@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -91,12 +92,12 @@ class VelociraptorLoader(DirLoader):
                 f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
                 "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
             )
-            self.root = zipfile.Path(path)
+            self.root = zipfile.Path(path.open("rb"))
         else:
             self.root = path
 
     @staticmethod
-    def detect(path: Path) -> bool:
+    def detect(path: Path | TargetPath) -> bool:
         # The 'uploads' folder contains the data acquired
         # The 'results' folder contains information about the used Velociraptor artifacts e.g. Generic.Collectors.File
         # The 'uploads.json' file contains information about the collected files
@@ -105,8 +106,8 @@ class VelociraptorLoader(DirLoader):
         #   results/
         #   uploads.json
         #   [...] other files related to the collection
-        if path.suffix == ".zip":  # novermin
-            path = zipfile.Path(path)
+        if path.exists() and path.suffix == ".zip":  # novermin
+            path = zipfile.Path(path.open("rb"))
 
         if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
             _, dirs = find_fs_directories(path)
