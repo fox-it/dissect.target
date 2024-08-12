@@ -14,7 +14,7 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.helpers.shell_application_ids import APPLICATION_IDENTIFIERS
 from dissect.target.helpers.utils import findall
-from dissect.target.plugin import NamespacePlugin, export
+from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.lnk import LnkRecord, parse_lnk_file
 
 log = logging.getLogger(__name__)
@@ -150,7 +150,7 @@ class CustomDestinationFile:
         return parse_name(self.file_name)
 
 
-class JumpListPlugin(NamespacePlugin):
+class JumpListPlugin(Plugin):
     """Jump List is a Windows feature introduced in Windows 7.
 
     It stores information about recently accessed applications and files.
