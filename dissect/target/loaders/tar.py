@@ -11,7 +11,6 @@ from dissect.target.filesystems.tar import (
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
 
 log = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 class TarLoader(Loader):
     """Load tar files."""
 
-    def __init__(self, path: Path | TargetPath | str, **kwargs):
+    def __init__(self, path: Path | str, **kwargs):
         super().__init__(path)
 
         if isinstance(path, str):
@@ -41,7 +40,7 @@ class TarLoader(Loader):
     def detect(path: Path) -> bool:
         return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
-    def is_compressed(self, path: Path | TargetPath | str) -> bool:
+    def is_compressed(self, path: Path | str) -> bool:
         return str(path).lower().endswith((".tar.gz", ".tgz"))
 
     def map(self, target: target.Target) -> None:

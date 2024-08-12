@@ -79,7 +79,7 @@ def print_extensive_file_stat_listing(
     timestamp: datetime | None = None,
     human_readable: bool = False,
 ) -> None:
-    """Print the file status as a single line"""
+    """Print the file status as a single line."""
     if entry is not None:
         try:
             entry_stat = entry.lstat()
@@ -191,7 +191,7 @@ def print_ls(
 
 
 def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = False) -> None:
-    """Print file status"""
+    """Print file status."""
     symlink = f"-> {path.readlink()}" if path.is_symlink() else ""
     s = path.stat() if dereference else path.lstat()
 
@@ -235,7 +235,7 @@ def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = Fals
 
 
 def print_xattr(basename: str, xattr: list, stdout: TextIO) -> None:
-    """Mimics getfattr -d {file} behaviour"""
+    """Mimics getfattr -d {file} behaviour."""
     if not hasattr(xattr[0], "name"):
         return
 

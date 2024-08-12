@@ -120,14 +120,13 @@ class ExtendedCmd(cmd.Cmd):
         for name in self.get_names():
             if name.startswith(self.CMD_PREFIX):
                 func = getattr(self, name)
-                if hasattr(func, "__aliases__"):
-                    for _alias in func.__aliases__:
-                        if not _alias.startswith(self.CMD_PREFIX):
-                            _alias = self.CMD_PREFIX + _alias
-                        # copy the function to the defined cmd_* alias
-                        setattr(self, _alias, func)
-                        # append the alias command do_* to _aliases for man/help
-                        self._aliases.append(_alias.replace(self.CMD_PREFIX, "do_"))
+                for alias in getattr(func, "__aliases__", []):
+                    if not alias.startswith(self.CMD_PREFIX):
+                        alias = self.CMD_PREFIX + alias
+                    # copy the function to the defined cmd_* alias
+                    setattr(self, alias, func)
+                    # append the alias command do_* to _aliases for man/help
+                    self._aliases.append(alias.replace(self.CMD_PREFIX, "do_", 1))
 
     def get_names(self) -> list[str]:
         names = cmd.Cmd.get_names(self)
@@ -463,7 +462,7 @@ class TargetCli(TargetCmd):
     def prompt(self) -> str:
         return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
 
-    def completedefault(self, text: str, line: str, begidx: int, endidx: int):
+    def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
         textlower = text.lower()
 
@@ -535,7 +534,7 @@ class TargetCli(TargetCmd):
 
         return path
 
-    def check_path(self, path: str) -> Optional[fsutil.TargetPath]:
+    def check_path(self, path: str) ->fsutil.TargetPath | None:
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file or directory")
@@ -678,7 +677,7 @@ class TargetCli(TargetCmd):
     @arg("path")
     @arg("-d", "--dump", action="store_true")
     @arg("-R", "--recursive", action="store_true")
-    @alias(name="cmd_getfattr")
+    @alias("getfattr")
     def cmd_attr(self, args: argparse.Namespace, stdout: TextIO) -> None:
         """display file attributes"""
         path = self.resolve_path(args.path)
