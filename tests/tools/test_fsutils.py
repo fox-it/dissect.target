@@ -11,7 +11,7 @@ from dissect.target.tools.fsutils import print_extensive_file_stat_listing
 
 
 def test_target_cli_print_extensive_file_stat(target_win: Target, capsys: pytest.CaptureFixture) -> None:
-    mock_stat = stat_result([0o1777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
+    mock_stat = stat_result([0o100777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
     mock_entry = MagicMock(spec_set=FilesystemEntry)
     mock_entry.lstat.return_value = mock_stat
     mock_entry.is_symlink.return_value = False
@@ -23,7 +23,7 @@ def test_target_cli_print_extensive_file_stat(target_win: Target, capsys: pytest
 
 
 def test_print_extensive_file_stat_symlink(target_win: Target, capsys: pytest.CaptureFixture) -> None:
-    mock_stat = stat_result([0o1777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
+    mock_stat = stat_result([0o120777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
     mock_entry = MagicMock(spec_set=FilesystemEntry)
     mock_entry.lstat.return_value = mock_stat
     mock_entry.is_symlink.return_value = True
@@ -32,7 +32,7 @@ def test_print_extensive_file_stat_symlink(target_win: Target, capsys: pytest.Ca
     print_extensive_file_stat_listing(sys.stdout, "foo", mock_entry)
 
     captured = capsys.readouterr()
-    assert captured.out == "-rwxrwxrwx 1337 7331        999 1970-01-01T00:00:00.000000+00:00 foo -> bar\n"
+    assert captured.out == "lrwxrwxrwx 1337 7331        999 1970-01-01T00:00:00.000000+00:00 foo -> bar\n"
 
 
 def test_print_extensive_file_stat_fail(target_win: Target, capsys: pytest.CaptureFixture) -> None:

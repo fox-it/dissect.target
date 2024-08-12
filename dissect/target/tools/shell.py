@@ -460,9 +460,7 @@ class TargetCli(TargetCmd):
     """CLI for interacting with a target and browsing the filesystem."""
 
     def __init__(self, target: Target):
-        self.prompt_base = (
-            f"{target.name}.{target.domain}" if (target.has_function("domain") and target.domain) else target.name
-        )
+        self.prompt_base = _target_name(target)
 
         TargetCmd.__init__(self, target)
 
@@ -1056,14 +1054,14 @@ class UnixConfigTreeCli(TargetCli):
     def __init__(self, target: Target):
         TargetCmd.__init__(self, target)
         self.config_tree = target.etc()
-        self.prompt_base = target.name
+        self.prompt_base = _target_name(target)
 
         self.cwd = None
         self.chdir("/")
 
     @property
     def prompt(self) -> str:
-        return f"{self.prompt_base}/config_tree {self.cwd}> "
+        return f"(config tree) {self.prompt_base}:{self.cwd}$ "
 
     def check_compatible(target: Target) -> bool:
         return target.has_function("etc")
@@ -1103,9 +1101,7 @@ class RegistryCli(TargetCmd):
     """CLI for browsing the registry."""
 
     def __init__(self, target: Target, registry: regutil.RegfHive | None = None):
-        self.prompt_base = (
-            f"{target.name}.{target.domain}" if (target.has_function("domain") and target.domain) else target.name
-        )
+        self.prompt_base = _target_name(target)
 
         TargetCmd.__init__(self, target)
 
@@ -1258,6 +1254,15 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
         if not hasattr(args, name):
             setattr(args, name, None)
     return args
+
+
+def _target_name(target: Target) -> str:
+    """Return a target name for cmd.Cmd base prompts."""
+
+    if target.has_function("domain") and target.domain:
+        return f"{target.name}.{target.domain}"
+
+    return target.name
 
 
 @contextmanager
