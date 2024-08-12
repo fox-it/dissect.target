@@ -1,14 +1,13 @@
-from ipaddress import ip_network
 from typing import Any, Iterator, Union
 
-from flow.record.fieldtypes.net import IPAddress
+from flow.record.fieldtypes.net import IPAddress, IPNetwork
 
 from dissect.target.helpers.record import (
     MacInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, export, internal
 
 InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
 
@@ -71,7 +70,7 @@ class NetworkPlugin(Plugin):
 
     @internal
     def in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
-        cidr = ip_network(cidr)
+        cidr = IPNetwork(cidr)
         for interface in self.interfaces():
             if any(ip_addr in cidr for ip_addr in interface.ip):
                 yield interface

@@ -35,3 +35,12 @@ def test_base_network_plugin(target_bare: Target, network_record: InterfaceRecor
         assert network.gateways() == ["10.42.42.1"]
         assert network.macs() == ["DE:AD:BE:EF:00:00"]
         assert network.dns() == ["8.8.8.8", "1.1.1.1"]
+
+        assert len(list(network.in_cidr("10.42.42.0/24"))) == 1
+        assert len(list(network.in_cidr("10.43.42.0/24"))) == 0
+
+        assert len(list(network.with_mac("DE:AD:BE:EF:00:00"))) == 1
+        assert len(list(network.with_mac("DE:AD:BE:EF:00:01"))) == 0
+
+        assert len(list(network.with_ip("10.42.42.10"))) == 1
+        assert len(list(network.with_ip("10.42.42.42"))) == 0
