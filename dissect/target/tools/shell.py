@@ -144,28 +144,31 @@ class ExtendedCmd(cmd.Cmd):
         dotext = "do_" + text
         return [a[3:] for a in self.get_names() + self._aliases if a.startswith(dotext)]
 
-    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
+    def check_custom_command_execution(self, line: str) -> bool | None:
         """Check whether custom handling of the cmd can be performed and if so, do it.
 
-        Returns a tuple containing a boolean whether or not a custom command execution was performed, and
-        the result of said execution.
+        If a custom handling of the cmd was performed, return the result (a boolean indicating whether the shell should
+        exit). If not, return None. Can be overridden by subclasses to perform further / other 'custom command' checks.
         """
         if line == "EOF":
-            return True, True
+            return True
 
         # Override default command execution to first attempt complex command execution
         command, command_args_str, line = self.parseline(line)
 
         if hasattr(self, self.CMD_PREFIX + command):
-            return True, self._exec_command(command, command_args_str)
+            return self._exec_command(command, command_args_str)
 
-        return False, None
+        # Return None if no custom command was found to be run
+        return None
 
-    def default(self, line: str) -> None:
-        handled, response = self.check_custom_command_execution(line)
-        if handled:
-            return response
-        return cmd.Cmd.default(self, line)
+    def default(self, line: str) -> bool:
+        if (should_exit := self.check_custom_command_execution(line)) is not None:
+            return should_exit
+
+        # Fallback to default
+        cmd.Cmd.default(self, line)
+        return False
 
     def emptyline(self) -> None:
         """This function forces Python's cmd.Cmd module to behave like a regular shell.
@@ -194,6 +197,7 @@ class ExtendedCmd(cmd.Cmd):
             except OSError as e:
                 # in case of a failure in a subprocess
                 print(e)
+                return False
         else:
             ctx = contextlib.nullcontext()
             if self.cyber and not no_cyber:
@@ -305,27 +309,28 @@ class TargetCmd(ExtendedCmd):
             except Exception as e:
                 log.debug("Error writing history file: %s", e)
 
-    def check_custom_command_execution(self, line: str) -> tuple[bool, Any]:
-        handled, response = super().check_custom_command_execution(line)
-        if handled:
-            return handled, response
+    def check_custom_command_execution(self, line: str) -> bool | None:
+        if (should_exit := super().check_custom_command_execution(line)) is not None:
+            return should_exit
 
         # The parent class has already attempted complex command execution, we now attempt target plugin command
         # execution
         command, command_args_str, line = self.parseline(line)
 
         if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return True, self._exec_target(plugins, command_args_str)
-        return False, None
+            return self._exec_target(plugins, command_args_str)
 
-    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> bool | None:
+        # We didn't execute a function on the target
+        return None
+
+    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> bool:
         """Command exection helper for target plugins."""
 
-        def _exec_(argparts: list[str], stdout: TextIO) -> bool | None:
+        def _exec_(argparts: list[str], stdout: TextIO) -> None:
             try:
                 output, value, _ = execute_function_on_target(self.target, func, argparts)
             except SystemExit:
-                return False
+                return
 
             if output == "record":
                 # if the command results are piped to another process,
@@ -347,16 +352,16 @@ class TargetCmd(ExtendedCmd):
             else:
                 print(value, file=stdout)
 
-        result = None
         for func in funcs:
             try:
-                result = self._exec(_exec_, command_args_str)
+                self._exec(_exec_, command_args_str)
             except PluginError as err:
                 if self.debug:
                     raise err
                 self.target.log.error(err)
 
-        return result
+        # Keep the shell open
+        return False
 
     def do_python(self, line: str) -> bool:
         """drop into a Python shell"""
@@ -384,11 +389,12 @@ class TargetHubCli(cmd.Cmd):
 
         self._clicache = {}
 
-    def default(self, line: str) -> bool | None:
+    def default(self, line: str) -> bool:
         if line == "EOF":
             return True
 
-        return cmd.Cmd.default(self, line)
+        cmd.Cmd.default(self, line)
+        return False
 
     def emptyline(self) -> None:
         pass
