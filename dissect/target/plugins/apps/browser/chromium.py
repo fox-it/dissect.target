@@ -79,11 +79,12 @@ class ChromiumMixin:
         users_dirs: list[tuple] = []
         for user_details in self.target.user_details.all_with_home():
             for d in hist_paths:
-                cur_dir: TargetPath = user_details.home_path.joinpath(d)
-                cur_dir = cur_dir.resolve()
-                if not cur_dir.exists() or (user_details, cur_dir) in users_dirs:
-                    continue
-                users_dirs.append((user_details, cur_dir))
+                home_dir: TargetPath = user_details.home_path
+                for cur_dir in home_dir.glob(d):
+                    cur_dir = cur_dir.resolve()
+                    if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
+                        continue
+                    users_dirs.append((user_details, cur_dir))
         return users_dirs
 
     def _iter_db(
@@ -278,6 +279,7 @@ class ChromiumMixin:
                         is_http_only=bool(cookie.is_httponly),
                         same_site=bool(cookie.samesite),
                         source=db_file,
+                        _target=self.target,
                         _user=user.user,
                     )
             except SQLError as e:
