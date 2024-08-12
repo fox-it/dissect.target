@@ -1,7 +1,6 @@
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.jumplist import JumpListPlugin
 from dissect.target.target import Target
-
 from tests._utils import absolute_path
 
 
