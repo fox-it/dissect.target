@@ -4,6 +4,7 @@ from defusedxml import ElementTree
 
 import dissect.target.container as container
 from dissect.target import Target
+from dissect.target.helpers import fsutil
 from dissect.target.loader import Loader
 
 
@@ -28,14 +29,12 @@ class LibvirtLoader(Loader):
             return all(any(needle in line for line in lines) for needle in needles)
 
     def map(self, target: Target) -> None:
-        xml_data = ElementTree.XML(self.path.read_text())
+        xml_data = ElementTree.fromstring(self.path.read_text())
         for disk in xml_data.findall("devices/disk/source"):
             if not (file := disk.get("file")):
                 continue
 
-            path = Path(file)
-
-            for part in [path.name, file]:
-                if (target_file := self.base_dir.joinpath(part)).exists():
-                    target.disks.add(container.open(target_file))
+            for part in [fsutil.basename(file), file]:
+                if (path := self.base_dir.joinpath(part)).exists():
+                    target.disks.add(container.open(path))
                     break
