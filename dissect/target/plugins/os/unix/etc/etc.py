@@ -63,11 +63,13 @@ class EtcTree(ConfigurationTreePlugin):
 
     @export(record=UnixConfigTreeRecord)
     @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    def etc(self, pattern: str) -> Iterator[UnixConfigTreeRecord]:
-        for entry, subs, items in self.config_fs.walk("/"):
+    @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
+    def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
+        for entry, subs, items in self.config_fs.walk(root):
             for item in items:
                 try:
                     config_object = self.get(str(Path(entry) / Path(item)))
+
                     if isinstance(config_object, ConfigurationEntry):
                         path = Path(entry) / Path(item)
                         yield from self._sub(config_object, path, orig_path=path, pattern=pattern)
