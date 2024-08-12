@@ -21,16 +21,11 @@ class LibvirtLoader(Loader):
             return False
 
         with path.open("rb") as fh:
-            part_xml_data = fh.read(512).split(b"\n")
+            lines = fh.read(512).split(b"\n")
             # From what I've seen, these are are always at the start of the file
             # If its generated using virt-install
             needles = [b"<domain", b"<name>", b"<uuid>"]
-
-            output = []
-            for needle in needles:
-                output.append(any(needle in line for line in part_xml_data))
-
-            return all(output)
+            return all(any(needle in line for line in lines) for needle in needles)
 
     def map(self, target: Target) -> None:
         xml_data = ElementTree.XML(self.path.read_text())
