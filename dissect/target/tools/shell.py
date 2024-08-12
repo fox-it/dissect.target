@@ -1247,8 +1247,8 @@ def arg_str_to_arg_list(args: str) -> list[str]:
 
 def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
     """Extend the arguments of the given ``func`` with the provided ``argparse.Namespace``."""
-    for short, _arg in func.__args__:
-        name = _arg.get("dest", short[-1]).lstrip("-").replace("-", "_")
+    for short, kwargs in func.__args__:
+        name = kwargs.get("dest", short[-1]).lstrip("-").replace("-", "_")
         if not hasattr(args, name):
             setattr(args, name, None)
     return args
