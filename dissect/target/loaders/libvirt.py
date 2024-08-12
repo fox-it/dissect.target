@@ -2,10 +2,10 @@ from pathlib import Path
 
 from defusedxml import ElementTree
 
-import dissect.target.container as container
-from dissect.target import Target
+from dissect.target import container
 from dissect.target.helpers import fsutil
 from dissect.target.loader import Loader
+from dissect.target.target import Target
 
 
 class LibvirtLoader(Loader):

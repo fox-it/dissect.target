@@ -8,13 +8,13 @@ from dissect.target.plugin import ChildTargetPlugin
 
 
 class QemuChildTargetPlugin(ChildTargetPlugin):
-    """Child target plugin that yields all qemu domains from a kvm libvirt deamon"""
+    """Child target plugin that yields all QEMU domains from a KVM libvirt deamon."""
 
     __type__ = "qemu"
 
     def check_compatible(self) -> None:
         if not self.target.fs.path("/etc/libvirt/qemu").exists():
-            raise UnsupportedPluginError("No libvirt qemu installation found.")
+            raise UnsupportedPluginError("No libvirt QEMU installation found")
 
     def list_children(self) -> Iterator[ChildTargetRecord]:
         for domain in self.target.fs.path("/etc/libvirt/qemu").glob("*.xml"):
