@@ -57,17 +57,20 @@ class NetworkPlugin(Plugin):
     def dns(self) -> list[str]:
         return list(self._get_record_type("dns"))
 
-    def interface_with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
+    @internal
+    def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
         for interface in self.interfaces():
             if ip_addr in interface.ip:
                 yield interface
 
-    def interface_with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
+    @internal
+    def with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
         for interface in self.interfaces():
             if interface.mac == mac:
                 yield interface
 
-    def interface_in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
+    @internal
+    def in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
         cidr = ip_network(cidr)
         for interface in self.interfaces():
             if any(ip_addr in cidr for ip_addr in interface.ip):
