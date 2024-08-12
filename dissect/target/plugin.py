@@ -5,6 +5,7 @@ See dissect/target/plugins/general/example.py for an example plugin.
 from __future__ import annotations
 
 import fnmatch
+import functools
 import importlib
 import importlib.util
 import inspect
@@ -450,6 +451,11 @@ def register(plugincls: Type[Plugin]) -> None:
     exports = []
     functions = []
 
+    # First pass to resolve aliases
+    for attr in get_nonprivate_attributes(plugincls):
+        for alias in getattr(attr, "__aliases__", []):
+            clone_alias(plugincls, attr, alias)
+
     for attr in get_nonprivate_attributes(plugincls):
         if isinstance(attr, property):
             attr = attr.fget
@@ -463,13 +469,6 @@ def register(plugincls: Type[Plugin]) -> None:
 
         if getattr(attr, "__internal__", False):
             functions.append(attr.__name__)
-
-        if hasattr(attr, "__aliases__"):
-            for alias in attr.__aliases__:
-                setattr(plugincls, alias, attr)
-                functions.append(alias)
-                if attr.__exported__:
-                    exports.append(alias)
 
     plugincls.__plugin__ = True
     plugincls.__functions__ = functions
@@ -567,6 +566,26 @@ def alias(*args, **kwargs: dict[str, Any]) -> Callable:
         return obj
 
     return decorator
+
+
+def clone_alias(plugincls: Plugin, attr: Callable, alias: str) -> None:
+    """Clone the given attribute to an alias in the provided Plugin."""
+
+    # Clone the function object
+    clone = type(attr)(attr.__code__, attr.__globals__, alias, attr.__defaults__, attr.__closure__)
+    clone.__kwdefaults__ = attr.__kwdefaults__
+
+    # Copy some attributes
+    functools.update_wrapper(clone, attr)
+    if wrapped := getattr(attr, "__wrapped__", None):
+        # update_wrapper sets a new wrapper, we want the original
+        clone.__wrapped__ = wrapped
+
+    # Update the names
+    clone.__name__ = alias
+    clone.__qualname__ = f"{plugincls.__name__}.{alias}"
+
+    setattr(plugincls, alias, clone)
 
 
 def plugins(

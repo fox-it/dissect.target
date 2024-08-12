@@ -8,7 +8,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, create_extended_descriptor
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import Plugin, alias, export, internal
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/history",
@@ -57,12 +57,7 @@ class CommandHistoryPlugin(Plugin):
                     history_files.append((shell, history_path, user_details.user))
         return history_files
 
-    @export(record=CommandHistoryRecord)
-    def bashhistory(self):
-        """Deprecated, use commandhistory function."""
-        self.target.log.warn("Function 'bashhistory' is deprecated, use the 'commandhistory' function instead.")
-        return self.commandhistory()
-
+    @alias("bashhistory")
     @export(record=CommandHistoryRecord)
     def commandhistory(self):
         """Return shell history for all users.

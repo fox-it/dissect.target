@@ -144,7 +144,7 @@ class ExtendedCmd(cmd.Cmd):
         dotext = "do_" + text
         return [a[3:] for a in self.get_names() + self._aliases if a.startswith(dotext)]
 
-    def check_custom_command_execution(self, line: str) -> bool | None:
+    def _handle_command(self, line: str) -> bool | None:
         """Check whether custom handling of the cmd can be performed and if so, do it.
 
         If a custom handling of the cmd was performed, return the result (a boolean indicating whether the shell should
@@ -163,7 +163,7 @@ class ExtendedCmd(cmd.Cmd):
         return None
 
     def default(self, line: str) -> bool:
-        if (should_exit := self.check_custom_command_execution(line)) is not None:
+        if (should_exit := self._handle_command(line)) is not None:
             return should_exit
 
         # Fallback to default
@@ -309,8 +309,8 @@ class TargetCmd(ExtendedCmd):
             except Exception as e:
                 log.debug("Error writing history file: %s", e)
 
-    def check_custom_command_execution(self, line: str) -> bool | None:
-        if (should_exit := super().check_custom_command_execution(line)) is not None:
+    def _handle_command(self, line: str) -> bool | None:
+        if (should_exit := super()._handle_command(line)) is not None:
             return should_exit
 
         # The parent class has already attempted complex command execution, we now attempt target plugin command
