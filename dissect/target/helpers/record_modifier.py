@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Callable, Iterable, Iterator, Optional
+from typing import Callable, Iterable, Iterator
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
@@ -47,8 +47,19 @@ def _resolve_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     return _create_modified_record("filesystem/file/resolved", field_name, type_info)
 
 
-def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Optional[Record]:
-    """Hash files from path fields inside the record."""
+def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
+    """Hash files from path fields inside the record.
+
+    Args:
+        field_name: Name of the field.
+        resolved_path: Path to the file we should hash.
+
+    Raises:
+        FileNotFoundError: Raised if the provided ``resolved_path`` does not exist on the target.
+        IsADirectoryError: Raised if the provided ``resolved_path`` is not a file.
+
+    Returns: Modified record with digests of path field types.
+    """
 
     if not resolved_path.exists():
         raise FileNotFoundError("File not found: '%s'" % resolved_path)
