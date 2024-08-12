@@ -3,11 +3,13 @@ import platform
 import sys
 from io import BytesIO, StringIO
 from pathlib import Path
+from typing import Callable
 from unittest.mock import MagicMock
 
 import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.target import Target
 from dissect.target.tools import fsutils
 from dissect.target.tools.shell import (
     TargetCli,
@@ -30,7 +32,7 @@ INPUT_STREAM = f"""
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe():
+def test_build_pipe() -> None:
     pipeparts = [
         "grep",
         "test2",
@@ -47,7 +49,7 @@ def test_build_pipe():
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe_nonexisting_command():
+def test_build_pipe_nonexisting_command() -> None:
     dummy_command = "non-existing-command"
     pipeparts = ["grep", "test1", "|", dummy_command]
     input_stream = "input data test1"
@@ -62,7 +64,7 @@ def test_build_pipe_nonexisting_command():
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe_broken_pipe():
+def test_build_pipe_broken_pipe() -> None:
     # `ls` command does not accept stdin, so pipe closes prematurely
     pipeparts = ["grep", "test1", "|", "ls"]
     input_stream = "input data test1"
@@ -76,7 +78,7 @@ def test_build_pipe_broken_pipe():
         print(input_stream, file=pipe_stdin)
 
 
-def test_targethubcli_autocomplete_enter(make_mock_targets):
+def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
     target1, target2 = make_mock_targets(2)
 
     target1.hostname = "dev-null-1.localhost"
@@ -99,7 +101,7 @@ def test_targethubcli_autocomplete_enter(make_mock_targets):
     assert suggestions == ["1"]
 
 
-def test_targetcli_autocomplete(target_bare, monkeypatch):
+def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     target_cli = TargetCli(target_bare)
 
     mock_subfolder = MagicMock(spec_set=TargetPath)
@@ -129,7 +131,7 @@ def test_targetcli_autocomplete(target_bare, monkeypatch):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_pipe_symbol_parsing(capfd, target_bare):
+def test_pipe_symbol_parsing(capfd: pytest.CaptureFixture, target_bare: Target) -> None:
     cli = TargetCli(target_bare)
 
     def mock_func(func_args, func_stdout):
@@ -153,7 +155,7 @@ def test_pipe_symbol_parsing(capfd, target_bare):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_exec_target_command(capfd, target_default):
+def test_exec_target_command(capfd: pytest.CaptureFixture, target_default: Target) -> None:
     cli = TargetCli(target_default)
     # `users` from the general OSPlugin does not ouput any records, but as the
     # ouput is piped to, the records are transformed to a binary record stream,
@@ -168,7 +170,7 @@ def test_exec_target_command(capfd, target_default):
     assert captured.out.endswith("0\n")
 
 
-def test_target_cli_ls(target_win, capsys, monkeypatch):
+def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     # disable colorful output in `target-shell`
     monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
@@ -195,7 +197,9 @@ def test_target_cli_ls(target_win, capsys, monkeypatch):
         ),
     ],
 )
-def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
+def test_target_cli_save(
+    target_win: Target, tmp_path: Path, folders: str, files: str, save: str, expected: str
+) -> None:
     output_dir = tmp_path / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import argparse
 import os
 import stat
 from datetime import datetime, timezone
-from typing import Callable, TextIO
+from typing import TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
@@ -151,6 +150,7 @@ def print_ls(
     use_atime: bool = False,
     color: bool = True,
 ) -> None:
+    """Print ls output"""
     subdirs = []
 
     if path.is_dir():
@@ -244,12 +244,3 @@ def print_xattr(basename: str, xattr: list, stdout: TextIO) -> None:
         basename=basename, attrs="\n".join([f'{attr.name}="{attr.value.decode()}"' for attr in xattr])
     )
     print(res, file=stdout)
-
-
-def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
-    for short, _arg in func.__args__:
-        name = _arg.get("dest", short[-1]).lstrip("-").replace("-", "_")
-        if not hasattr(args, name):
-            setattr(args, name, None)
-    return args
-

@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -19,7 +18,7 @@ UNIX_ACCESSORS = ["file", "auto"]
 WINDOWS_ACCESSORS = ["mft", "ntfs", "lazy_ntfs", "ntfs_vss", "auto"]
 
 
-def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional[list[Path]]]:
+def find_fs_directories(path: Path) -> tuple[OperatingSystem | None, list[Path] | None]:
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
 
     # Unix
@@ -57,7 +56,7 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
     return None, None
 
 
-def extract_drive_letter(name: str) -> Optional[str]:
+def extract_drive_letter(name: str) -> str | None:
     # \\.\X: in URL encoding
     if len(name) == 14 and name.startswith("%5C%5C.%5C") and name.endswith("%3A"):
         return name[10].lower()
@@ -97,7 +96,7 @@ class VelociraptorLoader(DirLoader):
             self.root = path
 
     @staticmethod
-    def detect(path: Path | TargetPath) -> bool:
+    def detect(path: Path) -> bool:
         # The 'uploads' folder contains the data acquired
         # The 'results' folder contains information about the used Velociraptor artifacts e.g. Generic.Collectors.File
         # The 'uploads.json' file contains information about the collected files
