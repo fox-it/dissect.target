@@ -221,6 +221,17 @@ def test_target_cli_save(
     assert tree == expected
 
 
+def run_target_shell(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, target_path: str, stdin: str
+) -> tuple[bytes, bytes]:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-shell", target_path])
+        m.setattr("sys.stdin", StringIO(stdin))
+        m.setenv("NO_COLOR", "1")
+        target_shell()
+        return capsys.readouterr()
+
+
 @pytest.mark.parametrize(
     "provided_input, expected_output",
     [
@@ -238,14 +249,24 @@ def test_target_cli_unicode_argparse(
     provided_input: str,
     expected_output: str,
 ) -> None:
-    with monkeypatch.context() as m:
-        target_file = absolute_path("_data/tools/shell/unicode.tar")
-        m.setattr("sys.argv", ["target-shell", target_file])
-        m.setattr("sys.stdin", StringIO(f"ls unicode/charsets/{provided_input}"))
-        m.setenv("NO_COLOR", 1)
-        target_shell()
-        out, err = capsys.readouterr()
-        out = out.replace("unicode.tar:/$", "").strip()
+    out, err = run_target_shell(
+        monkeypatch, capsys, absolute_path("_data/tools/shell/unicode.tar"), f"ls unicode/charsets/{provided_input}"
+    )
+    out = out.replace("unicode.tar:/$", "").strip()
+    assert out == expected_output
+    assert "unrecognized arguments" not in err
 
-        assert out == expected_output
-        assert "unrecognized arguments" not in err
+
+def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """test if alias commands call their parent attribute correctly."""
+    target_path = absolute_path("_data/tools/info/image.tar")
+
+    # 'dir' and 'ls' should return the same output
+    dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
+    ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
+    assert dir_out == ls_out
+
+    # ll is not really a standard aliased command so we test that separately.
+    ls_la_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls -la")
+    ll_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ll")
+    assert ls_la_out == ll_out
