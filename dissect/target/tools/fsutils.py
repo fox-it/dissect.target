@@ -65,10 +65,7 @@ def human_size(bytes: int, units: list[str] = ["", "K", "M", "G", "T", "P", "E"]
 
 def stat_modestr(st: fsutil.stat_result) -> str:
     """Helper method for generating a mode string from a numerical mode value."""
-    is_dir = "d" if stat.S_ISDIR(st.st_mode) else "-"
-    dic = {"7": "rwx", "6": "rw-", "5": "r-x", "4": "r--", "0": "---"}
-    perm = str(oct(st.st_mode)[-3:])
-    return is_dir + "".join(dic.get(x, x) for x in perm)
+    return stat.filemode(st.st_mode)
 
 
 def print_extensive_file_stat_listing(
