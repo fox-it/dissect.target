@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Union
 
@@ -138,10 +139,13 @@ def print_target_info(target: Target) -> None:
         if isinstance(value, list):
             value = ", ".join(value)
 
+        if isinstance(value, datetime):
+            value = value.isoformat(timespec="microseconds")
+
         if name == "hostname":
             print()
 
-        print(f"{name.capitalize().replace('_', ' ')}" + (14 - len(name)) * " " + f" : {value}")
+        print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
 def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:

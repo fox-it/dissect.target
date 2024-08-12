@@ -87,7 +87,7 @@ class Target:
         self._applied = False
 
         try:
-            self._config = config.load([self.path, os.getcwd()])
+            self._config = config.load([self.path, os.getcwd(), os.getenv("HOME")])
         except Exception as e:
             self.log.warning("Error loading config file: %s", self.path)
             self.log.debug("", exc_info=e)

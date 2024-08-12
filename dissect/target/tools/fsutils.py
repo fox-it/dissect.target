@@ -1,7 +1,10 @@
+from __future__ import annotations
+
+import argparse
 import os
 import stat
-from datetime import UTC, datetime
-from typing import TextIO
+from datetime import datetime, timezone
+from typing import Callable, TextIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
@@ -10,8 +13,8 @@ from dissect.target.helpers.fsutil import TargetPath
 
 # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
 STAT_TEMPLATE = """  File: {path} {symlink}
-  Size: {size}          {filetype}
- Inode: {inode}   Links: {nlink}
+  Size: {size}       Blocks: {blocks}    IO Block: {blksize}     {filetype}
+Device: {device}     Inode: {inode}      Links: {nlink}
 Access: ({modeord}/{modestr})  Uid: ( {uid} )   Gid: ( {gid} )
 Access: {atime}
 Modify: {mtime}
@@ -83,7 +86,7 @@ def print_extensive_file_stat_listing(
             if timestamp is None:
                 timestamp = entry_stat.st_mtime
             symlink = f" -> {entry.readlink()}" if entry.is_symlink() else ""
-            utc_time = datetime.fromtimestamp(timestamp, tz=UTC).isoformat(timespec="microseconds")
+            utc_time = datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat(timespec="microseconds")
             size = f"{human_size(entry_stat.st_size):5s}" if human_readable else f"{entry_stat.st_size:10d}"
 
             print(
@@ -96,7 +99,11 @@ def print_extensive_file_stat_listing(
             return
         except FileNotFoundError:
             pass
-    print(f"??????????    ?    ?          ? ????-??-??T??:??:??.?????? {name}", file=stdout)
+
+    hr_spaces = f"{'':5s}" if human_readable else " "
+    regular_spaces = f"{'':10s}" if not human_readable else " "
+
+    print(f"??????????    ?    ?{regular_spaces}?{hr_spaces}????-??-??T??:??:??.??????+??:?? {name}", file=stdout)
 
 
 def ls_scandir(path: fsutil.TargetPath, color: bool = False) -> list[tuple[fsutil.TargetPath, str]]:
@@ -201,30 +208,48 @@ def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = Fals
         symlink=symlink,
         size=s.st_size,
         filetype=filetype(path),
+        device="?",
         inode=s.st_ino,
+        blocks=s.st_blocks or "?",
+        blksize=s.st_blksize or "?",
         nlink=s.st_nlink,
         modeord=oct(stat.S_IMODE(s.st_mode)),
         modestr=stat_modestr(s),
         uid=s.st_uid,
         gid=s.st_gid,
-        atime=datetime.fromtimestamp(s.st_atime, tz=UTC).isoformat(timespec="microseconds"),
-        mtime=datetime.fromtimestamp(s.st_mtime, tz=UTC).isoformat(timespec="microseconds"),
-        ctime=datetime.fromtimestamp(s.st_ctime, tz=UTC).isoformat(timespec="microseconds"),
-        btime=datetime.fromtimestamp(s.st_birthtime, tz=UTC).isoformat(timespec="microseconds")
-        if hasattr(s, "st_birthtime")
-        else None,
+        atime=datetime.fromtimestamp(s.st_atime, tz=timezone.utc).isoformat(timespec="microseconds"),
+        mtime=datetime.fromtimestamp(s.st_mtime, tz=timezone.utc).isoformat(timespec="microseconds"),
+        ctime=datetime.fromtimestamp(s.st_ctime, tz=timezone.utc).isoformat(timespec="microseconds"),
+        btime=datetime.fromtimestamp(s.st_birthtime, tz=timezone.utc).isoformat(timespec="microseconds")
+        if hasattr(s, "st_birthtime") and s.st_birthtime
+        else "?",
     )
     print(res, file=stdout)
 
-    if xattr := path.get().attr():
-        print("  Attr:")
-        print_xattr(path.name, xattr, stdout)
+    try:
+        if (xattr := path.get().attr()) and isinstance(xattr, list) and hasattr(xattr[0], "name"):
+            print("  Attr:")
+            print_xattr(path.name, xattr, stdout)
+    except Exception:
+        pass
 
 
 def print_xattr(basename: str, xattr: list, stdout: TextIO) -> None:
     """Mimics getfattr -d {file} behaviour"""
+    if not hasattr(xattr[0], "name"):
+        return
+
     XATTR_TEMPLATE = "# file: {basename}\n{attrs}"
     res = XATTR_TEMPLATE.format(
         basename=basename, attrs="\n".join([f'{attr.name}="{attr.value.decode()}"' for attr in xattr])
     )
     print(res, file=stdout)
+
+
+def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
+    for short, _arg in func.__args__:
+        name = _arg.get("dest", short[-1]).lstrip("-").replace("-", "_")
+        if not hasattr(args, name):
+            setattr(args, name, None)
+    return args
+

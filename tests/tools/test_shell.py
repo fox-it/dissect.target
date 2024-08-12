@@ -238,9 +238,10 @@ def test_target_cli_unicode_argparse(
         target_file = absolute_path("_data/tools/shell/unicode.tar")
         m.setattr("sys.argv", ["target-shell", target_file])
         m.setattr("sys.stdin", StringIO(f"ls unicode/charsets/{provided_input}"))
+        m.setenv("NO_COLOR", 1)
         target_shell()
         out, err = capsys.readouterr()
-        out = out.replace("unicode.tar />", "").strip()
+        out = out.replace("unicode.tar:/$", "").strip()
 
         assert out == expected_output
         assert "unrecognized arguments" not in err

@@ -196,6 +196,8 @@ class Plugin:
     The :func:`internal` decorator and :class:`InternalPlugin` set the ``__internal__`` attribute.
     Finally. :func:`args` decorator sets the ``__args__`` attribute.
 
+    The :func:`alias` decorator populates the ``__aliases__`` private attribute of :class:`Plugin` methods.
+
     Args:
         target: The :class:`~dissect.target.target.Target` object to load the plugin for.
     """
@@ -462,6 +464,13 @@ def register(plugincls: Type[Plugin]) -> None:
         if getattr(attr, "__internal__", False):
             functions.append(attr.__name__)
 
+        if hasattr(attr, "__aliases__"):
+            for alias in attr.__aliases__:
+                setattr(plugincls, alias, attr)
+                functions.append(alias)
+                if attr.__exported__:
+                    exports.append(alias)
+
     plugincls.__plugin__ = True
     plugincls.__functions__ = functions
     plugincls.__exports__ = exports
@@ -537,6 +546,24 @@ def arg(*args, **kwargs) -> Callable:
             obj.__args__ = []
         arglist = getattr(obj, "__args__", [])
         arglist.append((args, kwargs))
+        return obj
+
+    return decorator
+
+
+def alias(*args, **kwargs: dict[str, Any]) -> Callable:
+    """Decorator to be used on :class:`Plugin` functions to register an alias of that function."""
+
+    if not kwargs.get("name") and not args:
+        raise ValueError("Missing argument 'name'")
+
+    def decorator(obj: Callable) -> Callable:
+        if not hasattr(obj, "__aliases__"):
+            obj.__aliases__ = []
+
+        if name := (kwargs.get("name") or args[0]):
+            obj.__aliases__.append(name)
+
         return obj
 
     return decorator
