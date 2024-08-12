@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Iterator, Union
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
@@ -8,13 +10,17 @@ from dissect.target.helpers.record import (
     WindowsInterfaceRecord,
 )
 from dissect.target.plugin import Plugin, export, internal
+from dissect.target.target import Target
 
 InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
 
 
 class NetworkPlugin(Plugin):
     __namespace__ = "network"
-    _interface_list: list = None
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._interface_list: list[InterfaceRecord] | None = None
 
     def check_compatible(self) -> None:
         pass
