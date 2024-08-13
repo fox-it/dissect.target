@@ -62,6 +62,13 @@ try:
     # remove `-`, `$` and `{` as an autocomplete delimeter on Linux
     # https://stackoverflow.com/questions/27288340/python-cmd-on-linux-does-not-autocomplete-special-characters-or-symbols
     readline.set_completer_delims(readline.get_completer_delims().replace("-", "").replace("$", "").replace("{", ""))
+    
+    # Fix autocomplete on macOS
+    # https://stackoverflow.com/a/7116997
+    if "libedit" in readline.__doc__:
+        readline.parse_and_bind("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
 except ImportError:
     # Readline is not available on Windows
     log.warning("Readline module is not available")
