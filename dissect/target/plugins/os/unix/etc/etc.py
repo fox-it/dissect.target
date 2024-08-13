@@ -29,7 +29,7 @@ class EtcTree(ConfigurationTreePlugin):
         super().__init__(target, "/etc")
 
     def _sub(
-        self, items: Union[ConfigurationEntry, dict], entry: Path, orig_path: Path, pattern: str
+        self, items: ConfigurationEntry | dict, entry: Path, orig_path: Path, pattern: str
     ) -> Iterator[UnixConfigTreeRecord]:
         index = 0
         if not isinstance(items, dict):
