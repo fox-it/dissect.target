@@ -2,6 +2,7 @@
 
 See dissect/target/plugins/general/example.py for an example plugin.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -568,8 +569,8 @@ def alias(*args, **kwargs: dict[str, Any]) -> Callable:
     return decorator
 
 
-def clone_alias(plugincls: Plugin, attr: Callable, alias: str) -> None:
-    """Clone the given attribute to an alias in the provided Plugin."""
+def clone_alias(cls: type, attr: Callable, alias: str) -> None:
+    """Clone the given attribute to an alias in the provided class."""
 
     # Clone the function object
     clone = type(attr)(attr.__code__, attr.__globals__, alias, attr.__defaults__, attr.__closure__)
@@ -581,11 +582,14 @@ def clone_alias(plugincls: Plugin, attr: Callable, alias: str) -> None:
         # update_wrapper sets a new wrapper, we want the original
         clone.__wrapped__ = wrapped
 
+    # Update module path so we can fool inspect.getmodule with subclassed Plugin classes
+    clone.__module__ = cls.__module__
+
     # Update the names
     clone.__name__ = alias
-    clone.__qualname__ = f"{plugincls.__name__}.{alias}"
+    clone.__qualname__ = f"{cls.__name__}.{alias}"
 
-    setattr(plugincls, alias, clone)
+    setattr(cls, alias, clone)
 
 
 def plugins(

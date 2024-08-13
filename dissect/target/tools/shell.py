@@ -32,7 +32,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import PluginFunction, alias, arg
+from dissect.target.plugin import PluginFunction, alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.fsutils import (
     fmt_ls_colors,
@@ -100,7 +100,7 @@ class ExtendedCmd(cmd.Cmd):
         self.debug = False
         self.cyber = cyber
         self.identchars += "."
-        self._aliases = []
+
         self.register_aliases()
 
     def __getattr__(self, attr: str) -> Any:
@@ -126,14 +126,12 @@ class ExtendedCmd(cmd.Cmd):
     def register_aliases(self) -> None:
         for name in self.get_names():
             if name.startswith(self.CMD_PREFIX):
-                func = getattr(self, name)
-                for _alias in getattr(func, "__aliases__", []):
-                    if not _alias.startswith(self.CMD_PREFIX):
-                        _alias = self.CMD_PREFIX + _alias
-                    # copy the function to the defined cmd_* alias
-                    setattr(self, _alias, func)
-                    # append the alias command do_* to _aliases for man/help
-                    self._aliases.append(_alias.replace(self.CMD_PREFIX, "do_", 1))
+                func = getattr(self.__class__, name)
+                for alias_name in getattr(func, "__aliases__", []):
+                    if not alias_name.startswith(self.CMD_PREFIX):
+                        alias_name = self.CMD_PREFIX + alias_name
+
+                    clone_alias(self.__class__, func, alias_name)
 
     def get_names(self) -> list[str]:
         names = cmd.Cmd.get_names(self)
@@ -145,11 +143,6 @@ class ExtendedCmd(cmd.Cmd):
             names.append("help_" + c)
 
         return names
-
-    def completenames(self, text: str, *ignored) -> list[str]:
-        # https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L247
-        dotext = "do_" + text
-        return [a[3:] for a in self.get_names() + self._aliases if a.startswith(dotext)]
 
     def _handle_command(self, line: str) -> bool | None:
         """Check whether custom handling of the cmd can be performed and if so, do it.
