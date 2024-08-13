@@ -144,7 +144,7 @@ class stat_result:  # noqa
         "st_file_attributes": "Windows file attribute bits",
         "st_fstype": "Type of filesystem",
         "st_reparse_tag": "Windows reparse tag",
-        "st_birthtime_ts": "time of creation in nanoseconds",
+        "st_birthtime_ns": "time of creation in nanoseconds",
         # Internal fields
         "_s": "internal tuple",
     }
