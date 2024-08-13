@@ -1,7 +1,7 @@
 import fnmatch
 import re
 from pathlib import Path
-from typing import Iterator, Union
+from typing import Iterator
 
 from dissect.target import Target
 from dissect.target.helpers.record import TargetRecordDescriptor
