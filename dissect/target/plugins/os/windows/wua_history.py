@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import re
+from datetime import datetime
 from typing import Iterator
 
-from dissect.esedb.c_esedb import RecordValue, decode_guid
+from dissect.esedb.c_esedb import decode_guid
 from dissect.esedb.esedb import EseDB
 from dissect.util.ts import oatimestamp
 
@@ -955,44 +958,22 @@ class WuaHistoryPlugin(Plugin):
         if not self._datastore or not self._update_table:
             raise UnsupportedPluginError("No Windows Update Agent data found.")
 
-    def get_table_records(self) -> Iterator[dict[str, RecordValue]]:
+    def get_table_records(self) -> Iterator[dict[str, str | int | datetime]]:
         for record in self._update_table.records():
             record_data = {}
             for column in self._update_table.columns:
-                value = record.get(column.name)
-                mapped_column_name = TBHISTORY_COLUMN_MAP.get(column.name, None)
+                column_value = record.get(column.name)
 
-                if not mapped_column_name:
-                    continue
-                if mapped_column_name == "ts":
-                    value = oatimestamp(value)
-                elif mapped_column_name == "update_id":
-                    value = decode_guid(value[:16])
-                elif mapped_column_name == "server_id":
-                    value = decode_guid(value[:16])
-                    record_data["server_id_mapped"] = SERVER_ID_MAP.get(value, "Unknown")
-                elif mapped_column_name == "classification":
-                    record_data["classification_mapped"] = CLASSIFICATION_MAP.get(value, "Unknown")
-                elif mapped_column_name == "title":
-                    if kb := re.search(r"(KB.[0-9]*)", value):
-                        record_data["kb"] = kb.group()
-                elif mapped_column_name == "status":
-                    record_data["status_mapped"] = STATUS_MAP.get(value, "Unknown")
-                elif mapped_column_name == "mapped_result":
-                    value = hex(int(value) & 0xFFFFFFFF)
-                    info = WUA_CODE_MAP.get(value, ["Unknown", "Unknown"])
-                    record_data["mapped_result_string"] = info[0]
-                    record_data["mapped_result_description"] = info[1]
-                elif mapped_column_name == "unmapped_result":
-                    value = hex(int(value) & 0xFFFFFFFF)
-                    info = WUA_CODE_MAP.get(value, ["Unknown", "Unknown"])
-                    record_data["unmapped_result_string"] = info[0]
-                    record_data["unmapped_result_description"] = info[1]
-                elif mapped_column_name == "server_selection":
-                    value -= 1
-                    record_data["server_selection_mapped"] = SERVER_SELECTION_MAP.get(value, "Unknown")
+                if mapped_column_name := TBHISTORY_COLUMN_MAP.get(column.name):
+                    if mapped_column_name in "unmapped_result":
+                        column_value = hex(int(column_value) & 0xFFFFFFFF)
 
-                record_data[mapped_column_name] = value
+                        info = WUA_CODE_MAP.get(column_value, ["Unknown", "Unknown"])
+                        record_data[f"{mapped_column_name}_description"] = info[0]
+                        record_data[f"{mapped_column_name}_string"] = info[1]
+
+                    record_data.update(self._format_record_value(mapped_column_name, column_value))
+
             yield record_data
 
     @export(record=WuaHistoryRecord)
@@ -1051,7 +1032,7 @@ class WuaHistoryPlugin(Plugin):
             path (uri): Path of the datastore containing the Windows Update Agent records.
             id_user (int): Undocumented and unknown.
             is_service_is_additional (string): Undocumented and unknown.
-        """  # noqa
+        """  # noqa: E501
         for record in self.get_table_records():
             values = {TBHISTORY_COLUMN_MAP.get(key, key): value for key, value in record.items()}
 
@@ -1060,3 +1041,33 @@ class WuaHistoryPlugin(Plugin):
                 path=self.target.fs.path(self.DATASTORE_PATH),
                 _target=self.target,
             )
+
+    def _format_record_value(self, mapped_column_name: str, value: str) -> dict[str, str | int | datetime]:
+        format_data = {}
+
+        if mapped_column_name == "ts":
+            format_data[mapped_column_name] = oatimestamp(value)
+        elif mapped_column_name == "update_id":
+            format_data[mapped_column_name] = decode_guid(value[:16])
+        elif mapped_column_name == "server_id":
+            guid = decode_guid(value[:16])
+            format_data[mapped_column_name] = guid
+            format_data["server_id_mapped"] = SERVER_ID_MAP.get(guid, "Unknown")
+        elif mapped_column_name == "classification":
+            format_data[mapped_column_name] = value
+            format_data["classification_mapped"] = CLASSIFICATION_MAP.get(value, "Unknown")
+        elif mapped_column_name == "title":
+            format_data[mapped_column_name] = value
+            if kb := re.search(r"(KB.[0-9]*)", value):
+                format_data["kb"] = kb.group()
+        elif mapped_column_name == "status":
+            format_data[mapped_column_name] = value
+            format_data["status_mapped"] = STATUS_MAP.get(value, "Unknown")
+        elif mapped_column_name == "server_selection":
+            key = value - 1
+            format_data[mapped_column_name] = key
+            format_data["server_selection_mapped"] = SERVER_SELECTION_MAP.get(key, "Unknown")
+        else:
+            format_data[mapped_column_name] = value
+
+        return format_data
