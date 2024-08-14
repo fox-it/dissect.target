@@ -120,7 +120,16 @@ class WindowsNotepadTab:
 
     def __init__(self, file: TargetPath):
         self.file = file
+        self.is_saved = None
+        self.content = None
+        self.deleted_content = None
         self._process_tab_file()
+
+    def __repr__(self):
+        return (
+            f"<{self.__class__.__name__} saved={self.is_saved} "
+            f"content_size={len(self.content)} has_deleted_content={self.deleted_content is not None}>"
+        )
 
     def _process_tab_file(self):
         """Parse a binary tab file and reconstruct the contents."""

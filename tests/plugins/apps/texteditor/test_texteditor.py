@@ -35,10 +35,7 @@ def test_windows_tab_parsing():
     tab_file = Path(absolute_path("_data/plugins/apps/texteditor/windowsnotepad/unsaved-with-deletions.bin"))
     content = WindowsNotepadTab(tab_file)
     assert content.content == "Not saved aasdflasd"
-
-    content_with_deletions = WindowsNotepadTab(tab_file)
-    assert content_with_deletions.content == "Not saved aasdflasd"
-    assert content_with_deletions.deleted_content == "snUlltllafds tjkf"
+    assert repr(content) == "<WindowsNotepadTab saved=False content_size=19 has_deleted_content=True>"
 
 
 def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, target_win_users, caplog):
