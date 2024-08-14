@@ -1,7 +1,7 @@
 import io
 import logging
 from struct import error as StructError
-from typing import Any, BinaryIO, Iterator
+from typing import BinaryIO, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.ole import OLE
@@ -59,20 +59,39 @@ c_custom_destination = cstruct()
 c_custom_destination.load(custom_destination_def)
 
 
-def parse_name(name: str) -> tuple[Any, str, str]:
-    application_id, application_type = name.split(".")
-    application_type = application_type.split("-")[0]
-    application_name = APPLICATION_IDENTIFIERS.get(application_id)
-
-    return application_name, application_id, application_type
-
-
-class AutomaticDestinationFile:
-    """Parse Jump List AutomaticDestination file."""
-
+class JumpListFile:
     def __init__(self, fh: BinaryIO, file_name: str):
         self.fh = fh
         self.file_name = file_name
+
+        self.application_id, self.application_type = file_name.split(".")
+        self.application_type = self.application_type.split("-")[0]
+        self.application_name = APPLICATION_IDENTIFIERS.get(self.application_id)
+
+    def __iter__(self) -> Iterator[Lnk]:
+        raise NotImplementedError
+
+    @property
+    def name(self) -> str:
+        """Return the name of the application."""
+        return self.application_name
+
+    @property
+    def id(self) -> str:
+        """Return the application identifier."""
+        return self.application_id
+
+    @property
+    def type(self) -> str:
+        """Return the type of the Jump List file."""
+        return self.application_type
+
+
+class AutomaticDestinationFile(JumpListFile):
+    """Parse Jump List AutomaticDestination file."""
+
+    def __init__(self, fh: BinaryIO, file_name: str):
+        super().__init__(fh, file_name)
         self.ole = OLE(self.fh)
 
     def __iter__(self) -> Iterator[Lnk]:
@@ -92,20 +111,15 @@ class AutomaticDestinationFile:
                     log.debug("", exc_info=e)
                     continue
 
-    @property
-    def name(self) -> tuple[Any, str, str]:
-        return parse_name(self.file_name)
 
-
-class CustomDestinationFile:
+class CustomDestinationFile(JumpListFile):
     """Parse Jump List CustomDestination file."""
 
     MAGIC_FOOTER = 0xBABFFBAB
     VERSIONS = [2]
 
     def __init__(self, fh: BinaryIO, file_name: str):
-        self.fh = fh
-        self.file_name = file_name
+        super().__init__(fh, file_name)
 
         self.fh.seek(-4, io.SEEK_END)
         self.footer = c_custom_destination.footer(self.fh.read(4))
@@ -145,10 +159,6 @@ class CustomDestinationFile:
                 log.debug("", exc_info=e)
                 continue
 
-    @property
-    def name(self) -> tuple[Any, str, str]:
-        return parse_name(self.file_name)
-
 
 class JumpListPlugin(Plugin):
     """Jump List is a Windows feature introduced in Windows 7.
@@ -185,7 +195,7 @@ class JumpListPlugin(Plugin):
 
     @export(record=JumpListRecord)
     def custom_destination(self) -> Iterator[JumpListRecord]:
-        """Return the content of custom destination Windows Jump Lists.
+        """Return the content of CustomDestination Windows Jump Lists.
 
         These are created when a user pins an application or a file in a Jump List.
 
@@ -215,37 +225,11 @@ class JumpListPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-
-        for destination, user in self.custom_destinations:
-            fh = destination.open("rb")
-
-            try:
-                custom_destination = CustomDestinationFile(fh, destination.name)
-            except Exception as e:
-                self.target.log.warning("Failed to parse CustomDestination header: %s", destination)
-                self.target.log.debug("", exc_info=e)
-                continue
-
-            application_name, application_id, application_type = custom_destination.name
-
-            for lnk in custom_destination:
-                lnk = parse_lnk_file(self.target, lnk, destination)
-
-                if lnk is None:
-                    continue
-
-                yield JumpListRecord(
-                    type=application_type,
-                    application_name=application_name,
-                    application_id=application_id,
-                    **lnk._asdict(),
-                    _user=user,
-                    _target=self.target,
-                )
+        yield from self._generate_records(self.custom_destinations)
 
     @export(record=JumpListRecord)
     def automatic_destination(self) -> Iterator[JumpListRecord]:
-        """Return the content of automatic destination Windows Jump Lists.
+        """Return the content of AutomaticDestination Windows Jump Lists.
 
         These are created automatically when a user opens an application or file.
 
@@ -275,11 +259,18 @@ class JumpListPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-        for destination, user in self.automatic_destinations:
+        yield from self._generate_records(self.automatic_destinations)
+
+    def _generate_records(self, destinations: list) -> Iterator[JumpListRecord]:
+        for destination, user in destinations:
             fh = destination.open("rb")
 
             try:
-                automatic_destination = AutomaticDestinationFile(fh, destination.name)
+                destination_file = (
+                    CustomDestinationFile(fh, destination.name)
+                    if destination.name.endswith(".customDestinations-ms")
+                    else AutomaticDestinationFile(fh, destination.name)
+                )
             except OleError:
                 continue
             except Exception as e:
@@ -287,19 +278,13 @@ class JumpListPlugin(Plugin):
                 self.target.log.debug("", exc_info=e)
                 continue
 
-            application_name, application_id, type = automatic_destination.name
-
-            for lnk in automatic_destination:
-                lnk = parse_lnk_file(self.target, lnk, destination)
-
-                if lnk is None:
-                    continue
-
-                yield JumpListRecord(
-                    type=type,
-                    application_name=application_name,
-                    application_id=application_id,
-                    **lnk._asdict(),
-                    _user=user,
-                    _target=self.target,
-                )
+            for lnk in destination_file:
+                if lnk := parse_lnk_file(self.target, lnk, destination):
+                    yield JumpListRecord(
+                        type=destination_file.type,
+                        application_name=destination_file.name,
+                        application_id=destination_file.id,
+                        **lnk._asdict(),
+                        _user=user,
+                        _target=self.target,
+                    )
