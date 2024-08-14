@@ -17,6 +17,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/$Extend",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/windows/system32",
+        f"uploads/{sub_dir}/%5C%5C.%5CC%3A/%2ETEST",
     ]
     root = tmp_path
     mkdirs(root, paths)
@@ -74,6 +75,7 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
     assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
+    assert target_bare.fs.path("sysvol/.TEST").exists()
 
 
 @pytest.mark.parametrize(
@@ -102,6 +104,7 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert target_bare.fs.path("sysvol/.TEST").exists()
 
 
 @pytest.mark.parametrize(
