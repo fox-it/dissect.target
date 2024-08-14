@@ -134,6 +134,10 @@ class ExtFilesystemEntry(FilesystemEntry):
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
 
+        # Set blocks
+        st_info.st_blocks = self.entry.inode.i_blocks_lo
+        st_info.st_blksize = self.entry.extfs.block_size
+
         return st_info
 
     def attr(self) -> Any:
