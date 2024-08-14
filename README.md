@@ -58,16 +58,19 @@ Opening a shell on a target is straight-forward. You can do so by specifying a p
 
 ```bash
     target-shell targets/EXAMPLE.vmx
-    EXAMPLE /> help
+    WIN-EXAMPLE:/$ help
 
     Documented commands (type help <topic>):
     ========================================
-    cat    disks  filesystems  help     less  python    save
-    cd     exit   find         hexdump  ls    readlink  stat
-    clear  file   hash         info     pwd   registry  volumes
+    attr   cls    enter        find     info  man       registry  volumes
+    cat    cyber  exit         hash     less  pwd       save      zcat   
+    cd     debug  file         help     ll    python    stat      zless  
+    clear  disks  filesystems  hexdump  ls    readlink  tree    
 
-    EXAMPLE /> ls
+    WIN-EXAMPLE:/$ ls
+    $fs$
     c:
+    efi
     sysvol
 ```
 
