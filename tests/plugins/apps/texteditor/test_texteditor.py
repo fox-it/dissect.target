@@ -36,18 +36,21 @@ def test_windows_tab_parsing(tmp_path):
     content_record = WindowsNotepadTabContent(tab_file)
     assert content_record.content == "Not saved aasdflasd"
 
-    content_record_with_deletions = WindowsNotepadTabContent(tab_file, include_deleted_content=True)
-    assert content_record_with_deletions.content == "Not saved aasdflasd --- DELETED-CONTENT: snUlltllafds tjkf"
+    content_record_with_deletions = WindowsNotepadTabContent(tab_file)
+    assert content_record_with_deletions.content == "Not saved aasdflasd"
+    assert content_record_with_deletions.deleted_content == "snUlltllafds tjkf"
 
 
 def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, target_win_users, caplog):
     file_text_map = {
-        "unsaved-with-deletions.bin": "Not saved aasdflasd --- DELETED-CONTENT: snUlltllafds tjkf",
-        "lots-of-deletions.bin": "This a text, which is nothing special. But I am going to modify it a bit. "
-        "For example, I have removed quote some stuff. "
-        "Adding a word in the beginning now... "
-        "At this point, I've edited it quite a lot. --- DELETED-CONTENT: "
-        "b a ,elpmac ydaerlae already thi laiceps emos",
+        "unsaved-with-deletions.bin": ("Not saved aasdflasd", "snUlltllafds tjkf"),
+        "lots-of-deletions.bin": (
+            "This a text, which is nothing special. But I am going to modify it a bit. "
+            "For example, I have removed quote some stuff. "
+            "Adding a word in the beginning now... "
+            "At this point, I've edited it quite a lot.",
+            "b a ,elpmac ydaerlae already thi laiceps emos",
+        ),
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
@@ -65,7 +68,7 @@ def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, targe
 
     target_win.add_plugin(WindowsNotepadPlugin)
 
-    records = list(target_win.windowsnotepad.tabs(include_deleted_content=True))
+    records = list(target_win.windowsnotepad.tabs())
 
     # Check the amount of files
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
@@ -73,29 +76,33 @@ def test_windows_tab_plugin_deleted_contents(target_win, fs_win, tmp_path, targe
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
-        assert rec.content == file_text_map[rec.path.name]
-        assert len(rec.content) == len(file_text_map[rec.path.name])
+        print(rec)
+        assert rec.content == file_text_map[rec.path.name][0]
+        assert rec.deleted_content == file_text_map[rec.path.name][1]
 
 
 def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_users, caplog):
     file_text_map = {
-        "c515e86f-08b3-4d76-844a-cddfcd43fcbb.bin": text1,
-        "85167c9d-aac2-4469-ae44-db5dccf8f7f4.bin": text2,
-        "dae80df8-e1e5-4996-87fe-b453f63fcb19.bin": text3,
-        "3f915e17-cf6c-462b-9bd1-2f23314cb979.bin": text4,
-        "ba291ccd-f1c3-4ca8-949c-c01f6633789d.bin": (text5 * 5),
-        "e609218e-94f2-45fa-84e2-f29df2190b26.bin": (text6 * 1260),
-        "3d0cc86e-dfc9-4f16-b74a-918c2c24188c.bin": loremipsum,
-        "wrong-checksum.bin": text4,  # only added to check for corrupt checksum, not validity
-        "cfe38135-9dca-4480-944f-d5ea0e1e589f.bin": (loremipsum * 37)[:-2],  # removed the two newlines in this file
-        "saved.bin": "Saved!",
-        "unsaved.bin": "Not saved at all",
-        "unsaved-with-deletions.bin": "Not saved aasdflasd",
-        "lots-of-deletions.bin": text7,
-        "appclosed_saved_and_deletions.bin": text8,
-        "appclosed_unsaved.bin": "Closing application now",
-        "new-format.bin": "",
-        "stored_unsaved_with_new_data.bin": "Stored to disk but unsaved, but with extra data.",
+        "c515e86f-08b3-4d76-844a-cddfcd43fcbb.bin": (text1, None),
+        "85167c9d-aac2-4469-ae44-db5dccf8f7f4.bin": (text2, None),
+        "dae80df8-e1e5-4996-87fe-b453f63fcb19.bin": (text3, "THis is "),
+        "3f915e17-cf6c-462b-9bd1-2f23314cb979.bin": (text4, None),
+        "ba291ccd-f1c3-4ca8-949c-c01f6633789d.bin": ((text5 * 5), None),
+        "e609218e-94f2-45fa-84e2-f29df2190b26.bin": ((text6 * 1260), None),
+        "3d0cc86e-dfc9-4f16-b74a-918c2c24188c.bin": (loremipsum, None),
+        "wrong-checksum.bin": (text4, None),  # only added to check for corrupt checksum, not validity
+        "cfe38135-9dca-4480-944f-d5ea0e1e589f.bin": (
+            (loremipsum * 37)[:-2],
+            None,
+        ),  # removed the two newlines in this file
+        "saved.bin": ("Saved!", None),
+        "unsaved.bin": ("Not saved at all", "snUllt"),
+        "unsaved-with-deletions.bin": ("Not saved aasdflasd", "snUlltllafds tjkf"),
+        "lots-of-deletions.bin": (text7, "b a ,elpmac ydaerlae already thi laiceps emos"),
+        "appclosed_saved_and_deletions.bin": (text8, None),
+        "appclosed_unsaved.bin": ("Closing application now", None),
+        "new-format.bin": ("", None),
+        "stored_unsaved_with_new_data.bin": ("Stored to disk but unsaved, but with extra data.", None),
     }
 
     tabcache = absolute_path("_data/plugins/apps/texteditor/windowsnotepad/")
@@ -113,7 +120,7 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
 
     target_win.add_plugin(WindowsNotepadPlugin)
 
-    records = list(target_win.windowsnotepad.tabs(include_deleted_content=False))
+    records = list(target_win.windowsnotepad.tabs())
 
     # Check the amount of files
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
@@ -128,8 +135,9 @@ def test_windows_tab_plugin_default(target_win, fs_win, tmp_path, target_win_use
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
-        assert rec.content == file_text_map[rec.path.name]
-        assert len(rec.content) == len(file_text_map[rec.path.name])
+        print(rec)
+        assert rec.content == file_text_map[rec.path.name][0]
+        assert rec.deleted_content == file_text_map[rec.path.name][1]
 
 
 def test_windows_saved_tab_plugin_extra_fields(target_win, fs_win, tmp_path, target_win_users, caplog):
@@ -163,7 +171,7 @@ def test_windows_saved_tab_plugin_extra_fields(target_win, fs_win, tmp_path, tar
 
     target_win.add_plugin(WindowsNotepadPlugin)
 
-    records = list(target_win.windowsnotepad.tabs(include_deleted_content=False))
+    records = list(target_win.windowsnotepad.tabs())
 
     # Check the amount of files
     assert len(list(tab_dir.iterdir())) == len(file_text_map.keys())
@@ -176,4 +184,4 @@ def test_windows_saved_tab_plugin_extra_fields(target_win, fs_win, tmp_path, tar
         assert rec.content == file_text_map[rec.path.name][0]
         assert rec.saved_path == file_text_map[rec.path.name][1]
         assert rec.modification_time == file_text_map[rec.path.name][2]
-        assert rec.sha256 == file_text_map[rec.path.name][3]
+        assert rec.hashes.sha256 == file_text_map[rec.path.name][3]

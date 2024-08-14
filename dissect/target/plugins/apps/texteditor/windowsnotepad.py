@@ -6,6 +6,7 @@ from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
+from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -19,7 +20,7 @@ from dissect.target.helpers.record import (
     WindowsUserRecord,
     create_extended_descriptor,
 )
-from dissect.target.plugin import arg, export
+from dissect.target.plugin import export
 from dissect.target.plugins.apps.texteditor.texteditor import (
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
     TexteditorPlugin,
@@ -96,7 +97,7 @@ struct options_v2 {
 };
 """
 
-WINDOWS_SAVED_TABS_EXTRA_FIELDS = [("datetime", "modification_time"), ("string", "sha256"), ("path", "saved_path")]
+WINDOWS_SAVED_TABS_EXTRA_FIELDS = [("datetime", "modification_time"), ("digest", "hashes"), ("path", "saved_path")]
 
 
 class WindowsSavedTabRecordDescriptorExtension(RecordDescriptorExtensionBase):
@@ -111,14 +112,14 @@ class WindowsSavedTabRecordDescriptorExtension(RecordDescriptorExtensionBase):
 
         modification_time = None
         saved_path = None
-        sha256 = None
+        hashes = None
 
         if r:
             modification_time = r.modification_time
-            sha256 = r.sha256
+            hashes = r.hashes
             saved_path = r.saved_path
 
-        record_kwargs.update({"modification_time": modification_time, "sha256": sha256, "saved_path": saved_path})
+        record_kwargs.update({"modification_time": modification_time, "hashes": hashes, "saved_path": saved_path})
         return record_kwargs
 
 
@@ -139,7 +140,8 @@ WindowsNotepadSavedTabRecord = create_extended_descriptor(
 )
 
 WindowsNotepadUnsavedTabContentRecord = create_extended_descriptor([])(
-    "texteditor/windowsnotepad/tab_content/unsaved", GENERIC_TAB_CONTENTS_RECORD_FIELDS
+    "texteditor/windowsnotepad/tab_content/unsaved",
+    GENERIC_TAB_CONTENTS_RECORD_FIELDS,
 )
 
 WindowsNotepadSavedTabContentRecord = create_extended_descriptor([])(
@@ -158,14 +160,12 @@ def _calc_crc32(data: bytes) -> bytes:
 class WindowsNotepadTabContent:
     """Windows notepad tab content parser"""
 
-    def __new__(
-        cls, file: TargetPath, include_deleted_content=False
-    ) -> WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord:
-        return cls._process_tab_file(file, include_deleted_content)
+    def __new__(cls, file: TargetPath) -> WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord:
+        return cls._process_tab_file(file)
 
     @staticmethod
     def _process_tab_file(
-        file: TargetPath, include_deleted_content: bool
+        file: TargetPath,
     ) -> WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord:
         """Parse a binary tab file and reconstruct the contents.
 
@@ -225,10 +225,6 @@ class WindowsNotepadTabContent:
             # Used to store the final content
             content = ""
 
-            # After a fixed_size_data_block, some more variable_size_data_blocks can be present. This boolean
-            # keeps track of whether more data is still present.
-            has_remaining_data = False
-
             # In the case that a fixedSizeDataBlock is present, this value is set to a nonzero value
             if tab_header.fixedSizeBlockLength > 0:
                 # So we parse the fixed size data block
@@ -250,23 +246,22 @@ class WindowsNotepadTabContent:
                 # Add the content of the fixed size data block to the tab content
                 content += data_entry.data
 
-                # The hasRemainingVariableDataBlocks indicates whether more data will follow after this single block
-                if data_entry.hasRemainingVariableDataBlocks == 1:
-                    has_remaining_data = True
+            # Used to store the deleted content, if available
+            deleted_content = ""
 
             # If fixedSizeBlockLength in the header has a value of zero, this means that the entire file consists of
             # variable-length blocks. Furthermore, if there is any remaining data after the
-            # first fixed size blocks, also continue we also want to continue parsing
-            if tab_header.fixedSizeBlockLength == 0 or has_remaining_data:
+            # first fixed size blocks, as indicated by the value of hasRemainingVariableDataBlocks,
+            # also continue we also want to continue parsing
+            if tab_header.fixedSizeBlockLength == 0 or (
+                tab_header.fixedSizeBlockLength > 0 and data_entry.hasRemainingVariableDataBlocks == 1
+            ):
                 # Here, data is stored in variable-length blocks. This happens, for example, when several
                 # additions and deletions of characters have been recorded and these changes have not been 'flushed'
 
                 # Since we don't know the size of the file up front, and offsets don't necessarily have to be in order,
                 # a list is used to easily insert text at offsets
                 text = []
-
-                # Used to store the deleted content, if available and requested
-                deleted_content = ""
 
                 while True:
                     # Unfortunately, there is no way of determining how many blocks there are. So just try to parse
@@ -295,32 +290,28 @@ class WindowsNotepadTabContent:
                     elif data_entry.nDeleted > 0:
                         # Create a new slice. Include everything up to the offset,
                         # plus everything after the nDeleted following bytes
-                        if include_deleted_content:
-                            deleted_content += "".join(
-                                text[data_entry.offset : data_entry.offset + data_entry.nDeleted]
-                            )
+                        deleted_content += "".join(text[data_entry.offset : data_entry.offset + data_entry.nDeleted])
                         text = text[: data_entry.offset] + text[data_entry.offset + data_entry.nDeleted :]
 
                 # Join all the characters to reconstruct the original text within the variable-length data blocks
                 text = "".join(text)
 
-                # Add the deleted content, if specified
-                if include_deleted_content:
-                    text += " --- DELETED-CONTENT: "
-                    text += deleted_content
-
                 # Finally, add the reconstructed text to the tab content
                 content += text
 
+        # Return None if no deleted content was found
+        deleted_content = deleted_content if deleted_content else None
+
         if file_header.fileType == 0:
-            return WindowsNotepadUnsavedTabContentRecord(content=content, path=file)
+            return WindowsNotepadUnsavedTabContentRecord(content=content, path=file, deleted_content=deleted_content)
         else:
             return WindowsNotepadSavedTabContentRecord(
                 content=content,
                 path=file,
                 modification_time=wintimestamp(tab_header.timestamp),
-                sha256=tab_header.sha256.hex(),
+                hashes=digest((None, None, tab_header.sha256.hex())),
                 saved_path=tab_header.filePath,
+                deleted_content=deleted_content,
             )
 
 
@@ -347,31 +338,29 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         if not self.users_tabs:
             raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
 
-    @arg(
-        "--include-deleted-content",
-        type=bool,
-        default=False,
-        required=False,
-        help="Include deleted but recoverable content.",
-    )
     @export(record=DynamicDescriptor(["path", "datetime", "string"]))
-    def tabs(self, include_deleted_content) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
+    def tabs(self) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
         """Return contents from Windows 11 temporary Notepad tabs.
 
-        Yields TextEditorTabRecord with the following fields:
-            contents (string): The contents of the tab.
-            path (path): The path the content originates from.
+        Yields a WindowsNotepadSavedTabRecord or WindowsNotepadUnsavedTabRecord, depending on the state of the tab.
         """
         for file, user in self.users_tabs:
             # Parse the file
             r: WindowsNotepadSavedTabContentRecord | WindowsNotepadUnsavedTabContentRecord = WindowsNotepadTabContent(
-                file, include_deleted_content
+                file
             )
 
             # If the modification_time attribute is present, this means that it's a WindowsNotepadSavedTabContentRecord
             if hasattr(r, "modification_time"):
                 yield WindowsNotepadSavedTabRecord(
-                    content=r.content, path=r.path, _saved=r, _target=self.target, _user=user
+                    content=r.content,
+                    path=r.path,
+                    _saved=r,
+                    _target=self.target,
+                    _user=user,
+                    deleted_content=r.deleted_content,
                 )
             else:
-                yield WindowsNotepadUnsavedTabRecord(content=r.content, path=r.path, _target=self.target, _user=user)
+                yield WindowsNotepadUnsavedTabRecord(
+                    content=r.content, path=r.path, _target=self.target, _user=user, deleted_content=r.deleted_content
+                )
