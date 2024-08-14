@@ -37,7 +37,11 @@ def find_entry_path(path: Path) -> str | None:
 
 
 def map_dirs(
-    target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, decode_name: bool = False, **kwargs
+    target: Target,
+    dirs: list[Path | tuple[str, Path]],
+    os_type: str,
+    unquote_path: bool = False,
+    **kwargs,
 ) -> None:
     """Map directories as filesystems into the given target.
 
@@ -66,10 +70,15 @@ def map_dirs(
                 path.at,
                 alt_separator=alt_separator,
                 case_sensitive=case_sensitive,
-                decode_name=decode_name,
+                unquote_path=unquote_path,
             )
         else:
-            dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = DirectoryFilesystem(
+                path,
+                alt_separator=alt_separator,
+                case_sensitive=case_sensitive,
+                unquote_path=unquote_path,
+            )
 
         drive_letter_map[drive_letter].append(dfs)
 

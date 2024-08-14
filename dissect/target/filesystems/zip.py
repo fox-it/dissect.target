@@ -4,12 +4,8 @@ import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
-<<<<<<< HEAD
-from typing import BinaryIO, Optional
-from urllib.parse import unquote
-=======
 from typing import BinaryIO, Iterator
->>>>>>> upstream/main
+from urllib.parse import unquote
 
 from dissect.util.stream import BufferedStream
 
@@ -44,7 +40,7 @@ class ZipFilesystem(Filesystem):
         self,
         fh: BinaryIO,
         base: str | None = None,
-        decode_name: bool = False,
+        unquote_path: bool = False,
         *args,
         **kwargs,
     ):
@@ -57,14 +53,14 @@ class ZipFilesystem(Filesystem):
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
 
-        self.map_members(decode_name)
+        self.map_members(unquote_path)
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         """Detect a zip file on a given file-like object."""
         return zipfile.is_zipfile(fh)
 
-    def map_members(self, decode_name: bool) -> None:
+    def map_members(self, unquote_path: bool) -> None:
         """Map members of the zip file into the VFS."""
         for member in self.zip.infolist():
             mname = member.filename.strip("/")
@@ -73,11 +69,10 @@ class ZipFilesystem(Filesystem):
 
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
 
-            if decode_name:
+            if unquote_path:
                 rel_name = unquote(rel_name)
 
             self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
-
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""
