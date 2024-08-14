@@ -145,6 +145,7 @@ class stat_result:  # noqa
         "st_file_attributes": "Windows file attribute bits",
         "st_fstype": "Type of filesystem",
         "st_reparse_tag": "Windows reparse tag",
+        "st_birthtime_ns": "time of creation in nanoseconds",
         # Internal fields
         "_s": "internal tuple",
     }
@@ -194,6 +195,7 @@ class stat_result:  # noqa
         self.st_file_attributes = s[22]
         self.st_fstype = s[23]
         self.st_reparse_tag = s[24]
+        self.st_birthtime_ns = s[25]
 
         # stat_result behaves like a tuple, but only with the first 10 fields
         # Note that this means it specifically uses the integer variants of the timestamps
