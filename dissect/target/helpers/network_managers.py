@@ -5,13 +5,16 @@ import re
 from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
+from itertools import chain
 from re import compile, sub
-from typing import Any, Callable, Iterable, Match, Optional
+from typing import Any, Callable, Iterable, Iterator, Match, Optional
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.plugins.os.unix.log.journal import JournalRecord
+from dissect.target.plugins.os.unix.log.messages import MessagesRecord
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -299,7 +302,8 @@ class Parser:
             return
 
         if section:
-            config = config.get(section, {})
+            # account for values of sections which are None
+            config = config.get(section, {}) or {}
 
         for key, value in config.items():
             if key == option:
@@ -507,62 +511,90 @@ class LinuxNetworkManager:
         return values
 
 
-def parse_unix_dhcp_log_messages(target) -> list[str]:
-    """Parse local syslog and cloud init log files for DHCP lease IPs.
+def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[str]:
+    """Parse local syslog, journal and cloud init-log files for DHCP lease IPs.
 
     Args:
         target: Target to discover and obtain network information from.
+        iter_all: Parse limited amount of journal messages (first 10000) or all of them.
 
     Returns:
-        List of DHCP ip addresses.
+        A set of found DHCP IP addresses.
     """
-    ips = []
+    ips = set()
+    messages = set()
 
-    # Search through parsed syslogs for DHCP leases.
-    try:
-        messages = target.messages()
-        for record in messages:
-            line = record.message
+    for log_func in ["messages", "journal"]:
+        try:
+            messages = chain(messages, getattr(target, log_func)())
+        except PluginError:
+            target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
 
-            # Ubuntu DHCP
-            if ("DHCPv4" in line or "DHCPv6" in line) and " address " in line and " via " in line:
-                ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
-                if ip not in ips:
-                    ips.append(ip)
+    if not messages:
+        target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
 
-            # Ubuntu DHCP NetworkManager
-            elif "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line) and "=> '" in line:
-                ip = line.split("=> '")[1].replace("'", "").strip()
-                if ip not in ips:
-                    ips.append(ip)
+    def records_enumerate(iterable: Iterable) -> Iterator[tuple[int, JournalRecord | MessagesRecord]]:
+        count = 0
+        for rec in iterable:
+            if rec._desc.name == "linux/log/journal":
+                count += 1
+            yield count, rec
 
-            # Debian and CentOS dhclient
-            elif record.daemon == "dhclient" and "bound to" in line:
-                ip = line.split("bound to")[1].split(" ")[1].strip()
-                if ip not in ips:
-                    ips.append(ip)
+    for count, record in records_enumerate(messages):
+        line = record.message
 
-            # CentOS DHCP and general NetworkManager
-            elif " address " in line and ("dhcp4" in line or "dhcp6" in line):
-                ip = line.split(" address ")[1].strip()
-                if ip not in ips:
-                    ips.append(ip)
+        if not line:
+            continue
 
-    except PluginError:
-        target.log.debug("Can not search for DHCP leases in syslog files as they does not exist.")
+        # Ubuntu cloud-init
+        if "Received dhcp lease on" in line:
+            interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
+            ips.add(ip)
+            continue
 
-    # A unix system might be provisioned using Ubuntu's cloud-init (https://cloud-init.io/).
-    if (path := target.fs.path("/var/log/cloud-init.log")).exists():
-        for line in path.open("rt"):
-            # We are interested in the following log line:
-            # YYYY-MM-DD HH:MM:SS,000 - dhcp.py[DEBUG]: Received dhcp lease on IFACE for IP/MASK
-            if "Received dhcp lease on" in line:
-                interface, ip, netmask = re.search(r"Received dhcp lease on (\w{0,}) for (\S+)\/(\S+)", line).groups()
-                if ip not in ips:
-                    ips.append(ip)
+        # Ubuntu DHCP
+        if ("DHCPv4" in line or "DHCPv6" in line) and " address " in line and " via " in line:
+            ip = line.split(" address ")[1].split(" via ")[0].strip().split("/")[0]
+            ips.add(ip)
+            continue
 
-    if not path and not messages:
-        target.log.warning("Can not search for DHCP leases in syslog or cloud-init.log files as they does not exist.")
+        # Ubuntu DHCP NetworkManager
+        if "option ip_address" in line and ("dhcp4" in line or "dhcp6" in line) and "=> '" in line:
+            ip = line.split("=> '")[1].replace("'", "").strip()
+            ips.add(ip)
+            continue
+
+        # Debian and CentOS dhclient
+        if hasattr(record, "daemon") and record.daemon == "dhclient" and "bound to" in line:
+            ip = line.split("bound to")[1].split(" ")[1].strip()
+            ips.add(ip)
+            continue
+
+        # CentOS DHCP and general NetworkManager
+        if " address " in line and ("dhcp4" in line or "dhcp6" in line):
+            ip = line.split(" address ")[1].strip()
+            ips.add(ip)
+            continue
+
+        # Ubuntu/Debian DHCP networkd (Journal)
+        if (
+            hasattr(record, "code_func")
+            and record.code_func == "dhcp_lease_acquired"
+            and " address " in line
+            and " via " in line
+        ):
+            interface, ip, netmask, gateway = re.search(
+                r"^(\S+): DHCPv[4|6] address (\S+)\/(\S+) via (\S+)", line
+            ).groups()
+            ips.add(ip)
+            continue
+
+        # The journal parser is relatively slow, so we stop when we have read 10000 journal entries,
+        # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
+        if not iter_all and (ips or count > 10_000):
+            if not ips:
+                target.log.warning("No DHCP IP addresses found in first 10000 journal entries.")
+            break
 
     return ips
 

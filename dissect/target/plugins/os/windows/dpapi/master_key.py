@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from io import BytesIO
 from typing import BinaryIO
 
@@ -11,6 +12,16 @@ from dissect.target.plugins.os.windows.dpapi.crypto import (
     dpapi_hmac,
 )
 
+try:
+    from Crypto.Hash import MD4
+
+    HAS_CRYPTO = True
+except ImportError:
+    HAS_CRYPTO = False
+
+log = logging.getLogger(__name__)
+
+
 master_key_def = """
 struct DomainKey {
     DWORD   dwVersion;
@@ -18,7 +29,7 @@ struct DomainKey {
     DWORD   accessCheckLen;
     char    guid[16];
     char    encryptedSecret[secretLen];
-    char    accessCheckLen[accessCheckLen];
+    char    accessCheck[accessCheckLen];
 };
 
 struct CredHist {
@@ -55,8 +66,7 @@ struct MasterKeyFileHeader {
     QWORD   qwDomainKeySize;
 };
 """
-c_master_key = cstruct()
-c_master_key.load(master_key_def)
+c_master_key = cstruct().load(master_key_def)
 
 
 class MasterKey:
@@ -85,9 +95,18 @@ class MasterKey:
 
     def decrypt_with_password(self, user_sid: str, pwd: str) -> bool:
         """Decrypts the master key with the given user's password and SID."""
+        pwd = pwd.encode("utf-16-le")
+
         for algo in ["sha1", "md4"]:
-            pwd_hash = hashlib.new(algo, pwd.encode("utf-16-le")).digest()
-            self.decrypt_with_key(derive_password_hash(pwd_hash, user_sid))
+            if algo in hashlib.algorithms_available:
+                pwd_hash = hashlib.new(algo, pwd)
+            elif HAS_CRYPTO and algo == "md4":
+                pwd_hash = MD4.new(pwd)
+            else:
+                log.warning("No cryptography capabilities for algorithm %s", algo)
+                continue
+
+            self.decrypt_with_key(derive_password_hash(pwd_hash.digest(), user_sid))
             if self.decrypted:
                 break
 

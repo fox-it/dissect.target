@@ -1,33 +1,23 @@
 from __future__ import annotations
 
-from typing import Iterator, Optional, TextIO
+from typing import Iterator, Optional
 
 from dissect.target.filesystem import Filesystem
-from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers import configutil
+from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
-
-
-class BuildProp:
-    def __init__(self, fh: TextIO):
-        self.props = {}
-
-        for line in fh:
-            line = line.strip()
-
-            if not line or line.startswith("#"):
-                continue
-
-            k, v = line.split("=")
-            self.props[k] = v
 
 
 class AndroidPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
-        self.props = BuildProp(self.target.fs.path("/build.prop").open("rt"))
+
+        self.props = {}
+        if (build_prop := self.target.fs.path("/build.prop")).exists():
+            self.props = configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data
 
     @classmethod
     def detect(cls, target: Target) -> Optional[Filesystem]:
@@ -42,8 +32,8 @@ class AndroidPlugin(LinuxPlugin):
         return cls(target)
 
     @export(property=True)
-    def hostname(self) -> str:
-        return self.props.props["ro.build.host"]
+    def hostname(self) -> Optional[str]:
+        return self.props.get("ro.build.host")
 
     @export(property=True)
     def ips(self) -> list[str]:
@@ -53,11 +43,11 @@ class AndroidPlugin(LinuxPlugin):
     def version(self) -> str:
         full_version = "Android"
 
-        release_version = self.props.props.get("ro.build.version.release")
-        if release_version := self.props.props.get("ro.build.version.release"):
+        release_version = self.props.get("ro.build.version.release")
+        if release_version := self.props.get("ro.build.version.release"):
             full_version += f" {release_version}"
 
-        if security_patch_version := self.props.props.get("ro.build.version.security_patch"):
+        if security_patch_version := self.props.get("ro.build.version.security_patch"):
             full_version += f" ({security_patch_version})"
 
         return full_version
@@ -66,5 +56,6 @@ class AndroidPlugin(LinuxPlugin):
     def os(self) -> str:
         return OperatingSystem.ANDROID.value
 
-    def users(self) -> Iterator[UnixUserRecord]:
-        raise NotImplementedError()
+    @export(record=EmptyRecord)
+    def users(self) -> Iterator[EmptyRecord]:
+        yield from ()

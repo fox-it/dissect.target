@@ -37,7 +37,7 @@ def test_protobuf_varint_cstruct() -> None:
     };
     """
     cs = cstruct(endian=">")
-    cs.addtype("varint", ProtobufVarint(cs, "varint", size=None, signed=False, alignment=1))
+    cs.add_custom_type("varint", ProtobufVarint, size=None, alignment=1, signed=False)
     cs.load(struct_def, compiled=False)
 
     aaa = b"a" * 123456

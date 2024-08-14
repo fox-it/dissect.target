@@ -8,6 +8,7 @@ from dissect.target.plugins.apps.browser.browser import (
     GENERIC_DOWNLOAD_RECORD_FIELDS,
     GENERIC_EXTENSION_RECORD_FIELDS,
     GENERIC_HISTORY_RECORD_FIELDS,
+    GENERIC_PASSWORD_RECORD_FIELDS,
     BrowserPlugin,
 )
 from dissect.target.plugins.apps.browser.chromium import (
@@ -47,6 +48,10 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
         "browser/brave/extension", GENERIC_EXTENSION_RECORD_FIELDS
     )
 
+    BrowserPasswordRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "browser/brave/password", GENERIC_PASSWORD_RECORD_FIELDS
+    )
+
     @export(record=BrowserHistoryRecord)
     def history(self) -> Iterator[BrowserHistoryRecord]:
         """Return browser history records for Brave."""
@@ -66,3 +71,8 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     def extensions(self) -> Iterator[BrowserExtensionRecord]:
         """Return browser extension records for Brave."""
         yield from super().extensions("brave")
+
+    @export(record=BrowserPasswordRecord)
+    def passwords(self) -> Iterator[BrowserPasswordRecord]:
+        """Return browser password records for Brave."""
+        yield from super().passwords("brave")

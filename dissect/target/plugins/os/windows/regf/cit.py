@@ -212,8 +212,7 @@ typedef struct _CIT_DP_DATA {
 } CIT_DP_DATA;
 """
 
-c_cit = cstruct()
-c_cit.load(cit_def)
+c_cit = cstruct().load(cit_def)
 
 
 CITSystemRecord = TargetRecordDescriptor(
