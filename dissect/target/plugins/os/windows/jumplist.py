@@ -188,6 +188,32 @@ class JumpListPlugin(Plugin):
         """Return the content of custom destination Windows Jump Lists.
 
         These are created when a user pins an application or a file in a Jump List.
+
+        Yields JumpListRecord with fields:
+
+        .. code-block:: text
+
+            type (string): Type of Jump List.
+            application_id (string): ID of the application.
+            application_name (string): Name of the application.
+            lnk_path (path): Path of the link (.lnk) file.
+            lnk_name (string): Name of the link (.lnk) file.
+            lnk_mtime (datetime): Modification time of the link (.lnk) file.
+            lnk_atime (datetime): Access time of the link (.lnk) file.
+            lnk_ctime (datetime): Creation time of the link (.lnk) file.
+            lnk_relativepath (path): Relative path of target file to the link (.lnk) file.
+            lnk_workdir (path): Path of the working directory the link (.lnk) file will execute from.
+            lnk_iconlocation (path): Path of the display icon used for the link (.lnk) file.
+            lnk_arguments (string): Command-line arguments passed to the target (linked) file.
+            local_base_path (string): Absolute path of the target (linked) file.
+            common_path_suffix (string): Suffix of the local_base_path.
+            lnk_full_path (string): Full path of the linked file. Made from local_base_path and common_path_suffix.
+            lnk_net_name (string): Specifies a server share path; for example, "\\\\server\\share".
+            lnk_device_name (string): Specifies a device; for example, the drive letter "D:"
+            machine_id (string): The NetBIOS name of the machine where the linked file was last known to reside.
+            target_mtime (datetime): Modification time of the target (linked) file.
+            target_atime (datetime): Access time of the target (linked) file.
+            target_ctime (datetime): Creation time of the target (linked) file.
         """
 
         for destination, user in self.custom_destinations:
@@ -222,6 +248,32 @@ class JumpListPlugin(Plugin):
         """Return the content of automatic destination Windows Jump Lists.
 
         These are created automatically when a user opens an application or file.
+
+        Yields JumpListRecord with fields:
+
+        .. code-block:: text
+
+            type (string): Type of Jump List.
+            application_id (string): ID of the application.
+            application_name (string): Name of the application.
+            lnk_path (path): Path of the link (.lnk) file.
+            lnk_name (string): Name of the link (.lnk) file.
+            lnk_mtime (datetime): Modification time of the link (.lnk) file.
+            lnk_atime (datetime): Access time of the link (.lnk) file.
+            lnk_ctime (datetime): Creation time of the link (.lnk) file.
+            lnk_relativepath (path): Relative path of target file to the link (.lnk) file.
+            lnk_workdir (path): Path of the working directory the link (.lnk) file will execute from.
+            lnk_iconlocation (path): Path of the display icon used for the link (.lnk) file.
+            lnk_arguments (string): Command-line arguments passed to the target (linked) file.
+            local_base_path (string): Absolute path of the target (linked) file.
+            common_path_suffix (string): Suffix of the local_base_path.
+            lnk_full_path (string): Full path of the linked file. Made from local_base_path and common_path_suffix.
+            lnk_net_name (string): Specifies a server share path; for example, "\\\\server\\share".
+            lnk_device_name (string): Specifies a device; for example, the drive letter "D:"
+            machine_id (string): The NetBIOS name of the machine where the linked file was last known to reside.
+            target_mtime (datetime): Modification time of the target (linked) file.
+            target_atime (datetime): Access time of the target (linked) file.
+            target_ctime (datetime): Creation time of the target (linked) file.
         """
         for destination, user in self.automatic_destinations:
             fh = destination.open("rb")
