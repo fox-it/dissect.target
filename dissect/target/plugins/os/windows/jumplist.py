@@ -1,7 +1,7 @@
 import io
 import logging
 from struct import error as StructError
-from typing import BinaryIO, Iterator
+from typing import BinaryIO, Callable, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.ole import OLE
@@ -225,7 +225,7 @@ class JumpListPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-        yield from self._generate_records(self.custom_destinations)
+        yield from self._generate_records(self.custom_destinations, CustomDestinationFile)
 
     @export(record=JumpListRecord)
     def automatic_destination(self) -> Iterator[JumpListRecord]:
@@ -259,31 +259,27 @@ class JumpListPlugin(Plugin):
             target_atime (datetime): Access time of the target (linked) file.
             target_ctime (datetime): Creation time of the target (linked) file.
         """
-        yield from self._generate_records(self.automatic_destinations)
+        yield from self._generate_records(self.automatic_destinations, AutomaticDestinationFile)
 
-    def _generate_records(self, destinations: list) -> Iterator[JumpListRecord]:
+    def _generate_records(self, destinations: list, destination_file: Callable) -> Iterator[JumpListRecord]:
         for destination, user in destinations:
             fh = destination.open("rb")
 
             try:
-                destination_file = (
-                    CustomDestinationFile(fh, destination.name)
-                    if destination.name.endswith(".customDestinations-ms")
-                    else AutomaticDestinationFile(fh, destination.name)
-                )
+                jumplist = destination_file(fh, destination.name)
             except OleError:
                 continue
             except Exception as e:
-                self.target.log.warning("Failed to parse AutomaticDestination file: %s", destination)
+                self.target.log.warning("Failed to parse Jump List file: %s", destination)
                 self.target.log.debug("", exc_info=e)
                 continue
 
-            for lnk in destination_file:
+            for lnk in jumplist:
                 if lnk := parse_lnk_file(self.target, lnk, destination):
                     yield JumpListRecord(
-                        type=destination_file.type,
-                        application_name=destination_file.name,
-                        application_id=destination_file.id,
+                        type=jumplist.type,
+                        application_name=jumplist.name,
+                        application_id=jumplist.id,
                         **lnk._asdict(),
                         _user=user,
                         _target=self.target,
