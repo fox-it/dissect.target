@@ -107,12 +107,12 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
 @pytest.mark.parametrize(
     "paths",
     [
-        (["uploads/file/etc", "uploads/file/var"]),
-        (["uploads/auto/etc", "uploads/auto/var"]),
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt"]),
-        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt"]),
-        (["uploads/file/Library", "uploads/file/Applications"]),
-        (["uploads/auto/Library", "uploads/auto/Applications"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt", "uploads/auto/%2ETEST"]),
+        (["uploads/file/Library", "uploads/file/Applications", "uploads/file/%2ETEST"]),
+        (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
 def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
@@ -125,8 +125,10 @@ def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
 
     loader = VelociraptorLoader(root)
     loader.map(target_bare)
+    target_bare.apply()
 
     assert len(target_bare.filesystems) == 1
+    assert target_bare.fs.path("/.TEST").exists()
 
 
 @pytest.mark.parametrize(
