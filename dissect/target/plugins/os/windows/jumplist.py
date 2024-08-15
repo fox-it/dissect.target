@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import io
 import logging
 from struct import error as StructError
-from typing import BinaryIO, Callable, Iterator
+from typing import BinaryIO, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.ole import OLE
@@ -261,7 +263,11 @@ class JumpListPlugin(Plugin):
         """
         yield from self._generate_records(self.automatic_destinations, AutomaticDestinationFile)
 
-    def _generate_records(self, destinations: list, destination_file: Callable) -> Iterator[JumpListRecord]:
+    def _generate_records(
+        self,
+        destinations: list,
+        destination_file: AutomaticDestinationFile | CustomDestinationFile,
+    ) -> Iterator[JumpListRecord]:
         for destination, user in destinations:
             fh = destination.open("rb")
 
