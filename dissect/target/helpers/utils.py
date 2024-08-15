@@ -13,6 +13,17 @@ from dissect.target.helpers import fsutil
 log = logging.getLogger(__name__)
 
 
+def findall(buf: bytes, needle: bytes) -> Iterator[int]:
+    offset = 0
+    while True:
+        offset = buf.find(needle, offset)
+        if offset == -1:
+            break
+
+        yield offset
+        offset += 1
+
+
 class StrEnum(str, Enum):
     """Sortable and serializible string-based enum"""
 
