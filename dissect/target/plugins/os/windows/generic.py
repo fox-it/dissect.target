@@ -8,7 +8,10 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
@@ -108,6 +111,15 @@ WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
         ("bytes", "providerid"),
         ("string", "enabled"),
         ("string", "version"),
+    ],
+)
+
+ComputerSidRecord = TargetRecordDescriptor(
+    "windows/sid/computer",
+    [
+        ("datetime", "ts"),
+        ("string", "sidtype"),
+        ("string", "sid"),
     ],
 )
 
@@ -571,3 +583,49 @@ class GenericPlugin(Plugin):
             return self.target.registry.key(key).value("ACP").value
         except RegistryError:
             pass
+
+    @export(record=ComputerSidRecord)
+    def sid(self) -> Iterator[ComputerSidRecord]:
+        key = "HKLM\\SAM\\SAM\\Domains\\Account"
+        for k in self.target.registry.keys(key):
+            try:
+                value = k.value('V').value
+
+                group_1 = int.from_bytes(value[-12:-8], byteorder='little')
+                group_2 = int.from_bytes(value[-8:-4], byteorder='little')
+                group_3 = int.from_bytes(value[-4:], byteorder='little')
+
+                sid = f'S-1-5-21-{group_1}-{group_2}-{group_3}'
+
+                yield ComputerSidRecord(
+                    ts=self.target.datetime.to_utc(k.timestamp),
+                    sidtype='machine',
+                    sid=sid,
+                    _target=self.target,
+                )
+                break
+            except RegistryValueNotFoundError:
+                continue
+
+        key = "HKLM\\SECURITY\\Policy\\PolMachineAccountS"
+        for k in self.target.registry.keys(key):
+            try:
+                value = k.value('(Default)').value
+                timestamp = k.timestamp
+
+                group_1 = int.from_bytes(value[-16:-12], byteorder='little')
+                group_2 = int.from_bytes(value[-12:-8], byteorder='little')
+                group_3 = int.from_bytes(value[-8:-4], byteorder='little')
+                group_4 = int.from_bytes(value[-4:], byteorder='little')
+
+                sid = f'S-1-5-21-{group_1}-{group_2}-{group_3}-{group_4}'
+
+                yield ComputerSidRecord(
+                    ts=self.target.datetime.to_utc(k.timestamp),
+                    sidtype='domain',
+                    sid=sid,
+                    _target=self.target,
+                )
+                break
+            except RegistryValueNotFoundError:
+                continue
