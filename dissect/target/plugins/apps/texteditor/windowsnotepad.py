@@ -12,7 +12,6 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import (
-    DynamicDescriptor,
     UnixUserRecord,
     WindowsUserRecord,
     create_extended_descriptor,
@@ -22,12 +21,13 @@ from dissect.target.plugins.apps.texteditor.texteditor import (
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
     TexteditorPlugin,
 )
+from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
 # thread. This really helped to figure out the last missing bits and pieces
 # required for recovering text from these files.
 
-c_def = """
+windowstab_def = """
 struct file_header {
     char        magic[2]; // NP
     uleb128     updateNumber; // increases on every settings update when fileType=9,
@@ -106,8 +106,7 @@ WindowsNotepadSavedTabRecord = create_extended_descriptor([UserRecordDescriptorE
     GENERIC_TAB_CONTENTS_RECORD_FIELDS + WINDOWS_SAVED_TABS_EXTRA_FIELDS,
 )
 
-c_windowstab = cstruct()
-c_windowstab.load(c_def)
+c_windowstab = cstruct().load(windowstab_def)
 
 
 def _calc_crc32(data: bytes) -> bytes:
@@ -272,7 +271,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
     GLOB = "AppData/Local/Packages/Microsoft.WindowsNotepad_*/LocalState/TabState/*.bin"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
         for user_details in self.target.user_details.all_with_home():
@@ -288,7 +287,7 @@ class WindowsNotepadPlugin(TexteditorPlugin):
         if not self.users_tabs:
             raise UnsupportedPluginError("No Windows Notepad tab files found")
 
-    @export(record=DynamicDescriptor(["path", "datetime", "string"]))
+    @export(record=[WindowsNotepadSavedTabRecord, WindowsNotepadUnsavedTabRecord])
     def tabs(self) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
         """Return contents from Windows 11 Notepad tabs - and its deleted content if available.
 
