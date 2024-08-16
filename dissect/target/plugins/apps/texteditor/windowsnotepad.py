@@ -125,13 +125,13 @@ class WindowsNotepadTab:
         self.deleted_content = None
         self._process_tab_file()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} saved={self.is_saved} "
             f"content_size={len(self.content)} has_deleted_content={self.deleted_content is not None}>"
         )
 
-    def _process_tab_file(self):
+    def _process_tab_file(self) -> None:
         """Parse a binary tab file and reconstruct the contents."""
         with self.file.open("rb") as fh:
             # Header is the same for all types
@@ -161,7 +161,7 @@ class WindowsNotepadTab:
             else:
                 # Raise an error, since we don't know how many bytes future optionVersions will occupy.
                 # Now knowing how many bytes to parse can mess up the alignment and structs.
-                raise Exception("Unknown option version")
+                raise NotImplementedError("Unknown Windows Notepad tab option version")
 
             # If the file is not saved to disk and no fixedSizeBlockLength is present, an extra checksum stub
             # is present. So parse that first
@@ -286,30 +286,56 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
     def check_compatible(self) -> None:
         if not self.users_tabs:
-            raise UnsupportedPluginError("No Windows Notepad temporary tab files found")
+            raise UnsupportedPluginError("No Windows Notepad tab files found")
 
     @export(record=DynamicDescriptor(["path", "datetime", "string"]))
     def tabs(self) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
-        """Return contents from Windows 11 temporary Notepad tabs.
+        """Return contents from Windows 11 Notepad tabs - and its deleted content if available.
 
-        Yields a WindowsNotepadSavedTabRecord or WindowsNotepadUnsavedTabRecord, depending on the state of the tab.
+        Windows Notepad application for Windows 11 is now able to restore both saved and unsaved tabs when you re-open
+        the application.
+
+
+        Resources:
+            - https://github.com/fox-it/dissect.target/pull/540
+            - https://github.com/JustArion/Notepad-Tabs
+            - https://github.com/ogmini/Notepad-Tabstate-Buffer
+            - https://github.com/ogmini/Notepad-State-Library
+            - https://github.com/Nordgaren/tabstate-util
+            - https://github.com/Nordgaren/tabstate-util/issues/1
+            - https://medium.com/@mahmoudsoheem/new-digital-forensics-artifact-from-windows-notepad-527645906b7b
+
+        Yields a WindowsNotepadSavedTabRecord or WindowsNotepadUnsavedTabRecord. with fields:
+
+        .. code-block:: text
+
+            content (string): The content of the tab.
+            path (path): The path to the tab file.
+            deleted_content (string): The deleted content of the tab, if available.
+            hashes (digest): A digest of the tab content.
+            saved_path (path): The path where the tab was saved.
+            modification_time (datetime): The modification time of the tab.
         """
         for file, user in self.users_tabs:
             # Parse the file
-            w: WindowsNotepadTab = WindowsNotepadTab(file)
+            tab: WindowsNotepadTab = WindowsNotepadTab(file)
 
-            if w.is_saved:
+            if tab.is_saved:
                 yield WindowsNotepadSavedTabRecord(
-                    content=w.content,
-                    path=w.file,
-                    deleted_content=w.deleted_content,
-                    hashes=digest((None, None, w.tab_header.sha256.hex())),
-                    saved_path=w.tab_header.filePath,
-                    modification_time=wintimestamp(w.tab_header.timestamp),
+                    content=tab.content,
+                    path=tab.file,
+                    deleted_content=tab.deleted_content,
+                    hashes=digest((None, None, tab.tab_header.sha256.hex())),
+                    saved_path=tab.tab_header.filePath,
+                    modification_time=wintimestamp(tab.tab_header.timestamp),
                     _target=self.target,
                     _user=user,
                 )
             else:
                 yield WindowsNotepadUnsavedTabRecord(
-                    content=w.content, path=w.file, _target=self.target, _user=user, deleted_content=w.deleted_content
+                    content=tab.content,
+                    path=tab.file,
+                    _target=self.target,
+                    _user=user,
+                    deleted_content=tab.deleted_content,
                 )
