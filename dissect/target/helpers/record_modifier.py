@@ -4,11 +4,7 @@ from typing import Callable, Iterable, Iterator
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
 from dissect.target import Target
-from dissect.target.exceptions import (
-    FileNotFoundError,
-    FilesystemError,
-    IsADirectoryError,
-)
+from dissect.target.exceptions import FileNotFoundError, FilesystemError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.hashutil import common
 from dissect.target.helpers.utils import StrEnum
@@ -55,17 +51,13 @@ def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
         resolved_path: Path to the file we should hash.
 
     Raises:
-        FileNotFoundError: Raised if the provided ``resolved_path`` does not exist on the target.
-        IsADirectoryError: Raised if the provided ``resolved_path`` is not a file.
+        FileNotFoundError: Raised if the provided ``resolved_path`` does not exist or is not a file on the target.
 
     Returns: Modified record with digests of path field types.
     """
 
-    if not resolved_path.exists():
-        raise FileNotFoundError("File not found: '%s'" % resolved_path)
-
-    if not resolved_path.is_file():
-        raise IsADirectoryError("Not a file: '%s'" % resolved_path)
+    if not resolved_path.exists() or not resolved_path.is_file():
+        raise FileNotFoundError(f"Path not found or is not a file: '{resolved_path}'")
 
     with resolved_path.open() as fh:
         path_hash = common(fh)
