@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Iterator
 
@@ -167,7 +169,7 @@ class GenericPlugin(Plugin):
                 continue
 
     @export(property=True)
-    def activity(self) -> Optional[datetime]:
+    def activity(self) -> datetime | None:
         """Return last seen activity based on filesystem timestamps."""
         last_seen = 0
 
@@ -193,7 +195,7 @@ class GenericPlugin(Plugin):
         return from_unix(last_seen)
 
     @export(property=True)
-    def install_date(self) -> Optional[datetime]:
+    def install_date(self) -> datetime | None:
         """Returns the install date of the system.
 
         The value of the registry key is stored as a Unix epoch timestamp.
@@ -562,7 +564,7 @@ class GenericPlugin(Plugin):
                     )
 
     @export(property=True)
-    def codepage(self) -> Optional[str]:
+    def codepage(self) -> str | None:
         """Returns the current active codepage on the system."""
 
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"

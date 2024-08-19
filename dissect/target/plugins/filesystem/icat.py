@@ -27,7 +27,7 @@ class ICatPlugin(Plugin):
     )
     @arg("--ads", type=str, default="", help="Alternate Data Stream name")
     @export(output="none")
-    def icat(self, inum, fs, ads) -> None:
+    def icat(self, inum: int, fs: int | None, ads: str) -> None:
         """Output the contents of a file based on its MFT segment or inode number. Supports Alternate Data Streams
 
         Example:

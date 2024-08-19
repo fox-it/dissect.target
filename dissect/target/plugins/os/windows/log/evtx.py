@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import re
 from functools import lru_cache
@@ -34,7 +36,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=DynamicDescriptor(["datetime"]))
-    def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: Optional[str] = None) -> Iterator[DynamicDescriptor]:
+    def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: str | None = None) -> Iterator[DynamicDescriptor]:
         """Return entries from Windows Event log files (``*.evtx``).
 
         Windows Event log is a detailed record of system, security and application notifications. It can be used to
