@@ -55,7 +55,7 @@ class UsbPlugin(Plugin):
     To get a full picture of the USB history on a Windows machine, you should parse the
     relevant EventIDs using the evtx plugin. For more research on event log USB forensics, see:
 
-        - https://www.researchgate.net/publication/318514858
+        - https://www.researchgate.net/publication/318514858_USB_Storage_Device_Forensics_for_Windows_10
         - https://dfir.pubpub.org/pub/h78di10n/release/2
         - https://www.senturean.com/posts/19_08_03_usb_storage_forensics_1/#1-system-events
 

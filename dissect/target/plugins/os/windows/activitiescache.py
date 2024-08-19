@@ -47,8 +47,8 @@ class ActivitiesCachePlugin(Plugin):
     """Plugin that parses the ActivitiesCache.db on newer Windows 10 machines.
 
     References:
-        https://www.cclsolutionsgroup.com/resources/technical-papers
-        https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
+        - https://www.cclsolutionsgroup.com/resources/technical-papers
+        - https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/
     """
 
     def __init__(self, target):

@@ -324,9 +324,9 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         * InventoryApplicationShortcut
 
     References:
-        https://binaryforay.blogspot.com/2015/04/appcompatcache-changes-in-windows-10.html
-        https://www.ssi.gouv.fr/uploads/2019/01/anssi-coriin_2019-analysis_amcache.pdf
-        https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
+        - https://binaryforay.blogspot.com/2015/04/appcompatcache-changes-in-windows-10.html
+        - https://cyber.gouv.fr/sites/default/files/2019/01/anssi-coriin_2019-analysis_amcache.pdf
+        - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
 
     """
 

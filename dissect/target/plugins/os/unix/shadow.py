@@ -38,7 +38,7 @@ class ShadowPlugin(Plugin):
         """Yield shadow records from /etc/shadow files.
 
         Resources:
-            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html#file:/etc/shadow
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
         seen_hashes = set()
