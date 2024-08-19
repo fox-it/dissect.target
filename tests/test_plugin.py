@@ -616,8 +616,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         annotations = py_func.fget.__annotations__
 
     # Plugin method should have a return annotation
-    if not annotations or "return" not in annotations.keys():
-        raise ValueError(f"No return type annotation for function {func}")
+    assert not annotations and "return" in annotations.keys(), f"No return type annotation for function {func}"
 
     # TODO: Check if the annotations make sense with the provided output_type
 
