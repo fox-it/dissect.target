@@ -293,7 +293,7 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
 
 
 def recurse(path_entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
-    """Recursively walk the given FilesystemEntry, yields FilesystemEntry instances."""
+    """Recursively walk the given :class:`FilesystemEntry`, yields :class:`FilesystemEntry` instances."""
     yield path_entry
 
     if not path_entry.is_dir():

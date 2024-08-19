@@ -1,10 +1,11 @@
 from unittest.mock import Mock
 
-from dissect.target.filesystem import VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.plugins.filesystem.unix.capability import CapabilityPlugin
+from dissect.target.target import Target
 
 
-def test_capability_plugin(target_unix, fs_unix):
+def test_capability_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     # Some fictional capability values
     xattr1 = Mock()
     xattr1.name = "security.capability"
@@ -33,7 +34,7 @@ def test_capability_plugin(target_unix, fs_unix):
     vfile3.lattr.return_value = [xattr3]
     fs_unix.map_file_entry("/path/to/xattr3/file", vfile3)
 
-    target_unix.add_plugin(CapabilityPlugin)
+    target_unix.add_plugin(CapabilityPlugin, check_compatible=False)
 
     results = list(target_unix.capability_binaries())
     assert len(results) == 3

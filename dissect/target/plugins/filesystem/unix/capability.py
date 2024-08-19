@@ -1,4 +1,3 @@
-import struct
 from enum import IntEnum
 from io import BytesIO
 from typing import Iterator
@@ -86,8 +85,8 @@ class CapabilityPlugin(Plugin):
         if not self.target.has_function("walkfs"):
             raise UnsupportedPluginError("Need walkfs plugin")
 
-        if self.target.os == "windows":
-            raise UnsupportedPluginError("Walkfs not supported on Windows")
+        if not any(fs.__type__ in ("extfs", "xfs") for fs in self.target.filesystems):
+            raise UnsupportedPluginError("Capability plugin only works on EXT and XFS filesystems")
 
     @export(record=CapabilityRecord)
     def capability_binaries(self) -> Iterator[CapabilityRecord]:
@@ -111,7 +110,7 @@ class CapabilityPlugin(Plugin):
 
             for attr in attrs:
                 try:
-                    parsed_attr = parse_attr(attr, BytesIO(attr.value))
+                    permitted, inheritable, effective, root_id = parse_attr(attr.value)
                 except ValueError as e:
                     self.target.log.warning("Could not parse attributes for entry %s: %s", entry, str(e.value))
                     self.target.log.debug("", exc_info=e)
@@ -119,19 +118,25 @@ class CapabilityPlugin(Plugin):
                 yield CapabilityRecord(
                     ts_mtime=entry.lstat().st_mtime,
                     path=entry.path,
-                    **parsed_attr,
+                    permitted=permitted,
+                    inheritable=inheritable,
+                    effective=effective,
+                    root_id=root_id,
                     _target=self.target,
                 )
 
 
-def parse_attr(attr: object, buf: BytesIO) -> dict:
+def parse_attr(attr: bytes) -> tuple[int, list[str], list[str], bool]:
     """Efficiently parse a Linux xattr capability struct.
 
-    Returns: dictionary of parsed capabilities for the given entry.
+    Returns:
+        A tuple of permitted capability names, inheritable capability names, effective flag and ``root_id``.
     """
+    buf = BytesIO(attr)
 
-    # The struct is small enough we can just use struct
-    magic_etc = struct.unpack("<I", buf.read(4))[0]
+    # The struct is small enough we can just use int.from_bytes
+    magic_etc = int.from_bytes(buf.read(4), "little")
+    effective = magic_etc & VFS_CAP_FLAGS_EFFECTIVE != 0
     cap_revision = magic_etc & VFS_CAP_REVISION_MASK
 
     permitted_caps = []
@@ -153,16 +158,15 @@ def parse_attr(attr: object, buf: BytesIO) -> dict:
     else:
         raise ValueError("Unexpected capability revision '%s'" % cap_revision)
 
-    if data_len != (actual_len := len(attr.value)):
+    if data_len != (actual_len := len(attr)):
         raise ValueError("Unexpected capability length (%s vs %s)", data_len, actual_len)
 
     for _ in range(num_caps):
-        permitted_val, inheritable_val = struct.unpack("<2I", buf.read(8))
-        permitted_caps.append(permitted_val)
-        inheritable_caps.append(inheritable_val)
+        permitted_caps.append(int.from_bytes(buf.read(4), "little"))
+        inheritable_caps.append(int.from_bytes(buf.read(4), "little"))
 
     if cap_revision == VFS_CAP_REVISION_3:
-        root_id = struct.unpack("<I", buf.read(4))[0]
+        root_id = int.from_bytes(buf.read(4), "little")
 
     permitted = []
     inheritable = []
@@ -178,9 +182,4 @@ def parse_attr(attr: object, buf: BytesIO) -> dict:
             if caps[cap_index] & (1 << (capability.value & 31)) != 0:
                 results.append(capability.name)
 
-    return {
-        "root_id": root_id,
-        "permitted": permitted,
-        "inheritable": inheritable,
-        "effective": magic_etc & VFS_CAP_FLAGS_EFFECTIVE != 0,
-    }
+    return permitted, inheritable, effective, root_id
