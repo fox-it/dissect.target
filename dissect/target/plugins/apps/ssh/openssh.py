@@ -31,7 +31,7 @@ def find_sshd_directory(target: Target) -> TargetPath:
 
 
 class OpenSSHPlugin(SSHPlugin):
-    """OpenSSH Plugin."""
+    """OpenSSH plugin."""
 
     __namespace__ = "openssh"
 

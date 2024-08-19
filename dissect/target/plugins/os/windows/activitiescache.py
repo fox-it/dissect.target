@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.sql import sqlite3
 from dissect.util.ts import from_unix
@@ -146,7 +146,7 @@ class ActivitiesCachePlugin(Plugin):
                 )
 
 
-def mkts(ts: int) -> Optional[datetime]:
+def mkts(ts: int) -> datetime | None:
     """Timestamps inside ActivitiesCache.db are stored in a Unix-like format.
 
     Source: https://salt4n6.com/2018/05/03/windows-10-timeline-forensic-artefacts/

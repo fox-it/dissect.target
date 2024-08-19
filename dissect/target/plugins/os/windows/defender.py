@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Iterable, Iterator, TextIO, Union
+from typing import Any, BinaryIO, Iterable, Iterator, TextIO
 
 import dissect.util.ts as ts
 from dissect.cstruct import cstruct

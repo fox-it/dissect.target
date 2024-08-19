@@ -30,7 +30,7 @@ SophosLogRecord = TargetRecordDescriptor(
 
 
 class SophosPlugin(Plugin):
-    """Sophos antivirus Plugin."""
+    """Sophos antivirus plugin."""
 
     __namespace__ = "sophos"
 

@@ -611,9 +611,10 @@ def decrypt_v10(encrypted_password: bytes) -> str:
     """Decrypt a version 10 encrypted password.
 
     Args:
-        encrypted_password (bytes)
+        encrypted_password: The encrypted password bytes.
 
-    Returns: decrypted password string
+    Returns:
+        Decrypted password string.
     """
 
     if not HAS_CRYPTO:
@@ -635,12 +636,6 @@ def decrypt_v10(encrypted_password: bytes) -> str:
 def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
     """Decrypt a version 10 type 2 password.
 
-    Args:
-        encrypted_password (bytes)
-        key (bytes)
-
-    Returns: decrypted password string
-
     .. code-block::
 
         struct chrome_pass {
@@ -648,6 +643,13 @@ def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
             byte iv[12];
             byte ciphertext[EOF];
         }
+
+    Args:
+        encrypted_password: The encrypted password bytes.
+        key: The encryption key.
+
+    Returns:
+        Decrypted password string.
     """
 
     if not HAS_CRYPTO:

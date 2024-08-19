@@ -1,7 +1,7 @@
 import datetime
 import re
 from functools import lru_cache
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException

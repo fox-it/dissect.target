@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
@@ -642,11 +642,11 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 )
 
 
-def parse_win_datetime(value: str) -> Optional[datetime]:
+def parse_win_datetime(value: str) -> datetime | None:
     if value:
         return datetime.strptime(value, "%m/%d/%Y %H:%M:%S")
 
 
-def parse_win_timestamp(value: str) -> Optional[datetime]:
+def parse_win_timestamp(value: str) -> datetime | None:
     if value:
         return wintimestamp(value)

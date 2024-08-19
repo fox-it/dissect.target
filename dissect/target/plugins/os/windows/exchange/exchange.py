@@ -11,7 +11,7 @@ class ExchangePlugin(Plugin):
         if not len(self.install_paths()):
             raise UnsupportedPluginError("No Exchange install path found")
 
-    def install_paths(self) -> list:
+    def install_paths(self) -> list[str]:
         paths = []
         key = "HKLM\\SOFTWARE\\Microsoft\\ExchangeServer"
         for reg_key in self.target.registry.keys(key):

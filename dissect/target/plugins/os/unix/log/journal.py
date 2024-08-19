@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import lzma
-from typing import Any, BinaryIO, Callable, Iterator, Optional
+from typing import Any, BinaryIO, Callable, Iterator
 
 import zstandard
 from dissect.cstruct import cstruct
@@ -257,7 +257,7 @@ struct EntryArrayObject_Compact {
 c_journal = cstruct().load(journal_def)
 
 
-def get_optional(value: str, to_type: Callable) -> Optional[Any]:
+def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
     return to_type(value) if value else None
 

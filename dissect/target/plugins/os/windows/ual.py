@@ -167,7 +167,7 @@ class UalPlugin(Plugin):
         if not any([path.exists() for path in self.mdb_paths]):
             raise UnsupportedPluginError("No MDB files found")
 
-    def find_mdb_files(self) -> list:
+    def find_mdb_files(self) -> list[Path]:
         return [
             path
             for path in self.target.fs.path("/").glob(self.LOG_DB_GLOB)

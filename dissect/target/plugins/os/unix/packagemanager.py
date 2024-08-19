@@ -19,7 +19,7 @@ PackageManagerLogRecord = TargetRecordDescriptor(
 
 
 class OperationTypes(Enum):
-    """Valid operation types"""
+    """Valid operation types."""
 
     Install = "install"
     Update = "update"

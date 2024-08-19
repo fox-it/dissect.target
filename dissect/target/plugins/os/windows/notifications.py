@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 from uuid import UUID
 
 from dissect.cstruct import cstruct
