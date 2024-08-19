@@ -21,7 +21,7 @@ EVTX_GLOB = "*.evtx"
 
 
 class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
-    """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)"""
+    """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)."""
 
     RECORD_NAME = "filesystem/windows/evtx"
     LOGS_DIR_PATH = "sysvol/windows/system32/winevt/logs"

@@ -43,7 +43,7 @@ class NetworkPlugin(Plugin):
 
     @export(record=InterfaceRecord)
     def interfaces(self) -> Iterator[InterfaceRecord]:
-        """Yield interfaces"""
+        """Yield interfaces."""
         # Only search for the interfaces once
         if self._interface_list is None:
             self._interface_list = list(self._interfaces())
@@ -52,22 +52,22 @@ class NetworkPlugin(Plugin):
 
     @export
     def ips(self) -> list[IPAddress]:
-        """Return IP addresses as list of :class:`IPAddress`"""
+        """Return IP addresses as list of :class:`IPAddress`."""
         return list(self._get_record_type("ip"))
 
     @export
     def gateways(self) -> list[IPAddress]:
-        """Return gateways as list of :class:`IPAddress`"""
+        """Return gateways as list of :class:`IPAddress`."""
         return list(self._get_record_type("gateway"))
 
     @export
     def macs(self) -> list[str]:
-        """Return MAC addresses as list of :class:`str`"""
+        """Return MAC addresses as list of :class:`str`."""
         return list(self._get_record_type("mac"))
 
     @export
     def dns(self) -> list[str]:
-        """Return DNS addresses as list of :class:`str`"""
+        """Return DNS addresses as list of :class:`str`."""
         return list(self._get_record_type("dns"))
 
     @internal
