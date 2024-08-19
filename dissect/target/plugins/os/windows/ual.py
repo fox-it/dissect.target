@@ -195,13 +195,13 @@ class UalPlugin(Plugin):
                 "role_name": record.get("RoleName"),
             }
 
-    def read_table_records(self, table_name) -> Iterator[tuple]:
+    def read_table_records(self, table_name: str) -> Iterator[tuple]:
         for mdb_path in self.mdb_paths:
             fh = mdb_path.open()
             try:
                 parser = ual.UAL(fh)
             except Error as e:
-                self.target.log.warning(f"Error opening {mdb_path} database", exc_info=e)
+                self.target.log.warning("Error opening database: %s", mdb_path, exc_info=e)
                 continue
 
             for table_record in parser.get_table_records(table_name):

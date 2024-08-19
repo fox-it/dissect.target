@@ -458,7 +458,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
     @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
-    def quarantine(self) -> Iterator[Union[DefenderQuarantineRecord, DefenderFileQuarantineRecord]]:
+    def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
