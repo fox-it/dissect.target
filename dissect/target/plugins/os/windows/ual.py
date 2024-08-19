@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterator
 
 from dissect.esedb.exceptions import Error

@@ -145,7 +145,7 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
-    def _parse_rh_legacy(self, path) -> Optional[str]:
+    def _parse_rh_legacy(self, path: TargetPath) -> Optional[str]:
         hostname = None
         file_contents = path.open("rt").readlines()
         for line in file_contents:

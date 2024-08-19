@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import fnmatch
 import re
 from pathlib import Path
@@ -48,7 +50,7 @@ class WindowsEventlogsMixin:
     LOGS_DIR_PATH = None
 
     @plugin.internal
-    def get_logs(self, filename_glob="*") -> List[Path]:
+    def get_logs(self, filename_glob="*") -> list[Path]:
         file_paths = []
         file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
 
@@ -66,7 +68,7 @@ class WindowsEventlogsMixin:
         return file_paths
 
     @plugin.internal
-    def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> List[Path]:
+    def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         logs_dir = self.target.fs.path(logs_dir)
         if logs_dir.exists():
@@ -76,7 +78,7 @@ class WindowsEventlogsMixin:
         return file_paths
 
     @plugin.internal
-    def get_logs_from_registry(self, filename_glob: str = "*") -> List[Path]:
+    def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
         # compile glob into case-insensitive regex
         filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
 
@@ -122,7 +124,7 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=EvtRecordDescriptor)
-    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: Optional[str] = None) -> Iterator[EvtRecordDescriptor]:
+    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: str | None = None) -> Iterator[EvtRecordDescriptor]:
         """Parse Windows Eventlog files (``*.evt``).
 
         Yields dynamically created records based on the fields in the event.
@@ -191,6 +193,6 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         fh.seek(offset - 4)
         return fh.read(chunk_size)
 
-    def _parse_chunk(self, _, chunk: bytes) -> Generator[Record, None, None]:
+    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)
