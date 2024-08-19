@@ -102,7 +102,6 @@ class CapabilityPlugin(Plugin):
 
             try:
                 attrs = [attr for attr in entry.lattr() if attr.name == "security.capability"]
-
             except Exception as e:
                 self.target.log.warning("Failed to get attrs for entry %s", entry)
                 self.target.log.debug("", exc_info=e)
@@ -117,7 +116,7 @@ class CapabilityPlugin(Plugin):
 
                 yield CapabilityRecord(
                     ts_mtime=entry.lstat().st_mtime,
-                    path=entry.path,
+                    path=self.target.fs.path(entry.path),
                     permitted=permitted,
                     inheritable=inheritable,
                     effective=effective,
@@ -126,7 +125,7 @@ class CapabilityPlugin(Plugin):
                 )
 
 
-def parse_attr(attr: bytes) -> tuple[int, list[str], list[str], bool]:
+def parse_attr(attr: bytes) -> tuple[list[str], list[str], bool, int]:
     """Efficiently parse a Linux xattr capability struct.
 
     Returns:
