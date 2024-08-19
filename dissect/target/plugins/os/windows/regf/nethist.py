@@ -41,7 +41,7 @@ class NethistPlugin(Plugin):
         about the networks to which the system has been connected, both wireless and wired.
 
         References:
-            - https://www.weaklink.org/2016/11/windows-network-profile-registry-keys/
+            - https://web.archive.org/web/20221127181357/https://www.weaklink.org/2016/11/windows-network-profile-registry-keys/
         """
         for key in self.target.registry.keys(self.KEY):
             for kind in key.subkeys():

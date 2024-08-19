@@ -28,6 +28,7 @@ from dissect.target.plugin import (
     plugins,
     save_plugin_import_failure,
 )
+from dissect.target.plugins.general.default import DefaultPlugin
 from dissect.target.target import Target
 
 
@@ -600,7 +601,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
     """
 
     # Ignore DefaultPlugin and NamespacePlugin instances
-    if func.class_object.__name__ == "DefaultPlugin" or func.class_object.__base__.__name__ == "NamespacePlugin":
+    if func.class_object.__base__ is NamespacePlugin or func.class_object is DefaultPlugin:
         return
 
     # Plugin method should specify what it returns
@@ -616,7 +617,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         annotations = py_func.fget.__annotations__
 
     # Plugin method should have a return annotation
-    assert not annotations and "return" in annotations.keys(), f"No return type annotation for function {func}"
+    assert annotations and "return" in annotations.keys(), f"No return type annotation for function {func}"
 
     # TODO: Check if the annotations make sense with the provided output_type
 

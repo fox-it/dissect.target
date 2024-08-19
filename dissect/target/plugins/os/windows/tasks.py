@@ -125,7 +125,7 @@ class TasksPlugin(Plugin):
         intervals. An adversary may leverage such scheduled tasks to gain persistence on a system.
 
         References:
-            https://en.wikipedia.org/wiki/Windows_Task_Scheduler
+            - https://en.wikipedia.org/wiki/Windows_Task_Scheduler
 
         Yields:
             The scheduled tasks found on the target.
