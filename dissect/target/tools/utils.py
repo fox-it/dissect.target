@@ -8,6 +8,7 @@ import textwrap
 import urllib
 from datetime import datetime
 from functools import wraps
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
@@ -32,6 +33,7 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
     args_parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     args_parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     args_parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
+    args_parser.add_argument("--version", action="store_true", help="print version")
     args_parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
     args_parser.add_argument(
         "--plugin-path",
@@ -44,6 +46,13 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
 
 def process_generic_arguments(args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
+
+    if args.version:
+        try:
+            print("dissect.target version " + version("dissect.target"))
+        except PackageNotFoundError:
+            print("unable to determine version")
+        sys.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
