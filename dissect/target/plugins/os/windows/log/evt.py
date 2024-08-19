@@ -1,7 +1,7 @@
 import fnmatch
 import re
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterator, List, Optional
+from typing import Any, BinaryIO, Iterator
 
 from dissect.eventlog import evt
 from flow.record import Record

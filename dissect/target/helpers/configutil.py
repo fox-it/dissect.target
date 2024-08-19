@@ -69,7 +69,7 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
 
 
 class PeekableIterator:
-    """Source: https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable"""
+    # https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
 
     def __init__(self, iterable):
         self._iterator = iter(iterable)

@@ -594,7 +594,9 @@ def test_plugin_alias(target_bare: Target) -> None:
 )
 def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
-    Resources: https://docs.dissect.tools/en/latest/contributing/style-guide.html
+
+    Resources: 
+        - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
 
     # Ignore DefaultPlugin and NamespacePlugin instances

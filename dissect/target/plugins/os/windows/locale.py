@@ -1,4 +1,4 @@
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
@@ -45,7 +45,7 @@ class LocalePlugin(Plugin):
                     )
 
     @export(property=True)
-    def language(self) -> Optional[str]:
+    def language(self) -> str | None:
         """Get a list of installed languages on the system."""
         # HKCU\\Control Panel\\International\\User Profile" Languages
         found_languages = []
@@ -57,6 +57,6 @@ class LocalePlugin(Plugin):
         return found_languages
 
     @export(property=True)
-    def timezone(self) -> Optional[str]:
+    def timezone(self) -> str | None:
         """Get the configured timezone of the system in IANA TZ standard format."""
         return normalize_timezone(self.target.datetime.tzinfo.name)

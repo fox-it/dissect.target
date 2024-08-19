@@ -93,12 +93,12 @@ class ThumbcachePlugin(Plugin):
 
     @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract thumbcache thumbnails to.")
     @export(record=[ThumbcacheRecord, IndexRecord])
-    def thumbcache(self, output_dir: Optional[Path] = None) -> Iterator[Union[ThumbcacheRecord, IndexRecord]]:
-        """Yield thumbcache thumbnails"""
+    def thumbcache(self, output_dir: Path | None = None) -> Iterator[ThumbcacheRecord | IndexRecord]:
+        """Yield thumbcache thumbnails."""
         yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache", output_dir)
 
     @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract iconcache thumbnails to.")
     @export(record=[IconcacheRecord, IndexRecord])
-    def iconcache(self, output_dir: Optional[Path] = None) -> Iterator[Union[IconcacheRecord, IndexRecord]]:
-        """Yield iconcache thumbnails"""
+    def iconcache(self, output_dir: Path | None = None) -> Iterator[IconcacheRecord | IndexRecord]:
+        """Yield iconcache thumbnails."""
         yield from self._parse_thumbcache(IconcacheRecord, "iconcache", output_dir)

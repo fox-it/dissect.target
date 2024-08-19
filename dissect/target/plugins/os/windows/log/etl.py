@@ -66,7 +66,7 @@ class EtlRecordBuilder:
 
 
 class EtlPlugin(Plugin):
-    """Plugin for fetching and parsing Windows ETL Files (``*.etl``)"""
+    """Plugin for parsing Windows ETL Files (``*.etl``)."""
 
     __namespace__ = "etl"
 

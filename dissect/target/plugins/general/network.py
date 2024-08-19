@@ -17,7 +17,7 @@ InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfac
 
 
 class NetworkPlugin(Plugin):
-    """Generic NetworkPlugin implementation."""
+    """Generic implementation for network interfaces plugin."""
 
     __namespace__ = "network"
 

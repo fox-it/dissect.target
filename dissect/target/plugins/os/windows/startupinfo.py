@@ -1,5 +1,5 @@
 import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 
 from defusedxml import ElementTree
 
@@ -35,7 +35,7 @@ StartupInfoRecord = TargetRecordDescriptor(
 )
 
 
-def parse_ts(time_string: str) -> Optional[datetime.datetime]:
+def parse_ts(time_string: str) -> datetime.datetime | None:
     if not time_string:
         return None
 

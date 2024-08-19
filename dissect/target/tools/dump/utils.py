@@ -38,7 +38,7 @@ log = structlog.get_logger(__name__)
 
 
 class Compression(enum.Enum):
-    """Supported compression types"""
+    """Supported compression types."""
 
     BZIP2 = "bzip2"
     GZIP = "gzip"
@@ -48,7 +48,7 @@ class Compression(enum.Enum):
 
 
 class Serialization(enum.Enum):
-    """Supported serialization methods"""
+    """Supported serialization methods."""
 
     JSONLINES = "jsonlines"
     MSGPACK = "msgpack"

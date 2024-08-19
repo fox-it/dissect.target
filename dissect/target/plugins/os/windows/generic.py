@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.util.ts import from_unix
 
@@ -123,7 +123,7 @@ class GenericPlugin(Plugin):
             raise UnsupportedPluginError("Unsupported Plugin")
 
     @export(property=True)
-    def ntversion(self) -> Optional[str]:
+    def ntversion(self) -> str | None:
         """Return the Windows NT version."""
         return self.target._os._nt_version()
 
@@ -142,7 +142,7 @@ class GenericPlugin(Plugin):
             yield r.value("Path").value
 
     @export(property=True)
-    def domain(self) -> Optional[str]:
+    def domain(self) -> str | None:
         """Return the domain name.
 
         Corporate Windows systems are usually connected to a domain (active directory).
