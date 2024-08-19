@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator
 
 from dissect.thumbcache import Error, Thumbcache
 from dissect.thumbcache.tools.extract_with_index import dump_entry_data_through_index
@@ -75,8 +75,8 @@ class ThumbcachePlugin(Plugin):
         self,
         record_type: TargetRecordDescriptor,
         prefix: str,
-        output_dir: Optional[Path],
-    ) -> Iterator[Union[ThumbcacheRecord, IconcacheRecord, IndexRecord]]:
+        output_dir: Path | None,
+    ) -> Iterator[ThumbcacheRecord | IconcacheRecord | IndexRecord]:
         for cache_path in self.get_cache_paths():
             try:
                 if output_dir:
