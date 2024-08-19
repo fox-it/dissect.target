@@ -636,13 +636,15 @@ def decrypt_v10(encrypted_password: bytes) -> str:
 def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
     """Decrypt a version 10 type 2 password.
 
-    .. code-block::
+    References:
 
-        struct chrome_pass {
-            byte signature[3] = 'v10';
-            byte iv[12];
-            byte ciphertext[EOF];
-        }
+        .. code-block::
+
+            struct chrome_pass {
+                byte signature[3] = 'v10';
+                byte iv[12];
+                byte ciphertext[EOF];
+            }
 
     Args:
         encrypted_password: The encrypted password bytes.
