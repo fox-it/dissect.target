@@ -19,8 +19,8 @@ from dissect.target.plugin import (
     NamespacePlugin,
     OSPlugin,
     Plugin,
-    alias,
     PluginFunction,
+    alias,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -565,6 +565,8 @@ def test_internal_namespace_plugin() -> None:
 
 
 class ExampleFooPlugin(Plugin):
+    """Example Foo Plugin."""
+
     def check_compatible(self) -> None:
         return
 
@@ -572,6 +574,7 @@ class ExampleFooPlugin(Plugin):
     @alias("bar")
     @alias(name="baz")
     def foo(self) -> Iterator[str]:
+        """Yield foo!"""
         yield "foo!"
 
 
@@ -629,7 +632,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
-            raise
+            assert str(e) in method_doc_str  # makes reading pytest error easier
 
     # Plugin class should have a docstring
     class_doc_str = func.class_object.__doc__
@@ -644,4 +647,4 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
-            raise
+            assert str(e) in class_doc_str  # makes reading pytest error easier
