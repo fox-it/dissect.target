@@ -7,11 +7,11 @@ from typing import Iterator
 
 import pytest
 
-import dissect.target.tools.shell as shell
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.fsutil import stat_result
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.target import Target
+from dissect.target.tools import fsutils
 from dissect.target.tools.diff import (
     DifferentialCli,
     TargetComparison,
@@ -224,7 +224,7 @@ def test_differentiate_plugins(src_target: Target, dst_target: Target) -> None:
 
 
 def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
-    monkeypatch.setattr(shell, "LS_COLORS", {})
+    monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
     cli.onecmd("ls changes")
@@ -249,7 +249,7 @@ def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -
 
 
 def test_shell_find(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
-    monkeypatch.setattr(shell, "LS_COLORS", {})
+    monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
     cli.onecmd("find /changes -cmd")
@@ -309,7 +309,7 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
 
 def test_target_diff_shell(capsys, monkeypatch) -> None:
     with monkeypatch.context() as m:
-        m.setattr(shell, "LS_COLORS", {})
+        m.setattr(fsutils, "LS_COLORS", {})
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
         m.setattr("sys.argv", ["target-diff", "--deep", "shell", src_target_path, dst_target_path])
