@@ -42,7 +42,7 @@ class NethistPlugin(Plugin):
 
         References:
             - https://web.archive.org/web/20221127181357/https://www.weaklink.org/2016/11/windows-network-profile-registry-keys/
-        """
+        """  # noqa: E501
         for key in self.target.registry.keys(self.KEY):
             for kind in key.subkeys():
                 for sig in kind.subkeys():
