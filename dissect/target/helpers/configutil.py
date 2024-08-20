@@ -96,9 +96,6 @@ class PeekableIterator:
 class ConfigurationParser:
     """A configuration parser where you can configure certain aspects of the parsing mechanism.
 
-    Attributes:
-        parsed_data: The resulting dictionary after parsing.
-
     Args:
         collapse: A ``bool`` or an ``Iterator``:
           If ``True``: it will collapse all the resulting dictionary values.

@@ -133,7 +133,7 @@ class ConfigurationEntry(FilesystemEntry):
     Behaves like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a ``dict``.
     Behaves like a ``file`` otherwise.
 
-    Attributes:
+    Args:
         parser_items: A dict-like object containing all configuration entries and values.
             In most cases this is either a :class:`.ConfigurationParser` or ``dict``.
             Otherwise, its the entry's value
