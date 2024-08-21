@@ -228,7 +228,7 @@ class Filesystem:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[tuple[str, str, str]]:
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory pointed to by ``path``, returning the string representation of both files
         and directories.
 
@@ -589,7 +589,7 @@ class FilesystemEntry:
         topdown: bool = True,
         onerror: Optional[Callable] = None,
         followlinks: bool = False,
-    ) -> Iterator[tuple[str, str, str]]:
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
         """Recursively walk a directory and yield its contents as strings split in a tuple
         of lists of files, directories and symlinks.
 
