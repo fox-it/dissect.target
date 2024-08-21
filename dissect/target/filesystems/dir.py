@@ -1,33 +1,24 @@
 import os
 from pathlib import Path
 from typing import BinaryIO, Iterator
-from urllib.parse import unquote
 
 from dissect.target.exceptions import (
+    FileNotFoundError,
     FilesystemError,
     IsADirectoryError,
     NotADirectoryError,
     NotASymlinkError,
 )
-from dissect.target.filesystem import (
-    Filesystem,
-    FilesystemEntry,
-    VirtualDirectory,
-    VirtualFilesystem,
-)
+from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
 
 class DirectoryFilesystem(Filesystem):
     __type__ = "dir"
 
-    def __init__(self, path: Path, unquote_path: bool = False, *args, **kwargs):
+    def __init__(self, path: Path, *args, **kwargs):
         super().__init__(None, *args, **kwargs)
         self.base_path = path
-
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
-
-        self.map_members(unquote_path)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"
@@ -36,36 +27,36 @@ class DirectoryFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on DirectoryFilesystem class")
 
-    def map_members(self, unquote_path: bool) -> None:
-        """Map members of a path into the VFS."""
+    def get(self, path: str) -> FilesystemEntry:
+        path = path.strip("/")
 
-        for path in self.base_path.rglob("*"):
-            pname = str(path)
+        if not path:
+            return DirectoryFilesystemEntry(self, "/", self.base_path)
 
-            if not pname.startswith(str(self.base_path)) or pname == ".":
-                continue
+        if not self.case_sensitive:
+            searchpath = self.base_path
 
-            rel_name = fsutil.normpath(pname[len(str(self.base_path)) :], alt_separator=self.alt_separator)
+            for p in path.split("/"):
+                match = [d for d in searchpath.iterdir() if d.name.lower() == p.lower()]
 
-            if unquote_path:
-                rel_name = unquote(rel_name)
+                if not match or len(match) > 1:
+                    raise FileNotFoundError(path)
 
-            self._fs.map_file_entry(rel_name, DirectoryFilesystemEntry(self, rel_name, path))
+                searchpath = match[0]
 
-    def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
-        """Returns a FilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, relentry=relentry)
+            entry = searchpath
+        else:
+            entry = self.base_path.joinpath(path.strip("/"))
+
+        try:
+            entry.lstat()
+            return DirectoryFilesystemEntry(self, path, entry)
+        except Exception:
+            raise FileNotFoundError(path)
 
 
-# Note: We subclass from VirtualDirectory because VirtualFilesystem is currently only compatible with VirtualDirectory
-# Subclass from VirtualDirectory so we get that compatibility for free, and override the rest to do our own thing
-class DirectoryFilesystemEntry(VirtualDirectory):
-    fs: DirectoryFilesystem
+class DirectoryFilesystemEntry(FilesystemEntry):
     entry: Path
-
-    def __init__(self, fs: DirectoryFilesystem, path: str, entry: Path):
-        super().__init__(fs, path)
-        self.entry = entry
 
     def get(self, path: str) -> FilesystemEntry:
         path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
