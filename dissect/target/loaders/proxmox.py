@@ -1,70 +1,68 @@
 from __future__ import annotations
-from pathlib import Path
+
 import re
+from pathlib import Path
 
-from dissect.target.containers.raw import RawContainer
+from dissect.target import container
 from dissect.target.loader import Loader
+from dissect.target.target import Target
 
+RE_VOLUME_ID = re.compile(r"(?:file=)?([^:]+):([^,]+)")
 
 
 class ProxmoxLoader(Loader):
-    """Load Proxmox disk data onto target disks.
-    
-    The method proxmox uses to store disk data varies on multiple factors such as 
-    filesystem used, available storage space and other factors. This information is 
-    stored within a config file in the filesystem.
+    """Loader for Proxmox VM configuration files.
 
-    This loader attains the necessary information to find the disk data on the 
-    filesystem and appends it to the target filesystem's disks.
+    Proxmox uses volume identifiers in the format of ``storage_id:volume_id``. The ``storage_id`` maps to a
+    storage configuration in ``/etc/pve/storage.cfg``. The ``volume_id`` is the name of the volume within
+    that configuration.
+
+    This loader currently does not support parsing the storage configuration, so it will attempt to open the
+    volume directly from the same directory as the configuration file, or from ``/dev/pve/`` (default LVM config).
+    If the volume is not found, it will log a warning.
     """
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         path = path.resolve()
-        super().__init__(path)        
+        super().__init__(path)
+        self.base_dir = path.parent
 
     @staticmethod
-    def detect(path) -> bool:
-        return path.suffix.lower() == ".conf"
+    def detect(path: Path) -> bool:
+        if path.suffix.lower() != ".conf":
+            return False
 
-    def map(self, target):
-        parsed_config = self._parse_vm_configuration(self.path)
+        with path.open("rb") as fh:
+            lines = fh.read(512).split(b"\n")
+            needles = [b"cpu:", b"memory:", b"name:"]
+            return all(any(needle in line for line in lines) for needle in needles)
 
-        for option in parsed_config:
-            config_value = parsed_config[option]
-            vm_disk = _get_vm_disk_name(config_value)
+    def map(self, target: Target) -> None:
+        with self.path.open("rt") as fh:
+            for line in fh:
+                if not (line := line.strip()):
+                    continue
 
-            if _is_disk_device(option) and vm_disk is not None:
-                disk_interface = option
-                vm_id = self.path.stem
-                name = parsed_config['name']
-                storage_id = _get_storage_ID(config_value)
+                key, value = line.split(":", 1)
+                value = value.strip()
 
-                path = self.path.joinpath("/dev/pve/", vm_disk)
-                try:
-                    target.disks.add(RawContainer(path.open("rb")))
-                except Exception:
-                    target.log.exception("Failed to load block device: %s", vm_disk)
-        
-    def _parse_vm_configuration(self, conf) -> list:
-        lines = conf.read_text().split("\n")
-        lines.remove("") # Removes any trailing empty lines in file 
-        parsed_lines = {}
+                if key.startswith(("scsi", "sata", "ide", "virtio")) and key[-1].isdigit():
+                    # https://pve.proxmox.com/wiki/Storage
+                    if match := RE_VOLUME_ID.match(value):
+                        storage_id, volume_id = match.groups()
 
-        for line in lines:
-            key, value = line.split(': ')
-            parsed_lines[key] = value
-            
-        return parsed_lines
+                        # TODO: parse the storage information from /etc/pve/storage.cfg
+                        # For now, let's try a few assumptions
+                        disk_path = None
+                        if (path := self.base_dir.joinpath(volume_id)).exists():
+                            disk_path = path
+                        elif (path := self.base_dir.joinpath("/dev/pve/").joinpath(volume_id)).exists():
+                            disk_path = path
 
-def _is_disk_device(config_value: str) -> bool | None:
-    disk = re.match(r"^(sata|scsi|ide)[0-9]+$", config_value)
-    return True if disk else None 
-
-def _get_vm_disk_name(config_value: str) -> str | None:
-    """Retrieves the disk device name from vm"""
-    disk = re.search(r"vm-[0-9]+-disk-[0-9]+", config_value)
-    return disk.group(0).replace(",", "") if disk else None
-
-def _get_storage_ID(config_value: str) -> str | None:
-    storage_id = config_value.split(":")
-    return storage_id[0] if storage_id else None
+                        if disk_path:
+                            try:
+                                target.disks.add(container.open(disk_path))
+                            except Exception:
+                                target.log.exception("Failed to open disk: %s", disk_path)
+                        else:
+                            target.log.warning("Unable to find disk: %s:%s", storage_id, volume_id)

@@ -1,138 +1,110 @@
 from __future__ import annotations
 
-import os
-import re
 import stat
-import pathlib
-import logging
 from io import BytesIO
-from typing import Optional
+from typing import BinaryIO
 
 from dissect.sql import sqlite3
+from dissect.util.stream import BufferedStream
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualFile, VirtualDirectory
+from dissect.target.filesystem import (
+    Filesystem,
+    VirtualDirectory,
+    VirtualFile,
+    VirtualFilesystem,
+)
 from dissect.target.helpers import fsutil
 from dissect.target.plugins.os.unix._os import OperatingSystem, export
-from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 from dissect.target.target import Target
 
 
-log = logging.getLogger(__name__)
-
-PROXMOX_PACKAGE_NAME="proxmox-ve"
-FILETREE_TABLE_NAME="tree"
-PMXCFS_DATABASE_PATH="/var/lib/pve-cluster/config.db"
-PROXMOX_NODES_PATH="/etc/pve/nodes"
-
-
-VirtualMachineRecord = TargetRecordDescriptor(
-    "proxmox/vm",
-    [
-        ("string", "id"),
-        ("string", "config_path"),
-    ],
-)
-
-
-class ProxmoxPlugin(LinuxPlugin):
-    def __init__(self, target: Target):
-        super().__init__(target)
-
+class ProxmoxPlugin(DebianPlugin):
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if (fs.exists("/etc/pve") or fs.exists("/var/lib/pve")):
+            if fs.exists("/etc/pve") or fs.exists("/var/lib/pve"):
                 return fs
+
         return None
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> ProxmoxPlugin:
         obj = super().create(target, sysvol)
-        pmxcfs = _create_pmxcfs(sysvol.path(PMXCFS_DATABASE_PATH).open("rb"))
-        target.fs.mount("/etc/pve", pmxcfs)
+
+        with target.fs.path("/var/lib/pve-cluster/config.db").open("rb") as fh:
+            vfs = _create_pmxcfs(fh, obj.hostname)
+
+        target.fs.mount("/etc/pve", vfs)
 
         return obj
+
+    @export(property=True)
+    def version(self) -> str:
+        """Returns Proxmox VE version with underlying OS release."""
+
+        for pkg in self.target.dpkg.status():
+            if pkg.name == "proxmox-ve":
+                distro_name = self._os_release.get("PRETTY_NAME", "")
+                return f"{pkg.name} {pkg.version} ({distro_name})"
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.PROXMOX.value
 
-    @export(property=True)
-    def version(self) -> str:
-        """Returns Proxmox VE version with underlying os release"""
 
-        for pkg in self.target.dpkg.status():
-            if pkg.name == PROXMOX_PACKAGE_NAME:
-                distro_name = self._os_release.get("PRETTY_NAME", "")
-                return f"{pkg.name} {pkg.version} ({distro_name})"
+DT_DIR = 4
+DT_REG = 8
 
-    @export(record=VirtualMachineRecord)
-    def vm_list(self) -> Iterator[VirtualMachineRecord]:
-        configs = self.target.fs.path(self.vm_configs_path)
-        for config in configs.iterdir():
-            yield VirtualMachineRecord(
-                id=pathlib.Path(config).stem,
-                config_path=config,
-            )
 
-    @export(property=True)
-    def vm_configs_path(self) -> str:
-        """Returns path containing VM configurations of the target pve node"""
-
-        return f"{PROXMOX_NODES_PATH}/{self.hostname}/qemu-server"
-
-def _create_pmxcfs(fh) -> VirtualFilesystem:
+def _create_pmxcfs(fh: BinaryIO, hostname: str | None = None) -> VirtualFilesystem:
+    # https://pve.proxmox.com/wiki/Proxmox_Cluster_File_System_(pmxcfs)
     db = sqlite3.SQLite3(fh)
-    filetree_table = db.table(FILETREE_TABLE_NAME)
-    rows = filetree_table.rows()
-    fs_entries = {}
 
-    # index entries on their inodes
-    for row in rows:
-        fs_entries[row.inode] = row
+    entries = {}
+    for row in db.table("tree").rows():
+        entries[row.inode] = row
 
     vfs = VirtualFilesystem()
-    for entry in fs_entries.values():
-        if entry.parent == 0: # Root entries do not require parent check
-            path = entry.name
-        else:
-            parts = []
-            current = entry
-            while current.parent != 0:
-                parts.append(current.name)
-                current = fs_entries[current.parent]
-            parts.append(current.name) # appends the missing root parent
-
-            path = "/".join(parts[::-1])
-        if entry.type == 4:
-            fsentry = ProxmoxConfigDirectoryEntry(vfs, path, entry)
-        elif entry.type == 8:
-            fsentry = ProxmoxConfigFileEntry(vfs, path, entry)
+    for entry in entries.values():
+        if entry.type == DT_DIR:
+            cls = ProxmoxConfigDirectoryEntry
+        elif entry.type == DT_REG:
+            cls = ProxmoxConfigFileEntry
         else:
             raise ValueError(f"Unknown pmxcfs file type: {entry.type}")
 
-        vfs.map_file_entry(path, fsentry)
+        parts = []
+        current = entry
+        while current.parent != 0:
+            parts.append(current.name)
+            current = entries[current.parent]
+        parts.append(current.name)
 
-    return  vfs
+        path = "/".join(parts[::-1])
+        vfs.map_file_entry(path, cls(vfs, path, entry))
+
+    if hostname:
+        node_root = vfs.path(f"nodes/{hostname}")
+        vfs.symlink(str(node_root), "local")
+        vfs.symlink(str(node_root / "lxc"), "lxc")
+        vfs.symlink(str(node_root / "openvz"), "openvz")
+        vfs.symlink(str(node_root / "qemu-server"), "qemu-server")
+
+    # TODO: .version, .members, .vmlist, maybe .clusterlog and .rrd?
+
+    return vfs
 
 
 class ProxmoxConfigFileEntry(VirtualFile):
     def open(self) -> BinaryIO:
-        """Returns file handle (file-like object)."""
-        # if self.entry is not a directory, but a file
-        return BytesIO(self.entry.data or b"")
-
-    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        """Return the stat information of this entry."""
-        return self.lstat()
+        return BufferedStream(BytesIO(self.entry.data or b""))
 
     def lstat(self) -> fsutil.stat_result:
-        """Return the stat information of the given path, without resolving links."""
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         return fsutil.stat_result(
             [
-                stat.S_IFREG | 0o777,
+                stat.S_IFREG | 0o640,
                 self.entry.inode,
                 id(self.fs),
                 1,
@@ -151,16 +123,12 @@ class ProxmoxConfigDirectoryEntry(VirtualDirectory):
         super().__init__(fs, path)
         self.entry = entry
 
-    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        """Return the stat information of this entry."""
-        return self.lstat()
-
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         return fsutil.stat_result(
             [
-                stat.S_IFDIR | 0o777,
+                stat.S_IFDIR | 0o755,
                 self.entry.inode,
                 id(self.fs),
                 1,

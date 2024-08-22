@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -10,12 +12,12 @@ class ProxmoxChildTargetPlugin(ChildTargetPlugin):
 
     def check_compatible(self) -> None:
         if self.target.os != "proxmox":
-            raise UnsupportedPluginError("Not an promox operating system")
+            raise UnsupportedPluginError("Not a Proxmox operating system")
 
-    def list_children(self):
-        for vm in self.target.vm_list():
+    def list_children(self) -> Iterator[ChildTargetRecord]:
+        for vm in self.target.vmlist():
             yield ChildTargetRecord(
                 type=self.__type__,
-                path=vm.config_path,
+                path=vm.path,
                 _target=self.target,
             )
