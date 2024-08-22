@@ -1245,9 +1245,9 @@ def test_layer_filesystem_relative_link() -> None:
     lfs = LayerFilesystem()
 
     vfs = VirtualFilesystem()
-    vfs.map_file_fh("dir/hello/world", BytesIO("🌍".encode()))
+    vfs.map_file_fh("dir/hello/world", BytesIO("o/".encode()))
     vfs.symlink("dir/hello", "bye")
 
     lfs.mount("/mnt", vfs)
 
-    assert lfs.path("/mnt/bye/world").read_text() == "🌍"
+    assert lfs.path("/mnt/bye/world").read_text() == "o/"
