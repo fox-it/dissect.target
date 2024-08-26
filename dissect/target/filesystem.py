@@ -753,7 +753,7 @@ class FilesystemEntry:
         """
         log.debug("%r::readlink_ext()", self)
         # Default behavior, resolve link own filesystem.
-        return fsutil.resolve_link(fs=self.fs, entry=self)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Determine the stat information of this entry.
@@ -1467,10 +1467,15 @@ class LayerFilesystem(Filesystem):
         """Get a :class:`FilesystemEntry` relative to a specific entry."""
         parts = path.split("/")
 
-        for part in parts:
+        for i, part in enumerate(parts):
             if entry.is_symlink():
                 # Resolve using the RootFilesystem instead of the entry's Filesystem
-                entry = fsutil.resolve_link(fs=self, entry=entry)
+                entry = fsutil.resolve_link(
+                    self,
+                    entry.readlink(),
+                    "/".join(parts[:i]),
+                    alt_separator=entry.fs.alt_separator,
+                )
             entry = entry.get(part)
 
         return entry
