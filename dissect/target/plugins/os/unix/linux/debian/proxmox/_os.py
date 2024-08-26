@@ -32,10 +32,11 @@ class ProxmoxPlugin(DebianPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> ProxmoxPlugin:
         obj = super().create(target, sysvol)
 
-        with target.fs.path("/var/lib/pve-cluster/config.db").open("rb") as fh:
-            vfs = _create_pmxcfs(fh, obj.hostname)
+        if (config_db := target.fs.path("/var/lib/pve-cluster/config.db")).exists():
+            with config_db.open("rb") as fh:
+                vfs = _create_pmxcfs(fh, obj.hostname)
 
-        target.fs.mount("/etc/pve", vfs)
+            target.fs.mount("/etc/pve", vfs)
 
         return obj
 
