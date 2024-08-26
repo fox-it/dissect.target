@@ -1,7 +1,7 @@
 import os
 from functools import reduce
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -15,6 +15,7 @@ from dissect.target.plugin import (
     NamespacePlugin,
     OSPlugin,
     Plugin,
+    alias,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -533,3 +534,24 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
         assert (os_docstring == subclass_docstring) is replaced
         if not replaced:
             assert subclass_docstring == f"Test docstring {method_name}"
+
+
+class ExampleFooPlugin(Plugin):
+    def check_compatible(self) -> None:
+        return
+
+    @export
+    @alias("bar")
+    @alias(name="baz")
+    def foo(self) -> Iterator[str]:
+        yield "foo!"
+
+
+def test_plugin_alias(target_bare: Target) -> None:
+    """test ``@alias`` decorator behaviour"""
+    target_bare.add_plugin(ExampleFooPlugin)
+    assert target_bare.has_function("foo")
+    assert target_bare.foo.__aliases__ == ["baz", "bar"]
+    assert target_bare.has_function("bar")
+    assert target_bare.has_function("baz")
+    assert list(target_bare.foo()) == list(target_bare.bar()) == list(target_bare.baz())
