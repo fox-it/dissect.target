@@ -9,6 +9,7 @@ import itertools
 import logging
 import os
 import pathlib
+import platform
 import pydoc
 import random
 import re
@@ -1441,6 +1442,20 @@ def main() -> None:
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:
         logging.getLogger("dissect").setLevel(level=logging.ERROR)
+
+    # PyPy < 3.10.14 readline is stuck in Python 2.7
+    if platform.python_implementation() == "PyPy":
+        major, minor, patch = tuple(map(int, platform.python_version_tuple()))
+        if major <= 3 and minor <= 10 and patch < 14:
+            print(
+                "\n".join(
+                    [
+                        "Note for users of PyPy < 3.10.14:",
+                        "Autocomplete might not work due to an outdated version of pyrepl/readline.py",
+                        "To fix this, please update your version of PyPy.",
+                    ]
+                )
+            )
 
     try:
         open_shell(args.targets, args.python, args.registry)
