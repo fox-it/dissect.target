@@ -96,6 +96,7 @@ __all__ = [
     "TargetPath",
     "walk_ext",
     "walk",
+    "recurse",
 ]
 
 
@@ -289,6 +290,20 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
 
     if not topdown:
         yield [path_entry], dirs, files
+
+
+def recurse(path_entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
+    """Recursively walk the given :class:`FilesystemEntry`, yields :class:`FilesystemEntry` instances."""
+    yield path_entry
+
+    if not path_entry.is_dir():
+        return
+
+    for child_entry in path_entry.scandir():
+        if child_entry.is_dir() and not child_entry.is_symlink():
+            yield from recurse(child_entry)
+        else:
+            yield child_entry
 
 
 def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
