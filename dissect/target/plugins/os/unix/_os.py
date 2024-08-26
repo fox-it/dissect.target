@@ -6,7 +6,7 @@ import uuid
 from struct import unpack
 from typing import Iterator, Optional, Union
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.utils import parse_options_string
@@ -250,13 +250,11 @@ class UnixPlugin(OSPlugin):
 
         Currently only adds LVM devices.
         """
-        vfs = VirtualFilesystem()
+        vfs = self.target.fs.append_layer()
 
         for volume in self.target.volumes:
             if volume.vs and volume.vs.__type__ == "lvm":
-                vfs.map_file_fh(f"{volume.raw.vg.name}/{volume.raw.name}", volume)
-
-        self.target.fs.mount("/dev", vfs, ignore_existing=False)
+                vfs.map_file_fh(f"/dev/{volume.raw.vg.name}/{volume.raw.name}", volume)
 
     def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
         """Parse files containing Unix version information.
