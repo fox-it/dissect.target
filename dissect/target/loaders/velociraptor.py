@@ -88,7 +88,7 @@ class VelociraptorLoader(DirLoader):
 
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))
-            compression_type = zipfile.ZipFile(str(path)).getinfo("uploads.json").compress_type
+            compression_type = self.root.root.getinfo("uploads.json").compress_type
             if compression_type > 0:
                 log.warning(
                     f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
