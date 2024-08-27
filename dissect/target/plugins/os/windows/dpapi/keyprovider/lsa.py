@@ -21,7 +21,7 @@ c_defaultpassword = cstruct().load(defaultpassword_def)
 
 
 class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
-    __namespace__ = "dpapi_keyprovider.lsa_defaultpassword"
+    __namespace__ = "_dpapi_keyprovider_lsa_defaultpassword"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("lsa"):

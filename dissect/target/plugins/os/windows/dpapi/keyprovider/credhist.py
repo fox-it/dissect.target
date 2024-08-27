@@ -8,7 +8,7 @@ from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
 
 
 class CredHistKeyProviderPlugin(KeyProviderPlugin):
-    __namespace__ = "dpapi_keyprovider.credhist"
+    __namespace__ = "_dpapi_keyprovider_credhist"
 
     def check_compatible(self) -> None:
         if not self.target.has_function("credhist"):

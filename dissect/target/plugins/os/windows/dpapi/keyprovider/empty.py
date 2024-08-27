@@ -7,7 +7,7 @@ from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
 
 
 class EmptyKeyProviderPlugin(KeyProviderPlugin):
-    __namespace__ = "dpapi_keyprovider.empty"
+    __namespace__ = "_dpapi_keyprovider_empty"
 
     def check_compatible(self) -> None:
         return
