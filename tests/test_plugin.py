@@ -1,7 +1,7 @@
 import os
 from functools import reduce
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
@@ -17,6 +17,7 @@ from dissect.target.plugin import (
     NamespacePlugin,
     OSPlugin,
     Plugin,
+    alias,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -558,3 +559,24 @@ def test_internal_namespace_plugin() -> None:
     assert "SUBPLUGINS" in dir(_TestInternalNamespacePlugin)
     assert "test" not in _TestInternalNamespacePlugin.__exports__
     assert "test" in _TestInternalNamespacePlugin.__functions__
+
+
+class ExampleFooPlugin(Plugin):
+    def check_compatible(self) -> None:
+        return
+
+    @export
+    @alias("bar")
+    @alias(name="baz")
+    def foo(self) -> Iterator[str]:
+        yield "foo!"
+
+
+def test_plugin_alias(target_bare: Target) -> None:
+    """test ``@alias`` decorator behaviour"""
+    target_bare.add_plugin(ExampleFooPlugin)
+    assert target_bare.has_function("foo")
+    assert target_bare.foo.__aliases__ == ["baz", "bar"]
+    assert target_bare.has_function("bar")
+    assert target_bare.has_function("baz")
+    assert list(target_bare.foo()) == list(target_bare.bar()) == list(target_bare.baz())
