@@ -3,11 +3,10 @@ from __future__ import annotations
 import zipfile
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
-from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
 from dissect.target.plugin import OperatingSystem
@@ -40,6 +39,7 @@ def map_dirs(
     target: Target,
     dirs: list[Path | tuple[str, Path]],
     os_type: str,
+    fs_type: Callable = DirectoryFilesystem,
     unquote_path: bool = False,
     **kwargs,
 ) -> None:
@@ -49,6 +49,9 @@ def map_dirs(
         target: The target to map into.
         dirs: The directories to map as filesystems. If a list member is a tuple, the first element is the drive letter.
         os_type: The operating system type, used to determine how the filesystem should be mounted.
+        fs_type: The filesystem type:
+        unquote_path: ``True`` URL decodes the ``path``, ``False`` it does not,
+                            if the ``ZipFilesystem`` is specified as ``fs_type``.
     """
     alt_separator = ""
     case_sensitive = True
@@ -65,7 +68,7 @@ def map_dirs(
             drive_letter = path.name[0]
 
         if isinstance(path, zipfile.Path):
-            dfs = ZipFilesystem(
+            dfs = fs_type(
                 path.root.fp,
                 path.at,
                 alt_separator=alt_separator,
@@ -73,12 +76,7 @@ def map_dirs(
                 unquote_path=unquote_path,
             )
         else:
-            dfs = DirectoryFilesystem(
-                path,
-                alt_separator=alt_separator,
-                case_sensitive=case_sensitive,
-                unquote_path=unquote_path,
-            )
+            dfs = fs_type(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 
         drive_letter_map[drive_letter].append(dfs)
 

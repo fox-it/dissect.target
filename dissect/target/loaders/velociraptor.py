@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dissect.target.filesystems.velociraptor import VelociraptorDirectoryFilesystem
+from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -88,6 +90,7 @@ class VelociraptorLoader(DirLoader):
 
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))
+            self.fs_type = ZipFilesystem
             compression_type = self.root.root.getinfo("uploads.json").compress_type
             if compression_type > 0:
                 log.warning(
@@ -96,6 +99,7 @@ class VelociraptorLoader(DirLoader):
                 )
         else:
             self.root = path
+            self.fs_type = VelociraptorDirectoryFilesystem
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -119,11 +123,13 @@ class VelociraptorLoader(DirLoader):
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
 
-        # Velociraptor URL encodes paths before storing these in a zip file, this leads plugins not being able to find
-        # these paths. To prevent this issue, the path names are URL decoded before mapping into the VFS.
+        # Velociraptor URL encodes paths before storing these in a collection, this leads plugins not being able to find
+        # these paths. To circumvent this issue, for a zip file the path names are URL decoded before mapping into the
+        # VFS and for a directory the paths are URL encoded at lookup time.
         map_dirs(
             target,
             dirs,
             os_type,
+            self.fs_type,
             unquote_path=True,
         )

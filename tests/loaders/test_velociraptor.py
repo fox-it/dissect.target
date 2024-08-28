@@ -24,6 +24,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
     (root / "uploads.json").write_bytes(b"{}")
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/C-DRIVE.txt").write_bytes(b"{}")
+    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/other.txt").write_text("my first file")
 
     with open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb") as fh:
         mft = fh.read(10 * 1025)
@@ -55,8 +56,6 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 )
 def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
-    root.joinpath(f"uploads/{other_dir}/C%3A").mkdir(parents=True, exist_ok=True)
-    root.joinpath(f"uploads/{other_dir}/C%3A/other.txt").write_text("my first file")
 
     assert VelociraptorLoader.detect(root) is True
 
