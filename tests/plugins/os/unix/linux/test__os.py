@@ -12,8 +12,8 @@ from tests.conftest import make_os_target
 @pytest.fixture
 def target_linux_proc_sys(tmp_path: pathlib.Path) -> Iterator[Target]:
     root_fs = VirtualFilesystem()
-    root_fs.makedirs("/proc")
-    root_fs.makedirs("/sys")
+    root_fs.makedirs("/proc/sys")
+    root_fs.makedirs("/sys/module")
     target_linux_proc_sys = make_os_target(tmp_path, LinuxPlugin, root_fs)
 
     yield target_linux_proc_sys

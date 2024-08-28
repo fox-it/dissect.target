@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import logging
-from typing import Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.network_managers import (
@@ -8,6 +9,8 @@ from dissect.target.helpers.network_managers import (
 )
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
+from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -20,18 +23,12 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         self.network_manager.discover()
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             if (
-                fs.exists("/var")
-                and fs.exists("/etc")
-                and fs.exists("/opt")
-                or (fs.exists("/proc") or fs.exists("/sys"))
-            ):
-                # If the target has registry function, it is most likely not a Linux system
-                if target.has_function("registry") or fs.exists("/Library"):
-                    return
-
+                (fs.exists("/var") and fs.exists("/etc") and fs.exists("/opt"))
+                or (fs.exists("/sys/module") or fs.exists("/proc/sys"))
+            ) and not (MacPlugin.detect(target) or WindowsPlugin.detect(target)):
                 return fs
 
     @export(property=True)
@@ -70,7 +67,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         return self.network_manager.get_config_value("netmask")
 
     @export(property=True)
-    def version(self) -> str:
+    def version(self) -> str | None:
         distrib_description = self._os_release.get("DISTRIB_DESCRIPTION", "")
         name = self._os_release.get("NAME", "") or self._os_release.get("DISTRIB_ID", "")
         version = (
@@ -81,9 +78,8 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
         if len(f"{name} {version}") > len(distrib_description):
             return f"{name} {version}"
-
         else:
-            return distrib_description
+            return distrib_description or None
 
     @export(property=True)
     def os(self) -> str:
