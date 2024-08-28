@@ -4,8 +4,9 @@ import logging
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
-from dissect.target.filesystems.velociraptor import VelociraptorDirectoryFilesystem
+from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
@@ -90,16 +91,14 @@ class VelociraptorLoader(DirLoader):
 
         if path.suffix == ".zip":
             self.root = zipfile.Path(path.open("rb"))
-            self.fs_type = ZipFilesystem
-            compression_type = self.root.root.getinfo("uploads.json").compress_type
-            if compression_type > 0:
+            if self.root.root.getinfo("uploads.json").compress_type > 0:
                 log.warning(
-                    f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
-                    "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
+                    "Velociraptor target '%s' is compressed, which will slightly affect performance. "
+                    "Consider uncompressing the archive and passing the uncompressed folder to Dissect.",
+                    path,
                 )
         else:
             self.root = path
-            self.fs_type = VelociraptorDirectoryFilesystem
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -130,6 +129,16 @@ class VelociraptorLoader(DirLoader):
             target,
             dirs,
             os_type,
-            self.fs_type,
-            unquote_path=True,
+            dirfs=VelociraptorDirectoryFilesystem,
+            zipfs=VelociraptorZipFilesystem,
         )
+
+
+class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
+    def _resolve_path(self, path: str) -> Path:
+        return super()._resolve_path(unquote(path).replace(".", "%2E"))
+
+
+class VelociraptorZipFilesystem(ZipFilesystem):
+    def _resolve_path(self, path: str) -> str:
+        return super()._resolve_path(unquote(path).replace(".", "%2E"))
