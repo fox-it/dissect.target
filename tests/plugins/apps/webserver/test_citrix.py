@@ -75,8 +75,7 @@ def test_error_logs(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     fs_bsd.map_file("var/log/httperror-vpn.log", BytesIO(b"Foo"))
     fs_bsd.map_file("var/log/httperror.log", BytesIO(b"Bar"))
 
-    target_citrix.add_plugin(CitrixWebserverPlugin)
-    access_log_paths, error_log_paths = target_citrix.citrix.get_log_paths()
+    access_log_paths, error_log_paths = CitrixWebserverPlugin(target_citrix).get_log_paths()
 
     assert len(error_log_paths) == 2
 

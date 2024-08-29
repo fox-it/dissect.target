@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 if TYPE_CHECKING:
     from flow.record import Record
@@ -44,7 +44,7 @@ class DefaultPlugin(OSPlugin):
         pass
 
     @export(record=EmptyRecord)
-    def users(self) -> list[Record]:
+    def users(self) -> Iterator[Record]:
         yield from ()
 
     @export(property=True)

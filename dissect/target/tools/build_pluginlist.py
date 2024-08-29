@@ -3,7 +3,7 @@ from __future__ import absolute_import, print_function
 
 import argparse
 import logging
-import pprint
+import textwrap
 
 from dissect.target import plugin
 
@@ -25,7 +25,12 @@ def main():
         logging.basicConfig(level=logging.CRITICAL)
 
     pluginlist = plugin.generate()
-    print(f"PLUGINS = \\\n{pprint.pformat(pluginlist)}")
+    template = """
+    from dissect.target.plugin import FailureDescriptor, FunctionDescriptor, PluginDescriptor
+
+    PLUGINS = {}
+    """
+    print(textwrap.dedent(template).format(pluginlist))
 
 
 if __name__ == "__main__":
