@@ -96,6 +96,7 @@ __all__ = [
     "TargetPath",
     "walk_ext",
     "walk",
+    "recurse",
 ]
 
 
@@ -291,6 +292,20 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
         yield [path_entry], dirs, files
 
 
+def recurse(path_entry: filesystem.FilesystemEntry) -> Iterator[filesystem.FilesystemEntry]:
+    """Recursively walk the given :class:`FilesystemEntry`, yields :class:`FilesystemEntry` instances."""
+    yield path_entry
+
+    if not path_entry.is_dir():
+        return
+
+    for child_entry in path_entry.scandir():
+        if child_entry.is_dir() and not child_entry.is_symlink():
+            yield from recurse(child_entry)
+        else:
+            yield child_entry
+
+
 def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
     """Split a pattern on path part boundaries on the first path part with a glob pattern.
 
@@ -425,15 +440,20 @@ def has_glob_magic(s) -> bool:
 
 
 def resolve_link(
-    fs: filesystem.Filesystem, entry: filesystem.FilesystemEntry, previous_links: set[str] = None
+    fs: filesystem.Filesystem,
+    link: str,
+    path: str,
+    *,
+    alt_separator: str = "",
+    previous_links: set[str] | None = None,
 ) -> filesystem.FilesystemEntry:
     """Resolves a symlink to its actual path.
 
     It stops resolving once it detects an infinite recursion loop.
     """
 
-    link = normalize(entry.readlink(), alt_separator=entry.fs.alt_separator)
-    path = normalize(entry.path, alt_separator=entry.fs.alt_separator)
+    link = normalize(link, alt_separator=alt_separator)
+    path = normalize(path, alt_separator=alt_separator)
 
     # Create hash for entry based on path and link
     link_id = f"{path}{link}"
@@ -456,7 +476,13 @@ def resolve_link(
     entry = fs.get(link)
 
     if entry.is_symlink():
-        entry = resolve_link(fs, entry, previous_links)
+        entry = resolve_link(
+            fs,
+            entry.readlink(),
+            link,
+            alt_separator=entry.fs.alt_separator,
+            previous_links=previous_links,
+        )
 
     return entry
 
