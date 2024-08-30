@@ -77,9 +77,9 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         )
 
         if len(f"{name} {version}") > len(distrib_description):
-            return f"{name} {version}"
-        else:
-            return distrib_description or None
+            distrib_description = f"{name} {version}"
+
+        return distrib_description or None
 
     @export(property=True)
     def os(self) -> str:
