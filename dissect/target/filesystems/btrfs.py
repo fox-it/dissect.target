@@ -71,6 +71,10 @@ class BtrfsSubvolumeFilesystem(Filesystem):
         else:
             self.subvolume = self.btrfs.default_subvolume
 
+        # Calculate the blocks availlable on the device
+        self.sector_size = self.btrfs.sector_size
+        self.blocks = self.btrfs.sb.total_bytes // self.sector_size
+
     def get(self, path: str) -> FilesystemEntry:
         return BtrfsFilesystemEntry(self, path, self._get_node(path))
 
@@ -153,7 +157,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = st_info = fsutil.stat_result(
+        st_info = fsutil.stat_result(
             [
                 entry.mode,
                 entry.inum,
@@ -173,8 +177,13 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         st_info.st_atime_ns = entry.atime_ns
         st_info.st_mtime_ns = entry.mtime_ns
         st_info.st_ctime_ns = entry.ctime_ns
+        st_info.st_birthtime_ns = entry.otime_ns
 
         # Btrfs has a birth time, called otime
         st_info.st_birthtime = entry.otime.timestamp()
+
+        # Add block information of the filesystem
+        st_info.st_blksize = self.fs.sector_size
+        st_info.st_blocks = self.fs.blocks
 
         return st_info
