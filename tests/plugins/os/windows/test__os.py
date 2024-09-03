@@ -1,4 +1,6 @@
-from typing import Any, Iterator, Optional
+from __future__ import annotations
+
+from typing import Any, Iterator
 
 import pytest
 
@@ -39,7 +41,7 @@ def target_win_linux_folders(target_win: Filesystem, fs_linux_sys: Filesystem) -
     yield target_win
 
 
-def map_version_value(target: Target, name: Optional[str], value: Any):
+def map_version_value(target: Target, name: str | None, value: Any):
     if name is not None:
         hive = target.registry._root
         hive.map_value(CURRENT_VERSION_KEY, name, VirtualValue(hive, name, value))
@@ -62,7 +64,7 @@ def assert_value(result: Any, value: Any):
 def test_windowsplugin__legacy_curre_ntversion(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -81,7 +83,7 @@ def test_windowsplugin__legacy_curre_ntversion(
 def test_windowsplugin__major_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -100,7 +102,7 @@ def test_windowsplugin__major_version(
 def test_windowsplugin__minor_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -137,7 +139,7 @@ def test_windowsplugin__nt_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
-    value: Optional[str],
+    value: str | None,
 ):
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)
@@ -236,7 +238,7 @@ def test_windowsplugin_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
-    value: Optional[str],
+    value: str | None,
 ):
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)

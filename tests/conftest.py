@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator
 
 import pytest
 
@@ -50,7 +52,7 @@ def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:
 def make_os_target(
     tmp_path: pathlib.Path,
     os_plugin: type[OSPlugin],
-    root_fs: Optional[Filesystem] = None,
+    root_fs: Filesystem | None = None,
     apply_target: bool = True,
 ) -> Target:
     mock_target = next(make_mock_target(tmp_path))
