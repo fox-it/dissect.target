@@ -1,6 +1,8 @@
+import struct
 from datetime import datetime
-from typing import Optional
+from typing import Iterator, Optional
 
+from dissect.util.sid import read_sid
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
@@ -586,46 +588,33 @@ class GenericPlugin(Plugin):
 
     @export(record=ComputerSidRecord)
     def sid(self) -> Iterator[ComputerSidRecord]:
-        key = "HKLM\\SAM\\SAM\\Domains\\Account"
-        for k in self.target.registry.keys(key):
-            try:
-                value = k.value('V').value
+        """Return the machine- and optional domain SID of the system."""
 
-                group_1 = int.from_bytes(value[-12:-8], byteorder='little')
-                group_2 = int.from_bytes(value[-8:-4], byteorder='little')
-                group_3 = int.from_bytes(value[-4:], byteorder='little')
+        try:
+            key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
 
-                sid = f'S-1-5-21-{group_1}-{group_2}-{group_3}'
+            # The machine SID is stored in the last 12 bytes of the V value as little-endian
+            # The machine SID differs from a 'normal' binary SID as only holds 3 values and lacks a prefix / Revision
+            # NOTE: Consider moving this to dissect.util.sid if we encounter this more often
+            sid = struct.unpack_from("<III", key.value("V").value, -12)
 
-                yield ComputerSidRecord(
-                    ts=self.target.datetime.to_utc(k.timestamp),
-                    sidtype='machine',
-                    sid=sid,
-                    _target=self.target,
-                )
-                break
-            except RegistryValueNotFoundError:
-                continue
+            yield ComputerSidRecord(
+                ts=key.timestamp,
+                sidtype="Machine",
+                sid=f"S-1-5-21-{sid[0]}-{sid[1]}-{sid[2]}",
+                _target=self.target,
+            )
+        except (RegistryError, struct.error):
+            pass
 
-        key = "HKLM\\SECURITY\\Policy\\PolMachineAccountS"
-        for k in self.target.registry.keys(key):
-            try:
-                value = k.value('(Default)').value
-                timestamp = k.timestamp
+        try:
+            key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
 
-                group_1 = int.from_bytes(value[-16:-12], byteorder='little')
-                group_2 = int.from_bytes(value[-12:-8], byteorder='little')
-                group_3 = int.from_bytes(value[-8:-4], byteorder='little')
-                group_4 = int.from_bytes(value[-4:], byteorder='little')
-
-                sid = f'S-1-5-21-{group_1}-{group_2}-{group_3}-{group_4}'
-
-                yield ComputerSidRecord(
-                    ts=self.target.datetime.to_utc(k.timestamp),
-                    sidtype='domain',
-                    sid=sid,
-                    _target=self.target,
-                )
-                break
-            except RegistryValueNotFoundError:
-                continue
+            yield ComputerSidRecord(
+                ts=key.timestamp,
+                sidtype="Domain",
+                sid=read_sid(key.value("(Default)").value),
+                _target=self.target,
+            )
+        except (RegistryError, struct.error):
+            pass
