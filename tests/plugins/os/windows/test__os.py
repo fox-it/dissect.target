@@ -1,8 +1,12 @@
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import Any, Iterator
 
 import pytest
 
+from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 from dissect.target.target import Target
@@ -31,7 +35,13 @@ def win_plugin(version_target: Target):
     return WindowsPlugin(version_target)
 
 
-def map_version_value(target: Target, name: Optional[str], value: Any):
+@pytest.fixture
+def target_win_linux_folders(target_win: Filesystem, fs_linux_sys: Filesystem) -> Iterator[Target]:
+    target_win.fs.mount("/", fs_linux_sys)
+    yield target_win
+
+
+def map_version_value(target: Target, name: str | None, value: Any):
     if name is not None:
         hive = target.registry._root
         hive.map_value(CURRENT_VERSION_KEY, name, VirtualValue(hive, name, value))
@@ -54,7 +64,7 @@ def assert_value(result: Any, value: Any):
 def test_windowsplugin__legacy_curre_ntversion(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -73,7 +83,7 @@ def test_windowsplugin__legacy_curre_ntversion(
 def test_windowsplugin__major_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -92,7 +102,7 @@ def test_windowsplugin__major_version(
 def test_windowsplugin__minor_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
-    name: Optional[str],
+    name: str | None,
     value: Any,
 ):
     map_version_value(version_target, name, value)
@@ -129,7 +139,7 @@ def test_windowsplugin__nt_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
-    value: Optional[str],
+    value: str | None,
 ):
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)
@@ -228,10 +238,18 @@ def test_windowsplugin_version(
     version_target: Target,
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
-    value: Optional[str],
+    value: str | None,
 ):
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)
     result = win_plugin.version
 
     assert_value(result, value)
+
+
+def test_windows_os_detection_with_linux_folders(target_win_linux_folders: Target) -> None:
+    fs_linux = LinuxPlugin.detect(target_win_linux_folders)
+    fs_windows = WindowsPlugin.detect(target_win_linux_folders)
+
+    assert fs_linux is None
+    assert fs_windows is not None
