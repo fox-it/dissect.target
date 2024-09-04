@@ -170,7 +170,7 @@ def main():
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list:
-        collected_plugins = {}
+        collected_plugins = []
 
         if targets:
             for plugin_target in Target.open_all(targets, args.children):
@@ -178,25 +178,34 @@ def main():
                     parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
                 for func in funcs:
-                    collected_plugins[func.path] = func.plugin_desc
+                    collected_plugins.append(func)
         else:
             funcs, _ = find_plugin_functions(Target(), args.list, compatibility=False, show_hidden=True)
             for func in funcs:
-                collected_plugins[func.path] = func.plugin_desc
+                collected_plugins.append(func)
 
-        # Display in a user friendly manner
         target = Target()
         fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
 
+        # Display in a user friendly manner
         if collected_plugins:
-            target.plugins(list(collected_plugins.values()))
+            if args.json:
+                print('{"plugins": ', end="")
+            target.plugins(collected_plugins, output_json=args.json)
 
         # No real targets specified, show the available loaders
         if not targets:
             fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
             fargs, rest = fparser.parse_known_args(rest)
-            target.loaders(**vars(fargs))
+            del fargs.output_json
+            if args.json:
+                print(', "loaders": ', end="")
+            target.loaders(**vars(fargs), output_json=args.json)
+
+        if args.json:
+            print("}")
+
         parser.exit()
 
     if not targets:

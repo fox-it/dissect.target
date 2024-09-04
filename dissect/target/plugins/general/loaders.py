@@ -1,6 +1,8 @@
+import json
+
 from dissect.target.helpers.docs import INDENT_STEP, get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 
 
 class LoaderListPlugin(Plugin):
@@ -10,7 +12,8 @@ class LoaderListPlugin(Plugin):
         pass
 
     @export(output="none")
-    def loaders(self):
+    @arg("--json", dest="output_json", action="store_true")
+    def loaders(self, output_json: bool = False) -> None:
         """List the available loaders."""
 
         loaders_info = {}
@@ -21,6 +24,12 @@ class LoaderListPlugin(Plugin):
             except ImportError:
                 continue
 
-        print("Available loaders:")
-        for loader_name, loader_description in sorted(loaders_info.items()):
-            print(f"{INDENT_STEP}{loader_name} - {loader_description}")
+        loaders = sorted(loaders_info.items())
+
+        if output_json:
+            print(json.dumps([{"name": name, "description": desc} for name, desc in loaders]), end="")
+
+        else:
+            print("Available loaders:")
+            for loader_name, loader_description in loaders:
+                print(f"{INDENT_STEP}{loader_name} - {loader_description}")
