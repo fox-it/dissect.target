@@ -63,17 +63,21 @@ class LSAPlugin(Plugin):
         """Decrypt and return the LSA key of the Windows system."""
         security_pol = self.target.registry.key(self.SECURITY_POLICY_KEY)
 
-        # Windows Vista or newer
-        if key := security_pol.subkeys().mapping.get("PolEKList"):
-            enc_key = key.value("(Default)").value
+        try:
+            # Windows Vista or newer
+            enc_key = security_pol.subkey("PolEKList").value("(Default)").value
             lsa_key = _decrypt_aes(enc_key, self.syskey)
             return lsa_key[68:100]
+        except RegistryKeyNotFoundError:
+            pass
 
-        # Windows XP
-        if key := security_pol.subkeys().mapping.get("PolSecretEncryptionKey"):
-            enc_key = key.value("(Default)").value
+        try:
+            # Windows XP
+            enc_key = security_pol.subkey("PolSecretEncryptionKey").value("(Default)").value
             lsa_key = _decrypt_rc4(enc_key, self.syskey)
             return lsa_key[16:32]
+        except RegistryKeyNotFoundError:
+            pass
 
         raise ValueError("Unable to determine LSA policy key location in registry")
 
