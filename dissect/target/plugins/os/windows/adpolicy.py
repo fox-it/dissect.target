@@ -70,8 +70,7 @@ class ADPolicyPlugin(Plugin):
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall(".//{*}Task"):
                     # https://github.com/python/cpython/issues/83122
-                    properties = task.find("Properties")
-                    if properties is None:
+                    if (properties := task.find("Properties")) is None:
                         properties = task
 
                     task_data = ElementTree.tostring(task)
