@@ -121,7 +121,7 @@ class TarFilesystemEntry(VirtualFile):
     def readlink_ext(self) -> FilesystemEntry:
         """Read the link if this entry is a symlink. Returns a filesystem entry."""
         # Can't use the one in VirtualFile as it overrides the FilesystemEntry
-        return fsutil.resolve_link(fs=self.fs, entry=self)
+        return fsutil.resolve_link(self.fs, self.readlink(), self.path, alt_separator=self.fs.alt_separator)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Return the stat information of this entry."""

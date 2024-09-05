@@ -5,8 +5,8 @@ from tests._utils import absolute_path
 
 
 def test_os_windows_jumplist(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    custom_destination = absolute_path("data/plugins/os/windows/jumplist/590aee7bdd69b59b.customDestinations-ms")
-    automatic_destination = absolute_path("data/plugins/os/windows/jumplist/5f7b5f1e01b83767.automaticDestinations-ms")
+    custom_destination = absolute_path("_data/plugins/os/windows/jumplist/590aee7bdd69b59b.customDestinations-ms")
+    automatic_destination = absolute_path("_data/plugins/os/windows/jumplist/5f7b5f1e01b83767.automaticDestinations-ms")
 
     user_details = target_win_users.user_details.find(username="John")
 
