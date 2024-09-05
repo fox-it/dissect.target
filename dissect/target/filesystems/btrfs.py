@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import BinaryIO, Iterator, Optional, Union
 
 import dissect.btrfs as btrfs
@@ -70,10 +71,6 @@ class BtrfsSubvolumeFilesystem(Filesystem):
             self.subvolume = self.btrfs.open_subvolume(subvolid)
         else:
             self.subvolume = self.btrfs.default_subvolume
-
-        # Calculate the blocks availlable on the device
-        self.sector_size = self.btrfs.sector_size
-        self.blocks = self.btrfs.sb.total_bytes // self.sector_size
 
     def get(self, path: str) -> FilesystemEntry:
         return BtrfsFilesystemEntry(self, path, self._get_node(path))
@@ -183,7 +180,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         st_info.st_birthtime = entry.otime.timestamp()
 
         # Add block information of the filesystem
-        st_info.st_blksize = self.fs.sector_size
-        st_info.st_blocks = self.fs.blocks
+        st_info.st_blksize = entry.btrfs.sector_size
+        st_info.st_blocks = math.ceil(entry.size / st_info.st_blksize)
 
         return st_info
