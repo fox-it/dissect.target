@@ -4,7 +4,7 @@ import hashlib
 from functools import cached_property
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
