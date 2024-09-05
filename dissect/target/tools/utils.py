@@ -95,12 +95,24 @@ def generate_argparse_for_unbound_method(
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
     fargs = getattr(method, "__args__", [])
+    groups = {}
+    default_group_options = {"required": False}
     for args, kwargs in fargs:
-        parser.add_argument(*args, **kwargs)
+        if "group" in kwargs:
+            group_name = kwargs.pop("group")
+            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
+            if group_name not in groups:
+                group = parser.add_mutually_exclusive_group(**options)
+                groups[group_name] = group
+            else:
+                group = groups[group_name]
+
+            group.add_argument(*args, **kwargs)
+        else:
+            parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
-
     func_name = method.__name__
     usage_tmpl = usage_tmpl or "{prog} {usage}"
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
