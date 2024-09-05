@@ -61,7 +61,6 @@ class LocalePlugin(Plugin):
             size = p_localtime.stat().st_size
             sha1 = p_localtime.get().sha1()
             for path in self.target.fs.path("/usr/share/zoneinfo").rglob("*"):
-
                 # Ignore posix files in zoneinfo directory (RHEL).
                 if path.name.startswith("posix"):
                     continue
