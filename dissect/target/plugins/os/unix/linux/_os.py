@@ -76,6 +76,9 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             or self._os_release.get("DISTRIB_RELEASE", "")
         )
 
+        if not any([name, version, distrib_description]):
+            return None
+
         if len(f"{name} {version}") > len(distrib_description):
             distrib_description = f"{name} {version}"
 

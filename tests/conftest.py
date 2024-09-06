@@ -21,7 +21,7 @@ from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
-from dissect.target.plugins.os.unix.linux.redhat._os import RedHat
+from dissect.target.plugins.os.unix.linux.redhat._os import RedHatPlugin
 from dissect.target.plugins.os.unix.linux.suse._os import SuSEPlugin
 from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -290,7 +290,7 @@ def target_debian(tmp_path: pathlib.Path, fs_debian: Filesystem) -> Iterator[Tar
 
 @pytest.fixture
 def target_redhat(tmp_path: pathlib.Path, fs_redhat: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, RedHat, root_fs=fs_redhat)
+    yield make_os_target(tmp_path, RedHatPlugin, root_fs=fs_redhat)
 
 
 @pytest.fixture
