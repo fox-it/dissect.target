@@ -101,13 +101,13 @@ def main():
     options["nothreads"] = True
     options["ro"] = True
     # Check if the allow other option is either not set (None) or set to True with -o allow_other=True
-    if (allow_other := options.get("allow_other")) is None or allow_other in ["True", "true"]:
+    if (allow_other := options.get("allow_other")) is None or str(allow_other).lower() == "true":
         options["allow_other"] = True
         # If allow_other was not set, warn the user that it will be set by default
         if allow_other is None:
             log.warning("Using option 'allow_other' by default, please use '-o allow_other=False' to unset")
     # Let the user be able to unset the allow_other option by supplying -o allow_other=False
-    elif allow_other in ["False", "false"]:
+    elif str(allow_other).lower() == "false":
         options["allow_other"] = False
 
     log.info("Mounting to %s with options: %s", args.mount, _format_options(options))
