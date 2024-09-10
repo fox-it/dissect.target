@@ -110,7 +110,7 @@ def main():
     elif allow_other in ["False", "false"]:
         options["allow_other"] = False
 
-    log.info(f"Mounting to {args.mount} with options: {_format_options(options)}")
+    log.info("Mounting to %s with options: %s", args.mount, _format_options(options))
     try:
         FUSE(DissectMount(vfs), args.mount, **options)
     except RuntimeError:
