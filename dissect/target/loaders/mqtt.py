@@ -341,8 +341,12 @@ class Broker:
             self.mqtt_client.subscribe(f"{self.case}/{host}/DISKS")
             self.mqtt_client.subscribe(f"{self.case}/{host}/READ/#")
             if self.command is not None:
+                self.mqtt_client.subscribe(f"{self.case}/{host}/CALLID")
                 self.mqtt_client.publish(f"{self.case}/{host}/COMM", self.command.encode("utf-8"))
             time.sleep(1)
+
+    def _on_callId(self, hostname: str, payload: bytes) -> None:
+        print(f"CALLID: {payload.decode("utf-8")}")
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
@@ -365,6 +369,8 @@ class Broker:
             self._on_read(hostname, tokens, msg.payload)
         elif response == "ID":
             self._on_id(hostname, msg.payload)
+        elif response == "CALLID":
+            self._on_callId(hostname, msg.payload)
 
     def seek(self, host: str, disk_id: int, offset: int, flength: int, optimization_strategy: int) -> None:
         length = int(flength / self.factor)
