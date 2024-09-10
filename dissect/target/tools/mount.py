@@ -113,8 +113,9 @@ def main():
     log.info("Mounting to %s with options: %s", args.mount, _format_options(options))
     try:
         FUSE(DissectMount(vfs), args.mount, **options)
-    except RuntimeError:
+    except RuntimeError as e:
         log.error("Mounting target %s failed", t)
+        log.debug("", exc_info=e)
         parser.exit(1)
 
 
