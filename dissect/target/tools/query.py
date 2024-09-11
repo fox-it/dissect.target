@@ -5,7 +5,7 @@ import argparse
 import logging
 import pathlib
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable
 
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
@@ -399,7 +399,7 @@ def main():
         log.debug("", exc_info=e)
         parser.exit(1)
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(tz=timezone.utc)
 
     execution_report.set_plugin_stats(PLUGINS)
     log.debug("%s", execution_report.get_formatted_report())
