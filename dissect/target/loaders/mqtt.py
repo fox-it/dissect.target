@@ -346,7 +346,14 @@ class Broker:
             time.sleep(1)
 
     def _on_callId(self, hostname: str, payload: bytes) -> None:
-        print(f"CALLID: {payload.decode("utf-8")}")
+        try:
+            decoded_payload = payload.decode("utf-8")
+        except UnicodeDecodeError as e:
+            log.error(f"Failed to decode payload for hostname {hostname}: {e}")
+            return
+
+        # The payload with the username and password is comma separated
+        print(f'CALLID: "{hostname}",{decoded_payload}')
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
