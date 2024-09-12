@@ -345,7 +345,7 @@ class Broker:
                 self.mqtt_client.publish(f"{self.case}/{host}/COMM", self.command.encode("utf-8"))
             time.sleep(1)
 
-    def _on_callId(self, hostname: str, payload: bytes) -> None:
+    def _on_call_id(self, hostname: str, payload: bytes) -> None:
         try:
             decoded_payload = payload.decode("utf-8")
         except UnicodeDecodeError as e:
@@ -353,7 +353,7 @@ class Broker:
             return
 
         # The payload with the username and password is comma separated
-        print(f'CALLID: "{hostname}",{decoded_payload}')
+        print(f'"{hostname}",{decoded_payload}')
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
@@ -377,7 +377,7 @@ class Broker:
         elif response == "ID":
             self._on_id(hostname, msg.payload)
         elif response == "CALLID":
-            self._on_callId(hostname, msg.payload)
+            self._on_call_id(hostname, msg.payload)
 
     def seek(self, host: str, disk_id: int, offset: int, flength: int, optimization_strategy: int) -> None:
         length = int(flength / self.factor)
