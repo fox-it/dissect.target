@@ -174,10 +174,10 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         st_info.st_atime_ns = entry.atime_ns
         st_info.st_mtime_ns = entry.mtime_ns
         st_info.st_ctime_ns = entry.ctime_ns
-        st_info.st_birthtime_ns = entry.otime_ns
 
         # Btrfs has a birth time, called otime
         st_info.st_birthtime = entry.otime.timestamp()
+        st_info.st_birthtime_ns = entry.otime_ns
 
         # Add block information of the filesystem
         st_info.st_blksize = entry.btrfs.sector_size
