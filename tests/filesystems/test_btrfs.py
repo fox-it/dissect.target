@@ -44,7 +44,6 @@ def test_stat_information_file_blocksize(sector_size: int, filesize: int, expect
     assert stat_info.st_gid == 1000
     assert stat_info.st_size == filesize
 
-
     assert stat_info.st_atime == 0.0
     assert stat_info.st_atime_ns == 0
     assert stat_info.st_mtime == 0.0
