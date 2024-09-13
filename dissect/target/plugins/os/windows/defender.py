@@ -517,6 +517,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                         regf_mtime=exclusion_type_subkey.timestamp,
                         type=exclusion_type,
                         value=exclusion_value,
+                        _target=self.target,
                     )
 
     def _mplog_processimage(self, data: dict) -> Iterator[DefenderMPLogProcessImageRecord]:
