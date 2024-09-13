@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import BinaryIO, Iterator, Optional, Union
 
 import dissect.btrfs as btrfs
@@ -153,7 +154,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = st_info = fsutil.stat_result(
+        st_info = fsutil.stat_result(
             [
                 entry.mode,
                 entry.inum,
@@ -176,5 +177,10 @@ class BtrfsFilesystemEntry(FilesystemEntry):
 
         # Btrfs has a birth time, called otime
         st_info.st_birthtime = entry.otime.timestamp()
+        st_info.st_birthtime_ns = entry.otime_ns
+
+        # Add block information of the filesystem
+        st_info.st_blksize = entry.btrfs.sector_size
+        st_info.st_blocks = math.ceil(entry.size / st_info.st_blksize)
 
         return st_info
