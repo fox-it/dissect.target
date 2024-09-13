@@ -62,9 +62,7 @@ def _create_pmxcfs(fh: BinaryIO, hostname: str | None = None) -> VirtualFilesyst
     # https://pve.proxmox.com/wiki/Proxmox_Cluster_File_System_(pmxcfs)
     db = sqlite3.SQLite3(fh)
 
-    entries = {}
-    for row in db.table("tree").rows():
-        entries[row.inode] = row
+    entries = {row.inode: row for row in db.table("tree")}
 
     vfs = VirtualFilesystem()
     for entry in entries.values():
