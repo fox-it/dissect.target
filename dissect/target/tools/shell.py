@@ -26,6 +26,7 @@ from flow.record import RecordOutput
 
 from dissect.target.exceptions import (
     PluginError,
+    PluginNotFoundError,
     RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
@@ -590,6 +591,50 @@ class TargetCli(TargetCmd):
         """print target information"""
         print_target_info(self.target)
         return False
+
+    def do_sync(self, line: str) -> Optional[bool]:
+        """sync target filesystem"""
+
+        def _invalidate_caches(obj: Any, cur_depth: int = 0, max_depth: int = 8) -> int:
+            """Recursively invalidate caches in the object and its attributes."""
+            total_invalidated = 0
+
+            if cur_depth > max_depth:
+                return total_invalidated
+
+            if not obj.__class__.__module__.startswith("dissect."):
+                return total_invalidated
+
+            if not hasattr(obj, "__dict__"):
+                return total_invalidated
+
+            for attr in obj.__dict__.values():
+                if isinstance(attr, (str, int, float, bool, bytes, bytearray)):
+                    continue
+
+                try:
+                    if hasattr(attr, "cache_clear"):
+                        attr.cache_clear()
+                        total_invalidated += 1
+                        continue
+                except PluginNotFoundError:
+                    continue
+
+                if isinstance(attr, (list, set, tuple)):
+                    for item in attr:
+                        total_invalidated += _invalidate_caches(item, cur_depth + 1, max_depth)
+                    continue
+
+                total_invalidated += _invalidate_caches(attr, cur_depth + 1, max_depth)
+            return total_invalidated
+
+        print("Attempting to invalidate caches... ", end="", flush=True)
+        try:
+            total = _invalidate_caches(self.target)
+            print(f"OK ({total} caches invalidated)")
+        except Exception as e:
+            print(f"FAILED: {e}")
+            raise
 
     @arg("path", nargs="?")
     @arg("-l", action="store_true")
