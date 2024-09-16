@@ -368,7 +368,6 @@ class DifferentialCli(ExtendedCmd):
 
     @property
     def prompt(self) -> str:
-
         if self.comparison.src_target.name != self.comparison.dst_target.name:
             prompt_base = f"({self.comparison.src_target.name}/{self.comparison.dst_target.name})"
         else:
@@ -410,7 +409,7 @@ class DifferentialCli(ExtendedCmd):
         absolute: bool = False,
     ) -> list[tuple[fsutil.TargetPath | DifferentialEntry], str]:
         """Given a DirectoryDifferential instance, construct a list of tuples where the first element is a  Filesystem /
-        DifferentialEntry entries and the second a color-formatted string."""
+        DifferentialEntry and the second a color-formatted string."""
         r = []
 
         attr = "path" if absolute else "name"
@@ -436,17 +435,29 @@ class DifferentialCli(ExtendedCmd):
         r.sort(key=lambda e: e[0].name)
         return r
 
-    def _targets_with_path(self, path: str, warn_when_incomplete: bool = False) -> list[Target]:
-        """Return targets where a given path exists, checking the src and dst target of this class. Optionally log a
-        warning if the path only exists on one of the two targets."""
-        targets_with_path = []
-        if self.comparison.src_target.fs.exists(path):
-            targets_with_path.append(self.comparison.src_target)
-        if self.comparison.dst_target.fs.exists(path):
-            targets_with_path.append(self.comparison.dst_target)
-        if warn_when_incomplete and len(targets_with_path) == 1:
-            log.warning("'%s' is only present on '%s'.", path, targets_with_path[0])
-        return targets_with_path
+    def _targets_with_directory(self, path: str, warn_when_incomplete: bool = False) -> int:
+        """Return whether a given path is an existing directory for neither, one of, or both of the targets being
+        compared. Optionally log a warning if the directory only exists on one of the two targets."""
+        src_has_dir = False
+        dst_has_dir = False
+        try:
+            entry = self.comparison.src_target.fs.get(path)
+            src_has_dir = entry.is_dir()
+        except FileNotFoundError:
+            pass
+        try:
+            entry = self.comparison.dst_target.fs.get(path)
+            dst_has_dir = entry.is_dir()
+        except FileNotFoundError:
+            pass
+
+        if (src_has_dir is False or dst_has_dir is False) and warn_when_incomplete:
+            if src_has_dir != dst_has_dir:
+                target_with_dir = self.comparison.src_target if src_has_dir else self.comparison.dst_target
+                log.warning("'%s' is only a valid path on '%s'.", path, target_with_dir)
+            else:
+                log.warning("'%s' is not a valid path on either target.", path)
+        return int(src_has_dir) + int(dst_has_dir)
 
     def _write_entry_contents_to_stdout(self, entry: FilesystemEntry, stdout: TextIO) -> bool:
         """Copy the contents of a Filesystementry to stdout."""
@@ -465,10 +476,21 @@ class DifferentialCli(ExtendedCmd):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
 
         diff = self.comparison.scandir(path)
-        names = [item.name for group in [diff.created, diff.modified, diff.unchanged, diff.deleted] for item in group]
+        items = [
+            (item.entry.is_dir(), item.name) for group in [diff.created, diff.unchanged, diff.deleted] for item in group
+        ]
+        items += [
+            (item.src_target_entry.is_dir() and item.dst_target_entry.is_dir(), item.name) for item in diff.modified
+        ]
+        suggestions = []
+        for is_dir, fname in items:
+            if not fname.lower().startswith(textlower):
+                continue
 
-        r = [name for name in names if name.lower().startswith(textlower)]
-        return r
+            # Add a trailing slash to directories, to allow for easier traversal of the filesystem
+            suggestion = f"{fname}/" if is_dir else fname
+            suggestions.append(suggestion)
+        return suggestions
 
     def do_list(self, line: str) -> bool:
         """Prints a list of targets to differentiate between. Useful when differentiating between three or more
@@ -530,8 +552,7 @@ class DifferentialCli(ExtendedCmd):
     def do_cd(self, path: str) -> bool:
         """Change directory to the given path."""
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
-        targets_with_path = self._targets_with_path(path, warn_when_incomplete=True)
-        if len(targets_with_path) != 0:
+        if self._targets_with_directory(path, warn_when_incomplete=True) != 0:
             self.cwd = path
         return False
 
@@ -549,11 +570,13 @@ class DifferentialCli(ExtendedCmd):
         else:
             for entry, name in results:
                 if not isinstance(entry, DifferentialEntry):
-                    print_extensive_file_stat_listing(stdout, name, entry)
+                    print_extensive_file_stat_listing(stdout, name, entry, human_readable=args.human_readable)
                 else:
                     # We have to choose for which version of this file we are going to print detailed info. The
                     # destination target seems to make the most sense: it is likely newer
-                    print_extensive_file_stat_listing(stdout, name, entry.dst_target_entry)
+                    print_extensive_file_stat_listing(
+                        stdout, name, entry.dst_target_entry, human_readable=args.human_readable
+                    )
         return False
 
     @arg("path", nargs="?")
@@ -686,8 +709,7 @@ class DifferentialCli(ExtendedCmd):
         if not path:
             return False
 
-        targets_with_path = self._targets_with_path(path, warn_when_incomplete=True)
-        if len(targets_with_path) < 0:
+        if self._targets_with_directory(path, warn_when_incomplete=True) == 0:
             return False
 
         if args.iname:
