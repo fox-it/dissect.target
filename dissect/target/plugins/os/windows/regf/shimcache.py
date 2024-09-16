@@ -1,6 +1,6 @@
 import binascii
 from datetime import datetime
-from enum import IntEnum, auto
+from enum import IntEnum
 from io import BytesIO
 from typing import Callable, Generator, Optional, Tuple, Union
 
@@ -116,7 +116,7 @@ class SHIMCACHE_WIN_TYPE(IntEnum):
     VERSION_NT61 = 0x0601
     VERSION_NT52 = 0x0502
 
-    VERSION_WIN81_NO_HEADER = auto()
+    VERSION_WIN81_NO_HEADER = 0x1002  # auto()
 
 
 def win_10_path(ed: Structure) -> str:
