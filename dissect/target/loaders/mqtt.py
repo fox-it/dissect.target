@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import argparse
 import atexit
+import ipaddress
 import logging
 import math
 import os
+import re
 import ssl
 import sys
 import time
@@ -280,7 +283,7 @@ class Broker:
     factor = 1
 
     def __init__(
-        self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
+        self, broker: str, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
     ):
         self.broker_host = broker
         self.broker_port = int(port)
@@ -423,13 +426,147 @@ class Broker:
         self.mqtt_client.loop_start()
 
 
-@arg("--mqtt-peers", type=int, dest="peers", help="minimum number of peers to await for first alias")
-@arg("--mqtt-case", dest="case", help="case name (broker will determine if you are allowed to access this data)")
-@arg("--mqtt-port", type=int, dest="port", help="broker connection port")
-@arg("--mqtt-broker", dest="broker", help="broker ip-address")
-@arg("--mqtt-key", dest="key", help="private key file")
-@arg("--mqtt-crt", dest="crt", help="client certificate file")
-@arg("--mqtt-ca", dest="ca", help="certificate authority file")
+def strictly_positive(value: str) -> int:
+    """
+    Validates that the provided value is a strictly positive integer.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The value to validate.
+
+    Returns:
+        int: The validated integer value.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a strictly positive integer.
+    """
+    try:
+        peer_value = int(value)
+        if peer_value < 1:
+            raise argparse.ArgumentTypeError("Value must be strictly positive.")
+        return peer_value
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
+
+
+def host_name(value: str) -> bool:
+    """Checks if the value is a valid host name."""
+
+    # Adapted from https://stackoverflow.com/questions/2532053/validate-a-hostname-string
+    if value[-1] == ".":
+        # Host names are allowed to end in a dot
+        value = value[:-1]
+    if len(value) > 253:
+        return False
+
+    labels = value.split(".")
+
+    # The top level domain must contain at least one alphabetic character.
+    # Stricter than necessary since a TLD can consists of multiple labels.
+    if re.match(r"[0-9]+$", labels[-1]):
+        return False
+
+    # Each label must be between 1 and 63 characters long.
+    # Labels cannot begin or start with a hyphen.
+    label_pattern = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(label_pattern.match(label) for label in labels)
+
+
+def ip_address(value: str) -> bool:
+    """Checks if the value is a valid IP address."""
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def host_name_or_ip_address(value: str) -> str:
+    """
+    Validate if the given value is a valid hostname or IP address.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The value to be validated as a hostname or IP address.
+    Returns:
+        str: The validated hostname or IP address.
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a valid hostname or IP address.
+    """
+
+    if host_name(value) or ip_address(value):
+        return value
+
+    raise argparse.ArgumentTypeError(f"Invalid hostname or IP address specified: '{value}'")
+
+
+def port(value: str) -> int:
+    """
+    Convert a string value to an integer representing a valid port number.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The string representation of the port number.
+    Returns:
+        int: The port number as an integer.
+    Raises:
+        argparse.ArgumentTypeError: If the port number is not an integer or out of the valid range (1-65535).
+    """
+
+    try:
+        port = int(value)
+        if port < 1 or port > 65535:
+            raise argparse.ArgumentTypeError("Port number must be between 1 and 65535.")
+        return port
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid port number specified: '{value}'")
+
+
+def case(value: str) -> str:
+    """
+    Validates that the given value is a valid case name consisting of
+    alphanumeric characters and underscores only.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The case name to validate.
+
+    Returns:
+        str: The validated case name if it matches the required pattern.
+
+    Raises:
+        argparse.ArgumentTypeError: If the case name does not match the required pattern.
+    """
+
+    if re.match(r"^[a-zA-Z0-9_]+$", value):
+        return value
+
+    raise argparse.ArgumentTypeError(f"Invalid case name specified: '{value}'")
+
+
+def file_exists(file_path: str) -> str:
+    """Checks if the file exists."""
+    if not os.path.isfile(file_path):
+        raise argparse.ArgumentTypeError(f"File does not exist: '{file_path}'")
+    return file_path
+
+
+@arg("--mqtt-peers", type=strictly_positive, dest="peers", help="minimum number of peers to await for first alias")
+@arg(
+    "--mqtt-case",
+    type=case,
+    dest="case",
+    help="case name (broker will determine if you are allowed to access this data)",
+)
+@arg("--mqtt-port", type=port, dest="port", help="broker connection port")
+@arg("--mqtt-broker", type=host_name_or_ip_address, dest="broker", help="broker ip-address")
+@arg("--mqtt-key", type=file_exists, dest="key", help="private key file")
+@arg("--mqtt-crt", type=file_exists, dest="crt", help="client certificate file")
+@arg("--mqtt-ca", type=file_exists, dest="ca", help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
 @arg("--mqtt-username", dest="username", help="Username for connection")

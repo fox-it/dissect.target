@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target import Target
+from dissect.target.loaders.mqtt import host_name
 
 
 class MQTTMock(MagicMock):
@@ -148,3 +149,43 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
     connection.read(1, 1200, 100, 0)
     assert connection.factor == (connection.prefetch_factor_inc * 2) + 1
     assert connection.prev == 1200
+
+
+def generate_longest_valid_hostname():
+    quotient, remainder = divmod(253, 63 + 1)
+    return ".".join(["a" * 63] * quotient + ["a" * remainder])
+
+
+@pytest.mark.parametrize(
+    "hostname, is_valid_hostname",
+    [
+        ("example.com", True),
+        ("example.com.", True),
+        ("example.com..", False),
+        ("localhost", True),
+        ("127.0.0.1", False),
+        ("255.255.255.255", False),
+        ("invalid_host_name", False),
+        ("-example.com", False),
+        ("example-.com", False),
+        ("example-label.com", True),
+        ("example..com", False),
+        (generate_longest_valid_hostname(), True),
+    ], ids=[
+        "valid_domain",
+        "valid_domain_with_trailing_dot",
+        "invalid_double_dot",
+        "localhost",
+        "numerical_tld_1",
+        "numerical_tld_2",
+        "underscores",
+        "invalid_start_hyphen",
+        "invalid_end_hyphen",
+        "valid_domain_with_hyphen",
+        "invalid_empty_label",
+        "valid_max_length"
+    ]
+)
+def test_host_name_parser(hostname, is_valid_hostname) -> None:
+    assert host_name(hostname) == is_valid_hostname
+
