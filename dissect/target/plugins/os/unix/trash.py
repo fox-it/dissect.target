@@ -28,6 +28,8 @@ class GnomeTrashPlugin(Plugin):
     Probably also works with other desktop interfaces as long as they follow
     the Trash specification from FreeDesktop.
 
+    Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
+
     Resources:
         - https://specifications.freedesktop.org/trash-spec/latest/
         - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
@@ -61,13 +63,13 @@ class GnomeTrashPlugin(Plugin):
         for user_details, trash in self.trashes:
             for trash_info_file in trash.glob("info/*.trashinfo"):
                 trash_info = configutil.parse(trash_info_file, hint="ini").get("Trash Info", {})
-                original_path = self.target.fs.path(trash_info.get("Path"))
+                original_path = self.target.fs.path(trash_info.get("Path", ""))
 
-                # TODO: also iterate the expunged folder
-                # https://gitlab.gnome.org/GNOME/glib/-/issues/1665
-                # https://bugs.launchpad.net/ubuntu/+source/nautilus/+bug/422012
+                # We use the basename of the .trashinfo file and not the Path variable inside the
+                # ini file. This way we can keep duplicate basenames of trashed files separated correctly.
+                deleted_path = trash / "files" / trash_info_file.name.replace(".trashinfo", "")
 
-                if (deleted_path := (trash / "files" / original_path.name)).exists():
+                if deleted_path.exists():
                     deleted_files = [deleted_path]
 
                     if deleted_path.is_dir():
@@ -75,8 +77,12 @@ class GnomeTrashPlugin(Plugin):
                             deleted_files.append(child)
 
                     for file in deleted_files:
+                        # NOTE: We currently do not 'fix' the original_path of files inside deleted directories.
+                        # This would require guessing where the parent folder starts, which is impossible without
+                        # making assumptions.
+
                         yield TrashRecord(
-                            ts=trash_info.get("DeletionDate"),
+                            ts=trash_info.get("DeletionDate", 0),
                             path=original_path,
                             filesize=file.lstat().st_size if file.is_file() else None,
                             deleted_path=file,
@@ -84,3 +90,35 @@ class GnomeTrashPlugin(Plugin):
                             _user=user_details.user,
                             _target=self.target,
                         )
+
+                # We cannot determine if the deleted entry is a directory since the path does
+                # not exist at $TRASH/files, so we work with what we have instead.
+                else:
+                    self.target.log.warning(f"Expected trashed file(s) at {deleted_path}")
+                    yield TrashRecord(
+                        ts=trash_info.get("DeletionDate", 0),
+                        path=original_path,
+                        filesize=0,
+                        deleted_path=deleted_path,
+                        source=trash_info_file,
+                        _user=user_details.user,
+                        _target=self.target,
+                    )
+
+            # We also iterate expunged folders, they can contain files that could not be
+            # deleted when the user pressed the "empty trash" button in the file manager.
+            # Resources:
+            #   - https://gitlab.gnome.org/GNOME/glib/-/issues/1665
+            #   - https://bugs.launchpad.net/ubuntu/+source/nautilus/+bug/422012
+
+            for item in (trash / "expunged").rglob("*/*"):
+                stat = item.lstat()
+                yield TrashRecord(
+                    ts=stat.st_mtime,  # NOTE: This is the timestamp at which the file failed to delete
+                    path=None,  # We do not know the original file path
+                    filesize=stat.st_size if item.is_file() else None,
+                    deleted_path=item,
+                    source=trash / "expunged",
+                    _user=user_details.user,
+                    _target=self.target,
+                )
