@@ -58,9 +58,9 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     assert results[0].type == "user"
     assert results[0].path == "C:\\Users\\user\\Desktop\\GoogleChromeEnterpriseBundle64\\Installers\\"
 
-    assert results[0].ts_installed is None
-    assert results[0].name == "Mozilla Firefox (x64 nl)"
-    assert results[0].version == "123.0.1"
-    assert results[0].author == "Mozilla"
-    assert results[0].type == "user"
-    assert results[0].path == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"
+    assert results[1].ts_installed is None
+    assert results[1].name == "Mozilla Firefox (x64 nl)"
+    assert results[1].version == "123.0.1"
+    assert results[1].author == "Mozilla"
+    assert results[1].type == "user"
+    assert results[1].path == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"
