@@ -32,10 +32,10 @@ class WindowsApplicationsPlugin(Plugin):
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
                     ts_installed=values.get("InstallDate"),
-                    name=values.get("DisplayName"),
+                    name=values.get("DisplayName") or app.name,
                     version=values.get("DisplayVersion"),
                     author=values.get("Publisher"),
-                    type="system" if values.get("SystemComponent") else "user",
+                    type="system" if values.get("SystemComponent") or not values else "user",
                     path=values.get("DisplayIcon") or values.get("InstallLocation") or values.get("InstallSource"),
                     _target=self.target,
                 )

@@ -5,7 +5,7 @@ from dissect.target.filesystems.squashfs import SquashFSFilesystem
 from dissect.target.helpers import configutil
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixApplicationRecord
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, alias, export
 from dissect.target.target import Target
 
 
@@ -41,6 +41,7 @@ class SnapPlugin(Plugin):
                 yield path
 
     @export(record=UnixApplicationRecord)
+    @alias("snaps")
     def snap(self) -> Iterator[UnixApplicationRecord]:
         """Yield installed snap packages."""
 
