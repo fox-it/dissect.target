@@ -163,14 +163,17 @@ class DockerPlugin(Plugin):
                 config = json.loads(config_path.read_text())
                 container_id = config.get("ID")
 
+                if not container_id:
+                    self.target.log.warning(f"Unable to parse config.v2.json at: {config_path}")
+                    continue
+
                 # determine state
-                running = config.get("State").get("Running")
+                running = config.get("State", {}).get("Running")
                 if running:
-                    ports = config.get("NetworkSettings").get("Ports", {})
-                    pid = config.get("Pid")
-                else:
-                    ports = config.get("Config").get("ExposedPorts", {})
-                    pid = None
+                    ports = config.get("NetworkSettings", {}).get("Ports", {})
+
+                if not running or not ports:
+                    ports = config.get("Config", {}).get("ExposedPorts", {})
 
                 # parse volumes
                 volumes = []
@@ -191,16 +194,16 @@ class DockerPlugin(Plugin):
 
                 yield DockerContainerRecord(
                     container_id=container_id,
-                    image=config.get("Config").get("Image"),
-                    image_id=config.get("Image").split(":")[-1],
-                    command=config.get("Config").get("Cmd"),
+                    image=config.get("Config", {}).get("Image"),
+                    image_id=config.get("Image", "").split(":")[-1],
+                    command=(config.get("Path", "") + " " + " ".join(config.get("Args", []))).strip(),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
-                    pid=pid,
-                    started=convert_timestamp(config.get("State").get("StartedAt")),
-                    finished=convert_timestamp(config.get("State").get("FinishedAt")),
+                    pid=config.get("State", {}).get("Pid"),
+                    started=convert_timestamp(config.get("State", {}).get("StartedAt")),
+                    finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
                     ports=convert_ports(ports),
-                    names=config.get("Name").replace("/", "", 1),
+                    names=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     mount_path=mount_path,
                     config_path=config_path,
@@ -341,7 +344,7 @@ def find_installs(target: Target) -> Iterator[Path]:
                     yield data_root_path
 
 
-def convert_timestamp(timestamp: str) -> str:
+def convert_timestamp(timestamp: str | None) -> str:
     """Docker sometimes uses (unpadded) 9 digit nanosecond precision
     in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
 
@@ -349,6 +352,9 @@ def convert_timestamp(timestamp: str) -> str:
     strip the last three digits from the timestamp to force
     compatbility with the 6 digit %f microsecond directive.
     """
+
+    if not timestamp:
+        return
 
     timestamp_nanoseconds_plus_postfix = timestamp[19:]
     match = RE_DOCKER_NS.match(timestamp_nanoseconds_plus_postfix)
