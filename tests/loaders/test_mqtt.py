@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target import Target
-from dissect.target.loaders.mqtt import host_name
 
 
 class MQTTMock(MagicMock):
@@ -188,4 +187,6 @@ def generate_longest_valid_hostname():
     ],
 )
 def test_host_name_parser(hostname, is_valid_hostname) -> None:
+    from dissect.target.loaders.mqtt import host_name
+
     assert host_name(hostname) == is_valid_hostname
