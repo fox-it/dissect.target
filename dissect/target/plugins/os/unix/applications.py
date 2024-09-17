@@ -1,0 +1,69 @@
+from typing import Iterator
+
+from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers import configutil
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.record import UnixApplicationRecord
+from dissect.target.plugin import Plugin, export
+from dissect.target.target import Target
+
+
+class UnixApplicationsPlugin(Plugin):
+    """Unix Applications plugin."""
+
+    SYSTEM_PATHS = [
+        "/usr/share/applications/",
+        "/usr/local/share/applications/",
+        "/var/lib/snapd/desktop/applications/",
+        "/var/lib/flatpak/exports/share/applications/",
+    ]
+
+    USER_PATHS = [
+        ".local/share/applications/",
+    ]
+
+    SYSTEM_APPS = [
+        "org.gnome.",
+    ]
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.desktop_files = list(self.find_desktop_files())
+
+    def find_desktop_files(self) -> Iterator[TargetPath]:
+        for dir in self.SYSTEM_PATHS:
+            for file in self.target.fs.path(dir).glob("*.desktop"):
+                yield file
+
+        for user_details in self.target.user_details.all_with_home():
+            for dir in self.USER_PATHS:
+                for file in user_details.home_path.joinpath(dir).glob("*.desktop"):
+                    yield file
+
+    def check_compatible(self) -> None:
+        if not self.desktop_files:
+            raise UnsupportedPluginError("No application .desktop files found")
+
+    @export(record=UnixApplicationRecord)
+    def applications(self) -> Iterator[UnixApplicationRecord]:
+        """Yield installed Unix GUI applications from GNOME and XFCE.
+
+        Resources:
+            - https://wiki.archlinux.org/title/Desktop_entries
+            - https://specifications.freedesktop.org/desktop-entry-spec/latest/
+            - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
+        """
+        for file in self.desktop_files:
+            parser = configutil.parse(file, hint="ini")
+            config = parser.get("Desktop Entry") or {}
+            stat = file.lstat()
+
+            yield UnixApplicationRecord(
+                ts_modified=stat.st_mtime,
+                ts_installed=stat.st_btime if hasattr(stat, "st_btime") else None,
+                name=config.get("Name"),
+                version=config.get("Version"),
+                path=config.get("Exec"),
+                type="system" if config.get("Icon", "")[0:10] in self.SYSTEM_APPS else "user",
+                _target=self.target,
+            )

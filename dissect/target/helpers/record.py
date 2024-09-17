@@ -179,3 +179,24 @@ MacInterfaceRecord = TargetRecordDescriptor(
         ("varint", "interface_service_order"),
     ],
 )
+
+
+COMMON_APPLICATION_FIELDS = [
+    ("datetime", "ts_modified"),
+    ("datetime", "ts_installed"),
+    ("string", "name"),
+    ("string", "version"),
+    ("string", "author"),
+    ("string", "type"),
+    ("path", "path"),
+]
+
+UnixApplicationRecord = TargetRecordDescriptor(
+    "unix/application",
+    COMMON_APPLICATION_FIELDS,
+)
+
+WindowsApplicationRecord = TargetRecordDescriptor(
+    "windows/application",
+    COMMON_APPLICATION_FIELDS,
+)
