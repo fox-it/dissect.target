@@ -355,8 +355,7 @@ class Broker:
             log.error(f"Failed to decode payload for hostname {hostname}: {e}")
             return
 
-        # The payload with the username and password is comma separated
-        print(f'"{hostname}",{decoded_payload}')
+        print(decoded_payload)
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
