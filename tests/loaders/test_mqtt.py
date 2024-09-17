@@ -171,7 +171,8 @@ def generate_longest_valid_hostname():
         ("example-label.com", True),
         ("example..com", False),
         (generate_longest_valid_hostname(), True),
-    ], ids=[
+    ],
+    ids=[
         "valid_domain",
         "valid_domain_with_trailing_dot",
         "invalid_double_dot",
@@ -183,9 +184,8 @@ def generate_longest_valid_hostname():
         "invalid_end_hyphen",
         "valid_domain_with_hyphen",
         "invalid_empty_label",
-        "valid_max_length"
-    ]
+        "valid_max_length",
+    ],
 )
 def test_host_name_parser(hostname, is_valid_hostname) -> None:
     assert host_name(hostname) == is_valid_hostname
-

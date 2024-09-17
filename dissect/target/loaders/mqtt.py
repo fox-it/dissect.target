@@ -547,13 +547,6 @@ def case(value: str) -> str:
     raise argparse.ArgumentTypeError(f"Invalid case name specified: '{value}'")
 
 
-def file_exists(file_path: str) -> str:
-    """Checks if the file exists."""
-    if not os.path.isfile(file_path):
-        raise argparse.ArgumentTypeError(f"File does not exist: '{file_path}'")
-    return file_path
-
-
 @arg("--mqtt-peers", type=strictly_positive, dest="peers", help="minimum number of peers to await for first alias")
 @arg(
     "--mqtt-case",
@@ -563,9 +556,9 @@ def file_exists(file_path: str) -> str:
 )
 @arg("--mqtt-port", type=port, dest="port", help="broker connection port")
 @arg("--mqtt-broker", type=host_name_or_ip_address, dest="broker", help="broker ip-address")
-@arg("--mqtt-key", type=file_exists, dest="key", help="private key file")
-@arg("--mqtt-crt", type=file_exists, dest="crt", help="client certificate file")
-@arg("--mqtt-ca", type=file_exists, dest="ca", help="certificate authority file")
+@arg("--mqtt-key", type=Path, dest="key", help="private key file")
+@arg("--mqtt-crt", type=Path, dest="crt", help="client certificate file")
+@arg("--mqtt-ca", type=Path, dest="ca", help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
 @arg("--mqtt-username", dest="username", help="Username for connection")
