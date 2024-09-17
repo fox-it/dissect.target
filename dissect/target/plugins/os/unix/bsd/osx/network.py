@@ -24,7 +24,6 @@ class MacNetworkPlugin(NetworkPlugin):
         if (preferences := self.target.fs.path(self.SYSTEM)).exists():
             self.plistnetwork = plistlib.load(preferences.open())
 
-    @internal
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
         if not self.plistlease:
             self._plistlease()
