@@ -441,10 +441,10 @@ def strictly_positive(value: str) -> int:
         argparse.ArgumentTypeError: If the value is not a strictly positive integer.
     """
     try:
-        peer_value = int(value)
-        if peer_value < 1:
+        strictly_positive_value = int(value)
+        if strictly_positive_value < 1:
             raise argparse.ArgumentTypeError("Value must be strictly positive.")
-        return peer_value
+        return strictly_positive_value
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
 
@@ -462,7 +462,7 @@ def host_name(value: str) -> bool:
     labels = value.split(".")
 
     # The top level domain must contain at least one alphabetic character.
-    # Stricter than necessary since a TLD can consists of multiple labels.
+    # Checking the last label is stricter than necessary since a TLD can consists of multiple labels.
     if re.match(r"[0-9]+$", labels[-1]):
         return False
 
@@ -547,21 +547,27 @@ def case(value: str) -> str:
     raise argparse.ArgumentTypeError(f"Invalid case name specified: '{value}'")
 
 
-@arg("--mqtt-peers", type=strictly_positive, dest="peers", help="minimum number of peers to await for first alias")
+@arg(
+    "--mqtt-peers",
+    type=strictly_positive,
+    dest="peers",
+    default=1,
+    help="minimum number of peers to await for first alias",
+)
 @arg(
     "--mqtt-case",
     type=case,
     dest="case",
     help="case name (broker will determine if you are allowed to access this data)",
 )
-@arg("--mqtt-port", type=port, dest="port", help="broker connection port")
-@arg("--mqtt-broker", type=host_name_or_ip_address, dest="broker", help="broker ip-address")
-@arg("--mqtt-key", type=Path, dest="key", help="private key file")
-@arg("--mqtt-crt", type=Path, dest="crt", help="client certificate file")
-@arg("--mqtt-ca", type=Path, dest="ca", help="certificate authority file")
+@arg("--mqtt-port", type=port, dest="port", default=443, help="broker connection port")
+@arg("--mqtt-broker", type=host_name_or_ip_address, default="localhost", dest="broker", help="broker ip-address")
+@arg("--mqtt-key", type=Path, dest="key", required=True, help="private key file")
+@arg("--mqtt-crt", type=Path, dest="crt", required=True, help="client certificate file")
+@arg("--mqtt-ca", type=Path, dest="ca", required=True, help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
-@arg("--mqtt-username", dest="username", help="Username for connection")
+@arg("--mqtt-username", dest="username", default="mqtt-loader", help="Username for connection")
 @arg("--mqtt-password", action="store_true", dest="password", help="Ask for password before connecting")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
