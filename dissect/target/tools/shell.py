@@ -503,6 +503,8 @@ class TargetHubCli(cmd.Cmd):
 class TargetCli(TargetCmd):
     """CLI for interacting with a target and browsing the filesystem."""
 
+    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
+
     def __init__(self, target: Target):
         self.prompt_base = _target_name(target)
 
@@ -511,6 +513,11 @@ class TargetCli(TargetCmd):
         self._clicache = {}
         self.cwd = None
         self.chdir("/")
+
+        self.runcommandsfile = pathlib.Path(
+            getattr(target._config, "TARGETRCFILE", self.DEFAULT_RUNCOMMANDSFILE)
+        ).expanduser()
+        self.load_runcommands()
 
     @property
     def prompt(self) -> str:
@@ -529,6 +536,19 @@ class TargetCli(TargetCmd):
             suggestion = f"{fname}/" if fpath.is_dir() else fname
             suggestions.append(suggestion)
         return suggestions
+
+    def load_runcommands(self):
+        """Load and execute commands from the run commands file."""
+        try:
+            with self.runcommandsfile.open() as fh:
+                for line in fh:
+                    if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
+                        self.onecmd(line)
+        except FileNotFoundError:
+            # The .targetrc file is optional
+            pass
+        except Exception as e:
+            self.stdout.write(f"Error reading run commands file: {e}\n")
 
     def resolve_path(self, path: str) -> fsutil.TargetPath:
         if not path:
