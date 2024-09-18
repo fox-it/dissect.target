@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util import ts
@@ -128,10 +128,16 @@ class DockerPlugin(Plugin):
         for data_root in self.installs:
             images_path = data_root.joinpath("image/overlay2/repositories.json")
 
-            if images_path.exists():
-                repositories = json.loads(images_path.read_text()).get("Repositories")
-            else:
+            if not images_path.exists():
                 self.target.log.debug("No docker images found, file %s does not exist.", images_path)
+                continue
+
+            try:
+                repositories = json.loads(images_path.read_text()).get("Repositories", {})
+
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.target.log.warning("Unable to parse JSON in: %s", images_path)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             for name, tags in repositories.items():
@@ -142,8 +148,12 @@ class DockerPlugin(Plugin):
                     created = None
 
                     if image_metadata_path.exists():
-                        image_metadata = json.loads(image_metadata_path.read_text())
-                        created = convert_timestamp(image_metadata.get("created"))
+                        try:
+                            image_metadata = json.loads(image_metadata_path.read_text())
+                            created = convert_timestamp(image_metadata.get("created"))
+                        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                            self.target.log.warning("Unable to parse JSON in: %s", image_metadata_path)
+                            self.target.log.debug("", exc_info=e)
 
                     yield DockerImageRecord(
                         name=name,
@@ -160,12 +170,15 @@ class DockerPlugin(Plugin):
 
         for data_root in self.installs:
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
-                config = json.loads(config_path.read_text())
-                container_id = config.get("ID")
+                try:
+                    config = json.loads(config_path.read_text())
 
-                if not container_id:
-                    self.target.log.warning(f"Unable to parse config.v2.json at: {config_path}")
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    self.target.log.warning("Unable to parse JSON in file: %s", config_path)
+                    self.target.log.debug("", exc_info=e)
                     continue
+
+                container_id = config.get("ID")
 
                 # determine state
                 running = config.get("State", {}).get("Running")
@@ -177,20 +190,19 @@ class DockerPlugin(Plugin):
 
                 # parse volumes
                 volumes = []
-                if mount_points := config.get("MountPoints"):
-                    for mp in mount_points:
-                        mount_point = mount_points[mp]
+                if mount_points := config.get("MountPoints", {}):
+                    for mount_point in mount_points.values():
                         volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
 
                 # determine mount point
                 mount_path = None
-                if config.get("Driver") == "overlay2":
+                if container_id and config.get("Driver") == "overlay2":
                     mount_path = data_root.joinpath("image/overlay2/layerdb/mounts", container_id)
                     if not mount_path.exists():
-                        self.target.log.warning("Overlay2 mount path for container %s does not exist!", container_id)
+                        self.target.log.warning("Overlay2 mount path does not exist for container: %s", container_id)
 
                 else:
-                    self.target.log.warning("Encountered unsupported container filesystem %s", config.get("Driver"))
+                    self.target.log.warning("Encountered unsupported container filesystem: %s", config.get("Driver"))
 
                 yield DockerContainerRecord(
                     container_id=container_id,
@@ -291,19 +303,19 @@ class DockerPlugin(Plugin):
         for line in open_decompress(path, "rt"):
             try:
                 entry = json.loads(line)
-            except json.JSONDecodeError as e:
-                self.target.log.warning("Could not decode JSON line in file %s", path)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.target.log.warning("Could not decode JSON line in file: %s", path)
                 self.target.log.debug("", exc_info=e)
                 continue
             yield entry
 
 
-def get_data_path(path: Path) -> Optional[str]:
+def get_data_path(path: Path) -> str | None:
     """Returns the configured Docker daemon data-root path."""
     try:
         config = json.loads(path.open("rt").read())
-    except json.JSONDecodeError as e:
-        log.warning("Could not read JSON file '%s'", path)
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        log.warning("Could not read JSON file: %s", path)
         log.debug(exc_info=e)
 
     return config.get("data-root")
