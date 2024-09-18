@@ -4,6 +4,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
+from dissect.target.target import Target
 
 INVENTORY_PATHS = [
     # Windows
@@ -13,7 +14,7 @@ INVENTORY_PATHS = [
 ]
 
 
-def find_vm_inventory(target) -> Iterator[TargetPath]:
+def find_vm_inventory(target: Target) -> Iterator[TargetPath]:
     """Search for inventory.vmls files in user home folders.
 
     Does not support older vmAutoStart.xml or vmInventory.xml formats."""
@@ -29,7 +30,7 @@ class VmwareWorkstationChildTargetPlugin(ChildTargetPlugin):
 
     __type__ = "vmware_workstation"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.inventories = list(find_vm_inventory(target))
 
