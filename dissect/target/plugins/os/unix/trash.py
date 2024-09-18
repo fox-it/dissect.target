@@ -25,8 +25,7 @@ class GnomeTrashPlugin(Plugin):
     """Linux GNOME Trash plugin.
 
     Recovers deleted files and artifacts from ``$HOME/.local/share/Trash``.
-    Probably also works with other desktop interfaces as long as they follow
-    the Trash specification from FreeDesktop.
+    Probably also works with other desktop interfaces as long as they follow the Trash specification from FreeDesktop.
 
     Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
 
@@ -80,7 +79,6 @@ class GnomeTrashPlugin(Plugin):
                         # NOTE: We currently do not 'fix' the original_path of files inside deleted directories.
                         # This would require guessing where the parent folder starts, which is impossible without
                         # making assumptions.
-
                         yield TrashRecord(
                             ts=trash_info.get("DeletionDate", 0),
                             path=original_path,
@@ -110,7 +108,6 @@ class GnomeTrashPlugin(Plugin):
             # Resources:
             #   - https://gitlab.gnome.org/GNOME/glib/-/issues/1665
             #   - https://bugs.launchpad.net/ubuntu/+source/nautilus/+bug/422012
-
             for item in (trash / "expunged").rglob("*/*"):
                 stat = item.lstat()
                 yield TrashRecord(
