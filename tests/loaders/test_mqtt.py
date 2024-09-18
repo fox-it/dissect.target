@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from dataclasses import dataclass
@@ -151,8 +152,11 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
 
 
 def generate_longest_valid_hostname():
-    quotient, remainder = divmod(253, 63 + 1)
-    return ".".join(["a" * 63] * quotient + ["a" * remainder])
+    """Generate a valid hostname with the maximum length of 253 characters."""
+    number_of_full_labels, remainder = divmod(253, 63 + 1)
+    longest_hostname = ".".join(["a" * 63] * number_of_full_labels + ["a" * remainder])
+    assert len(longest_hostname) == 253
+    return longest_hostname
 
 
 @pytest.mark.parametrize(
@@ -186,7 +190,40 @@ def generate_longest_valid_hostname():
         "valid_max_length",
     ],
 )
-def test_host_name_parser(hostname, is_valid_hostname) -> None:
+def test_host_name_parser(hostname: str, is_valid_hostname: bool) -> None:
     from dissect.target.loaders.mqtt import host_name
 
     assert host_name(hostname) == is_valid_hostname
+
+
+@pytest.mark.parametrize(
+    "case_name, parse_result",
+    [
+        ("valid_case_name", "valid_case_name"),
+        ("ValidCase123", "ValidCase123"),
+        ("valid_case_123", "valid_case_123"),
+        ("invalid-case", pytest.raises(argparse.ArgumentTypeError)),
+        ("invalid case", pytest.raises(argparse.ArgumentTypeError)),
+        ("invalid.case", pytest.raises(argparse.ArgumentTypeError)),
+        ("invalid@case", pytest.raises(argparse.ArgumentTypeError)),
+        ("", pytest.raises(argparse.ArgumentTypeError)),
+    ],
+    ids=[
+        "valid_case_lower",
+        "valid_case_mixed",
+        "valid_case_with_numbers",
+        "invalid_case_hyphen",
+        "invalid_case_space",
+        "invalid_case_dot",
+        "invalid_case_special_char",
+        "invalid_case_empty",
+    ],
+)
+def test_case(case_name, parse_result: str | pytest.RaisesContext[argparse.ArgumentTypeError]) -> None:
+    from dissect.target.loaders.mqtt import case
+
+    if isinstance(parse_result, str):
+        assert case(case_name) == parse_result
+    else:
+        with parse_result:
+            case(case_name)
