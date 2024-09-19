@@ -1,10 +1,11 @@
 import argparse
+import pathlib
 import platform
 import sys
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Callable
-from unittest.mock import MagicMock
+from typing import Callable, Iterator
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
@@ -128,6 +129,32 @@ def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyP
 
     # We expect folder suggestions to be trailed with a '/'
     assert suggestions == [f"{subfolder_name}/", subfile_name]
+
+
+@pytest.fixture
+def targetrc_file() -> Iterator[list[str]]:
+    content = """
+    ls
+        # This is a comment line and should be ignored
+    ll
+    """
+
+    original_open = pathlib.Path.open
+
+    def custom_open(self: Path, *args, **kwargs):
+        if self.name.endswith(".targetrc"):
+            return mock_open(read_data=content)()
+        return original_open(self, *args, **kwargs)
+
+    with patch("pathlib.Path.open", custom_open):
+        yield ["ls", "ll"]
+
+
+def test_targetcli_targetrc(target_bare: Target, targetrc_file: list[str]) -> None:
+    with patch.object(TargetCli, "onecmd", autospec=True) as mock_onecmd:
+        cli = TargetCli(target_bare)
+        expected_calls = [call(cli, cmd) for cmd in targetrc_file]
+        mock_onecmd.assert_has_calls(expected_calls, any_order=False)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
