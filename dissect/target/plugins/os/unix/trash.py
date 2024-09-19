@@ -22,18 +22,7 @@ TrashRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
 
 
 class GnomeTrashPlugin(Plugin):
-    """Linux GNOME Trash plugin.
-
-    Recovers deleted files and artifacts from ``$HOME/.local/share/Trash``.
-    Probably also works with other desktop interfaces as long as they follow the Trash specification from FreeDesktop.
-
-    Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
-
-    Resources:
-        - https://specifications.freedesktop.org/trash-spec/latest/
-        - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
-        - https://specifications.freedesktop.org/basedir-spec/latest/
-    """
+    """Linux GNOME Trash plugin."""
 
     PATHS = [
         # Default $XDG_DATA_HOME/Trash
@@ -42,9 +31,10 @@ class GnomeTrashPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.trashes = list(self.garbage_collector())
+        self.trashes = list(self._garbage_collector())
 
-    def garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
+    def _garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
+        """it aint much, but its honest work"""
         for user_details in self.target.user_details.all_with_home():
             for trash_path in self.PATHS:
                 if (path := user_details.home_path.joinpath(trash_path)).exists():
@@ -57,7 +47,28 @@ class GnomeTrashPlugin(Plugin):
     @export(record=TrashRecord)
     @alias(name="recyclebin")
     def trash(self) -> Iterator[TrashRecord]:
-        """Yield deleted files from GNOME Trash folders."""
+        """Yield deleted files from GNOME Trash folders.
+
+        Recovers deleted files and artifacts from ``$HOME/.local/share/Trash``.
+        Probably also works with other desktop interfaces as long as they follow the Trash specification from FreeDesktop.
+
+        Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
+
+        Resources:
+            - https://specifications.freedesktop.org/trash-spec/latest/
+            - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
+            - https://specifications.freedesktop.org/basedir-spec/latest/
+
+        Yields ``TrashRecord``s with the following fields:
+
+        .. code-block:: text
+
+            ts           (datetime): timestamp when the file was deleted or for expunged files when it could not be permanently deleted
+            path         (path):     path where the file was located before it was deleted
+            filesize     (filesize): size in bytes of the deleted file
+            deleted_path (path):     path to the current location of the deleted file
+            source       (path):     path to the .trashinfo file
+        """  # noqa: E501
 
         for user_details, trash in self.trashes:
             for trash_info_file in trash.glob("info/*.trashinfo"):
