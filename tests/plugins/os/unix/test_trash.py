@@ -16,6 +16,10 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     target_unix_users.add_plugin(UnixPlugin)
     target_unix_users.add_plugin(GnomeTrashPlugin)
 
+    # test if the plugin and its alias were registered
+    assert target_unix_users.has_function("trash")
+    assert target_unix_users.has_function("recyclebin")
+
     results = sorted(list(target_unix_users.trash()), key=lambda r: r.source)
     assert len(results) == 11
 
