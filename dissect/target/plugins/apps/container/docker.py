@@ -134,7 +134,6 @@ class DockerPlugin(Plugin):
 
             try:
                 repositories = json.loads(images_path.read_text()).get("Repositories", {})
-
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 self.target.log.warning("Unable to parse JSON in: %s", images_path)
                 self.target.log.debug("", exc_info=e)
@@ -172,7 +171,6 @@ class DockerPlugin(Plugin):
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
                 try:
                     config = json.loads(config_path.read_text())
-
                 except (json.JSONDecodeError, UnicodeDecodeError) as e:
                     self.target.log.warning("Unable to parse JSON in file: %s", config_path)
                     self.target.log.debug("", exc_info=e)
@@ -208,7 +206,7 @@ class DockerPlugin(Plugin):
                     container_id=container_id,
                     image=config.get("Config", {}).get("Image"),
                     image_id=config.get("Image", "").split(":")[-1],
-                    command=(config.get("Path", "") + " " + " ".join(config.get("Args", []))).strip(),
+                    command=f"{config.get('Path', '')}  {' '.join(config.get('Args', []))}".strip(),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
                     pid=config.get("State", {}).get("Pid"),
