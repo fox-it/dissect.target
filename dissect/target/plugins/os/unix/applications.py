@@ -28,7 +28,7 @@ class UnixApplicationsPlugin(Plugin):
         super().__init__(target)
         self.desktop_files = list(self.find_desktop_files())
 
-    def find_desktop_files(self) -> Iterator[TargetPath]:
+    def _find_desktop_files(self) -> Iterator[TargetPath]:
         for dir in self.SYSTEM_PATHS:
             for file in self.target.fs.path(dir).glob("*.desktop"):
                 yield file
