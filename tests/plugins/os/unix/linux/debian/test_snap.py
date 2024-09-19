@@ -24,6 +24,8 @@ def test_snap_packages(target_unix_users: Target, fs_unix: VirtualFilesystem) ->
     target_unix_users.add_plugin(UnixPlugin)
     target_unix_users.add_plugin(SnapPlugin)
 
+    assert target_unix_users.has_function("snap")
+
     results = list(target_unix_users.snaps())
     assert len(results) == 2
 

@@ -9,11 +9,9 @@ from dissect.target.target import Target
 class WindowsApplicationsPlugin(Plugin):
     """Windows Applications plugin."""
 
-    KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-
     def __init__(self, target: Target):
         super().__init__(target)
-        self.keys = list(self.target.registry.keys(self.KEY))
+        self.keys = list(self.target.registry.keys("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"))
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):

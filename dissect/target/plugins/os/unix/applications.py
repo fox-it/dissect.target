@@ -22,9 +22,7 @@ class UnixApplicationsPlugin(Plugin):
         ".local/share/applications/",
     ]
 
-    SYSTEM_APPS = [
-        "org.gnome.",
-    ]
+    SYSTEM_APPS = ("org.gnome.",)
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -64,6 +62,6 @@ class UnixApplicationsPlugin(Plugin):
                 name=config.get("Name"),
                 version=config.get("Version"),
                 path=config.get("Exec"),
-                type="system" if config.get("Icon", "")[0:10] in self.SYSTEM_APPS else "user",
+                type="system" if config.get("Icon", "").startswith(self.SYSTEM_APPS) else "user",
                 _target=self.target,
             )
