@@ -18,7 +18,7 @@ PARALLELS_SYSTEM_PATHS = [
 
 
 def find_pvms(target: Target) -> Iterator[TargetPath]:
-    """Finds virtual machines located in default folders on a MacOS target.
+    """Finds virtual machines located in default folders on a macOS target.
 
     Resources:
         - https://kb.parallels.com/117333
