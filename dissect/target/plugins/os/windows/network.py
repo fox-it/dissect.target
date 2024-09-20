@@ -266,9 +266,6 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 if type_device := _try_value(subkey, "*IfType"):
                     device_info["type"] = IfTypes(int(type_device)).name
 
-                # extract the source path of the information
-                device_info["source"] = f"HKLM\\SYSTEM\\{subkey.path}"
-
                 # Yield a record for each non-empty configuration
                 for conf in config:
                     if conf:
@@ -277,6 +274,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                         record_info.update(conf)
                         yield WindowsInterfaceRecord(
                             **record_info,
+                            source=f"HKLM\\SYSTEM\\{subkey.path}",
                             _target=self.target,
                         )
 
