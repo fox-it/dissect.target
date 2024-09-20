@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
 from dissect.target.target import Target
 
 
@@ -14,6 +13,11 @@ from dissect.target.target import Target
 class MockRegVal:
     name: str
     value: str | int
+
+
+REGISTRY_KEY_INTERFACE = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\"
+REGISTRY_KEY_CONTROLSET = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\"
 
 
 @pytest.mark.parametrize(
@@ -154,8 +158,8 @@ def test_windows_network(
         mock_registry
         if name
         in [
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
+            f"{REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
+            f"{REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
         ]
         else None
     )
@@ -208,8 +212,8 @@ def test_windows_network_none(
         mock_registry
         if name
         in [
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
+            f"{REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
+            f"{REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
         ]
         else None
     )
@@ -303,8 +307,8 @@ def test_network_dhcp_and_static(
         mock_registry
         if name
         in [
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
-            f"{WindowsNetworkPlugin.REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
+            f"{REGISTRY_KEY_CONNECTION}TESTINGINSTANCEID\\Connection",
+            f"{REGISTRY_KEY_INTERFACE}TESTINGINSTANCEID",
         ]
         else None
     )

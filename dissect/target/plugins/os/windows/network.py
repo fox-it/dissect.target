@@ -223,26 +223,11 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
 
 
 class WindowsNetworkPlugin(NetworkPlugin):
-    """
-    Windows Network Plugin
-
-    This class interacts with the Windows registry to extract the network configuration.
-
-    Attributes:
-        REGISTRY_KEY_INTERFACE (str): Interface parameters for TCP/IP.
-        REGISTRY_KEY_CONTROLSET (str): Control set for network class.
-        REGISTRY_KEY_CONNECTION (str): Network connection settings.
-    """
-
-    REGISTRY_KEY_INTERFACE = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\"
-    REGISTRY_KEY_CONTROLSET = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
-    REGISTRY_KEY_CONNECTION = (
-        "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\"
-    )
-
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
         # Get all the network interfaces
-        for keys in self.target.registry.keys(self.REGISTRY_KEY_CONTROLSET):
+        for keys in self.target.registry.keys(
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+        ):
             for subkey in keys.subkeys():
                 device_info = {}
 
@@ -257,12 +242,17 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     continue
 
                 # Extract the network device name for given interface id
-                name_key = self.target.registry.key(self.REGISTRY_KEY_CONNECTION + f"{net_cfg_instance_id}\\Connection")
+                name_key = self.target.registry.key(
+                    f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\"
+                    f"{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
+                )
                 if value_name := _try_value(name_key, "Name"):
                     device_info["name"] = value_name
 
                 # Extract the metric value from the REGISTRY_KEY_INTERFACE key
-                interface_key = self.target.registry.key(self.REGISTRY_KEY_INTERFACE + net_cfg_instance_id)
+                interface_key = self.target.registry.key(
+                    f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
+                )
                 if value_metric := _try_value(interface_key, "InterfaceMetric"):
                     device_info["metric"] = value_metric
 
@@ -298,7 +288,9 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         # Get the registry keys for the given interface id
         try:
-            keys = self.target.registry.key(self.REGISTRY_KEY_INTERFACE + interface_id)
+            keys = self.target.registry.key(
+                f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{interface_id}"
+            )
         except RegistryKeyNotFoundError:
             return None
 
