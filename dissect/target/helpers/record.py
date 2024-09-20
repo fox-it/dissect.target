@@ -144,7 +144,7 @@ EmptyRecord = RecordDescriptor(
 )
 
 COMMON_INTERFACE_ELEMENTS = [
-    ("stringlist", "sources"),
+    ("string", "source"),
     ("string", "name"),
     ("string", "type"),
     ("boolean", "enabled"),
