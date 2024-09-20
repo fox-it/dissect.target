@@ -345,7 +345,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
             static_config["search_domain"] = [static_domain]
 
         if len(static_config) > 0:
-            static_config["enabled"] = static_config == 0
+            static_config["enabled"] = None
             static_config["dhcp"] = False
 
         # Combine ip and subnetmask for extraction
