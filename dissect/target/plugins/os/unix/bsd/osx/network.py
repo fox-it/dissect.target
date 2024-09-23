@@ -1,21 +1,25 @@
 from __future__ import annotations
 
 import plistlib
-from functools import cache
+from functools import lru_cache
 from typing import Iterator
 
 from dissect.target.helpers.record import MacInterfaceRecord
 from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.target import Target
 
 
 class MacNetworkPlugin(NetworkPlugin):
-    @cache
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._plistlease = lru_cache(4096)(self._plistlease)
+        self._plistnetwork = lru_cache(4096)(self._plistnetwork)
+
     def _plistlease(self, devname: str) -> dict:
         for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}-*"):
             return plistlib.load(lease.open())
         return {}
 
-    @cache
     def _plistnetwork(self) -> dict:
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
