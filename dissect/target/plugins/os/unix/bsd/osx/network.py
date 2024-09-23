@@ -16,7 +16,7 @@ class MacNetworkPlugin(NetworkPlugin):
         self._plistnetwork = lru_cache(4096)(self._plistnetwork)
 
     def _plistlease(self, devname: str) -> dict:
-        for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}-*"):
+        for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}*"):
             return plistlib.load(lease.open())
         return {}
 
