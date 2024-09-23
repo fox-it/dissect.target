@@ -3,7 +3,9 @@ from dissect.target.filesystems.overlay import Overlay2Filesystem
 
 
 def test_overlay_filesystem_docker_container(target_linux_docker: Target) -> None:
-    mount_path = target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071")  # noqa: E501
+    mount_path = target_linux_docker.fs.path(
+        "/var/lib/docker/image/overlay2/layerdb/mounts/f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"  # noqa: E501
+    )
     fs = Overlay2Filesystem(mount_path)
 
     assert fs.__type__ == "overlay2"

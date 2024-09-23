@@ -89,10 +89,11 @@ class Overlay2Filesystem(LayerFilesystem):
 
         # append and mount every layer
         for dest, layer in layers:
-
             # we could have collected a layer reference that actually does not exist on the host
             if not layer.exists():
-                log.warning("Can not mount layer %s for container %s as it does not exist on the host", layer, path.name)
+                log.warning(
+                    "Can not mount layer %s for container %s as it does not exist on the host", layer, path.name
+                )
                 continue
 
             # mount points can be files
