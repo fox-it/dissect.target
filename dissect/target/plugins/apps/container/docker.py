@@ -206,7 +206,7 @@ class DockerPlugin(Plugin):
                     container_id=container_id,
                     image=config.get("Config", {}).get("Image"),
                     image_id=config.get("Image", "").split(":")[-1],
-                    command=f"{config.get('Path', '')}  {' '.join(config.get('Args', []))}".strip(),
+                    command=f"{config.get('Path', '')} {' '.join(config.get('Args', []))}".strip(),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
                     pid=config.get("State", {}).get("Pid"),
