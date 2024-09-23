@@ -157,7 +157,7 @@ def test_macos_network(
         plistlease = {}
         plistnetwork = {}
 
-        def _plistlease(self) -> dict:
+        def _plistlease(self, devicename: str) -> dict:
             return self.plistlease
 
         def _plistnetwork(self) -> dict:

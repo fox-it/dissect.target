@@ -10,11 +10,9 @@ from dissect.target.plugins.general.network import NetworkPlugin
 
 class MacNetworkPlugin(NetworkPlugin):
     @cache
-    def _plistlease(self) -> dict:
-        if (dhcp := self.target.fs.path("/private/var/db/dhcpclient/leases")).exists():
-            for lease in dhcp.iterdir():
-                if lease.is_file():
-                    return plistlib.load(lease.open())
+    def _plistlease(self, devname: str) -> dict:
+        for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}-*"):
+            return plistlib.load(lease.open())
         return {}
 
     @cache
@@ -23,11 +21,7 @@ class MacNetworkPlugin(NetworkPlugin):
             return plistlib.load(preferences.open())
 
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
-        plistlease = self._plistlease()
         plistnetwork = self._plistnetwork()
-
-        dhcp_ip = plistlease.get("IPAddress")
-
         current_set = plistnetwork.get("CurrentSet")
         sets = plistnetwork.get("Sets", {})
         for name, _set in sets.items():
@@ -48,39 +42,46 @@ class MacNetworkPlugin(NetworkPlugin):
             dns = set()
             gateways = set()
             ips = set()
-            data = {}
-            data["source"] = "NetworkServices"
             device = interface.get("Interface", {})
-            data["name"] = device.get("DeviceName")
-            data["type"] = device.get("Type")
-            data["vlan"] = vlan_lookup.get(data["name"])
-            data["dhcp"] = False
+            name = device.get("DeviceName")
+            _type = device.get("Type")
+            vlan = vlan_lookup.get(name)
+            dhcp = False
             subnetmask = []
-            data["interface_service_order"] = service_order.index(_id) if _id in service_order else None
+            network = []
+            interface_service_order = service_order.index(_id) if _id in service_order else None
             try:
-                data["enabled"] = not interface.get("__INACTIVE__", False)
                 for addr in interface.get("DNS", {}).get("ServerAddresses", {}):
                     dns.add(addr)
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
                     subnetmask += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
                     if router := addresses.get("Router"):
                         gateways.add(router)
-                    if dhcp_ip and addresses.get("ConfigMethod", "") == "DHCP":
-                        ips.add(dhcp_ip)
-                        data["dhcp"] = True
+                    if addresses.get("ConfigMethod", "") == "DHCP":
+                        ips.add(self._plistlease(name).get("IPAddress"))
+                        dhcp = True
                     else:
                         for addr in addresses.get("Addresses", []):
                             ips.add(addr)
 
-                data["ip"] = list(ips)
-                data["dns"] = list(dns)
-                data["gateway"] = list(gateways)
-
                 if subnetmask:
-                    data["network"] = self.calculate_network(ips, data["subnetmask"])
+                    network = self.calculate_network(ips, subnetmask)
 
-                yield MacInterfaceRecord(_target=self.target, **data)
+                yield MacInterfaceRecord(
+                    _target=self.target,
+                    source="NetworkServices",
+                    enabled=not interface.get("__INACTIVE__", False),
+                    dhcp=dhcp,
+                    vlan=vlan,
+                    name=name,
+                    type=_type,
+                    network=network,
+                    gateway=list(gateways),
+                    dns=list(dns),
+                    ip=list(ips),
+                    interface_service_order=interface_service_order,
+                )
 
             except Exception as e:
-                self.target.log.warning("Error reading configuration for network device %s: %s", data["name"], e)
+                self.target.log.warning("Error reading configuration for network device %s: %s", name, e)
                 continue
