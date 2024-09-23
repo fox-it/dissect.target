@@ -347,7 +347,7 @@ def macb_aggr(records: list[Record]) -> Iterator[Record]:
 
         field = "MACB".find(record.ts_type) + offset_std + offset_ads
         for macb in macbs:
-            if macb.ts == record.ts:
+            if macb.ts == record.ts and macb.path == record.path:
                 macb.macb = macb_set(macb.macb, field, record.ts_type)
                 found = True
                 break
