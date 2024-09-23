@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -38,7 +39,7 @@ def find_pvms(target: Target) -> Iterator[TargetPath]:
                     yield from iter_vms(path)
 
 
-def iter_vms(path: TargetPath) -> Iterator[TargetPath]:
+def iter_vms(path: Path) -> Iterator[TargetPath]:
     """Glob for .pvm folders in the provided folder."""
     for file in path.rglob("*.pvm"):
         if file.is_dir():
@@ -58,7 +59,7 @@ class ParallelsChildTargetPlugin(ChildTargetPlugin):
         if not self.pvms:
             raise UnsupportedPluginError("No Parallels pvm file(s) found")
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for pvm in self.pvms:
             yield ChildTargetRecord(
                 type=self.__type__,
