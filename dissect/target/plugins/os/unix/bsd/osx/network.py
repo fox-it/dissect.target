@@ -1,40 +1,35 @@
 from __future__ import annotations
 
 import plistlib
+from functools import cache
 from typing import Iterator
 
 from dissect.target.helpers.record import MacInterfaceRecord
-from dissect.target.plugin import internal
 from dissect.target.plugins.general.network import NetworkPlugin
 
 
 class MacNetworkPlugin(NetworkPlugin):
-    SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"
-    DHCP = "/private/var/db/dhcpclient/leases"
-    plistlease = {}
-    plistnetwork = {}
-
+    @cache
     def _plistlease(self) -> None:
-        if (dhcp := self.target.fs.path(self.DHCP)).exists():
+        if (dhcp := self.target.fs.path("/private/var/db/dhcpclient/leases")).exists():
             for lease in dhcp.iterdir():
                 if lease.is_file():
-                    self.plistlease = plistlib.load(lease.open())
+                    return plistlib.load(lease.open())
+        return {}
 
+    @cache
     def _plistnetwork(self) -> None:
-        if (preferences := self.target.fs.path(self.SYSTEM)).exists():
-            self.plistnetwork = plistlib.load(preferences.open())
+        if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
+            return plistlib.load(preferences.open())
 
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
-        if not self.plistlease:
-            self._plistlease()
+        plistlease = self._plistlease()
+        plistnetwork = self._plistnetwork()
 
-        if not self.plistnetwork:
-            self._plistnetwork()
+        dhcp_ip = plistlease.get("IPAddress")
 
-        dhcp_ip = self.plistlease.get("IPAddress")
-
-        current_set = self.plistnetwork.get("CurrentSet")
-        sets = self.plistnetwork.get("Sets", {})
+        current_set = plistnetwork.get("CurrentSet")
+        sets = plistnetwork.get("Sets", {})
         for name, _set in sets.items():
             if f"/Sets/{name}" == current_set:
                 item = _set
@@ -43,8 +38,8 @@ class MacNetworkPlugin(NetworkPlugin):
                 service_order = item
                 break
 
-        network = self.plistnetwork.get("NetworkServices", {})
-        vlans = self.plistnetwork.get("VirtualNetworkInterfaces", {}).get("VLAN", {})
+        network = plistnetwork.get("NetworkServices", {})
+        vlans = plistnetwork.get("VirtualNetworkInterfaces", {}).get("VLAN", {})
         vlan_lookup = {}
         for key, vlan in vlans.items():
             vlan_lookup[key] = vlan.get("Tag")
@@ -52,35 +47,42 @@ class MacNetworkPlugin(NetworkPlugin):
         for _id, interface in network.items():
             dns = set()
             gateways = set()
-            proxies = set()
             ips = set()
-            record = MacInterfaceRecord(_target=self.target)
-            record.source = "NetworkServices"
+            data = {}
+            data["source"] = "NetworkServices"
             device = interface.get("Interface", {})
-            record.name = device.get("DeviceName")
-            record.type = device.get("Type")
-            record.vlan = vlan_lookup.get(record.name)
-            record.interface_service_order = service_order.index(_id) if _id in service_order else None
+            data["name"] = device.get("DeviceName")
+            data["type"] = device.get("Type")
+            data["vlan"] = vlan_lookup.get(data["name"])
+            data["dhcp"] = False
+            data["subnetmask"] = []
+            data["interface_service_order"] = service_order.index(_id) if _id in service_order else None
             try:
-                record.enabled = not interface.get("__INACTIVE__", False)
-                for setting, value in interface.get("Proxies", {}).items():
-                    if setting.endswith("Proxy"):
-                        proxies.add(value)
-                record.proxy = proxies
+                data["enabled"] = not interface.get("__INACTIVE__", False)
                 for addr in interface.get("DNS", {}).get("ServerAddresses", {}):
                     dns.add(addr)
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
+                    data["subnetmask"] += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
                     if router := addresses.get("Router"):
                         gateways.add(router)
-                    for addr in addresses.get("Addresses", []):
-                        ips.add(addr)
                     if dhcp_ip and addresses.get("ConfigMethod", "") == "DHCP":
                         ips.add(dhcp_ip)
-                record.ip = list(ips)
-                record.dns = list(dns)
-                record.gateway = list(gateways)
-            except Exception as message:
-                self.target.log.warning("Error reading configuration for network device %s: %s.", record.name, message)
-                continue
+                        data["dhcp"] = True
+                    else:
+                        for addr in addresses.get("Addresses", []):
+                            ips.add(addr)
 
-            yield record
+                data["ip"] = list(ips)
+                data["dns"] = list(dns)
+                data["gateway"] = list(gateways)
+
+                if data["subnetmask"]:
+                    data["network"] = self.calculate_network(ips, data["subnetmask"])
+
+                yield MacInterfaceRecord(_target=self.target, **data)
+
+            except Exception as message:
+                self.target.log.warning(
+                    "Error reading configuration for network device %s: %s.", data["name"], message
+                )
+                continue

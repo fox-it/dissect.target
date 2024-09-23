@@ -180,7 +180,9 @@ MacInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("varint", "vlan"),
-        ("net.ipaddress[]", "proxy"),
+        ("net.ipnetwork[]", "network"),
         ("varint", "interface_service_order"),
+        ("net.ipaddress[]", "subnetmask"),
+        ("boolean", "dhcp"),
     ],
 )
