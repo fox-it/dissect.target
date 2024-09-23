@@ -144,7 +144,6 @@ EmptyRecord = RecordDescriptor(
 )
 
 COMMON_INTERFACE_ELEMENTS = [
-    ("string", "source"),
     ("string", "name"),
     ("string", "type"),
     ("boolean", "enabled"),
@@ -152,6 +151,7 @@ COMMON_INTERFACE_ELEMENTS = [
     ("net.ipaddress[]", "dns"),
     ("net.ipaddress[]", "ip"),
     ("net.ipaddress[]", "gateway"),
+    ("string", "source"),
 ]
 
 
