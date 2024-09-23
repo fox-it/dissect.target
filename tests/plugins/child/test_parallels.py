@@ -9,7 +9,7 @@ def test_parallels_child_detection(target_osx_users: Target, fs_osx: VirtualFile
     fs_osx.makedirs("/Users/dissect/Parallels/Windows 11.pvm")
     fs_osx.makedirs("/Users/dissect/Documents/Parallels/Windows 10.pvm")
     fs_osx.makedirs(
-        "/Users/dissect/Library/Group Containers/someversionnumber.com.parallels.desktop.appstore/Shared/Parallels/Windows 8.pvm"
+        "/Users/dissect/Library/Group Containers/someversionnumber.com.parallels.desktop.appstore/Shared/Parallels/Windows 8.pvm"  # noqa: E501
     )
     fs_osx.makedirs("/Users/Shared/Parallels/Windows 7.pvm")
 
@@ -21,5 +21,5 @@ def test_parallels_child_detection(target_osx_users: Target, fs_osx: VirtualFile
         "/Users/Shared/Parallels/Windows 7.pvm",
         "/Users/dissect/Parallels/Windows 11.pvm",
         "/Users/dissect/Documents/Parallels/Windows 10.pvm",
-        "/Users/dissect/Library/Group Containers/someversionnumber.com.parallels.desktop.appstore/Shared/Parallels/Windows 8.pvm",
+        "/Users/dissect/Library/Group Containers/someversionnumber.com.parallels.desktop.appstore/Shared/Parallels/Windows 8.pvm",  # noqa: E501
     ]
