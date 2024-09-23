@@ -46,21 +46,54 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     chrome_key.add_value("DisplayName", "Google Chrome")
     hive_hklm.map_key(chrome_name, chrome_key)
 
+    addressbook_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\AddressBook"
+    addressbook_key = VirtualKey(hive_hklm, addressbook_name)
+    addressbook_key.timestamp = datetime(2024, 12, 31, 13, 37, 0, tzinfo=timezone.utc)
+    hive_hklm.map_key(addressbook_name, addressbook_key)
+
+    msvc_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{D5D19E2F-7189-42FE-8103-92CD1FA457C2}"
+    msvc_key = VirtualKey(hive_hklm, msvc_name)
+    msvc_key.add_value("DisplayName", "Microsoft Visual C++ 2022 X64 Minimum Runtime - 14.36.32532")
+    msvc_key.add_value("InstallDate", "20240301")
+    msvc_key.add_value("DisplayVersion", "14.36.32532")
+    msvc_key.add_value("Publisher", "Microsoft Corporation")
+    msvc_key.add_value(
+        "InstallSource",
+        "C:\\ProgramData\\Package Cache\\{D5D19E2F-7189-42FE-8103-92CD1FA457C2}v14.36.32532\\packages\\vcRuntimeMinimum_amd64\\",  # noqa: E501
+    )
+    msvc_key.add_value("SystemComponent", 1)
+    hive_hklm.map_key(msvc_name, msvc_key)
+
     target_win_users.add_plugin(WindowsApplicationsPlugin)
     results = sorted(list(target_win_users.applications()), key=lambda r: r.name)
 
-    assert len(results) == 2
+    assert len(results) == 4
 
-    assert results[0].ts_installed == datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
-    assert results[0].name == "Google Chrome"
-    assert results[0].version == "122.0.6261.95"
-    assert results[0].author == "Google LLC"
-    assert results[0].type == "user"
-    assert results[0].path == "C:\\Users\\user\\Desktop\\GoogleChromeEnterpriseBundle64\\Installers\\"
+    assert results[0].ts_installed is None
+    assert results[0].ts_modified == datetime(2024, 12, 31, 13, 37, 0, tzinfo=timezone.utc)
+    assert results[0].name == "AddressBook"
+    assert results[0].type == "system"
 
-    assert results[1].ts_installed is None
-    assert results[1].name == "Mozilla Firefox (x64 nl)"
-    assert results[1].version == "123.0.1"
-    assert results[1].author == "Mozilla"
+    assert results[1].ts_installed == datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+    assert results[1].name == "Google Chrome"
+    assert results[1].version == "122.0.6261.95"
+    assert results[1].author == "Google LLC"
     assert results[1].type == "user"
-    assert results[1].path == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"
+    assert results[1].path == "C:\\Users\\user\\Desktop\\GoogleChromeEnterpriseBundle64\\Installers\\"
+
+    assert results[2].ts_installed == datetime(2024, 3, 1, 0, 0, 0, tzinfo=timezone.utc)
+    assert results[2].name == "Microsoft Visual C++ 2022 X64 Minimum Runtime - 14.36.32532"
+    assert results[2].version == "14.36.32532"
+    assert results[2].author == "Microsoft Corporation"
+    assert results[2].type == "system"
+    assert (
+        results[2].path
+        == "C:\\ProgramData\\Package Cache\\{D5D19E2F-7189-42FE-8103-92CD1FA457C2}v14.36.32532\\packages\\vcRuntimeMinimum_amd64\\"  # noqa: E501
+    )
+
+    assert results[3].ts_installed is None
+    assert results[3].name == "Mozilla Firefox (x64 nl)"
+    assert results[3].version == "123.0.1"
+    assert results[3].author == "Mozilla"
+    assert results[3].type == "user"
+    assert results[3].path == "C:\\Program Files\\Mozilla Firefox\\firefox.exe,0"

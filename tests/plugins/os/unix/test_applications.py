@@ -78,5 +78,15 @@ def test_unix_applications_desktop_files(target_unix_users: Target, fs_unix: Vir
         "gnome-terminal",
         "/usr/bin/vlc --started-from-file %U",
         "/usr/bin/vmware %U",
-        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",
+        "env BAMF_DESKTOP_FILE_HINT=/var/lib/snapd/desktop/applications/code_code.desktop /snap/bin/code --force-user-env %F",  # noqa: E501
+    ]
+
+    assert [r.type for r in results] == [
+        "user",
+        "user",
+        "user",
+        "system",
+        "user",
+        "user",
+        "user",
     ]

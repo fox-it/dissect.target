@@ -26,7 +26,7 @@ class UnixApplicationsPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.desktop_files = list(self.find_desktop_files())
+        self.desktop_files = list(self._find_desktop_files())
 
     def _find_desktop_files(self) -> Iterator[TargetPath]:
         for dir in self.SYSTEM_PATHS:
@@ -52,8 +52,7 @@ class UnixApplicationsPlugin(Plugin):
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
         """
         for file in self.desktop_files:
-            parser = configutil.parse(file, hint="ini")
-            config = parser.get("Desktop Entry") or {}
+            config = configutil.parse(file, hint="ini").get("Desktop Entry") or {}
             stat = file.lstat()
 
             yield UnixApplicationRecord(
