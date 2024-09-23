@@ -55,14 +55,14 @@ class MacNetworkPlugin(NetworkPlugin):
             data["type"] = device.get("Type")
             data["vlan"] = vlan_lookup.get(data["name"])
             data["dhcp"] = False
-            data["subnetmask"] = []
+            subnetmask = []
             data["interface_service_order"] = service_order.index(_id) if _id in service_order else None
             try:
                 data["enabled"] = not interface.get("__INACTIVE__", False)
                 for addr in interface.get("DNS", {}).get("ServerAddresses", {}):
                     dns.add(addr)
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
-                    data["subnetmask"] += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
+                    subnetmask += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
                     if router := addresses.get("Router"):
                         gateways.add(router)
                     if dhcp_ip and addresses.get("ConfigMethod", "") == "DHCP":
@@ -76,7 +76,7 @@ class MacNetworkPlugin(NetworkPlugin):
                 data["dns"] = list(dns)
                 data["gateway"] = list(gateways)
 
-                if data["subnetmask"]:
+                if subnetmask:
                     data["network"] = self.calculate_network(ips, data["subnetmask"])
 
                 yield MacInterfaceRecord(_target=self.target, **data)
