@@ -517,7 +517,7 @@ class TargetCli(TargetCmd):
         runcommands_file = pathlib.Path(
             getattr(target._config, "TARGETRCFILE", self.DEFAULT_RUNCOMMANDSFILE)
         ).expanduser()
-        self.load_runcommands(runcommands_file)
+        self._load_targetrc(runcommands_file)
 
     @property
     def prompt(self) -> str:
@@ -537,10 +537,10 @@ class TargetCli(TargetCmd):
             suggestions.append(suggestion)
         return suggestions
 
-    def load_runcommands(self, runcommands_file: pathlib.Path) -> None:
+    def _load_targetrc(self, path: pathlib.Path) -> None:
         """Load and execute commands from the run commands file."""
         try:
-            with runcommands_file.open() as fh:
+            with path.open() as fh:
                 for line in fh:
                     if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
                         self.onecmd(line)
@@ -548,7 +548,7 @@ class TargetCli(TargetCmd):
             # The .targetrc file is optional
             pass
         except Exception as e:
-            self.stdout.write(f"Error processing run commands file: {e}\n")
+            log.debug("Error processing .targetrc file: %s", e)
 
     def resolve_path(self, path: str) -> fsutil.TargetPath:
         if not path:
