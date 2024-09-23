@@ -16,7 +16,6 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
@@ -250,9 +249,6 @@ def plugin_function_with_argparser(
 
         plugin_method = plugin_obj.get_all_records
         parser = generate_argparse_for_plugin(plugin_obj)
-    elif isinstance(target_attr, CommandProxy):
-        plugin_method = target_attr.command()
-        parser = generate_argparse_for_bound_method(plugin_method)
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)
