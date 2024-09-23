@@ -1,4 +1,5 @@
 from typing import Iterator
+from unittest import mock
 
 import pytest
 
@@ -153,19 +154,13 @@ def dhcp(fake_plist: dict) -> Iterator[dict]:
 def test_macos_network(
     target_osx: Target, lease: dict, netinfo_param: str, expected: dict, count: int, request: pytest.FixtureRequest
 ) -> None:
-    class DiagnosticMacNetworkPlugin(MacNetworkPlugin):
-        plistlease = {}
-        plistnetwork = {}
-
-        def _plistlease(self, devicename: str) -> dict:
-            return self.plistlease
-
-        def _plistnetwork(self) -> dict:
-            return self.plistnetwork
-
-    network = DiagnosticMacNetworkPlugin(target_osx)
-    network.plistlease = lease
-    network.plistnetwork = request.getfixturevalue(netinfo_param)
+    plistnetwork = request.getfixturevalue(netinfo_param)
+    with mock.patch(
+        "dissect.target.plugins.os.unix.bsd.osx.network.MacNetworkPlugin._plistlease", return_value=lease
+    ), mock.patch(
+        "dissect.target.plugins.os.unix.bsd.osx.network.MacNetworkPlugin._plistnetwork", return_value=plistnetwork
+    ):
+        network = MacNetworkPlugin(target_osx)
 
     interfaces = list(network.interfaces())
     assert len(interfaces) == count
