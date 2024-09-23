@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import atexit
-import ipaddress
 import logging
 import math
 import os
@@ -449,58 +448,6 @@ def strictly_positive(value: str) -> int:
         raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
 
 
-def host_name(value: str) -> bool:
-    """Checks if the value is a valid host name."""
-
-    # Adapted from https://stackoverflow.com/questions/2532053/validate-a-hostname-string
-    if value[-1] == ".":
-        # Host names are allowed to end in a dot
-        value = value[:-1]
-    if len(value) > 253:
-        return False
-
-    labels = value.split(".")
-
-    # The top level domain must contain at least one alphabetic character.
-    # Checking the last label is stricter than necessary since a TLD can consists of multiple labels.
-    if re.match(r"[0-9]+$", labels[-1]):
-        return False
-
-    # Each label must be between 1 and 63 characters long.
-    # Labels cannot begin or start with a hyphen.
-    label_pattern = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)$", re.IGNORECASE)
-    return all(label_pattern.match(label) for label in labels)
-
-
-def ip_address(value: str) -> bool:
-    """Checks if the value is a valid IP address."""
-    try:
-        ipaddress.ip_address(value)
-        return True
-    except ValueError:
-        return False
-
-
-def host_name_or_ip_address(value: str) -> str:
-    """
-    Validate if the given value is a valid hostname or IP address.
-
-    This function is intended to be used as a type for argparse arguments.
-
-    Args:
-        value (str): The value to be validated as a hostname or IP address.
-    Returns:
-        str: The validated hostname or IP address.
-    Raises:
-        argparse.ArgumentTypeError: If the value is not a valid hostname or IP address.
-    """
-
-    if host_name(value) or ip_address(value):
-        return value
-
-    raise argparse.ArgumentTypeError(f"Invalid hostname or IP address specified: '{value}'")
-
-
 def port(value: str) -> int:
     """
     Convert a string value to an integer representing a valid port number.
@@ -561,7 +508,7 @@ def case(value: str) -> str:
     help="case name (broker will determine if you are allowed to access this data)",
 )
 @arg("--mqtt-port", type=port, dest="port", default=443, help="broker connection port")
-@arg("--mqtt-broker", type=host_name_or_ip_address, default="localhost", dest="broker", help="broker ip-address")
+@arg("--mqtt-broker", default="localhost", dest="broker", help="broker ip-address")
 @arg("--mqtt-key", type=Path, dest="key", required=True, help="private key file")
 @arg("--mqtt-crt", type=Path, dest="crt", required=True, help="client certificate file")
 @arg("--mqtt-ca", type=Path, dest="ca", required=True, help="certificate authority file")

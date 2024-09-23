@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from dissect.target import Target
-from dissect.target.loaders.mqtt import Broker, MQTTConnection, case, host_name
+from dissect.target.loaders.mqtt import Broker, MQTTConnection, case
 
 
 class MQTTMock(MagicMock):
@@ -134,51 +134,6 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
     connection.read(1, 1200, 100, 0)
     assert connection.factor == (connection.prefetch_factor_inc * 2) + 1
     assert connection.prev == 1200
-
-
-def generate_longest_valid_hostname():
-    """Generate a valid hostname with the maximum length of 253 characters."""
-    number_of_full_labels, remainder = divmod(253, 63 + 1)
-    longest_hostname = ".".join(["a" * 63] * number_of_full_labels + ["a" * remainder])
-    assert len(longest_hostname) == 253
-    return longest_hostname
-
-
-@pytest.mark.parametrize(
-    "hostname, is_valid_hostname",
-    [
-        ("example.com", True),
-        ("example.com.", True),
-        ("example.com..", False),
-        ("localhost", True),
-        ("127.0.0.1", False),
-        ("255.255.255.255", False),
-        ("invalid_host_name", False),
-        ("-example.com", False),
-        ("example-.com", False),
-        ("example-label.com", True),
-        ("example..com", False),
-        (generate_longest_valid_hostname(), True),
-        (generate_longest_valid_hostname() + "a", False),
-    ],
-    ids=[
-        "valid_domain",
-        "valid_domain_with_trailing_dot",
-        "invalid_double_dot",
-        "localhost",
-        "numerical_tld_1",
-        "numerical_tld_2",
-        "underscores",
-        "invalid_start_hyphen",
-        "invalid_end_hyphen",
-        "valid_domain_with_hyphen",
-        "invalid_empty_label",
-        "valid_max_length",
-        "too_long",
-    ],
-)
-def test_host_name_parser(hostname: str, is_valid_hostname: bool) -> None:
-    assert host_name(hostname) == is_valid_hostname
 
 
 @pytest.mark.parametrize(
