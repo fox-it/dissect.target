@@ -7,6 +7,7 @@ from struct import pack
 from typing import Iterator
 from unittest.mock import MagicMock, patch
 
+import paho.mqtt.client as mqtt
 import pytest
 
 from dissect.target import Target
@@ -69,13 +70,6 @@ class MockBroker(MagicMock):
 
 
 @pytest.fixture
-def mock_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    import paho.mqtt.client as mqtt
-
-    monkeypatch.setattr(mqtt, "Client", MQTTMock)
-
-
-@pytest.fixture
 def mock_broker() -> Iterator[MockBroker]:
     yield MockBroker()
 
@@ -93,7 +87,7 @@ def mock_broker() -> Iterator[MockBroker]:
 @patch.object(time, "sleep")  # improve speed during test, no need to wait for peers
 def test_remote_loader_stream(
     time: MagicMock,
-    mock_client: None,
+    monkeypatch: pytest.MonkeyPatch,
     alias: str,
     hosts: list[str],
     disks: list[int],
@@ -102,6 +96,8 @@ def test_remote_loader_stream(
     read: int,
     expected: bytes,
 ) -> None:
+    monkeypatch.setattr(mqtt, "Client", MQTTMock)
+
     broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1", "user", "pass")
     broker.connect()
     broker.mqtt_client.fill_disks(disks)
