@@ -7,12 +7,12 @@ from dissect.target.target import Target
 
 
 @pytest.fixture
-def almost_empty_plist():
+def almost_empty_plist() -> Iterator[dict]:
     yield {"CurrentSet": {}}
 
 
 @pytest.fixture
-def fake_plist():
+def fake_plist() -> Iterator[dict]:
     yield {
         "CurrentSet": "/Sets/1",
         "NetworkServices": {
@@ -74,14 +74,6 @@ def double(fake_plist: dict) -> Iterator[dict]:
 def dhcp(fake_plist: dict) -> Iterator[dict]:
     fake_plist["NetworkServices"]["1"]["IPv4"].update({"ConfigMethod": "DHCP"})
     yield fake_plist
-
-
-class DiagnosticMacNetworkPlugin(MacNetworkPlugin):
-    def _plistlease(self) -> None:
-        return self.plistlease
-
-    def _plistnetwork(self) -> None:
-        return self.plistnetwork
 
 
 @pytest.mark.parametrize(
@@ -161,6 +153,16 @@ class DiagnosticMacNetworkPlugin(MacNetworkPlugin):
 def test_macos_network(
     target_osx: Target, lease: dict, netinfo_param: str, expected: dict, count: int, request: pytest.FixtureRequest
 ) -> None:
+    class DiagnosticMacNetworkPlugin(MacNetworkPlugin):
+        plistlease = {}
+        plistnetwork = {}
+
+        def _plistlease(self) -> dict:
+            return self.plistlease
+
+        def _plistnetwork(self) -> dict:
+            return self.plistnetwork
+
     network = DiagnosticMacNetworkPlugin(target_osx)
     network.plistlease = lease
     network.plistnetwork = request.getfixturevalue(netinfo_param)

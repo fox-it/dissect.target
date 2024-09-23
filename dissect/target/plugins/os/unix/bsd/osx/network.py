@@ -10,7 +10,7 @@ from dissect.target.plugins.general.network import NetworkPlugin
 
 class MacNetworkPlugin(NetworkPlugin):
     @cache
-    def _plistlease(self) -> None:
+    def _plistlease(self) -> dict:
         if (dhcp := self.target.fs.path("/private/var/db/dhcpclient/leases")).exists():
             for lease in dhcp.iterdir():
                 if lease.is_file():
@@ -18,7 +18,7 @@ class MacNetworkPlugin(NetworkPlugin):
         return {}
 
     @cache
-    def _plistnetwork(self) -> None:
+    def _plistnetwork(self) -> dict:
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
 
