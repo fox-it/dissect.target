@@ -443,7 +443,7 @@ def strictly_positive(value: str) -> int:
     try:
         strictly_positive_value = int(value)
         if strictly_positive_value < 1:
-            raise argparse.ArgumentTypeError("Value must be strictly positive.")
+            raise argparse.ArgumentTypeError("Value must be larger than or equal to 1.")
         return strictly_positive_value
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
