@@ -81,6 +81,6 @@ class MacNetworkPlugin(NetworkPlugin):
 
                 yield MacInterfaceRecord(_target=self.target, **data)
 
-            except Exception as message:
-                self.target.log.warning("Error reading configuration for network device %s: %s.", data["name"], message)
+            except Exception as e:
+                self.target.log.warning("Error reading configuration for network device %s: %s", data["name"], e)
                 continue
