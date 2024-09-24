@@ -180,7 +180,8 @@ MacInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("varint", "vlan"),
-        ("string", "proxy"),
+        ("net.ipnetwork[]", "network"),
         ("varint", "interface_service_order"),
+        ("boolean", "dhcp"),
     ],
 )
