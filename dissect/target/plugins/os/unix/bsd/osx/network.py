@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import plistlib
-from functools import lru_cache
+from functools import cache, lru_cache
 from typing import Iterator
 
 from dissect.target.helpers.record import MacInterfaceRecord
@@ -12,8 +12,8 @@ from dissect.target.target import Target
 class MacNetworkPlugin(NetworkPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
-        self._plistlease = lru_cache(4096)(self._plistlease)
-        self._plistnetwork = lru_cache(4096)(self._plistnetwork)
+        self._plistlease = cache(self._plistlease)
+        self._plistnetwork = lru_cache(32)(self._plistnetwork)
 
     def _plistlease(self, devname: str) -> dict:
         for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}*"):
@@ -38,9 +38,8 @@ class MacNetworkPlugin(NetworkPlugin):
 
         network = plistnetwork.get("NetworkServices", {})
         vlans = plistnetwork.get("VirtualNetworkInterfaces", {}).get("VLAN", {})
-        vlan_lookup = {}
-        for key, vlan in vlans.items():
-            vlan_lookup[key] = vlan.get("Tag")
+
+        vlan_lookup = {key: vlan.get("Tag") for key, vlan in vlans.items()}
 
         for _id, interface in network.items():
             dns = set()
@@ -72,18 +71,18 @@ class MacNetworkPlugin(NetworkPlugin):
                     network = self.calculate_network(ips, subnetmask)
 
                 yield MacInterfaceRecord(
-                    _target=self.target,
-                    source="NetworkServices",
-                    enabled=not interface.get("__INACTIVE__", False),
-                    dhcp=dhcp,
-                    vlan=vlan,
                     name=name,
                     type=_type,
-                    network=network,
-                    gateway=list(gateways),
+                    enabled=not interface.get("__INACTIVE__", False),
                     dns=list(dns),
                     ip=list(ips),
+                    gateway=list(gateways),
+                    source="NetworkServices",
+                    vlan=vlan,
+                    network=network,
                     interface_service_order=interface_service_order,
+                    dhcp=dhcp,
+                    _target=self.target,
                 )
 
             except Exception as e:
