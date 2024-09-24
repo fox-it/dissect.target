@@ -12,8 +12,8 @@ from dissect.target.target import Target
 class MacNetworkPlugin(NetworkPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
-        self._plistlease = cache(self._plistlease)
-        self._plistnetwork = lru_cache(32)(self._plistnetwork)
+        self._plistnetwork = cache(self._plistnetwork)
+        self._plistlease = lru_cache(32)(self._plistlease)
 
     def _plistlease(self, devname: str) -> dict:
         for lease in self.target.fs.glob_ext(f"/private/var/db/dhcpclient/leases/{devname}*"):
