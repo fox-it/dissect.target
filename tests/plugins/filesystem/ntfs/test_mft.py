@@ -193,6 +193,18 @@ def test_mft_plugin_macb(target_win: Target) -> None:
         ts = record.ts
 
 
+def test_mft_plugin_macb_ads(target_win: Target) -> None:
+    load_mft_plugin(target_win)
+    mft_data = list(target_win.mft(macb=True))
+    for record in mft_data:
+        if str(record.path).find(":") > -1:
+            assert not record.macb.endswith("/....")
+            assert record.macb.startswith("..../....")
+        else:
+            assert not record.macb.startswith("..../....")
+            assert record.macb.endswith("/....")
+
+
 def test_mft_plugin_macb_nodup() -> None:
     # test whether you can never have duplicates
 
