@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterator, Union
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
+from flow.record.fieldtypes.net.ipv4 import Address, addr_long, addr_str, mask_to_bits
 
 from dissect.target.helpers.record import (
     MacInterfaceRecord,
@@ -80,3 +81,10 @@ class NetworkPlugin(Plugin):
         for interface in self.interfaces():
             if any(ip_addr in cidr for ip_addr in interface.ip):
                 yield interface
+
+    def calculate_network(self, ips: int | Address, subnets: int | Address) -> Iterator[str]:
+        for ip, subnet_mask in zip(ips, subnets):
+            subnet_mask_int = addr_long(subnet_mask)
+            cidr = mask_to_bits(subnet_mask_int)
+            network_address = addr_str(addr_long(ip) & subnet_mask_int)
+            yield f"{network_address}/{cidr}"

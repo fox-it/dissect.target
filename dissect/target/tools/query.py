@@ -18,7 +18,6 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
-from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
@@ -174,8 +173,6 @@ def main():
 
         if targets:
             for plugin_target in Target.open_all(targets, args.children):
-                if isinstance(plugin_target._loader, ProxyLoader):
-                    parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
                 for func in funcs:
                     collected_plugins.append(func)
