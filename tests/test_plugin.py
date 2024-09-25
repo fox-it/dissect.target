@@ -627,14 +627,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
     assert method_doc_str != "", f"Empty docstring for function {func}"
 
     # The method docstring should compile to rst without warnings
-    try:
-        publish_string(method_doc_str, settings_overrides={"halt_level": 2})
-
-    except SystemMessage as e:
-        # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
-        # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
-        if "Unknown interpreted text role" not in str(e):
-            assert str(e) in method_doc_str  # makes reading pytest error easier
+    assert_valid_rst(method_doc_str)
 
     # Plugin class should have a docstring
     class_doc_str = func.class_object.__doc__
@@ -642,11 +635,17 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
     assert class_doc_str != "", f"Empty docstring for class {func.class_object.__name__}"
 
     # The class docstring should compile to rst without warnings
+    assert_valid_rst(class_doc_str)
+
+
+def assert_valid_rst(src: str) -> None:
+    """Attempts to compile the given string to rst."""
+
     try:
-        publish_string(class_doc_str, settings_overrides={"halt_level": 2})
+        publish_string(src, settings_overrides={"halt_level": 2})
 
     except SystemMessage as e:
         # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
         # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
         if "Unknown interpreted text role" not in str(e):
-            assert str(e) in class_doc_str  # makes reading pytest error easier
+            assert str(e) in src  # makes reading pytest error easier
