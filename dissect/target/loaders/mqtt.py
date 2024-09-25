@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import atexit
 import logging
 import math
 import os
+import re
 import ssl
 import sys
 import time
@@ -280,7 +282,7 @@ class Broker:
     factor = 1
 
     def __init__(
-        self, broker: Broker, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
+        self, broker: str, port: str, key: str, crt: str, ca: str, case: str, username: str, password: str, **kwargs
     ):
         self.broker_host = broker
         self.broker_port = int(port)
@@ -352,8 +354,7 @@ class Broker:
             log.error(f"Failed to decode payload for hostname {hostname}: {e}")
             return
 
-        # The payload with the username and password is comma separated
-        print(f'"{hostname}",{decoded_payload}')
+        print(decoded_payload)
 
     def _on_log(self, client: mqtt.Client, userdata: Any, log_level: int, message: str) -> None:
         log.debug(message)
@@ -423,16 +424,97 @@ class Broker:
         self.mqtt_client.loop_start()
 
 
-@arg("--mqtt-peers", type=int, dest="peers", help="minimum number of peers to await for first alias")
-@arg("--mqtt-case", dest="case", help="case name (broker will determine if you are allowed to access this data)")
-@arg("--mqtt-port", type=int, dest="port", help="broker connection port")
-@arg("--mqtt-broker", dest="broker", help="broker ip-address")
-@arg("--mqtt-key", dest="key", help="private key file")
-@arg("--mqtt-crt", dest="crt", help="client certificate file")
-@arg("--mqtt-ca", dest="ca", help="certificate authority file")
+def strictly_positive(value: str) -> int:
+    """
+    Validates that the provided value is a strictly positive integer.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The value to validate.
+
+    Returns:
+        int: The validated integer value.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not a strictly positive integer.
+    """
+    try:
+        strictly_positive_value = int(value)
+        if strictly_positive_value < 1:
+            raise argparse.ArgumentTypeError("Value must be larger than or equal to 1.")
+        return strictly_positive_value
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
+
+
+def port(value: str) -> int:
+    """
+    Convert a string value to an integer representing a valid port number.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The string representation of the port number.
+    Returns:
+        int: The port number as an integer.
+    Raises:
+        argparse.ArgumentTypeError: If the port number is not an integer or out of the valid range (1-65535).
+    """
+
+    try:
+        port = int(value)
+        if port < 1 or port > 65535:
+            raise argparse.ArgumentTypeError("Port number must be between 1 and 65535.")
+        return port
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid port number specified: '{value}'")
+
+
+def case(value: str) -> str:
+    """
+    Validates that the given value is a valid case name consisting of
+    alphanumeric characters and underscores only.
+
+    This function is intended to be used as a type for argparse arguments.
+
+    Args:
+        value (str): The case name to validate.
+
+    Returns:
+        str: The validated case name if it matches the required pattern.
+
+    Raises:
+        argparse.ArgumentTypeError: If the case name does not match the required pattern.
+    """
+
+    if re.match(r"^[a-zA-Z0-9_]+$", value):
+        return value
+
+    raise argparse.ArgumentTypeError(f"Invalid case name specified: '{value}'")
+
+
+@arg(
+    "--mqtt-peers",
+    type=strictly_positive,
+    dest="peers",
+    default=1,
+    help="minimum number of peers to await for first alias",
+)
+@arg(
+    "--mqtt-case",
+    type=case,
+    dest="case",
+    help="case name (broker will determine if you are allowed to access this data)",
+)
+@arg("--mqtt-port", type=port, dest="port", default=443, help="broker connection port")
+@arg("--mqtt-broker", default="localhost", dest="broker", help="broker ip-address")
+@arg("--mqtt-key", type=Path, dest="key", required=True, help="private key file")
+@arg("--mqtt-crt", type=Path, dest="crt", required=True, help="client certificate file")
+@arg("--mqtt-ca", type=Path, dest="ca", required=True, help="certificate authority file")
 @arg("--mqtt-command", dest="command", help="direct command to client(s)")
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
-@arg("--mqtt-username", dest="username", help="Username for connection")
+@arg("--mqtt-username", dest="username", default="mqtt-loader", help="Username for connection")
 @arg("--mqtt-password", action="store_true", dest="password", help="Ask for password before connecting")
 class MQTTLoader(Loader):
     """Load remote targets through a broker."""
