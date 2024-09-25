@@ -605,7 +605,7 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
         return
 
     # Plugin method should specify what it returns
-    assert func.output_type in ["record", "yield", "default", "none"]
+    assert func.output_type in ["record", "yield", "default", "none"], f"Invalid output_type for function {func}"
 
     py_func = getattr(func.class_object, func.method_name)
     annotations = None
@@ -623,8 +623,8 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
 
     # Plugin method should have a docstring
     method_doc_str = py_func.__doc__
-    assert isinstance(method_doc_str, str)
-    assert method_doc_str != ""
+    assert isinstance(method_doc_str, str), f"No docstring for function {func}"
+    assert method_doc_str != "", f"Empty docstring for function {func}"
 
     # The method docstring should compile to rst without warnings
     try:
@@ -638,8 +638,8 @@ def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
 
     # Plugin class should have a docstring
     class_doc_str = func.class_object.__doc__
-    assert isinstance(class_doc_str, str)
-    assert class_doc_str != ""
+    assert isinstance(class_doc_str, str), f"No docstring for class {func.class_object.__name__}"
+    assert class_doc_str != "", f"Empty docstring for class {func.class_object.__name__}"
 
     # The class docstring should compile to rst without warnings
     try:

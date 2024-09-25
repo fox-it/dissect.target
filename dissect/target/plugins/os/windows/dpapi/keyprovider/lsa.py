@@ -21,6 +21,8 @@ c_defaultpassword = cstruct().load(defaultpassword_def)
 
 
 class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
+    """Windows LSA DefaultPassword key provider plugin."""
+
     __namespace__ = "_dpapi_keyprovider_lsa_defaultpassword"
 
     def check_compatible(self) -> None:
@@ -29,6 +31,7 @@ class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
 
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
+        """Yield Windows LSA DefaultPassword strings."""
         if default_pass := self.target.lsa._secrets.get("DefaultPassword"):
             try:
                 value = c_defaultpassword.DefaultPassword(default_pass).data
