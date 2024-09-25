@@ -195,7 +195,7 @@ class UalPlugin(Plugin):
                 "role_name": record.get("RoleName"),
             }
 
-    def read_table_records(self, table_name: str) -> Iterator[tuple]:
+    def read_table_records(self, table_name: str) -> Iterator[tuple[Path, dict[str, Any]]]:
         for mdb_path in self.mdb_paths:
             fh = mdb_path.open()
             try:
