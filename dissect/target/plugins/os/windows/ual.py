@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import ual
