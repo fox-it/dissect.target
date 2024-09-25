@@ -473,7 +473,8 @@ class Env(ConfigurationParser):
     """Parses ``.env`` file contents according to Docker and bash specification.
 
     Does not apply interpolation of substituted values, eg. ``foo=${bar}`` and does not attempt
-    to parse list or dict strings. Does not support dynamic env files, eg. `` foo=`bar` ``.
+    to parse list or dict strings. Does not support dynamic env files, eg. `` foo=`bar` ``. Also
+    does not support multi-line key/value assignments (yet).
 
     Resources:
         - https://docs.docker.com/compose/environment-variables/variable-interpolation/#env-file-syntax
@@ -501,7 +502,7 @@ class Env(ConfigurationParser):
 
             # Line could be invalid
             if not match:
-                log.debug("Could not parse line in %s: '%s'", fh, line)
+                log.warning("Could not parse line in %s: '%s'", fh, line)
                 continue
 
             key = match.groupdict()["key"]
@@ -513,12 +514,9 @@ class Env(ConfigurationParser):
             # Surrounding whitespace characters are removed, unless quoted.
             if value and ((value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'")):
                 is_quoted = True
-            else:
-                is_quoted = False
-
-            if is_quoted:
                 value = value.strip("\"'")
             else:
+                is_quoted = False
                 value = value.strip()
 
             # Unquoted values may start with a quote if they are properly escaped.
@@ -536,7 +534,7 @@ class Env(ConfigurationParser):
                 value = int(value)
 
             if key.strip() in self.parsed_data:
-                log.info("Duplicate environment key '%s' in file %s", key.strip(), fh)
+                log.warning("Duplicate environment key '%s' in file %s", key.strip(), fh)
 
             self.parsed_data[key.strip()] = (value, comment) if self.comments else value
 
