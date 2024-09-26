@@ -105,6 +105,7 @@ FilesystemMACBRecord = TargetRecordDescriptor(
         ("filesize", "filesize"),
         ("boolean", "resident"),
         ("boolean", "inuse"),
+        ("boolean", "ads"),
         ("string", "volume_uuid"),
     ],
 )
@@ -151,7 +152,7 @@ class MftPlugin(Plugin):
         "--macb",
         group="fmt",
         action="store_true",
-        help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
+        help="compacts the MFT entry timestamps into aggregated records with MACB bitfield (format: standard|ads/filename)",
     )
     def mft(
         self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
@@ -342,10 +343,11 @@ def macb_aggr(records: list[Record]) -> Iterator[Record]:
     for record in records:
         found = False
 
-        offset_std = int(record._desc.name == "filesystem/ntfs/mft/std") * 5
-        offset_ads = (int(record.ads) * 10) if offset_std == 0 else 0
+        offset = 0
+        if not getattr(record, "ads", False):
+            offset = int(record._desc.name == "filesystem/ntfs/mft/filename") * 5
 
-        field = "MACB".find(record.ts_type) + offset_std + offset_ads
+        field = "MACB".find(record.ts_type) + offset
         for macb in macbs:
             if macb.ts == record.ts and macb.path == record.path:
                 macb.macb = macb_set(macb.macb, field, record.ts_type)
@@ -356,7 +358,7 @@ def macb_aggr(records: list[Record]) -> Iterator[Record]:
             continue
 
         macb = FilesystemMACBRecord.init_from_record(record)
-        macb.macb = "..../..../...."
+        macb.macb = "..../...."
         macb.macb = macb_set(macb.macb, field, record.ts_type)
 
         macbs.append(macb)

@@ -183,10 +183,10 @@ def test_mft_plugin_macb(target_win: Target) -> None:
     path = None
     ts = None
     macb = None
-    field = "MACB/MACB/MACB"
+    field = "MACB/MACB"
     for record in mft_data:
         assert record.macb != macb or record.ts != ts or record.path != path
-        for bit in [0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 12]:
+        for bit in [0, 1, 2, 3, 5, 6, 7]:
             assert record.macb[bit : bit + 1] in (field[bit : bit + 1], ".")
         path = record.path
         macb = record.macb
@@ -198,13 +198,10 @@ def test_mft_plugin_macb_ads(target_win: Target) -> None:
     mft_data = list(target_win.mft(macb=True))
     ads_entries = 0
     for record in mft_data:
-        if str(record.path).find(":") > -1:
+        if record.ads:
             ads_entries += 1
-            assert not record.macb.endswith("/....")
-            assert record.macb.startswith("..../....")
-        else:
-            assert not record.macb.startswith("..../....")
             assert record.macb.endswith("/....")
+            assert not record.macb.startswith("..../")
     assert ads_entries == 6
 
 
