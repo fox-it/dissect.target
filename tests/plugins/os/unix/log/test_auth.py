@@ -276,7 +276,7 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
 )
 def test_auth_plugin_additional_fields(
     target_unix, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, Union[str, int]]
-):
+) -> None:
     data_path = tmp_path / "auth.log"
     data_path.write_text(message)
     fs_unix.map_file("var/log/auth.log", data_path)

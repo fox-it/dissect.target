@@ -1,6 +1,6 @@
 import re
+from abc import ABC, abstractmethod
 from datetime import datetime
-from enum import Enum
 from functools import lru_cache
 from itertools import chain
 from pathlib import Path
@@ -15,75 +15,67 @@ from dissect.target.plugin import Plugin, export
 _TS_REGEX = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
 RE_TS = re.compile(_TS_REGEX)
 RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\S+\s")
+# Generic regular expressions
+IPV4_ADDRESS_REGEX = re.compile(
+    r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}"  # First three octets
+    r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"  # Last octet
+)
+PAM_UNIX_REGEX = re.compile(
+    r"pam_unix\([^\s]+:session\):\s(?P<action>session\s\w+) "  # Session action, usually opened or closed
+    r"for\suser\s(?P<user>[^\s\(]+)(?:\(uid=(?P<user_uid>\d+)\))?"  # User may contain uid like: root(uid=0)
+    r"(?:\sby\s\(uid=(?P<by_uid>\d+)\))?$"  # Opened action also contains this "by" addition
+)
+USER_REGEX = re.compile(r"for ([^\s]+)")
 
 
-class AuthLogServicesEnum(str, Enum):
-    cron = "CRON"
-    su = "su"
-    sudo = "sudo"
-    sshd = "sshd"
-    systemd = "systemd"
-    systemd_logind = "systemd-logind"
-    pkexec = "pkexec"
+class BaseService(ABC):
+    @classmethod
+    @abstractmethod
+    def parse_message(cls, message: str) -> dict[str, str]:
+        pass
 
 
-class AuthLogRecordBuilder:
-    RECORD_NAME = "linux/log/auth"
-    # Generic regular expressions
-    IPV4_ADDRESS_REGEX = re.compile(
-        r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}"  # First three octets
-        r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"  # Last octet
-    )
-    PAM_UNIX_REGEX = re.compile(
-        r"pam_unix\([^\s]+:session\):\s(?P<action>session\s\w+) "  # Session action, usually opened or closed
-        r"for\suser\s(?P<user>[^\s\(]+)(?:\(uid=(?P<user_uid>\d+)\))?"  # User may contain uid like: root(uid=0)
-        r"(?:\sby\s\(uid=(?P<by_uid>\d+)\))?$"  # Opened action also contains this "by" addition
-    )
-    USER_REGEX = re.compile(r"for ([^\s]+)")
-    # sudo regular expressions
+class SudoService(BaseService):
+    """Class for parsing sudo service messages in the auth log"""
+
     SUDO_COMMAND_REGEX = re.compile(
         r"TTY=(?P<tty>\w+\/\w+)\s;\s"  # The TTY -> TTY=pts/0 ;
         r"PWD=(?P<pwd>[\/\w]+)\s;\s"  # The current working directory -> PWD="/home/user" ;
         r"USER=(?P<effective_user>\w+)\s;\s"  # The effective user -> USER=root ;
         r"COMMAND=(?P<command>.+)$"  # The command -> COMMAND=/usr/bin/whoami
     )
-    # su regular expressions
-    SU_BY_REGEX = re.compile(r"by\s([^\s]+)")
-    SU_ON_REGEX = re.compile(r"on\s([^\s]+)")
-    SU_COMMAND_REGEX = re.compile(r"'(.*?)'")
-    # pkexec regular expressions
-    PKEXEC_COMMAND_REGEX = re.compile(
-        r"(?P<user>.*?):\sExecuting\scommand\s"  # Starts with actual user -> user:
-        r"\[USER=(?P<effective_user>[^\]]+)\]\s"  # The impersonated user -> [USER=root]
-        r"\[TTY=(?P<tty>[^\]]+)\]\s"  # The tty -> [TTY=unknown]
-        r"\[CWD=(?P<cwd>[^\]]+)\]\s"  # Current working directory -> [CWD=/home/user]
-        r"\[COMMAND=(?P<command>[^\]]+)\]"  # Command performed -> [COMMAND=/usr/lib/example]
-    )
-    # sshd regular expressions
+
+    @classmethod
+    def parse_message(cls, message: str) -> dict[str, str]:
+        """Parse auth log message from sudo"""
+        if not (match := cls.SUDO_COMMAND_REGEX.search(message)):
+            return {}
+
+        additional_fields = {}
+        for key, value in match.groupdict().items():
+            additional_fields[key] = value
+
+        return additional_fields
+
+
+class SshdService(BaseService):
+    """Class for parsing sshd messages in the auth log"""
+
     SSHD_PORT_REGEX = re.compile(r"port\s(\d+)")
     USER_REGEX = re.compile(r"for\s([^\s]+)")
-    # systemd-logind regular expressions
-    SYSTEMD_LOGIND_WATCHING_REGEX = re.compile(
-        r"(?P<action>Watching\ssystem\sbuttons)\s"  # Action is "Watching system buttons"
-        r"on\s(?P<device>[^\s]+)\s"  # The device the button is related to -> /dev/input/event0
-        r"\((?P<device_name>.*?)\)"  # The device (button) name -> "(Power button)"
-    )
 
-    def __init__(self, target: Target):
-        self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
-        self.target = target
-
-    def _parse_sshd_message(self, message: str) -> dict[str, Union[str, int]]:
+    @classmethod
+    def parse_message(cls, message: str) -> dict[str, Union[str, int]]:
         """Parse message from sshd"""
         additional_fields = {}
-        if ip_address := self.IPV4_ADDRESS_REGEX.search(message):
+        if ip_address := IPV4_ADDRESS_REGEX.search(message):
             field_name = "host_ip" if "listening" in message else "remote_ip"
             additional_fields[field_name] = ip_address.group(0)
-        if port := self.SSHD_PORT_REGEX.search(message):
+        if port := cls.SSHD_PORT_REGEX.search(message):
             additional_fields["port"] = int(port.group(1))
-        if user := self.USER_REGEX.search(message):
+        if user := cls.USER_REGEX.search(message):
             additional_fields["user"] = user.group(1)
-        # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2: RSA SHA256:123456789asdfghjklöertzuio
+        # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio
         if "Accepted publickey" in message:
             ssh_protocol, encryption_algo, key_info = message.split()[-3:]
             hash_algo, key_hash = key_info.split(":")
@@ -98,14 +90,25 @@ class AuthLogRecordBuilder:
 
         return additional_fields
 
-    def _parse_systemd_logind_message(self, message: str) -> dict[str, str]:
+
+class SystemdLogindService(BaseService):
+    """Class for parsing systemd-logind messages in the auth log"""
+
+    SYSTEMD_LOGIND_WATCHING_REGEX = re.compile(
+        r"(?P<action>Watching\ssystem\sbuttons)\s"  # Action is "Watching system buttons"
+        r"on\s(?P<device>[^\s]+)\s"  # The device the button is related to -> /dev/input/event0
+        r"\((?P<device_name>.*?)\)"  # The device (button) name -> "(Power button)"
+    )
+
+    @classmethod
+    def parse_message(cls, message: str):
         """Parse auth log message from systemd-logind"""
         additional_fields = {}
         # Example: Nov 14 07:14:09 ubuntu-1 systemd-logind[4]: Removed session 4.
         if "Removed" in message:
             additional_fields["action"] = "removed session"
             additional_fields["session"] = message.split()[-1].strip(".")
-        elif "Watching" in message and (match := self.SYSTEMD_LOGIND_WATCHING_REGEX.search(message)):
+        elif "Watching" in message and (match := cls.SYSTEMD_LOGIND_WATCHING_REGEX.search(message)):
             for key, value in match.groupdict().items():
                 additional_fields[key] = value
         # Example: New session 4 of user sampleuser.
@@ -127,36 +130,47 @@ class AuthLogRecordBuilder:
 
         return additional_fields
 
-    def _parse_sudo_message(self, message: str) -> dict[str, str]:
-        """Parse auth log message from sudo"""
-        if not (match := self.SUDO_COMMAND_REGEX.search(message)):
-            return {}
 
+class SuService(BaseService):
+    """Class for parsing su messages in the auth log"""
+
+    SU_BY_REGEX = re.compile(r"by\s([^\s]+)")
+    SU_ON_REGEX = re.compile(r"on\s([^\s]+)")
+    SU_COMMAND_REGEX = re.compile(r"'(.*?)'")
+
+    @classmethod
+    def parse_message(cls, message: str) -> dict[str, str]:
         additional_fields = {}
-        for key, value in match.groupdict().items():
-            additional_fields[key] = value
-
-        return additional_fields
-
-    def _parse_su_message(self, message: str) -> dict[str, str]:
-        additional_fields = {}
-        if user := self.USER_REGEX.search(message):
+        if user := USER_REGEX.search(message):
             additional_fields["user"] = user.group(1)
-        if by := self.SU_BY_REGEX.search(message):
+        if by := cls.SU_BY_REGEX.search(message):
             additional_fields["by"] = by.group(1)
-        if on := self.SU_ON_REGEX.search(message):
+        if on := cls.SU_ON_REGEX.search(message):
             additional_fields["device"] = on.group(1)
-        if command := self.SU_COMMAND_REGEX.search(message):
+        if command := cls.SU_COMMAND_REGEX.search(message):
             additional_fields["command"] = command.group(1)
         if (failed := "failed" in message) or "Successful" in message:
             additional_fields["su_result"] = "failed" if failed else "success"
 
         return additional_fields
 
-    def _parse_pkexec_message(self, message: str) -> dict[str, str]:
+
+class PkexecService(BaseService):
+    """Class for parsing pkexec messages in the auth log"""
+
+    PKEXEC_COMMAND_REGEX = re.compile(
+        r"(?P<user>.*?):\sExecuting\scommand\s"  # Starts with actual user -> user:
+        r"\[USER=(?P<effective_user>[^\]]+)\]\s"  # The impersonated user -> [USER=root]
+        r"\[TTY=(?P<tty>[^\]]+)\]\s"  # The tty -> [TTY=unknown]
+        r"\[CWD=(?P<cwd>[^\]]+)\]\s"  # Current working directory -> [CWD=/home/user]
+        r"\[COMMAND=(?P<command>[^\]]+)\]"  # Command performed -> [COMMAND=/usr/lib/example]
+    )
+
+    @classmethod
+    def parse_message(cls, message: str) -> dict[str, str]:
         """Parse auth log message from pkexec"""
         additional_fields = {}
-        if exec_cmd := self.PKEXEC_COMMAND_REGEX.search(message):
+        if exec_cmd := cls.PKEXEC_COMMAND_REGEX.search(message):
             additional_fields["action"] = "executing command"
             for key, value in exec_cmd.groupdict().items():
                 if value and value.isdigit():
@@ -165,9 +179,26 @@ class AuthLogRecordBuilder:
 
         return additional_fields
 
+
+class AuthLogRecordBuilder:
+    """Class for dynamically creating auth log records"""
+
+    RECORD_NAME = "linux/log/auth"
+    SERVICES: dict[str, BaseService] = {
+        "su": SuService,
+        "sudo": SudoService,
+        "sshd": SshdService,
+        "systemd-logind": SystemdLogindService,
+        "pkexec": PkexecService,
+    }
+
+    def __init__(self, target: Target):
+        self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
+        self.target = target
+
     def _parse_pam_unix_message(self, message: str) -> dict[str, str]:
         """Parse auth log message from pluggable authentication modules (PAM)"""
-        if not (match := self.PAM_UNIX_REGEX.search(message)):
+        if not (match := PAM_UNIX_REGEX.search(message)):
             return {}
 
         additional_fields = {}
@@ -180,31 +211,22 @@ class AuthLogRecordBuilder:
 
     def _parse_additional_fields(self, service: str, message: str) -> dict[str, any]:
         """Parse additional fields in the message based on the service"""
-        if service not in [item.value for item in AuthLogServicesEnum] and "pam_unix(" not in message:
+        if "pam_unix(" in message:
+            return self._parse_pam_unix_message(message)
+
+        if service not in self.SERVICES:
             self.target.log.debug("Service %s is not recognised, no additional fields could be parsed", service)
             return {}
 
-        additional_fields = {}
         try:
-            if "pam_unix(" in message:
-                additional_fields.update(self._parse_pam_unix_message(message))
-            elif service == AuthLogServicesEnum.sshd:
-                additional_fields.update(self._parse_sshd_message(message))
-            elif service == AuthLogServicesEnum.sudo:
-                additional_fields.update(self._parse_sudo_message(message))
-            elif service == AuthLogServicesEnum.su:
-                additional_fields.update(self._parse_su_message(message))
-            elif service == AuthLogServicesEnum.systemd_logind:
-                additional_fields.update(self._parse_systemd_logind_message(message))
-            elif service == AuthLogServicesEnum.pkexec:
-                additional_fields.update(self._parse_pkexec_message(message))
+            service_class = self.SERVICES[service]
+            return service_class.parse_message(message)
         except Exception as e:
             self.target.log.warning(
                 "Parsing additional fields in message '%s' for service %s failed", message, service, exc_info=e
             )
             self.target.log.debug("", exc_info=e)
-
-        return additional_fields
+            raise e
 
     def build_record(self, ts: datetime, source: Path, service: str, pid: int, message: str) -> TargetRecordDescriptor:
         """Builds an AuthLog event record"""
