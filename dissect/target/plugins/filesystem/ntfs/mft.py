@@ -152,7 +152,7 @@ class MftPlugin(Plugin):
         "--macb",
         group="fmt",
         action="store_true",
-        help="compacts MFT timestamps into MACB bitfield (format: standard|ads/filename)",
+        help="compacts MFT timestamps into MACB bitfield (format: standard|ads / filename)",
     )
     def mft(
         self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
