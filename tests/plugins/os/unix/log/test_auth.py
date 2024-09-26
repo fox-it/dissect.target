@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Union
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -275,7 +274,7 @@ def test_auth_plugin_year_rollover(target_unix, fs_unix: VirtualFilesystem):
     ],
 )
 def test_auth_plugin_additional_fields(
-    target_unix, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, Union[str, int]]
+    target_unix, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, str | int]
 ) -> None:
     data_path = tmp_path / "auth.log"
     data_path.write_text(message)

@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import lru_cache
 from itertools import chain
 from pathlib import Path
-from typing import Iterator, Union
+from typing import Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -31,7 +31,7 @@ USER_REGEX = re.compile(r"for ([^\s]+)")
 class BaseService(ABC):
     @classmethod
     @abstractmethod
-    def parse_message(cls, message: str) -> dict[str, str]:
+    def parse_message(cls, message: str) -> dict[str, any]:
         pass
 
 
@@ -65,7 +65,7 @@ class SshdService(BaseService):
     USER_REGEX = re.compile(r"for\s([^\s]+)")
 
     @classmethod
-    def parse_message(cls, message: str) -> dict[str, Union[str, int]]:
+    def parse_message(cls, message: str) -> dict[str, str | int]:
         """Parse message from sshd"""
         additional_fields = {}
         if ip_address := IPV4_ADDRESS_REGEX.search(message):
