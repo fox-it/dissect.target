@@ -153,6 +153,9 @@ def targetrc_file() -> Iterator[list[str]]:
 def test_targetcli_targetrc(target_bare: Target, targetrc_file: list[str]) -> None:
     with patch.object(TargetCli, "onecmd", autospec=True) as mock_onecmd:
         cli = TargetCli(target_bare)
+
+        cli.preloop()
+
         expected_calls = [call(cli, cmd) for cmd in targetrc_file]
         mock_onecmd.assert_has_calls(expected_calls, any_order=False)
 

@@ -96,6 +96,7 @@ class ExtendedCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
     _runtime_aliases = {}
+    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -120,6 +121,28 @@ class ExtendedCmd(cmd.Cmd):
                 pass
 
         return object.__getattribute__(self, attr)
+
+    def _load_targetrc(self, path: pathlib.Path) -> None:
+        """Load and execute commands from the run commands file."""
+        try:
+            with path.open() as fh:
+                for line in fh:
+                    if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
+                        self.onecmd(line)
+        except FileNotFoundError:
+            # The .targetrc file is optional
+            pass
+        except Exception as e:
+            log.debug("Error processing .targetrc file: %s", e)
+
+    def _get_targetrc_path(self) -> pathlib.Path:
+        """Get the path to the run commands file."""
+
+        return pathlib.Path(self.DEFAULT_RUNCOMMANDSFILE).expanduser()
+
+    def preloop(self) -> None:
+        super().preloop()
+        self._load_targetrc(self._get_targetrc_path())
 
     @staticmethod
     def check_compatible(target: Target) -> bool:
@@ -309,6 +332,7 @@ class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILESIZE = 10_000
     DEFAULT_HISTDIR = None
     DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+    CONFIG_KEY_RUNCOMMANDSFILE = "TARGETRCFILE"
 
     def __init__(self, target: Target):
         self.target = target
@@ -338,7 +362,15 @@ class TargetCmd(ExtendedCmd):
 
         super().__init__(self.target.props.get("cyber"))
 
+    def _get_targetrc_path(self) -> pathlib.Path:
+        """Get the path to the run commands file."""
+
+        return pathlib.Path(
+            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDSFILE, self.DEFAULT_RUNCOMMANDSFILE)
+        ).expanduser()
+
     def preloop(self) -> None:
+        super().preloop()
         if readline and self.histfile.exists():
             try:
                 readline.read_history_file(self.histfile)
@@ -503,21 +535,13 @@ class TargetHubCli(cmd.Cmd):
 class TargetCli(TargetCmd):
     """CLI for interacting with a target and browsing the filesystem."""
 
-    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
-
     def __init__(self, target: Target):
         self.prompt_base = _target_name(target)
 
         TargetCmd.__init__(self, target)
-
         self._clicache = {}
         self.cwd = None
         self.chdir("/")
-
-        runcommands_file = pathlib.Path(
-            getattr(target._config, "TARGETRCFILE", self.DEFAULT_RUNCOMMANDSFILE)
-        ).expanduser()
-        self._load_targetrc(runcommands_file)
 
     @property
     def prompt(self) -> str:
@@ -536,19 +560,6 @@ class TargetCli(TargetCmd):
             suggestion = f"{fname}/" if fpath.is_dir() else fname
             suggestions.append(suggestion)
         return suggestions
-
-    def _load_targetrc(self, path: pathlib.Path) -> None:
-        """Load and execute commands from the run commands file."""
-        try:
-            with path.open() as fh:
-                for line in fh:
-                    if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
-                        self.onecmd(line)
-        except FileNotFoundError:
-            # The .targetrc file is optional
-            pass
-        except Exception as e:
-            log.debug("Error processing .targetrc file: %s", e)
 
     def resolve_path(self, path: str) -> fsutil.TargetPath:
         if not path:
@@ -1163,6 +1174,10 @@ class UnixConfigTreeCli(TargetCli):
 
 class RegistryCli(TargetCmd):
     """CLI for browsing the registry."""
+
+    # Registry shell is incompatible with default shell, so override the default rc file and config key
+    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc.registry"
+    CONFIG_KEY_RUNCOMMANDSFILE = "TARGETRCFILE_REGISTRY"
 
     def __init__(self, target: Target, registry: regutil.RegfHive | None = None):
         self.prompt_base = _target_name(target)
