@@ -2,11 +2,12 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualKey
+from tests.plugins.os.windows.credential.test_lsa import map_lsa_system_keys
 
 try:
     from Crypto.Hash import MD4
 
-    from dissect.target.plugins.os.windows.sam import SamPlugin
+    from dissect.target.plugins.os.windows.credential.sam import SamPlugin
 
     HAS_CRYPTO = True
 except ImportError:
@@ -111,17 +112,15 @@ def test_sam_plugin_rev1(target_win_users, hive_hklm):
     sam_key.add_subkey("Users", users_key)
     hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
-    # Create SYSTEM keys
-    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
-    data_key = VirtualKey(hive_hklm, "Data", class_name="6d1ae431")
-    system_key.add_subkey("Data", data_key)
-    gbg_key = VirtualKey(hive_hklm, "GBG", class_name="1ddbd1f5")
-    system_key.add_subkey("GBG", gbg_key)
-    jd_key = VirtualKey(hive_hklm, "JD", class_name="5f3df852")
-    system_key.add_subkey("JD", jd_key)
-    skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="c42b803c")
-    system_key.add_subkey("Skew1", skew1_key)
-    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
+    map_lsa_system_keys(
+        hive_hklm,
+        {
+            "Data": "6d1ae431",
+            "GBG": "1ddbd1f5",
+            "JD": "5f3df852",
+            "Skew1": "c42b803c",
+        },
+    )
 
     target_win_users.add_plugin(SamPlugin)
     results = list(target_win_users.sam())
@@ -305,17 +304,15 @@ def test_sam_plugin_rev2(target_win_users, hive_hklm):
     sam_key.add_subkey("Users", users_key)
     hive_hklm.map_key(SAM_KEY_PATH, sam_key)
 
-    # Create SYSTEM keys
-    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
-    data_key = VirtualKey(hive_hklm, "Data", class_name="36f1befb")
-    system_key.add_subkey("Data", data_key)
-    gbg_key = VirtualKey(hive_hklm, "GBG", class_name="bae89edb")
-    system_key.add_subkey("GBG", gbg_key)
-    jd_key = VirtualKey(hive_hklm, "JD", class_name="626b21ce")
-    system_key.add_subkey("JD", jd_key)
-    skew1_key = VirtualKey(hive_hklm, "Skew1", class_name="e6f92d89")
-    system_key.add_subkey("Skew1", skew1_key)
-    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
+    map_lsa_system_keys(
+        hive_hklm,
+        {
+            "Data": "36f1befb",
+            "GBG": "bae89edb",
+            "JD": "626b21ce",
+            "Skew1": "e6f92d89",
+        },
+    )
 
     target_win_users.add_plugin(SamPlugin)
     results = list(target_win_users.sam())

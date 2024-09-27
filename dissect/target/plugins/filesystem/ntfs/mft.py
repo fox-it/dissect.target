@@ -138,12 +138,18 @@ class MftPlugin(Plugin):
             FilesystemFilenameCompactRecord,
         ]
     )
-    @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
+    @arg(
+        "--compact",
+        group="fmt",
+        action="store_true",
+        help="compacts the MFT entry timestamps into a single record",
+    )
     @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
     @arg(
         "--macb",
+        group="fmt",
         action="store_true",
         help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
     )
@@ -171,9 +177,7 @@ class MftPlugin(Plugin):
 
         aggr = noaggr
 
-        if compact and macb:
-            raise ValueError("--macb and --compact are mutually exclusive")
-        elif compact:
+        if compact:
             record_formatter = compacted_formatter
         elif macb:
             aggr = macb_aggr

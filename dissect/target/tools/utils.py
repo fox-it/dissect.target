@@ -16,7 +16,6 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
@@ -91,16 +90,32 @@ def generate_argparse_for_unbound_method(
         raise ValueError(f"Value `{method}` is not an unbound plugin method")
 
     desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
+
+    if "\n" in desc:
+        desc = inspect.cleandoc(desc)
+
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
     fargs = getattr(method, "__args__", [])
+    groups = {}
+    default_group_options = {"required": False}
     for args, kwargs in fargs:
-        parser.add_argument(*args, **kwargs)
+        if "group" in kwargs:
+            group_name = kwargs.pop("group")
+            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
+            if group_name not in groups:
+                group = parser.add_mutually_exclusive_group(**options)
+                groups[group_name] = group
+            else:
+                group = groups[group_name]
+
+            group.add_argument(*args, **kwargs)
+        else:
+            parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
-
     func_name = method.__name__
     usage_tmpl = usage_tmpl or "{prog} {usage}"
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
@@ -238,9 +253,6 @@ def plugin_function_with_argparser(
 
         plugin_method = plugin_obj.get_all_records
         parser = generate_argparse_for_plugin(plugin_obj)
-    elif isinstance(target_attr, CommandProxy):
-        plugin_method = target_attr.command()
-        parser = generate_argparse_for_bound_method(plugin_method)
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)
