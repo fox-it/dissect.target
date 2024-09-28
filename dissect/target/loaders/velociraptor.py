@@ -4,7 +4,7 @@ import logging
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
@@ -136,9 +136,9 @@ class VelociraptorLoader(DirLoader):
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
     def _resolve_path(self, path: str) -> Path:
-        return super()._resolve_path(unquote(path).replace(".", "%2E"))
+        return super()._resolve_path(quote(path, "$/").replace(".", "%2E"))
 
 
 class VelociraptorZipFilesystem(ZipFilesystem):
     def _resolve_path(self, path: str) -> str:
-        return super()._resolve_path(unquote(path).replace(".", "%2E"))
+        return unquote(super()._resolve_path(path)).replace("%2E", ".")
