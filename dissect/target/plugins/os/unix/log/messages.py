@@ -24,7 +24,9 @@ RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
 RE_PID = re.compile(r"\w\[(\d+)\]")
 RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
-RE_CLOUD_INIT_LINE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$")  # noqa: E501
+RE_CLOUD_INIT_LINE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$"
+)
 
 
 class MessagesPlugin(Plugin):
