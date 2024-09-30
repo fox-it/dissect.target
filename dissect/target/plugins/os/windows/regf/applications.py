@@ -22,7 +22,26 @@ class WindowsApplicationsPlugin(Plugin):
 
     @export(record=WindowsApplicationRecord)
     def applications(self) -> Iterator[WindowsApplicationRecord]:
-        """Yields installed applications from the Windows registry."""
+        """Yields currently installed applications from the Windows registry.
+
+        Use the Windows eventlog plugin (``evtx``, ``evt``) to parse install and uninstall events
+        of applications and services (e.g. ``4697``, ``110707``, ``1034`` and ``11724``).
+
+        Resources:
+            - https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key
+
+        Yields ``WindowsApplicationRecord``s with the following fields:
+
+        .. code-block:: text
+
+            ts_modified  (datetime): timestamp when the installation was modified according to the registry
+            ts_installed (datetime): timestamp when the application was installed according to the application
+            name         (string):   name of the application
+            version      (string):   version of the application
+            author       (string):   author of the application
+            type         (string):   type of the application, either user or system
+            path         (string):   path to the installed location or installer of the application
+        """
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}

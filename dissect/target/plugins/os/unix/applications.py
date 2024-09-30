@@ -50,6 +50,18 @@ class UnixApplicationsPlugin(Plugin):
             - https://wiki.archlinux.org/title/Desktop_entries
             - https://specifications.freedesktop.org/desktop-entry-spec/latest/
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
+
+        Yields ``UnixApplicationRecord``s with the following fields:
+
+        .. code-block:: text
+
+            ts_modified  (datetime): timestamp when the installation was modified
+            ts_installed (datetime): timestamp when the application was installed on the system
+            name         (string):   name of the application
+            version      (string):   version of the application
+            author       (string):   author of the application
+            type         (string):   type of the application, either user or system
+            path         (string):   path to the desktop file entry of the application
         """
         for file in self.desktop_files:
             config = configutil.parse(file, hint="ini").get("Desktop Entry") or {}

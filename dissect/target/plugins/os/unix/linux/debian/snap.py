@@ -10,15 +10,7 @@ from dissect.target.target import Target
 
 
 class SnapPlugin(Plugin):
-    """Canonical Linux Snapcraft plugin.
-
-    Reads information from installed ``*.snap`` files found in ``/var/lib/snapd/snaps``.
-    Logs of the ``snapd`` daemon can be parsed using the ``journal`` or ``syslog`` plugins.
-
-    Resources:
-        - https://github.com/canonical/snapcraft
-        - https://en.wikipedia.org/wiki/Snap_(software)
-    """
+    """Canonical Linux Snapcraft plugin."""
 
     PATHS = [
         "/var/lib/snapd/snaps",
@@ -43,7 +35,24 @@ class SnapPlugin(Plugin):
     @export(record=UnixApplicationRecord)
     @alias("snaps")
     def snap(self) -> Iterator[UnixApplicationRecord]:
-        """Yield installed snap packages."""
+        """Yields installed Canonical Linux Snapcraft (snaps) applications on the target system.
+
+        Reads information from installed SquashFS ``*.snap`` files found in ``/var/lib/snapd/snaps``.
+        Logs of the ``snapd`` daemon can be parsed using the ``journal`` or ``syslog`` plugins.
+
+        Resources:
+            - https://github.com/canonical/snapcraft
+            - https://en.wikipedia.org/wiki/Snap_(software)
+
+        Yields ``UnixApplicationRecord``s with the following fields:
+
+        .. code-block:: text
+
+            ts_modified  (datetime): timestamp when the installation was modified
+            name         (string):   name of the application
+            version      (string):   version of the application
+            path         (string):   path to the application snap file
+        """
 
         for install_path in self.installs:
             for snap in install_path.glob("*.snap"):
