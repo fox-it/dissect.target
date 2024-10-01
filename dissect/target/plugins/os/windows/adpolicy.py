@@ -69,7 +69,10 @@ class ADPolicyPlugin(Plugin):
                 xml = task_file.read_text()
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall(".//{*}Task"):
-                    properties = task.find("Properties") or task
+                    # https://github.com/python/cpython/issues/83122
+                    if (properties := task.find("Properties")) is None:
+                        properties = task
+
                     task_data = ElementTree.tostring(task)
                     yield ADPolicyRecord(
                         last_modification_time=task_file_stat.st_mtime,

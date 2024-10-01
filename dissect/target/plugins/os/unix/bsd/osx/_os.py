@@ -40,24 +40,8 @@ class MacPlugin(BsdPlugin):
     @export(property=True)
     def ips(self) -> Optional[list[str]]:
         ips = set()
-
-        # Static configured IP-addresses
-        if (preferences := self.target.fs.path(self.SYSTEM)).exists():
-            network = plistlib.load(preferences.open()).get("NetworkServices")
-
-            for interface in network.values():
-                for addresses in [interface.get("IPv4"), interface.get("IPv6")]:
-                    ips.update(addresses.get("Addresses", []))
-
-        # IP-addresses configured by DHCP
-        if (dhcp := self.target.fs.path("/private/var/db/dhcpclient/leases")).exists():
-            for lease in dhcp.iterdir():
-                if lease.is_file():
-                    lease = plistlib.load(lease.open())
-
-                    if ip := lease.get("IPAddress"):
-                        ips.add(ip)
-
+        for ip in self.target.network.ips():
+            ips.add(str(ip))
         return list(ips)
 
     @export(property=True)

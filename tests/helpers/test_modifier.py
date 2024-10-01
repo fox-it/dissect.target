@@ -50,6 +50,8 @@ def test_hash_path_records_with_paths(
 
     with (
         patch.object(TargetPath, "open", mock_open(read_data=b"")),
+        patch("dissect.target.helpers.fsutil.TargetPath.exists", return_value=True),
+        patch("dissect.target.helpers.fsutil.TargetPath.is_file", return_value=True),
         patch("dissect.target.helpers.record_modifier.common", return_value=HASHES),
     ):
         hashed_record = hash_function(target_win, record)

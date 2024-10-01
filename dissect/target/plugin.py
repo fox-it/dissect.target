@@ -2,9 +2,11 @@
 
 See dissect/target/plugins/general/example.py for an example plugin.
 """
+
 from __future__ import annotations
 
 import fnmatch
+import functools
 import importlib
 import importlib.util
 import inspect
@@ -140,7 +142,7 @@ def get_nonprivate_attributes(cls: Type[Plugin]) -> list[Any]:
 
 def get_nonprivate_methods(cls: Type[Plugin]) -> list[Callable]:
     """Retrieve all public methods of a :class:`Plugin`."""
-    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property)]
+    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property) and callable(attr)]
 
 
 def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]) -> list[RecordDescriptor]:
@@ -195,6 +197,8 @@ class Plugin:
 
     The :func:`internal` decorator and :class:`InternalPlugin` set the ``__internal__`` attribute.
     Finally. :func:`args` decorator sets the ``__args__`` attribute.
+
+    The :func:`alias` decorator populates the ``__aliases__`` private attribute of :class:`Plugin` methods.
 
     Args:
         target: The :class:`~dissect.target.target.Target` object to load the plugin for.
@@ -448,6 +452,11 @@ def register(plugincls: Type[Plugin]) -> None:
     exports = []
     functions = []
 
+    # First pass to resolve aliases
+    for attr in get_nonprivate_attributes(plugincls):
+        for alias in getattr(attr, "__aliases__", []):
+            clone_alias(plugincls, attr, alias)
+
     for attr in get_nonprivate_attributes(plugincls):
         if isinstance(attr, property):
             attr = attr.fget
@@ -540,6 +549,47 @@ def arg(*args, **kwargs) -> Callable:
         return obj
 
     return decorator
+
+
+def alias(*args, **kwargs: dict[str, Any]) -> Callable:
+    """Decorator to be used on :class:`Plugin` functions to register an alias of that function."""
+
+    if not kwargs.get("name") and not args:
+        raise ValueError("Missing argument 'name'")
+
+    def decorator(obj: Callable) -> Callable:
+        if not hasattr(obj, "__aliases__"):
+            obj.__aliases__ = []
+
+        if name := (kwargs.get("name") or args[0]):
+            obj.__aliases__.append(name)
+
+        return obj
+
+    return decorator
+
+
+def clone_alias(cls: type, attr: Callable, alias: str) -> None:
+    """Clone the given attribute to an alias in the provided class."""
+
+    # Clone the function object
+    clone = type(attr)(attr.__code__, attr.__globals__, alias, attr.__defaults__, attr.__closure__)
+    clone.__kwdefaults__ = attr.__kwdefaults__
+
+    # Copy some attributes
+    functools.update_wrapper(clone, attr)
+    if wrapped := getattr(attr, "__wrapped__", None):
+        # update_wrapper sets a new wrapper, we want the original
+        clone.__wrapped__ = wrapped
+
+    # Update module path so we can fool inspect.getmodule with subclassed Plugin classes
+    clone.__module__ = cls.__module__
+
+    # Update the names
+    clone.__name__ = alias
+    clone.__qualname__ = f"{cls.__name__}.{alias}"
+
+    setattr(cls, alias, clone)
 
 
 def plugins(
@@ -970,7 +1020,7 @@ class NamespacePlugin(Plugin):
                 continue
 
             # The method needs to output records
-            if getattr(subplugin_func, "__output__", None) != "record":
+            if getattr(subplugin_func, "__output__", None) not in ["record", "yield"]:
                 continue
 
             # The method may not be part of a parent class.
@@ -1056,6 +1106,9 @@ class NamespacePlugin(Plugin):
             cls.__init_subclass_namespace__(cls, **kwargs)
 
 
+__COMMON_PLUGIN_METHOD_NAMES__ = {attr.__name__ for attr in get_nonprivate_methods(Plugin)}
+
+
 class InternalPlugin(Plugin):
     """Parent class for internal plugins.
 
@@ -1065,11 +1118,15 @@ class InternalPlugin(Plugin):
 
     def __init_subclass__(cls, **kwargs):
         for method in get_nonprivate_methods(cls):
-            if callable(method):
+            if callable(method) and method.__name__ not in __COMMON_PLUGIN_METHOD_NAMES__:
                 method.__internal__ = True
 
         super().__init_subclass__(**kwargs)
         return cls
+
+
+class InternalNamespacePlugin(NamespacePlugin, InternalPlugin):
+    pass
 
 
 @dataclass(frozen=True, eq=True)
