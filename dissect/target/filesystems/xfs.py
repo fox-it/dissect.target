@@ -32,6 +32,10 @@ class XfsFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return XfsFilesystemEntry(self, path, self._get_node(path))
 
+    @property
+    def block_size(self) -> int:
+        return self.xfs.block_size
+
     def _get_node(self, path: str, node: Optional[xfs.INode] = None) -> xfs.INode:
         try:
             return self.xfs.get(path, node)
@@ -129,6 +133,10 @@ class XfsFilesystemEntry(FilesystemEntry):
         st_info.st_atime_ns = self.entry.atime_ns
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
+
+        # Set blocks
+        st_info.st_blksize = self.fs.block_size
+        st_info.st_blocks = self.entry.number_of_blocks * (self.fs.block_size // 512)
 
         # XFS has a birth time, called crtime
         st_info.st_birthtime = self.entry.crtime.timestamp()
