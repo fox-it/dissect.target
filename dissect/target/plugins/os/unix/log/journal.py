@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import lzma
 from typing import BinaryIO, Callable, Iterator
 
@@ -12,6 +13,8 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+log = logging.getLogger(__name__)
 
 # The events have undocumented fields that are not part of the record
 JournalRecord = TargetRecordDescriptor(
@@ -28,7 +31,7 @@ JournalRecord = TargetRecordDescriptor(
         ("varint", "errno"),
         ("string", "invocation_id"),
         ("string", "user_invocation_id"),
-        ("varint", "syslog_facility"),
+        ("string", "syslog_facility"),
         ("string", "syslog_identifier"),
         ("varint", "syslog_pid"),
         ("string", "syslog_raw"),
@@ -70,7 +73,7 @@ JournalRecord = TargetRecordDescriptor(
         ("path", "udev_devlink"),
         # Other fields
         ("string", "journal_hostname"),
-        ("path", "filepath"),
+        ("path", "source"),
     ],
 )
 
@@ -259,16 +262,26 @@ c_journal = cstruct().load(journal_def)
 
 def get_optional(value: str, to_type: Callable):
     """Return the value if True, otherwise return None."""
-    return to_type(value) if value else None
+
+    if not value:
+        return None
+
+    try:
+        return to_type(value)
+
+    except ValueError as e:
+        log.error("Unable to cast '%s' to %s", value, to_type)
+        log.debug("", exc_info=e)
+        return None
 
 
 class JournalFile:
     """Parse Systemd Journal file format.
 
     References:
-        - https://github.com/systemd/systemd/blob/206f0f397edf1144c63a158fb30f496c3e89f256/docs/JOURNAL_FILE_FORMAT.md
-        - https://github.com/libyal/dtformats/blob/c4fc2b8102702c64b58f145971821986bf74e6c0/documentation/Systemd%20journal%20file%20format.asciidoc
-    """  # noqa: E501
+        - https://github.com/systemd/systemd/blob/main/docs/JOURNAL_FILE_FORMAT.md
+        - https://github.com/libyal/dtformats/blob/main/documentation/Systemd%20journal%20file%20format.asciidoc
+    """
 
     def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
@@ -321,10 +334,16 @@ class JournalFile:
         for offset in self.entry_object_offsets():
             self.fh.seek(offset)
 
-            if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                entry = c_journal.EntryObject_Compact(self.fh)
-            else:
-                entry = c_journal.EntryObject(self.fh)
+            try:
+                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                    entry = c_journal.EntryObject_Compact(self.fh)
+                else:
+                    entry = c_journal.EntryObject(self.fh)
+
+            except EOFError as e:
+                self.target.log.warning("Unable to read Journal EntryObject at offset %s in: %s", offset, self.fh)
+                self.target.log.debug("", exc_info=e)
+                continue
 
             event = {}
             event["ts"] = ts.from_unix_us(entry.realtime)
@@ -360,7 +379,7 @@ class JournalFile:
 
                 except Exception as e:
                     self.target.log.warning(
-                        "The data object in Journal file %s could not be parsed",
+                        "Data object in Journal file could not be parsed: %s",
                         getattr(self.fh, "name", None),
                         exc_info=e,
                     )
@@ -370,39 +389,44 @@ class JournalFile:
 
 
 class JournalPlugin(Plugin):
+    """Systemd Journal plugin."""
+
     JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
     JOURNAL_SIGNATURE = "LPKSHHRH"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.journal_paths = []
+        self.journal_files = []
 
-        for _path in self.JOURNAL_PATHS:
-            self.journal_paths.extend(self.target.fs.path(_path).glob(self.JOURNAL_GLOB))
+        for journal_path in self.JOURNAL_PATHS:
+            self.journal_files.extend(self.target.fs.path(journal_path).glob(self.JOURNAL_GLOB))
 
     def check_compatible(self) -> None:
-        if not len(self.journal_paths):
+        if not self.journal_files:
             raise UnsupportedPluginError("No journald files found")
 
     @export(record=JournalRecord)
     def journal(self) -> Iterator[JournalRecord]:
-        """Return the content of Systemd Journal log files.
+        """Return the contents of Systemd Journal log files.
 
         References:
             - https://wiki.archlinux.org/title/Systemd/Journal
-            - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
-        """  # noqa: E501
-
+            - https://github.com/systemd/systemd/blob/main/man/systemd.journal-fields.xml
+        """
         path_function = self.target.fs.path
 
-        for _path in self.journal_paths:
-            fh = _path.open()
+        for journal_file in self.journal_files:
 
+            if not journal_file.is_file():
+                self.target.log.warning("Unable to parse journal file: %s", journal_file)
+                continue
+
+            fh = journal_file.open()
             journal = JournalFile(fh, self.target)
 
             if not journal.signature == self.JOURNAL_SIGNATURE:
-                self.target.log.warning("The Journal log file %s has an invalid magic header", _path)
+                self.target.log.warning("Journal file %s has invalid magic header %s", journal_file, journal.signature)
                 continue
 
             for entry in journal:
@@ -417,7 +441,7 @@ class JournalPlugin(Plugin):
                     errno=get_optional(entry.get("errno"), int),
                     invocation_id=entry.get("invocation_id"),
                     user_invocation_id=entry.get("user_invocation_id"),
-                    syslog_facility=get_optional(entry.get("syslog_facility"), int),
+                    syslog_facility=entry.get("syslog_facility"),
                     syslog_identifier=entry.get("syslog_identifier"),
                     syslog_pid=get_optional(entry.get("syslog_pid"), int),
                     syslog_raw=entry.get("syslog_raw"),
@@ -456,6 +480,6 @@ class JournalPlugin(Plugin):
                     udev_devnode=get_optional(entry.get("udev_devnode"), path_function),
                     udev_devlink=get_optional(entry.get("udev_devlink"), path_function),
                     journal_hostname=entry.get("hostname"),
-                    filepath=_path,
+                    source=journal_file,
                     _target=self.target,
                 )
