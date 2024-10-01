@@ -6,8 +6,8 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.helpers.network_managers import NetworkManager
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.network_managers import NetworkManager
 from dissect.target.tools.query import main as target_query
 from tests._utils import absolute_path
 
