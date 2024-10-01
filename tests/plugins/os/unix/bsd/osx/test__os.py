@@ -1,3 +1,5 @@
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from tests._utils import absolute_path
 
@@ -25,10 +27,8 @@ def test_unix_bsd_osx_os(target_osx_users, fs_osx):
 
     assert dissect_user.name == "_dissect"
     assert dissect_user.passwd == "*"
-    # When the test is running under windows, comparing to the string representation ensures
-    # that the home directory is stored in posix format.
-    # The __eq__ operator of the path class is too lenient.
-    assert str(dissect_user.home) == "/var/empty"
+    assert dissect_user.home == "/var/empty"
+    assert isinstance(dissect_user.home, posix_path)
     assert dissect_user.shell == "/usr/bin/false"
     assert dissect_user.source == "/var/db/dslocal/nodes/Default/users/_dissect.plist"
 
