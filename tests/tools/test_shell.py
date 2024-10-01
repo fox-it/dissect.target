@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import platform
 import sys
@@ -222,10 +224,10 @@ def test_target_cli_save(
 
 
 def run_target_shell(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, target_path: str, stdin: str
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
 ) -> tuple[bytes, bytes]:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-shell", target_path])
+        m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
         target_shell()
@@ -270,3 +272,10 @@ def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     ls_la_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls -la")
     ll_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ll")
     assert ls_la_out == ll_out
+
+
+def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    target_path = absolute_path("_data/tools/info/image.tar")
+    dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
+    ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
+    assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
