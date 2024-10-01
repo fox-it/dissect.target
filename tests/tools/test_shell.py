@@ -270,3 +270,14 @@ def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     ls_la_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls -la")
     ll_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ll")
     assert ls_la_out == ll_out
+
+
+def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """test if alias commands call their parent attribute correctly."""
+    target_path = absolute_path("_data/tools/info/image.tar")
+
+    # 'list' and 'ls' should return the same output after runtime aliasing
+    list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls\nlist")
+    sys.stdout.flush()
+    ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
+    assert list_out == "ubuntu:/$ " + ls_out

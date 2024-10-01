@@ -95,6 +95,7 @@ class ExtendedCmd(cmd.Cmd):
     """
 
     CMD_PREFIX = "cmd_"
+    _runtime_aliases = {}
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -164,6 +165,10 @@ class ExtendedCmd(cmd.Cmd):
         return None
 
     def default(self, line: str) -> bool:
+        cmd, arg, _ = self.parseline(line)
+        if cmd in self._runtime_aliases:
+            expanded = " ".join([self._runtime_aliases[cmd], arg])
+            return self.onecmd(expanded)
         if (should_exit := self._handle_command(line)) is not None:
             return should_exit
 
@@ -229,6 +234,19 @@ class ExtendedCmd(cmd.Cmd):
 
     def complete_man(self, *args) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
+
+    def do_alias(self, line: str) -> bool:
+        """create a runtime alias"""
+        args = list(shlex.shlex(line, posix=True))
+        if len(args) > 2 and args[1] == "=":
+            self._runtime_aliases[args[0]] = args[2]
+        elif len(args) > 0 and args[0] in self._runtime_aliases:
+            print(f"alias {args[0]} {self._runtime_aliases[args[0]]}")
+        else:
+            for aliased, command in self._runtime_aliases.items():
+                print(f"alias {aliased} {command}")
+
+        return False
 
     def do_clear(self, line: str) -> bool:
         """clear the terminal screen"""
