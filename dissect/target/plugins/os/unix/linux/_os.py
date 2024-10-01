@@ -6,7 +6,7 @@ from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
-from dissect.target.plugins.os.unix.network_managers import (
+from dissect.target.plugins.os.unix.linux.network_managers import (
     LinuxNetworkManager,
     parse_unix_dhcp_log_messages,
 )
