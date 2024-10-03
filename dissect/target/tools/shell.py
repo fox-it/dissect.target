@@ -236,19 +236,23 @@ class ExtendedCmd(cmd.Cmd):
     def complete_man(self, *args) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
-    def do_unalias(self, aliased: str) -> bool:
+    def do_unalias(self, line: str) -> bool:
         """delete runtime alias"""
-        if aliased in self._runtime_aliases:
-            del self._runtime_aliases[aliased]
-        else:
-            print(f"alias {aliased} not found")
+        aliases = list(shlex.shlex(line, posix=True))
+        for aliased in aliases:
+            if aliased in self._runtime_aliases:
+                del self._runtime_aliases[aliased]
+            else:
+                print(f"alias {aliased} not found")
         return False
 
     def do_alias(self, line: str) -> bool:
         """create a runtime alias"""
         args = list(shlex.shlex(line, posix=True))
-        if len(args) > 2 and args[1] == "=":
-            self._runtime_aliases[args[0]] = args[2]
+        if len(args) > 2 and len(args) % 3 == 0:
+            for i in range(0, len(args), 3):
+                if args[i + 1] == "=":
+                    self._runtime_aliases[args[i]] = args[i + 2]
         elif len(args) > 0 and args[0] in self._runtime_aliases:
             print(f"alias {args[0]}={self._runtime_aliases[args[0]]}")
         else:
