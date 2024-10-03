@@ -10,7 +10,7 @@ from dissect.target.filesystems.xfs import XfsFilesystem, XfsFilesystemEntry
 
 @pytest.fixture
 def xfs_fs() -> Iterator[XfsFilesystem]:
-    with patch("dissect.xfs.xfs.XFS", autospec=True):
+    with patch("dissect.xfs.xfs.XFS"):
         xfs_fs = XfsFilesystem(Mock())
         xfs_fs.xfs.block_size = 4096
 

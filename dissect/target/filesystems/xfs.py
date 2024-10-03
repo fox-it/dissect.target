@@ -134,13 +134,12 @@ class XfsFilesystemEntry(FilesystemEntry):
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
 
-        # Set blocks
         st_info.st_blksize = self.fs.block_size
         # Convert number of filesystem blocks to basic blocks
         # Reference: https://github.com/torvalds/linux/blob/e32cde8d2bd7d251a8f9b434143977ddf13dcec6/fs/xfs/xfs_iops.c#L602 # noqa: E501
         st_info.st_blocks = self.entry.number_of_blocks * (self.fs.block_size // 512)
 
-        # XFS has a birth time, since inode version 3 (version 5 filesystem)
+        # XFS has a birth time, since inode version 3 (version 5 of filesystem)
         st_info.st_birthtime = self.entry.crtime.timestamp()
 
         return st_info
