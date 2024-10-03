@@ -1,3 +1,5 @@
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from tests._utils import absolute_path
 
@@ -26,6 +28,7 @@ def test_unix_bsd_osx_os(target_osx_users, fs_osx):
     assert dissect_user.name == "_dissect"
     assert dissect_user.passwd == "*"
     assert dissect_user.home == "/var/empty"
+    assert isinstance(dissect_user.home, posix_path)
     assert dissect_user.shell == "/usr/bin/false"
     assert dissect_user.source == "/var/db/dslocal/nodes/Default/users/_dissect.plist"
 
