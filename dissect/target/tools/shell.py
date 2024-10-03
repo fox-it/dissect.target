@@ -249,15 +249,27 @@ class ExtendedCmd(cmd.Cmd):
     def do_alias(self, line: str) -> bool:
         """create a runtime alias"""
         args = list(shlex.shlex(line, posix=True))
-        if len(args) > 2 and len(args) % 3 == 0:
-            for i in range(0, len(args), 3):
-                if args[i + 1] == "=":
-                    self._runtime_aliases[args[i]] = args[i + 2]
-        elif len(args) > 0 and args[0] in self._runtime_aliases:
-            print(f"alias {args[0]}={self._runtime_aliases[args[0]]}")
-        else:
+
+        if not args:
             for aliased, command in self._runtime_aliases.items():
                 print(f"alias {aliased}={command}")
+            return False
+
+        while args:
+            alias_name = args.pop(0)
+            try:
+                equals = args.pop(0)
+                # our parser works different, so we have to stop this
+                if equals != "=":
+                    raise RuntimeError("Token not allowed")
+                expanded = args.pop(0) if args else ""  # this is how it works in bash
+                self._runtime_aliases[alias_name] = expanded
+            except IndexError:
+                if alias_name in self._runtime_aliases:
+                    print(f"alias {alias_name}={self._runtime_aliases[alias_name]}")
+                else:
+                    print(f"alias {alias_name} not found")
+                pass
 
         return False
 

@@ -277,7 +277,44 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     target_path = absolute_path("_data/tools/info/image.tar")
 
     # 'list' and 'ls' should return the same output after runtime aliasing
-    list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls\nlist")
+    list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls xxl='ls -la'\nlist")
     sys.stdout.flush()
     ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
     assert list_out == "ubuntu:/$ " + ls_out
+
+    # list aliases
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias list=ls\nalias xxl=ls -la\nubuntu:/$ \n"
+
+    # list single aliases
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list")
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
+
+    # unalias
+    sys.stdout.flush()
+    run_target_shell(monkeypatch, capsys, target_path, "unalias xxl")
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
+
+    # unalias multiple and non-existant
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "unalias list abc")
+    assert out == "ubuntu:/$ alias abc not found\nubuntu:/$ \n"
+
+    # alias multiple broken - b will be empty
+    sys.stdout.flush()
+    run_target_shell(monkeypatch, capsys, target_path, "alias a=1 b=")
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias a=1\nalias b=\nubuntu:/$ \n"
+
+    # alias set/get mixed
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b=1 a")
+    assert out == "ubuntu:/$ alias a=1\nubuntu:/$ \n"
+
+    # alias with other symbols not allowed due to parser difference
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b+1")
+    assert out.find("*** Unhandled error: Token not allowed") > -1
