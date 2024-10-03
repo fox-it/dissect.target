@@ -165,10 +165,11 @@ class ExtendedCmd(cmd.Cmd):
         return None
 
     def default(self, line: str) -> bool:
-        cmd, arg, _ = self.parseline(line)
-        if cmd in self._runtime_aliases:
-            expanded = " ".join([self._runtime_aliases[cmd], arg])
+        com, arg, _ = self.parseline(line)
+        if com in self._runtime_aliases:
+            expanded = " ".join([self._runtime_aliases[com], arg])
             return self.onecmd(expanded)
+
         if (should_exit := self._handle_command(line)) is not None:
             return should_exit
 
@@ -241,10 +242,10 @@ class ExtendedCmd(cmd.Cmd):
         if len(args) > 2 and args[1] == "=":
             self._runtime_aliases[args[0]] = args[2]
         elif len(args) > 0 and args[0] in self._runtime_aliases:
-            print(f"alias {args[0]} {self._runtime_aliases[args[0]]}")
+            print(f"alias {args[0]}={self._runtime_aliases[args[0]]}")
         else:
             for aliased, command in self._runtime_aliases.items():
-                print(f"alias {aliased} {command}")
+                print(f"alias {aliased}={command}")
 
         return False
 
