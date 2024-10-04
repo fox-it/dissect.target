@@ -128,6 +128,7 @@ class ExtFilesystemEntry(FilesystemEntry):
         # Set birthtime if available
         if self.entry.crtime:
             st_info.st_birthtime = self.entry.crtime.timestamp()
+            st_info.st_birthtime_ns = self.entry.crtime_ns
 
         # Set the nanosecond resolution separately
         st_info.st_atime_ns = self.entry.atime_ns
