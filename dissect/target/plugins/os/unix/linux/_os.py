@@ -37,8 +37,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         ips = set()
 
         for ip_set in self.network_manager.get_config_value("ips"):
-            for ip in ip_set:
-                ips.add(ip)
+            ips.update(ip_set)
 
         for ip in parse_unix_dhcp_log_messages(self.target, iter_all=False):
             ips.add(ip)

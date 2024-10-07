@@ -242,19 +242,25 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     continue
 
                 # Extract the network device name for given interface id
-                name_key = self.target.registry.key(
-                    f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\"
-                    f"{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
-                )
-                if value_name := _try_value(name_key, "Name"):
-                    device_info["name"] = value_name
+                try:
+                    name_key = self.target.registry.key(
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\"
+                        f"{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
+                    )
+                    if value_name := _try_value(name_key, "Name"):
+                        device_info["name"] = value_name
+                except RegistryKeyNotFoundError:
+                    pass
 
                 # Extract the metric value from the REGISTRY_KEY_INTERFACE key
-                interface_key = self.target.registry.key(
-                    f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
-                )
-                if value_metric := _try_value(interface_key, "InterfaceMetric"):
-                    device_info["metric"] = value_metric
+                try:
+                    interface_key = self.target.registry.key(
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
+                    )
+                    if value_metric := _try_value(interface_key, "InterfaceMetric"):
+                        device_info["metric"] = value_metric
+                except RegistryKeyNotFoundError:
+                    pass
 
                 # Extract the rest of the device information
                 device_info["mac"] = _try_value(subkey, "NetworkAddress")

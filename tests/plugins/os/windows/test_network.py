@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.plugins.os.windows._os import WindowsPlugin
+from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
 from dissect.target.target import Target
+from tests.conftest import change_controlset
 
 
 @dataclass
@@ -354,3 +358,52 @@ def test_network_dhcp_and_static(
         assert network.dns() == dns
         assert network.gateways() == gateways
         assert network.macs() == macs
+
+
+@patch(
+    "dissect.target.plugins.os.windows.registry.RegistryPlugin.controlsets",
+    property(MagicMock(return_value=["ControlSet001", "ControlSet002", "ControlSet003"])),
+)
+def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+
+    change_controlset(hive_hklm, 3)
+
+    # register the interfaces
+    kvs = [
+        (
+            "SYSTEM\\ControlSet001\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001",
+            "{some-net-cfg-instance-uuid}",
+        ),
+        (
+            "SYSTEM\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001",
+            "{some-net-cfg-instance-uuid}",
+        ),
+        (
+            "SYSTEM\\ControlSet003\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001",
+            "{some-net-cfg-instance-uuid}",
+        ),
+    ]
+    for name, value in kvs:
+        key = VirtualKey(hive_hklm, name)
+        key.add_value("NetCfgInstanceId", value)
+        hive_hklm.map_key(name, key)
+
+    # register interface dhcp ip addresses for three different control sets
+    kvs = [
+        ("SYSTEM\\ControlSet001\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "1.2.3.4"),
+        ("SYSTEM\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "1.2.3.4"),
+        ("SYSTEM\\ControlSet003\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "5.6.7.8"),
+    ]
+    for name, value in kvs:
+        key = VirtualKey(hive_hklm, name)
+        key.add_value("DhcpIPAddress", value)
+        hive_hklm.map_key(name, key)
+
+    target_win.add_plugin(WindowsPlugin)
+    target_win.add_plugin(WindowsNetworkPlugin)
+
+    assert isinstance(target_win.ips, list)
+    assert all([isinstance(ip, str) for ip in target_win.ips])
+    assert len(target_win.ips) == 2
+    assert target_win.ips == ["1.2.3.4", "5.6.7.8"]
