@@ -7,15 +7,17 @@ from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
 from re import compile, sub
-from typing import Any, Callable, Iterable, Iterator, Match, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Match
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
-from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.plugins.os.unix.log.journal import JournalRecord
-from dissect.target.plugins.os.unix.log.messages import MessagesRecord
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.os.unix.log.journal import JournalRecord
+    from dissect.target.plugins.os.unix.log.messages import MessagesRecord
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ class Template:
         """Sets the name of the the used parsing template to the name of the discovered network manager."""
         self.name = name
 
-    def create_config(self, path: TargetPath) -> Optional[dict]:
+    def create_config(self, path: TargetPath) -> dict | None:
         """Create a network config dictionary based on the configured template and supplied path.
 
         Args:
@@ -81,7 +83,7 @@ class Template:
             config = self._parse_configparser_config(path)
         return config
 
-    def _parse_netplan_config(self, path: TargetPath) -> Optional[dict]:
+    def _parse_netplan_config(self, path: TargetPath) -> dict | None:
         """Internal function to parse a netplan YAML based configuration file into a dict.
 
         Args:
@@ -286,7 +288,7 @@ class Parser:
             if option in translation_values and value:
                 return translation_key
 
-    def _get_option(self, config: dict, option: str, section: Optional[str] = None) -> Optional[str | Callable]:
+    def _get_option(self, config: dict, option: str, section: str | None = None) -> str | Callable | None:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
 
         Args:
@@ -334,7 +336,7 @@ class NetworkManager:
         self.config_globs = (config_globs,) if isinstance(config_globs, str) else config_globs
         self.detection_globs = (detection_globs,) if isinstance(detection_globs, str) else detection_globs
 
-    def detect(self, target: Optional[Target] = None) -> bool:
+    def detect(self, target: Target | None = None) -> bool:
         """Detects if the network manager is active on the target
 
         Returns:

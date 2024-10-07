@@ -455,6 +455,8 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
     test = absolute_path("_data/plugins/os/unix/bsd/osx/_os/test.plist")
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
+    fs_osx.makedirs("/Users/dissect")
+
     yield target_osx
 
 
