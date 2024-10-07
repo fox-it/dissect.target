@@ -95,6 +95,7 @@ class ExtendedCmd(cmd.Cmd):
     """
 
     CMD_PREFIX = "cmd_"
+    _runtime_aliases = {}
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -164,6 +165,11 @@ class ExtendedCmd(cmd.Cmd):
         return None
 
     def default(self, line: str) -> bool:
+        com, arg, _ = self.parseline(line)
+        if com in self._runtime_aliases:
+            expanded = " ".join([self._runtime_aliases[com], arg])
+            return self.onecmd(expanded)
+
         if (should_exit := self._handle_command(line)) is not None:
             return should_exit
 
@@ -229,6 +235,43 @@ class ExtendedCmd(cmd.Cmd):
 
     def complete_man(self, *args) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
+
+    def do_unalias(self, line: str) -> bool:
+        """delete runtime alias"""
+        aliases = list(shlex.shlex(line, posix=True))
+        for aliased in aliases:
+            if aliased in self._runtime_aliases:
+                del self._runtime_aliases[aliased]
+            else:
+                print(f"alias {aliased} not found")
+        return False
+
+    def do_alias(self, line: str) -> bool:
+        """create a runtime alias"""
+        args = list(shlex.shlex(line, posix=True))
+
+        if not args:
+            for aliased, command in self._runtime_aliases.items():
+                print(f"alias {aliased}={command}")
+            return False
+
+        while args:
+            alias_name = args.pop(0)
+            try:
+                equals = args.pop(0)
+                # our parser works different, so we have to stop this
+                if equals != "=":
+                    raise RuntimeError("Token not allowed")
+                expanded = args.pop(0) if args else ""  # this is how it works in bash
+                self._runtime_aliases[alias_name] = expanded
+            except IndexError:
+                if alias_name in self._runtime_aliases:
+                    print(f"alias {alias_name}={self._runtime_aliases[alias_name]}")
+                else:
+                    print(f"alias {alias_name} not found")
+                pass
+
+        return False
 
     def do_clear(self, line: str) -> bool:
         """clear the terminal screen"""
