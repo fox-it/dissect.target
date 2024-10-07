@@ -419,7 +419,6 @@ class JournalPlugin(Plugin):
         path_function = self.target.fs.path
 
         for journal_file in self.journal_files:
-
             if not journal_file.is_file():
                 self.target.log.warning("Unable to parse journal file: %s", journal_file)
                 continue
