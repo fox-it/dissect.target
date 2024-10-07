@@ -96,7 +96,7 @@ class ExtendedCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
     _runtime_aliases = {}
-    DEFAULT_RUNCOMMANDSFILE = None
+    DEFAULT_RUNCOMMANDS_FILE = None
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -136,13 +136,12 @@ class ExtendedCmd(cmd.Cmd):
             log.debug("Error processing .targetrc file: %s", e)
 
     def _get_targetrc_path(self) -> Optional[pathlib.Path]:
-        """Get the path to the run commands file. Can return None if DEFAULT_RUNCOMMANDSFILE is not set."""
-        return pathlib.Path(self.DEFAULT_RUNCOMMANDSFILE).expanduser() if self.DEFAULT_RUNCOMMANDSFILE else None
+        """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
+        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
 
     def preloop(self) -> None:
         super().preloop()
-        targetrc_path = self._get_targetrc_path()
-        if targetrc_path is not None:
+        if targetrc_path := self._get_targetrc_path():
             self._load_targetrc(targetrc_path)
 
     @staticmethod
@@ -333,8 +332,8 @@ class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILESIZE = 10_000
     DEFAULT_HISTDIR = None
     DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
-    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
-    CONFIG_KEY_RUNCOMMANDSFILE = "TARGETRCFILE"
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE"
 
     def __init__(self, target: Target):
         self.target = target
@@ -368,7 +367,7 @@ class TargetCmd(ExtendedCmd):
         """Get the path to the run commands file."""
 
         return pathlib.Path(
-            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDSFILE, self.DEFAULT_RUNCOMMANDSFILE)
+            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
         ).expanduser()
 
     def preloop(self) -> None:
@@ -1178,8 +1177,8 @@ class RegistryCli(TargetCmd):
     """CLI for browsing the registry."""
 
     # Registry shell is incompatible with default shell, so override the default rc file and config key
-    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc.registry"
-    CONFIG_KEY_RUNCOMMANDSFILE = "TARGETRCFILE_REGISTRY"
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc.registry"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE_REGISTRY"
 
     def __init__(self, target: Target, registry: regutil.RegfHive | None = None):
         self.prompt_base = _target_name(target)
