@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
@@ -237,6 +240,8 @@ class Prefetch:
 
 
 class PrefetchPlugin(Plugin):
+    """Windows prefetch plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self.prefetchdir = self.target.fs.path("sysvol/windows/prefetch")
@@ -247,7 +252,7 @@ class PrefetchPlugin(Plugin):
 
     @export(record=[PrefetchRecord, GroupedPrefetchRecord])
     @arg("--grouped", action="store_true", help="Group the prefetch record")
-    def prefetch(self, grouped=False):
+    def prefetch(self, grouped=False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
         """Return the content of all prefetch files.
 
         Prefetch is a memory management feature in Windows. It contains information (for example run count and
@@ -268,7 +273,7 @@ class PrefetchPlugin(Plugin):
             linkedfile (path): The linked file entry.
             runcount (int): The run count.
 
-        with --grouped:
+        with ``--grouped``:
 
         Yields PrefetchRecords with fields:
 

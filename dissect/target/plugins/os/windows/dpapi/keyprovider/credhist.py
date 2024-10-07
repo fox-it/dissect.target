@@ -8,6 +8,8 @@ from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
 
 
 class CredHistKeyProviderPlugin(KeyProviderPlugin):
+    """Windows CREDHIST SHA1-hash key provider plugin."""
+
     __namespace__ = "_dpapi_keyprovider_credhist"
 
     def check_compatible(self) -> None:
@@ -16,6 +18,7 @@ class CredHistKeyProviderPlugin(KeyProviderPlugin):
 
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
+        """Yield Windows CREDHIST SHA1 hashes."""
         for credhist in self.target.credhist():
             if value := getattr(credhist, "sha1"):
                 yield self.__namespace__, value

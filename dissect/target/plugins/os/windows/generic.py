@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Optional
+from typing import Iterator
 
 from dissect.util.ts import from_unix
 
@@ -123,12 +125,12 @@ class GenericPlugin(Plugin):
             raise UnsupportedPluginError("Unsupported Plugin")
 
     @export(property=True)
-    def ntversion(self):
+    def ntversion(self) -> str | None:
         """Return the Windows NT version."""
         return self.target._os._nt_version()
 
     @export(output="yield")
-    def pathenvironment(self):
+    def pathenvironment(self) -> Iterator[str]:
         """Return the content of the Windows PATH environment variable.
 
         PATH is an environment variable on an operating system that specifies a set of directories where executable
@@ -142,7 +144,7 @@ class GenericPlugin(Plugin):
             yield r.value("Path").value
 
     @export(property=True)
-    def domain(self):
+    def domain(self) -> str | None:
         """Return the domain name.
 
         Corporate Windows systems are usually connected to a domain (active directory).
@@ -167,7 +169,7 @@ class GenericPlugin(Plugin):
                 continue
 
     @export(property=True)
-    def activity(self) -> Optional[datetime]:
+    def activity(self) -> datetime | None:
         """Return last seen activity based on filesystem timestamps."""
         last_seen = 0
 
@@ -193,7 +195,7 @@ class GenericPlugin(Plugin):
         return from_unix(last_seen)
 
     @export(property=True)
-    def install_date(self) -> Optional[datetime]:
+    def install_date(self) -> datetime | None:
         """Returns the install date of the system.
 
         The value of the registry key is stored as a Unix epoch timestamp.
@@ -211,7 +213,7 @@ class GenericPlugin(Plugin):
             return
 
     @export(record=AppInitRecord)
-    def appinit(self):
+    def appinit(self) -> Iterator[AppInitRecord]:
         """Return all available Application Initial (AppInit) DLLs registry key values.
 
         AppInit_DLLs is a mechanism that allows an arbitrary list of DLLs to be loaded into each user mode process on
@@ -258,7 +260,7 @@ class GenericPlugin(Plugin):
                     continue
 
     @export(record=KnownDllRecord)
-    def knowndlls(self):
+    def knowndlls(self) -> Iterator[KnownDllRecord]:
         """Return all available KnownDLLs registry key values.
 
         The KnownDLLs registry key values are used to cache frequently used system DLLs. Initially, it was added to
@@ -287,7 +289,7 @@ class GenericPlugin(Plugin):
             pass
 
     @export(record=SessionManagerRecord)
-    def sessionmanager(self):
+    def sessionmanager(self) -> Iterator[SessionManagerRecord]:
         """Return interesting Session Manager (Smss.exe) registry key entries.
 
         Session Manager (Smss.exe) is the first user-mode process started by the kernel and performs several tasks,
@@ -339,7 +341,7 @@ class GenericPlugin(Plugin):
                     )
 
     @export(record=NullSessionPipeRecord)
-    def nullsessionpipes(self):
+    def nullsessionpipes(self) -> Iterator[NullSessionPipeRecord]:
         """Return the NullSessionPipes registry key value.
 
         The NullSessionPipes registry key value specifies server pipes and shared folders that are excluded from the
@@ -367,7 +369,7 @@ class GenericPlugin(Plugin):
                 continue
 
     @export(record=NdisRecord)
-    def ndis(self):
+    def ndis(self) -> Iterator[NdisRecord]:
         """Return network registry key entries."""
         key = "HKLM\\System\\CurrentControlSet\\Control\\Network\\{4D36E972-E325-11CE-BFC1-08002BE10318}"
         for r in self.target.registry.keys(key):
@@ -401,7 +403,7 @@ class GenericPlugin(Plugin):
                     )
 
     @export(record=CommandProcAutoRunRecord)
-    def commandprocautorun(self):
+    def commandprocautorun(self) -> Iterator[CommandProcAutoRunRecord]:
         """Return all available Command Processor (cmd.exe) AutoRun registry key values.
 
         The Command Processor AutoRun registry key values contain commands that are run each time the Command Processor
@@ -435,7 +437,7 @@ class GenericPlugin(Plugin):
                     continue
 
     @export(record=AlternateShellRecord)
-    def alternateshell(self):
+    def alternateshell(self) -> Iterator[AlternateShellRecord]:
         """Return the AlternateShell registry key value.
 
         The AlternateShell registry key, HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Safeboot, specifies the
@@ -459,7 +461,7 @@ class GenericPlugin(Plugin):
             )
 
     @export(record=BootShellRecord)
-    def bootshell(self):
+    def bootshell(self) -> Iterator[BootShellRecord]:
         """Return the BootShell registry key entry.
 
         Usually contains a path to bootim.exe which is Windows's recovery menu.
@@ -483,7 +485,7 @@ class GenericPlugin(Plugin):
             )
 
     @export(record=FileRenameOperationRecord)
-    def filerenameop(self):
+    def filerenameop(self) -> Iterator[FileRenameOperationRecord]:
         """Return all pending file rename operations.
 
         The PendingFileRenameOperations registry key value contains information about files that will be renamed on
@@ -513,7 +515,7 @@ class GenericPlugin(Plugin):
                 )
 
     @export(record=WinRarRecord)
-    def winrar(self):
+    def winrar(self) -> Iterator[WinRarRecord]:
         """Return all available WinRAR history registry key values."""
         keys = [
             "HKEY_CURRENT_USER\\Software\\WinRAR\\ArcHistory",
@@ -534,7 +536,7 @@ class GenericPlugin(Plugin):
                     )
 
     @export(record=WinSockNamespaceProviderRecord)
-    def winsocknamespaceprovider(self):
+    def winsocknamespaceprovider(self) -> Iterator[WinSockNamespaceProviderRecord]:
         """Return available protocols stored in the Winsock catalog database.
 
         References:
@@ -562,7 +564,7 @@ class GenericPlugin(Plugin):
                     )
 
     @export(property=True)
-    def codepage(self) -> Optional[str]:
+    def codepage(self) -> str | None:
         """Returns the current active codepage on the system."""
 
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage"

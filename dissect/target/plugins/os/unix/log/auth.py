@@ -22,17 +22,19 @@ RE_TS_AND_HOSTNAME = re.compile(_TS_REGEX + r"\s\S+\s")
 
 
 class AuthPlugin(Plugin):
+    """Unix auth log plugin."""
+
     def check_compatible(self) -> None:
         var_log = self.target.fs.path("/var/log")
         if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
             raise UnsupportedPluginError("No auth log files found")
 
-    @export(record=[AuthLogRecord])
+    @export(record=AuthLogRecord)
     def securelog(self) -> Iterator[AuthLogRecord]:
         """Return contents of /var/log/auth.log* and /var/log/secure*."""
         return self.authlog()
 
-    @export(record=[AuthLogRecord])
+    @export(record=AuthLogRecord)
     def authlog(self) -> Iterator[AuthLogRecord]:
         """Return contents of /var/log/auth.log* and /var/log/secure*."""
 

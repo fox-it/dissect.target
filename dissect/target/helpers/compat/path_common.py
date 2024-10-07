@@ -56,11 +56,11 @@ class _DissectScandirIterator:
 
     The _DissectScandirIterator provides a context manager, so scandir can be called as:
 
-    ```
-    with scandir(path) as it:
-        for entry in it
-            print(entry.name)
-    ```
+    .. code-block:: python
+
+        with scandir(path) as it:
+            for entry in it
+                print(entry.name)
 
     similar to os.scandir() behaviour since Python 3.6.
     """

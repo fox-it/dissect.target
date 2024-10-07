@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -253,7 +255,7 @@ class NotificationsPlugin(Plugin):
         chunk: c_appdb.Chunk,
         chunk_num: int,
         user: WindowsUserRecord,
-    ) -> Optional[AppDBPushRecord]:
+    ) -> AppDBPushRecord | None:
         badge_record = None
         push_uri = chunk.Push.Uri.split(b"\x00")[0]
         push_uri = push_uri.decode("utf-8", errors="surrogateescape")
@@ -282,7 +284,7 @@ class NotificationsPlugin(Plugin):
         chunk: c_appdb.Chunk,
         chunk_num: int,
         user: WindowsUserRecord,
-    ) -> Optional[AppDBBadgeRecord]:
+    ) -> AppDBBadgeRecord | None:
         badge_record = None
         badge_id = chunk.Badge.Id
 
@@ -432,7 +434,7 @@ class NotificationsPlugin(Plugin):
                         yield toast_record
 
     @export(record=[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord])
-    def wpndatabase(self):
+    def wpndatabase(self) -> Iterator[WpnDatabaseNotificationRecord | WpnDatabaseNotificationHandlerRecord]:
         """Returns Windows Notifications from wpndatabase.db (post Windows 10 Anniversary).
 
         References:

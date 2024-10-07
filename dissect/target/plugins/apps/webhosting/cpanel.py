@@ -23,6 +23,8 @@ CPANEL_LASTLOGIN_PATTERN = re.compile(
 
 
 class CPanelPlugin(Plugin):
+    """cPanel webhosting plugin."""
+
     # TODO: Parse other log files https://support.cartika.com/portal/en/kb/articles/whm-cpanel-log-files-and-locations
     __namespace__ = "cpanel"
 

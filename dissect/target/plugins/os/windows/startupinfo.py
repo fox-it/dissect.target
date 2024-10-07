@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import datetime
+from typing import Iterator
 
 from defusedxml import ElementTree
 
@@ -34,7 +37,7 @@ StartupInfoRecord = TargetRecordDescriptor(
 )
 
 
-def parse_ts(time_string):
+def parse_ts(time_string: str) -> datetime.datetime | None:
     if not time_string:
         return None
 
@@ -42,6 +45,8 @@ def parse_ts(time_string):
 
 
 class StartupInfoPlugin(Plugin):
+    """Windows startup info plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self._files = []
@@ -55,7 +60,7 @@ class StartupInfoPlugin(Plugin):
             raise UnsupportedPluginError("No StartupInfo files found")
 
     @export(record=StartupInfoRecord)
-    def startupinfo(self):
+    def startupinfo(self) -> Iterator[StartupInfoRecord]:
         """Return the contents of StartupInfo files.
 
         On a Windows system, the StartupInfo log files contain information about process execution for the first 90

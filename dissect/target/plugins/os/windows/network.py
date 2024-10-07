@@ -223,6 +223,8 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
 
 
 class WindowsNetworkPlugin(NetworkPlugin):
+    """Windows network interface plugin."""
+
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
         # Get all the network interfaces
         for keys in self.target.registry.keys(

@@ -994,7 +994,6 @@ class WuaHistoryPlugin(Plugin):
             - https://learn.microsoft.com/en-us/windows/deployment/update/windows-update-error-reference
             - https://learn.microsoft.com/en-us/troubleshoot/windows-client/installing-updates-features-roles/common-windows-update-errors
             - https://learn.microsoft.com/en-us/troubleshoot/windows-client/installing-updates-features-roles/common-windows-update-errors?context=%2Fwindows%2Fdeployment%2Fcontext%2Fcontext
-
             - https://github.com/libyal/esedb-kb/blob/main/documentation/Windows%20Update.asciidoc
             - https://www.nirsoft.net/articles/extract-windows-updates-list-external-drive.html
 

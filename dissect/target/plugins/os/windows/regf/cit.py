@@ -1,12 +1,10 @@
-# Resources:
-# - generaltel.dll
-# - win32k.sys (Windows 7)
-# - win32kbase.sys (Windows 10)
+from __future__ import annotations
 
 import datetime
 import struct
 from binascii import crc32
 from io import BytesIO
+from typing import Iterator, Union, get_args
 
 from dissect.cstruct import cstruct
 from dissect.util.compression import lznt1
@@ -20,6 +18,10 @@ from dissect.target.helpers.record import (
 )
 from dissect.target.plugin import Plugin, export
 
+# Resources:
+# - generaltel.dll
+# - win32k.sys (Windows 7)
+# - win32kbase.sys (Windows 10)
 cit_def = """
 typedef QWORD FILETIME;
 
@@ -353,7 +355,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CIT_RECORDS = [
+CITRecords = Union[
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
@@ -602,7 +604,7 @@ class ProgramDataBitmaps(BaseUseDataBitmaps):
         self.foreground = self._parse_bitmap(0)
 
 
-def decode_name(name):
+def decode_name(name: str) -> bytes:
     """Decode the registry key name.
 
     The CIT key name in the registry has some strange encoding.
@@ -642,8 +644,8 @@ class CITPlugin(Plugin):
         if not len(list(self.target.registry.keys(self.KEY))) > 0:
             raise UnsupportedPluginError("No CIT registry key found")
 
-    @export(record=CIT_RECORDS)
-    def cit(self):
+    @export(record=get_args(CITRecords))
+    def cit(self) -> Iterator[CITRecords]:
         """Return CIT data from the registry for executed executable information.
 
         CIT data is stored at HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\System.
@@ -772,7 +774,7 @@ class CITPlugin(Plugin):
                     self.target.log.exception("Failed to parse CIT value: %s", value.name)
 
     @export(record=CITPostUpdateUseInfoRecord)
-    def puu(self):
+    def puu(self) -> Iterator[CITPostUpdateUseInfoRecord]:
         """Parse CIT PUU (Post Update Usage) data from the registry.
 
         Generally only available since Windows 10.
@@ -823,7 +825,7 @@ class CITPlugin(Plugin):
                 )
 
     @export(record=[CITDPRecord, CITDPDurationRecord])
-    def dp(self):
+    def dp(self) -> Iterator[CITDPRecord | CITDPDurationRecord]:
         """Parse CIT DP data from the registry.
 
         Generally only available since Windows 10.
@@ -878,7 +880,7 @@ class CITPlugin(Plugin):
                         )
 
     @export(record=CITTelemetryRecord)
-    def telemetry(self):
+    def telemetry(self) -> Iterator[CITTelemetryRecord]:
         """Parse CIT process telemetry answers from the registry.
 
         In some versions of Windows, processes would get "telemetry answers" set on their process struct, based on
@@ -899,7 +901,7 @@ class CITPlugin(Plugin):
                     )
 
     @export(record=CITModuleRecord)
-    def modules(self):
+    def modules(self) -> Iterator[CITModuleRecord]:
         """Parse CIT tracked module information from the registry.
 
         Contains applications that loaded a tracked module. By default these are:

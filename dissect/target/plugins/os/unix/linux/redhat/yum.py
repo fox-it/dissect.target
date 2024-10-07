@@ -7,13 +7,16 @@ from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
+    PackageManagerPlugin,
 )
 
 YUM_LOG_KEYWORDS = ["Installed", "Updated", "Erased", "Obsoleted"]
 RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 
 
-class YumPlugin(plugin.Plugin):
+class YumPlugin(PackageManagerPlugin):
+    """Yum package manager plugin."""
+
     __namespace__ = "yum"
 
     LOG_DIR_PATH = "/var/log"

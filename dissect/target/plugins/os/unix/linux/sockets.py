@@ -64,6 +64,8 @@ PacketSocketRecord = TargetRecordDescriptor(
 
 
 class NetSocketPlugin(Plugin):
+    """Linux volatile net sockets plugin."""
+
     __namespace__ = "sockets"
 
     def __init__(self, target: Target):
