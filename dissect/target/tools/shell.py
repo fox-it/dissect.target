@@ -96,6 +96,7 @@ class ExtendedCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
     _runtime_aliases = {}
+    DEFAULT_RUNCOMMANDS_FILE = None
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -120,6 +121,28 @@ class ExtendedCmd(cmd.Cmd):
                 pass
 
         return object.__getattribute__(self, attr)
+
+    def _load_targetrc(self, path: pathlib.Path) -> None:
+        """Load and execute commands from the run commands file."""
+        try:
+            with path.open() as fh:
+                for line in fh:
+                    if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
+                        self.onecmd(line)
+        except FileNotFoundError:
+            # The .targetrc file is optional
+            pass
+        except Exception as e:
+            log.debug("Error processing .targetrc file: %s", e)
+
+    def _get_targetrc_path(self) -> pathlib.Path | None:
+        """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
+        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
+
+    def preloop(self) -> None:
+        super().preloop()
+        if targetrc_path := self._get_targetrc_path():
+            self._load_targetrc(targetrc_path)
 
     @staticmethod
     def check_compatible(target: Target) -> bool:
@@ -309,6 +332,8 @@ class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILESIZE = 10_000
     DEFAULT_HISTDIR = None
     DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE"
 
     def __init__(self, target: Target):
         self.target = target
@@ -338,7 +363,15 @@ class TargetCmd(ExtendedCmd):
 
         super().__init__(self.target.props.get("cyber"))
 
+    def _get_targetrc_path(self) -> pathlib.Path:
+        """Get the path to the run commands file."""
+
+        return pathlib.Path(
+            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
+        ).expanduser()
+
     def preloop(self) -> None:
+        super().preloop()
         if readline and self.histfile.exists():
             try:
                 readline.read_history_file(self.histfile)
@@ -507,7 +540,6 @@ class TargetCli(TargetCmd):
         self.prompt_base = _target_name(target)
 
         TargetCmd.__init__(self, target)
-
         self._clicache = {}
         self.cwd = None
         self.chdir("/")
@@ -1143,6 +1175,10 @@ class UnixConfigTreeCli(TargetCli):
 
 class RegistryCli(TargetCmd):
     """CLI for browsing the registry."""
+
+    # Registry shell is incompatible with default shell, so override the default rc file and config key
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc.registry"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE_REGISTRY"
 
     def __init__(self, target: Target, registry: regutil.RegfHive | None = None):
         self.prompt_base = _target_name(target)
