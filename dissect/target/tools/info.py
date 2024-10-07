@@ -137,7 +137,7 @@ def print_target_info(target: Target) -> None:
             continue
 
         if isinstance(value, list):
-            value = ", ".join([str(v) for v in value])
+            value = ", ".join(map(str, value))
 
         if isinstance(value, datetime):
             value = value.isoformat(timespec="microseconds")
