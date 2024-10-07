@@ -99,28 +99,7 @@ class WindowsPlugin(OSPlugin):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        key = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces"
-        fields = ["IPAddress", "DhcpIPAddress"]
-        ips = set()
-
-        for r in self.target.registry.keys(key):
-            for s in r.subkeys():
-                for field in fields:
-                    try:
-                        ip = s.value(field).value
-                    except RegistryValueNotFoundError:
-                        continue
-
-                    if isinstance(ip, str):
-                        ip = [ip]
-
-                    for i in ip:
-                        if i == "0.0.0.0":
-                            continue
-
-                        ips.add(i)
-
-        return list(ips)
+        return self.target.network.ips()
 
     def _get_version_reg_value(self, value_name: str) -> Any:
         try:

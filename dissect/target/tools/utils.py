@@ -16,7 +16,6 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
@@ -91,6 +90,10 @@ def generate_argparse_for_unbound_method(
         raise ValueError(f"Value `{method}` is not an unbound plugin method")
 
     desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
+
+    if "\n" in desc:
+        desc = inspect.cleandoc(desc)
+
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
@@ -250,9 +253,6 @@ def plugin_function_with_argparser(
 
         plugin_method = plugin_obj.get_all_records
         parser = generate_argparse_for_plugin(plugin_obj)
-    elif isinstance(target_attr, CommandProxy):
-        plugin_method = target_attr.command()
-        parser = generate_argparse_for_bound_method(plugin_method)
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)
