@@ -165,8 +165,13 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("varint", "vlan"),
-        ("string", "metric"),
+        ("net.ipnetwork[]", "network"),
+        ("varint", "metric"),
+        ("stringlist", "search_domain"),
+        ("datetime", "first_connected"),
         ("datetime", "last_connected"),
+        ("net.ipaddress[]", "subnetmask"),
+        ("boolean", "dhcp"),
     ],
 )
 
@@ -175,7 +180,8 @@ MacInterfaceRecord = TargetRecordDescriptor(
     [
         *COMMON_INTERFACE_ELEMENTS,
         ("varint", "vlan"),
-        ("string", "proxy"),
+        ("net.ipnetwork[]", "network"),
         ("varint", "interface_service_order"),
+        ("boolean", "dhcp"),
     ],
 )
