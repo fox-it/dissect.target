@@ -3,6 +3,8 @@ from __future__ import annotations
 import plistlib
 from typing import Iterator, Optional
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
@@ -68,7 +70,7 @@ class MacPlugin(BsdPlugin):
                         uid=user.get("uid", [None])[0],
                         gid=user.get("gid", [None])[0],
                         gecos=user.get("realname", [None])[0],
-                        home=home_dir,
+                        home=posix_path(home_dir) if home_dir else None,
                         shell=user.get("shell", [None])[0],
                         source=path,
                     )

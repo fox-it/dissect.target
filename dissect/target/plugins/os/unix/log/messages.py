@@ -6,7 +6,7 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, alias, export
 
 MessagesRecord = TargetRecordDescriptor(
     "linux/log/messages",
@@ -24,7 +24,9 @@ RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
 RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
 RE_PID = re.compile(r"\w\[(\d+)\]")
 RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
-RE_CLOUD_INIT_LINE = re.compile(r"(?P<ts>.*) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$")
+RE_CLOUD_INIT_LINE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$"
+)
 
 
 class MessagesPlugin(Plugin):
@@ -43,19 +45,12 @@ class MessagesPlugin(Plugin):
         if not self.log_files:
             raise UnsupportedPluginError("No log files found")
 
-    @export(record=MessagesRecord)
-    def syslog(self) -> Iterator[MessagesRecord]:
-        """Return contents of /var/log/messages*, /var/log/syslog* and cloud-init logs.
-
-        See ``messages`` for more information.
-        """
-        return self.messages()
-
+    @alias("syslog")
     @export(record=MessagesRecord)
     def messages(self) -> Iterator[MessagesRecord]:
         """Return contents of /var/log/messages*, /var/log/syslog* and cloud-init logs.
 
-        Note: due to year rollover detection, the contents of the files are returned in reverse.
+        Due to year rollover detection, the contents of the files are returned in reverse.
 
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
