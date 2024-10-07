@@ -78,6 +78,8 @@ JournalRecord = TargetRecordDescriptor(
 )
 
 journal_def = """
+#define HEADER_SIGNATURE "LPKSHHRH"
+
 typedef uint8 uint8_t;
 typedef uint32 le32_t;
 typedef uint64 le64_t;
@@ -395,7 +397,6 @@ class JournalPlugin(Plugin):
 
     JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
-    JOURNAL_SIGNATURE = "LPKSHHRH"
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -420,14 +421,22 @@ class JournalPlugin(Plugin):
 
         for journal_file in self.journal_files:
             if not journal_file.is_file():
-                self.target.log.warning("Unable to parse journal file: %s", journal_file)
+                self.target.log.warning("Unable to parse journal file as it is not a file: %s", journal_file)
                 continue
 
-            fh = journal_file.open()
-            journal = JournalFile(fh, self.target)
+            try:
+                fh = journal_file.open()
+                journal = JournalFile(fh, self.target)
 
-            if not journal.signature == self.JOURNAL_SIGNATURE:
-                self.target.log.warning("Journal file %s has invalid magic header %s", journal_file, journal.signature)
+            except Exception as e:
+                self.target.log.warning("Unable to parse journal file structure: %s", journal_file)
+                self.target.log.debug("", exc_info=e)
+                continue
+
+            if journal.signature != c_journal.HEADER_SIGNATURE:
+                self.target.log.warning(
+                    "Journal file has invalid magic header '%s': %s", journal.signature, journal_file
+                )
                 continue
 
             for entry in journal:
