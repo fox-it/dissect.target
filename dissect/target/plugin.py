@@ -142,7 +142,7 @@ def get_nonprivate_attributes(cls: Type[Plugin]) -> list[Any]:
 
 def get_nonprivate_methods(cls: Type[Plugin]) -> list[Callable]:
     """Retrieve all public methods of a :class:`Plugin`."""
-    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property)]
+    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property) and callable(attr)]
 
 
 def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]) -> list[RecordDescriptor]:
@@ -1020,7 +1020,7 @@ class NamespacePlugin(Plugin):
                 continue
 
             # The method needs to output records
-            if getattr(subplugin_func, "__output__", None) != "record":
+            if getattr(subplugin_func, "__output__", None) not in ["record", "yield"]:
                 continue
 
             # The method may not be part of a parent class.
@@ -1106,6 +1106,9 @@ class NamespacePlugin(Plugin):
             cls.__init_subclass_namespace__(cls, **kwargs)
 
 
+__COMMON_PLUGIN_METHOD_NAMES__ = {attr.__name__ for attr in get_nonprivate_methods(Plugin)}
+
+
 class InternalPlugin(Plugin):
     """Parent class for internal plugins.
 
@@ -1115,11 +1118,15 @@ class InternalPlugin(Plugin):
 
     def __init_subclass__(cls, **kwargs):
         for method in get_nonprivate_methods(cls):
-            if callable(method):
+            if callable(method) and method.__name__ not in __COMMON_PLUGIN_METHOD_NAMES__:
                 method.__internal__ = True
 
         super().__init_subclass__(**kwargs)
         return cls
+
+
+class InternalNamespacePlugin(NamespacePlugin, InternalPlugin):
+    pass
 
 
 @dataclass(frozen=True, eq=True)

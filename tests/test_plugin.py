@@ -12,6 +12,8 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import EmptyRecord, create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
+    InternalNamespacePlugin,
+    InternalPlugin,
     NamespacePlugin,
     OSPlugin,
     Plugin,
@@ -534,6 +536,29 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
         assert (os_docstring == subclass_docstring) is replaced
         if not replaced:
             assert subclass_docstring == f"Test docstring {method_name}"
+
+
+class _TestInternalPlugin(InternalPlugin):
+    def test(self) -> None:
+        pass
+
+
+def test_internal_plugin() -> None:
+    assert "test" not in _TestInternalPlugin.__exports__
+    assert "test" in _TestInternalPlugin.__functions__
+
+
+class _TestInternalNamespacePlugin(InternalNamespacePlugin):
+    __namespace__ = "NS"
+
+    def test(self) -> None:
+        pass
+
+
+def test_internal_namespace_plugin() -> None:
+    assert "SUBPLUGINS" in dir(_TestInternalNamespacePlugin)
+    assert "test" not in _TestInternalNamespacePlugin.__exports__
+    assert "test" in _TestInternalNamespacePlugin.__functions__
 
 
 class ExampleFooPlugin(Plugin):
