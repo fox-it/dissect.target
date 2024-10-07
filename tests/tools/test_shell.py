@@ -280,6 +280,7 @@ def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Captu
     ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
     assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
 
+
 def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     """test if alias commands call their parent attribute correctly."""
     target_path = absolute_path("_data/tools/info/image.tar")

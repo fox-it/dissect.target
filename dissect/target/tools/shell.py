@@ -1389,7 +1389,6 @@ def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
         if commands is not None:
-            # @todo if cli is not RegistryCli: - load targetrc
             for command in commands:
                 cli.onecmd(command)
             return
