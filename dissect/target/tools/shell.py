@@ -19,7 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, BinaryIO, Callable, Iterator, TextIO
+from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -96,7 +96,7 @@ class ExtendedCmd(cmd.Cmd):
 
     CMD_PREFIX = "cmd_"
     _runtime_aliases = {}
-    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
+    DEFAULT_RUNCOMMANDSFILE = None
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -135,14 +135,15 @@ class ExtendedCmd(cmd.Cmd):
         except Exception as e:
             log.debug("Error processing .targetrc file: %s", e)
 
-    def _get_targetrc_path(self) -> pathlib.Path:
-        """Get the path to the run commands file."""
-
-        return pathlib.Path(self.DEFAULT_RUNCOMMANDSFILE).expanduser()
+    def _get_targetrc_path(self) -> Optional[pathlib.Path]:
+        """Get the path to the run commands file. Can return None if DEFAULT_RUNCOMMANDSFILE is not set."""
+        return pathlib.Path(self.DEFAULT_RUNCOMMANDSFILE).expanduser() if self.DEFAULT_RUNCOMMANDSFILE else None
 
     def preloop(self) -> None:
         super().preloop()
-        self._load_targetrc(self._get_targetrc_path())
+        targetrc_path = self._get_targetrc_path()
+        if targetrc_path is not None:
+            self._load_targetrc(targetrc_path)
 
     @staticmethod
     def check_compatible(target: Target) -> bool:
@@ -332,6 +333,7 @@ class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILESIZE = 10_000
     DEFAULT_HISTDIR = None
     DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+    DEFAULT_RUNCOMMANDSFILE = "~/.targetrc"
     CONFIG_KEY_RUNCOMMANDSFILE = "TARGETRCFILE"
 
     def __init__(self, target: Target):
