@@ -161,7 +161,7 @@ class ConfigurationParser:
     def get(self, item: str, default: Optional[Any] = None) -> Any:
         return self.parsed_data.get(item, default)
 
-    def read_file(self, fh: TextIO) -> None:
+    def read_file(self, fh: TextIO | io.BytesIO) -> None:
         """Parse a configuration file.
 
         Raises:
@@ -301,6 +301,14 @@ class Txt(ConfigurationParser):
     def parse_file(self, fh: TextIO) -> None:
         # Cast the size to a string, to print it out later.
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
+
+
+class Bin(ConfigurationParser):
+
+    """Read the file into ``binary`` and show the number of bytes read"""
+
+    def parse_file(self, fh: io.BytesIO) -> None:
+        self.parsed_data = {"binary": fh.read(), "size": str(fh.tell())}
 
 
 class Xml(ConfigurationParser):
@@ -733,6 +741,8 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
     "*/sysctl.d/*.conf": ParserConfig(Default),
     "*/xml/*": ParserConfig(Xml),
+    "*.bashrc": ParserConfig(Txt),
+    "*/vim/vimrc*": ParserConfig(Txt),
 }
 
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
@@ -744,6 +754,13 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
     "sample": ParserConfig(Txt),
+    "sh": ParserConfig(Txt),
+    "key": ParserConfig(Txt),
+    "crt": ParserConfig(Txt),
+    "pem": ParserConfig(Txt),
+    "pl": ParserConfig(Txt),  # various admin panels
+    "lua": ParserConfig(Txt),  # wireshark etc.
+    "txt": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
     "toml": ParserConfig(Toml),
@@ -759,6 +776,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
     "catalog": ParserConfig(Xml),
+    "ld.so.cache": ParserConfig(Bin),
     "fstab": ParserConfig(
         CSVish,
         separator=(r"\s",),
@@ -832,9 +850,11 @@ def parse_config(
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-
     with entry.open() as fh:
-        open_file = io.TextIOWrapper(fh, encoding="utf-8")
+        if not isinstance(parser, Bin):
+            open_file = io.TextIOWrapper(fh, encoding="utf-8")
+        else:
+            open_file = io.BytesIO(fh.read())
         parser.read_file(open_file)
 
     return parser
