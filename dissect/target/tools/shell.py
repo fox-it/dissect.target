@@ -1385,7 +1385,7 @@ def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, 
         target_shell(targets, cli_cls=cli_cls, commands=commands)
 
 
-def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str]) -> None:
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
         if commands is not None:
