@@ -99,7 +99,10 @@ class WindowsPlugin(OSPlugin):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        return self.target.network.ips()
+        ips = set()
+        for ip in self.target.network.ips():
+            ips.add(str(ip))
+        return list(ips)
 
     def _get_version_reg_value(self, value_name: str) -> Any:
         try:
