@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import lzma
-from typing import BinaryIO, Callable, Iterator
+from typing import Any, BinaryIO, Callable, Iterator
 
 import zstandard
 from dissect.cstruct import cstruct
@@ -260,7 +260,7 @@ struct EntryArrayObject_Compact {
 c_journal = cstruct().load(journal_def)
 
 
-def get_optional(value: str, to_type: Callable):
+def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
 
     if not value:
@@ -345,44 +345,46 @@ class JournalFile:
                 self.target.log.debug("", exc_info=e)
                 continue
 
-            event = {}
-            event["ts"] = ts.from_unix_us(entry.realtime)
-
+            event = {"ts": ts.from_unix_us(entry.realtime)}
             for item in entry.items:
                 try:
                     self.fh.seek(item.object_offset)
-
                     object = c_journal.ObjectHeader(self.fh)
 
-                    if object.type == c_journal.ObjectType.OBJECT_DATA:
-                        self.fh.seek(item.object_offset)
+                    if object.type != c_journal.ObjectType.OBJECT_DATA:
+                        continue
 
-                        if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                            data_object = c_journal.DataObject_Compact(self.fh)
-                        else:
-                            data_object = c_journal.DataObject(self.fh)
+                    self.fh.seek(item.object_offset)
 
-                        data = data_object.payload
+                    if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                        data_object = c_journal.DataObject_Compact(self.fh)
+                    else:
+                        data_object = c_journal.DataObject(self.fh)
 
-                        if not data:
-                            # If the payload is empty
-                            continue
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
-                            data = lzma.decompress(data)
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
-                            data = lz4.decompress(data[8:])
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
-                            data = zstandard.decompress(data)
+                    data = data_object.payload
 
-                        key, value = self.decode_value(data)
-                        event[key] = value
+                    if not data:
+                        continue
+
+                    if data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
+                        data = lzma.decompress(data)
+
+                    elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
+                        data = lz4.decompress(data[8:])
+
+                    elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
+                        data = zstandard.decompress(data)
+
+                    key, value = self.decode_value(data)
+                    event[key] = value
 
                 except Exception as e:
                     self.target.log.warning(
-                        "Data object in Journal file could not be parsed: %s",
+                        "Journal DataObject could not be parsed at offset %s in %s",
+                        item.object_offset,
                         getattr(self.fh, "name", None),
-                        exc_info=e,
                     )
+                    self.target.log.debug("", exc_info=e)
                     continue
 
             yield event
