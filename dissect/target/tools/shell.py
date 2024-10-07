@@ -1374,7 +1374,7 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str]) -> None:
+def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
     targets = list(Target.open_all(targets))
 
