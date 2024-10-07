@@ -105,7 +105,7 @@ flag IncompatibleFlag : le32_t {
 };
 
 struct Header {
-    uint8_t           signature[8];
+    char              signature[8];
     le32_t            compatible_flags;
     IncompatibleFlag  incompatible_flags;
     State             state;
@@ -170,7 +170,7 @@ struct ObjectHeader {
 
 // The first four members are copied from ObjectHeader, so that the size can be used as the length of payload
 struct DataObject {
-    ObjectType  type;
+    // ObjectType  type;
     ObjectFlag  flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -186,7 +186,7 @@ struct DataObject {
 // If the HEADER_INCOMPATIBLE_COMPACT flag is set, two extra fields are stored to allow immediate access
 // to the tail entry array in the DATA object's entry array chain.
 struct DataObject_Compact {
-    ObjectType  type;
+    // ObjectType  type;
     ObjectFlag  flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -241,7 +241,7 @@ struct EntryObject_Compact {
 
 // The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
 struct EntryArrayObject {
-    ObjectType  type;
+    // ObjectType  type;
     uint8_t     flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -250,7 +250,7 @@ struct EntryArrayObject {
 };
 
 struct EntryArrayObject_Compact {
-    ObjectType  type;
+    // ObjectType  type;
     uint8_t     flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -288,108 +288,97 @@ class JournalFile:
     def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
         self.target = target
-        self.header = c_journal.Header(self.fh)
-        self.signature = "".join(chr(c) for c in self.header.signature)
-        self.entry_array_offset = self.header.entry_array_offset
 
-    def entry_object_offsets(self) -> Iterator[int]:
-        """Read object entry arrays."""
+        try:
+            self.header = c_journal.Header(self.fh)
+        except EOFError as e:
+            raise ValueError(f"Invalid Systemd Journal file: {str(e)}")
 
-        offset = self.entry_array_offset
-
-        # Entry Array with next_entry_array_offset set to 0 is the last in the list
-        while offset != 0:
-            self.fh.seek(offset)
-
-            object = c_journal.ObjectHeader(self.fh)
-
-            if object.type == c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
-                # After the object is checked, read again but with EntryArrayObject instead of ObjectHeader
-                self.fh.seek(offset)
-
-                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                    entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
-                else:
-                    entry_array_object = c_journal.EntryArrayObject(self.fh)
-
-                for entry_object_offset in entry_array_object.entry_object_offsets:
-                    # Check if the offset is not zero and points to nothing
-                    if entry_object_offset:
-                        yield entry_object_offset
-
-                offset = entry_array_object.next_entry_array_offset
+        if self.header.signature != c_journal.HEADER_SIGNATURE.encode():
+            raise ValueError(f"Journal file has invalid magic header '{str(self.header.signature)}'")
 
     def decode_value(self, value: bytes) -> tuple[str, str]:
-        value = value.decode(encoding="utf-8", errors="surrogateescape").strip()
-
-        # Strip leading underscores part of the field name
-        value = value.lstrip("_")
-
+        """Decode the given bytes to a key value pair."""
+        value = value.decode(encoding="utf-8", errors="surrogateescape").strip().lstrip("_")
         key, value = value.split("=", 1)
         key = key.lower()
-
         return key, value
 
     def __iter__(self) -> Iterator[dict[str, int | str]]:
         "Iterate over the entry objects to read payloads."
 
-        for offset in self.entry_object_offsets():
+        offset = self.header.entry_array_offset
+        while offset != 0:
             self.fh.seek(offset)
 
-            try:
-                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                    entry = c_journal.EntryObject_Compact(self.fh)
-                else:
-                    entry = c_journal.EntryObject(self.fh)
+            if int.from_bytes(self.fh.read(1)) != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
+                raise ValueError("Expected OBJECT_ENTRY_ARRAY at offset %s", offset)
 
-            except EOFError as e:
-                self.target.log.warning("Unable to read Journal EntryObject at offset %s in: %s", offset, self.fh)
+            if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
+            else:
+                entry_array_object = c_journal.EntryArrayObject(self.fh)
+
+            for entry_object_offset in entry_array_object.entry_object_offsets:
+                if entry_object_offset:
+                    yield from self._parse_entry_object(offset=entry_object_offset)
+
+            offset = entry_array_object.next_entry_array_offset
+
+    def _parse_entry_object(self, offset: int) -> Iterator[dict]:
+        self.fh.seek(offset)
+
+        try:
+            if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                entry = c_journal.EntryObject_Compact(self.fh)
+            else:
+                entry = c_journal.EntryObject(self.fh)
+
+        except EOFError as e:
+            self.target.log.warning("Unable to read Journal EntryObject at offset %s in: %s", offset, self.fh)
+            self.target.log.debug("", exc_info=e)
+            return
+
+        event = {"ts": ts.from_unix_us(entry.realtime)}
+        for item in entry.items:
+            try:
+                self.fh.seek(item.object_offset)
+
+                if int.from_bytes(self.fh.read(1)) != c_journal.ObjectType.OBJECT_DATA:
+                    continue
+
+                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                    data_object = c_journal.DataObject_Compact(self.fh)
+                else:
+                    data_object = c_journal.DataObject(self.fh)
+
+                if not data_object.payload:
+                    continue
+
+                data = data_object.payload
+
+                if data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
+                    data = lzma.decompress(data)
+
+                elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
+                    data = lz4.decompress(data[8:])
+
+                elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
+                    data = zstandard.decompress(data)
+
+                key, value = self.decode_value(data)
+                event[key] = value
+
+            except Exception as e:
+                self.target.log.warning(
+                    "Journal DataObject could not be parsed at offset %s in %s",
+                    item.object_offset,
+                    getattr(self.fh, "name", None),
+                )
                 self.target.log.debug("", exc_info=e)
                 continue
 
-            event = {"ts": ts.from_unix_us(entry.realtime)}
-            for item in entry.items:
-                try:
-                    self.fh.seek(item.object_offset)
-                    object = c_journal.ObjectHeader(self.fh)
-
-                    if object.type != c_journal.ObjectType.OBJECT_DATA:
-                        continue
-
-                    self.fh.seek(item.object_offset)
-
-                    if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                        data_object = c_journal.DataObject_Compact(self.fh)
-                    else:
-                        data_object = c_journal.DataObject(self.fh)
-
-                    data = data_object.payload
-
-                    if not data:
-                        continue
-
-                    if data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
-                        data = lzma.decompress(data)
-
-                    elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
-                        data = lz4.decompress(data[8:])
-
-                    elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
-                        data = zstandard.decompress(data)
-
-                    key, value = self.decode_value(data)
-                    event[key] = value
-
-                except Exception as e:
-                    self.target.log.warning(
-                        "Journal DataObject could not be parsed at offset %s in %s",
-                        item.object_offset,
-                        getattr(self.fh, "name", None),
-                    )
-                    self.target.log.debug("", exc_info=e)
-                    continue
-
-            yield event
+        yield event
 
 
 class JournalPlugin(Plugin):
@@ -429,14 +418,8 @@ class JournalPlugin(Plugin):
                 journal = JournalFile(fh, self.target)
 
             except Exception as e:
-                self.target.log.warning("Unable to parse journal file structure: %s", journal_file)
+                self.target.log.warning("Unable to parse journal file structure: %s: %s", journal_file, str(e))
                 self.target.log.debug("", exc_info=e)
-                continue
-
-            if journal.signature != c_journal.HEADER_SIGNATURE:
-                self.target.log.warning(
-                    "Journal file has invalid magic header '%s': %s", journal.signature, journal_file
-                )
                 continue
 
             for entry in journal:
