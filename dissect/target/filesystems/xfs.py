@@ -133,6 +133,7 @@ class XfsFilesystemEntry(FilesystemEntry):
         st_info.st_blksize = self.fs.xfs.block_size
         # Convert number of filesystem blocks to basic blocks
         # Reference: https://github.com/torvalds/linux/blob/e32cde8d2bd7d251a8f9b434143977ddf13dcec6/fs/xfs/xfs_iops.c#L602 # noqa: E501
+        # Note that block size in XFS is always a multiple of 512, so the division below is safe
         st_info.st_blocks = self.entry.nblocks * (self.fs.xfs.block_size // 512)
 
         # XFS has a birth time, since inode version 3 (version 5 of filesystem)
