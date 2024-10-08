@@ -44,7 +44,7 @@ def xfs_fs_entry(xfs_fs: XfsFilesystem) -> Iterator[XfsFilesystemEntry]:
     yield entry
 
 
-def test_es_filesystems_xfs_stat(xfs_fs: XfsFilesystem, xfs_fs_entry: XfsFilesystemEntry) -> None:
+def test_xfs_stat(xfs_fs: XfsFilesystem, xfs_fs_entry: XfsFilesystemEntry) -> None:
     stat = xfs_fs_entry.stat()
 
     entry = xfs_fs_entry.entry
