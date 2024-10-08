@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from struct import unpack
-from typing import Iterator, Optional, Union
+from typing import Iterator, Union
 
 from flow.record.fieldtypes import posix_path
 
@@ -27,7 +27,7 @@ class UnixPlugin(OSPlugin):
         self._os_release = self._parse_os_release()
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             if fs.exists("/var") and fs.exists("/etc"):
                 return fs
@@ -124,16 +124,16 @@ class UnixPlugin(OSPlugin):
                 )
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         return self._get_architecture(self.os)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         hosts_string = self._hosts_dict.get("hostname", "localhost")
         return self._hostname_dict.get("hostname", hosts_string)
 
     @export(property=True)
-    def domain(self) -> Optional[str]:
+    def domain(self) -> str | None:
         domain = self._hostname_dict.get("domain", "localhost")
         if domain == "localhost":
             domain = self._hosts_dict["hostname", "localhost"]
@@ -154,7 +154,7 @@ class UnixPlugin(OSPlugin):
             _, _, hostname = line.rstrip().partition("=")
         return hostname
 
-    def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
+    def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
         """
         Returns a dict containing the hostname and domain name portion of the path(s) specified
 
@@ -186,7 +186,7 @@ class UnixPlugin(OSPlugin):
             break  # break whenever a valid hostname is found
         return hostname_dict
 
-    def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
+    def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
         hosts_string = {"ip": None, "hostname": None}
 
@@ -246,7 +246,7 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
-    def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
+    def _parse_os_release(self, glob: str | None = None) -> dict[str, str]:
         """Parse files containing Unix version information.
 
         Not all these files are equal. Generally speaking these files are
@@ -288,7 +288,7 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> Optional[str]:
+    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> str | None:
         arch_strings = {
             0x00: "Unknown",
             0x02: "SPARC",
