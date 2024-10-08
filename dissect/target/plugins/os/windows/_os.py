@@ -4,6 +4,8 @@ import operator
 import struct
 from typing import Any, Iterator, Optional
 
+from flow.record.fieldtypes import windows_path
+
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
@@ -312,7 +314,7 @@ class WindowsPlugin(OSPlugin):
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=home,
+                    home=windows_path(home),
                     _target=self.target,
                 )
 
