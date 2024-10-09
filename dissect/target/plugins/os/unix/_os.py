@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from struct import unpack
-from typing import Iterator, Union
+from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
 
@@ -324,7 +324,7 @@ class UnixPlugin(OSPlugin):
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
-) -> Iterator[tuple[Union[uuid.UUID, str], str, str, str, str]]:
+) -> Iterator[tuple[uuid.UUID | str, str, str, str, str]]:
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """
