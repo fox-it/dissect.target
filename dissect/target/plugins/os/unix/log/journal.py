@@ -78,7 +78,7 @@ JournalRecord = TargetRecordDescriptor(
 )
 
 journal_def = """
-#define HEADER_SIGNATURE "LPKSHHRH"
+#define HEADER_SIGNATURE b"LPKSHHRH"
 
 typedef uint8 uint8_t;
 typedef uint32 le32_t;
@@ -281,9 +281,9 @@ class JournalFile:
     """Parse Systemd Journal file format.
 
     References:
-        - https://github.com/systemd/systemd/blob/main/docs/JOURNAL_FILE_FORMAT.md
-        - https://github.com/libyal/dtformats/blob/main/documentation/Systemd%20journal%20file%20format.asciidoc
-    """
+        - https://github.com/systemd/systemd/blob/206f0f397edf1144c63a158fb30f496c3e89f256/docs/JOURNAL_FILE_FORMAT.md
+        - https://github.com/libyal/dtformats/blob/c4fc2b8102702c64b58f145971821986bf74e6c0/documentation/Systemd%20journal%20file%20format.asciidoc
+    """  # noqa: E501
 
     def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
@@ -294,12 +294,12 @@ class JournalFile:
         except EOFError as e:
             raise ValueError(f"Invalid Systemd Journal file: {str(e)}")
 
-        if self.header.signature != c_journal.HEADER_SIGNATURE.encode():
+        if self.header.signature != c_journal.HEADER_SIGNATURE:
             raise ValueError(f"Journal file has invalid magic header '{str(self.header.signature)}'")
 
     def decode_value(self, value: bytes) -> tuple[str, str]:
         """Decode the given bytes to a key value pair."""
-        value = value.decode(encoding="utf-8", errors="surrogateescape").strip().lstrip("_")
+        value = value.decode(errors="surrogateescape").strip().lstrip("_")
         key, value = value.split("=", 1)
         key = key.lower()
         return key, value
@@ -312,7 +312,7 @@ class JournalFile:
             self.fh.seek(offset)
 
             if int.from_bytes(self.fh.read(1)) != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
-                raise ValueError("Expected OBJECT_ENTRY_ARRAY at offset %s", offset)
+                raise ValueError(f"Expected OBJECT_ENTRY_ARRAY at offset {offset}")
 
             if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                 entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
@@ -404,8 +404,8 @@ class JournalPlugin(Plugin):
 
         References:
             - https://wiki.archlinux.org/title/Systemd/Journal
-            - https://github.com/systemd/systemd/blob/main/man/systemd.journal-fields.xml
-        """
+            - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
+        """  # noqa: E501
         path_function = self.target.fs.path
 
         for journal_file in self.journal_files:
