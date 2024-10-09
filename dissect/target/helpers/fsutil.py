@@ -52,7 +52,9 @@ from dissect.target.helpers.polypath import (
     splitroot,
 )
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 13):
+    from dissect.target.helpers.compat.path_313 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 12):
     from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 11):
     from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
