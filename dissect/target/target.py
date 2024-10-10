@@ -19,6 +19,7 @@ from dissect.target.exceptions import (
     VolumeSystemError,
 )
 from dissect.target.helpers import config
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
@@ -86,8 +87,13 @@ class Target:
         self._errors = []
         self._applied = False
 
+        # We do not want to look for config files at the Target path if it is actually a child Target.
+        config_paths = [Path.cwd(), Path.home()]
+        if not isinstance(path, TargetPath):
+            config_paths = [self.path] + config_paths
+
         try:
-            self._config = config.load([self.path, Path.cwd(), Path.home()])
+            self._config = config.load(config_paths)
         except Exception as e:
             self.log.warning("Error loading config file: %s", self.path)
             self.log.debug("", exc_info=e)

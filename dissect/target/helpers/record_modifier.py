@@ -94,6 +94,13 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
     for field_name, resolved_path in _resolve_path_types(target, record):
         try:
             _record = modifier_function(field_name, resolved_path)
+
+        except FileNotFoundError as e:
+            target.log.info(
+                "Unable to modify record '%s' with function '%s': %s", record._desc.name, modifier_function.__name__, e
+            )
+            target.log.debug("", exc_info=e)
+
         except FilesystemError as e:
             target.log.warning(
                 "Unable to modify record '%s' with function '%s': %s",
@@ -102,6 +109,7 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
                 e,
             )
             target.log.debug("", exc_info=e)
+
         else:
             additional_records.append(_record)
 
