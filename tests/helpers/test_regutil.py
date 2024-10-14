@@ -8,6 +8,7 @@ from dissect.target.helpers.regutil import (
     RegFlex,
     RegistryHive,
     RegistryKeyNotFoundError,
+    RegValueType,
     VirtualHive,
     VirtualKey,
     glob_ext,
@@ -38,20 +39,49 @@ def test_regflex() -> None:
     key = hive.key("Test Values")
     assert len(key.values()) == 15
     assert key.value("String").value == "a"
+
+    assert key.value("String").type == RegValueType.REG_SZ
     assert key.value("Long String").value == "a" * 1218
+    assert key.value("Long String").type == RegValueType.REG_SZ
+
     assert key.value("Binary").value == b"\x00" * 8
+    assert key.value("Binary").type == RegValueType.REG_BINARY
+
     assert key.value("Long Binary").value == b"\x00" * 240
+    assert key.value("Long Binary").type == RegValueType.REG_BINARY
+
     assert key.value("Dword").value == 1
+    assert key.value("Dword").type == RegValueType.REG_DWORD
+
     assert key.value("None").value == b"\x00\x01\x02\x04"
+    assert key.value("None").type == RegValueType.REG_NONE
+
     assert key.value("Hex String").value == "abcd"
+    assert key.value("Hex String").type == RegValueType.REG_SZ
+
     assert key.value("Expandable String").value == "a"
+    assert key.value("Expandable String").type == RegValueType.REG_EXPAND_SZ
+
     assert key.value("Long Expandable String").value == "a" * 2584
+    assert key.value("Long Expandable String").type == RegValueType.REG_EXPAND_SZ
+
     assert key.value("Hex Binary").value == b"\x00" * 8
+    assert key.value("Hex Binary").type == RegValueType.REG_BINARY
+
     assert key.value("Hex Dword LE").value == 1
+    assert key.value("Hex Dword LE").type == RegValueType.REG_DWORD
+
     assert key.value("Hex Dword BE").value == 1
+    assert key.value("Hex Dword BE").type == RegValueType.REG_DWORD_BIG_ENDIAN
+
     assert key.value("Multi String").value == ["a", "b", "c", "d"]
+    assert key.value("Multi String").type == RegValueType.REG_MULTI_SZ
+
     assert key.value("Long Multi String").value == ["a" * 1024, "b" * 1024, "c" * 1024, "d" * 1024]
+    assert key.value("Long Multi String").type == RegValueType.REG_MULTI_SZ
+
     assert key.value("Qword").value == 1
+    assert key.value("Qword").type == RegValueType.REG_QWORD
 
 
 @pytest.mark.parametrize(

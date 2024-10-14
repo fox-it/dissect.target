@@ -6,6 +6,7 @@ import re
 import struct
 from collections import defaultdict
 from datetime import datetime
+from enum import Enum
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, Iterator, Optional, TextIO, Union
@@ -26,6 +27,19 @@ KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, re
 
 ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
+
+
+class RegValueType(Enum):
+    REG_NONE = regf.REG_NONE
+    REG_SZ = regf.REG_SZ
+    REG_EXPAND_SZ = regf.REG_EXPAND_SZ
+    REG_BINARY = regf.REG_BINARY
+    REG_DWORD = regf.REG_DWORD
+    REG_DWORD_BIG_ENDIAN = regf.REG_DWORD_BIG_ENDIAN
+    REG_MULTI_SZ = regf.REG_MULTI_SZ
+    REG_FULL_RESOURCE_DESCRIPTOR = regf.REG_FULL_RESOURCE_DESCRIPTOR
+    REG_RESOURCE_REQUIREMENTS_LIST = regf.REG_RESOURCE_REQUIREMENTS_LIST
+    REG_QWORD = regf.REG_QWORD
 
 
 class RegistryHive:
@@ -405,8 +419,8 @@ class VirtualValue(RegistryValue):
         return self._value
 
     @property
-    def type(self) -> int:
-        return None
+    def type(self) -> RegValueType:
+        return RegValueType(regf.REG_NONE)
 
 
 class HiveCollection(RegistryHive):
@@ -683,8 +697,8 @@ class RegfValue(RegistryValue):
         return self.kv.value
 
     @property
-    def type(self) -> int:
-        return self.kv.type
+    def type(self) -> RegValueType:
+        return RegValueType(self.kv.type)
 
 
 class RegFlex:
@@ -750,17 +764,19 @@ class RegFlexKey(VirtualKey):
 
 class RegFlexValue(VirtualValue):
     def __init__(self, hive: RegistryHive, name: str, value: ValueType):
-        self._parsed_value = None
         super().__init__(hive, name, value)
+        self._parsed_type, self._parsed_value = parse_flex_value(self._value)
 
     @property
     def value(self) -> ValueType:
-        if not self._parsed_value:
-            self._parsed_value = parse_flex_value(self._value)
         return self._parsed_value
 
+    @property
+    def type(self) -> ValueType:
+        return self._parsed_type
 
-def parse_flex_value(value: str) -> ValueType:
+
+def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
     """Parse values from text registry exports.
 
     Args:
@@ -770,31 +786,34 @@ def parse_flex_value(value: str) -> ValueType:
         NotImplementedError: If ``value`` is not of a supported type for parsing.
     """
     if value.startswith('"'):
-        return value.strip('"')
+        decoded = value.strip('"')
+        return (RegValueType(regf.REG_SZ), decoded)
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
-        return struct.unpack(">i", bytes.fromhex(value))[0]
+        decoded = struct.unpack(">i", bytes.fromhex(value))[0]
+        return (RegValueType(regf.REG_DWORD), decoded)
     elif "hex" in vtype:
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
-            return value
+            decoded = value
+            return (RegValueType(regf.REG_BINARY), decoded)
 
         # hex(T)
         # These values match regf type values
         vtype = int(vtype[4:5], 16)
         if vtype == regf.REG_NONE:
-            return value if value else None
+            decoded = value if value else None
         elif vtype == regf.REG_SZ:
-            return regf.try_decode_sz(value)
+            decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_EXPAND_SZ:
-            return regf.try_decode_sz(value)
+            decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_BINARY:
-            return value
+            decoded = value
         elif vtype == regf.REG_DWORD:
-            return struct.unpack("<I", value)[0]
+            decoded = struct.unpack("<I", value)[0]
         elif vtype == regf.REG_DWORD_BIG_ENDIAN:
-            return struct.unpack(">I", value)[0]
+            decoded = struct.unpack(">I", value)[0]
         elif vtype == regf.REG_MULTI_SZ:
             d = BytesIO(value)
 
@@ -806,11 +825,12 @@ def parse_flex_value(value: str) -> ValueType:
 
                 r.append(s)
 
-            return r
+            decoded = r
         elif vtype == regf.REG_QWORD:
-            return struct.unpack(">Q", value)[0]
+            decoded = struct.unpack(">Q", value)[0]
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
+        return (RegValueType(vtype), decoded)
 
 
 def has_glob_magic(pattern: str) -> bool:
