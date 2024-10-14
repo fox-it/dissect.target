@@ -10,9 +10,9 @@ from dissect.target.filesystems.btrfs import BtrfsFilesystemEntry
 @pytest.mark.parametrize(
     "sector_size, filesize, expected_blocks",
     [
-        (0x1000, 0x343, 0x1),
-        (0x1000, 0x1000, 0x1),
-        (0x1000, 0x1001, 0x2),
+        (0x1000, 0x343, 0x8),
+        (0x1000, 0x1000, 0x8),
+        (0x1000, 0x1001, 0x10),
     ],
     ids=["lower", "equal", "greater"],
 )
@@ -55,3 +55,27 @@ def test_stat_information_file_blocksize(sector_size: int, filesize: int, expect
 
     assert stat_info.st_blksize == sector_size
     assert stat_info.st_blocks == expected_blocks
+
+
+def test_stat_directory() -> None:
+    """Using btrfs stat information as a base"""
+    entry = INode(Mock(), 42, type=c_btrfs.BTRFS_FT_DIR)
+    entry.btrfs = Mock(sector_size=0x1000)
+    timestamp = c_btrfs.btrfs_timespec()
+    entry.inode = c_btrfs.btrfs_inode_item(
+        mode=0o777,
+        nlink=0,
+        uid=1000,
+        gid=1000,
+        size=0x1000,
+        atime=timestamp,
+        ctime=timestamp,
+        otime=timestamp,
+        mtime=timestamp,
+    )
+
+    fs_entry = BtrfsFilesystemEntry(Mock(), "some/path", entry)
+
+    stat_info = fs_entry.lstat()
+
+    assert stat_info.st_blocks == 0

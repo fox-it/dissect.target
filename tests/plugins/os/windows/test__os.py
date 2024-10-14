@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterator
 
 import pytest
+from flow.record.fieldtypes import windows_path
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
@@ -253,3 +254,17 @@ def test_windows_os_detection_with_linux_folders(target_win_linux_folders: Targe
 
     assert fs_linux is None
     assert fs_windows is not None
+
+
+def test_windows_user(target_win_users: Target) -> None:
+    users = list(target_win_users.users())
+
+    assert len(users) == 2
+
+    assert users[0].sid == "S-1-5-18"
+    assert users[0].name == "systemprofile"
+    assert users[0].home == windows_path("%systemroot%\\system32\\config\\systemprofile")
+
+    assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
+    assert users[1].name == "John"
+    assert users[1].home == windows_path("C:\\Users\\John")

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
+from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
@@ -113,7 +114,7 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
         ("/etc/sysconfig/network", None, None, ""),
     ],
 )
-def test__parse_hostname_string(
+def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
@@ -127,3 +128,21 @@ def test__parse_hostname_string(
 
     assert hostname_dict["hostname"] == expected_hostname
     assert hostname_dict["domain"] == expected_domain
+
+
+def test_users(target_unix_users: Target) -> None:
+    users = list(target_unix_users.users())
+
+    assert len(users) == 2
+
+    assert users[0].name == "root"
+    assert users[0].uid == 0
+    assert users[0].gid == 0
+    assert users[0].home == posix_path("/root")
+    assert users[0].shell == "/bin/bash"
+
+    assert users[1].name == "user"
+    assert users[1].uid == 1000
+    assert users[1].gid == 1000
+    assert users[1].home == posix_path("/home/user")
+    assert users[1].shell == "/bin/bash"

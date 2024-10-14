@@ -95,6 +95,8 @@ class ExtendedCmd(cmd.Cmd):
     """
 
     CMD_PREFIX = "cmd_"
+    _runtime_aliases = {}
+    DEFAULT_RUNCOMMANDS_FILE = None
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -119,6 +121,28 @@ class ExtendedCmd(cmd.Cmd):
                 pass
 
         return object.__getattribute__(self, attr)
+
+    def _load_targetrc(self, path: pathlib.Path) -> None:
+        """Load and execute commands from the run commands file."""
+        try:
+            with path.open() as fh:
+                for line in fh:
+                    if (line := line.strip()) and not line.startswith("#"):  # Ignore empty lines and comments
+                        self.onecmd(line)
+        except FileNotFoundError:
+            # The .targetrc file is optional
+            pass
+        except Exception as e:
+            log.debug("Error processing .targetrc file: %s", e)
+
+    def _get_targetrc_path(self) -> pathlib.Path | None:
+        """Get the path to the run commands file. Can return ``None`` if ``DEFAULT_RUNCOMMANDS_FILE`` is not set."""
+        return pathlib.Path(self.DEFAULT_RUNCOMMANDS_FILE).expanduser() if self.DEFAULT_RUNCOMMANDS_FILE else None
+
+    def preloop(self) -> None:
+        super().preloop()
+        if targetrc_path := self._get_targetrc_path():
+            self._load_targetrc(targetrc_path)
 
     @staticmethod
     def check_compatible(target: Target) -> bool:
@@ -164,6 +188,11 @@ class ExtendedCmd(cmd.Cmd):
         return None
 
     def default(self, line: str) -> bool:
+        com, arg, _ = self.parseline(line)
+        if com in self._runtime_aliases:
+            expanded = " ".join([self._runtime_aliases[com], arg])
+            return self.onecmd(expanded)
+
         if (should_exit := self._handle_command(line)) is not None:
             return should_exit
 
@@ -230,6 +259,43 @@ class ExtendedCmd(cmd.Cmd):
     def complete_man(self, *args) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
+    def do_unalias(self, line: str) -> bool:
+        """delete runtime alias"""
+        aliases = list(shlex.shlex(line, posix=True))
+        for aliased in aliases:
+            if aliased in self._runtime_aliases:
+                del self._runtime_aliases[aliased]
+            else:
+                print(f"alias {aliased} not found")
+        return False
+
+    def do_alias(self, line: str) -> bool:
+        """create a runtime alias"""
+        args = list(shlex.shlex(line, posix=True))
+
+        if not args:
+            for aliased, command in self._runtime_aliases.items():
+                print(f"alias {aliased}={command}")
+            return False
+
+        while args:
+            alias_name = args.pop(0)
+            try:
+                equals = args.pop(0)
+                # our parser works different, so we have to stop this
+                if equals != "=":
+                    raise RuntimeError("Token not allowed")
+                expanded = args.pop(0) if args else ""  # this is how it works in bash
+                self._runtime_aliases[alias_name] = expanded
+            except IndexError:
+                if alias_name in self._runtime_aliases:
+                    print(f"alias {alias_name}={self._runtime_aliases[alias_name]}")
+                else:
+                    print(f"alias {alias_name} not found")
+                pass
+
+        return False
+
     def do_clear(self, line: str) -> bool:
         """clear the terminal screen"""
         os.system("cls||clear")
@@ -266,6 +332,8 @@ class TargetCmd(ExtendedCmd):
     DEFAULT_HISTFILESIZE = 10_000
     DEFAULT_HISTDIR = None
     DEFAULT_HISTDIRFMT = ".dissect_history_{uid}_{target}"
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE"
 
     def __init__(self, target: Target):
         self.target = target
@@ -295,7 +363,15 @@ class TargetCmd(ExtendedCmd):
 
         super().__init__(self.target.props.get("cyber"))
 
+    def _get_targetrc_path(self) -> pathlib.Path:
+        """Get the path to the run commands file."""
+
+        return pathlib.Path(
+            getattr(self.target._config, self.CONFIG_KEY_RUNCOMMANDS_FILE, self.DEFAULT_RUNCOMMANDS_FILE)
+        ).expanduser()
+
     def preloop(self) -> None:
+        super().preloop()
         if readline and self.histfile.exists():
             try:
                 readline.read_history_file(self.histfile)
@@ -464,7 +540,6 @@ class TargetCli(TargetCmd):
         self.prompt_base = _target_name(target)
 
         TargetCmd.__init__(self, target)
-
         self._clicache = {}
         self.cwd = None
         self.chdir("/")
@@ -1101,6 +1176,10 @@ class UnixConfigTreeCli(TargetCli):
 class RegistryCli(TargetCmd):
     """CLI for browsing the registry."""
 
+    # Registry shell is incompatible with default shell, so override the default rc file and config key
+    DEFAULT_RUNCOMMANDS_FILE = "~/.targetrc.registry"
+    CONFIG_KEY_RUNCOMMANDS_FILE = "TARGETRCFILE_REGISTRY"
+
     def __init__(self, target: Target, registry: regutil.RegfHive | None = None):
         self.prompt_base = _target_name(target)
 
@@ -1331,29 +1410,38 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool) -> None:
+def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
     targets = list(Target.open_all(targets))
 
     if python:
-        python_shell(targets)
+        python_shell(targets, commands=commands)
     else:
         cli_cls = RegistryCli if registry else TargetCli
-        target_shell(targets, cli_cls=cli_cls)
+        target_shell(targets, cli_cls=cli_cls, commands=commands)
 
 
-def target_shell(targets: list[Target], cli_cls: type[TargetCmd]) -> None:
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
+        if commands is not None:
+            for command in commands:
+                cli.onecmd(command)
+            return
         run_cli(cli)
 
 
-def python_shell(targets: list[Target]) -> None:
+def python_shell(targets: list[Target], commands: list[str] | None) -> None:
     """Helper method for starting a (I)Python shell with multiple targets."""
     banner = "Loaded targets in 'targets' variable. First target is in 't'."
     ns = {"targets": targets, "t": targets[0]}
 
     try:
+        if commands is not None:
+            for command in commands:
+                eval(command, ns)
+            return
+
         import IPython
 
         IPython.embed(header=banner, user_ns=ns, colors="linux")
@@ -1433,7 +1521,7 @@ def main() -> None:
         default=None,
         help="select a specific loader (i.e. vmx, raw)",
     )
-
+    parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
     args, rest = parser.parse_known_args()
     args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
@@ -1458,7 +1546,7 @@ def main() -> None:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry)
+        open_shell(args.targets, args.python, args.registry, args.commands)
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)
