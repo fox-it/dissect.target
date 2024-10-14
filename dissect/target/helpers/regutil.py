@@ -792,7 +792,7 @@ def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
     vtype, _, value = value.partition(":")
     if vtype == "dword":
         decoded = struct.unpack(">i", bytes.fromhex(value))[0]
-        return (RegValueType(regf.REG_DWORD), decoded)
+        return (RegValueType.REG_DWORD, decoded)
     elif "hex" in vtype:
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
