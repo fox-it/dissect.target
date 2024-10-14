@@ -762,16 +762,34 @@ class RegFlexKey(VirtualKey):
     pass
 
 
+def lazy(postponed):
+    def decorator(func):
+        def inner(self):
+            flag = f"_{postponed.__name__}_called"
+            if not hasattr(self, flag):
+                postponed(self)
+                setattr(self, flag, True)
+            return func(self)
+
+        return inner
+
+    return decorator
+
+
 class RegFlexValue(VirtualValue):
     def __init__(self, hive: RegistryHive, name: str, value: ValueType):
         super().__init__(hive, name, value)
+
+    def _parse(self):
         self._parsed_type, self._parsed_value = parse_flex_value(self._value)
 
     @property
+    @lazy(_parse)
     def value(self) -> ValueType:
         return self._parsed_value
 
     @property
+    @lazy(_parse)
     def type(self) -> ValueType:
         return self._parsed_type
 
