@@ -420,7 +420,7 @@ class VirtualValue(RegistryValue):
 
     @property
     def type(self) -> RegValueType:
-        return RegValueType(regf.REG_NONE)
+        return RegValueType.REG_NONE
 
 
 class HiveCollection(RegistryHive):
