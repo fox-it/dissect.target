@@ -29,7 +29,7 @@ ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
 
 
-class RegValueType(Enum):
+class RegistryValueType(Enum):
     NONE = regf.REG_NONE
     SZ = regf.REG_SZ
     EXPAND_SZ = regf.REG_EXPAND_SZ
