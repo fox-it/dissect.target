@@ -419,8 +419,8 @@ class VirtualValue(RegistryValue):
         return self._value
 
     @property
-    def type(self) -> RegValueType:
-        return RegValueType.REG_NONE
+    def type(self) -> RegistryValueType:
+        return RegistryValueType.NONE
 
 
 class HiveCollection(RegistryHive):
@@ -697,8 +697,8 @@ class RegfValue(RegistryValue):
         return self.kv.value
 
     @property
-    def type(self) -> RegValueType:
-        return RegValueType(self.kv.type)
+    def type(self) -> RegistryValueType:
+        return RegistryValueType(self.kv.type)
 
 
 class RegFlex:
@@ -776,7 +776,7 @@ class RegFlexValue(VirtualValue):
         return self._parsed_type
 
 
-def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
+def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
     """Parse values from text registry exports.
 
     Args:
@@ -787,17 +787,17 @@ def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
     """
     if value.startswith('"'):
         decoded = value.strip('"')
-        return (RegValueType.REG_SZ, decoded)
+        return (RegistryValueType.SZ, decoded)
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
         decoded = struct.unpack(">i", bytes.fromhex(value))[0]
-        return (RegValueType.REG_DWORD, decoded)
+        return (RegistryValueType.DWORD, decoded)
     elif "hex" in vtype:
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
             decoded = value
-            return (RegValueType.REG_BINARY, decoded)
+            return (RegistryValueType.BINARY, decoded)
 
         # hex(T)
         # These values match regf type values
@@ -830,7 +830,7 @@ def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
             decoded = struct.unpack(">Q", value)[0]
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
-        return (RegValueType(vtype), decoded)
+        return (RegistryValueType(vtype), decoded)
 
 
 def has_glob_magic(pattern: str) -> bool:
