@@ -797,7 +797,7 @@ def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
             decoded = value
-            return (RegValueType(regf.REG_BINARY), decoded)
+            return (RegValueType.REG_BINARY, decoded)
 
         # hex(T)
         # These values match regf type values
