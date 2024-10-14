@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, TextIO, Union
+from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
 
 from dissect.regf import regf
 
@@ -27,6 +27,20 @@ KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, re
 
 ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
+
+
+def lazy(postponed: Callable) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        def inner(self: Any) -> Any:
+            flag = f"_{postponed.__name__}_called"
+            if not hasattr(self, flag):
+                postponed(self)
+                setattr(self, flag, True)
+            return func(self)
+
+        return inner
+
+    return decorator
 
 
 class RegistryValueType(Enum):
@@ -760,20 +774,6 @@ class RegFlexHive(VirtualHive):
 
 class RegFlexKey(VirtualKey):
     pass
-
-
-def lazy(postponed):
-    def decorator(func):
-        def inner(self):
-            flag = f"_{postponed.__name__}_called"
-            if not hasattr(self, flag):
-                postponed(self)
-                setattr(self, flag, True)
-            return func(self)
-
-        return inner
-
-    return decorator
 
 
 class RegFlexValue(VirtualValue):
