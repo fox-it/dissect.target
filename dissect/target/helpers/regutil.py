@@ -787,7 +787,7 @@ def parse_flex_value(value: str) -> tuple(RegValueType, ValueType):
     """
     if value.startswith('"'):
         decoded = value.strip('"')
-        return (RegValueType(regf.REG_SZ), decoded)
+        return (RegValueType.REG_SZ, decoded)
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
