@@ -73,9 +73,8 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
 
-    # FIXME: These tests fail, but the test below this works while the objects are the same
-    # assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
-    # assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
+    assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
 
     paths = list(target_bare.fs.path("sysvol").iterdir())
 
