@@ -1,3 +1,4 @@
+import gzip
 import tarfile
 import textwrap
 from datetime import datetime, timezone
@@ -108,19 +109,30 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target
         assert len(results) == 2
 
 
-def test_unix_messages_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if we correctly parse plaintext and compressed cloud-init log files."""
+
     messages = """
     2005-08-09 11:55:21,000 - foo.py[DEBUG]: This is a cloud-init message!
     2005-08-09 11:55:21,001 - util.py[DEBUG]: Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds.
     """  # noqa: E501
-    fs_unix.map_file_fh("/var/log/installer/cloud-init.log", BytesIO(textwrap.dedent(messages).encode()))
+    msg_bytes = textwrap.dedent(messages).encode()
 
-    target_unix_users.add_plugin(MessagesPlugin)
+    fs_unix.map_file_fh("/var/log/installer/cloud-init.log", BytesIO(msg_bytes))
+    fs_unix.map_file_fh("/var/log/installer/cloud-init.log.1.gz", BytesIO(gzip.compress(msg_bytes)))
+    target_unix.add_plugin(MessagesPlugin)
 
-    results = list(target_unix_users.messages())
-    assert len(results) == 2
+    results = sorted(list(target_unix.messages()), key=lambda r: r.source)
+    assert len(results) == 4
+
     assert results[0].ts == dt(2005, 8, 9, 11, 55, 21)
     assert results[0].daemon == "foo.py"
     assert results[0].pid is None
     assert results[0].message == "This is a cloud-init message!"
     assert results[0].source == "/var/log/installer/cloud-init.log"
+
+    assert results[-1].ts == dt(2005, 8, 9, 11, 55, 21)
+    assert results[-1].daemon == "util.py"
+    assert results[-1].pid is None
+    assert results[-1].message == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."
+    assert results[-1].source == "/var/log/installer/cloud-init.log.1.gz"

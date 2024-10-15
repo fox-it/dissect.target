@@ -4,6 +4,7 @@ from typing import Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
@@ -96,18 +97,23 @@ class MessagesPlugin(Plugin):
 
         Returns: ``MessagesRecord``
         """
-        for line in log_file.open("rt").readlines():
-            if line := line.strip():
-                if match := RE_CLOUD_INIT_LINE.match(line):
-                    match = match.groupdict()
-                    yield MessagesRecord(
-                        ts=match["ts"].split(",")[0],
-                        daemon=match["daemon"],
-                        pid=None,
-                        message=match["message"],
-                        source=log_file,
-                        _target=self.target,
-                    )
-                else:
-                    self.target.log.warning("Could not match cloud-init log line")
+
+        with open_decompress(log_file, "rt") as fh:
+            for line in fh.readlines():
+                if not (line := line.strip()):
+                    continue
+
+                if not (match := RE_CLOUD_INIT_LINE.match(line)):
+                    self.target.log.warning("Could not match cloud-init log line in file: %s", log_file)
                     self.target.log.debug("No match for line '%s'", line)
+                    continue
+
+                values = match.groupdict()
+                yield MessagesRecord(
+                    ts=values["ts"].split(",")[0],
+                    daemon=values["daemon"],
+                    pid=None,
+                    message=values["message"],
+                    source=log_file,
+                    _target=self.target,
+                )
