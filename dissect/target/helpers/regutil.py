@@ -790,8 +790,7 @@ def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
         NotImplementedError: If ``value`` is not of a supported type for parsing.
     """
     if value.startswith('"'):
-        decoded = value.strip('"')
-        return (RegistryValueType.SZ, decoded)
+        return RegistryValueType.SZ, value.strip('"')
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
