@@ -776,7 +776,7 @@ class RegFlexValue(VirtualValue):
         return self._parse[1]
 
     @property
-    def type(self) -> ValueType:
+    def type(self) -> RegistryValueType:
         return self._parse[0]
 
 
