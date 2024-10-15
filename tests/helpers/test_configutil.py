@@ -13,6 +13,7 @@ from dissect.target.helpers.configutil import (
     ConfigurationParser,
     CSVish,
     Default,
+    Env,
     Indentation,
     Json,
     ScopeManager,
@@ -317,3 +318,47 @@ def test_parse(target_linux: Target, fs_linux: VirtualFilesystem, tmp_path: Path
         parse(target_linux.fs.path("/path/to"))
 
     parse(target_linux.fs.path("/path/to/file"))
+
+
+@pytest.mark.parametrize(
+    "input,expected_output",
+    [
+        ("", {}),
+        ("foo=bar\n", {"foo": "bar"}),
+        ("foo = bar \n", {"foo": "bar"}),
+        ('foo = "bar"\n', {"foo": "bar"}),
+        ("foo=bar\nempty=\nhello=world\n", {"foo": "bar", "empty": "", "hello": "world"}),
+        # multiple delimiters
+        ("foo=option=foo,value=bar", {"foo": "option=foo,value=bar"}),
+        # types
+        ("foo=123", {"foo": 123}),
+        ("foo=1", {"foo": True}),
+        ("foo=0", {"foo": False}),
+        ("foo='1'", {"foo": True}),
+        ("foo=true", {"foo": True}),
+        ('foo="False"\nbar="true"\n', {"bar": True, "foo": False}),
+        # comments
+        ("foo=bar#\n", {"foo": "bar#"}),
+        ('foo="bar#"\n', {"foo": "bar#"}),
+        ("foo='bar#'\n", {"foo": "bar#"}),
+        ("foo=bar # comment\n", {"foo": "bar"}),
+        ("foo='bar' # comment\n", {"foo": "bar"}),
+        ("foo='bar #' # comment\n", {"foo": "bar #"}),
+        ("foo=bar# not a comment\n", {"foo": "bar# not a comment"}),
+        ("foo='bar # not a comment'\n", {"foo": "bar # not a comment"}),
+        (Path(absolute_path("_data/helpers/configutil/env")), {"foo": "'bar"}),
+        # whitespaces inside quotes
+        ("foo='bar '\n", {"foo": "bar "}),
+        # quotes inside values
+        ('foo=ba"r\n', {"foo": 'ba"r'}),
+    ],
+)
+def test_env_parser(input: str | Path, expected_output: dict) -> None:
+    parser = Env(comments=False)
+
+    if isinstance(input, str):
+        parser.parse_file(StringIO(input))
+    else:
+        parser.parse_file(input.open("r"))
+
+    assert parser.parsed_data == expected_output
