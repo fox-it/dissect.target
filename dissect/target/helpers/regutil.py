@@ -7,9 +7,10 @@ import struct
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
+from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Callable, Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, Optional, TextIO, Union
 
 from dissect.regf import regf
 
@@ -27,20 +28,6 @@ KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, re
 
 ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
-
-
-def lazy(postponed: Callable) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        def inner(self: Any) -> Any:
-            flag = f"_{postponed.__name__}_called"
-            if not hasattr(self, flag):
-                postponed(self)
-                setattr(self, flag, True)
-            return func(self)
-
-        return inner
-
-    return decorator
 
 
 class RegistryValueType(Enum):
@@ -780,18 +767,17 @@ class RegFlexValue(VirtualValue):
     def __init__(self, hive: RegistryHive, name: str, value: ValueType):
         super().__init__(hive, name, value)
 
+    @cached_property
     def _parse(self):
-        self._parsed_type, self._parsed_value = parse_flex_value(self._value)
+        return parse_flex_value(self._value)
 
     @property
-    @lazy(_parse)
     def value(self) -> ValueType:
-        return self._parsed_value
+        return self._parse[1]
 
     @property
-    @lazy(_parse)
     def type(self) -> ValueType:
-        return self._parsed_type
+        return self._parse[0]
 
 
 def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
