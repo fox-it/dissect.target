@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import fnmatch
 import re
-import struct
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
