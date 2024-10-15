@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import argparse
+import pathlib
 import platform
 import sys
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Callable
-from unittest.mock import MagicMock
+from typing import Callable, Iterator
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
@@ -130,6 +133,35 @@ def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyP
     assert suggestions == [f"{subfolder_name}/", subfile_name]
 
 
+@pytest.fixture
+def targetrc_file() -> Iterator[list[str]]:
+    content = """
+    ls
+        # This is a comment line and should be ignored
+    ll
+    """
+
+    original_open = pathlib.Path.open
+
+    def custom_open(self: Path, *args, **kwargs):
+        if self.name.endswith(".targetrc"):
+            return mock_open(read_data=content)()
+        return original_open(self, *args, **kwargs)
+
+    with patch("pathlib.Path.open", custom_open):
+        yield ["ls", "ll"]
+
+
+def test_targetcli_targetrc(target_bare: Target, targetrc_file: list[str]) -> None:
+    with patch.object(TargetCli, "onecmd", autospec=True) as mock_onecmd:
+        cli = TargetCli(target_bare)
+
+        cli.preloop()
+
+        expected_calls = [call(cli, cmd) for cmd in targetrc_file]
+        mock_onecmd.assert_has_calls(expected_calls, any_order=False)
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
 def test_pipe_symbol_parsing(capfd: pytest.CaptureFixture, target_bare: Target) -> None:
     cli = TargetCli(target_bare)
@@ -222,10 +254,10 @@ def test_target_cli_save(
 
 
 def run_target_shell(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, target_path: str, stdin: str
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
 ) -> tuple[bytes, bytes]:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-shell", target_path])
+        m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
         target_shell()
@@ -270,6 +302,13 @@ def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     ls_la_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls -la")
     ll_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ll")
     assert ls_la_out == ll_out
+
+
+def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    target_path = absolute_path("_data/tools/info/image.tar")
+    dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
+    ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
+    assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
 
 
 def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
