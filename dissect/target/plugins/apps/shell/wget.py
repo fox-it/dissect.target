@@ -43,6 +43,8 @@ class WgetPlugin(Plugin):
     def hsts(self) -> Iterator[WgetHstsRecord]:
         """Yield domain entries found in wget HSTS files.
 
+When using the ``wget`` command-line utility, a file named ``.wget-hsts`` is created in the user’s home directory by default. The ``.wget-hsts`` file records HTTP Strict Transport Security (HSTS) information for the websites visited by the user via ``wget``.
+
         Resources:
             - https://www.gnu.org/software/wget
             - https://gitlab.com/gnuwget/wget/-/blob/master/src/hsts.c
