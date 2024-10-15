@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import textwrap
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
@@ -9,6 +9,7 @@ import pytest
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
+    Bin,
     ConfigurationParser,
     CSVish,
     Default,
@@ -266,6 +267,18 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
     parser = Json()
     parser.parse_file(StringIO(data_string))
 
+    assert parser.parsed_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "data, expected_data",
+    [
+        (b"\x00\x01\x02", {"binary": b"\x00\x01\x02", "size": "3"}),
+    ],
+)
+def test_bin_parser(data: bytes, expected_data: dict) -> None:
+    parser = Bin()
+    parser.parse_file(BytesIO(data))
     assert parser.parsed_data == expected_data
 
 
