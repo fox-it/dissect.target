@@ -52,21 +52,19 @@ class WgetPlugin(Plugin):
 
         .. code-block:: text
 
-            ts_created          (datetime)  when the host was first added to the HSTS file
-            host                (uri)       the host that was accessed over TLS by wget
-            explicit_port       (boolean)   if the TCP port for TLS should be checked
-            include_subdomains  (boolean)   if subdomains are included in the HSTS check
-            max_age             (datetime)  time to live of the entry in the HSTS file
-            source              (path)      location of the .wget-hsts file
-
+            ts_created          (datetime):  When the host was first added to the HSTS file
+            host                (uri):       The host that was accessed over TLS by wget
+            explicit_port       (boolean):   If the TCP port for TLS should be checked
+            include_subdomains  (boolean):   If subdomains are included in the HSTS check
+            max_age             (datetime):  Time to live of the entry in the HSTS file
+            source              (path):      Location of the .wget-hsts file
         """
         for hsts_file, user_details in self.artifacts:
             if not hsts_file.is_file():
                 continue
 
             for line in hsts_file.open("rt").readlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
+                if not (line := line.strip()) or line.startswith("#"):
                     continue
 
                 try:
