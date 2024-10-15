@@ -768,7 +768,7 @@ class RegFlexValue(VirtualValue):
         super().__init__(hive, name, value)
 
     @cached_property
-    def _parse(self):
+    def _parse(self) -> tuple[RegistryValueType, ValueType]:
         return parse_flex_value(self._value)
 
     @property
