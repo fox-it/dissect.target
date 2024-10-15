@@ -830,7 +830,7 @@ def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
 
             decoded = r
         elif vtype == regf.REG_QWORD:
-            decoded = struct.unpack(">Q", value)[0]
+            decoded = int.from_bytes(value, "big", signed=False)
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
         return (RegistryValueType(vtype), decoded)
