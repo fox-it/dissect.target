@@ -292,10 +292,10 @@ class JournalFile:
         try:
             self.header = c_journal.Header(self.fh)
         except EOFError as e:
-            raise ValueError(f"Invalid Systemd Journal file: {str(e)}")
+            raise ValueError(f"Invalid systemd Journal file: {e}")
 
         if self.header.signature != c_journal.HEADER_SIGNATURE:
-            raise ValueError(f"Journal file has invalid magic header '{str(self.header.signature)}'")
+            raise ValueError(f"Journal file has invalid magic header: {self.header.signature!r}'")
 
     def decode_value(self, value: bytes) -> tuple[str, str]:
         """Decode the given bytes to a key value pair."""
