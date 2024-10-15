@@ -5,7 +5,7 @@ import fnmatch
 import re
 from collections import defaultdict
 from datetime import datetime
-from enum import Enum
+from enum import IntEnum
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
@@ -29,7 +29,7 @@ ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
 
 
-class RegistryValueType(Enum):
+class RegistryValueType(IntEnum):
     NONE = regf.REG_NONE
     SZ = regf.REG_SZ
     EXPAND_SZ = regf.REG_EXPAND_SZ
