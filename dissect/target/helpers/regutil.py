@@ -817,7 +817,7 @@ def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
         elif vtype == regf.REG_DWORD:
             decoded = struct.unpack("<I", value)[0]
         elif vtype == regf.REG_DWORD_BIG_ENDIAN:
-            decoded = struct.unpack(">I", value)[0]
+            decoded = int.from_bytes(value, "big", signed=False)
         elif vtype == regf.REG_MULTI_SZ:
             d = BytesIO(value)
 
