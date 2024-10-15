@@ -780,7 +780,7 @@ class RegFlexValue(VirtualValue):
         return self._parse[0]
 
 
-def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
+def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
     """Parse values from text registry exports.
 
     Args:
