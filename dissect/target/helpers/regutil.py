@@ -833,7 +833,7 @@ def parse_flex_value(value: str) -> tuple(RegistryValueType, ValueType):
             decoded = int.from_bytes(value, "big", signed=False)
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
-        return (RegistryValueType(vtype), decoded)
+        return RegistryValueType(vtype), decoded
 
 
 def has_glob_magic(pattern: str) -> bool:
