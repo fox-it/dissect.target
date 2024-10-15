@@ -311,7 +311,7 @@ class JournalFile:
         while offset != 0:
             self.fh.seek(offset)
 
-            if int.from_bytes(self.fh.read(1)) != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
+            if int.from_bytes(self.fh.read(1), "little") != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
                 raise ValueError(f"Expected OBJECT_ENTRY_ARRAY at offset {offset}")
 
             if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
@@ -344,7 +344,7 @@ class JournalFile:
             try:
                 self.fh.seek(item.object_offset)
 
-                if int.from_bytes(self.fh.read(1)) != c_journal.ObjectType.OBJECT_DATA:
+                if int.from_bytes(self.fh.read(1), "little") != c_journal.ObjectType.OBJECT_DATA:
                     continue
 
                 if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
