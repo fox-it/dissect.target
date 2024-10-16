@@ -62,7 +62,8 @@ class GnomeTrashPlugin(Plugin):
         Recovers deleted files and artifacts from ``$HOME/.local/share/Trash``.
         Probably also works with other desktop interfaces as long as they follow the Trash specification from FreeDesktop.
 
-        Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
+        Also parses media trash locations such as ``/media/$USER/$Label/.Trash-*``, ``/mnt/$Label/.Trash-*`` and other
+        locations as defined in ``/etc/fstab``.
 
         Resources:
             - https://specifications.freedesktop.org/trash-spec/latest/
