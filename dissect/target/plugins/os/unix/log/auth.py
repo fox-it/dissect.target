@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -334,14 +335,11 @@ class AuthPlugin(Plugin):
                 yield self._auth_log_builder.build_record(ts, auth_file, line)
 
 
-def iso_readlines(file: TargetPath, limit: int | None = None) -> Iterator[tuple[datetime, str]]:
+def iso_readlines(file: TargetPath) -> Iterator[tuple[datetime, str]]:
     """Iterator reading the provided auth log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
 
     with open_decompress(file, "rt") as fh:
-        for count, line in enumerate(fh):
-            if limit and count > limit:
-                break
-
+        for line in fh:
             if not (match := RE_TS_ISO.match(line)):
                 log.warning("No timestamp found in one of the lines in %s!", file)
                 log.debug("Skipping line: %s", line)
@@ -360,5 +358,4 @@ def iso_readlines(file: TargetPath, limit: int | None = None) -> Iterator[tuple[
 
 def is_iso_fmt(file: TargetPath) -> bool:
     """Determine if the provided auth log file uses new ISO format logging or not."""
-
-    return any(iso_readlines(file, limit=3))
+    return any(itertools.islice(iso_readlines(file), 0, 2))
