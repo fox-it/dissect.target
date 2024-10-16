@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import re
 import sys
 from collections import deque
@@ -45,6 +46,9 @@ try:
     HAS_TOML = True
 except ImportError:
     HAS_TOML = False
+
+
+log = logging.getLogger(__name__)
 
 
 def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
@@ -161,7 +165,7 @@ class ConfigurationParser:
     def get(self, item: str, default: Optional[Any] = None) -> Any:
         return self.parsed_data.get(item, default)
 
-    def read_file(self, fh: TextIO) -> None:
+    def read_file(self, fh: TextIO | io.BytesIO) -> None:
         """Parse a configuration file.
 
         Raises:
@@ -301,6 +305,14 @@ class Txt(ConfigurationParser):
     def parse_file(self, fh: TextIO) -> None:
         # Cast the size to a string, to print it out later.
         self.parsed_data = {"content": fh.read(), "size": str(fh.tell())}
+
+
+class Bin(ConfigurationParser):
+
+    """Read the file into ``binary`` and show the number of bytes read"""
+
+    def parse_file(self, fh: io.BytesIO) -> None:
+        self.parsed_data = {"binary": fh.read(), "size": str(fh.tell())}
 
 
 class Xml(ConfigurationParser):
@@ -455,6 +467,76 @@ class Toml(ConfigurationParser):
             self.parsed_data = toml.loads(fh.read())
         else:
             raise ConfigurationParsingError("Failed to parse file, please install tomli.")
+
+
+class Env(ConfigurationParser):
+    """Parses ``.env`` file contents according to Docker and bash specification.
+
+    Does not apply interpolation of substituted values, eg. ``foo=${bar}`` and does not attempt
+    to parse list or dict strings. Does not support dynamic env files, eg. `` foo=`bar` ``. Also
+    does not support multi-line key/value assignments (yet).
+
+    Resources:
+        - https://docs.docker.com/compose/environment-variables/variable-interpolation/#env-file-syntax
+        - https://github.com/theskumar/python-dotenv/blob/main/src/dotenv/parser.py
+    """
+
+    RE_KV = re.compile(r"^(?P<key>.+?)=(?P<value>(\".+?\")|(\'.+?\')|(.*?))?(?P<comment> \#.+?)?$")
+
+    def __init__(self, comments: bool = True, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.comments = comments
+        self.parsed_data: dict | tuple[dict, str | None] = {}
+
+    def parse_file(self, fh: TextIO) -> None:
+        for line in fh.readlines():
+            # Blank lines are ignored.
+            # Lines beginning with ``#`` are processed as comments and ignored.
+            if not line or line[0] == "#" or "=" not in line:
+                continue
+
+            # Each line represents a key-value pair. Values can optionally be quoted.
+            # Inline comments for unquoted values must be preceded with a space.
+            # Value may be empty.
+            match = self.RE_KV.match(line)
+
+            # Line could be invalid
+            if not match:
+                log.warning("Could not parse line in %s: '%s'", fh, line)
+                continue
+
+            key = match.groupdict()["key"]
+            value = match.groupdict().get("value") or ""
+            value = value.strip()
+            comment = match.groupdict().get("comment")
+            comment = comment.replace(" # ", "", 1) if comment else None
+
+            # Surrounding whitespace characters are removed, unless quoted.
+            if value and ((value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'")):
+                is_quoted = True
+                value = value.strip("\"'")
+            else:
+                is_quoted = False
+                value = value.strip()
+
+            # Unquoted values may start with a quote if they are properly escaped.
+            if not is_quoted and value[:2] in ["\\'", '\\"']:
+                value = value[1:]
+
+            # Interpret boolean values
+            if value.lower() in ["1", "true"]:
+                value = True
+            elif value.lower() in ["0", "false"]:
+                value = False
+
+            # Interpret integer values
+            if isinstance(value, str) and re.match(r"^[0-9]{1,}$", value):
+                value = int(value)
+
+            if key.strip() in self.parsed_data:
+                log.warning("Duplicate environment key '%s' in file %s", key.strip(), fh)
+
+            self.parsed_data[key.strip()] = (value, comment) if self.comments else value
 
 
 class ScopeManager:
@@ -733,6 +815,8 @@ MATCH_MAP: dict[str, ParserConfig] = {
     "*/sysconfig/network-scripts/ifcfg-*": ParserConfig(Default),
     "*/sysctl.d/*.conf": ParserConfig(Default),
     "*/xml/*": ParserConfig(Xml),
+    "*.bashrc": ParserConfig(Txt),
+    "*/vim/vimrc*": ParserConfig(Txt),
 }
 
 CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
@@ -744,6 +828,13 @@ CONFIG_MAP: dict[tuple[str, ...], ParserConfig] = {
     "cnf": ParserConfig(Default),
     "conf": ParserConfig(Default, separator=(r"\s",)),
     "sample": ParserConfig(Txt),
+    "sh": ParserConfig(Txt),
+    "key": ParserConfig(Txt),
+    "crt": ParserConfig(Txt),
+    "pem": ParserConfig(Txt),
+    "pl": ParserConfig(Txt),  # various admin panels
+    "lua": ParserConfig(Txt),  # wireshark etc.
+    "txt": ParserConfig(Txt),
     "systemd": ParserConfig(SystemD),
     "template": ParserConfig(Txt),
     "toml": ParserConfig(Toml),
@@ -759,6 +850,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
     "nsswitch.conf": ParserConfig(Default, separator=(":",)),
     "lsb-release": ParserConfig(Default),
     "catalog": ParserConfig(Xml),
+    "ld.so.cache": ParserConfig(Bin),
     "fstab": ParserConfig(
         CSVish,
         separator=(r"\s",),
@@ -832,9 +924,11 @@ def parse_config(
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-
     with entry.open() as fh:
-        open_file = io.TextIOWrapper(fh, encoding="utf-8")
+        if not isinstance(parser, Bin):
+            open_file = io.TextIOWrapper(fh, encoding="utf-8")
+        else:
+            open_file = io.BytesIO(fh.read())
         parser.read_file(open_file)
 
     return parser

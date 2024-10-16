@@ -1410,29 +1410,38 @@ def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
         yield pipe_stdin
 
 
-def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool) -> None:
+def open_shell(targets: list[str | pathlib.Path], python: bool, registry: bool, commands: list[str] | None) -> None:
     """Helper method for starting a regular, Python or registry shell for one or multiple targets."""
     targets = list(Target.open_all(targets))
 
     if python:
-        python_shell(targets)
+        python_shell(targets, commands=commands)
     else:
         cli_cls = RegistryCli if registry else TargetCli
-        target_shell(targets, cli_cls=cli_cls)
+        target_shell(targets, cli_cls=cli_cls, commands=commands)
 
 
-def target_shell(targets: list[Target], cli_cls: type[TargetCmd]) -> None:
+def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list[str] | None) -> None:
     """Helper method for starting a :class:`TargetCli` or :class:`TargetHubCli` for one or multiple targets."""
     if cli := create_cli(targets, cli_cls):
+        if commands is not None:
+            for command in commands:
+                cli.onecmd(command)
+            return
         run_cli(cli)
 
 
-def python_shell(targets: list[Target]) -> None:
+def python_shell(targets: list[Target], commands: list[str] | None = None) -> None:
     """Helper method for starting a (I)Python shell with multiple targets."""
     banner = "Loaded targets in 'targets' variable. First target is in 't'."
     ns = {"targets": targets, "t": targets[0]}
 
     try:
+        if commands is not None:
+            for command in commands:
+                eval(command, ns)
+            return
+
         import IPython
 
         IPython.embed(header=banner, user_ns=ns, colors="linux")
@@ -1512,7 +1521,7 @@ def main() -> None:
         default=None,
         help="select a specific loader (i.e. vmx, raw)",
     )
-
+    parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
     args, rest = parser.parse_known_args()
     args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
@@ -1537,7 +1546,7 @@ def main() -> None:
             )
 
     try:
-        open_shell(args.targets, args.python, args.registry)
+        open_shell(args.targets, args.python, args.registry, args.commands)
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)
