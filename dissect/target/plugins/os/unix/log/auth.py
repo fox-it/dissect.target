@@ -338,7 +338,7 @@ def iso_readlines(file: TargetPath, limit: int | None = None) -> Iterator[tuple[
     """Iterator reading the provided auth log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
 
     with open_decompress(file, "rt") as fh:
-        for count, line in enumerate(fh.readlines()):
+        for count, line in enumerate(fh):
             if limit and count > limit:
                 break
 
@@ -361,5 +361,4 @@ def iso_readlines(file: TargetPath, limit: int | None = None) -> Iterator[tuple[
 def is_iso_fmt(file: TargetPath) -> bool:
     """Determine if the provided auth log file uses new ISO format logging or not."""
 
-    results = list(iso_readlines(file, limit=3))
-    return any(results)
+    return any(iso_readlines(file, limit=3))
