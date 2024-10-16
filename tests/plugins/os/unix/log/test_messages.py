@@ -10,6 +10,7 @@ from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.plugins.general import default
+from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
 from tests._utils import absolute_path
 
@@ -138,3 +139,29 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
         == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."  # noqa: E501
     )
     assert results[-1].source == "/var/log/installer/cloud-init.log.1.gz"
+
+
+def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if we correctly detect and parse ISO 8601 formatted syslog logs."""
+
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
+    messages = """
+    2024-12-31T13:37:00.123456+02:00 hostname systemd[1]: Started anacron.service - Run anacron jobs.
+    2024-12-31T13:37:00.123456+02:00 hostname anacron[1337]: Anacron 2.3 started on 2024-12-31
+    2024-12-31T13:37:00.123456+02:00 hostname anacron[1337]: Normal exit (0 jobs run)
+    2024-12-31T13:37:00.123456+02:00 hostname systemd[1]: anacron.service: Deactivated successfully.
+    """
+    fs_unix.map_file_fh("/var/log/syslog.1", BytesIO(gzip.compress(textwrap.dedent(messages).encode())))
+
+    target_unix.add_plugin(UnixPlugin)
+    target_unix.add_plugin(MessagesPlugin)
+    results = sorted(list(target_unix.syslog()), key=lambda r: r.ts)
+
+    assert len(results) == 4
+
+    assert results[0].hostname == "hostname"
+    assert results[0].daemon == "systemd"
+    assert results[0].pid == 1
+    assert results[0].ts == datetime(2024, 12, 31, 11, 37, 0, 123456, tzinfo=timezone.utc)
+    assert results[0].message == "Started anacron.service - Run anacron jobs."
+    assert results[0].source == "/var/log/syslog.1"
