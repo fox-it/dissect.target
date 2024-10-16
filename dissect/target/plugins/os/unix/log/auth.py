@@ -348,7 +348,7 @@ def iso_readlines(file: TargetPath, limit: int | None = None) -> Iterator[tuple[
                 continue
 
             try:
-                ts = datetime.strptime(match[0], "%Y-%m-%dT%H:%M:%S.%f%:z")
+                ts = datetime.strptime(match[0], "%Y-%m-%dT%H:%M:%S.%f%z")
 
             except ValueError as e:
                 log.warning("Unable to parse ISO timestamp in line: %s", line)
