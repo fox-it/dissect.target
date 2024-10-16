@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import IntEnum
 from functools import lru_cache
-from typing import Any, Iterator
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
@@ -273,7 +273,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 # Extract the metric value from the REGISTRY_KEY_INTERFACE key
                 try:
                     interface_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"  # noqa: E501
                     )
                     if value_metric := _try_value(interface_key, "InterfaceMetric"):
                         device_info["metric"] = value_metric

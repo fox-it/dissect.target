@@ -49,13 +49,11 @@ class NetworkPlugin(Plugin):
 
     @export
     def ips(self) -> list[IPAddress]:
-        # TODO: deduplicate using set: https://github.com/fox-it/flow.record/pull/148
-        return list(self._get_record_type("ip"))
+        return list(set(self._get_record_type("ip")))
 
     @export
     def gateways(self) -> list[IPAddress]:
-        # TODO: deduplicate using set: https://github.com/fox-it/flow.record/pull/148
-        return list(self._get_record_type("gateway"))
+        return list(set(self._get_record_type("gateway")))
 
     @export
     def macs(self) -> list[str]:
@@ -63,8 +61,7 @@ class NetworkPlugin(Plugin):
 
     @export
     def dns(self) -> list[str | IPAddress]:
-        # TODO: deduplicate using set: https://github.com/fox-it/flow.record/pull/148
-        return list(self._get_record_type("dns"))
+        return list(set(self._get_record_type("dns")))
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:

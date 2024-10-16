@@ -335,7 +335,17 @@ def test_network_dhcp_and_static(
         network = target_win.network
         interfaces = list(network.interfaces())
 
+        ips = set()
+        dns = set()
+        gateways = set()
+        macs = set()
+
         for interface, expected in zip(interfaces, expected_values):
+            ips.update(interface.ip)
+            dns.update(interface.dns)
+            gateways.update(interface.gateway)
+            macs.add(interface.mac)
+
             assert interface.ip == expected["ip"]
             assert interface.dns == expected["dns"]
             assert interface.gateway == expected["gateway"]
@@ -350,6 +360,11 @@ def test_network_dhcp_and_static(
             assert interface.subnetmask == expected["subnetmask"]
             assert interface.dhcp == expected["dhcp"]
             assert interface.enabled == expected["enabled"]
+
+        assert network.ips() == list(ips)
+        assert network.dns() == list(dns)
+        assert network.gateways() == list(gateways)
+        assert network.macs() == list(macs)
 
 
 @patch(
