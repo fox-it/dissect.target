@@ -1431,7 +1431,7 @@ def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list
         run_cli(cli)
 
 
-def python_shell(targets: list[Target], commands: list[str] | None) -> None:
+def python_shell(targets: list[Target], commands: list[str] | None = None) -> None:
     """Helper method for starting a (I)Python shell with multiple targets."""
     banner = "Loaded targets in 'targets' variable. First target is in 't'."
     ns = {"targets": targets, "t": targets[0]}
