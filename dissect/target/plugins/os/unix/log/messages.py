@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 from typing import Iterator
 
@@ -67,7 +68,7 @@ class MessagesPlugin(Plugin):
 
         for log_file in self.log_files:
             if "cloud-init" in log_file.name:
-                yield from self._parse_cloud_init_log(log_file)
+                yield from self._parse_cloud_init_log(log_file, tzinfo)
                 continue
 
             for ts, line in year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo):
@@ -84,7 +85,7 @@ class MessagesPlugin(Plugin):
                     _target=self.target,
                 )
 
-    def _parse_cloud_init_log(self, log_file: Path) -> Iterator[MessagesRecord]:
+    def _parse_cloud_init_log(self, log_file: Path, tzinfo: tzinfo | None = timezone.utc) -> Iterator[MessagesRecord]:
         """Parse a cloud-init.log file.
 
         Lines are structured in the following format:
@@ -98,8 +99,10 @@ class MessagesPlugin(Plugin):
         Returns: ``MessagesRecord``
         """
 
+        ts_fmt = "%Y-%m-%d %H:%M:%S,%f"
+
         with open_decompress(log_file, "rt") as fh:
-            for line in fh.readlines():
+            for line in fh:
                 if not (line := line.strip()):
                     continue
 
@@ -109,8 +112,24 @@ class MessagesPlugin(Plugin):
                     continue
 
                 values = match.groupdict()
+
+                # Actual format is ``YYYY-MM-DD HH:MM:SS,000`` (asctime with milliseconds) but python has no strptime
+                # operator for 3 digit milliseconds, so we convert and pad to six digit microseconds.
+                # https://github.com/canonical/cloud-init/blob/main/cloudinit/log/loggers.py#DEFAULT_LOG_FORMAT
+                # https://docs.python.org/3/library/logging.html#asctime
+                raw_ts, milliseconds = values["ts"].split(",", maxsplit=1)
+                raw_ts += "," + str((int(milliseconds) * 1000)).zfill(6)
+
+                try:
+                    ts = datetime.strptime(raw_ts, ts_fmt).replace(tzinfo=tzinfo)
+
+                except ValueError as e:
+                    self.target.log.warning("Timestamp '%s' does not match format '%s'", raw_ts, ts_fmt)
+                    self.target.log.debug("", exc_info=e)
+                    ts = datetime(1970, 1, 1, 0, 0, 0, 0)
+
                 yield MessagesRecord(
-                    ts=values["ts"].split(",")[0],
+                    ts=ts,
                     daemon=values["daemon"],
                     pid=None,
                     message=values["message"],

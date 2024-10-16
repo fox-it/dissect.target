@@ -6,8 +6,6 @@ from io import BytesIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from flow.record.fieldtypes import datetime as dt
-
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
@@ -84,8 +82,8 @@ def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     assert len(results) == 2
     assert isinstance(results[0], type(MessagesRecord()))
     assert isinstance(results[1], type(MessagesRecord()))
-    assert results[0].ts == dt(2020, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("America/Chicago"))
-    assert results[1].ts == dt(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
+    assert results[0].ts == datetime(2020, 12, 31, 3, 14, 0, tzinfo=ZoneInfo("America/Chicago"))
+    assert results[1].ts == datetime(2021, 1, 1, 13, 37, 0, tzinfo=ZoneInfo("America/Chicago"))
 
 
 def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -118,6 +116,7 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
     """  # noqa: E501
     msg_bytes = textwrap.dedent(messages).encode()
 
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
     fs_unix.map_file_fh("/var/log/installer/cloud-init.log", BytesIO(msg_bytes))
     fs_unix.map_file_fh("/var/log/installer/cloud-init.log.1.gz", BytesIO(gzip.compress(msg_bytes)))
     target_unix.add_plugin(MessagesPlugin)
@@ -125,14 +124,17 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
     results = sorted(list(target_unix.messages()), key=lambda r: r.source)
     assert len(results) == 4
 
-    assert results[0].ts == dt(2005, 8, 9, 11, 55, 21)
+    assert results[0].ts == datetime(2005, 8, 9, 11, 55, 21, 0, tzinfo=ZoneInfo("Europe/Amsterdam"))
     assert results[0].daemon == "foo.py"
     assert results[0].pid is None
     assert results[0].message == "This is a cloud-init message!"
     assert results[0].source == "/var/log/installer/cloud-init.log"
 
-    assert results[-1].ts == dt(2005, 8, 9, 11, 55, 21)
+    assert results[-1].ts == datetime(2005, 8, 9, 11, 55, 21, 1_000, tzinfo=ZoneInfo("Europe/Amsterdam"))
     assert results[-1].daemon == "util.py"
     assert results[-1].pid is None
-    assert results[-1].message == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."
+    assert (
+        results[-1].message
+        == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."  # noqa: E501
+    )
     assert results[-1].source == "/var/log/installer/cloud-init.log.1.gz"
