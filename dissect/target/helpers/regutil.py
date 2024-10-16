@@ -310,6 +310,7 @@ class VirtualKey(RegistryKey):
         self._class_name = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
+        self._timestamp: datetime = None
         self.top: RegistryKey = None
         super().__init__(hive=hive)
 
@@ -339,10 +340,18 @@ class VirtualKey(RegistryKey):
         return self._path
 
     @property
-    def timestamp(self) -> datetime:
+    def timestamp(self) -> datetime | None:
         if self.top:
             return self.top.timestamp
+
+        if self._timestamp:
+            return self._timestamp
+
         return None
+
+    @timestamp.setter
+    def timestamp(self, ts: datetime) -> None:
+        self._timestamp = ts
 
     def subkey(self, subkey: str) -> RegistryKey:
         try:

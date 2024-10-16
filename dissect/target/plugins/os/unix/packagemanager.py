@@ -9,7 +9,7 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 PackageManagerLogRecord = TargetRecordDescriptor(
-    "unix/log/packagemanager",
+    "unix/packagemanager/log",
     [
         ("datetime", "ts"),
         ("string", "package_manager"),
