@@ -119,7 +119,7 @@ class MessagesPlugin(Plugin):
                 # operator for 3 digit milliseconds, so we convert and pad to six digit microseconds.
                 # https://github.com/canonical/cloud-init/blob/main/cloudinit/log/loggers.py#DEFAULT_LOG_FORMAT
                 # https://docs.python.org/3/library/logging.html#asctime
-                raw_ts, milliseconds = values["ts"].split(",", maxsplit=1)
+                raw_ts, _, milliseconds = values["ts"].rpartition(",")
                 raw_ts += "," + str((int(milliseconds) * 1000)).zfill(6)
 
                 try:
