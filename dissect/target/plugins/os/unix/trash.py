@@ -31,14 +31,24 @@ class GnomeTrashPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.trashes = list(self._garbage_collector())
+        self.trashes = list(set(self._garbage_collector()))
 
     def _garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
         """it aint much, but its honest work"""
+
+        # home trash folders
         for user_details in self.target.user_details.all_with_home():
             for trash_path in self.PATHS:
                 if (path := user_details.home_path.joinpath(trash_path)).exists():
                     yield user_details, path
+
+        # mounted devices trash folders
+        for mount_path in list(self.target.fs.mounts.keys()) + ["/mnt", "/media"]:
+            if mount_path == "/":
+                continue
+
+            for mount_trash in self.target.fs.path(mount_path).glob("**/.Trash-*"):
+                yield None, mount_trash
 
     def check_compatible(self) -> None:
         if not self.trashes:
@@ -96,7 +106,7 @@ class GnomeTrashPlugin(Plugin):
                             filesize=file.lstat().st_size if file.is_file() else None,
                             deleted_path=file,
                             source=trash_info_file,
-                            _user=user_details.user,
+                            _user=user_details.user if user_details else None,
                             _target=self.target,
                         )
 
@@ -110,7 +120,7 @@ class GnomeTrashPlugin(Plugin):
                         filesize=0,
                         deleted_path=deleted_path,
                         source=trash_info_file,
-                        _user=user_details.user,
+                        _user=user_details.user if user_details else None,
                         _target=self.target,
                     )
 
@@ -127,6 +137,6 @@ class GnomeTrashPlugin(Plugin):
                     filesize=stat.st_size if item.is_file() else None,
                     deleted_path=item,
                     source=trash / "expunged",
-                    _user=user_details.user,
+                    _user=user_details.user if user_details else None,
                     _target=self.target,
                 )

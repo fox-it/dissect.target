@@ -1300,6 +1300,8 @@ class VirtualFilesystem(Filesystem):
 class LayerFilesystem(Filesystem):
     __type__ = "layer"
 
+    mounts: dict = {}
+
     def __init__(self, **kwargs):
         self.layers: list[Filesystem] = []
         self.mounts = {}
