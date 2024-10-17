@@ -116,6 +116,7 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
         module = ".".join([MODULE_PATH, module_name])
     else:
         module = module_name
+
     loader = getattr(import_lazy(module), class_name)
     LOADERS.append(loader)
     LOADERS_BY_SCHEME[module_name] = loader
