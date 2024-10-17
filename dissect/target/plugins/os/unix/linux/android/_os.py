@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class AndroidPlugin(LinuxPlugin):

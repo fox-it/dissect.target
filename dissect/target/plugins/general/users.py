@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Iterator, NamedTuple, Union
+from typing import TYPE_CHECKING, Iterator, NamedTuple, Union
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, WindowsUserRecord
 from dissect.target.plugin import InternalPlugin
+
+if TYPE_CHECKING:
+    from dissect.target import Target
+
 
 UserRecord = Union[UnixUserRecord, WindowsUserRecord]
 

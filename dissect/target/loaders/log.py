@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import urllib
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 @arg("--log-hint", dest="hint", help="hint for file type")

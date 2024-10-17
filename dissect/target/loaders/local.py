@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import ctypes
 import platform
 import re
 from functools import cache
+from logging import Logger
 from pathlib import Path
+from typing import TYPE_CHECKING, Iterator
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target import Target, filesystem, volume
+from dissect.target import filesystem, volume
 from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.utils import parse_path_uri
 from dissect.target.loader import Loader
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 SOLARIS_DEV_DIR = Path("/dev/dsk")
 SOLARIS_DRIVE_REGEX = re.compile(r".+d\d+$")
@@ -33,11 +40,11 @@ class LocalLoader(Loader):
     """Load local filesystem."""
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         _, path_part, _ = parse_path_uri(path)
         return path_part == "local"
 
-    def map(self, target):
+    def map(self, target: Target) -> None:
         os_name = _get_os_name()
 
         force_dirfs = "force-directory-fs" in target.path_query
@@ -68,7 +75,7 @@ class LocalLoader(Loader):
                 raise LoaderError(f"Unsupported OS for local target: {os_name}")
 
 
-def map_linux_drives(target: Target):
+def map_linux_drives(target: Target) -> None:
     """Map Linux raw disks and /proc and /sys.
 
     Iterate through /dev and match raw device names (not partitions).
@@ -92,7 +99,7 @@ def map_linux_drives(target: Target):
             target.fs.mount(str(volatile_path), volatile_fs)
 
 
-def map_solaris_drives(target):
+def map_solaris_drives(target: Target) -> None:
     """Map Solaris raw disks.
 
     Iterate through /dev/dsk and match raw device names (not slices or partitions).
@@ -103,7 +110,7 @@ def map_solaris_drives(target):
         _add_disk_as_raw_container_to_target(drive, target)
 
 
-def map_esxi_drives(target):
+def map_esxi_drives(target: Target) -> None:
     """Map ESXi raw disks.
 
     Get all devices from /vmfs/devices/disks/* (not partitions).
@@ -114,7 +121,7 @@ def map_esxi_drives(target):
         _add_disk_as_raw_container_to_target(drive, target)
 
 
-def map_windows_drives(target):
+def map_windows_drives(target: Target) -> None:
     """Map Windows drives by iterating physical drives.
 
     For each physical drive, load the partition table and volumes.
@@ -175,7 +182,7 @@ def _add_disk_as_raw_container_to_target(drive: Path, target: Target) -> None:
         target.log.warning(f"Unable to open drive: {drive}, skipped", exc_info=e)
 
 
-def _read_drive_letters():
+def _read_drive_letters() -> bytes:
     # Get all logical drive letters
     drives_buf = ctypes.c_buffer(256)
     ctypes.windll.kernel32.GetLogicalDriveStringsA(256, drives_buf)
@@ -183,7 +190,7 @@ def _read_drive_letters():
     return drives_buf.raw.rstrip(b"\x00").split(b"\x00")
 
 
-def _get_windows_drive_volumes(log):
+def _get_windows_drive_volumes(log: Logger) -> Iterator[tuple[volume.Volume, bool, RawContainer | None, int | None]]:
     # Get the sysvol drive letter
     windir_buf = ctypes.c_buffer(256)
     ctypes.windll.kernel32.GetWindowsDirectoryA(windir_buf, 256)
