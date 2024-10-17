@@ -119,4 +119,9 @@ class JFFSFilesystemEntry(FilesystemEntry):
             ]
         )
 
+        # JFFS2 block size is a function of the "erase size" of the underlying flash device.
+        # Linux stat reports the default block size, which is defined as 4k in libc.
+        st_info.st_blksize = 4096
+        st_info.st_blocks = (node.isize + 511) // 512 if node.isize else 0
+
         return st_info
