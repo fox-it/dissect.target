@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Iterator
 from unittest.mock import Mock, patch
+
 import pytest
 
 from dissect.target.filesystems.jffs import JFFSFilesystem, JFFSFilesystemEntry
