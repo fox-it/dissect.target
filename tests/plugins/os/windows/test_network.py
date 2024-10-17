@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey
+from dissect.target.plugins.os.windows._os import WindowsPlugin
+from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
 from dissect.target.target import Target
+from tests.conftest import change_controlset
 
 
 @dataclass
@@ -102,7 +106,7 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "dns": [],
                 "mac": [],
                 "network": [],
-                "search_domain": None,
+                "search_domain": [],
                 "first_connected": None,
                 "vlan": None,
                 "name": None,
@@ -136,7 +140,7 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "first_connected": None,
                 "dns": [],
                 "network": [],
-                "search_domain": None,
+                "search_domain": [],
                 "vlan": None,
                 "metric": None,
                 "name": None,
@@ -170,7 +174,9 @@ def test_windows_network(
 
     with (
         patch("dissect.target.plugins.os.windows.generic.GenericPlugin", return_value=""),
-        patch("dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", return_value="hostname"),
+        patch(
+            "dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", property(MagicMock(return_value="hostname"))
+        ),
         patch.object(target_win, "registry", mock_registry),
     ):
         network = target_win.network
@@ -223,7 +229,9 @@ def test_windows_network_none(
     mock_registry.values.return_value = list(mock_value_dict.values())
 
     with (
-        patch("dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", return_value="hostname"),
+        patch(
+            "dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", property(MagicMock(return_value="hostname"))
+        ),
         patch.object(target_win, "registry", mock_registry),
     ):
         network = target_win.network
@@ -319,26 +327,29 @@ def test_network_dhcp_and_static(
 
     with (
         patch("dissect.target.plugins.os.windows.generic.GenericPlugin", return_value=""),
-        patch("dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", return_value="hostname"),
+        patch(
+            "dissect.target.plugins.os.windows._os.WindowsPlugin.hostname", property(MagicMock(return_value="hostname"))
+        ),
         patch.object(target_win, "registry", mock_registry),
     ):
-        ips = []
-        dns = []
-        gateways = []
-        macs = []
-
         network = target_win.network
         interfaces = list(network.interfaces())
 
+        ips = set()
+        dns = set()
+        gateways = set()
+        macs = set()
+
         for interface, expected in zip(interfaces, expected_values):
+            ips.update(interface.ip)
+            dns.update(interface.dns)
+            gateways.update(interface.gateway)
+            macs.add(interface.mac)
+
             assert interface.ip == expected["ip"]
-            ips.extend(interface.ip)
             assert interface.dns == expected["dns"]
-            dns.extend(interface.dns)
             assert interface.gateway == expected["gateway"]
-            gateways.extend(interface.gateway)
             assert interface.mac == expected["mac"]
-            macs.append(interface.mac)
             assert interface.network == expected["network"]
             assert interface.first_connected == expected["first_connected"]
             assert interface.type == expected["type"]
@@ -350,7 +361,56 @@ def test_network_dhcp_and_static(
             assert interface.dhcp == expected["dhcp"]
             assert interface.enabled == expected["enabled"]
 
-        assert network.ips() == ips
-        assert network.dns() == dns
-        assert network.gateways() == gateways
-        assert network.macs() == macs
+        assert network.ips() == list(ips)
+        assert network.dns() == list(dns)
+        assert network.gateways() == list(gateways)
+        assert network.macs() == list(macs)
+
+
+@patch(
+    "dissect.target.plugins.os.windows.registry.RegistryPlugin.controlsets",
+    property(MagicMock(return_value=["ControlSet001", "ControlSet002", "ControlSet003"])),
+)
+def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+
+    change_controlset(hive_hklm, 3)
+
+    # register the interfaces
+    kvs = [
+        (
+            "SYSTEM\\ControlSet001\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0001",
+            "{some-net-cfg-instance-uuid}",
+        ),
+        (
+            "SYSTEM\\ControlSet002\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0002",
+            "{some-net-cfg-instance-uuid}",
+        ),
+        (
+            "SYSTEM\\ControlSet003\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}\\0003",
+            "{some-net-cfg-instance-uuid}",
+        ),
+    ]
+    for name, value in kvs:
+        key = VirtualKey(hive_hklm, name)
+        key.add_value("NetCfgInstanceId", value)
+        hive_hklm.map_key(name, key)
+
+    # register interface dhcp ip addresses for three different control sets
+    kvs = [
+        ("SYSTEM\\ControlSet001\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "1.2.3.4"),
+        ("SYSTEM\\ControlSet002\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "1.2.3.4"),
+        ("SYSTEM\\ControlSet003\\Services\\Tcpip\\Parameters\\Interfaces\\{some-net-cfg-instance-uuid}", "5.6.7.8"),
+    ]
+    for name, value in kvs:
+        key = VirtualKey(hive_hklm, name)
+        key.add_value("DhcpIPAddress", value)
+        hive_hklm.map_key(name, key)
+
+    target_win.add_plugin(WindowsPlugin)
+    target_win.add_plugin(WindowsNetworkPlugin)
+
+    assert isinstance(target_win.ips, list)
+    assert all([isinstance(ip, str) for ip in target_win.ips])
+    assert len(target_win.ips) == 2
+    assert sorted(target_win.ips) == ["1.2.3.4", "5.6.7.8"]

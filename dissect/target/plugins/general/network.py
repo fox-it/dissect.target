@@ -49,19 +49,19 @@ class NetworkPlugin(Plugin):
 
     @export
     def ips(self) -> list[IPAddress]:
-        return list(self._get_record_type("ip"))
+        return list(set(self._get_record_type("ip")))
 
     @export
     def gateways(self) -> list[IPAddress]:
-        return list(self._get_record_type("gateway"))
+        return list(set(self._get_record_type("gateway")))
 
     @export
     def macs(self) -> list[str]:
-        return list(self._get_record_type("mac"))
+        return list(set(self._get_record_type("mac")))
 
     @export
-    def dns(self) -> list[str]:
-        return list(self._get_record_type("dns"))
+    def dns(self) -> list[str | IPAddress]:
+        return list(set(self._get_record_type("dns")))
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
