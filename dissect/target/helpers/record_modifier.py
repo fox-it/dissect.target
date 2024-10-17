@@ -1,3 +1,4 @@
+import logging
 from functools import partial
 from typing import Callable, Iterable, Iterator
 
@@ -95,13 +96,16 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
         try:
             _record = modifier_function(field_name, resolved_path)
         except FilesystemError as e:
-            target.log.warning(
+            level = logging.INFO if isinstance(e, FileNotFoundError) else logging.WARNING
+            target.log.log(
+                level,
                 "Unable to modify record '%s' with function '%s': %s",
                 record._desc.name,
                 modifier_function.__name__,
                 e,
             )
             target.log.debug("", exc_info=e)
+
         else:
             additional_records.append(_record)
 
