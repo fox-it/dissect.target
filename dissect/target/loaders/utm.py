@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import plistlib
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.target import container
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class UtmLoader(Loader):

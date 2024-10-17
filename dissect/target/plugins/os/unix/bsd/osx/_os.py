@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import plistlib
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 from flow.record.fieldtypes import posix_path
 
@@ -9,7 +9,9 @@ from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class MacPlugin(BsdPlugin):

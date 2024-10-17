@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.filesystems.overlay import Overlay2Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class Overlay2Loader(Loader):

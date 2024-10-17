@@ -16,7 +16,7 @@ from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Union
 
 import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
@@ -25,7 +25,9 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 log = logging.getLogger(__name__)
 

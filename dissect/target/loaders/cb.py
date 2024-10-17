@@ -30,7 +30,7 @@ from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
-    from dissect.target.target import Target
+    from dissect.target import Target
 
 
 class CbLoader(Loader):

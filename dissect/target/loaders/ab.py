@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import hashlib
 import io
 import posixpath
 import shutil
 import struct
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 try:
     from Crypto.Cipher import AES
@@ -21,7 +23,10 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
+
 
 DIRECTORY_MAPPING = {
     "a": "/data/app/{id}",
