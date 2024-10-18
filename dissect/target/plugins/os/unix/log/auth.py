@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import lru_cache
 from itertools import chain
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -29,27 +29,22 @@ RE_LINE = re.compile(
 )
 
 # Generic regular expressions
-IPV4_ADDRESS_REGEX = re.compile(
+RE_IPV4_ADDRESS = re.compile(
     r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}"  # First three octets
     r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"  # Last octet
 )
-PAM_UNIX_REGEX = re.compile(
-    r"pam_unix\([^\s]+:session\):\s(?P<action>session\s\w+) "  # Session action, usually opened or closed
-    r"for\suser\s(?P<user>[^\s\(]+)(?:\(uid=(?P<user_uid>\d+)\))?"  # User may contain uid like: root(uid=0)
-    r"(?:\sby\s\(uid=(?P<by_uid>\d+)\))?$"  # Opened action also contains this "by" addition
-)
-USER_REGEX = re.compile(r"for ([^\s]+)")
+RE_USER = re.compile(r"for ([^\s]+)")
 
 
 class BaseService(ABC):
     @classmethod
     @abstractmethod
-    def parse_message(cls, message: str) -> dict[str, any]:
+    def parse(cls, message: str) -> dict[str, any]:
         pass
 
 
 class SudoService(BaseService):
-    """Class for parsing sudo service messages in the auth log"""
+    """Parsing of sudo service messages in the auth log."""
 
     SUDO_COMMAND_REGEX = re.compile(
         r"TTY=(?P<tty>\w+\/\w+)\s;\s"  # The TTY -> TTY=pts/0 ;
@@ -59,8 +54,8 @@ class SudoService(BaseService):
     )
 
     @classmethod
-    def parse_message(cls, message: str) -> dict[str, str]:
-        """Parse auth log message from sudo"""
+    def parse(cls, message: str) -> dict[str, str]:
+        """Parse auth log message from sudo."""
         if not (match := cls.SUDO_COMMAND_REGEX.search(message)):
             return {}
 
@@ -72,21 +67,21 @@ class SudoService(BaseService):
 
 
 class SshdService(BaseService):
-    """Class for parsing sshd messages in the auth log"""
+    """Class for parsing sshd messages in the auth log."""
 
-    SSHD_PORT_REGEX = re.compile(r"port\s(\d+)")
-    USER_REGEX = re.compile(r"for\s([^\s]+)")
+    RE_SSHD_PORTREGEX = re.compile(r"port\s(\d+)")
+    RE_USER = re.compile(r"for\s([^\s]+)")
 
     @classmethod
-    def parse_message(cls, message: str) -> dict[str, str | int]:
+    def parse(cls, message: str) -> dict[str, str | int]:
         """Parse message from sshd"""
         additional_fields = {}
-        if ip_address := IPV4_ADDRESS_REGEX.search(message):
+        if ip_address := RE_IPV4_ADDRESS.search(message):
             field_name = "host_ip" if "listening" in message else "remote_ip"
             additional_fields[field_name] = ip_address.group(0)
-        if port := cls.SSHD_PORT_REGEX.search(message):
+        if port := cls.RE_SSHD_PORTREGEX.search(message):
             additional_fields["port"] = int(port.group(1))
-        if user := cls.USER_REGEX.search(message):
+        if user := cls.RE_USER.search(message):
             additional_fields["user"] = user.group(1)
         # Accepted publickey for test_user from 8.8.8.8 IP port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio
         if "Accepted publickey" in message:
@@ -105,23 +100,23 @@ class SshdService(BaseService):
 
 
 class SystemdLogindService(BaseService):
-    """Class for parsing systemd-logind messages in the auth log"""
+    """Class for parsing systemd-logind messages in the auth log."""
 
-    SYSTEMD_LOGIND_WATCHING_REGEX = re.compile(
+    RE_SYSTEMD_LOGIND_WATCHING = re.compile(
         r"(?P<action>Watching\ssystem\sbuttons)\s"  # Action is "Watching system buttons"
         r"on\s(?P<device>[^\s]+)\s"  # The device the button is related to -> /dev/input/event0
         r"\((?P<device_name>.*?)\)"  # The device (button) name -> "(Power button)"
     )
 
     @classmethod
-    def parse_message(cls, message: str):
-        """Parse auth log message from systemd-logind"""
+    def parse(cls, message: str):
+        """Parse auth log message from systemd-logind."""
         additional_fields = {}
         # Example: Nov 14 07:14:09 ubuntu-1 systemd-logind[4]: Removed session 4.
         if "Removed" in message:
             additional_fields["action"] = "removed session"
             additional_fields["session"] = message.split()[-1].strip(".")
-        elif "Watching" in message and (match := cls.SYSTEMD_LOGIND_WATCHING_REGEX.search(message)):
+        elif "Watching" in message and (match := cls.RE_SYSTEMD_LOGIND_WATCHING.search(message)):
             for key, value in match.groupdict().items():
                 additional_fields[key] = value
         # Example: New session 4 of user sampleuser.
@@ -145,22 +140,22 @@ class SystemdLogindService(BaseService):
 
 
 class SuService(BaseService):
-    """Class for parsing su messages in the auth log"""
+    """Class for parsing su messages in the auth log."""
 
-    SU_BY_REGEX = re.compile(r"by\s([^\s]+)")
-    SU_ON_REGEX = re.compile(r"on\s([^\s]+)")
-    SU_COMMAND_REGEX = re.compile(r"'(.*?)'")
+    RE_SU_BY = re.compile(r"by\s([^\s]+)")
+    RE_SU_ON = re.compile(r"on\s([^\s]+)")
+    RE_SU_COMMAND = re.compile(r"'(.*?)'")
 
     @classmethod
-    def parse_message(cls, message: str) -> dict[str, str]:
+    def parse(cls, message: str) -> dict[str, str]:
         additional_fields = {}
-        if user := USER_REGEX.search(message):
+        if user := RE_USER.search(message):
             additional_fields["user"] = user.group(1)
-        if by := cls.SU_BY_REGEX.search(message):
+        if by := cls.RE_SU_BY.search(message):
             additional_fields["by"] = by.group(1)
-        if on := cls.SU_ON_REGEX.search(message):
+        if on := cls.RE_SU_ON.search(message):
             additional_fields["device"] = on.group(1)
-        if command := cls.SU_COMMAND_REGEX.search(message):
+        if command := cls.RE_SU_COMMAND.search(message):
             additional_fields["command"] = command.group(1)
         if (failed := "failed" in message) or "Successful" in message:
             additional_fields["su_result"] = "failed" if failed else "success"
@@ -169,9 +164,9 @@ class SuService(BaseService):
 
 
 class PkexecService(BaseService):
-    """Class for parsing pkexec messages in the auth log"""
+    """Class for parsing pkexec messages in the auth log."""
 
-    PKEXEC_COMMAND_REGEX = re.compile(
+    RE_PKEXEC_COMMAND = re.compile(
         r"(?P<user>\S+?):\sExecuting\scommand\s"  # Starts with actual user -> user:
         r"\[USER=(?P<effective_user>[^\]]+)\]\s"  # The impersonated user -> [USER=root]
         r"\[TTY=(?P<tty>[^\]]+)\]\s"  # The tty -> [TTY=unknown]
@@ -180,10 +175,10 @@ class PkexecService(BaseService):
     )
 
     @classmethod
-    def parse_message(cls, message: str) -> dict[str, str]:
+    def parse(cls, message: str) -> dict[str, str]:
         """Parse auth log message from pkexec"""
         additional_fields = {}
-        if exec_cmd := cls.PKEXEC_COMMAND_REGEX.search(message):
+        if exec_cmd := cls.RE_PKEXEC_COMMAND.search(message):
             additional_fields["action"] = "executing command"
             for key, value in exec_cmd.groupdict().items():
                 if value and value.isdigit():
@@ -193,8 +188,30 @@ class PkexecService(BaseService):
         return additional_fields
 
 
+class PamUnixService(BaseService):
+    RE_PAM_UNIX = re.compile(
+        r"pam_unix\([^\s]+:session\):\s(?P<action>session\s\w+) "  # Session action, usually opened or closed
+        r"for\suser\s(?P<user>[^\s\(]+)(?:\(uid=(?P<user_uid>\d+)\))?"  # User may contain uid like: root(uid=0)
+        r"(?:\sby\s\(uid=(?P<by_uid>\d+)\))?$"  # Opened action also contains this "by" addition
+    )
+
+    @classmethod
+    def parse(cls, message):
+        """Parse auth log message from pluggable authentication modules (PAM)."""
+        if not (match := cls.RE_PAM_UNIX.search(message)):
+            return {}
+
+        additional_fields = {}
+        for key, value in match.groupdict().items():
+            if value and value.isdigit():
+                value = int(value)
+            additional_fields[key] = value
+
+        return additional_fields
+
+
 class AuthLogRecordBuilder:
-    """Class for dynamically creating auth log records"""
+    """Class for dynamically creating auth log records."""
 
     RECORD_NAME = "linux/log/auth"
     SERVICES: dict[str, BaseService] = {
@@ -209,40 +226,24 @@ class AuthLogRecordBuilder:
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
         self.target = target
 
-    def _parse_pam_unix_message(self, message: str) -> dict[str, str]:
-        """Parse auth log message from pluggable authentication modules (PAM)"""
-        if not (match := PAM_UNIX_REGEX.search(message)):
-            return {}
-
-        additional_fields = {}
-        for key, value in match.groupdict().items():
-            if value and value.isdigit():
-                value = int(value)
-            additional_fields[key] = value
-
-        return additional_fields
-
-    def _parse_additional_fields(self, service: str, message: str) -> dict[str, any]:
-        """Parse additional fields in the message based on the service"""
+    def _parse_additional_fields(self, service: str, message: str) -> dict[str, Any]:
+        """Parse additional fields in the message based on the service."""
         if "pam_unix(" in message:
-            return self._parse_pam_unix_message(message)
+            return PamUnixService.parse(message)
 
         if service not in self.SERVICES:
             self.target.log.debug("Service %s is not recognised, no additional fields could be parsed", service)
             return {}
 
         try:
-            service_class = self.SERVICES[service]
-            return service_class.parse_message(message)
+            return self.SERVICES[service].parse(message)
         except Exception as e:
-            self.target.log.warning(
-                "Parsing additional fields in message '%s' for service %s failed", message, service, exc_info=e
-            )
+            self.target.log.warning("Parsing additional fields in message '%s' for service %s failed", message, service)
             self.target.log.debug("", exc_info=e)
             raise e
 
     def build_record(self, ts: datetime, source: Path, line: str) -> TargetRecordDescriptor:
-        """Builds an AuthLog event record"""
+        """Builds an ``AuthLog`` event record."""
 
         record_fields = [
             ("datetime", "ts"),
@@ -299,7 +300,7 @@ class AuthPlugin(Plugin):
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
-    def authlog(self) -> Iterator[any]:
+    def authlog(self) -> Iterator[Any]:
         """Yield contents of ``/var/log/auth.log*`` and ``/var/log/secure*`` files.
 
         Order of returned events is not guaranteed to be chronological because of year
