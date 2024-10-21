@@ -92,7 +92,7 @@ class RegistryPlugin(Plugin):
 
     def _init_registry(self) -> None:
         dirs = [
-            # Windows XP, and Server 2003
+            # Windows XP or newer
             ("sysvol/windows/system32/config", False),
             # Windows NT3, NT4, 2k
             ("sysvol/WINNT/system32/config", False),
