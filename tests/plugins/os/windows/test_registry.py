@@ -20,6 +20,12 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> 
     expected = [
         f"{target}: Could not find hive: sysvol/windows/system32/config/{hive}" for hive in RegistryPlugin.SYSTEM
     ]
+
+    expected += [
+        f"{target}: Could not find hive: sysvol/WINNT/system32/config/{hive}" for hive in RegistryPlugin.SYSTEM
+    ]
+    expected += [f"{target}: Could not find hive: sysvol/windows/{hive}" for hive in RegistryPlugin.SYSTEM]
+    expected += [f"{target}: Could not find hive: sysvol/reactos/{hive}" for hive in RegistryPlugin.SYSTEM]
     expected += [
         f"{target}: Could not find hive: sysvol/windows/system32/config/RegBack/{hive}"
         for hive in RegistryPlugin.SYSTEM
