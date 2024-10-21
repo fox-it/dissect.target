@@ -15,7 +15,7 @@ def jffs_fs() -> Iterator[JFFSFilesystem]:
 
 
 @pytest.fixture
-def jffs_fs_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
+def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
     raw_inode = Mock(uid=1000, guid=999, isize=165002)
     inode = Mock(
         mode=33204,
@@ -24,19 +24,45 @@ def jffs_fs_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
         atime=datetime(2024, 10, 1, 12, 0, 0),
         mtime=datetime(2024, 10, 2, 12, 0, 0),
         ctime=datetime(2024, 10, 3, 12, 0, 0),
+        is_file=lambda: True,
+        is_dir=lambda: False,
+        is_symlink=lambda: False,
     )
 
     entry = JFFSFilesystemEntry(jffs_fs, "/some_file", inode)
     yield entry
 
 
-def test_jffs2(jffs_fs: JFFSFilesystem, jffs_fs_entry: JFFSFilesystemEntry) -> None:
-    stat = jffs_fs_entry.stat()
+@pytest.fixture
+def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
+    raw_inode = Mock(uid=1000, guid=999, isize=0)
+    inode = Mock(
+        mode=16893,
+        inum=2,
+        inode=raw_inode,
+        atime=datetime(2024, 10, 1, 12, 0, 0),
+        mtime=datetime(2024, 10, 2, 12, 0, 0),
+        ctime=datetime(2024, 10, 3, 12, 0, 0),
+        is_file=lambda: False,
+        is_dir=lambda: True,
+        is_symlink=lambda: False,
+    )
 
-    entry = jffs_fs_entry.entry
+    entry = JFFSFilesystemEntry(jffs_fs, "/some_directory", inode)
+    yield entry
+
+
+@pytest.mark.parametrize(
+    "entry_fixture, expected_blocks", [("jffs_fs_file_entry", 323), ("jffs_fs_directory_entry", 0)]
+)
+def test_jffs2_stat(entry_fixture: str, expected_blocks: int, request: pytest.FixtureRequest) -> None:
+    jffs_entry: JFFSFilesystemEntry = request.getfixturevalue(entry_fixture)
+    stat = jffs_entry.stat()
+
+    entry = jffs_entry.entry
     assert stat.st_mode == entry.mode
     assert stat.st_ino == entry.inum
-    assert stat.st_dev == id(jffs_fs)
+    assert stat.st_dev == id(jffs_entry.fs)
     assert stat.st_nlink == 1
     assert stat.st_uid == entry.inode.uid
     assert stat.st_gid == entry.inode.gid
@@ -45,4 +71,4 @@ def test_jffs2(jffs_fs: JFFSFilesystem, jffs_fs_entry: JFFSFilesystemEntry) -> N
     assert stat.st_mtime == entry.mtime.timestamp()
     assert stat.st_ctime == entry.ctime.timestamp()
     assert stat.st_blksize == 4096
-    assert stat.st_blocks == 323
+    assert stat.st_blocks == expected_blocks
