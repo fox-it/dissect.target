@@ -18,7 +18,7 @@ def jffs_fs() -> Iterator[JFFSFilesystem]:
 def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
     raw_inode = Mock(uid=1000, guid=999, isize=165002)
     inode = Mock(
-        mode=33204,
+        mode=0o100664,
         inum=4,
         inode=raw_inode,
         atime=datetime(2024, 10, 1, 12, 0, 0),
@@ -37,7 +37,7 @@ def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]
 def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
     raw_inode = Mock(uid=1000, guid=999, isize=0)
     inode = Mock(
-        mode=16893,
+        mode=0o40775,
         inum=2,
         inode=raw_inode,
         atime=datetime(2024, 10, 1, 12, 0, 0),
