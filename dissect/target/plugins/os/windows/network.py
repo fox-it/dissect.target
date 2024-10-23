@@ -240,10 +240,10 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self._extract_network_device_config = lru_cache(4096)(self._extract_network_device_config)
+        self._extract_network_device_config = lru_cache(128)(self._extract_network_device_config)
 
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
-        """Yields found Windows interfaces used by :class:`NetworkPlugin` `interfaces` export func."""
+        """Yields found Windows interfaces used by :class:`NetworkPlugin` ``interfaces`` export func."""
 
         # Get all the network interfaces
         for key in self.target.registry.keys(
