@@ -31,7 +31,7 @@ class WindowsApplicationsPlugin(Plugin):
         Resources:
             - https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key
 
-        Yields ``WindowsApplicationRecord``s with the following fields:
+        Yields ``WindowsApplicationRecord`` records with the following fields:
 
         .. code-block:: text
 

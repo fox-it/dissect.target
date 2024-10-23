@@ -51,7 +51,7 @@ class UnixApplicationsPlugin(Plugin):
             - https://specifications.freedesktop.org/desktop-entry-spec/latest/
             - https://unix.stackexchange.com/questions/582928/where-gnome-apps-are-installed
 
-        Yields ``UnixApplicationRecord``s with the following fields:
+        Yields ``UnixApplicationRecord`` records with the following fields:
 
         .. code-block:: text
 
