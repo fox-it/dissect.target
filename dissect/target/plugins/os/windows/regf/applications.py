@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -45,10 +46,14 @@ class WindowsApplicationsPlugin(Plugin):
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
+                install_date = None
+
+                if install_date := values.get("InstallDate"):
+                    install_date = datetime.strptime(install_date, "%Y%m%d")
 
                 yield WindowsApplicationRecord(
                     ts_modified=app.ts,
-                    ts_installed=values.get("InstallDate"),
+                    ts_installed=install_date,
                     name=values.get("DisplayName") or app.name,
                     version=values.get("DisplayVersion"),
                     author=values.get("Publisher"),
