@@ -34,7 +34,7 @@ def test_base_network_plugin(target_bare: Target, network_record: InterfaceRecor
         assert network.ips() == ["10.42.42.10"]
         assert network.gateways() == ["10.42.42.1"]
         assert network.macs() == ["DE:AD:BE:EF:00:00"]
-        assert list(map(str, network.dns())) == ["8.8.8.8", "1.1.1.1"]
+        assert sorted(list(map(str, network.dns()))) == ["1.1.1.1", "8.8.8.8"]
 
         assert len(list(network.in_cidr("10.42.42.0/24"))) == 1
         assert len(list(network.in_cidr("10.43.42.0/24"))) == 0
