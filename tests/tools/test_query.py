@@ -296,5 +296,5 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "name": "sam",
         "description": "Dump SAM entries",
         "output": "record",
-        "path": "os.windows.sam.sam",
+        "path": "os.windows.credential.sam.sam",
     }
