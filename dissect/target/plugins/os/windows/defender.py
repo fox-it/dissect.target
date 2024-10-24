@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator, TextIO, Union
+from typing import Any, BinaryIO, Iterable, Iterator, TextIO
 
 import dissect.util.ts as ts
 from dissect.cstruct import cstruct
@@ -434,7 +434,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No Defender objects found")
 
     @plugin.export(record=DefenderLogRecord)
-    def evtx(self) -> Generator[Record, None, None]:
+    def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files"""
 
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
@@ -458,7 +458,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
     @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
-    def quarantine(self) -> Iterator[Union[DefenderQuarantineRecord, DefenderFileQuarantineRecord]]:
+    def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in

@@ -27,6 +27,8 @@ FilesystemRecord = TargetRecordDescriptor(
 
 
 class WalkFSPlugin(Plugin):
+    """Filesystem agnostic walkfs plugin."""
+
     def check_compatible(self) -> None:
         if not len(self.target.filesystems):
             raise UnsupportedPluginError("No filesystems to walk")
