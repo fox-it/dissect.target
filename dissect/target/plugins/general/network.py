@@ -53,22 +53,22 @@ class NetworkPlugin(Plugin):
     @export
     def ips(self) -> list[IPAddress]:
         """Return IP addresses as list of :class:`IPAddress`."""
-        return list(self._get_record_type("ip"))
+        return list(set(self._get_record_type("ip")))
 
     @export
     def gateways(self) -> list[IPAddress]:
         """Return gateways as list of :class:`IPAddress`."""
-        return list(self._get_record_type("gateway"))
+        return list(set(self._get_record_type("gateway")))
 
     @export
     def macs(self) -> list[str]:
         """Return MAC addresses as list of :class:`str`."""
-        return list(self._get_record_type("mac"))
+        return list(set(self._get_record_type("mac")))
 
     @export
-    def dns(self) -> list[str]:
+    def dns(self) -> list[str | IPAddress]:
         """Return DNS addresses as list of :class:`str`."""
-        return list(self._get_record_type("dns"))
+        return list(set(self._get_record_type("dns")))
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
