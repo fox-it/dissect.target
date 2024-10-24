@@ -608,6 +608,15 @@ def remove_padding(decrypted: bytes) -> bytes:
 
 
 def decrypt_v10(encrypted_password: bytes) -> str:
+    """Decrypt a version 10 encrypted password.
+
+    Args:
+        encrypted_password: The encrypted password bytes.
+
+    Returns:
+        Decrypted password string.
+    """
+
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -625,12 +634,24 @@ def decrypt_v10(encrypted_password: bytes) -> str:
 
 
 def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
-    """
-    struct chrome_pass {
-        byte signature[3] = 'v10';
-        byte iv[12];
-        byte ciphertext[EOF];
-    }
+    """Decrypt a version 10 type 2 password.
+
+    References:
+
+        .. code-block::
+
+            struct chrome_pass {
+                byte signature[3] = 'v10';
+                byte iv[12];
+                byte ciphertext[EOF];
+            }
+
+    Args:
+        encrypted_password: The encrypted password bytes.
+        key: The encryption key.
+
+    Returns:
+        Decrypted password string.
     """
 
     if not HAS_CRYPTO:

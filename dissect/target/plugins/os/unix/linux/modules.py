@@ -28,6 +28,8 @@ class Module:
 
 
 class ModulePlugin(Plugin):
+    """Linux volatile kernel ``/sys/module`` plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._module_base_path = self.target.fs.path("/sys/module")
