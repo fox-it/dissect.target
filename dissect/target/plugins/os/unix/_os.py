@@ -5,7 +5,7 @@ import re
 import uuid
 from pathlib import Path
 from struct import unpack
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
 
 from flow.record.fieldtypes import posix_path
 
@@ -14,7 +14,9 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 log = logging.getLogger(__name__)
 

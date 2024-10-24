@@ -14,7 +14,6 @@ from impacket.dcerpc.v5 import rpcrt, rrp, scmr, transport
 from impacket.dcerpc.v5.rpcrt import DCERPCException
 from impacket.smbconnection import SessionError, SMBConnection
 
-from dissect.target import Target
 from dissect.target.exceptions import (
     LoaderError,
     RegistryKeyNotFoundError,
@@ -29,6 +28,8 @@ from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
 if TYPE_CHECKING:
     from impacket.dcerpc.v5.srvs import SHARE_INFO_1
+
+    from dissect.target import Target
 
 
 class SmbLoader(Loader):
