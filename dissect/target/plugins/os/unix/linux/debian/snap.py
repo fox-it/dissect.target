@@ -44,7 +44,7 @@ class SnapPlugin(Plugin):
             - https://github.com/canonical/snapcraft
             - https://en.wikipedia.org/wiki/Snap_(software)
 
-        Yields ``UnixApplicationRecord``s with the following fields:
+        Yields ``UnixApplicationRecord`` records with the following fields:
 
         .. code-block:: text
 
