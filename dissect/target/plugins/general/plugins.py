@@ -98,12 +98,16 @@ def get_description_dict(
 
 
 class PluginListPlugin(Plugin):
+    """Plugin list plugin (so meta)."""
+
     def check_compatible(self) -> None:
         pass
 
     @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true")
     def plugins(self, plugins: list[dict] = None, print_docs: bool = False) -> None:
+        """Print all registered plugins to stdout."""
+
         categorized_plugins = dict(sorted(categorize_plugins(plugins).items()))
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 

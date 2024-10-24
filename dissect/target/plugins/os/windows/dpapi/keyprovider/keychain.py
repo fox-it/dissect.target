@@ -8,6 +8,8 @@ from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
 
 
 class KeychainKeyProviderPlugin(KeyProviderPlugin):
+    """Keychain key provider plugin."""
+
     __namespace__ = "_dpapi_keyprovider_keychain"
 
     def check_compatible(self) -> None:
@@ -15,6 +17,7 @@ class KeychainKeyProviderPlugin(KeyProviderPlugin):
 
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
+        """Yield keychain passphrases."""
         for key in keychain.get_keys_for_provider("user") + keychain.get_keys_without_provider():
             if key.key_type == keychain.KeyType.PASSPHRASE:
                 yield self.__namespace__, key.value
