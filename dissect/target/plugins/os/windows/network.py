@@ -236,7 +236,7 @@ def _get_config_value(key: RegistryKey, name: str) -> set:
 
 
 class WindowsNetworkPlugin(NetworkPlugin):
-    """Windows network plugin."""
+    """Windows network interface plugin."""
 
     def __init__(self, target: Target):
         super().__init__(target)

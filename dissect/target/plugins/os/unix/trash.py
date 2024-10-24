@@ -59,7 +59,7 @@ class GnomeTrashPlugin(Plugin):
             - https://github.com/GNOME/glib/blob/main/gio/glocalfile.c
             - https://specifications.freedesktop.org/basedir-spec/latest/
 
-        Yields ``TrashRecord``s with the following fields:
+        Yields ``TrashRecord`` records with the following fields:
 
         .. code-block:: text
 
