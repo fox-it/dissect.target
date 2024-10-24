@@ -102,6 +102,8 @@ def get_description_dict(
 
 
 class PluginListPlugin(Plugin):
+    """Plugin list plugin (so meta)."""
+
     def check_compatible(self) -> None:
         pass
 
@@ -113,6 +115,7 @@ class PluginListPlugin(Plugin):
 
         dict_plugins = list({p.path: p.plugin_desc for p in plugins}.values())
         categorized_plugins = dict(sorted(categorize_plugins(dict_plugins).items()))
+
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 
         plugins_list = textwrap.indent(

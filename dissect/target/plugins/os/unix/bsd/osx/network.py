@@ -10,6 +10,8 @@ from dissect.target.target import Target
 
 
 class MacNetworkPlugin(NetworkPlugin):
+    """macOS network interface plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._plistnetwork = cache(self._plistnetwork)

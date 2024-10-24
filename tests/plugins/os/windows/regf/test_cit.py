@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cit import CITPlugin
 

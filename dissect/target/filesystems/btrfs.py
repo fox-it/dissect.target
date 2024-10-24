@@ -181,6 +181,9 @@ class BtrfsFilesystemEntry(FilesystemEntry):
 
         # Add block information of the filesystem
         st_info.st_blksize = entry.btrfs.sector_size
-        st_info.st_blocks = math.ceil(entry.size / st_info.st_blksize)
+
+        st_info.st_blocks = 0
+        if not self.is_dir():
+            st_info.st_blocks = (st_info.st_blksize // 512) * math.ceil(st_info.st_size / st_info.st_blksize)
 
         return st_info

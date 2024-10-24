@@ -18,6 +18,8 @@ LinuxServiceRecord = TargetRecordDescriptor(RECORD_NAME, DEFAULT_ELEMENTS)
 
 
 class ServicesPlugin(Plugin):
+    """Linux services plugin."""
+
     SYSTEMD_PATHS = [
         "/etc/systemd/system",
         "/lib/systemd/system",
@@ -35,9 +37,9 @@ class ServicesPlugin(Plugin):
         """Return information about all installed systemd and init.d services.
 
         References:
-        - https://geeksforgeeks.org/what-is-init-d-in-linux-service-management
-        - http://0pointer.de/blog/projects/systemd-for-admins-3.html
-        - https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
+            - https://geeksforgeeks.org/what-is-init-d-in-linux-service-management
+            - http://0pointer.de/blog/projects/systemd-for-admins-3.html
+            - https://www.freedesktop.org/software/systemd/man/latest/systemd.syntax.html
         """
 
         return chain(self.systemd(), self.initd())

@@ -8,6 +8,8 @@ log = logging.getLogger(__name__)
 
 
 class KeyType(Enum):
+    """Valid key types."""
+
     RAW = "raw"
     PASSPHRASE = "passphrase"
     RECOVERY_KEY = "recovery_key"
