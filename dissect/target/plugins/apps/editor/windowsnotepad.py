@@ -17,10 +17,7 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import export
-from dissect.target.plugins.apps.texteditor.texteditor import (
-    GENERIC_TAB_CONTENTS_RECORD_FIELDS,
-    TexteditorPlugin,
-)
+from dissect.target.plugins.apps.editor.editor import EditorPlugin
 from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
@@ -94,15 +91,27 @@ struct options_v2 {
 };
 """
 
-WINDOWS_SAVED_TABS_EXTRA_FIELDS = [("datetime", "modification_time"), ("digest", "hashes"), ("path", "saved_path")]
+GENERIC_TAB_CONTENTS_RECORD_FIELDS = [
+    ("string", "editor"),
+    ("string", "content"),
+    ("path", "path"),
+    ("string", "deleted_content"),
+    ("path", "source"),
+]
+
+WINDOWS_SAVED_TABS_EXTRA_FIELDS = [
+    ("datetime", "ts_mtime"),
+    ("digest", "digest"),
+    ("path", "saved_path"),
+]
 
 WindowsNotepadUnsavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "texteditor/windowsnotepad/tab/unsaved",
+    "application/editor/windowsnotepad/tab/unsaved",
     GENERIC_TAB_CONTENTS_RECORD_FIELDS,
 )
 
 WindowsNotepadSavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "texteditor/windowsnotepad/tab/saved",
+    "application/editor/windowsnotepad/tab/saved",
     GENERIC_TAB_CONTENTS_RECORD_FIELDS + WINDOWS_SAVED_TABS_EXTRA_FIELDS,
 )
 
@@ -264,7 +273,7 @@ class WindowsNotepadTab:
         self.deleted_content = deleted_content if deleted_content else None
 
 
-class WindowsNotepadPlugin(TexteditorPlugin):
+class WindowsNotepadPlugin(EditorPlugin):
     """Windows notepad tab content plugin."""
 
     __namespace__ = "windowsnotepad"
@@ -304,16 +313,16 @@ class WindowsNotepadPlugin(TexteditorPlugin):
             - https://github.com/Nordgaren/tabstate-util/issues/1
             - https://medium.com/@mahmoudsoheem/new-digital-forensics-artifact-from-windows-notepad-527645906b7b
 
-        Yields a WindowsNotepadSavedTabRecord or WindowsNotepadUnsavedTabRecord. with fields:
+        Yields a ``WindowsNotepadSavedTabRecord`` or ``WindowsNotepadUnsavedTabRecord`` with fields:
 
         .. code-block:: text
 
+            ts_mtime (datetime): The modification time of the tab.
             content (string): The content of the tab.
             path (path): The path to the tab file.
             deleted_content (string): The deleted content of the tab, if available.
-            hashes (digest): A digest of the tab content.
+            digest (digest): A digest of the tab content.
             saved_path (path): The path where the tab was saved.
-            modification_time (datetime): The modification time of the tab.
         """
         for file, user in self.users_tabs:
             # Parse the file
@@ -321,20 +330,24 @@ class WindowsNotepadPlugin(TexteditorPlugin):
 
             if tab.is_saved:
                 yield WindowsNotepadSavedTabRecord(
+                    ts_mtime=wintimestamp(tab.tab_header.timestamp),
+                    editor="windowsnotepad",
                     content=tab.content,
                     path=tab.file,
                     deleted_content=tab.deleted_content,
-                    hashes=digest((None, None, tab.tab_header.sha256.hex())),
+                    digest=digest((None, None, tab.tab_header.sha256.hex())),
                     saved_path=tab.tab_header.filePath,
-                    modification_time=wintimestamp(tab.tab_header.timestamp),
-                    _target=self.target,
+                    source=file,
                     _user=user,
+                    _target=self.target,
                 )
             else:
                 yield WindowsNotepadUnsavedTabRecord(
+                    editor="windowsnotepad",
                     content=tab.content,
-                    path=tab.file,
-                    _target=self.target,
-                    _user=user,
                     deleted_content=tab.deleted_content,
+                    path=tab.file,
+                    source=file,
+                    _user=user,
+                    _target=self.target,
                 )
