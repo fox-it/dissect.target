@@ -25,7 +25,7 @@ def xfs_fs_entry(xfs_fs: XfsFilesystem) -> Iterator[XfsFilesystemEntry]:
     ctime = datetime(2024, 10, 3, 12, 0, 0)
     crtime = datetime(2024, 10, 4, 12, 0, 0)
 
-    dinode = Mock(di_mode=33272, di_nlink=1, di_uid=1000, di_gid=999)
+    dinode = Mock(di_mode=0o100750, di_nlink=1, di_uid=1000, di_gid=999)
     inode = Mock(
         nblocks=10,
         inode=dinode,
