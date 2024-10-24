@@ -276,6 +276,10 @@ def get_optional(value: str, to_type: Callable) -> Any | None:
         log.debug("", exc_info=e)
         return None
 
+# Sometimes stringy None is inserted by external tools like Ansible    
+def int_or_none(value: str):
+    return int(value) if value and value != "None" else None
+
 
 class JournalFile:
     """Parse Systemd Journal file format.
