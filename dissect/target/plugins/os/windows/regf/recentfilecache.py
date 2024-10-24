@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -40,7 +42,7 @@ class RecentFileCachePlugin(Plugin):
             raise UnsupportedPluginError("Could not load RecentFileCache.bcf")
 
     @export(record=RecentFileCacheRecord)
-    def recentfilecache(self):
+    def recentfilecache(self) -> Iterator[RecentFileCacheRecord]:
         """Parse RecentFileCache.bcf.
 
         Yields RecentFileCacheRecords with fields:

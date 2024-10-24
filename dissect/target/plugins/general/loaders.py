@@ -10,7 +10,7 @@ class LoaderListPlugin(Plugin):
         pass
 
     @export(output="none")
-    def loaders(self):
+    def loaders(self) -> None:
         """List the available loaders."""
 
         loaders_info = {}

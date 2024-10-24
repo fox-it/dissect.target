@@ -29,6 +29,8 @@ def timezone_from_path(path: Path) -> str:
 
 
 class LocalePlugin(Plugin):
+    """Unix locale plugin."""
+
     def check_compatible(self) -> None:
         pass
 

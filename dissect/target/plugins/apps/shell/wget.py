@@ -52,7 +52,7 @@ class WgetPlugin(Plugin):
             - https://gitlab.com/gnuwget/wget/-/blob/master/src/hsts.c
             - https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security
 
-        Yields ``WgetHstsRecord``s with the following fields:
+        Yields ``WgetHstsRecord`` records with the following fields:
 
         .. code-block:: text
 
