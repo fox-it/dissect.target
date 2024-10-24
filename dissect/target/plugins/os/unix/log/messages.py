@@ -34,6 +34,8 @@ RE_CLOUD_INIT_LINE = re.compile(
 
 
 class MessagesPlugin(Plugin):
+    """Unix messages log plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.log_files = set(self._find_log_files())

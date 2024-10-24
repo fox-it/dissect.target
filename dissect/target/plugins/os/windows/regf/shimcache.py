@@ -108,7 +108,7 @@ MAGIC_WIN10 = 0x73743031
 
 
 class SHIMCACHE_WIN_TYPE(IntEnum):
-    """Specific shimcache versions"""
+    """Shimcache version mapping."""
 
     VERSION_WIN10_CREATORS = 0x1001
     VERSION_WIN10 = 0x1000
