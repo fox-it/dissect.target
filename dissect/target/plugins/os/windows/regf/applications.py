@@ -46,7 +46,6 @@ class WindowsApplicationsPlugin(Plugin):
         for uninstall in self.keys:
             for app in uninstall.subkeys():
                 values = {value.name: value.value for value in app.values()}
-                install_date = None
 
                 if install_date := values.get("InstallDate"):
                     install_date = datetime.strptime(install_date, "%Y%m%d")
