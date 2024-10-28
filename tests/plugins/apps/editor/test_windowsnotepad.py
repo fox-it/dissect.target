@@ -190,6 +190,6 @@ def test_windows_saved_tab_plugin_extra_fields(
         assert len(rec.content) == len(file_text_map[rec.path.name][0])
         assert rec.content == file_text_map[rec.path.name][0]
         assert rec.saved_path == file_text_map[rec.path.name][1]
-        assert rec.ts_mtime == file_text_map[rec.path.name][2]
+        assert rec.ts == file_text_map[rec.path.name][2]
         assert rec.digest.sha256 == file_text_map[rec.path.name][3]
         assert rec.source is not None

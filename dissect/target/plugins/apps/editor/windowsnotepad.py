@@ -17,7 +17,7 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import export
-from dissect.target.plugins.apps.editor.editor import EditorPlugin
+from dissect.target.plugins.apps.editor.editor import COMMON_EDITOR_FIELDS, EditorPlugin
 from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
@@ -92,27 +92,24 @@ struct options_v2 {
 """
 
 GENERIC_TAB_CONTENTS_RECORD_FIELDS = [
-    ("string", "editor"),
     ("string", "content"),
     ("path", "path"),
     ("string", "deleted_content"),
-    ("path", "source"),
-]
-
-WINDOWS_SAVED_TABS_EXTRA_FIELDS = [
-    ("datetime", "ts_mtime"),
-    ("digest", "digest"),
-    ("path", "saved_path"),
 ]
 
 WindowsNotepadUnsavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/editor/windowsnotepad/tab/unsaved",
-    GENERIC_TAB_CONTENTS_RECORD_FIELDS,
+    COMMON_EDITOR_FIELDS + GENERIC_TAB_CONTENTS_RECORD_FIELDS,
 )
 
 WindowsNotepadSavedTabRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/editor/windowsnotepad/tab/saved",
-    GENERIC_TAB_CONTENTS_RECORD_FIELDS + WINDOWS_SAVED_TABS_EXTRA_FIELDS,
+    COMMON_EDITOR_FIELDS
+    + GENERIC_TAB_CONTENTS_RECORD_FIELDS
+    + [
+        ("digest", "digest"),
+        ("path", "saved_path"),
+    ],
 )
 
 c_windowstab = cstruct().load(windowstab_def)
@@ -282,15 +279,14 @@ class WindowsNotepadPlugin(EditorPlugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.users_tabs: list[TargetPath, UnixUserRecord | WindowsUserRecord] = []
+        self.users_tabs: set[TargetPath, UnixUserRecord | WindowsUserRecord] = set()
         for user_details in self.target.user_details.all_with_home():
             for tab_file in user_details.home_path.glob(self.GLOB):
-                # These files seem to contain information on different settings / configurations,
-                # and are skipped for now
+                # These files contain information on different settings / configurations, and are skipped for now.
                 if tab_file.name.endswith(".1.bin") or tab_file.name.endswith(".0.bin"):
                     continue
 
-                self.users_tabs.append((tab_file, user_details.user))
+                self.users_tabs.add((tab_file, user_details.user))
 
     def check_compatible(self) -> None:
         if not self.users_tabs:
@@ -303,7 +299,6 @@ class WindowsNotepadPlugin(EditorPlugin):
         Windows Notepad application for Windows 11 is now able to restore both saved and unsaved tabs when you re-open
         the application.
 
-
         Resources:
             - https://github.com/fox-it/dissect.target/pull/540
             - https://github.com/JustArion/Notepad-Tabs
@@ -313,24 +308,23 @@ class WindowsNotepadPlugin(EditorPlugin):
             - https://github.com/Nordgaren/tabstate-util/issues/1
             - https://medium.com/@mahmoudsoheem/new-digital-forensics-artifact-from-windows-notepad-527645906b7b
 
-        Yields a ``WindowsNotepadSavedTabRecord`` or ``WindowsNotepadUnsavedTabRecord`` with fields:
+        Yields ``WindowsNotepadSavedTabRecord`` or ``WindowsNotepadUnsavedTabRecord`` records:
 
         .. code-block:: text
 
-            ts_mtime (datetime): The modification time of the tab.
-            content (string): The content of the tab.
-            path (path): The path to the tab file.
-            deleted_content (string): The deleted content of the tab, if available.
-            digest (digest): A digest of the tab content.
-            saved_path (path): The path where the tab was saved.
+            ts              (datetime): The modification time of the tab.
+            content         (string):   The content of the tab.
+            path            (path):     The path to the tab file.
+            deleted_content (string):   The deleted content of the tab, if available.
+            digest          (digest):   A digest of the tab content.
+            saved_path      (path):     The path where the tab was saved.
         """
         for file, user in self.users_tabs:
-            # Parse the file
-            tab: WindowsNotepadTab = WindowsNotepadTab(file)
+            tab = WindowsNotepadTab(file)
 
             if tab.is_saved:
                 yield WindowsNotepadSavedTabRecord(
-                    ts_mtime=wintimestamp(tab.tab_header.timestamp),
+                    ts=wintimestamp(tab.tab_header.timestamp),
                     editor="windowsnotepad",
                     content=tab.content,
                     path=tab.file,
@@ -341,6 +335,7 @@ class WindowsNotepadPlugin(EditorPlugin):
                     _user=user,
                     _target=self.target,
                 )
+
             else:
                 yield WindowsNotepadUnsavedTabRecord(
                     editor="windowsnotepad",
