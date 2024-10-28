@@ -12,7 +12,11 @@ class LoaderListPlugin(Plugin):
         pass
 
     @export(output="none")
-    @arg("--json", dest="output_json", action="store_true")
+    # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
+    # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
+    # https://github.com/fox-it/dissect.target/pull/841
+    # https://github.com/fox-it/dissect.target/issues/889
+    @arg("--as-json", dest="output_json", action="store_true")
     def loaders(self, output_json: bool = False) -> None:
         """List the available loaders."""
 
