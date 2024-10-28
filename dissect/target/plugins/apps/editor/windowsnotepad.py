@@ -16,7 +16,7 @@ from dissect.target.helpers.record import (
     WindowsUserRecord,
     create_extended_descriptor,
 )
-from dissect.target.plugin import export
+from dissect.target.plugin import alias, export
 from dissect.target.plugins.apps.editor.editor import COMMON_EDITOR_FIELDS, EditorPlugin
 from dissect.target.target import Target
 
@@ -292,8 +292,9 @@ class WindowsNotepadPlugin(EditorPlugin):
         if not self.users_tabs:
             raise UnsupportedPluginError("No Windows Notepad tab files found")
 
+    @alias("tabs")
     @export(record=[WindowsNotepadSavedTabRecord, WindowsNotepadUnsavedTabRecord])
-    def tabs(self) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
+    def history(self) -> Iterator[WindowsNotepadSavedTabRecord | WindowsNotepadUnsavedTabRecord]:
         """Return contents from Windows 11 Notepad tabs - and its deleted content if available.
 
         Windows Notepad application for Windows 11 is now able to restore both saved and unsaved tabs when you re-open
