@@ -261,10 +261,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
                 # Extract a network device name for given interface id
                 try:
-                    name_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\"
-                        f"{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
-                    )
+                    name_key = self.target.registry.key(f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection")  # noqa: E501
                     if value_name := _try_value(name_key, "Name"):
                         device_info["name"] = value_name
                 except RegistryKeyNotFoundError:
