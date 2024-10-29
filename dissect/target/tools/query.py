@@ -189,16 +189,16 @@ def main():
         if collected_plugins:
             if args.json:
                 print('{"plugins": ', end="")
-            target.plugins(collected_plugins, output_json=args.json)
+            target.plugins(collected_plugins, as_json=args.json)
 
         # No real targets specified, show the available loaders
         if not targets:
             fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
             fargs, rest = fparser.parse_known_args(rest)
-            del fargs.output_json
+            del fargs.as_json
             if args.json:
                 print(', "loaders": ', end="")
-            target.loaders(**vars(fargs), output_json=args.json)
+            target.loaders(**vars(fargs), as_json=args.json)
 
         if args.json:
             print("}")

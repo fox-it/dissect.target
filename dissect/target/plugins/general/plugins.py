@@ -109,8 +109,12 @@ class PluginListPlugin(Plugin):
 
     @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true")
-    @arg("--json", dest="output_json", action="store_true")
-    def plugins(self, plugins: list[Plugin] = None, print_docs: bool = False, output_json: bool = False) -> None:
+    # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
+    # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
+    # https://github.com/fox-it/dissect.target/pull/841
+    # https://github.com/fox-it/dissect.target/issues/889
+    @arg("--as-json", dest="as_json", action="store_true")
+    def plugins(self, plugins: list[Plugin] = None, print_docs: bool = False, as_json: bool = False) -> None:
         """Print all available plugins."""
 
         dict_plugins = list({p.path: p.plugin_desc for p in plugins}.values())
@@ -150,7 +154,7 @@ class PluginListPlugin(Plugin):
             failed_list,
         ]
 
-        if output_json:
+        if as_json:
             out = {"loaded": list(generate_plugins_json(plugins))}
 
             if failed_plugins := plugin.failed():

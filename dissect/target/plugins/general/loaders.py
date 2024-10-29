@@ -16,8 +16,8 @@ class LoaderListPlugin(Plugin):
     # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
     # https://github.com/fox-it/dissect.target/pull/841
     # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="output_json", action="store_true")
-    def loaders(self, output_json: bool = False) -> None:
+    @arg("--as-json", dest="as_json", action="store_true")
+    def loaders(self, as_json: bool = False) -> None:
         """List the available loaders."""
 
         loaders_info = {}
@@ -30,7 +30,7 @@ class LoaderListPlugin(Plugin):
 
         loaders = sorted(loaders_info.items())
 
-        if output_json:
+        if as_json:
             print(json.dumps([{"name": name, "description": desc} for name, desc in loaders]), end="")
 
         else:
