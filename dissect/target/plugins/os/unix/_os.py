@@ -39,6 +39,7 @@ class UnixPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
+        self._add_devices()
         self._hostname_dict = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
@@ -262,6 +263,17 @@ class UnixPlugin(OSPlugin):
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
+
+    def _add_devices(self) -> None:
+        """Add some virtual block devices to the target.
+
+        Currently only adds LVM devices.
+        """
+        vfs = self.target.fs.append_layer()
+
+        for volume in self.target.volumes:
+            if volume.vs and volume.vs.__type__ == "lvm":
+                vfs.map_file_fh(f"/dev/{volume.raw.vg.name}/{volume.raw.name}", volume)
 
     def _parse_os_release(self, glob: str | None = None) -> dict[str, str]:
         """Parse files containing Unix version information.
