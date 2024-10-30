@@ -24,6 +24,8 @@ UsnjrnlRecord = TargetRecordDescriptor(
 
 
 class UsnjrnlPlugin(Plugin):
+    """NFTS UsnJrnl plugin."""
+
     def check_compatible(self) -> None:
         pass
 
