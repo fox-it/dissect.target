@@ -78,7 +78,7 @@ class FortiOSPlugin(LinuxPlugin):
             # Tested on FortiGate, FortiAnalyzer and FortiManager.
             # Other Fortinet devices may look different.
             if fs.exists("/rootfs.gz") and (
-                fs.exists("/.fgtsum") or fs.exists("/.fmg_sign") or fs.exists("/flatkc") or fs.exists("/system.conf")
+                any(map(fs.exists, (".fgtsum", ".fmg_sign", "flatkc", "system.conf")))
             ):
                 return fs
 

@@ -317,7 +317,7 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix", path: TargetPath | str = "/bin/ls") -> str | None:
+    def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
         """Determine architecture by reading an ELF header of a binary on the target."""
 
         if not isinstance(path, TargetPath):
