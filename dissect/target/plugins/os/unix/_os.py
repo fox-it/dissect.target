@@ -19,19 +19,22 @@ from dissect.target.target import Target
 log = logging.getLogger(__name__)
 
 
+# https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
 ARCH_MAP = {
-    0x00: "Unknown",
-    0x02: "SPARC",
+    0x00: "unknown",
+    0x02: "sparc",
     0x03: "x86",
-    0x08: "MIPS",
-    0x14: "PowerPC",
-    0x16: "S390",
-    0x28: "ARM",
-    0x2A: "SuperH",
-    0x32: "IA-64",
+    0x08: "mips",
+    0x14: "powerpc32",
+    0x15: "powerpc64",
+    0x16: "s390",  # and s390x
+    0x28: "aarch32",  # armv7
+    0x2A: "superh",
+    0x32: "ia-64",
     0x3E: "x86_64",
-    0xB7: "AArch64",
-    0xF3: "RISC-V",
+    0xB7: "aarch64",  # armv8
+    0xF3: "riscv64",
+    0xF7: "bpf",
 }
 
 
@@ -343,7 +346,7 @@ class UnixPlugin(OSPlugin):
         arch = unpack("H", fh.read(2))[0]
         arch = ARCH_MAP.get(arch)
 
-        if bits == 1:  # 32 bit system
+        if bits == 1 and not arch.endswith("32"):  # 32 bit system
             return f"{arch}_32-{os}"
         else:
             return f"{arch}-{os}"
