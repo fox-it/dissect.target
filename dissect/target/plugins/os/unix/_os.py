@@ -328,7 +328,10 @@ class UnixPlugin(OSPlugin):
                     CANDIDATE_FOUND = True
                     break
 
-        if not CANDIDATE_FOUND or not path.exists():
+            if not CANDIDATE_FOUND:
+                return
+
+        if not path.exists():
             return
 
         fh = path.open("rb")
