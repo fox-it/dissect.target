@@ -24,7 +24,10 @@ UTMP_FIELDS = [
     ("net.ipaddress", "ut_addr"),
 ]
 
-BtmpRecord = TargetRecordDescriptor("linux/log/btmp", UTMP_FIELDS)
+BtmpRecord = TargetRecordDescriptor(
+    "linux/log/btmp", 
+    UTMP_FIELDS,
+)
 
 WtmpRecord = TargetRecordDescriptor(
     "linux/log/wtmp",
@@ -150,7 +153,7 @@ class UtmpFile:
 class UtmpPlugin(Plugin):
     """Unix utmp log plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.btmp_paths = list(self.target.fs.path("/").glob("var/log/btmp*"))
         self.wtmp_paths = list(self.target.fs.path("/").glob("var/log/wtmp*"))
@@ -161,7 +164,7 @@ class UtmpPlugin(Plugin):
             raise UnsupportedPluginError("No wtmp and/or btmp log files found")
 
     def _build_record(self, record: TargetRecordDescriptor, entry) -> Iterator[BtmpRecord | WtmpRecord]:
-        yield record(
+        return record(
             ts=entry.ts,
             ut_type=entry.ut_type,
             ut_pid=entry.ut_pid,
@@ -183,15 +186,15 @@ class UtmpPlugin(Plugin):
             - https://en.wikipedia.org/wiki/Utmp
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
-        for btmp_path in self.btmp_paths:
-            if not btmp_path.is_file():
-                self.target.log.warning("Unable to parse btmp file %s as it is not a file", btmp_path)
+        for path in self.btmp_paths:
+            if not path.is_file():
+                self.target.log.warning("Unable to parse btmp file: %s is not a file", path)
                 continue
 
-            btmp = UtmpFile(btmp_path)
+            btmp = UtmpFile(path)
 
             for entry in btmp:
-                yield from self._build_record(BtmpRecord, entry)
+                yield self._build_record(BtmpRecord, entry)
 
     @alias("utmp")
     @export(record=WtmpRecord)
@@ -206,12 +209,12 @@ class UtmpPlugin(Plugin):
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
 
-        for wtmp_path in self.wtmp_paths + self.utmp_paths:
+        for path in self.wtmp_paths + self.utmp_paths:
             if not wtmp_path.is_file():
-                self.target.log.warning("Unable to parse wtmp file %s as it is not a file", wtmp_path)
+                self.target.log.warning("Unable to parse wtmp file: %s is not a file", path)
                 continue
 
-            wtmp = UtmpFile(wtmp_path)
+            wtmp = UtmpFile(path)
 
             for entry in wtmp:
-                yield from self._build_record(WtmpRecord, entry)
+                yield self._build_record(WtmpRecord, entry)
