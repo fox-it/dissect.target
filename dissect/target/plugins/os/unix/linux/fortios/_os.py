@@ -127,7 +127,6 @@ class FortiOSPlugin(LinuxPlugin):
             "node-scripts.tar.xz",
             "docker.tar.xz",
             "syntax.tar.xz",
-            "rootfs-ext.tar.xz",
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
                 fh = xz.repair_checksum(tar.open("rb"))
@@ -237,18 +236,19 @@ class FortiOSPlugin(LinuxPlugin):
             self.target.log.debug("", exc_info=e)
 
         # FortiManager administrative users
-        try:
-            for username, entry in self._config["global-config"]["system"]["admin"]["user"].items():
-                yield FortiOSUserRecord(
-                    name=username,
-                    password=":".join(entry.get("password", [])),
-                    groups=list(entry.get("profileid", [])),
-                    home="/root",
-                    _target=self.target,
-                )
-        except KeyError as e:
-            self.target.log.warning("Exception while parsing FortiManager admin users")
-            self.target.log.debug("", exc_info=e)
+        if self._config.get("global-config", {}).get("system", {}).get("admin", {}).get("user"):
+            try:
+                for username, entry in self._config["global-config"]["system"]["admin"]["user"].items():
+                    yield FortiOSUserRecord(
+                        name=username,
+                        password=":".join(entry.get("password", [])),
+                        groups=list(entry.get("profileid", [])),
+                        home="/root",
+                        _target=self.target,
+                    )
+            except KeyError as e:
+                self.target.log.warning("Exception while parsing FortiManager admin users")
+                self.target.log.debug("", exc_info=e)
 
         if self._config.get("root-config"):
             # Local users
@@ -299,7 +299,7 @@ class FortiOSPlugin(LinuxPlugin):
     @export(property=True)
     def architecture(self) -> str | None:
         """Return architecture FortiOS runs on."""
-        for path in ["/lib/libav.so", "/bin/ctr"]:
+        for path in ["/lib/libav.so", "/bin/ctr", "/bin/grep"]:
             if (bin := self.target.fs.path(path)).exists():
                 return self._get_architecture(path=bin)
 
