@@ -163,7 +163,7 @@ class UtmpPlugin(Plugin):
         if not any(self.btmp_paths + self.wtmp_paths + self.utmp_paths):
             raise UnsupportedPluginError("No wtmp and/or btmp log files found")
 
-    def _build_record(self, record: TargetRecordDescriptor, entry) -> Iterator[BtmpRecord | WtmpRecord]:
+    def _build_record(self, record: TargetRecordDescriptor, entry: UTMP_ENTRY) -> Iterator[BtmpRecord | WtmpRecord]:
         return record(
             ts=entry.ts,
             ut_type=entry.ut_type,
@@ -210,7 +210,7 @@ class UtmpPlugin(Plugin):
         """
 
         for path in self.wtmp_paths + self.utmp_paths:
-            if not wtmp_path.is_file():
+            if not path.is_file():
                 self.target.log.warning("Unable to parse wtmp file: %s is not a file", path)
                 continue
 
