@@ -19,6 +19,22 @@ from dissect.target.target import Target
 log = logging.getLogger(__name__)
 
 
+ARCH_MAP = {
+    0x00: "Unknown",
+    0x02: "SPARC",
+    0x03: "x86",
+    0x08: "MIPS",
+    0x14: "PowerPC",
+    0x16: "S390",
+    0x28: "ARM",
+    0x2A: "SuperH",
+    0x32: "IA-64",
+    0x3E: "x86_64",
+    0xB7: "AArch64",
+    0xF3: "RISC-V",
+}
+
+
 class UnixPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
@@ -289,37 +305,33 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> str | None:
-        arch_strings = {
-            0x00: "Unknown",
-            0x02: "SPARC",
-            0x03: "x86",
-            0x08: "MIPS",
-            0x14: "PowerPC",
-            0x16: "S390",
-            0x28: "ARM",
-            0x2A: "SuperH",
-            0x32: "IA-64",
-            0x3E: "x86_64",
-            0xB7: "AArch64",
-            0xF3: "RISC-V",
-        }
+    def _get_architecture(self, os: str = "unix", path: TargetPath | str = "/bin/ls") -> str | None:
+        """Determine architecture by reading an ELF header of a binary on the target."""
 
-        for fs in self.target.filesystems:
-            if fs.exists(path):
-                fh = fs.open(path)
-                fh.seek(4)
-                # ELF - e_ident[EI_CLASS]
-                bits = unpack("B", fh.read(1))[0]
-                fh.seek(18)
-                # ELF - e_machine
-                arch = unpack("H", fh.read(2))[0]
-                arch = arch_strings.get(arch)
+        if not isinstance(path, TargetPath):
+            CANDIDATE_FOUND = False
+            for fs in self.target.filesystems:
+                if fs.exists(path):
+                    path = fs.path(path)
+                    CANDIDATE_FOUND = True
+                    break
 
-                if bits == 1:  # 32 bit system
-                    return f"{arch}_32-{os}"
-                else:
-                    return f"{arch}-{os}"
+        if not CANDIDATE_FOUND or not path.exists():
+            return
+
+        fh = path.open("rb")
+        fh.seek(4)
+        # ELF - e_ident[EI_CLASS]
+        bits = unpack("B", fh.read(1))[0]
+        fh.seek(18)
+        # ELF - e_machine
+        arch = unpack("H", fh.read(2))[0]
+        arch = ARCH_MAP.get(arch)
+
+        if bits == 1:  # 32 bit system
+            return f"{arch}_32-{os}"
+        else:
+            return f"{arch}-{os}"
 
 
 def parse_fstab(
