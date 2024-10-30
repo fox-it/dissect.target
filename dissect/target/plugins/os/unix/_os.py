@@ -321,35 +321,29 @@ class UnixPlugin(OSPlugin):
         return os_release
 
     def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
-        """Determine architecture by reading an ELF header of a binary on the target."""
+        """Determine architecture by reading an ELF header of a binary on the target.
+
+        Resources:
+            - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+        """
 
         if not isinstance(path, TargetPath):
-            CANDIDATE_FOUND = False
-            for fs in self.target.filesystems:
-                if fs.exists(path):
-                    path = fs.path(path)
-                    CANDIDATE_FOUND = True
+            for fs in [self.target.fs, *self.target.filesystems]:
+                if (path := fs.path(path)).exists():
                     break
 
-            if not CANDIDATE_FOUND:
-                return
-
-        if not path.exists():
+        if path is None or not path.exists():
             return
 
         fh = path.open("rb")
-        fh.seek(4)
-        # ELF - e_ident[EI_CLASS]
-        bits = unpack("B", fh.read(1))[0]
-        fh.seek(18)
-        # ELF - e_machine
-        arch = unpack("H", fh.read(2))[0]
-        arch = ARCH_MAP.get(arch)
+        fh.seek(4)  # ELF - e_ident[EI_CLASS]
+        bits = fh.read(1)[0]
 
-        if bits == 1 and not arch.endswith("32"):  # 32 bit system
-            return f"{arch}_32-{os}"
-        else:
-            return f"{arch}-{os}"
+        fh.seek(18)  # ELF - e_machine
+        e_machine = int.from_bytes(fh.read(2), "little")
+        arch = ARCH_MAP.get(e_machine, "unknown")
+
+        return f"{arch}_32-{os}" if bits == 1 and not arch[-2:] == "32" else f"{arch}-{os}"
 
 
 def parse_fstab(
