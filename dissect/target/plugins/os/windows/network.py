@@ -243,7 +243,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
         self._extract_network_device_config = lru_cache(128)(self._extract_network_device_config)
 
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
-        """Yields found Windows interfaces used by :class:`NetworkPlugin` ``interfaces`` export func."""
+        """Yields found Windows interfaces used by :meth:`NetworkPlugin.interfaces() <dissect.target.plugins.general.network.NetworkPlugin.interfaces>`."""  # noqa: E501
 
         # Get all the network interfaces
         for key in self.target.registry.keys(
