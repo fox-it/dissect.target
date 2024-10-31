@@ -332,7 +332,7 @@ class UnixPlugin(OSPlugin):
                 if (path := fs.path(path)).exists():
                     break
 
-        if path is None or not path.exists():
+        if not path.exists():
             return
 
         fh = path.open("rb")
