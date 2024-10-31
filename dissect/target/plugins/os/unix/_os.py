@@ -4,7 +4,6 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from struct import unpack
 from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
