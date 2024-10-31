@@ -165,7 +165,7 @@ class GenericPlugin(Plugin):
                 if val:
                     val = val.strip("\\")
                     return val
-            except (RegistryError, AttributeError):
+            except RegistryError:
                 continue
 
     @export(property=True)
