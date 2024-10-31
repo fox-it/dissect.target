@@ -57,17 +57,18 @@ log = logging.getLogger(__name__)
 
 
 class OperatingSystem(StrEnum):
-    LINUX = "linux"
-    WINDOWS = "windows"
-    ESXI = "esxi"
-    BSD = "bsd"
-    OSX = "osx"
-    UNIX = "unix"
     ANDROID = "android"
-    VYOS = "vyos"
-    IOS = "ios"
-    FORTIOS = "fortios"
+    BSD = "bsd"
     CITRIX = "citrix-netscaler"
+    ESXI = "esxi"
+    FORTIOS = "fortios"
+    IOS = "ios"
+    LINUX = "linux"
+    OSX = "osx"
+    PROXMOX = "proxmox"
+    UNIX = "unix"
+    VYOS = "vyos"
+    WINDOWS = "windows"
 
 
 def export(*args, **kwargs) -> Callable:
