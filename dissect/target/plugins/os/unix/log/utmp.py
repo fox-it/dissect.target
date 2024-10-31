@@ -12,6 +12,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, alias, export
+from dissect.target.target import Target
 
 UTMP_FIELDS = [
     ("datetime", "ts"),
@@ -25,7 +26,7 @@ UTMP_FIELDS = [
 ]
 
 BtmpRecord = TargetRecordDescriptor(
-    "linux/log/btmp", 
+    "linux/log/btmp",
     UTMP_FIELDS,
 )
 
