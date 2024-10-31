@@ -126,6 +126,12 @@ class FfsFilesystemEntry(FilesystemEntry):
             ]
         )
 
+        # Note: stat on linux always returns the default block size of 4096
+        # We are returning the actual block size of the filesystem, as on BSD
+        st_info.st_blksize = self.fs.ffs.block_size
+        # Note: st_blocks * 512 can be lower than st_blksize because FFS employs fragments
+        st_info.st_blocks = self.entry.nblocks
+
         # Set the nanosecond resolution separately
         st_info.st_atime_ns = self.entry.atime_ns
         st_info.st_mtime_ns = self.entry.mtime_ns
@@ -134,5 +140,6 @@ class FfsFilesystemEntry(FilesystemEntry):
         # FFS2 has a birth time, FFS1 does not
         if btime := self.entry.btime:
             st_info.st_birthtime = btime.timestamp()
+            st_info.st_birthtime_ns = self.entry.btime_ns
 
         return st_info
