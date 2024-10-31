@@ -191,9 +191,7 @@ class UtmpPlugin(Plugin):
                 self.target.log.warning("Unable to parse btmp file: %s is not a file", path)
                 continue
 
-            btmp = UtmpFile(path)
-
-            for entry in btmp:
+            for entry in UtmpFile(path):
                 yield self._build_record(BtmpRecord, entry)
 
     @alias("utmp")
@@ -214,7 +212,5 @@ class UtmpPlugin(Plugin):
                 self.target.log.warning("Unable to parse wtmp file: %s is not a file", path)
                 continue
 
-            wtmp = UtmpFile(path)
-
-            for entry in wtmp:
+            for entry in UtmpFile(path):
                 yield self._build_record(WtmpRecord, entry)
