@@ -41,10 +41,7 @@ class MacPlugin(BsdPlugin):
 
     @export(property=True)
     def ips(self) -> Optional[list[str]]:
-        ips = set()
-        for ip in self.target.network.ips():
-            ips.add(str(ip))
-        return list(ips)
+        return list(set(map(str, self.target.network.ips())))
 
     @export(property=True)
     def version(self) -> Optional[str]:
