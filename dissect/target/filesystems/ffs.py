@@ -39,13 +39,13 @@ class FfsFilesystem(Filesystem):
         try:
             return self.ffs.get(path, node)
         except ffs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except ffs.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except ffs.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except ffs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class FfsFilesystemEntry(FilesystemEntry):

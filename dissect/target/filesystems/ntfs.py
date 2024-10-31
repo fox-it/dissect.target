@@ -48,12 +48,12 @@ class NtfsFilesystem(Filesystem):
         try:
             path = path.rsplit(":", maxsplit=1)[0]
             return self.ntfs.mft.get(path, root=root)
-        except NtfsFileNotFoundError:
-            raise FileNotFoundError(path)
+        except NtfsFileNotFoundError as e:
+            raise FileNotFoundError(path) from e
         except NtfsNotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except NtfsError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class NtfsFilesystemEntry(FilesystemEntry):
