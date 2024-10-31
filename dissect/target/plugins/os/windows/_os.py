@@ -12,6 +12,14 @@ from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
+ARCH_MAP = {
+    "x86": 32,
+    "IA64": 64,
+    "ARM64": 64,
+    "EM64T": 64,
+    "AMD64": 64,
+}
+
 
 class WindowsPlugin(OSPlugin):
     CURRENT_VERSION_KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion"
@@ -265,19 +273,11 @@ class WindowsPlugin(OSPlugin):
             Dict: arch: architecture, bitness: bits
         """
 
-        arch_strings = {
-            "x86": 32,
-            "IA64": 64,
-            "ARM64": 64,
-            "EM64T": 64,
-            "AMD64": 64,
-        }
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:
             arch = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
-            bits = arch_strings.get(arch)
+            bits = ARCH_MAP.get(arch)
 
             # return {"arch": arch, "bitness": bits}
             if bits == 64:
