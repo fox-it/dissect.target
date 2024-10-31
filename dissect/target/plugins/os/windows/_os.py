@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 import struct
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from flow.record.fieldtypes import windows_path
 
@@ -10,7 +10,9 @@ from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 
 class WindowsPlugin(OSPlugin):

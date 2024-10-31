@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import re
 import warnings
 from collections import defaultdict
 from functools import lru_cache
-from typing import Iterator, Optional, Union
+from typing import TYPE_CHECKING, Iterator, Optional, Union
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
@@ -25,7 +27,9 @@ from dissect.target.helpers.regutil import (
 )
 from dissect.target.plugin import Plugin, internal
 from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target import Target
 
 CONTROLSET_REGEX = re.compile("CurrentControlSet", flags=re.IGNORECASE)
 
