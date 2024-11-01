@@ -73,15 +73,15 @@ class PluginNotFoundError(PluginError):
     """Plugin cannot be found."""
 
 
-class FileNotFoundError(FilesystemError):
+class FileNotFoundError(FilesystemError, FileNotFoundError):
     """The requested path could not be found."""
 
 
-class IsADirectoryError(FilesystemError):
+class IsADirectoryError(FilesystemError, IsADirectoryError):
     """The entry is a directory."""
 
 
-class NotADirectoryError(FilesystemError):
+class NotADirectoryError(FilesystemError, NotADirectoryError):
     """The entry is not a directory."""
 
 
