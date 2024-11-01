@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import struct
 from datetime import datetime
 from typing import Iterator
 
+from dissect.util.sid import read_sid
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
@@ -10,7 +12,10 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
@@ -110,6 +115,15 @@ WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
         ("bytes", "providerid"),
         ("string", "enabled"),
         ("string", "version"),
+    ],
+)
+
+ComputerSidRecord = TargetRecordDescriptor(
+    "windows/sid/computer",
+    [
+        ("datetime", "ts"),
+        ("string", "sidtype"),
+        ("string", "sid"),
     ],
 )
 
@@ -572,4 +586,37 @@ class GenericPlugin(Plugin):
         try:
             return self.target.registry.key(key).value("ACP").value
         except RegistryError:
+            pass
+
+    @export(record=ComputerSidRecord)
+    def sid(self) -> Iterator[ComputerSidRecord]:
+        """Return the machine- and optional domain SID of the system."""
+
+        try:
+            key = self.target.registry.key("HKLM\\SAM\\SAM\\Domains\\Account")
+
+            # The machine SID is stored in the last 12 bytes of the V value as little-endian
+            # The machine SID differs from a 'normal' binary SID as only holds 3 values and lacks a prefix / Revision
+            # NOTE: Consider moving this to dissect.util.sid if we encounter this more often
+            sid = struct.unpack_from("<III", key.value("V").value, -12)
+
+            yield ComputerSidRecord(
+                ts=key.timestamp,
+                sidtype="Machine",
+                sid=f"S-1-5-21-{sid[0]}-{sid[1]}-{sid[2]}",
+                _target=self.target,
+            )
+        except (RegistryError, struct.error):
+            pass
+
+        try:
+            key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
+
+            yield ComputerSidRecord(
+                ts=key.timestamp,
+                sidtype="Domain",
+                sid=read_sid(key.value("(Default)").value),
+                _target=self.target,
+            )
+        except (RegistryError, struct.error):
             pass
