@@ -1,4 +1,5 @@
-""" Registry related abstractions """
+"""Registry related abstractions"""
+
 from __future__ import annotations
 
 import fnmatch
@@ -645,7 +646,7 @@ class RegfHive(RegistryHive):
         try:
             return RegfKey(self, self.hive.open(key))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(key, cause=e)
+            raise RegistryKeyNotFoundError(key) from e
 
 
 class RegfKey(RegistryKey):
@@ -675,7 +676,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfKey(self.hive, self.key.subkey(subkey))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(subkey, cause=e)
+            raise RegistryKeyNotFoundError(subkey) from e
 
     def subkeys(self) -> list[RegistryKey]:
         return [RegfKey(self.hive, k) for k in self.key.subkeys()]
@@ -684,7 +685,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfValue(self.hive, self.key.value(value))
         except regf.RegistryValueNotFoundError as e:
-            raise RegistryValueNotFoundError(value, cause=e)
+            raise RegistryValueNotFoundError(value) from e
 
     def values(self) -> list[RegistryValue]:
         return [RegfValue(self.hive, v) for v in self.key.values()]
