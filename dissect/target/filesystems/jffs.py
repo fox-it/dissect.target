@@ -35,13 +35,13 @@ class JFFSFilesystem(Filesystem):
         try:
             return self.jffs2.get(path, node)
         except jffs2.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except jffs2.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except jffs2.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except jffs2.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class JFFSFilesystemEntry(FilesystemEntry):
