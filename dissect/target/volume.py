@@ -334,7 +334,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> DissectVolumeSystem:
     try:
         return disk.DissectVolumeSystem(fh)
     except Exception as e:
-        raise VolumeSystemError(f"Failed to load volume system for {fh}", cause=e)
+        raise VolumeSystemError(f"Failed to load volume system for {fh}") from e
     finally:
         fh.seek(offset)
 
@@ -353,7 +353,7 @@ def is_lvm_volume(volume: BinaryIO) -> bool:
             log.info("Failed to import %s", logical_vs)
             log.debug("", exc_info=e)
         except Exception as e:
-            raise VolumeSystemError(f"Failed to detect logical volume for {volume}", cause=e)
+            raise VolumeSystemError(f"Failed to detect logical volume for {volume}") from e
 
     return False
 
@@ -372,7 +372,7 @@ def is_encrypted(volume: BinaryIO) -> bool:
             log.info("Failed to import %s", manager)
             log.debug("", exc_info=e)
         except Exception as e:
-            raise VolumeSystemError(f"Failed to detect encrypted volume for {volume}", cause=e)
+            raise VolumeSystemError(f"Failed to detect encrypted volume for {volume}") from e
     return False
 
 
@@ -422,4 +422,4 @@ def open_lvm(volumes: list[BinaryIO], *args, **kwargs) -> Iterator[VolumeSystem]
             log.info("Failed to import %s", logical_vs)
             log.debug("", exc_info=e)
         except Exception as e:
-            raise VolumeSystemError(f"Failed to load logical volume system for {volumes}", cause=e)
+            raise VolumeSystemError(f"Failed to load logical volume system for {volumes}") from e

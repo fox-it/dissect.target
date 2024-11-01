@@ -807,7 +807,7 @@ def load(plugin_desc: PluginDescriptor) -> Type[Plugin]:
         module = importlib.import_module(module)
         return getattr(module, plugin_desc["class"])
     except Exception as e:
-        raise PluginError(f"An exception occurred while trying to load a plugin: {module}", cause=e)
+        raise PluginError(f"An exception occurred while trying to load a plugin: {module}") from e
 
 
 def failed() -> list[dict[str, Any]]:

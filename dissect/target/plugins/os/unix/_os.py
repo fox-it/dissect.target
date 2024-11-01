@@ -4,7 +4,6 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from struct import unpack
 from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
@@ -17,6 +16,25 @@ from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
+
+
+# https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+ARCH_MAP = {
+    0x00: "unknown",
+    0x02: "sparc",
+    0x03: "x86",
+    0x08: "mips",
+    0x14: "powerpc32",
+    0x15: "powerpc64",
+    0x16: "s390",  # and s390x
+    0x28: "aarch32",  # armv7
+    0x2A: "superh",
+    0x32: "ia-64",
+    0x3E: "x86_64",
+    0xB7: "aarch64",  # armv8
+    0xF3: "riscv64",
+    0xF7: "bpf",
+}
 
 
 class UnixPlugin(OSPlugin):
@@ -301,37 +319,30 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> str | None:
-        arch_strings = {
-            0x00: "Unknown",
-            0x02: "SPARC",
-            0x03: "x86",
-            0x08: "MIPS",
-            0x14: "PowerPC",
-            0x16: "S390",
-            0x28: "ARM",
-            0x2A: "SuperH",
-            0x32: "IA-64",
-            0x3E: "x86_64",
-            0xB7: "AArch64",
-            0xF3: "RISC-V",
-        }
+    def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
+        """Determine architecture by reading an ELF header of a binary on the target.
 
-        for fs in self.target.filesystems:
-            if fs.exists(path):
-                fh = fs.open(path)
-                fh.seek(4)
-                # ELF - e_ident[EI_CLASS]
-                bits = unpack("B", fh.read(1))[0]
-                fh.seek(18)
-                # ELF - e_machine
-                arch = unpack("H", fh.read(2))[0]
-                arch = arch_strings.get(arch)
+        Resources:
+            - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+        """
 
-                if bits == 1:  # 32 bit system
-                    return f"{arch}_32-{os}"
-                else:
-                    return f"{arch}-{os}"
+        if not isinstance(path, TargetPath):
+            for fs in [self.target.fs, *self.target.filesystems]:
+                if (path := fs.path(path)).exists():
+                    break
+
+        if not path.exists():
+            return
+
+        fh = path.open("rb")
+        fh.seek(4)  # ELF - e_ident[EI_CLASS]
+        bits = fh.read(1)[0]
+
+        fh.seek(18)  # ELF - e_machine
+        e_machine = int.from_bytes(fh.read(2), "little")
+        arch = ARCH_MAP.get(e_machine, "unknown")
+
+        return f"{arch}_32-{os}" if bits == 1 and not arch[-2:] == "32" else f"{arch}-{os}"
 
 
 def parse_fstab(
