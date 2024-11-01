@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from datetime import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.util.sid import read_sid
 from dissect.util.ts import from_unix
