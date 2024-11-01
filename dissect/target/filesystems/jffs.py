@@ -76,13 +76,13 @@ class JFFSFilesystemEntry(FilesystemEntry):
             entry_path = fsutil.join(self.path, name, alt_separator=self.fs.alt_separator)
             yield JFFSFilesystemEntry(self.fs, entry_path, entry)
 
-    def is_dir(self, follow_symlinks: bool = False) -> bool:
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:
             return self._resolve(follow_symlinks).entry.is_dir()
         except FilesystemError:
             return False
 
-    def is_file(self, follow_symlinks: bool = False) -> bool:
+    def is_file(self, follow_symlinks: bool = True) -> bool:
         try:
             return self._resolve(follow_symlinks).entry.is_file()
         except FilesystemError:
@@ -97,7 +97,7 @@ class JFFSFilesystemEntry(FilesystemEntry):
 
         return self.entry.link
 
-    def stat(self, follow_symlinks: bool = False) -> fsutil.stat_result:
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
