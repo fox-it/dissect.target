@@ -35,13 +35,13 @@ class JFFSFilesystem(Filesystem):
         try:
             return self.jffs2.get(path, node)
         except jffs2.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except jffs2.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except jffs2.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except jffs2.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class JFFSFilesystemEntry(FilesystemEntry):
@@ -118,5 +118,10 @@ class JFFSFilesystemEntry(FilesystemEntry):
                 self.entry.ctime.timestamp(),
             ]
         )
+
+        # JFFS2 block size is a function of the "erase size" of the underlying flash device.
+        # Linux stat reports the default block size, which is defined as 4k in libc.
+        st_info.st_blksize = 4096
+        st_info.st_blocks = (node.isize + 511) // 512 if self.is_file() else 0
 
         return st_info

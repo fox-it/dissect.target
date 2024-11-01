@@ -1,12 +1,11 @@
-from typing import Iterable
+from typing import Iterator
 
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import LayerFilesystemEntry
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, arg, export
 from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
@@ -28,39 +27,53 @@ FilesystemRecord = TargetRecordDescriptor(
 
 
 class WalkFSPlugin(Plugin):
+    """Filesystem agnostic walkfs plugin."""
+
     def check_compatible(self) -> None:
         if not len(self.target.filesystems):
-            raise UnsupportedPluginError("No filesystems found")
+            raise UnsupportedPluginError("No filesystems to walk")
 
     @export(record=FilesystemRecord)
-    def walkfs(self) -> Iterable[FilesystemRecord]:
+    @arg("--walkfs-path", default="/", help="path to recursively walk")
+    def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
-        for path_entries, _, files in self.target.fs.walk_ext("/"):
-            entries = [path_entries[-1]] + files
-            for entry in entries:
-                path = self.target.fs.path(entry.path)
-                try:
-                    record = generate_record(self.target, path)
-                except FileNotFoundError:
-                    continue
-                yield record
+        for entry in self.target.fs.recurse(walkfs_path):
+            try:
+                yield generate_record(self.target, entry)
+
+            except FileNotFoundError as e:
+                self.target.log.warning("File not found: %s", entry)
+                self.target.log.debug("", exc_info=e)
+            except Exception as e:
+                self.target.log.warning("Exception generating record for: %s", entry)
+                self.target.log.debug("", exc_info=e)
+                continue
 
 
-def generate_record(target: Target, path: TargetPath) -> FilesystemRecord:
-    stat = path.lstat()
-    btime = from_unix(stat.st_birthtime) if stat.st_birthtime else None
-    entry = path.get()
+def generate_record(target: Target, entry: FilesystemEntry) -> FilesystemRecord:
+    """Generate a :class:`FilesystemRecord` from the given :class:`FilesystemEntry`.
+
+    Args:
+        target: :class:`Target` instance
+        entry: :class:`FilesystemEntry` instance
+
+    Returns:
+        Generated :class:`FilesystemRecord` for the given :class:`FilesystemEntry`.
+    """
+    stat = entry.lstat()
+
     if isinstance(entry, LayerFilesystemEntry):
         fs_types = [sub_entry.fs.__type__ for sub_entry in entry.entries]
     else:
         fs_types = [entry.fs.__type__]
+
     return FilesystemRecord(
         atime=from_unix(stat.st_atime),
         mtime=from_unix(stat.st_mtime),
         ctime=from_unix(stat.st_ctime),
-        btime=btime,
+        btime=from_unix(stat.st_birthtime) if stat.st_birthtime else None,
         ino=stat.st_ino,
-        path=path,
+        path=entry.path,
         size=stat.st_size,
         mode=stat.st_mode,
         uid=stat.st_uid,

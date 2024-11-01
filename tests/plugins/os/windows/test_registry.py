@@ -17,13 +17,18 @@ def test_missing_hives(fs_win: VirtualFilesystem, caplog: LogCaptureFixture) -> 
     caplog.set_level(logging.DEBUG, target.log.name)
     target.apply()
 
-    expected = [
-        f"{target}: Could not find hive: sysvol/windows/system32/config/{hive}" for hive in RegistryPlugin.SYSTEM
+    expected = []
+
+    base_paths = [
+        "sysvol/windows/system32/config",
+        "sysvol/WINNT/system32/config",
+        "sysvol/windows",
+        "sysvol/reactos",
+        "sysvol/windows/system32/config/RegBack",
     ]
-    expected += [
-        f"{target}: Could not find hive: sysvol/windows/system32/config/RegBack/{hive}"
-        for hive in RegistryPlugin.SYSTEM
-    ]
+
+    for base_path in base_paths:
+        expected += [f"{target}: Could not find hive: {base_path}/{hive}" for hive in RegistryPlugin.SYSTEM]
 
     assert [record.message for record in caplog.records if record.filename == "registry.py"] == expected
 
