@@ -100,16 +100,23 @@ class FatFilesystemEntry(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = [
-            (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
-            self.entry.cluster,
-            id(self.fs),
-            1,
-            0,
-            0,
-            self.entry.size,
-            self.entry.atime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-            self.entry.mtime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-            self.entry.ctime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-        ]
-        return fsutil.stat_result(st_info)
+        creation_time = self.entry.ctime.replace(tzinfo=self.fs.tzinfo).timestamp()
+        st_info = fsutil.stat_result(
+            [
+                (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
+                self.entry.cluster,
+                id(self.fs),
+                1,
+                0,
+                0,
+                self.entry.size,
+                self.entry.atime.replace(tzinfo=self.fs.tzinfo).timestamp(),
+                self.entry.mtime.replace(tzinfo=self.fs.tzinfo).timestamp(),
+                creation_time,
+            ]
+        )
+
+        st_info.st_blocks = self.entry.nblocks
+        st_info.st_blksize = self.entry.blksize
+        st_info.st_birthtime = creation_time
+        return st_info
