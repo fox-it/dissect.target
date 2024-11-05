@@ -13,6 +13,8 @@ from dissect.target.target import TargetPath
 
 
 class LinuxNetworkPlugin(NetworkPlugin):
+    """Linux network interface plugin."""
+
     def _interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
         for manager_cls in MANAGERS:

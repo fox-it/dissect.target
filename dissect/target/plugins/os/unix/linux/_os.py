@@ -6,7 +6,10 @@ from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
-from dissect.target.plugins.os.unix.linux.network_managers import LinuxNetworkManager
+from dissect.target.plugins.os.unix.linux.network_managers import (
+    LinuxNetworkManager,
+    parse_unix_dhcp_log_messages,
+)
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.target import Target
 
@@ -30,7 +33,16 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        return self.target.network.ips()
+        """Returns a list of static IP addresses and DHCP lease IP addresses found on the host system."""
+        ips = set()
+
+        for ip_set in self.network_manager.get_config_value("ips"):
+            ips.update(ip_set)
+
+        for ip in parse_unix_dhcp_log_messages(self.target, iter_all=False):
+            ips.add(ip)
+
+        return list(ips)
 
     @export(property=True)
     def dns(self) -> list[str]:

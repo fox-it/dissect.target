@@ -84,6 +84,7 @@ class MacNetworkPlugin(NetworkPlugin):
                     network=network,
                     interface_service_order=interface_service_order,
                     dhcp=dhcp,
+                    mac=[],
                     _target=self.target,
                 )
 
