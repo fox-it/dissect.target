@@ -28,14 +28,14 @@ class LinuxConfigParser:
     def __init__(self, target: Target):
         self._target = target
 
-    def _config_files(self, config_paths: list[str], glob: str) -> Iterator[TargetPath]:
+    def _config_files(self, config_paths: list[str], glob: str) -> list[TargetPath]:
         """Yield all configuration files in config_paths matching the given extension."""
         all_files = []
         for config_path in config_paths:
             paths = self._target.fs.path(config_path).glob(glob)
             all_files.extend(config_file for config_file in paths if config_file.is_file())
 
-        yield from sorted(all_files, key=lambda p: p.name)
+        return sorted(all_files, key=lambda p: p.name)
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Parse network interfaces from configuration files."""
@@ -146,7 +146,8 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
         "/usr/local/lib/systemd/network/",
     ]
 
-    # Can be enclosed in brackets for IPv6. Can also have port and SNI, which we ignore.
+    # Can be enclosed in brackets for IPv6. Can also have port, iface name, and SNI, which we ignore.
+    # Example: [1111:2222::3333]:9953%ifname#example.com
     dns_ip_patttern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})|\[(\[?[0-9a-fA-F:]+\]?)\]")
 
     def interfaces(self) -> Iterator:
