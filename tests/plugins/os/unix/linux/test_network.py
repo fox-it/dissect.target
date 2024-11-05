@@ -51,7 +51,7 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
     assert not wired.dhcp_ipv4
     assert not wired.dhcp_ipv6
     assert wired.enabled is None
-    assert wired.last_connected == datetime.fromisoformat("2024-10-29 08:59:54+00:00")
+    assert wired.last_connected == datetime.fromisoformat("2024-10-29 07:59:54+00:00")
     assert wired.vlan == [10]
     assert wired.source == "/etc/NetworkManager/system-connections/wired-static.nmconnection"
     assert wired.configurator == "NetworkManager"

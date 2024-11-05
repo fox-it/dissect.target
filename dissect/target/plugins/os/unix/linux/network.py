@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from ipaddress import ip_address, ip_interface
 from typing import Iterator
 
@@ -135,7 +135,7 @@ class NetworkManagerConfigParser(LinuxConfigParser):
             return None
 
         timestamp_int = int(value)
-        return datetime.fromtimestamp(timestamp_int)
+        return datetime.fromtimestamp(timestamp_int, timezone.utc)
 
 
 class SystemdNetworkConfigParser(LinuxConfigParser):
