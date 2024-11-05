@@ -50,16 +50,16 @@ class NetworkManagerConfigParser(LinuxConfigParser):
     ]
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
-        connections: dict[str, dict] = {}
+        connections: list[dict] = []
         vlan_id_by_interface: LinuxConfigParser.VlanIdByName = {}
 
         for connection_file_path in self._config_files(self.config_paths, "*"):
             try:
-                connection = configutil.parse(connection_file_path, hint="ini")
+                config = configutil.parse(connection_file_path, hint="ini")
 
-                common_section: dict[str, str] = connection.get("connection", {})
+                common_section: dict[str, str] = config.get("connection", {})
                 interface_type = common_section.get("type", "")
-                sub_type: dict[str, str] = connection.get(interface_type, {})
+                sub_type: dict[str, str] = config.get(interface_type, {})
 
                 if interface_type == "vlan":
                     # Store vlan id by parent interface name
@@ -75,7 +75,7 @@ class NetworkManagerConfigParser(LinuxConfigParser):
                 dhcp_settings: dict[str, str] = {"ipv4": "", "ipv6": ""}
 
                 for ip_version in ["ipv4", "ipv6"]:
-                    ip_section: dict[str, str] = connection.get(ip_version, {})
+                    ip_section: dict[str, str] = config.get(ip_version, {})
                     for key, value in ip_section.items():
                         # nmcli inserts a trailling semicolon
                         if key == "dns" and (stripped := value.rstrip(";")):
@@ -97,7 +97,9 @@ class NetworkManagerConfigParser(LinuxConfigParser):
 
                 name = common_section.get("interface-name", None)
                 mac_address = [sub_type.get("mac-address", "")] if sub_type.get("mac-address", "") else []
-                connections[name] = {  # Store as dict to allow for clean updating with vlan
+
+                connection = {  # Store as dict to allow for clean updating with vlan
+                    "uuid": common_section.get("uuid"),  # Used for looking up parent of vlan
                     "source": str(connection_file_path),
                     "enabled": None,  # Stored in run-time state
                     "last_connected": self._parse_lastconnected(common_section.get("timestamp", "")),
@@ -112,15 +114,19 @@ class NetworkManagerConfigParser(LinuxConfigParser):
                     "gateway": list(gateways),
                     "configurator": "NetworkManager",
                 }
+                connections.append(connection)
+
             except Exception as e:
                 self._target.log.warning("Error parsing network config file %s: %s", connection_file_path, e)
 
-        for parent_interface_name, vlan_id in vlan_id_by_interface.items():
-            if parent_connection := connections.get(parent_interface_name):
-                parent_connection["vlan"] = {vlan_id}
+        # Unfavorable O(n^2) complexity, but the number of vlans is expected to be small
+        for connection in connections:
+            if vlan_id := vlan_id_by_interface.get(connection["name"]) or vlan_id_by_interface.get(connection["uuid"]):
+                connection["vlan"] = {vlan_id}
 
-        for connection in connections.values():
-            yield UnixInterfaceRecord(**connection)
+        for config in connections:
+            config.pop("uuid", None)
+            yield UnixInterfaceRecord(**config)
 
     def _parse_route(self, route: str) -> ip_address | None:
         """Parse a route and return gateway IP address."""
