@@ -43,6 +43,13 @@ class LinuxConfigParser:
 
 
 class NetworkManagerConfigParser(LinuxConfigParser):
+    """NetworkManager configuration parser.
+
+    NetworkManager configuration files are generally in an INI-like format.
+    Note that Red Hat and Fedora deprecated ifcfg files.
+    Documentation: https://networkmanager.dev/docs/api/latest/nm-settings-keyfile.html
+    """
+
     config_paths: list[str] = [
         "/etc/NetworkManager/system-connections/",
         "/usr/lib/NetworkManager/system-connections/",
@@ -145,6 +152,14 @@ class NetworkManagerConfigParser(LinuxConfigParser):
 
 
 class SystemdNetworkConfigParser(LinuxConfigParser):
+    """Systemd network configuration parser.
+
+    Systemd network configuration files are generally in an INI-like format with some quirks.
+    Note that drop-in directories are not yet supported.
+
+    Documentation: https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html
+    """
+
     config_paths: list[str] = [
         "/etc/systemd/network/",
         "/run/systemd/network/",
@@ -252,7 +267,8 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
     def _parse_dns_ip(self, address: str) -> ip_address:
         """Parse DNS address from systemd network configuration file.
 
-        See https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html DNS for details.
+        The optional brackets and port number make this hard to parse.
+        See https://www.freedesktop.org/software/systemd/man/latest/systemd.network.html and search for DNS.
         """
 
         match = self.dns_ip_patttern.search(address)
