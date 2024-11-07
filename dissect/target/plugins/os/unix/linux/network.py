@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import ip_address, ip_interface
-from typing import Iterator
+from typing import Iterator, Literal, NamedTuple
 
 from dissect.target import Target
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
+from dissect.target.helpers.utils import to_list
 from dissect.target.plugins.general.network import NetworkPlugin
 from dissect.target.target import TargetPath
 
@@ -18,13 +20,14 @@ class LinuxNetworkPlugin(NetworkPlugin):
     def _interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Try all available network configuration managers and aggregate the results."""
         for manager_cls in MANAGERS:
-            manager: LinuxConfigParser = manager_cls(self.target)
+            manager: LinuxNetworkConfigParser = manager_cls(self.target)
             yield from manager.interfaces()
 
 
-class LinuxConfigParser:
-    VlanIdByName = dict[str, int]
+VlanIdByInterface = dict[str, set[int]]
 
+
+class LinuxNetworkConfigParser:
     def __init__(self, target: Target):
         self._target = target
 
@@ -35,14 +38,14 @@ class LinuxConfigParser:
             paths = self._target.fs.path(config_path).glob(glob)
             all_files.extend(config_file for config_file in paths if config_file.is_file())
 
-        return sorted(all_files, key=lambda p: p.name)
+        return sorted(all_files, key=lambda p: p.stem)
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
         """Parse network interfaces from configuration files."""
         yield from ()
 
 
-class NetworkManagerConfigParser(LinuxConfigParser):
+class NetworkManagerConfigParser(LinuxNetworkConfigParser):
     """NetworkManager configuration parser.
 
     NetworkManager configuration files are generally in an INI-like format.
@@ -56,84 +59,76 @@ class NetworkManagerConfigParser(LinuxConfigParser):
         "/run/NetworkManager/system-connections/",
     ]
 
+    @dataclass
+    class ParserContext:
+        source: str
+        uuid: str | None = None
+        last_connected: datetime | None = None
+        name: str | None = None
+        mac_address: str | None = None
+        type: str = ""
+        dns: set[ip_address] = field(default_factory=set)
+        ip_interfaces: set[ip_interface] = field(default_factory=set)
+        gateways: set[ip_address] = field(default_factory=set)
+        dhcp_ipv4: bool = False
+        dhcp_ipv6: bool = False
+        vlan: set[int] = field(default_factory=set)
+
+        def to_record(self) -> UnixInterfaceRecord:
+            return UnixInterfaceRecord(
+                source=self.source,
+                last_connected=self.last_connected,
+                name=self.name,
+                mac=[self.mac_address] if self.mac_address else [],
+                type=self.type,
+                dhcp_ipv4=self.dhcp_ipv4,
+                dhcp_ipv6=self.dhcp_ipv6,
+                dns=list(self.dns),
+                ip=[interface.ip for interface in self.ip_interfaces],
+                network=[interface.network for interface in self.ip_interfaces],
+                gateway=list(self.gateways),
+                vlan=list(self.vlan),
+                configurator="NetworkManager",
+            )
+
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
-        connections: list[dict] = []
-        vlan_id_by_interface: LinuxConfigParser.VlanIdByName = {}
+        connections: list[NetworkManagerConfigParser.ParserContext] = []
+        vlan_id_by_interface: VlanIdByInterface = {}
 
         for connection_file_path in self._config_files(self.config_paths, "*"):
             try:
                 config = configutil.parse(connection_file_path, hint="ini")
-
+                context = self.ParserContext(source=connection_file_path)
                 common_section: dict[str, str] = config.get("connection", {})
-                interface_type = common_section.get("type", "")
-                sub_type: dict[str, str] = config.get(interface_type, {})
+                context.type = common_section.get("type", "")
+                sub_type: dict[str, str] = config.get(context.type, {})
 
-                if interface_type == "vlan":
-                    # Store vlan id by parent interface name
-                    parent_interface = sub_type.get("parent", None)
-                    vlan_id = sub_type.get("id", None)
-                    if parent_interface and vlan_id:
-                        vlan_id_by_interface[parent_interface] = int(vlan_id)
+                if context.type == "vlan":
+                    self._parse_vlan(sub_type, vlan_id_by_interface)
                     continue
-
-                dns = set[ip_address]()
-                ip_interfaces: set[ip_interface] = set()
-                gateways: set[ip_address] = set()
-                dhcp_settings: dict[str, str] = {"ipv4": "", "ipv6": ""}
 
                 for ip_version in ["ipv4", "ipv6"]:
                     ip_section: dict[str, str] = config.get(ip_version, {})
                     for key, value in ip_section.items():
-                        # nmcli inserts a trailling semicolon
-                        if key == "dns" and (stripped := value.rstrip(";")):
-                            dns.update({ip_address(addr) for addr in stripped.split(";")})
-                        elif key.startswith("address"):
-                            # Undocumented: single gateway on address line. Observed when running:
-                            # nmcli connection add type ethernet ... ip4 192.168.2.138/24 gw4 192.168.2.1
-                            ip, *gateway = value.split(",", 1)
-                            ip_interfaces.add(ip_interface(ip))
-                            if gateway:
-                                gateways.add(ip_address(gateway[0]))
-                        elif key.startswith("gateway"):
-                            gateways.add(ip_address(value))
-                        elif key == "method":
-                            dhcp_settings[ip_version] = value
-                        elif key.startswith("route"):
-                            if gateway := self._parse_route(value):
-                                gateways.add(gateway)
+                        self._parse_ip_section_key(key, value, context, ip_version)
 
-                name = common_section.get("interface-name", None)
-                mac_address = [sub_type.get("mac-address", "")] if sub_type.get("mac-address", "") else []
+                context.name = common_section.get("interface-name")
+                context.mac_address = sub_type.get("mac-address")
+                context.uuid = common_section.get("uuid")
+                context.source = str(connection_file_path)
+                context.last_connected = self._parse_lastconnected(common_section.get("timestamp", ""))
 
-                connection = {  # Store as dict to allow for clean updating with vlan
-                    "uuid": common_section.get("uuid"),  # Used for looking up parent of vlan
-                    "source": str(connection_file_path),
-                    "enabled": None,  # Stored in run-time state
-                    "last_connected": self._parse_lastconnected(common_section.get("timestamp", "")),
-                    "name": name,
-                    "mac": mac_address,
-                    "type": interface_type,
-                    "dhcp_ipv4": dhcp_settings.get("ipv4", {}) == "auto",
-                    "dhcp_ipv6": dhcp_settings.get("ipv6", {}) == "auto",
-                    "dns": list(dns),
-                    "ip": [interface.ip for interface in ip_interfaces],
-                    "network": [interface.network for interface in ip_interfaces],
-                    "gateway": list(gateways),
-                    "configurator": "NetworkManager",
-                }
-                connections.append(connection)
+                connections.append(context)
 
             except Exception as e:
                 self._target.log.warning("Error parsing network config file %s: %s", connection_file_path, e)
 
-        # Unfavorable O(n^2) complexity, but the number of vlans is expected to be small
         for connection in connections:
-            if vlan_id := vlan_id_by_interface.get(connection["name"]) or vlan_id_by_interface.get(connection["uuid"]):
-                connection["vlan"] = {vlan_id}
-
-        for config in connections:
-            config.pop("uuid", None)
-            yield UnixInterfaceRecord(**config)
+            uuid = vlan_id_by_interface.get(context.uuid) if context.uuid else None
+            name = vlan_id_by_interface.get(connection.name) if connection.name else None
+            if vlan_ids := (name or uuid):
+                connection.vlan.update(vlan_ids)
+            yield connection.to_record()
 
     def _parse_route(self, route: str) -> ip_address | None:
         """Parse a route and return gateway IP address."""
@@ -142,16 +137,47 @@ class NetworkManagerConfigParser(LinuxConfigParser):
 
         return None
 
-    def _parse_lastconnected(self, value: str) -> datetime | None:
+    def _parse_lastconnected(self, last_connected: str) -> datetime | None:
         """Parse last connected timestamp."""
-        if not value:
+        if not last_connected:
             return None
 
-        timestamp_int = int(value)
-        return datetime.fromtimestamp(timestamp_int, timezone.utc)
+        return datetime.fromtimestamp(int(last_connected), timezone.utc)
+
+    def _parse_ip_section_key(
+        self, key: str, value: str, context: ParserContext, ip_version: Literal["ipv4", "ipv6"]
+    ) -> None:
+        # nmcli inserts a trailling semicolon
+        if key == "dns" and (stripped := value.rstrip(";")):
+            context.dns.update({ip_address(addr) for addr in stripped.split(";")})
+        elif key.startswith("address") and (trimmed := value.strip()):
+            # Undocumented: single gateway on address line. Observed when running:
+            # nmcli connection add type ethernet ... ip4 192.168.2.138/24 gw4 192.168.2.1
+            ip, *gateway = trimmed.split(",", 1)
+            context.ip_interfaces.add(ip_interface(ip))
+            if gateway:
+                context.gateways.add(ip_address(gateway[0]))
+        elif key.startswith("gateway") and value:
+            context.gateways.add(ip_address(value))
+        elif key == "method" and ip_version == "ipv4":
+            context.dhcp_ipv4 = value == "auto"
+        elif key == "method" and ip_version == "ipv6":
+            context.dhcp_ipv6 = value == "auto"
+        elif key.startswith("route"):
+            if gateway := self._parse_route(value):
+                context.gateways.add(gateway)
+
+    def _parse_vlan(self, sub_type: dict["str", any], vlan_id_by_interface: VlanIdByInterface) -> None:
+        parent_interface = sub_type.get("parent", None)
+        vlan_id = sub_type.get("id", None)
+        if not parent_interface or not vlan_id:
+            return
+
+        ids = vlan_id_by_interface.setdefault(parent_interface, set())
+        ids.add(int(vlan_id))
 
 
-class SystemdNetworkConfigParser(LinuxConfigParser):
+class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
     """Systemd network configuration parser.
 
     Systemd network configuration files are generally in an INI-like format with some quirks.
@@ -167,18 +193,24 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
         "/usr/local/lib/systemd/network/",
     ]
 
+    class DhcpConfig(NamedTuple):
+        ipv4: bool
+        ipv6: bool
+
     # Can be enclosed in brackets for IPv6. Can also have port, iface name, and SNI, which we ignore.
     # Example: [1111:2222::3333]:9953%ifname#example.com
-    dns_ip_patttern = re.compile(r"((?:\d{1,3}\.){3}\d{1,3})|\[(\[?[0-9a-fA-F:]+\]?)\]")
+    dns_ip_patttern = re.compile(
+        r"(?P<withoutBrackets>(?:\d{1,3}\.){3}\d{1,3})|\[(?P<withBrackets>\[?[0-9a-fA-F:]+\]?)\]"
+    )
 
     def interfaces(self) -> Iterator:
         virtual_networks = self._parse_virtual_networks()
         yield from self._parse_networks(virtual_networks)
 
-    def _parse_virtual_networks(self) -> LinuxConfigParser.VlanIdByName:
+    def _parse_virtual_networks(self) -> VlanIdByInterface:
         """Parse virtual network configurations from systemd network configuration files."""
 
-        virtual_networks: LinuxConfigParser.VlanIdByName = {}
+        virtual_networks: VlanIdByInterface = {}
         for config_file in self._config_files(self.config_paths, "*.netdev"):
             try:
                 virtual_network_config = configutil.parse(config_file, hint="systemd")
@@ -190,11 +222,11 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
                 if (name := net_dev_section.get("Name")) and vlan_id:
                     virtual_networks[name] = int(vlan_id)
             except Exception as e:
-                self._target.log.warning("Error parsing virtual network config file %s: %s", config_file, e)
+                self._target.log.warning("Error parsing virtual network config file %s", config_file, exc_info=e)
 
         return virtual_networks
 
-    def _parse_networks(self, virtual_networks: LinuxConfigParser.VlanIdByName) -> Iterator[UnixInterfaceRecord]:
+    def _parse_networks(self, virtual_networks: VlanIdByInterface) -> Iterator[UnixInterfaceRecord]:
         """Parse network configurations from systemd network configuration files."""
         for config_file in self._config_files(self.config_paths, "*.network"):
             try:
@@ -207,44 +239,35 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
                 ip_interfaces: set[ip_interface] = set()
                 gateways: set[ip_address] = set()
                 dns: set[ip_address] = set()
-                mac_addresses = set[str]()
+                mac_addresses: set[str] = set()
 
-                dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
                 if link_mac := link_section.get("MACAddress"):
                     mac_addresses.add(link_mac)
-                if match_macs := match_section.get("MACAddress"):
-                    mac_addresses.update(match_macs.split(" "))
-                if permanent_macs := match_section.get("PermanentMACAddress"):
-                    mac_addresses.update(permanent_macs.split(" "))
+                mac_addresses.update(match_section.get("MACAddress", "").split())
+                mac_addresses.update(match_section.get("PermanentMACAddress", "").split())
 
-                if dns_value := network_section.get("DNS"):
-                    if isinstance(dns_value, str):
-                        dns_value = [dns_value]
-                    dns.update({self._parse_dns_ip(dns_ip) for dns_ip in dns_value})
+                dns_value = to_list(network_section.get("DNS", []))
+                dns.update({self._parse_dns_ip(dns_ip) for dns_ip in dns_value})
 
-                if address_value := network_section.get("Address"):
-                    if isinstance(address_value, str):
-                        address_value = [address_value]
-                    ip_interfaces.update({ip_interface(addr) for addr in address_value})
+                address_value = to_list(network_section.get("Address", []))
+                ip_interfaces.update({ip_interface(addr) for addr in address_value})
 
-                if gateway_value := network_section.get("Gateway"):
-                    if isinstance(gateway_value, str):
-                        gateway_value = [gateway_value]
-                    gateways.update({ip_address(gateway) for gateway in gateway_value})
+                gateway_value = to_list(network_section.get("Gateway", []))
+                gateways.update({ip_address(gateway) for gateway in gateway_value})
 
-                vlan_values = network_section.get("VLAN", [])
+                vlan_names = network_section.get("VLAN", [])
                 vlan_ids = {
-                    virtual_networks[vlan_name]
-                    for vlan_name in ([vlan_values] if isinstance(vlan_values, str) else vlan_values)
-                    if vlan_name in virtual_networks
+                    vlan_id
+                    for vlan_name in to_list(vlan_names)
+                    if (vlan_id := virtual_networks.get(vlan_name)) is not None
                 }
 
                 # There are possibly multiple route sections, but they are collapsed into one by the parser.
                 route_section = config.get("Route", {})
-                gateway_values = route_section.get("Gateway", [])
-                if isinstance(gateway_values, str):
-                    gateway_values = [gateway_values]
+                gateway_values = to_list(route_section.get("Gateway", []))
                 gateways.update(filter(None, map(self._parse_gateway, gateway_values)))
+
+                dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
                 yield UnixInterfaceRecord(
                     source=str(config_file),
@@ -262,7 +285,7 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
                     configurator="systemd-networkd",
                 )
             except Exception as e:
-                self._target.log.warning("Error parsing network config file %s: %s", config_file, e)
+                self._target.log.warning("Error parsing network config file %s", config_file, exc_info=e)
 
     def _parse_dns_ip(self, address: str) -> ip_address:
         """Parse DNS address from systemd network configuration file.
@@ -272,27 +295,30 @@ class SystemdNetworkConfigParser(LinuxConfigParser):
         """
 
         match = self.dns_ip_patttern.search(address)
-        if match:
-            return ip_address(match.group(1) or match.group(2))
-        else:
+        if not match:
             raise ValueError(f"Invalid DNS address format: {address}")
 
-    def _parse_dhcp(self, value: str | None) -> tuple[bool, bool]:
-        """Parse DHCP value from systemd network configuration file to a boolean tuple (ipv4, ipv6)."""
+        return ip_address(match.group("withoutBrackets") or match.group("withBrackets"))
+
+    def _parse_dhcp(self, value: str | None) -> DhcpConfig:
+        """Parse DHCP value from systemd network configuration file to a named tuple (ipv4, ipv6)."""
 
         if value is None or value == "no":
-            return False, False
+            return self.DhcpConfig(ipv4=False, ipv6=False)
         elif value == "yes":
-            return True, True
+            return self.DhcpConfig(ipv4=True, ipv6=True)
         elif value == "ipv4":
-            return True, False
+            return self.DhcpConfig(ipv4=True, ipv6=False)
         elif value == "ipv6":
-            return False, True
-        else:
-            raise ValueError(f"Invalid DHCP value: {value}")
+            return self.DhcpConfig(ipv4=False, ipv6=True)
+
+        raise ValueError(f"Invalid DHCP value: {value}")
 
     def _parse_gateway(self, value: str | None) -> ip_address | None:
-        return None if not value or value in {"_dhcp4", "_ipv6ra"} else ip_address(value)
+        if (not value) or (value in {"_dhcp4", "_ipv6ra"}):
+            return None
+
+        return ip_address(value)
 
 
 MANAGERS = [NetworkManagerConfigParser, SystemdNetworkConfigParser]

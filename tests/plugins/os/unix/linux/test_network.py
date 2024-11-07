@@ -1,4 +1,3 @@
-import os
 import posixpath
 from datetime import datetime
 from ipaddress import ip_address, ip_network
@@ -9,7 +8,7 @@ from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.general.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
-    LinuxConfigParser,
+    LinuxNetworkConfigParser,
     LinuxNetworkPlugin,
     NetworkManagerConfigParser,
     SystemdNetworkConfigParser,
@@ -18,20 +17,7 @@ from dissect.target.plugins.os.unix.linux.network import (
 
 def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     fixture_dir = "tests/_data/plugins/os/unix/linux/NetworkManager/"
-    fs_linux.makedirs("/etc/NetworkManager/system-connections")
-
-    fs_linux.map_file(
-        "/etc/NetworkManager/system-connections/wired-static.nmconnection",
-        os.path.join(fixture_dir, "wired-static.nmconnection"),
-    )
-    fs_linux.map_file(
-        "/etc/NetworkManager/system-connections/vlan.nmconnection",
-        os.path.join(fixture_dir, "vlan.nmconnection"),
-    )
-    fs_linux.map_file(
-        "/etc/NetworkManager/system-connections/wireless.nmconnection",
-        os.path.join(fixture_dir, "wireless.nmconnection"),
-    )
+    fs_linux.map_dir("/etc/NetworkManager/system-connections", fixture_dir)
 
     network_manager_config_parser = NetworkManagerConfigParser(target_linux)
     interfaces = list(network_manager_config_parser.interfaces())
@@ -86,14 +72,20 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     fs_linux.map_file(
         "/usr/lib/systemd/network/40-wireless.network", posixpath.join(fixture_dir, "40-wireless.network")
     )
+    fs_linux.map_file(
+        "/run/systemd/network/40-wireless-ipv4.network", posixpath.join(fixture_dir, "40-wireless-ipv4.network")
+    )
+    fs_linux.map_file(
+        "/usr/local/lib/systemd/network/40-wireless-ipv6.network",
+        posixpath.join(fixture_dir, "40-wireless-ipv6.network"),
+    )
     fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", posixpath.join(fixture_dir, "20-vlan.netdev"))
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
     interfaces = list(systemd_network_config_parser.interfaces())
 
-    assert len(interfaces) == 3
-
-    wired_static, wired_static_complex, wireless = interfaces
+    assert len(interfaces) == 5
+    wired_static, wired_static_complex, wireless, wireless_ipv4, wireless_ipv6 = interfaces
 
     assert wired_static.name == "enp1s0"
     assert wired_static.type is None
@@ -146,14 +138,22 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert wireless.source == "/usr/lib/systemd/network/40-wireless.network"
     assert wired_static_complex.configurator == "systemd-networkd"
 
+    assert wireless_ipv4.dhcp_ipv4
+    assert not wireless_ipv4.dhcp_ipv6
+    assert wireless_ipv4.source == "/run/systemd/network/40-wireless-ipv4.network"
+
+    assert not wireless_ipv6.dhcp_ipv4
+    assert wireless_ipv6.dhcp_ipv6
+    assert wireless_ipv6.source == "/usr/local/lib/systemd/network/40-wireless-ipv6.network"
+
 
 def test_linux_network_plugin_interfaces(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     """Assert that the LinuxNetworkPlugin aggregates from all Config Parsers."""
 
-    MockLinuxConfigParser1: LinuxConfigParser = MagicMock()
+    MockLinuxConfigParser1: LinuxNetworkConfigParser = MagicMock()
     MockLinuxConfigParser1.return_value.interfaces.return_value = []
 
-    MockLinuxConfigParser2: LinuxConfigParser = MagicMock()
+    MockLinuxConfigParser2: LinuxNetworkConfigParser = MagicMock()
     MockLinuxConfigParser2.return_value.interfaces.return_value = [UnixInterfaceRecord()]
 
     with patch(
