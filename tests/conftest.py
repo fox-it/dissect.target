@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import pathlib
 import tempfile
 import textwrap
 from io import BytesIO
-from typing import Callable, Iterator, Optional
+from typing import Callable, Iterator
 
 import pytest
 
+from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSymlink
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -18,11 +21,10 @@ from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
-from dissect.target.plugins.os.unix.linux.redhat._os import RedHat
+from dissect.target.plugins.os.unix.linux.redhat._os import RedHatPlugin
 from dissect.target.plugins.os.unix.linux.suse._os import SuSEPlugin
 from dissect.target.plugins.os.windows import registry
 from dissect.target.plugins.os.windows._os import WindowsPlugin
-from dissect.target.plugins.os.windows.dpapi.dpapi import DPAPIPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -50,7 +52,7 @@ def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:
 def make_os_target(
     tmp_path: pathlib.Path,
     os_plugin: type[OSPlugin],
-    root_fs: Optional[Filesystem] = None,
+    root_fs: Filesystem | None = None,
     apply_target: bool = True,
 ) -> Target:
     mock_target = next(make_mock_target(tmp_path))
@@ -124,6 +126,12 @@ def fs_suse() -> Iterator[VirtualFilesystem]:
     fs.makedirs("etc/zypp")
     fs.makedirs("opt")
     yield fs
+
+
+@pytest.fixture
+def fs_linux_sys(fs_linux: VirtualFilesystem) -> Iterator[VirtualFilesystem]:
+    fs_linux.makedirs("sys")
+    yield fs_linux
 
 
 @pytest.fixture
@@ -219,14 +227,23 @@ def hive_hklm() -> Iterator[VirtualHive]:
     hive = VirtualHive()
 
     # set current control set to ControlSet001 and mock it
-    controlset_key = "SYSTEM\\ControlSet001"
+    change_controlset(hive, 1)
+
+    yield hive
+
+
+def change_controlset(hive: VirtualHive, num: int) -> None:
+    """Update the current control set of the given HKLM hive."""
+
+    if not isinstance(num, int) or num > 999 or num < 1:
+        raise ValueError("ControlSet integer must be between 1 and 999")
+
+    controlset_key = f"SYSTEM\\ControlSet{num:>03}"
     hive.map_key(controlset_key, VirtualKey(hive, controlset_key))
 
     select_key = "SYSTEM\\Select"
     hive.map_key(select_key, VirtualKey(hive, select_key))
-    hive.map_value(select_key, "Current", VirtualValue(hive, "Current", 1))
-
-    yield hive
+    hive.map_value(select_key, "Current", VirtualValue(hive, "Current", num))
 
 
 @pytest.fixture
@@ -282,7 +299,7 @@ def target_debian(tmp_path: pathlib.Path, fs_debian: Filesystem) -> Iterator[Tar
 
 @pytest.fixture
 def target_redhat(tmp_path: pathlib.Path, fs_redhat: Filesystem) -> Iterator[Target]:
-    yield make_os_target(tmp_path, RedHat, root_fs=fs_redhat)
+    yield make_os_target(tmp_path, RedHatPlugin, root_fs=fs_redhat)
 
 
 @pytest.fixture
@@ -328,92 +345,38 @@ def target_android(tmp_path: pathlib.Path, fs_android: Filesystem) -> Iterator[T
     yield make_os_target(tmp_path, AndroidPlugin, root_fs=fs_android)
 
 
-@pytest.fixture
-def target_win_users(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target) -> Iterator[Target]:
+def add_win_user(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target, sid: str, home: str) -> None:
+    """add a user to the provided windows target"""
+
     profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
-    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
+    try:
+        profile_list_key = hive_hklm.key(profile_list_key_name)
+    except RegistryKeyNotFoundError:
+        profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
 
-    sid_local_system = "S-1-5-18"
-    profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
-    profile1_key.add_value(
-        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
-    )
+    try:
+        hive_hklm.key(f"{profile_list_key_name}\\{sid}")
+        raise ValueError(f"User with SID {sid} already exists!")
+    except RegistryKeyNotFoundError:
+        pass
 
-    sid_users_john = "S-1-5-21-3263113198-3007035898-945866154-1002"
-    profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_users_john}")
-    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\John"))
-
-    profile_list_key.add_subkey(sid_local_system, profile1_key)
-    profile_list_key.add_subkey(sid_users_john, profile2_key)
+    profile_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid}")
+    profile_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", home))
+    profile_list_key.add_subkey(sid, profile_key)
 
     hive_hklm.map_key(profile_list_key_name, profile_list_key)
 
-    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_users_john}", hive_hku, TargetPath(target_win.fs, ""))
-
-    yield target_win
-
-
-SYSTEM_KEY_PATH = "SYSTEM\\ControlSet001\\Control\\LSA"
-POLICY_KEY_PATH = "SECURITY\\Policy\\PolEKList"
-DPAPI_KEY_PATH = "SECURITY\\Policy\\Secrets\\DPAPI_SYSTEM\\CurrVal"
+    if sid != "S-1-5-18":
+        target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid}", hive_hku, TargetPath(target_win.fs, ""))
 
 
 @pytest.fixture
-def target_win_users_dpapi(
-    hive_hklm: VirtualHive, hive_hku: VirtualHive, fs_win: VirtualFilesystem, target_win: Target
-) -> Iterator[Target]:
-    # Add User
-    profile_list_key_name = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList"
-    profile_list_key = VirtualKey(hive_hklm, profile_list_key_name)
-
-    sid_local_system = "S-1-5-18"
-    profile1_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_local_system}")
-    profile1_key.add_value(
-        "ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "%systemroot%\\system32\\config\\systemprofile")
+def target_win_users(hive_hklm: VirtualHive, hive_hku: VirtualHive, target_win: Target) -> Iterator[Target]:
+    """minimal windows target with a SYSTEM user and local user John"""
+    add_win_user(hive_hklm, hive_hku, target_win, sid="S-1-5-18", home="%systemroot%\\system32\\config\\systemprofile")
+    add_win_user(
+        hive_hklm, hive_hku, target_win, sid="S-1-5-21-3263113198-3007035898-945866154-1002", home="C:\\Users\\John"
     )
-
-    sid_user = "S-1-5-21-1342509979-482553916-3960431919-1000"
-    profile2_key = VirtualKey(hive_hklm, f"{profile_list_key_name}\\{sid_user}")
-    profile2_key.add_value("ProfileImagePath", VirtualValue(hive_hklm, "ProfileImagePath", "C:\\Users\\user"))
-
-    profile_list_key.add_subkey(sid_local_system, profile1_key)
-    profile_list_key.add_subkey(sid_user, profile2_key)
-
-    hive_hklm.map_key(profile_list_key_name, profile_list_key)
-
-    target_win.registry.add_hive("HKEY_USERS", f"HKEY_USERS\\{sid_user}", hive_hku, TargetPath(target_win.fs, ""))
-
-    # Add system dpapi files
-    fs_win.map_dir(
-        "Windows/System32/Microsoft/Protect", absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_System32")
-    )
-
-    # Add user dpapi files
-    fs_win.map_dir(
-        "Users/User/AppData/Roaming/Microsoft/Protect",
-        absolute_path("_data/plugins/os/windows/dpapi/fixture/Protect_User"),
-    )
-
-    # Add registry dpapi keys
-    system_key = VirtualKey(hive_hklm, SYSTEM_KEY_PATH)
-    system_key.add_subkey("Data", VirtualKey(hive_hklm, "Data", class_name="8fa8e1fb"))
-    system_key.add_subkey("GBG", VirtualKey(hive_hklm, "GBG", class_name="a6e23eb8"))
-    system_key.add_subkey("JD", VirtualKey(hive_hklm, "JD", class_name="fe5ffdaf"))
-    system_key.add_subkey("Skew1", VirtualKey(hive_hklm, "Skew1", class_name="6e289261"))
-    hive_hklm.map_key(SYSTEM_KEY_PATH, system_key)
-
-    policy_key = VirtualKey(hive_hklm, POLICY_KEY_PATH)
-    policy_key_value = b"\x00\x00\x00\x01\xec\xff\xe1{*\x99t@\xaa\x93\x9a\xdb\xff&\xf1\xfc\x03\x00\x00\x00\x00\x00\x00\x00goX67\xc3\xe0\xe7\xb9\xed\xf4;;)\xb1\xd0\xd2L\xb6\xbf\xc6\x0e\x0f\xc4\xdcDn}$M053\xb9\n+\xd72\xfc\xf9\x85t\x8a\x89\x17\xae\xa7>\x9d\x0b)\x0e\xe4\xba/S\xe6\xa9\xa0\xac\x9b<\x9b&\xe7!\xb0\x1bzl\x1f\x92\xb5\x17\xe2\xa3?_m\xe7\xf76qg\x93\xb1\x98r\x05\x95\x95\xe6\xb4\xdc\x88\x8d\x19\xd1\xd6\x15\xd6\x02\xbe\xd5SG\x8cA\x1d/\xed\x04V\x02\xdd\xbbZ\xdc1\xc9\x90\x10!\xad3\x9b\xca6\x8b\xdbUO\xfe\x07JptR\x8d^\x9d\xcb\xb4g"  # noqa
-    policy_key.add_value("(Default)", policy_key_value)
-    hive_hklm.map_key(POLICY_KEY_PATH, policy_key)
-
-    secrets_key = VirtualKey(hive_hklm, DPAPI_KEY_PATH)
-    secrets_key_value = b"\x00\x00\x00\x01|>q\xec\xa8\xfbN\xed\x03\xeaCa\xfb\xc7\x83\x87\x03\x00\x00\x00\x00\x00\x00\x00\xafd\xca2\xa1PY\xf8\xe3\x8f2\x8a_\x16\xd0c\x93\x9b\xdb\xb92\x1b\xa1Y\xdc\xaf\xd9\xcd\xf3\x16\xd8/\x89\xa8)\xd7X\x02K'm\t\x9e\xf2)\x0c\xa4o\xc7\xb2cUhP\x0b\xf2\xd3\x1e\xd8\xce\x1e\x0304\\\xca^\xf3\xe8\xd1\x83\x99\xa2*\xe8\x8d\xb1(r\xee[\xb0\xc1\xf0\xdd;\x83\x06bi\xd0\xd9a\x8b\x19\xbb"  # noqa
-    secrets_key.add_value("(Default)", secrets_key_value)
-    hive_hklm.map_key(DPAPI_KEY_PATH, secrets_key)
-
-    target_win.add_plugin(DPAPIPlugin)
-
     yield target_win
 
 
@@ -500,6 +463,8 @@ def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[
 
     test = absolute_path("_data/plugins/os/unix/bsd/osx/_os/test.plist")
     fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+
+    fs_osx.makedirs("/Users/dissect")
 
     yield target_osx
 

@@ -34,7 +34,7 @@ dependencies = [
     "dissect.regf>=3.3,<4",
     "dissect.util>=3,<4",
     "dissect.volume>=2,<4",
-    "flow.record~=3.15.0",
+    "flow.record~=3.17.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -47,6 +47,7 @@ repository = "https://github.com/fox-it/dissect.target"
 [project.optional-dependencies]
 full = [
     "asn1crypto",
+    "dissect.archive>=1,<2",
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
@@ -56,6 +57,7 @@ full = [
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
     "dissect.jffs>=1,<2",
+    "dissect.ole>=3,<4",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
     "dissect.sql>=3,<4",
@@ -78,6 +80,7 @@ full = [
 ]
 dev = [
     "dissect.target[full,mqtt,yara]",
+    "dissect.archive[dev]>=1.0.dev,<2.0.dev",
     "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
     "dissect.cim[dev]>=3.0.dev,<4.0.dev",
     "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
@@ -100,7 +103,7 @@ dev = [
     "dissect.util>=3.0.dev,<4.0.dev",
     "dissect.vmfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
-    "dissect.xfs[dev]>=3.0.dev,<4.0.dev", 
+    "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -133,6 +136,7 @@ target-mount = "dissect.target.tools.mount:main"
 target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
+target-yara = "dissect.target.tools.yara:main"
 
 [tool.black]
 line-length = 120

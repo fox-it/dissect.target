@@ -142,3 +142,67 @@ EmptyRecord = RecordDescriptor(
     "empty",
     [],
 )
+
+COMMON_INTERFACE_ELEMENTS = [
+    ("string", "name"),
+    ("string", "type"),
+    ("boolean", "enabled"),
+    ("string", "mac"),
+    ("net.ipaddress[]", "dns"),
+    ("net.ipaddress[]", "ip"),
+    ("net.ipaddress[]", "gateway"),
+    ("string", "source"),
+]
+
+
+UnixInterfaceRecord = TargetRecordDescriptor(
+    "unix/network/interface",
+    COMMON_INTERFACE_ELEMENTS,
+)
+
+WindowsInterfaceRecord = TargetRecordDescriptor(
+    "windows/network/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("varint", "vlan"),
+        ("net.ipnetwork[]", "network"),
+        ("varint", "metric"),
+        ("stringlist", "search_domain"),
+        ("datetime", "first_connected"),
+        ("datetime", "last_connected"),
+        ("net.ipaddress[]", "subnetmask"),
+        ("boolean", "dhcp"),
+    ],
+)
+
+MacInterfaceRecord = TargetRecordDescriptor(
+    "macos/network/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("varint", "vlan"),
+        ("net.ipnetwork[]", "network"),
+        ("varint", "interface_service_order"),
+        ("boolean", "dhcp"),
+    ],
+)
+
+
+COMMON_APPLICATION_FIELDS = [
+    ("datetime", "ts_modified"),
+    ("datetime", "ts_installed"),
+    ("string", "name"),
+    ("string", "version"),
+    ("string", "author"),
+    ("string", "type"),
+    ("path", "path"),
+]
+
+UnixApplicationRecord = TargetRecordDescriptor(
+    "unix/application",
+    COMMON_APPLICATION_FIELDS,
+)
+
+WindowsApplicationRecord = TargetRecordDescriptor(
+    "windows/application",
+    COMMON_APPLICATION_FIELDS,
+)

@@ -16,6 +16,8 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
 
 
 class EnvironPlugin(Plugin):
+    """Linux volatile proc environment plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 

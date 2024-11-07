@@ -41,11 +41,11 @@ class FatFilesystem(Filesystem):
         try:
             return self.fatfs.get(path, dirent=entry)
         except fat_exc.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except fat_exc.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except fat_exc.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class FatFilesystemEntry(FilesystemEntry):

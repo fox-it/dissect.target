@@ -3,13 +3,15 @@ from dissect.target.plugin import Plugin, export
 
 
 class ExchangePlugin(Plugin):
+    """Microsoft Exchange Server plugin."""
+
     __namespace__ = "exchange"
 
     def check_compatible(self) -> None:
         if not len(self.install_paths()):
             raise UnsupportedPluginError("No Exchange install path found")
 
-    def install_paths(self):
+    def install_paths(self) -> list[str]:
         paths = []
         key = "HKLM\\SOFTWARE\\Microsoft\\ExchangeServer"
         for reg_key in self.target.registry.keys(key):
@@ -23,9 +25,9 @@ class ExchangePlugin(Plugin):
 
         return paths
 
-    @export
-    def transport_agents(self):
-        """Return the content of the config file for Transport Agents for Microsoft Exchange.
+    @export(output="none")
+    def transport_agents(self) -> None:
+        """Print the content of the config file for Transport Agents for Microsoft Exchange.
 
         A Transport Agent is additional software on a Microsoft Exchange server that allows for custom processing of
         email messages that go through the transport pipeline.

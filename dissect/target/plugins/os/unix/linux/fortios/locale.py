@@ -5,6 +5,8 @@ from dissect.target.plugin import Plugin, export
 
 
 class LocalePlugin(Plugin):
+    """FortiOS locale plugin."""
+
     def check_compatible(self) -> None:
         if self.target.os != "fortios":
             raise UnsupportedPluginError("FortiOS specific plugin loaded on non-FortiOS target")
