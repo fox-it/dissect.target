@@ -77,7 +77,8 @@ class SyscachePlugin(Plugin):
                 full_path = None
                 if mft:
                     try:
-                        full_path = self.target.fs.path("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
+                        if path := mft(file_segment).full_path():
+                            full_path = self.target.fs.path("\\".join(["sysvol", path]))
                     except ntfs.Error:
                         pass
 

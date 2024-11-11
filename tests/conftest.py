@@ -227,14 +227,23 @@ def hive_hklm() -> Iterator[VirtualHive]:
     hive = VirtualHive()
 
     # set current control set to ControlSet001 and mock it
-    controlset_key = "SYSTEM\\ControlSet001"
+    change_controlset(hive, 1)
+
+    yield hive
+
+
+def change_controlset(hive: VirtualHive, num: int) -> None:
+    """Update the current control set of the given HKLM hive."""
+
+    if not isinstance(num, int) or num > 999 or num < 1:
+        raise ValueError("ControlSet integer must be between 1 and 999")
+
+    controlset_key = f"SYSTEM\\ControlSet{num:>03}"
     hive.map_key(controlset_key, VirtualKey(hive, controlset_key))
 
     select_key = "SYSTEM\\Select"
     hive.map_key(select_key, VirtualKey(hive, select_key))
-    hive.map_value(select_key, "Current", VirtualValue(hive, "Current", 1))
-
-    yield hive
+    hive.map_value(select_key, "Current", VirtualValue(hive, "Current", num))
 
 
 @pytest.fixture
