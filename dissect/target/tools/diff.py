@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
+import os
 import re
 import shutil
 import sys
@@ -374,7 +375,10 @@ class DifferentialCli(ExtendedCmd):
         else:
             prompt_base = self.comparison.src_target.name
 
-        suffix = f"\x1b[1;32m{prompt_base}\x1b[0m:\x1b[1;34m{self.cwd}\x1b[0m$ "
+        if os.getenv("NO_COLOR"):
+            suffix = f"{prompt_base}:{self.cwd}$ "
+        else:
+            suffix = f"\x1b[1;32m{prompt_base}\x1b[0m:\x1b[1;34m{self.cwd}\x1b[0m$ "
 
         if len(self.targets) <= 2:
             return f"(diff) {suffix}"
