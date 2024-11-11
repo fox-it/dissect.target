@@ -79,10 +79,6 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     assert results[1].filesize == 79
 
 
-@patch(
-    "dissect.target.filesystem.LayerFilesystem.mounts",
-    property(MagicMock(return_value={"/tmp/example": None, "/mnt/example": None})),
-)
 def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     """test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
 
@@ -92,14 +88,15 @@ def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesyste
     fs_unix.map_dir("tmp/example/.Trash-5678", absolute_path("_data/plugins/os/unix/trash"))
     fs_unix.map_dir("media/user/example/.Trash-1000", absolute_path("_data/plugins/os/unix/trash"))
 
-    target_unix_users.add_plugin(UnixPlugin)
-    plugin = GnomeTrashPlugin(target_unix_users)
-
-    assert sorted([str(t) for _, t in plugin.trashes]) == [
-        "/home/user/.local/share/Trash",
-        "/media/user/example/.Trash-1000",
-        "/mnt/example/.Trash-1234",
-        "/tmp/example/.Trash-5678",
-    ]
-
-    assert len(list(plugin.trash())) == 11 * len(plugin.trashes)
+    with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None}):
+        target_unix_users.add_plugin(UnixPlugin)
+        plugin = GnomeTrashPlugin(target_unix_users)
+    
+        assert sorted([str(t) for _, t in plugin.trashes]) == [
+            "/home/user/.local/share/Trash",
+            "/media/user/example/.Trash-1000",
+            "/mnt/example/.Trash-1234",
+            "/tmp/example/.Trash-5678",
+        ]
+    
+        assert len(list(plugin.trash())) == 11 * len(plugin.trashes)
