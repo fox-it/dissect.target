@@ -35,14 +35,14 @@ class XfsFilesystem(Filesystem):
     def _get_node(self, path: str, node: Optional[xfs.INode] = None) -> xfs.INode:
         try:
             return self.xfs.get(path, node)
-        except xfs.FileNotFoundError:
-            raise FileNotFoundError(path)
-        except xfs.NotADirectoryError:
-            raise NotADirectoryError(path)
-        except xfs.NotASymlinkError:
-            raise NotASymlinkError(path)
+        except xfs.FileNotFoundError as e:
+            raise FileNotFoundError(path) from e
+        except xfs.NotADirectoryError as e:
+            raise NotADirectoryError(path) from e
+        except xfs.NotASymlinkError as e:
+            raise NotASymlinkError(path) from e
         except xfs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class XfsFilesystemEntry(FilesystemEntry):
