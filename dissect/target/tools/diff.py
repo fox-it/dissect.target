@@ -331,7 +331,7 @@ class TargetComparison:
 class DifferentialCli(ExtendedCmd):
     """CLI for browsing the differential between two or more targets."""
 
-    doc_header_prefix = "Target Diff\n" "==========\n"
+    doc_header_prefix = "target-diff\n" "==========\n"
     doc_header_suffix = "\n\nDocumented commands (type help <topic>):"
     doc_header_multiple_targets = "Use 'list', 'prev' and 'next' to list and select targets to differentiate between."
 
@@ -351,12 +351,13 @@ class DifferentialCli(ExtendedCmd):
         self.doc_header = self.doc_header_prefix + doc_header_middle + self.doc_header_suffix
 
         self._select_source_and_dest(0, 1)
-        if len(self.targets) > 2:
-            # Some help may be nice if you are diffing more than 2 targets at once
-            self.do_help(arg=None)
 
         start_in_cyber = any(target.props.get("cyber") for target in self.targets)
         super().__init__(start_in_cyber)
+
+        if len(self.targets) > 2:
+            # Some help may be nice if you are diffing more than 2 targets at once
+            self.do_help(arg=None)
 
     @property
     def src_target(self) -> Target:
@@ -369,11 +370,11 @@ class DifferentialCli(ExtendedCmd):
     @property
     def prompt(self) -> str:
         if self.comparison.src_target.name != self.comparison.dst_target.name:
-            prompt_base = f"({self.comparison.src_target.name}/{self.comparison.dst_target.name})"
+            prompt_base = f"{self.comparison.src_target.name}/{self.comparison.dst_target.name}"
         else:
             prompt_base = self.comparison.src_target.name
 
-        suffix = f"{prompt_base}:{self.cwd}$ "
+        suffix = f"\x1b[1;32m{prompt_base}\x1b[0m:\x1b[1;34m{self.cwd}\x1b[0m$ "
 
         if len(self.targets) <= 2:
             return f"(diff) {suffix}"
@@ -658,6 +659,14 @@ class DifferentialCli(ExtendedCmd):
             print(f"File {name} not found.")
         else:
             print(f"No two versions available for {name} to differentiate between.")
+        return False
+
+    @arg("path", nargs="?")
+    @alias("xxd")
+    def cmd_hexdump(self, args: argparse.Namespace, stdout: TextIO) -> bool:
+        """Output difference of the given file between targets in hexdump."""
+        setattr(args, "hex", True)
+        return self.cmd_diff(args, stdout)
 
     @arg("index", type=str)
     @arg("type", choices=["src", "dst"])
@@ -796,8 +805,6 @@ def differentiate_target_filesystems(
 ) -> Iterator[Record]:
     """Given a list of targets, compare targets against one another and yield File[Created|Modified|Deleted]Records
     indicating the differences between them."""
-    if len(targets) < 2:
-        raise ValueError("Provide two or more targets to differentiate between.")
 
     for target_pair in make_target_pairs(targets, absolute):
         # Unpack the tuple and initialize the comparison class
@@ -864,13 +871,13 @@ def main() -> None:
         type=int,
         help="How many bytes to compare before assuming a file is left unchanged (0 for no limit)",
     )
-    subparsers = parser.add_subparsers(help="Mode for differentiating targets", dest="mode")
+    subparsers = parser.add_subparsers(help="Mode for differentiating targets", dest="mode", required=True)
 
     shell_mode = subparsers.add_parser("shell", help="Open an interactive shell to compare two or more targets.")
-    shell_mode.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to differentiate between")
+    shell_mode.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to differentiate between")
 
     fs_mode = subparsers.add_parser("fs", help="Yield records about differences between target filesystems.")
-    fs_mode.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to differentiate between")
+    fs_mode.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to differentiate between")
     fs_mode.add_argument("-s", "--strings", action="store_true", help="print records as strings")
     fs_mode.add_argument("-e", "--exclude", action="append", help="Path(s) on targets not to check for differences")
     fs_mode.add_argument(
@@ -891,7 +898,7 @@ def main() -> None:
     )
 
     query_mode = subparsers.add_parser("query", help="Differentiate plugin outputs between two or more targets.")
-    query_mode.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to differentiate between")
+    query_mode.add_argument("targets", metavar="TARGETS", nargs="+", help="Targets to differentiate between")
     query_mode.add_argument("-s", "--strings", action="store_true", help="print records as strings")
     query_mode.add_argument(
         "-p",
@@ -930,6 +937,10 @@ def main() -> None:
     args = parser.parse_args()
     process_generic_arguments(args)
 
+    if len(args.targets) < 2:
+        print("At least two targets are required for target-diff.")
+        parser.exit(1)
+
     target_list = [Target.open(path) for path in args.targets]
     if args.mode == "shell":
         cli = DifferentialCli(*target_list, deep=args.deep, limit=args.limit)
@@ -946,6 +957,14 @@ def main() -> None:
                 exclude=args.exclude,
             )
         elif args.mode == "query":
+            if args.deep:
+                log.error("argument --deep is not available in target-diff query mode")
+                parser.exit(1)
+
+            if args.limit != FILE_LIMIT:
+                log.error("argument --limit is not available in target-diff query mode")
+                parser.exit(1)
+
             iterator = differentiate_target_plugin_outputs(
                 *target_list,
                 absolute=args.absolute,
@@ -953,8 +972,14 @@ def main() -> None:
                 plugin=args.plugin,
                 plugin_args=arg_str_to_arg_list(args.parameters),
             )
-        for record in iterator:
-            writer.write(record)
+
+        try:
+            for record in iterator:
+                writer.write(record)
+
+        except Exception as e:
+            log.error(e)
+            parser.exit(1)
 
 
 if __name__ == "__main__":
