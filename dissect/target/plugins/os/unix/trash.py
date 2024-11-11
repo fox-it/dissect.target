@@ -107,7 +107,7 @@ class GnomeTrashPlugin(Plugin):
                             filesize=file.lstat().st_size if file.is_file() else None,
                             deleted_path=file,
                             source=trash_info_file,
-                            _user=user_details.user
+                            _user=user_details.user,
                             _target=self.target,
                         )
 
@@ -121,7 +121,7 @@ class GnomeTrashPlugin(Plugin):
                         filesize=0,
                         deleted_path=deleted_path,
                         source=trash_info_file,
-                        _user=user_details.user
+                        _user=user_details.user,
                         _target=self.target,
                     )
 
@@ -138,6 +138,6 @@ class GnomeTrashPlugin(Plugin):
                     filesize=stat.st_size if item.is_file() else None,
                     deleted_path=item,
                     source=trash / "expunged",
-                    _user=user_details.user if user_details else None,
+                    _user=user_details.user,
                     _target=self.target,
                 )
