@@ -11,7 +11,11 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
-from dissect.target.plugins.os.unix.log.helpers import RE_LINE, is_iso_fmt, iso_readlines
+from dissect.target.plugins.os.unix.log.helpers import (
+    RE_LINE,
+    is_iso_fmt,
+    iso_readlines,
+)
 
 MessagesRecord = TargetRecordDescriptor(
     "linux/log/messages",
@@ -83,19 +87,16 @@ class MessagesPlugin(Plugin):
                 iterable = year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo)
 
             for ts, line in iterable:
-                match = RE_LINE.match(line)
+                match = RE_LINE.search(line)
 
                 if not match:
                     self.target.log.warning("Unable to parse message line in %s", log_file)
                     self.target.log.debug("Line %s", line)
                     continue
 
-                values = match.groupdict()
                 yield MessagesRecord(
                     ts=ts,
-                    daemon=values["service"],
-                    pid=values["pid"],
-                    message=values["message"],
+                    **match.groupdict(),
                     source=log_file,
                     _target=self.target,
                 )

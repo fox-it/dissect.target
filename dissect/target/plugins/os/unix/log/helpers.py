@@ -2,25 +2,28 @@ import itertools
 import logging
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Iterator
 
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 
 log = logging.getLogger(__name__)
 
-_RE_TS = r"^[A-Za-z]{3}\s*[0-9]{1,2}\s[0-9]{1,2}:[0-9]{2}:[0-9]{2}"
-_RE_TS_ISO = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}"
-
-RE_TS = re.compile(_RE_TS)
-RE_TS_ISO = re.compile(_RE_TS_ISO)
+RE_TS = re.compile(r"^[A-Za-z]{3}\s*\d{1,2}\s\d{1,2}:\d{2}:\d{2}")
+RE_TS_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}")
 RE_LINE = re.compile(
-    rf"(?P<ts>{_RE_TS}|{_RE_TS_ISO})\s(?P<hostname>\S+)\s(?P<service>\S+?)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"
+    r"""
+    \d{2}:\d{2}\s                           # First match on the similar ending of the different timestamps
+    (?:\S+)\s                               # The hostname, but do not capture it
+    (?P<daemon>\S+?)(\[(?P<pid>\d+)\])?:    # The daemon with optionally the PID between brackets
+    \s*(?P<message>.+?)\s*$                 # The log message stripped from spaces left and right
+    """,
+    re.VERBOSE,
 )
 
 
-def iso_readlines(file: TargetPath) -> Iterator[tuple[datetime, str]]:
+def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:
     """Iterator reading the provided log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
-
     with open_decompress(file, "rt") as fh:
         for line in fh:
             if not (match := RE_TS_ISO.match(line)):
@@ -30,7 +33,6 @@ def iso_readlines(file: TargetPath) -> Iterator[tuple[datetime, str]]:
 
             try:
                 ts = datetime.strptime(match[0], "%Y-%m-%dT%H:%M:%S.%f%z")
-
             except ValueError as e:
                 log.warning("Unable to parse ISO timestamp in line: %s", line)
                 log.debug("", exc_info=e)
@@ -39,6 +41,6 @@ def iso_readlines(file: TargetPath) -> Iterator[tuple[datetime, str]]:
             yield ts, line
 
 
-def is_iso_fmt(file: TargetPath) -> bool:
+def is_iso_fmt(file: Path) -> bool:
     """Determine if the provided log file uses ISO 8601 timestamp format logging or not."""
     return any(itertools.islice(iso_readlines(file), 0, 2))

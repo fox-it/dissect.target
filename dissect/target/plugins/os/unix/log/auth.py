@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 import logging
 import re
 from abc import ABC, abstractmethod
@@ -12,10 +11,10 @@ from typing import Any, Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
+from dissect.target.plugins.os.unix.log.helpers import is_iso_fmt, iso_readlines
 
 log = logging.getLogger(__name__)
 
@@ -347,27 +346,3 @@ class AuthPlugin(Plugin):
 
             for ts, line in iterable:
                 yield self._auth_log_builder.build_record(ts, auth_file, line)
-
-
-def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:
-    """Iterator reading the provided auth log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
-    with open_decompress(file, "rt") as fh:
-        for line in fh:
-            if not (match := RE_TS_ISO.match(line)):
-                log.warning("No timestamp found in one of the lines in %s!", file)
-                log.debug("Skipping line: %s", line)
-                continue
-
-            try:
-                ts = datetime.strptime(match[0], "%Y-%m-%dT%H:%M:%S.%f%z")
-            except ValueError as e:
-                log.warning("Unable to parse ISO timestamp in line: %s", line)
-                log.debug("", exc_info=e)
-                continue
-
-            yield ts, line
-
-
-def is_iso_fmt(file: Path) -> bool:
-    """Determine if the provided auth log file uses new ISO format logging or not."""
-    return any(itertools.islice(iso_readlines(file), 0, 2))
