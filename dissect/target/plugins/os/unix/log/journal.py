@@ -276,8 +276,9 @@ def get_optional(value: str, to_type: Callable) -> Any | None:
         log.debug("", exc_info=e)
         return None
 
-# Sometimes stringy None is inserted by external tools like Ansible    
-def int_or_none(value: str):
+
+# Sometimes stringy None is inserted by external tools like Ansible
+def int_or_none(value: str) -> int | None:
     return int(value) if value and value != "None" else None
 
 
@@ -431,30 +432,30 @@ class JournalPlugin(Plugin):
                     ts=entry.get("ts"),
                     message=entry.get("message"),
                     message_id=entry.get("message_id"),
-                    priority=get_optional(entry.get("priority"), int),
+                    priority=int_or_none(entry.get("priority")),
                     code_file=get_optional(entry.get("code_file"), path_function),
-                    code_line=get_optional(entry.get("code_line"), int),
+                    code_line=int_or_none(entry.get("code_line")),
                     code_func=entry.get("code_func"),
-                    errno=get_optional(entry.get("errno"), int),
+                    errno=int_or_none(entry.get("errno")),
                     invocation_id=entry.get("invocation_id"),
                     user_invocation_id=entry.get("user_invocation_id"),
                     syslog_facility=entry.get("syslog_facility"),
                     syslog_identifier=entry.get("syslog_identifier"),
-                    syslog_pid=get_optional(entry.get("syslog_pid"), int),
+                    syslog_pid=int_or_none(entry.get("syslog_pid")),
                     syslog_raw=entry.get("syslog_raw"),
                     documentation=entry.get("documentation"),
-                    tid=get_optional(entry.get("tid"), int),
+                    tid=int_or_none(entry.get("tid")),
                     unit=entry.get("unit"),
                     user_unit=entry.get("user_unit"),
-                    pid=get_optional(entry.get("pid"), int),
-                    uid=get_optional(entry.get("uid"), int),
-                    gid=get_optional(entry.get("gid"), int),
+                    pid=int_or_none(entry.get("pid")),
+                    uid=int_or_none(entry.get("uid")),
+                    gid=int_or_none(entry.get("gid")),
                     comm=entry.get("comm"),
                     exe=get_optional(entry.get("exe"), path_function),
                     cmdline=entry.get("cmdline"),
                     cap_effective=entry.get("cap_effective"),
-                    audit_session=get_optional(entry.get("audit_session"), int),
-                    audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
+                    audit_session=int_or_none(entry.get("audit_session")),
+                    audit_loginuid=int_or_none(entry.get("audit_loginuid")),
                     systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path_function),
                     systemd_slice=entry.get("systemd_slice"),
                     systemd_unit=entry.get("systemd_unit"),
