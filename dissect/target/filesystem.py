@@ -1142,7 +1142,7 @@ class VirtualFilesystem(Filesystem):
                     try:
                         return entry.top.get(fsutil.join(*parts[i:], alt_separator=self.alt_separator))
                     except FilesystemError as e:
-                        raise FileNotFoundError(full_path, cause=e)
+                        raise FileNotFoundError(full_path) from e
                 else:
                     raise FileNotFoundError(full_path)
 
@@ -1717,7 +1717,7 @@ def open(fh: BinaryIO, *args, **kwargs) -> Filesystem:
                 log.info("Failed to import %s", filesystem)
                 log.debug("", exc_info=e)
             except Exception as e:
-                raise FilesystemError(f"Failed to open filesystem for {fh}", cause=e)
+                raise FilesystemError(f"Failed to open filesystem for {fh}") from e
     finally:
         fh.seek(offset)
 

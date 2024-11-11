@@ -1,4 +1,5 @@
-""" Registry related abstractions """
+"""Registry related abstractions"""
+
 from __future__ import annotations
 
 import fnmatch
@@ -310,6 +311,7 @@ class VirtualKey(RegistryKey):
         self._class_name = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
+        self._timestamp: datetime = None
         self.top: RegistryKey = None
         super().__init__(hive=hive)
 
@@ -339,10 +341,18 @@ class VirtualKey(RegistryKey):
         return self._path
 
     @property
-    def timestamp(self) -> datetime:
+    def timestamp(self) -> datetime | None:
         if self.top:
             return self.top.timestamp
+
+        if self._timestamp:
+            return self._timestamp
+
         return None
+
+    @timestamp.setter
+    def timestamp(self, ts: datetime) -> None:
+        self._timestamp = ts
 
     def subkey(self, subkey: str) -> RegistryKey:
         try:
@@ -636,7 +646,7 @@ class RegfHive(RegistryHive):
         try:
             return RegfKey(self, self.hive.open(key))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(key, cause=e)
+            raise RegistryKeyNotFoundError(key) from e
 
 
 class RegfKey(RegistryKey):
@@ -666,7 +676,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfKey(self.hive, self.key.subkey(subkey))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(subkey, cause=e)
+            raise RegistryKeyNotFoundError(subkey) from e
 
     def subkeys(self) -> list[RegistryKey]:
         return [RegfKey(self.hive, k) for k in self.key.subkeys()]
@@ -675,7 +685,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfValue(self.hive, self.key.value(value))
         except regf.RegistryValueNotFoundError as e:
-            raise RegistryValueNotFoundError(value, cause=e)
+            raise RegistryValueNotFoundError(value) from e
 
     def values(self) -> list[RegistryValue]:
         return [RegfValue(self.hive, v) for v in self.key.values()]

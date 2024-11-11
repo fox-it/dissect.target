@@ -79,13 +79,13 @@ class BtrfsSubvolumeFilesystem(Filesystem):
         try:
             return self.subvolume.get(path, node)
         except btrfs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except btrfs.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except btrfs.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except btrfs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class BtrfsFilesystemEntry(FilesystemEntry):
