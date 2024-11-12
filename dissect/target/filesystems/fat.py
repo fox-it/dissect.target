@@ -1,4 +1,5 @@
 import datetime
+import math
 import stat
 from typing import BinaryIO, Iterator, Optional, Union
 
@@ -116,7 +117,7 @@ class FatFilesystemEntry(FilesystemEntry):
             ]
         )
 
-        st_info.st_blocks = self.entry.nblocks
-        st_info.st_blksize = self.entry.blksize
+        st_info.st_blocks = math.ceil( self.entry.size / self.entry.fs.cluster_size)
+        st_info.st_blksize = self.entry.fs.cluster_size
         st_info.st_birthtime = creation_time
         return st_info
