@@ -206,4 +206,5 @@ register("smb", "SmbLoader")
 register("cb", "CbLoader")
 register("cyber", "CyberLoader")
 register("proxmox", "ProxmoxLoader")
+register("single", "SingleFileLoader")
 register("multiraw", "MultiRawLoader")  # Should be last

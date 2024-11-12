@@ -118,12 +118,16 @@ def main():
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
+    parser.add_argument("--single-file", nargs="*", help="glob pattern to match files on local system")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
 
     # If loader is specified then map to uri
     targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
+
+    if args.single_file:
+        targets = args_to_uri(args.single_file, "single")  # Guess we piggyback on this uri scheme then.
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
