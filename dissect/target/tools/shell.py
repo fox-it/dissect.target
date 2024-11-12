@@ -407,6 +407,8 @@ class TargetCmd(ExtendedCmd):
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
+            else:
+                self.target.log.warning("Error {cwd} and {base} was not set inside PS1, using the default prompt.")
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
