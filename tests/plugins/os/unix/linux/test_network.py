@@ -38,7 +38,7 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
     assert not wired.dhcp_ipv6
     assert wired.enabled is None
     assert wired.last_connected == datetime.fromisoformat("2024-10-29 07:59:54+00:00")
-    assert wired.vlan == [10]
+    assert Counter(wired.vlan) == Counter([10, 11])
     assert wired.source == "/etc/NetworkManager/system-connections/wired-static.nmconnection"
     assert wired.configurator == "NetworkManager"
 
@@ -80,6 +80,7 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
         posixpath.join(fixture_dir, "40-wireless-ipv6.network"),
     )
     fs_linux.map_file("/etc/systemd/network/20-vlan.netdev", posixpath.join(fixture_dir, "20-vlan.netdev"))
+    fs_linux.map_file("/etc/systemd/network/20-vlan2.netdev", posixpath.join(fixture_dir, "20-vlan2.netdev"))
 
     systemd_network_config_parser = SystemdNetworkConfigParser(target_linux)
     interfaces = list(systemd_network_config_parser.interfaces())
@@ -98,7 +99,7 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert not wired_static.dhcp_ipv6
     assert wired_static.enabled is None
     assert wired_static.last_connected is None
-    assert wired_static.vlan == [100]
+    assert Counter(wired_static.vlan) == Counter([100, 101])
     assert wired_static.source == "/etc/systemd/network/20-wired-static.network"
     assert wired_static.configurator == "systemd-networkd"
 
@@ -147,7 +148,7 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert wireless_ipv6.source == "/usr/local/lib/systemd/network/40-wireless-ipv6.network"
 
 
-def test_linux_network_plugin_interfaces(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+def test_linux_network_plugin_interfaces(target_linux: Target) -> None:
     """Assert that the LinuxNetworkPlugin aggregates from all Config Parsers."""
 
     MockLinuxConfigParser1: LinuxNetworkConfigParser = MagicMock()

@@ -32,7 +32,7 @@ class LinuxNetworkConfigParser:
         self._target = target
 
     def _config_files(self, config_paths: list[str], glob: str) -> list[TargetPath]:
-        """Yield all configuration files in config_paths matching the given extension."""
+        """Returns all configuration files in config_paths matching the given extension."""
         all_files = []
         for config_path in config_paths:
             paths = self._target.fs.path(config_path).glob(glob)
@@ -124,10 +124,12 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
                 self._target.log.warning("Error parsing network config file %s: %s", connection_file_path, e)
 
         for connection in connections:
-            uuid = vlan_id_by_interface.get(context.uuid) if context.uuid else None
-            name = vlan_id_by_interface.get(connection.name) if connection.name else None
-            if vlan_ids := (name or uuid):
-                connection.vlan.update(vlan_ids)
+            vlan_ids_from_interface = vlan_id_by_interface.get(connection.name, set())
+            connection.vlan.update(vlan_ids_from_interface)
+
+            vlan_ids_from_uuid = vlan_id_by_interface.get(connection.uuid, set())
+            connection.vlan.update(vlan_ids_from_uuid)
+
             yield connection.to_record()
 
     def _parse_route(self, route: str) -> ip_address | None:
@@ -147,29 +149,32 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
     def _parse_ip_section_key(
         self, key: str, value: str, context: ParserContext, ip_version: Literal["ipv4", "ipv6"]
     ) -> None:
-        # nmcli inserts a trailling semicolon
-        if key == "dns" and (stripped := value.rstrip(";")):
-            context.dns.update({ip_address(addr) for addr in stripped.split(";")})
-        elif key.startswith("address") and (trimmed := value.strip()):
+        if not (trimmed := value.strip()):
+            return
+
+        if key == "dns":
+            context.dns.update({ip_address(addr) for addr in trimmed.split(";") if addr})
+        elif key.startswith("address"):
             # Undocumented: single gateway on address line. Observed when running:
             # nmcli connection add type ethernet ... ip4 192.168.2.138/24 gw4 192.168.2.1
             ip, *gateway = trimmed.split(",", 1)
             context.ip_interfaces.add(ip_interface(ip))
             if gateway:
                 context.gateways.add(ip_address(gateway[0]))
-        elif key.startswith("gateway") and value:
-            context.gateways.add(ip_address(value))
-        elif key == "method" and ip_version == "ipv4":
-            context.dhcp_ipv4 = value == "auto"
-        elif key == "method" and ip_version == "ipv6":
-            context.dhcp_ipv6 = value == "auto"
+        elif key.startswith("gateway"):
+            context.gateways.add(ip_address(trimmed))
+        elif key == "method":
+            if ip_version == "ipv4":
+                context.dhcp_ipv4 = trimmed == "auto"
+            elif ip_version == "ipv6":
+                context.dhcp_ipv6 = trimmed == "auto"
         elif key.startswith("route"):
             if gateway := self._parse_route(value):
                 context.gateways.add(gateway)
 
     def _parse_vlan(self, sub_type: dict["str", any], vlan_id_by_interface: VlanIdByInterface) -> None:
-        parent_interface = sub_type.get("parent", None)
-        vlan_id = sub_type.get("id", None)
+        parent_interface = sub_type.get("parent")
+        vlan_id = sub_type.get("id")
         if not parent_interface or not vlan_id:
             return
 
@@ -220,7 +225,8 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
 
                 vlan_id = virtual_network_config.get("VLAN", {}).get("Id")
                 if (name := net_dev_section.get("Name")) and vlan_id:
-                    virtual_networks[name] = int(vlan_id)
+                    vlan_ids = virtual_networks.setdefault(name, set())
+                    vlan_ids.add(int(vlan_id))
             except Exception as e:
                 self._target.log.warning("Error parsing virtual network config file %s", config_file, exc_info=e)
 
@@ -255,15 +261,14 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                 gateway_value = to_list(network_section.get("Gateway", []))
                 gateways.update({ip_address(gateway) for gateway in gateway_value})
 
-                vlan_names = network_section.get("VLAN", [])
-                vlan_ids = {
-                    vlan_id
-                    for vlan_name in to_list(vlan_names)
-                    if (vlan_id := virtual_networks.get(vlan_name)) is not None
-                }
+                vlan_ids: set[int] = set()
+                vlan_names = to_list(network_section.get("VLAN", []))
+                for vlan_name in vlan_names:
+                    if ids := virtual_networks.get(vlan_name):
+                        vlan_ids.update(ids)
 
                 # There are possibly multiple route sections, but they are collapsed into one by the parser.
-                route_section = config.get("Route", {})
+                route_section: dict[str, any] = config.get("Route", {})
                 gateway_values = to_list(route_section.get("Gateway", []))
                 gateways.update(filter(None, map(self._parse_gateway, gateway_values)))
 
