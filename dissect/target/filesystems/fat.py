@@ -116,6 +116,6 @@ class FatFilesystemEntry(FilesystemEntry):
             ]
         )
 
-        st_info.st_blocks = math.ceil( self.entry.size / self.entry.fs.cluster_size)
+        st_info.st_blocks = math.ceil(self.entry.size / self.entry.fs.cluster_size)
         st_info.st_blksize = self.entry.fs.cluster_size
         return st_info
