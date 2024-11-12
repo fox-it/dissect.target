@@ -304,9 +304,10 @@ class ExtendedCmd(cmd.Cmd):
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
 
-    def do_man(self, line: str) -> None:
+    def do_man(self, line: str) -> bool:
         """alias for help"""
         self.do_help(line)
+        return False
 
     def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
