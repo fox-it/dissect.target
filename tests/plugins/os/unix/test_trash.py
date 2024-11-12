@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin
@@ -91,12 +91,12 @@ def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesyste
     with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None}):
         target_unix_users.add_plugin(UnixPlugin)
         plugin = GnomeTrashPlugin(target_unix_users)
-    
+
         assert sorted([str(t) for _, t in plugin.trashes]) == [
             "/home/user/.local/share/Trash",
             "/media/user/example/.Trash-1000",
             "/mnt/example/.Trash-1234",
             "/tmp/example/.Trash-5678",
         ]
-    
+
         assert len(list(plugin.trash())) == 11 * len(plugin.trashes)
