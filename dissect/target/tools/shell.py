@@ -253,11 +253,11 @@ class ExtendedCmd(cmd.Cmd):
         no_cyber = cmdfunc.__func__ in (TargetCli.cmd_registry, TargetCli.cmd_enter)
         return self._exec(_exec_, command_args_str, no_cyber)
 
-    def do_man(self, line: str) -> bool:
+    def do_man(self, line: str) -> None:
         """alias for help"""
-        return self.do_help(line)
+        self.do_help(line)
 
-    def complete_man(self, *args) -> list[str]:
+    def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
@@ -352,15 +352,13 @@ class TargetCmd(ExtendedCmd):
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
+        self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
-
-        else:
-            self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
 
         super().__init__(self.target.props.get("cyber"))
 
