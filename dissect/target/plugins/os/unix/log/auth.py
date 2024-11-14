@@ -14,6 +14,7 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
 
@@ -300,7 +301,7 @@ class AuthLogRecordBuilder:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
 
-class AuthPlugin(Plugin):
+class AuthPlugin(Plugin, SingleFileMixin):
     """Unix authentication log plugin."""
 
     def __init__(self, target: Target):
@@ -308,9 +309,15 @@ class AuthPlugin(Plugin):
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
     def check_compatible(self) -> None:
-        var_log = self.target.fs.path("/var/log")
-        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
-            raise UnsupportedPluginError("No auth log files found")
+        if self.single_file_mode:
+            if any(self.get_single_files("auth.log*")) or any(self.get_single_files("secure*")):
+                return
+        else:
+            var_log = self.target.fs.path("/var/log")
+            if any(var_log.glob("auth.log*")) or any(var_log.glob("secure*")):
+                return
+
+        raise UnsupportedPluginError("No auth log files found")
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
@@ -338,8 +345,13 @@ class AuthPlugin(Plugin):
 
         tzinfo = self.target.datetime.tzinfo
 
-        var_log = self.target.fs.path("/var/log")
-        for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
+        if self.single_file_mode:
+            iter_single_file = chain(self.get_single_files("auth.log*"), self.get_single_files("secure*"))
+        else:
+            var_log = self.target.fs.path("/var/log")
+            iter_single_file = chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
+
+        for auth_file in iter_single_file:
             if is_iso_fmt(auth_file):
                 iterable = iso_readlines(auth_file)
             else:
