@@ -1,6 +1,8 @@
 import textwrap
 from io import BytesIO
 
+from flow.record.fieldtypes import posix_path
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.target import Target
@@ -39,7 +41,7 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert len(users) == 8
 
     assert users[0].name == "alfred"  # Only listed in /var/nstmp
-    assert users[0].home == "/var/nstmp/alfred"
+    assert users[0].home == posix_path("/var/nstmp/alfred")
 
     assert users[1].name == "batman"  # Only listed in config
     assert users[1].home is None
@@ -51,15 +53,15 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert users[3].home is None
 
     assert users[4].name == "nobody"  # User entry for the nobody user from /etc/passwd
-    assert users[4].home == "/nonexistent"
+    assert users[4].home == posix_path("/nonexistent")
 
     assert users[5].name == "robin"  # Listed in config and /var/nstmp
-    assert users[5].home == "/var/nstmp/robin"
+    assert users[5].home == posix_path("/var/nstmp/robin")
 
     assert users[6].name == "root"  # User entry for /root, from the config
-    assert users[6].home == "/root"
+    assert users[6].home == posix_path("/root")
     assert users[6].shell is None
 
     assert users[7].name == "root"  # User entry for /root, from /etc/passwd
-    assert users[7].home == "/root"
+    assert users[7].home == posix_path("/root")
     assert users[7].shell == "/usr/bin/bash"

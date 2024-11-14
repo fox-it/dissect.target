@@ -90,6 +90,9 @@ class Blob:
         if self.decrypted:
             return True
 
+        if not master_key:
+            raise ValueError("No master key provided to decrypt blob with")
+
         for algo in [crypt_session_key_type1, crypt_session_key_type2]:
             session_key = algo(
                 master_key,

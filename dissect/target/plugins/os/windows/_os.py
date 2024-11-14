@@ -2,13 +2,23 @@ from __future__ import annotations
 
 import operator
 import struct
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator
+
+from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
+
+ARCH_MAP = {
+    "x86": 32,
+    "IA64": 64,
+    "ARM64": 64,
+    "EM64T": 64,
+    "AMD64": 64,
+}
 
 
 class WindowsPlugin(OSPlugin):
@@ -26,7 +36,7 @@ class WindowsPlugin(OSPlugin):
         )
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             if fs.exists("/windows/system32") or fs.exists("/winnt"):
                 return fs
@@ -90,7 +100,7 @@ class WindowsPlugin(OSPlugin):
                 self.target.log.warning("Unknown drive letter for sysvol")
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         key = "HKLM\\SYSTEM\\ControlSet001\\Control\\Computername\\Computername"
         try:
             return self.target.registry.value(key, "Computername").value
@@ -99,28 +109,7 @@ class WindowsPlugin(OSPlugin):
 
     @export(property=True)
     def ips(self) -> list[str]:
-        key = "HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces"
-        fields = ["IPAddress", "DhcpIPAddress"]
-        ips = set()
-
-        for r in self.target.registry.keys(key):
-            for s in r.subkeys():
-                for field in fields:
-                    try:
-                        ip = s.value(field).value
-                    except RegistryValueNotFoundError:
-                        continue
-
-                    if isinstance(ip, str):
-                        ip = [ip]
-
-                    for i in ip:
-                        if i == "0.0.0.0":
-                            continue
-
-                        ips.add(i)
-
-        return list(ips)
+        return list(set(map(str, self.target.network.ips())))
 
     def _get_version_reg_value(self, value_name: str) -> Any:
         try:
@@ -130,7 +119,7 @@ class WindowsPlugin(OSPlugin):
 
         return value
 
-    def _legacy_current_version(self) -> Optional[str]:
+    def _legacy_current_version(self) -> str | None:
         """Returns the NT version as used up to and including NT 6.3.
 
         This corresponds with Windows 8 / Windows 2012 Server.
@@ -142,7 +131,7 @@ class WindowsPlugin(OSPlugin):
         """
         return self._get_version_reg_value("CurrentVersion")
 
-    def _major_version(self) -> Optional[int]:
+    def _major_version(self) -> int | None:
         """Return the NT major version number (starting from NT 10.0 / Windows 10).
 
         Returns:
@@ -152,7 +141,7 @@ class WindowsPlugin(OSPlugin):
         """
         return self._get_version_reg_value("CurrentMajorVersionNumber")
 
-    def _minor_version(self) -> Optional[int]:
+    def _minor_version(self) -> int | None:
         """Return the NT minor version number (starting from NT 10.0 / Windows 10).
 
         Returns:
@@ -162,7 +151,7 @@ class WindowsPlugin(OSPlugin):
         """
         return self._get_version_reg_value("CurrentMinorVersionNumber")
 
-    def _nt_version(self) -> Optional[int]:
+    def _nt_version(self) -> int | None:
         """Return the Windows NT version in x.y format.
 
         For systems up to and including NT 6.3 (Win 8 / Win 2012 Server) this
@@ -190,7 +179,7 @@ class WindowsPlugin(OSPlugin):
         return version
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         """Return a string representation of the Windows version of the target.
 
         For Windows versions before Windows 10 this looks like::
@@ -276,7 +265,7 @@ class WindowsPlugin(OSPlugin):
         return version_string
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         """
         Returns a dict containing the architecture and bitness of the system
 
@@ -284,19 +273,11 @@ class WindowsPlugin(OSPlugin):
             Dict: arch: architecture, bitness: bits
         """
 
-        arch_strings = {
-            "x86": 32,
-            "IA64": 64,
-            "ARM64": 64,
-            "EM64T": 64,
-            "AMD64": 64,
-        }
-
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
 
         try:
             arch = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
-            bits = arch_strings.get(arch)
+            bits = ARCH_MAP.get(arch)
 
             # return {"arch": arch, "bitness": bits}
             if bits == 64:
@@ -333,7 +314,7 @@ class WindowsPlugin(OSPlugin):
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=home,
+                    home=windows_path(home),
                     _target=self.target,
                 )
 

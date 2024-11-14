@@ -105,6 +105,7 @@ FilesystemMACBRecord = TargetRecordDescriptor(
         ("filesize", "filesize"),
         ("boolean", "resident"),
         ("boolean", "inuse"),
+        ("boolean", "ads"),
         ("string", "volume_uuid"),
     ],
 )
@@ -122,6 +123,8 @@ COMPACT_RECORD_TYPES = {
 
 
 class MftPlugin(Plugin):
+    """NTFS MFT plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self.ntfs_filesystems = {index: fs for index, fs in enumerate(self.target.filesystems) if fs.__type__ == "ntfs"}
@@ -138,14 +141,20 @@ class MftPlugin(Plugin):
             FilesystemFilenameCompactRecord,
         ]
     )
-    @arg("--compact", action="store_true", help="compacts the MFT entry timestamps into a single record")
+    @arg(
+        "--compact",
+        group="fmt",
+        action="store_true",
+        help="compacts the MFT entry timestamps into a single record",
+    )
     @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
     @arg("--start", type=int, default=0, help="the first MFT segment number")
     @arg("--end", type=int, default=-1, help="the last MFT segment number")
     @arg(
         "--macb",
+        group="fmt",
         action="store_true",
-        help="compacts the MFT entry timestamps into aggregated records with MACB bitfield",
+        help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )
     def mft(
         self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
@@ -171,9 +180,7 @@ class MftPlugin(Plugin):
 
         aggr = noaggr
 
-        if compact and macb:
-            raise ValueError("--macb and --compact are mutually exclusive")
-        elif compact:
+        if compact:
             record_formatter = compacted_formatter
         elif macb:
             aggr = macb_aggr
@@ -338,12 +345,13 @@ def macb_aggr(records: list[Record]) -> Iterator[Record]:
     for record in records:
         found = False
 
-        offset_std = int(record._desc.name == "filesystem/ntfs/mft/std") * 5
-        offset_ads = (int(record.ads) * 10) if offset_std == 0 else 0
+        offset = 0
+        if not getattr(record, "ads", False):
+            offset = int(record._desc.name == "filesystem/ntfs/mft/filename") * 5
 
-        field = "MACB".find(record.ts_type) + offset_std + offset_ads
+        field = "MACB".find(record.ts_type) + offset
         for macb in macbs:
-            if macb.ts == record.ts:
+            if macb.ts == record.ts and macb.path == record.path:
                 macb.macb = macb_set(macb.macb, field, record.ts_type)
                 found = True
                 break
@@ -352,7 +360,7 @@ def macb_aggr(records: list[Record]) -> Iterator[Record]:
             continue
 
         macb = FilesystemMACBRecord.init_from_record(record)
-        macb.macb = "..../..../...."
+        macb.macb = "..../...."
         macb.macb = macb_set(macb.macb, field, record.ts_type)
 
         macbs.append(macb)

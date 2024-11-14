@@ -1,6 +1,6 @@
 """Dissect plugin system.
 
-See dissect/target/plugins/general/example.py for an example plugin.
+See ``dissect/target/plugins/general/example.py`` for an example plugin.
 """
 
 from __future__ import annotations
@@ -57,17 +57,18 @@ log = logging.getLogger(__name__)
 
 
 class OperatingSystem(StrEnum):
-    LINUX = "linux"
-    WINDOWS = "windows"
-    ESXI = "esxi"
-    BSD = "bsd"
-    OSX = "osx"
-    UNIX = "unix"
     ANDROID = "android"
-    VYOS = "vyos"
-    IOS = "ios"
-    FORTIOS = "fortios"
+    BSD = "bsd"
     CITRIX = "citrix-netscaler"
+    ESXI = "esxi"
+    FORTIOS = "fortios"
+    IOS = "ios"
+    LINUX = "linux"
+    OSX = "osx"
+    PROXMOX = "proxmox"
+    UNIX = "unix"
+    VYOS = "vyos"
+    WINDOWS = "windows"
 
 
 def export(*args, **kwargs) -> Callable:
@@ -76,18 +77,19 @@ def export(*args, **kwargs) -> Callable:
     Supported keyword arguments:
         property (bool): Whether this export should be regarded as a property.
             Properties are implicitly cached.
+
         cache (bool): Whether the result of this function should be cached.
+
         record (RecordDescriptor): The :class:`flow.record.RecordDescriptor` for the records that this function yields.
             If the records are dynamically made, use DynamicRecord instead.
-        output (str): The output type of this function. Can be one of:
 
+        output (str): The output type of this function. Must be one of:
         - default: Single return value
         - record: Yields records. Implicit when record argument is given.
         - yield: Yields printable values.
         - none: No return value. Plugin is responsible for output formatting and should return ``None``.
 
     The ``export`` decorator adds some additional private attributes to an exported method or property:
-
     - ``__output__``: The output type to expect for this function, this is the same as ``output``.
     - ``__record__``: The type of record to expect, this value is the same as ``record``.
     - ``__exported__``: set to ``True`` to indicate the method or property is exported.
@@ -142,7 +144,7 @@ def get_nonprivate_attributes(cls: Type[Plugin]) -> list[Any]:
 
 def get_nonprivate_methods(cls: Type[Plugin]) -> list[Callable]:
     """Retrieve all public methods of a :class:`Plugin`."""
-    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property)]
+    return [attr for attr in get_nonprivate_attributes(cls) if not isinstance(attr, property) and callable(attr)]
 
 
 def get_descriptors_on_nonprivate_methods(cls: Type[Plugin]) -> list[RecordDescriptor]:
@@ -173,7 +175,7 @@ class Plugin:
     class attribute. Namespacing results in your plugin needing to be prefixed
     with this namespace when being called. For example, if your plugin has
     specified ``test`` as namespace and a function called ``example``, you must
-    call your plugin with ``test.example``::
+    call your plugin with ``test.example``.
 
     A ``Plugin`` class has the following private class attributes:
 
@@ -430,15 +432,13 @@ def register(plugincls: Type[Plugin]) -> None:
     """Register a plugin, and put related data inside :attr:`PLUGINS`.
 
     This function uses the following private attributes that are set using decorators:
-
-    - ``__exported__``: Set in :func:`export`.
-    - ``__internal__``: Set in :func:`internal`.
+        - ``__exported__``: Set in :func:`export`.
+        - ``__internal__``: Set in :func:`internal`.
 
     Additionally, ``register`` sets the following private attributes on the `plugincls`:
-
-    - ``__plugin__``: Always set to ``True``.
-    - ``__functions__``: A list of all the methods and properties that are ``__internal__`` or ``__exported__``.
-    - ``__exports__``: A list of all the methods or properties that were explicitly exported.
+        - ``__plugin__``: Always set to ``True``.
+        - ``__functions__``: A list of all the methods and properties that are ``__internal__`` or ``__exported__``.
+        - ``__exports__``: A list of all the methods or properties that were explicitly exported.
 
     Args:
         plugincls: A plugin class to register.
@@ -807,7 +807,7 @@ def load(plugin_desc: PluginDescriptor) -> Type[Plugin]:
         module = importlib.import_module(module)
         return getattr(module, plugin_desc["class"])
     except Exception as e:
-        raise PluginError(f"An exception occurred while trying to load a plugin: {module}", cause=e)
+        raise PluginError(f"An exception occurred while trying to load a plugin: {module}") from e
 
 
 def failed() -> list[dict[str, Any]]:
@@ -1020,7 +1020,7 @@ class NamespacePlugin(Plugin):
                 continue
 
             # The method needs to output records
-            if getattr(subplugin_func, "__output__", None) != "record":
+            if getattr(subplugin_func, "__output__", None) not in ["record", "yield"]:
                 continue
 
             # The method may not be part of a parent class.
@@ -1106,6 +1106,9 @@ class NamespacePlugin(Plugin):
             cls.__init_subclass_namespace__(cls, **kwargs)
 
 
+__COMMON_PLUGIN_METHOD_NAMES__ = {attr.__name__ for attr in get_nonprivate_methods(Plugin)}
+
+
 class InternalPlugin(Plugin):
     """Parent class for internal plugins.
 
@@ -1115,11 +1118,15 @@ class InternalPlugin(Plugin):
 
     def __init_subclass__(cls, **kwargs):
         for method in get_nonprivate_methods(cls):
-            if callable(method):
+            if callable(method) and method.__name__ not in __COMMON_PLUGIN_METHOD_NAMES__:
                 method.__internal__ = True
 
         super().__init_subclass__(**kwargs)
         return cls
+
+
+class InternalNamespacePlugin(NamespacePlugin, InternalPlugin):
+    pass
 
 
 @dataclass(frozen=True, eq=True)
@@ -1130,6 +1137,9 @@ class PluginFunction:
     class_object: type[Plugin]
     method_name: str
     plugin_desc: PluginDescriptor = field(hash=False)
+
+    def __repr__(self) -> str:
+        return self.path
 
 
 def plugin_function_index(target: Optional[Target]) -> tuple[dict[str, PluginDescriptor], set[str]]:
@@ -1285,7 +1295,7 @@ def find_plugin_functions(
                         path=index_name,
                         class_object=loaded_plugin_object,
                         method_name=method_name,
-                        output_type=getattr(fobject, "__output__", "text"),
+                        output_type=getattr(fobject, "__output__", "none"),
                         plugin_desc=func,
                     )
                 )
@@ -1330,7 +1340,7 @@ def find_plugin_functions(
                         path=f"{description['module']}.{funcname}",
                         class_object=loaded_plugin_object,
                         method_name=funcname,
-                        output_type=getattr(fobject, "__output__", "text"),
+                        output_type=getattr(fobject, "__output__", "none"),
                         plugin_desc=description,
                     )
                 )

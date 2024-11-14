@@ -189,7 +189,7 @@ class XmlTask:
             bytes: The raw XML data as string of the element if found, otherwise None.
         """
         data = self.task_element.find(xml_path) if xml_path else self.task_element
-        if data:
+        if data is not None:
             return ElementTree.tostring(data, encoding="utf-8").strip()
 
     def get_triggers(self) -> Iterator[GroupedRecord]:

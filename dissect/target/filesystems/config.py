@@ -133,7 +133,7 @@ class ConfigurationEntry(FilesystemEntry):
     Behaves like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a ``dict``.
     Behaves like a ``file`` otherwise.
 
-    Attributes:
+    Args:
         parser_items: A dict-like object containing all configuration entries and values.
             In most cases this is either a :class:`.ConfigurationParser` or ``dict``.
             Otherwise, its the entry's value
@@ -247,9 +247,13 @@ class ConfigurationEntry(FilesystemEntry):
         Returns:
             A file-like object holding a byte representation of :attr:`parser_items`.
         """
+
         if isinstance(self.parser_items, ConfigurationParser):
             # Currently trying to open the underlying entry
             return self.entry.open()
+
+        if isinstance(self.parser_items, bytes):
+            return io.BytesIO(self.parser_items)
 
         output_data = self._write_value_mapping(self.parser_items)
         return io.BytesIO(bytes(output_data, "utf-8"))

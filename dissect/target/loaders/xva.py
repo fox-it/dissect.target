@@ -1,4 +1,4 @@
-from dissect.hypervisor import xva
+from dissect.archive import xva
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader
