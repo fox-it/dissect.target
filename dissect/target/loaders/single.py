@@ -20,7 +20,7 @@ class SingleFileLoader(Loader):
     """
 
     @staticmethod
-    def detect(path: Path) -> bool:
+    def detect(_: Path) -> bool:
         return False
 
     def map(self, target: Target) -> None:

@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import docs, keychain, local_files
+from dissect.target.helpers import docs, keychain, single_file
 from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
@@ -42,6 +42,7 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
         help="a file or directory containing plugins and extensions",
     )
 
+
 def process_generic_arguments(args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
 
@@ -57,9 +58,6 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
 
     if args.keychain_value:
         keychain.register_wildcard_value(args.keychain_value)
-
-    if args.single_file:
-        local_files.register_local_file_glob(args.files)
 
     paths = get_external_module_paths(args.plugin_path or [])
     load_modules_from_paths(paths)

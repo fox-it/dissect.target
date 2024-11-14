@@ -127,7 +127,7 @@ def main():
     targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
 
     if args.single_file:
-        targets = args_to_uri(args.single_file, "single")  # Guess we piggyback on this uri scheme then.
+        targets = args_to_uri(args.single_file, "single", [])  # Guess we piggyback on this uri scheme then.
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
@@ -209,7 +209,7 @@ def main():
 
         parser.exit()
 
-    if not targets:
+    if not targets and not args.single_file:
         parser.error("too few arguments")
 
     if not args.function:
