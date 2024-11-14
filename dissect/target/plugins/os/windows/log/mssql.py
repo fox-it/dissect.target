@@ -32,6 +32,7 @@ class MssqlPlugin(Plugin):
     References:
         - https://learn.microsoft.com/en-us/sql/relational-databases/logs/view-offline-log-files
     """
+
     __namespace__ = "mssql"
 
     MSSQL_KEY = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server"
