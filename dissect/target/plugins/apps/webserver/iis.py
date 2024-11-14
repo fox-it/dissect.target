@@ -12,6 +12,7 @@ from dissect.target.exceptions import FileNotFoundError as DissectFileNotFoundEr
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import has_glob_magic
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
@@ -45,7 +46,7 @@ BasicRecordDescriptor = TargetRecordDescriptor(LOG_RECORD_NAME, BASIC_RECORD_FIE
 FIELD_NAME_INVALID_CHARS_RE = re.compile(r"[^a-zA-Z0-9]")
 
 
-class IISLogsPlugin(WebserverPlugin):
+class IISLogsPlugin(WebserverPlugin, SingleFileMixin):
     """IIS 7 (and above) logs plugin.
 
     References:
@@ -68,12 +69,12 @@ class IISLogsPlugin(WebserverPlugin):
     def __init__(self, target):
         super().__init__(target)
         self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
-        self.log_dirs = self.get_log_dirs()
+        self.log_dirs = self.get_log_dirs() if not self.single_file_mode else []
 
         self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        if not self.log_dirs and not self.single_file_mode:
             raise UnsupportedPluginError("No IIS log files found")
 
     @plugin.internal
@@ -114,10 +115,15 @@ class IISLogsPlugin(WebserverPlugin):
         return list(log_paths)
 
     @plugin.internal
-    def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
+    def iter_log_format_path_pairs(self) -> Iterator[tuple[str, str]]:
         for log_format, log_dir_path in self.log_dirs:
             for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
+
+    @plugin.internal
+    def iter_single_file_path_pairs(self) -> Iterator[tuple[str, str]]:
+        for log_file in self.get_single_files():
+            yield ("auto", log_file)
 
     @plugin.internal
     def parse_autodetect_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
@@ -309,7 +315,13 @@ class IISLogsPlugin(WebserverPlugin):
         web. Logs files might, for example, contain traces that indicate that the web server has been exploited.
         Supported log formats: IIS, W3C.
         """
-        for log_format, log_file in self.iter_log_format_path_pairs():
+
+        if self.single_file_mode:
+            log_format_pairs = self.iter_single_file_path_pairs()
+        else:
+            log_format_pairs = self.iter_log_format_path_pairs()
+
+        for log_format, log_file in log_format_pairs:
             if log_format == "IIS":
                 parse_func = self.parse_iis_format_log
             elif log_format == "W3C":
