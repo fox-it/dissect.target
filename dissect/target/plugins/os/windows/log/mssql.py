@@ -23,6 +23,15 @@ RE_TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{2}")
 
 
 class MssqlPlugin(Plugin):
+    """Return information related to Microsoft SQL Server.
+        
+        Currently returns ERRORLOG messages. These log files contain information such as:
+         - Logon failures
+         - Enabling/disabling of features, such as xp_cmdshell
+
+        References:
+            - https://learn.microsoft.com/en-us/sql/relational-databases/logs/view-offline-log-files
+    """
     __namespace__ = "mssql"
 
     MSSQL_KEY = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server"
