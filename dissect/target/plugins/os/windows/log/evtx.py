@@ -12,6 +12,7 @@ from flow.record import Record, utils
 from dissect.target import plugin
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
@@ -20,7 +21,7 @@ re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
 EVTX_GLOB = "*.evtx"
 
 
-class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
+class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
     """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)."""
 
     RECORD_NAME = "filesystem/windows/evtx"
@@ -29,12 +30,14 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
     NEEDLE = b"ElfChnk\x00"
     CHUNK_SIZE = 0x10000
 
+    def check_compatible(self) -> None:
+        if not self.single_file_mode:
+            WindowsEventlogsMixin.check_compatible(self)
+
     def __init__(self, target):
         super().__init__(target)
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
-    @plugin.arg("--logs-dir", help="logs directory to scan")
-    @plugin.arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: str | None = None) -> Iterator[DynamicDescriptor]:
         """Return entries from Windows Event log files (``*.evtx``).
@@ -59,10 +62,13 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
             EventID (int): The EventID of the event.
         """
 
-        if logs_dir:
-            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+        if self.single_file_mode:
+            log_paths = self.get_single_files('*')
         else:
-            log_paths = self.get_logs(filename_glob=log_file_glob)
+            if logs_dir:
+                log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+            else:
+                log_paths = self.get_logs(filename_glob=log_file_glob)
 
         for entry in log_paths:
             if not entry.exists():

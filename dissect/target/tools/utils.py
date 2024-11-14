@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, U
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import docs, keychain, single_file
+from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (

@@ -18,6 +18,7 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
@@ -297,6 +298,10 @@ def main():
 
                 if args.dry_run:
                     print(f"  execute: {func_def.name} ({func_def.path})")
+                    continue
+
+                if args.single_file and not issubclass(func_def.class_object, SingleFileMixin):
+                    target.log.error("Plugin `%s` does not support single file mode", func_def)
                     continue
 
                 try:
