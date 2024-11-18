@@ -158,11 +158,10 @@ class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
     def _get_files(self, logs_dir: str | None, log_file_glob: str | None = "*") -> Iterable[Path]:
         if self.single_file_mode:
             return self.get_drop_files()
-
-        if logs_dir:
+        elif logs_dir:
             return self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
-        else:
-            return self.get_logs(filename_glob=log_file_glob)
+
+        return self.get_logs(filename_glob=log_file_glob)
 
 
 def format_value(value: Any) -> Any:

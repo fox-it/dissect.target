@@ -22,9 +22,11 @@ class SingleFileLoader(Loader):
         return False
 
     def map(self, target: Target) -> None:
+        """Maps the contents of the target path recursively into a special drop folder"""
+
         vfs = VirtualFilesystem(case_sensitive=False, alt_separator=target.fs.alt_separator)
         target.filesystems.add(vfs)
         target.fs.mount("/", vfs)
         for entry in self.path.parent.glob(self.path.name):
-            mapping = str(vfs.path(SINGLE_FILE_DIR).joinpath(entry.name))
-            vfs.map_file(mapping, str(entry))
+            mapping = vfs.path(SINGLE_FILE_DIR).joinpath(entry.name)
+            vfs.map_file(str(mapping), str(entry))

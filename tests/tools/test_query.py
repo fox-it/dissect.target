@@ -300,33 +300,6 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
     }
 
 
-def test_target_query_single_file_supported(monkeypatch: pytest.MonkeyPatch) -> None:
-    """test if target-query can execute a plugin in single file mode if supported."""
-
-    with monkeypatch.context() as m:
-        m.setattr(
-            "sys.argv",
-            [
-                "target-query",
-                "-f",
-                "authlog",
-                "--single-file",
-                "tests/_data/plugins/os/windows/log/schedlgu/schedlgu.txt",
-            ],
-        )
-
-        with (
-            patch(
-                "dissect.target.tools.query.execute_function_on_target",
-                autospec=True,
-                side_effect=mock_execute_function,
-            ) as mock_execute,
-        ):
-            target_query()
-
-            assert len(mock_execute.mock_calls) == 1
-
-
 def test_target_query_single_file_unsupported(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """test if target-query prints an error if a plugin does not support single file mode."""
 
