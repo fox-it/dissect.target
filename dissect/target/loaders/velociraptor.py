@@ -136,14 +136,12 @@ class VelociraptorLoader(DirLoader):
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
     def _resolve_path(self, path: str) -> Path:
-        path = quote(path, "$/")
+        path = quote(path, safe="$/")
         path = path.replace(".", "%2E", 1) if path.startswith(".") else path
-        path = super()._resolve_path(path)
-        return path
+        return super()._resolve_path(path)
 
 
 class VelociraptorZipFilesystem(ZipFilesystem):
     def _resolve_path(self, path: str) -> str:
         path = unquote(super()._resolve_path(path))
-        path = path.replace("%2E", ".", 1) if path.startswith("%2E") else path
-        return path
+        return path.replace("%2E", ".", 1) if path.startswith("%2E") else path
