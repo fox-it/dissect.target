@@ -74,8 +74,10 @@ class IISLogsPlugin(WebserverPlugin, SingleFileMixin):
         self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs and not self.single_file_mode:
-            raise UnsupportedPluginError("No IIS log files found")
+        if self.single_file_mode or self.log_dirs:
+            return
+
+        raise UnsupportedPluginError("No IIS log files found")
 
     @plugin.internal
     def get_log_dirs(self) -> list[tuple[str, Path]]:
@@ -116,14 +118,13 @@ class IISLogsPlugin(WebserverPlugin, SingleFileMixin):
 
     @plugin.internal
     def iter_log_format_path_pairs(self) -> Iterator[tuple[str, str]]:
+        if self.single_file_mode:
+            for log_file in self.get_drop_files():
+                yield ("auto", log_file)
+
         for log_format, log_dir_path in self.log_dirs:
             for log_file in log_dir_path.glob("*/*.log"):
                 yield (log_format, log_file)
-
-    @plugin.internal
-    def iter_single_file_path_pairs(self) -> Iterator[tuple[str, str]]:
-        for log_file in self.get_single_files():
-            yield ("auto", log_file)
 
     @plugin.internal
     def parse_autodetect_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
@@ -316,12 +317,7 @@ class IISLogsPlugin(WebserverPlugin, SingleFileMixin):
         Supported log formats: IIS, W3C.
         """
 
-        if self.single_file_mode:
-            log_format_pairs = self.iter_single_file_path_pairs()
-        else:
-            log_format_pairs = self.iter_log_format_path_pairs()
-
-        for log_format, log_file in log_format_pairs:
+        for log_format, log_file in self.iter_log_format_path_pairs():
             if log_format == "IIS":
                 parse_func = self.parse_iis_format_log
             elif log_format == "W3C":

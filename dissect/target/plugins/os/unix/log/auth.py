@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import lru_cache
 from itertools import chain
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
@@ -309,13 +309,8 @@ class AuthPlugin(Plugin, SingleFileMixin):
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
     def check_compatible(self) -> None:
-        if self.single_file_mode:
-            if any(self.get_single_files("auth.log*")) or any(self.get_single_files("secure*")):
-                return
-        else:
-            var_log = self.target.fs.path("/var/log")
-            if any(var_log.glob("auth.log*")) or any(var_log.glob("secure*")):
-                return
+        if any(self._iter_log_paths()):
+            return
 
         raise UnsupportedPluginError("No auth log files found")
 
@@ -345,13 +340,7 @@ class AuthPlugin(Plugin, SingleFileMixin):
 
         tzinfo = self.target.datetime.tzinfo
 
-        if self.single_file_mode:
-            iter_single_file = chain(self.get_single_files("auth.log*"), self.get_single_files("secure*"))
-        else:
-            var_log = self.target.fs.path("/var/log")
-            iter_single_file = chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
-
-        for auth_file in iter_single_file:
+        for auth_file in self._iter_log_paths():
             if is_iso_fmt(auth_file):
                 iterable = iso_readlines(auth_file)
             else:
@@ -359,6 +348,13 @@ class AuthPlugin(Plugin, SingleFileMixin):
 
             for ts, line in iterable:
                 yield self._auth_log_builder.build_record(ts, auth_file, line)
+
+    def _iter_log_paths(self) -> Iterable[Path]:
+        if self.single_file_mode:
+            return chain(self.get_drop_files("auth.log*"), self.get_drop_files("secure*"))
+
+        var_log = self.target.fs.path("/var/log")
+        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
 
 
 def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:

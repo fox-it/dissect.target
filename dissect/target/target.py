@@ -29,6 +29,8 @@ log = logging.getLogger(__name__)
 
 FunctionTuple = tuple[plugin.Plugin, Optional[Union[plugin.Plugin, property]]]
 
+SINGLE_FILE_DIR = "$drop$"     # The directory where user-specified single files are mapped
+
 
 class Event(StrEnum):
     INCOMPATIBLE_PLUGIN = "incompatible-plugin"

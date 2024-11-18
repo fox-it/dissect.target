@@ -3,7 +3,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import Any, BinaryIO, Iterable, Iterator
 
 from dissect.eventlog import evt
 from flow.record import Record
@@ -17,6 +17,7 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#]")
 
@@ -113,13 +114,17 @@ class WindowsEventlogsMixin:
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 
 
-class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
+class EvtPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
     """Windows ``.evt`` event log plugin."""
 
     LOGS_DIR_PATH = "sysvol/windows/system32/config"
 
     NEEDLE = b"LfLe"
     CHUNK_SIZE = 0x10000
+
+    def check_compatible(self) -> None:
+        if not self.single_file_mode:
+            WindowsEventlogsMixin.check_compatible(self)
 
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
@@ -139,12 +144,7 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
             EventID (int): The EventID of the event.
         """
 
-        if logs_dir:
-            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
-        else:
-            log_paths = self.get_logs(filename_glob=log_file_glob)
-
-        for entry in log_paths:
+        for entry in self._get_files(logs_dir, log_file_glob):
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue
@@ -196,3 +196,12 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
     def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)
+
+    def _get_files(self, logs_dir: str | None, log_file_glob: str | None = "*") -> Iterable[Path]:
+        if self.single_file_mode:
+            return self.get_drop_files()
+
+        if logs_dir:
+            return self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+        else:
+            return self.get_logs(filename_glob=log_file_glob)

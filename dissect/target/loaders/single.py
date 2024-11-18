@@ -5,9 +5,7 @@ from pathlib import Path
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loader import Loader
-
-
-DROP_FILE_DIR = "$drop$"
+from dissect.target.target import SINGLE_FILE_DIR
 
 
 class SingleFileLoader(Loader):
@@ -28,5 +26,5 @@ class SingleFileLoader(Loader):
         target.filesystems.add(vfs)
         target.fs.mount("/", vfs)
         for entry in self.path.parent.glob(self.path.name):
-            mapping = str(vfs.path(DROP_FILE_DIR).joinpath(entry.name))
+            mapping = str(vfs.path(SINGLE_FILE_DIR).joinpath(entry.name))
             vfs.map_file(mapping, str(entry))

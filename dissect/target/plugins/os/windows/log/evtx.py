@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 import re
 from functools import lru_cache
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
@@ -38,6 +39,8 @@ class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
         super().__init__(target)
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
+    @plugin.arg("--logs-dir", help="logs directory to scan")
+    @plugin.arg("--log-file-glob", default=EVTX_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def evtx(self, log_file_glob: str = EVTX_GLOB, logs_dir: str | None = None) -> Iterator[DynamicDescriptor]:
         """Return entries from Windows Event log files (``*.evtx``).
@@ -62,15 +65,7 @@ class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
             EventID (int): The EventID of the event.
         """
 
-        if self.single_file_mode:
-            log_paths = self.get_single_files('*')
-        else:
-            if logs_dir:
-                log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
-            else:
-                log_paths = self.get_logs(filename_glob=log_file_glob)
-
-        for entry in log_paths:
+        for entry in self._get_files(logs_dir, log_file_glob):
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue
@@ -159,6 +154,15 @@ class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
 
     def _create_event_descriptor(self, record_fields) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
+
+    def _get_files(self, logs_dir: str | None, log_file_glob: str | None = "*") -> Iterable[Path]:
+        if self.single_file_mode:
+            return self.get_drop_files()
+
+        if logs_dir:
+            return self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+        else:
+            return self.get_logs(filename_glob=log_file_glob)
 
 
 def format_value(value: Any) -> Any:
