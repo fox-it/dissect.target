@@ -205,7 +205,8 @@ class ExtendedCmd(cmd.Cmd):
 
         When entering an empty command, the cmd module will by default repeat the previous command.
         By defining an empty ``emptyline`` function we make sure no command is executed instead.
-        Resources:
+
+        References:
             - https://stackoverflow.com/a/16479030
             - https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L10
         """
@@ -1431,7 +1432,7 @@ def target_shell(targets: list[Target], cli_cls: type[TargetCmd], commands: list
         run_cli(cli)
 
 
-def python_shell(targets: list[Target], commands: list[str] | None) -> None:
+def python_shell(targets: list[Target], commands: list[str] | None = None) -> None:
     """Helper method for starting a (I)Python shell with multiple targets."""
     banner = "Loaded targets in 'targets' variable. First target is in 't'."
     ns = {"targets": targets, "t": targets[0]}

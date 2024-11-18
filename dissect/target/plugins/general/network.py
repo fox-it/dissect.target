@@ -17,6 +17,8 @@ InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfac
 
 
 class NetworkPlugin(Plugin):
+    """Generic implementation for network interfaces plugin."""
+
     __namespace__ = "network"
 
     def __init__(self, target: Target):
@@ -41,6 +43,7 @@ class NetworkPlugin(Plugin):
 
     @export(record=InterfaceRecord)
     def interfaces(self) -> Iterator[InterfaceRecord]:
+        """Yield interfaces."""
         # Only search for the interfaces once
         if self._interface_list is None:
             self._interface_list = list(self._interfaces())
@@ -49,19 +52,23 @@ class NetworkPlugin(Plugin):
 
     @export
     def ips(self) -> list[IPAddress]:
-        return list(self._get_record_type("ip"))
+        """Return IP addresses as list of :class:`IPAddress`."""
+        return list(set(self._get_record_type("ip")))
 
     @export
     def gateways(self) -> list[IPAddress]:
-        return list(self._get_record_type("gateway"))
+        """Return gateways as list of :class:`IPAddress`."""
+        return list(set(self._get_record_type("gateway")))
 
     @export
     def macs(self) -> list[str]:
-        return list(self._get_record_type("mac"))
+        """Return MAC addresses as list of :class:`str`."""
+        return list(set(self._get_record_type("mac")))
 
     @export
-    def dns(self) -> list[str]:
-        return list(self._get_record_type("dns"))
+    def dns(self) -> list[str | IPAddress]:
+        """Return DNS addresses as list of :class:`str`."""
+        return list(set(self._get_record_type("dns")))
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:

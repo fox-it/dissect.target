@@ -1,10 +1,9 @@
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
-from flow.record.fieldtypes import datetime as dt
-
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.apps.texteditor.windowsnotepad import (
+from dissect.target.plugins.apps.editor.windowsnotepad import (
     WindowsNotepadPlugin,
     WindowsNotepadTab,
 )
@@ -77,8 +76,10 @@ def test_windows_tab_plugin_deleted_contents(
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
+        assert rec.editor == "windowsnotepad"
         assert rec.content == file_text_map[rec.path.name][0]
         assert rec.deleted_content == file_text_map[rec.path.name][1]
+        assert rec.source is not None
 
 
 def test_windows_tab_plugin_default(
@@ -137,8 +138,10 @@ def test_windows_tab_plugin_default(
 
     # The recovered content in the records should match the original data, as well as the length
     for rec in records:
+        assert rec.editor == "windowsnotepad"
         assert rec.content == file_text_map[rec.path.name][0]
         assert rec.deleted_content == file_text_map[rec.path.name][1]
+        assert rec.source is not None
 
 
 def test_windows_saved_tab_plugin_extra_fields(
@@ -148,13 +151,13 @@ def test_windows_saved_tab_plugin_extra_fields(
         "saved.bin": (
             "Saved!",
             "C:\\Users\\user\\Desktop\\Saved!.txt",
-            dt(2024, 3, 28, 13, 7, 55, 482183),
+            datetime(2024, 3, 28, 13, 7, 55, 482183, tzinfo=timezone.utc),
             "ed9b760289e614c9dc8776e7280abe870be0a85019a32220b35acc54c0ecfbc1",
         ),
         "appclosed_saved_and_deletions.bin": (
             text8,
             "C:\\Users\\user\\Desktop\\Saved.txt",
-            dt(2024, 3, 28, 13, 16, 21, 158279),
+            datetime(2024, 3, 28, 13, 16, 21, 158279, tzinfo=timezone.utc),
             "8d0533144aa42e2d81e7474332bdef6473e42b699041528d55a62e5391e914ce",
         ),
     }
@@ -183,8 +186,10 @@ def test_windows_saved_tab_plugin_extra_fields(
     # The recovered content in the records should match the original data, as well as the length and all the
     # other saved metadata
     for rec in records:
+        assert rec.editor == "windowsnotepad"
         assert len(rec.content) == len(file_text_map[rec.path.name][0])
         assert rec.content == file_text_map[rec.path.name][0]
         assert rec.saved_path == file_text_map[rec.path.name][1]
-        assert rec.modification_time == file_text_map[rec.path.name][2]
-        assert rec.hashes.sha256 == file_text_map[rec.path.name][3]
+        assert rec.ts == file_text_map[rec.path.name][2]
+        assert rec.digest.sha256 == file_text_map[rec.path.name][3]
+        assert rec.source is not None
