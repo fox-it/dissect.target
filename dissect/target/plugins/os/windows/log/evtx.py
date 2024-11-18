@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import datetime
-from pathlib import Path
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 from dissect.eventlog import evtx
