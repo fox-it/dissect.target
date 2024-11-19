@@ -86,7 +86,6 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
     assert paths[5] == target_bare.fs.path("sysvol/other.txt")
 
     assert target_bare.fs.path("sysvol/.TEST").exists()
-    print(paths)
     assert target_bare.fs.path("sysvol/Test%4Test.evtx").exists()
 
 
