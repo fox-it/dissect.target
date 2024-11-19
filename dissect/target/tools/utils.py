@@ -230,15 +230,15 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
             target.add_plugin(plugin_class)
         except UnsupportedPluginError as e:
             raise UnsupportedPluginError(
-                f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
-            )
+                f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}"
+            ) from e
 
     _, target_attr = plugin_factory(target, plugin_class, func.method_name, func.plugin_desc["namespace"])
     return target_attr
 
 
 def plugin_function_with_argparser(
-    target_attr: Union[Plugin, Callable]
+    target_attr: Union[Plugin, Callable],
 ) -> tuple[Optional[Iterator], Optional[argparse.ArgumentParser]]:
     """Resolves which plugin function to execute, and creates the argument parser for said plugin."""
     plugin_method = None

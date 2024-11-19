@@ -34,17 +34,15 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
     @export(property=True)
     def ips(self) -> list[str]:
         """Returns a list of static IP addresses and DHCP lease IP addresses found on the host system."""
-        ips = []
+        ips = set()
 
         for ip_set in self.network_manager.get_config_value("ips"):
-            for ip in ip_set:
-                ips.append(ip)
+            ips.update(ip_set)
 
         for ip in parse_unix_dhcp_log_messages(self.target, iter_all=False):
-            if ip not in ips:
-                ips.append(ip)
+            ips.add(ip)
 
-        return ips
+        return list(ips)
 
     @export(property=True)
     def dns(self) -> list[str]:

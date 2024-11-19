@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
+from functools import lru_cache
 from typing import Iterator
 
 from dissect.util.ts import wintimestamp
@@ -12,6 +13,7 @@ from dissect.target.exceptions import (
 from dissect.target.helpers.record import WindowsInterfaceRecord
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.target import Target
 
 
 class IfTypes(IntEnum):
@@ -222,15 +224,32 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
         return None
 
 
+def _get_config_value(key: RegistryKey, name: str) -> set:
+    value = _try_value(key, name)
+    if not value or value in ("", "0.0.0.0", None, [], ["0.0.0.0"]):
+        return set()
+
+    if isinstance(value, list):
+        return set(value)
+
+    return {value}
+
+
 class WindowsNetworkPlugin(NetworkPlugin):
     """Windows network interface plugin."""
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._extract_network_device_config = lru_cache(128)(self._extract_network_device_config)
+
     def _interfaces(self) -> Iterator[WindowsInterfaceRecord]:
+        """Yields found Windows interfaces used by :meth:`NetworkPlugin.interfaces() <dissect.target.plugins.general.network.NetworkPlugin.interfaces>`."""  # noqa: E501
+
         # Get all the network interfaces
-        for keys in self.target.registry.keys(
+        for key in self.target.registry.keys(
             "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
         ):
-            for subkey in keys.subkeys():
+            for subkey in key.subkeys():
                 device_info = {}
 
                 if (net_cfg_instance_id := _try_value(subkey, "NetCfgInstanceId")) is None:
@@ -238,25 +257,28 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     continue
 
                 # Extract the network device configuration for given interface id
-                config = self._extract_network_device_config(net_cfg_instance_id)
-                if config is None or all(not conf for conf in config):
-                    # if no configuration is found or all configurations are empty, skip this network interface
+                if not (config := self._extract_network_device_config(net_cfg_instance_id)):
                     continue
 
-                # Extract the network device name for given interface id
-                name_key = self.target.registry.key(
-                    f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\"
-                    f"{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
-                )
-                if value_name := _try_value(name_key, "Name"):
-                    device_info["name"] = value_name
+                # Extract a network device name for given interface id
+                try:
+                    name_key = self.target.registry.key(
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"  # noqa: E501
+                    )
+                    if value_name := _try_value(name_key, "Name"):
+                        device_info["name"] = value_name
+                except RegistryKeyNotFoundError:
+                    pass
 
-                # Extract the metric value from the REGISTRY_KEY_INTERFACE key
-                interface_key = self.target.registry.key(
-                    f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
-                )
-                if value_metric := _try_value(interface_key, "InterfaceMetric"):
-                    device_info["metric"] = value_metric
+                # Extract the metric value from the interface registry key
+                try:
+                    interface_key = self.target.registry.key(
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"  # noqa: E501
+                    )
+                    if value_metric := _try_value(interface_key, "InterfaceMetric"):
+                        device_info["metric"] = value_metric
+                except RegistryKeyNotFoundError:
+                    pass
 
                 # Extract the rest of the device information
                 device_info["mac"] = _try_value(subkey, "NetworkAddress")
@@ -270,96 +292,89 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
                 # Yield a record for each non-empty configuration
                 for conf in config:
-                    if conf:
-                        # Create a copy of device_info to avoid overwriting
-                        record_info = device_info.copy()
-                        record_info.update(conf)
-                        yield WindowsInterfaceRecord(
-                            **record_info,
-                            source=f"HKLM\\SYSTEM\\{subkey.path}",
-                            _target=self.target,
-                        )
+                    # If no configuration is found or all configurations are empty,
+                    # skip this network interface.
+                    if not conf or not any(
+                        [
+                            conf["dns"],
+                            conf["ip"],
+                            conf["gateway"],
+                            conf["subnetmask"],
+                            conf["search_domain"],
+                        ]
+                    ):
+                        continue
 
-    def _extract_network_device_config(
-        self, interface_id: str
-    ) -> list[dict[str, str | list], dict[str, str | list]] | None:
-        dhcp_config = {}
-        static_config = {}
+                    # Create a copy of device_info to avoid overwriting
+                    record_info = device_info.copy()
+                    record_info.update(conf)
+                    yield WindowsInterfaceRecord(
+                        **record_info,
+                        source=f"HKLM\\SYSTEM\\{subkey.path}",
+                        _target=self.target,
+                    )
+
+    def _extract_network_device_config(self, interface_id: str) -> list[dict[str, set | bool | None]]:
+        """Extract network device configuration from the given interface_id for all ControlSets on the system."""
+
+        dhcp_config = {
+            "gateway": set(),
+            "ip": set(),
+            "dns": set(),
+            "subnetmask": set(),
+            "search_domain": set(),
+            "network": set(),
+        }
+
+        static_config = {
+            "ip": set(),
+            "dns": set(),
+            "subnetmask": set(),
+            "search_domain": set(),
+            "gateway": set(),
+            "network": set(),
+        }
 
         # Get the registry keys for the given interface id
         try:
-            keys = self.target.registry.key(
-                f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{interface_id}"
+            keys = list(
+                self.target.registry.keys(
+                    f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{interface_id}"
+                )
             )
         except RegistryKeyNotFoundError:
-            return None
+            return []
 
         if not len(keys):
-            return None
+            return []
 
-        # Extract DHCP configuration from the registry
-        dhcp_gateway = _try_value(keys, "DhcpDefaultGateway")
-        if dhcp_gateway not in ["", "0.0.0.0", None, []]:
-            dhcp_config["gateway"] = dhcp_gateway
+        for key in keys:
+            # Extract DHCP configuration from the registry
+            dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
+            dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
+            dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
+            dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
+            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer"))
 
-        dhcp_ip = _try_value(keys, "DhcpIPAddress")
-        if dhcp_ip not in ["", "0.0.0.0", None]:
-            dhcp_config["ip"] = [dhcp_ip]
-
-        dhcp_dns = _try_value(keys, "DhcpNameServer")
-        if dhcp_dns not in ["", "0.0.0.0", None]:
-            dhcp_config["dns"] = dhcp_dns.split(" ")
-
-        dhcp_subnetmask = _try_value(keys, "DhcpSubnetMask")
-        if dhcp_subnetmask not in ["", "0.0.0.0", None]:
-            dhcp_config["subnetmask"] = [dhcp_subnetmask]
-
-        dhcp_domain = _try_value(keys, "DhcpDomain")
-        if dhcp_domain not in ["", None]:
-            dhcp_config["search_domain"] = [dhcp_domain]
+            # Extract static configuration from the registry
+            static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
+            static_config["dns"].update(_get_config_value(key, "NameServer"))
+            static_config["search_domain"].update(_get_config_value(key, "Domain"))
+            static_config["ip"].update(_get_config_value(key, "IPAddress"))
+            static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))
 
         if len(dhcp_config) > 0:
-            dhcp_enable = _try_value(keys, "EnableDHCP")
-            dhcp_config["enabled"] = dhcp_enable == 1
+            dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1
             dhcp_config["dhcp"] = True
-
-        # Extract static configuration from the registry
-        static_gateway = _try_value(keys, "DefaultGateway")
-        if static_gateway not in ["", None, []]:
-            static_config["gateway"] = static_gateway
-
-        static_ip = _try_value(keys, "IPAddress")
-        if static_ip not in ["", "0.0.0.0", ["0.0.0.0"], None, []]:
-            static_config["ip"] = static_ip if isinstance(static_ip, list) else [static_ip]
-
-        static_dns = _try_value(keys, "NameServer")
-        if static_dns not in ["", "0.0.0.0", None]:
-            static_config["dns"] = static_dns.split(",")
-
-        static_subnetmask = _try_value(keys, "SubnetMask")
-        if static_subnetmask not in ["", "0.0.0.0", ["0.0.0.0"], None, []]:
-            static_config["subnetmask"] = (
-                static_subnetmask if isinstance(static_subnetmask, list) else [static_subnetmask]
-            )
-
-        static_domain = _try_value(keys, "Domain")
-        if static_domain not in ["", None]:
-            static_config["search_domain"] = [static_domain]
 
         if len(static_config) > 0:
             static_config["enabled"] = None
             static_config["dhcp"] = False
 
-        # Combine ip and subnetmask for extraction
-        combined_configs = [
-            (dhcp_config, dhcp_config.get("ip", []), dhcp_config.get("subnetmask", [])),
-            (static_config, static_config.get("ip", []), static_config.get("subnetmask", [])),
-        ]
-
         # Iterate over combined ip/subnet lists
-        for config, ips, subnet_masks in combined_configs:
-            for network_address in self.calculate_network(ips, subnet_masks):
-                config.setdefault("network", []).append(network_address)
+        for config in (dhcp_config, static_config):
+            if (ips := config.get("ip")) and (masks := config.get("subnetmask")):
+                config["network"].update(set(self.calculate_network(ips, masks)))
 
         # Return both configurations
         return [dhcp_config, static_config]
