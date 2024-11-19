@@ -48,7 +48,7 @@ class DirectoryFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         path = path.strip("/")
 
-        if not path:
+        if not (path := path.strip("/")):
             return DirectoryFilesystemEntry(self, "/", self.base_path)
 
         entry = self._resolve_path(path)

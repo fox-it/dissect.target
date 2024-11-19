@@ -8,6 +8,7 @@ from urllib.parse import quote, unquote
 
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
+from dissect.target.helpers.fsutil import basename, dirname, join
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -136,8 +137,10 @@ class VelociraptorLoader(DirLoader):
 
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
     def _resolve_path(self, path: str) -> Path:
-        path = Path(quote(path, safe="$/"))
-        path = str(path.with_name(path.name.replace(".", "%2E", 1))) if path.name.startswith(".") else str(path)
+        path = quote(path, safe="$/% ")
+        path = (
+            join(dirname(path), str(basename(path)).replace(".", "%2E", 1)) if basename(path).startswith(".") else path
+        )
         return super()._resolve_path(path)
 
 

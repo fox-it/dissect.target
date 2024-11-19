@@ -24,7 +24,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
     (root / "uploads.json").write_bytes(b"{}")
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/C-DRIVE.txt").write_bytes(b"{}")
-    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/Test%254Test.evtx").write_bytes(b"{}")
+    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/Microsoft-Windows-Windows Defender%254WHC.evtx").write_bytes(b"{}")
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/other.txt").write_text("my first file")
 
     with open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb") as fh:
@@ -86,7 +86,7 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
     assert paths[5] == target_bare.fs.path("sysvol/other.txt")
 
     assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("sysvol/Test%4Test.evtx").exists()
+    assert target_bare.fs.path("Microsoft-Windows-Windows Defender%4WHC.evtx")
 
 
 @pytest.mark.parametrize(
@@ -116,7 +116,7 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
     assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("sysvol/Test%4Test.evtx").exists()
+    assert target_bare.fs.path("Microsoft-Windows-Windows Defender%4WHC.evtx")
 
 
 @pytest.mark.parametrize(
