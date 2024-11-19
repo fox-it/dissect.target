@@ -143,5 +143,4 @@ class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
 
 class VelociraptorZipFilesystem(ZipFilesystem):
     def _resolve_path(self, path: str) -> str:
-        path = unquote(super()._resolve_path(path))
-        return path.replace("%2E", ".", 1) if path.startswith("%2E") else path
+        return unquote(super()._resolve_path(path))
