@@ -250,7 +250,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         # Get all the network interfaces
         for key in self.target.registry.keys(
-                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
         ):
             for subkey in key.subkeys():
                 device_info = {}
