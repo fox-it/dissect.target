@@ -350,7 +350,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         if not len(keys):
             return []
-        print("HERE")
+
         for key in keys:
             # Extract DHCP configuration from the registry
             dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
