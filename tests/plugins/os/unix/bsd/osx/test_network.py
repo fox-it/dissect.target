@@ -95,7 +95,7 @@ def dhcp(fake_plist: dict) -> Iterator[dict]:
                 (0, "vlan", ["None"]),
                 (0, "enabled", ["True"]),
                 (0, "interface_service_order", ["0"]),
-                (0, "mac", ["None"]),
+                (0, "mac", []),
                 (0, "vlan", ["None"]),
             ],
             1,
