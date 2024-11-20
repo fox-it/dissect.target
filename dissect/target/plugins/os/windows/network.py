@@ -266,8 +266,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 # Extract a network device name for given interface id
                 try:
                     name_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
-                        # noqa: E501
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"  # noqa: E501
                     )
                     if value_name := _try_value(name_key, "Name"):
                         device_info["name"] = value_name
@@ -277,8 +276,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 # Extract the metric value from the interface registry key
                 try:
                     interface_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
-                        # noqa: E501
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"  # noqa: E501
                     )
                     if value_metric := _try_value(interface_key, "InterfaceMetric"):
                         device_info["metric"] = value_metric
