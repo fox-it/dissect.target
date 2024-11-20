@@ -138,9 +138,8 @@ class VelociraptorLoader(DirLoader):
 class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
     def _resolve_path(self, path: str) -> Path:
         path = quote(path, safe="$/% ")
-        path = (
-            join(dirname(path), str(basename(path)).replace(".", "%2E", 1)) if basename(path).startswith(".") else path
-        )
+        if (fname := basename(path)).startswith("."):
+            path = str(join(dirname(path), fname.replace(".", "%2E", 1)))
         return super()._resolve_path(path)
 
 
