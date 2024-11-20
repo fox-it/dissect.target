@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from enum import IntEnum
 from functools import lru_cache
-from typing import Iterator
+from typing import Iterator, Optional
 
 from dissect.util.ts import wintimestamp
 
@@ -224,11 +225,13 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
         return None
 
 
-def _get_config_value(key: RegistryKey, name: str) -> set:
+def _get_config_value(key: RegistryKey, name: str, split_char: Optional[list[str]] = None) -> set:
     value = _try_value(key, name)
     if not value or value in ("", "0.0.0.0", None, [], ["0.0.0.0"]):
         return set()
-
+    if split_char:
+        split_regexp = '|'.join(re.escape(c) for c in split_char)
+        value = re.split(split_regexp, value)
     if isinstance(value, list):
         return set(value)
 
@@ -247,7 +250,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         # Get all the network interfaces
         for key in self.target.registry.keys(
-            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
+                "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e972-e325-11ce-bfc1-08002be10318}"
         ):
             for subkey in key.subkeys():
                 device_info = {}
@@ -263,7 +266,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 # Extract a network device name for given interface id
                 try:
                     name_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"  # noqa: E501
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{{4D36E972-E325-11CE-BFC1-08002BE10318}}\\{net_cfg_instance_id}\\Connection"
+                        # noqa: E501
                     )
                     if value_name := _try_value(name_key, "Name"):
                         device_info["name"] = value_name
@@ -273,7 +277,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 # Extract the metric value from the interface registry key
                 try:
                     interface_key = self.target.registry.key(
-                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"  # noqa: E501
+                        f"HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{net_cfg_instance_id}"
+                        # noqa: E501
                     )
                     if value_metric := _try_value(interface_key, "InterfaceMetric"):
                         device_info["metric"] = value_metric
@@ -295,13 +300,13 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     # If no configuration is found or all configurations are empty,
                     # skip this network interface.
                     if not conf or not any(
-                        [
-                            conf["dns"],
-                            conf["ip"],
-                            conf["gateway"],
-                            conf["subnetmask"],
-                            conf["search_domain"],
-                        ]
+                            [
+                                conf["dns"],
+                                conf["ip"],
+                                conf["gateway"],
+                                conf["subnetmask"],
+                                conf["search_domain"],
+                            ]
                     ):
                         continue
 
@@ -347,18 +352,18 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         if not len(keys):
             return []
-
+        print("HERE")
         for key in keys:
             # Extract DHCP configuration from the registry
             dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
             dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
             dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
             dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
-            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer"))
+            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", [" ", ","]))
 
             # Extract static configuration from the registry
             static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
-            static_config["dns"].update(_get_config_value(key, "NameServer"))
+            static_config["dns"].update(_get_config_value(key, "NameServer", [" ", ","]))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
             static_config["ip"].update(_get_config_value(key, "IPAddress"))
             static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))
