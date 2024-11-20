@@ -298,13 +298,13 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     # If no configuration is found or all configurations are empty,
                     # skip this network interface.
                     if not conf or not any(
-                            [
-                                conf["dns"],
-                                conf["ip"],
-                                conf["gateway"],
-                                conf["subnetmask"],
-                                conf["search_domain"],
-                            ]
+                        [
+                            conf["dns"],
+                            conf["ip"],
+                            conf["gateway"],
+                            conf["subnetmask"],
+                            conf["search_domain"],
+                        ]
                     ):
                         continue
 
