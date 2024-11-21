@@ -126,13 +126,13 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
     assert len(results) == 4
 
     assert results[0].ts == datetime(2005, 8, 9, 11, 55, 21, 0, tzinfo=ZoneInfo("Europe/Amsterdam"))
-    assert results[0].daemon == "foo.py"
+    assert results[0].service == "foo.py"
     assert results[0].pid is None
     assert results[0].message == "This is a cloud-init message!"
     assert results[0].source == "/var/log/installer/cloud-init.log"
 
     assert results[-1].ts == datetime(2005, 8, 9, 11, 55, 21, 1_000, tzinfo=ZoneInfo("Europe/Amsterdam"))
-    assert results[-1].daemon == "util.py"
+    assert results[-1].service == "util.py"
     assert results[-1].pid is None
     assert (
         results[-1].message
@@ -160,7 +160,7 @@ def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualF
     assert len(results) == 4
 
     assert results[0].hostname == "hostname"
-    assert results[0].daemon == "systemd"
+    assert results[0].service == "systemd"
     assert results[0].pid == 1
     assert results[0].ts == datetime(2024, 12, 31, 11, 37, 0, 123456, tzinfo=timezone.utc)
     assert results[0].message == "Started anacron.service - Run anacron jobs."

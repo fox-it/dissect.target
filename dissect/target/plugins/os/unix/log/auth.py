@@ -14,21 +14,15 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
-from dissect.target.plugins.os.unix.log.helpers import is_iso_fmt, iso_readlines
+from dissect.target.plugins.os.unix.log.helpers import (
+    RE_LINE,
+    RE_TS,
+    is_iso_fmt,
+    iso_readlines,
+)
 
 log = logging.getLogger(__name__)
 
-RE_TS = re.compile(r"^[A-Za-z]{3}\s*\d{1,2}\s\d{1,2}:\d{2}:\d{2}")
-RE_TS_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2}")
-RE_LINE = re.compile(
-    r"""
-    \d{2}:\d{2}\s                           # First match on the similar ending of the different timestamps
-    (?P<hostname>\S+)\s                     # The hostname
-    (?P<service>\S+?)(\[(?P<pid>\d+)\])?:   # The service with optionally the PID between brackets
-    \s*(?P<message>.+?)\s*$                 # The log message stripped from spaces left and right
-    """,
-    re.VERBOSE,
-)
 
 # Generic regular expressions
 RE_IPV4_ADDRESS = re.compile(

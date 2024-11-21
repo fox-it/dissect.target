@@ -13,6 +13,7 @@ from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
 from dissect.target.plugins.os.unix.log.helpers import (
     RE_LINE,
+    RE_TS,
     is_iso_fmt,
     iso_readlines,
 )
@@ -21,7 +22,7 @@ MessagesRecord = TargetRecordDescriptor(
     "linux/log/messages",
     [
         ("datetime", "ts"),
-        ("string", "daemon"),
+        ("string", "service"),
         ("varint", "pid"),
         ("string", "message"),
         ("path", "source"),
@@ -29,12 +30,8 @@ MessagesRecord = TargetRecordDescriptor(
 )
 
 DEFAULT_TS_LOG_FORMAT = "%b %d %H:%M:%S"
-RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
-RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
-RE_PID = re.compile(r"\w\[(\d+)\]")
-RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
 RE_CLOUD_INIT_LINE = re.compile(
-    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$"
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<service>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$"
 )
 
 
@@ -146,7 +143,7 @@ class MessagesPlugin(Plugin):
 
                 yield MessagesRecord(
                     ts=ts,
-                    daemon=values["daemon"],
+                    service=values["service"],
                     pid=None,
                     message=values["message"],
                     source=log_file,
