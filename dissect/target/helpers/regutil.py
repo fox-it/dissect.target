@@ -707,8 +707,12 @@ class RegfValue(RegistryValue):
         return self.kv.value
 
     @property
-    def type(self) -> RegistryValueType:
-        return RegistryValueType(self.kv.type)
+    def type(self) -> RegistryValueType | int:
+        try:
+            return RegistryValueType(self.kv.type)
+
+        except ValueError:
+            return self.kv.type
 
 
 class RegFlex:
