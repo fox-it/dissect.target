@@ -229,7 +229,7 @@ def _get_config_value(key: RegistryKey, name: str, split_char: list[str] | None 
     value = _try_value(key, name)
     if not value or value in ("", "0.0.0.0", None, [], ["0.0.0.0"]):
         return set()
-    if split_char:
+    if split_char and isinstance(value, str):
         split_regexp = '|'.join(re.escape(c) for c in split_char)
         value = re.split(split_regexp, value)
     if isinstance(value, list):
