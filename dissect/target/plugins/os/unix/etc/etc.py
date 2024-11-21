@@ -74,10 +74,10 @@ class EtcTree(ConfigurationTreePlugin):
         for entry, subs, items in self.config_fs.walk(root):
             for item in items:
                 try:
-                    config_object = self.get(str(Path(entry) / Path(item)))
+                    path = Path(entry) / item
+                    config_object = self.get(str(path))
 
                     if isinstance(config_object, ConfigurationEntry):
-                        path = Path(entry) / Path(item)
                         yield from self._sub(config_object, path, orig_path=path, pattern=pattern)
                 except Exception:
                     self.target.log.warning("Could not open configuration item: %s", item)
