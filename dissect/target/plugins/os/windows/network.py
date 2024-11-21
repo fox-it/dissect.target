@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from enum import IntEnum
 from functools import lru_cache
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
@@ -225,7 +225,7 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
         return None
 
 
-def _get_config_value(key: RegistryKey, name: str, split_char: Optional[list[str]] = None) -> set:
+def _get_config_value(key: RegistryKey, name: str, split_char: list[str] | None = None) -> set:
     value = _try_value(key, name)
     if not value or value in ("", "0.0.0.0", None, [], ["0.0.0.0"]):
         return set()
