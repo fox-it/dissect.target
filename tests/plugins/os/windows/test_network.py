@@ -257,7 +257,7 @@ def test_windows_network_none(
                 "DhcpIPAddress": "192.168.0.10",
                 "IPAddress": "10.0.0.10",
                 "DhcpNameServer": "192.168.0.2",
-                "NameServer": "10.0.0.2",
+                "NameServer": "10.0.0.2 10.0.0.3",
                 "SubnetMask": "255.255.255.0",
                 "DhcpSubnetMask": "255.255.255.0",
                 "VlanID": 10,
@@ -285,7 +285,7 @@ def test_windows_network_none(
                 },
                 {
                     "ip": ["10.0.0.10"],
-                    "dns": ["10.0.0.2"],
+                    "dns": ["10.0.0.3", "10.0.0.2"],
                     "gateway": ["10.0.0.1"],
                     "mac": "FE:EE:EE:EE:EE:ED",
                     "subnetmask": ["255.255.255.0"],
