@@ -47,7 +47,7 @@ class GnomeTrashPlugin(Plugin):
             if mount_path == "/":
                 continue
 
-            for mount_trash in self.target.fs.path(mount_path).glob("**/.Trash-*"):
+            for mount_trash in self.target.fs.path(mount_path).rglob(".Trash-*"):
                 yield UserDetails(None, None), mount_trash
 
     def check_compatible(self) -> None:
