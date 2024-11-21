@@ -25,6 +25,8 @@ UnixConfigTreeRecord = TargetRecordDescriptor(
 
 
 class EtcTree(ConfigurationTreePlugin):
+    """Unix etc configuration tree plugin."""
+
     __namespace__ = "etc"
 
     def __init__(self, target: Target):
@@ -67,6 +69,8 @@ class EtcTree(ConfigurationTreePlugin):
     @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
     @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
     def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
+        """Yield etc configuration records."""
+
         for entry, subs, items in self.config_fs.walk(root):
             for item in items:
                 try:

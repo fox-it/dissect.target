@@ -68,6 +68,10 @@ class RegistryPlugin(Plugin):
         "COMPONENTS",
         "DEFAULT",
         "ELAM",
+        "USER.DAT",  # Win 95/98/ME
+        "SYSTEM.DAT",  # Win 95/98/ME
+        "CLASSES.DAT",  # Win ME
+        "REG.DAT",  # Win 3.1
     ]
 
     def __init__(self, target: Target) -> None:
@@ -88,7 +92,14 @@ class RegistryPlugin(Plugin):
 
     def _init_registry(self) -> None:
         dirs = [
+            # Windows XP or newer
             ("sysvol/windows/system32/config", False),
+            # Windows NT3, NT4, 2k
+            ("sysvol/WINNT/system32/config", False),
+            # Windows 3.11, 95, 98, ME
+            ("sysvol/windows", False),
+            # ReactOS (alternative location)
+            ("sysvol/reactos", False),
             # RegBack hives are often empty files
             ("sysvol/windows/system32/config/RegBack", True),
         ]

@@ -1,4 +1,5 @@
 from struct import unpack
+from typing import Iterator
 
 from defusedxml import ElementTree
 from dissect.cstruct import cstruct
@@ -69,7 +70,10 @@ class ADPolicyPlugin(Plugin):
                 xml = task_file.read_text()
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall(".//{*}Task"):
-                    properties = task.find("Properties") or task
+                    # https://github.com/python/cpython/issues/83122
+                    if (properties := task.find("Properties")) is None:
+                        properties = task
+
                     task_data = ElementTree.tostring(task)
                     yield ADPolicyRecord(
                         last_modification_time=task_file_stat.st_mtime,
@@ -87,7 +91,7 @@ class ADPolicyPlugin(Plugin):
                 self.target.log.warning("Unable to read XML policy file: %s", error)
 
     @export(record=ADPolicyRecord)
-    def adpolicy(self):
+    def adpolicy(self) -> Iterator[ADPolicyRecord]:
         """Return all AD policies (also known as GPOs or Group Policy Objects).
 
         An Active Directory (AD) maintains global policies that should be adhered by all systems in the domain.

@@ -6,8 +6,8 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.helpers.network_managers import NetworkManager
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.linux.network_managers import NetworkManager
 from dissect.target.tools.query import main as target_query
 from tests._utils import absolute_path
 
@@ -222,3 +222,27 @@ def test_clean_ips(input: str, expected_output: set) -> None:
     """Test the cleaning of dirty ip addresses."""
 
     assert NetworkManager.clean_ips({input}) == expected_output
+
+
+def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+
+    config = """
+    network:
+        ethernets:
+            eth0:
+                addresses: ['1.2.3.4']
+    """
+    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+    fs_unix.map_file_fh("/etc/netplan/02-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+
+    syslog = "Apr  4 13:37:04 localhost dhclient[4]: bound to 1.2.3.4 -- renewal in 1337 seconds."
+    fs_unix.map_file_fh("/var/log/syslog", BytesIO(textwrap.dedent(syslog).encode()))
+
+    target_unix.add_plugin(LinuxPlugin)
+
+    assert isinstance(target_unix.ips, list)
+    assert all([isinstance(ip, str) for ip in target_unix.ips])
+
+    assert len(target_unix.ips) == 1
+    assert target_unix.ips == ["1.2.3.4"]

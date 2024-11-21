@@ -32,3 +32,8 @@ autodoc_typehints = "signature"
 autodoc_member_order = "groupwise"
 
 autosectionlabel_prefix_document = True
+
+suppress_warnings = [
+    # https://github.com/readthedocs/sphinx-autoapi/issues/285
+    "autoapi.python_import_resolution",
+]

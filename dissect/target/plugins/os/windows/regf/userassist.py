@@ -1,4 +1,5 @@
 import codecs
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
@@ -60,7 +61,7 @@ class UserAssistPlugin(Plugin):
             raise UnsupportedPluginError("No UserAssist key found")
 
     @export(record=UserAssistRecord)
-    def userassist(self):
+    def userassist(self) -> Iterator[UserAssistRecord]:
         """Return the UserAssist information for each user.
 
         The UserAssist registry keys contain information about programs that were recently executed on the system.

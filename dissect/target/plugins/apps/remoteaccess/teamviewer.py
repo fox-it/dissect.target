@@ -30,10 +30,12 @@ class TeamViewerPlugin(RemoteAccessPlugin):
     SYSTEM_GLOBS = [
         "sysvol/Program Files/TeamViewer/*.log",
         "sysvol/Program Files (x86)/TeamViewer/*.log",
+        "/var/log/teamviewer*/*.log",
     ]
 
     USER_GLOBS = [
         "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
+        "Library/Logs/TeamViewer/teamviewer*_logfile*.log",
     ]
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
