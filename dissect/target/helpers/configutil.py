@@ -891,7 +891,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 }
 
 
-def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, *args, **kwargs) -> ConfigParser:
+def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, *args, **kwargs) -> ConfigurationParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
@@ -922,7 +922,7 @@ def parse_config(
     entry: FilesystemEntry,
     hint: Optional[str] = None,
     options: Optional[ParserOptions] = None,
-) -> ConfigParser:
+) -> ConfigurationParser:
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)

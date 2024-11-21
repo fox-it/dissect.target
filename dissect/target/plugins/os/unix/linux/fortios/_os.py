@@ -248,10 +248,16 @@ class FortiOSPlugin(LinuxPlugin):
                 self.target.log.warning("Exception while parsing FortiManager admin users")
                 self.target.log.debug("", exc_info=e)
 
-        if self._config.get("root-config"):
+        if self._config.get("root-config", {}).get("user", {}).get("local"):
             # Local users
             try:
                 local_groups = local_groups_to_users(self._config["root-config"]["user"]["group"])
+            except KeyError as e:
+                self.target.log.warning("Unable to get local user groups in root config")
+                self.target.log.debug("", exc_info=e)
+                local_groups = {}
+
+            try:
                 for username, entry in self._config["root-config"]["user"].get("local", {}).items():
                     try:
                         password = decrypt_password(entry["passwd"][-1])
@@ -269,6 +275,7 @@ class FortiOSPlugin(LinuxPlugin):
                 self.target.log.warning("Exception while parsing FortiOS local users")
                 self.target.log.debug("", exc_info=e)
 
+        if self._config.get("root-config", {}).get("user", {}).get("group", {}).get("guestgroup"):
             # Temporary guest users
             try:
                 for _, entry in (

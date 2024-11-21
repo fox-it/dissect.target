@@ -257,7 +257,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     continue
 
                 # Extract the network device configuration for given interface id
-                config = self._extract_network_device_config(net_cfg_instance_id)
+                if not (config := self._extract_network_device_config(net_cfg_instance_id)):
+                    continue
 
                 # Extract a network device name for given interface id
                 try:
@@ -280,7 +281,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     pass
 
                 # Extract the rest of the device information
-                device_info["mac"] = _try_value(subkey, "NetworkAddress")
+                if mac_address := _try_value(subkey, "NetworkAddress"):
+                    device_info["mac"] = [mac_address]
                 device_info["vlan"] = _try_value(subkey, "VlanID")
 
                 if timestamp := _try_value(subkey, "NetworkInterfaceInstallTimestamp"):
@@ -313,9 +315,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                         _target=self.target,
                     )
 
-    def _extract_network_device_config(
-        self, interface_id: str
-    ) -> list[dict[str, str | list], dict[str, str | list]] | None:
+    def _extract_network_device_config(self, interface_id: str) -> list[dict[str, set | bool | None]]:
         """Extract network device configuration from the given interface_id for all ControlSets on the system."""
 
         dhcp_config = {
@@ -344,10 +344,10 @@ class WindowsNetworkPlugin(NetworkPlugin):
                 )
             )
         except RegistryKeyNotFoundError:
-            return None
+            return []
 
         if not len(keys):
-            return None
+            return []
 
         for key in keys:
             # Extract DHCP configuration from the registry

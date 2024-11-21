@@ -79,7 +79,7 @@ class NetworkPlugin(Plugin):
     @internal
     def with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
         for interface in self.interfaces():
-            if interface.mac == mac:
+            if mac in interface.mac:
                 yield interface
 
     @internal
