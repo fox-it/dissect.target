@@ -284,7 +284,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     pass
 
                 # Extract the rest of the device information
-                device_info["mac"] = _try_value(subkey, "NetworkAddress")
+                if mac_address := _try_value(subkey, "NetworkAddress"):
+                    device_info["mac"] = [mac_address]
                 device_info["vlan"] = _try_value(subkey, "VlanID")
 
                 if timestamp := _try_value(subkey, "NetworkInterfaceInstallTimestamp"):
