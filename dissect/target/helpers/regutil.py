@@ -52,7 +52,7 @@ class RegistryValueType(IntEnum):
     QWORD = c_regf.REG_QWORD
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value: int) -> IntEnum:
         # Allow values other than defined members
         member = int.__new__(cls, value)
         member._name_ = None
