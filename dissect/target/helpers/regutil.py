@@ -724,7 +724,7 @@ class RegfValue(RegistryValue):
         return self.kv.value
 
     @property
-    def type(self) -> RegistryValueType | int:
+    def type(self) -> RegistryValueType:
         return RegistryValueType(self.kv.type)
 
 
