@@ -90,7 +90,12 @@ class _DissectScandirIterator:
 
 
 def scandir(path: TargetPath) -> _DissectScandirIterator:
-    return _DissectScandirIterator(path.get().scandir())
+    try:
+        sdir = path.get().scandir()
+    except Exception:
+        sdir = iter([])
+
+    return _DissectScandirIterator(sdir)
 
 
 def realpath(path: TargetPath, *, strict: bool = False) -> str:
