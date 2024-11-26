@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from io import BytesIO
+from unittest.mock import patch
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin
@@ -76,3 +77,26 @@ def test_gnome_trash(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     assert results[1].path is None
     assert results[1].deleted_path == "/home/user/.local/share/Trash/expunged/123456789/some-dir/some-file.txt"
     assert results[1].filesize == 79
+
+
+def test_gnome_trash_mounts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if GNOME Trash plugin finds Trash files in mounted devices from ``/etc/fstab``, ``/mnt`` and ``/media``."""
+
+    fs_unix.map_file_fh("etc/hostname", BytesIO(b"hostname"))
+    fs_unix.map_dir("home/user/.local/share/Trash", absolute_path("_data/plugins/os/unix/trash"))
+    fs_unix.map_dir("mnt/example/.Trash-1234", absolute_path("_data/plugins/os/unix/trash"))
+    fs_unix.map_dir("tmp/example/.Trash-5678", absolute_path("_data/plugins/os/unix/trash"))
+    fs_unix.map_dir("media/user/example/.Trash-1000", absolute_path("_data/plugins/os/unix/trash"))
+
+    with patch.object(target_unix_users.fs, "mounts", {"/tmp/example": None, "/mnt/example": None}):
+        target_unix_users.add_plugin(UnixPlugin)
+        plugin = GnomeTrashPlugin(target_unix_users)
+
+        assert sorted([str(t) for _, t in plugin.trashes]) == [
+            "/home/user/.local/share/Trash",
+            "/media/user/example/.Trash-1000",
+            "/mnt/example/.Trash-1234",
+            "/tmp/example/.Trash-5678",
+        ]
+
+        assert len(list(plugin.trash())) == 11 * len(plugin.trashes)
