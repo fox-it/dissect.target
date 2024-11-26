@@ -1,6 +1,7 @@
 from typing import Union
 
 import pytest
+from dissect.regf import c_regf
 
 from dissect.target.helpers.regutil import (
     HiveCollection,
@@ -339,3 +340,28 @@ def test_glob_ext(key_collection: KeyCollection, pattern: str, key_paths: list[s
         collection_paths.append(key_collection.path)
 
     assert sorted(collection_paths) == sorted(key_paths)
+
+
+@pytest.mark.parametrize(
+    "input, expected_name, expected_value",
+    [
+        (c_regf.REG_NONE, "NONE", 0),
+        (c_regf.REG_SZ, "SZ", 1),
+        (c_regf.REG_EXPAND_SZ, "EXPAND_SZ", 2),
+        (c_regf.REG_BINARY, "BINARY", 3),
+        (c_regf.REG_DWORD, "DWORD", 4),
+        (c_regf.REG_DWORD_BIG_ENDIAN, "DWORD_BIG_ENDIAN", 5),
+        (c_regf.REG_LINK, "LINK", 6),
+        (c_regf.REG_MULTI_SZ, "MULTI_SZ", 7),
+        (c_regf.REG_RESOURCE_LIST, "RESOURCE_LIST", 8),
+        (c_regf.REG_FULL_RESOURCE_DESCRIPTOR, "FULL_RESOURCE_DESCRIPTOR", 9),
+        (c_regf.REG_RESOURCE_REQUIREMENTS_LIST, "RESOURCE_REQUIREMENTS_LIST", 10),
+        (c_regf.REG_QWORD, "QWORD", 11),
+        (1337, None, 1337),
+    ],
+)
+def test_registry_value_type_enum(input: int, expected_name: str | None, expected_value: int) -> None:
+    """test if registry value types are not parsed strictly within the Enum"""
+    regf_value = RegistryValueType(input)
+    assert regf_value == expected_value
+    assert regf_value.name == expected_name

@@ -12,7 +12,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, Iterator, Optional, TextIO, Union
 
-from dissect.regf import regf
+from dissect.regf import c_regf, regf
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -31,16 +31,33 @@ ValueType = Union[int, str, bytes, list[str]]
 
 
 class RegistryValueType(IntEnum):
-    NONE = regf.REG_NONE
-    SZ = regf.REG_SZ
-    EXPAND_SZ = regf.REG_EXPAND_SZ
-    BINARY = regf.REG_BINARY
-    DWORD = regf.REG_DWORD
-    DWORD_BIG_ENDIAN = regf.REG_DWORD_BIG_ENDIAN
-    MULTI_SZ = regf.REG_MULTI_SZ
-    FULL_RESOURCE_DESCRIPTOR = regf.REG_FULL_RESOURCE_DESCRIPTOR
-    RESOURCE_REQUIREMENTS_LIST = regf.REG_RESOURCE_REQUIREMENTS_LIST
-    QWORD = regf.REG_QWORD
+    """Registry value types as defined in ``winnt.h``.
+
+    Resources:
+        - https://learn.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
+        - https://github.com/fox-it/dissect.regf/blob/main/dissect/regf/c_regf.py
+    """
+
+    NONE = c_regf.REG_NONE
+    SZ = c_regf.REG_SZ
+    EXPAND_SZ = c_regf.REG_EXPAND_SZ
+    BINARY = c_regf.REG_BINARY
+    DWORD = c_regf.REG_DWORD
+    DWORD_BIG_ENDIAN = c_regf.REG_DWORD_BIG_ENDIAN
+    LINK = c_regf.REG_LINK
+    MULTI_SZ = c_regf.REG_MULTI_SZ
+    RESOURCE_LIST = c_regf.REG_RESOURCE_LIST
+    FULL_RESOURCE_DESCRIPTOR = c_regf.REG_FULL_RESOURCE_DESCRIPTOR
+    RESOURCE_REQUIREMENTS_LIST = c_regf.REG_RESOURCE_REQUIREMENTS_LIST
+    QWORD = c_regf.REG_QWORD
+
+    @classmethod
+    def _missing_(cls, value):
+        # Allow values other than defined members
+        member = int.__new__(cls, value)
+        member._name_ = None
+        member._value_ = value
+        return member
 
 
 class RegistryHive:
@@ -708,11 +725,7 @@ class RegfValue(RegistryValue):
 
     @property
     def type(self) -> RegistryValueType | int:
-        try:
-            return RegistryValueType(self.kv.type)
-
-        except ValueError:
-            return self.kv.type
+        return RegistryValueType(self.kv.type)
 
 
 class RegFlex:
