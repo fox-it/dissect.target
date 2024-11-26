@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import re
 import warnings
@@ -7,6 +9,7 @@ from typing import Iterator, Optional, Union
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
+    RegistryError,
     RegistryKeyNotFoundError,
     UnsupportedPluginError,
 )
@@ -18,6 +21,7 @@ from dissect.target.helpers.regutil import (
     RegfHive,
     RegistryHive,
     RegistryKey,
+    RegistryValue,
     ValueCollection,
     VirtualHive,
     glob_ext,
@@ -283,9 +287,29 @@ class RegistryPlugin(Plugin):
         return res
 
     @internal
+    def key_or_empty(self, key: Optional[str] = None) -> KeyCollection:
+        """Like key, but return empty keycollection if it does not exist."""
+
+        try:
+            return self.key(key)
+        except RegistryKeyNotFoundError:
+            return KeyCollection()
+
+    @internal
     def value(self, key: str, value: str) -> ValueCollection:
         """Convenience method for accessing a specific value."""
         return self.key(key).value(value)
+
+    @internal
+    def value_or_empty(self, key: str, value: str) -> ValueCollection:
+        """Convenience method for trying to access a specific value.
+
+        Returns a empty collection if the key or value does not exist.
+        """
+        try:
+            return self.value(key, value)
+        except RegistryError:
+            return ValueCollection()
 
     @internal
     def subkey(self, key: str, subkey: str) -> KeyCollection:
@@ -337,7 +361,7 @@ class RegistryPlugin(Plugin):
         return self.MAPPINGS
 
     @internal
-    def get_user_details(self, key: RegistryKey) -> UserDetails:
+    def get_user_details(self, key: RegistryKey | RegistryValue) -> UserDetails | None:
         """Return user details for the user who owns a registry hive that contains the provided key"""
         if not key.hive or not getattr(key.hive, "filepath", None):
             return
@@ -345,7 +369,7 @@ class RegistryPlugin(Plugin):
         return self._hives_to_users.get(key.hive)
 
     @internal
-    def get_user(self, key: RegistryKey) -> WindowsUserRecord:
+    def get_user(self, key: RegistryKey | RegistryValue) -> WindowsUserRecord | None:
         """Return user record for the user who owns a registry hive that contains the provided key"""
         details = self._hives_to_users.get(key.hive)
         if details:

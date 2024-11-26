@@ -29,8 +29,8 @@ def findall(buf: bytes, needle: bytes) -> Iterator[int]:
 T = TypeVar("T")
 
 
-def to_list(value: T | list[T]) -> list[T]:
-    """Convert a single value or a list of values to a list.
+def to_list(value: T | list[T] | None) -> list[T]:
+    """Convert a single value or a list of values to a list. A value of `None` is converted to an empty list.
 
     Args:
         value: The value to convert.
@@ -38,8 +38,11 @@ def to_list(value: T | list[T]) -> list[T]:
     Returns:
         A list of values.
     """
-    if not isinstance(value, list):
+    if value is None:
+        return []
+    elif not isinstance(value, list):
         return [value]
+
     return value
 
 

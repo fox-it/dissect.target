@@ -26,7 +26,7 @@ GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str]]
+ValueType = Union[int, str, bytes, list[str], None]
 """The possible value types that can be returned from the registry."""
 
 
@@ -171,6 +171,18 @@ class RegistryKey:
             RegistryValueNotFoundError: If this key has no value with the requested name.
         """
         raise NotImplementedError()
+
+    def value_or_default(self, value: str, default: ValueType = None) -> RegistryValue:
+        """Returns a specific value from this key, or a default value if it does not exist.
+
+        Args:
+            value: The name of the value to retrieve.
+            default: The default value to return if the value does not exist.
+        """
+        try:
+            return self.value(value)
+        except RegistryValueNotFoundError:
+            return VirtualValue(VirtualHive(), value, default)
 
     def values(self) -> list[RegistryValue]:
         """Returns a list of all the values from this key."""
