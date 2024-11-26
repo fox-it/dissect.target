@@ -1,4 +1,4 @@
-from typing import Union
+from __future__ import annotations
 
 import pytest
 from dissect.regf import c_regf
@@ -173,7 +173,7 @@ def key_collection(hivecollection: HiveCollection) -> KeyCollection:
         ("some\\other\\bla\\", "bla"),
     ],
 )
-def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: Union[str, RegistryKeyNotFoundError]) -> None:
+def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: str | RegistryKeyNotFoundError) -> None:
     key = hive.key("\\")
 
     if key_name is RegistryKeyNotFoundError:
@@ -195,7 +195,7 @@ def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: Union[str
 def test_key_collection_get(
     key_collection: KeyCollection,
     key_path: str,
-    key_name: Union[str, RegistryKeyNotFoundError],
+    key_name: str | RegistryKeyNotFoundError,
 ) -> None:
     if key_name is RegistryKeyNotFoundError:
         with pytest.raises(key_name):
