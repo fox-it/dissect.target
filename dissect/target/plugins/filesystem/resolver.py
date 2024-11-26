@@ -48,7 +48,7 @@ class ResolverPlugin(Plugin):
         for entry, environment in REPLACEMENTS:
             path = re.sub(entry, re.escape(environment), path, flags=re.IGNORECASE)
 
-        path = self.target.expand_env(path)
+        path = self.target.expand_env(path, user_sid)
         # Normalize again because environment variable expansion may have introduced backslashes again
         path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
@@ -96,12 +96,12 @@ class ResolverPlugin(Plugin):
             lookup = " ".join([lookup, part]) if lookup else part
             for ext in pathext:
                 lookup_ext = lookup + ext
-                if self.target.fs.exists(lookup_ext):
+                if self.target.fs.is_file(lookup_ext):
                     return lookup_ext
 
                 for search_path in search_paths:
                     lookup_path = fsutil.join(search_path, lookup_ext, alt_separator=self.target.fs.alt_separator)
-                    if self.target.fs.exists(lookup_path):
+                    if self.target.fs.is_file(lookup_path):
                         return lookup_path
 
         return path
