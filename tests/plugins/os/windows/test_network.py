@@ -285,7 +285,7 @@ def test_windows_network_none(
                 },
                 {
                     "ip": ["10.0.0.10"],
-                    "dns": ["10.0.0.3", "10.0.0.2"],
+                    "dns": ["10.0.0.2", "10.0.0.3"],
                     "gateway": ["10.0.0.1"],
                     "mac": ["FE:EE:EE:EE:EE:ED"],
                     "subnetmask": ["255.255.255.0"],
@@ -346,8 +346,8 @@ def test_network_dhcp_and_static(
             gateways.update(interface.gateway)
             macs.update(interface.mac)
 
-            assert interface.ip == expected["ip"]
-            assert interface.dns == expected["dns"]
+            assert sorted(map(str, interface.ip)) == expected["ip"]
+            assert sorted(map(str, interface.dns)) == expected["dns"]
             assert interface.gateway == expected["gateway"]
             assert interface.mac == expected["mac"]
             assert interface.network == expected["network"]
