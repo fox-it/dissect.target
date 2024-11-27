@@ -217,12 +217,11 @@ class CatrootPlugin(Plugin):
             with ese_file.open("rb") as fh:
                 ese_db = EseDB(fh)
 
-                tables = [table.name for table in ese_db.tables()]
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
-                    if table_name not in tables:
+                    if not (table := ese_db.table(table_name)):
                         continue
 
-                    for record in ese_db.table(table_name).records():
+                    for record in table.records():
                         file_digest = digest()
                         setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
                         catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
