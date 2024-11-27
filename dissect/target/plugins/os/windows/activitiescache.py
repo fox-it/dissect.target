@@ -116,7 +116,11 @@ class ActivitiesCachePlugin(Plugin):
         for user, cache_file in self.cachefiles:
             fh = cache_file.open()
             db = sqlite3.SQLite3(fh)
-            for r in db.table("Activity").rows():
+
+            if not (table := db.table("Activity")):
+                return
+
+            for r in table.rows():
                 yield ActivitiesCacheRecord(
                     start_time=mkts(r["[StartTime]"]),
                     end_time=mkts(r["[EndTime]"]),

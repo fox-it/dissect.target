@@ -472,7 +472,11 @@ def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
     db = sqlite3.SQLite3(fh)
 
     store = {}
-    for row in db.table("Config").rows():
+
+    if not (table := db.table("Config")):
+        return store
+
+    for row in table.rows():
         component_name = row.Component
         config_group_name = row.ConfigGroup
         value_group_name = row.Name

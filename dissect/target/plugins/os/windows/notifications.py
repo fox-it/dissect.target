@@ -444,8 +444,8 @@ class NotificationsPlugin(Plugin):
             db = sqlite3.SQLite3(wpndatabase.open())
             handlers = {}
 
-            if "NotificationHandler" in [table.name for table in db.tables()]:
-                for row in db.table("NotificationHandler").rows():
+            if table := db.table("NotificationHandler"):
+                for row in table.rows():
                     handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
                         created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S"),
                         modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"),
@@ -459,7 +459,10 @@ class NotificationsPlugin(Plugin):
                         _user=user,
                     )
 
-            for row in db.table("Notification").rows():
+            if not (table := db.table("Notification")):
+                return
+
+            for row in table.rows():
                 record = WpnDatabaseNotificationRecord(
                     arrival_time=wintimestamp(row["[ArrivalTime]"]),
                     expiry_time=wintimestamp(row["[ExpiryTime]"]),
