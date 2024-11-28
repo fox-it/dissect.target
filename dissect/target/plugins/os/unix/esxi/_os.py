@@ -473,40 +473,38 @@ def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
 
     store = {}
 
-    if not (table := db.table("Config")):
-        return store
+    if table := db.table("Config"):
+        for row in table.rows():
+            component_name = row.Component
+            config_group_name = row.ConfigGroup
+            value_group_name = row.Name
+            identifier_name = row.Identifier
 
-    for row in table.rows():
-        component_name = row.Component
-        config_group_name = row.ConfigGroup
-        value_group_name = row.Name
-        identifier_name = row.Identifier
+            if component_name not in store:
+                store[component_name] = {}
+            component = store[component_name]
 
-        if component_name not in store:
-            store[component_name] = {}
-        component = store[component_name]
+            if config_group_name not in component:
+                component[config_group_name] = {}
+            config_group = component[config_group_name]
 
-        if config_group_name not in component:
-            component[config_group_name] = {}
-        config_group = component[config_group_name]
+            if value_group_name not in config_group:
+                config_group[value_group_name] = {}
+            value_group = config_group[value_group_name]
 
-        if value_group_name not in config_group:
-            config_group[value_group_name] = {}
-        value_group = config_group[value_group_name]
+            if identifier_name not in value_group:
+                value_group[identifier_name] = {}
+            identifier = value_group[identifier_name]
 
-        if identifier_name not in value_group:
-            value_group[identifier_name] = {}
-        identifier = value_group[identifier_name]
-
-        identifier["modified_time"] = row.ModifiedTime
-        identifier["creation_time"] = row.CreationTime
-        identifier["version"] = row.Version
-        identifier["success"] = row.Success
-        identifier["auto_conf_value"] = json.loads(row.AutoConfValue) if row.AutoConfValue else None
-        identifier["user_value"] = json.loads(row.UserValue) if row.UserValue else None
-        identifier["vital_value"] = json.loads(row.VitalValue) if row.VitalValue else None
-        identifier["cached_value"] = json.loads(row.CachedValue) if row.CachedValue else None
-        identifier["desired_value"] = json.loads(row.DesiredValue) if row.DesiredValue else None
-        identifier["revision"] = row.Revision
+            identifier["modified_time"] = row.ModifiedTime
+            identifier["creation_time"] = row.CreationTime
+            identifier["version"] = row.Version
+            identifier["success"] = row.Success
+            identifier["auto_conf_value"] = json.loads(row.AutoConfValue) if row.AutoConfValue else None
+            identifier["user_value"] = json.loads(row.UserValue) if row.UserValue else None
+            identifier["vital_value"] = json.loads(row.VitalValue) if row.VitalValue else None
+            identifier["cached_value"] = json.loads(row.CachedValue) if row.CachedValue else None
+            identifier["desired_value"] = json.loads(row.DesiredValue) if row.DesiredValue else None
+            identifier["revision"] = row.Revision
 
     return store
