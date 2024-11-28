@@ -36,14 +36,18 @@ class WebCache:
             All ``ContainerId`` values for the requested container name.
         """
         try:
-            for container_record in self.db.table("Containers").records():
+            table = self.db.table("Containers")
+
+            for container_record in table.records():
                 if record_name := container_record.get("Name"):
                     record_name = record_name.rstrip("\00").lower()
                     if record_name == name.lower():
                         container_id = container_record.get("ContainerId")
                         yield self.db.table(f"Container_{container_id}")
-        except KeyError:
-            pass
+
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing EseDB Containers table")
+            self.target.log.debug("", exc_info=e)
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
         """Yield records from a Webcache container.
