@@ -31,14 +31,24 @@ class GnomeTrashPlugin(Plugin):
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.trashes = list(self._garbage_collector())
+        self.trashes = set(self._garbage_collector())
 
     def _garbage_collector(self) -> Iterator[tuple[UserDetails, TargetPath]]:
         """it aint much, but its honest work"""
+
+        # home trash folders
         for user_details in self.target.user_details.all_with_home():
             for trash_path in self.PATHS:
                 if (path := user_details.home_path.joinpath(trash_path)).exists():
                     yield user_details, path
+
+        # mounted devices trash folders
+        for mount_path in list(self.target.fs.mounts) + ["/mnt", "/media"]:
+            if mount_path == "/":
+                continue
+
+            for mount_trash in self.target.fs.path(mount_path).rglob(".Trash-*"):
+                yield UserDetails(None, None), mount_trash
 
     def check_compatible(self) -> None:
         if not self.trashes:
@@ -52,7 +62,8 @@ class GnomeTrashPlugin(Plugin):
         Recovers deleted files and artifacts from ``$HOME/.local/share/Trash``.
         Probably also works with other desktop interfaces as long as they follow the Trash specification from FreeDesktop.
 
-        Currently does not parse media trash locations such as ``/media/$Label/.Trash-1000/*``.
+        Also parses media trash locations such as ``/media/$USER/$Label/.Trash-*``, ``/mnt/$Label/.Trash-*`` and other
+        locations as defined in ``/etc/fstab``.
 
         Resources:
             - https://specifications.freedesktop.org/trash-spec/latest/
