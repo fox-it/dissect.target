@@ -220,7 +220,6 @@ class CatrootPlugin(Plugin):
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
                     try:
                         table = ese_db.table(table_name)
-
                     except KeyError as e:
                         self.target.log.warning("EseDB %s has no table %s", ese_file, table_name)
                         self.target.log.debug("", exc_info=e)

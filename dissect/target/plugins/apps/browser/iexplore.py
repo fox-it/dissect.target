@@ -48,7 +48,6 @@ class WebCache:
         except KeyError as e:
             self.target.log.warning("Exception while parsing EseDB Containers table")
             self.target.log.debug("", exc_info=e)
-            return
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
         """Yield records from a Webcache container.
