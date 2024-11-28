@@ -459,30 +459,28 @@ class NotificationsPlugin(Plugin):
                         _user=user,
                     )
 
-            if not (table := db.table("Notification")):
-                return
+            if table := db.table("Notification"):
+                for row in table.rows():
+                    record = WpnDatabaseNotificationRecord(
+                        arrival_time=wintimestamp(row["[ArrivalTime]"]),
+                        expiry_time=wintimestamp(row["[ExpiryTime]"]),
+                        order=row["[Order]"],
+                        id=row["[Id]"],
+                        handler_id=row["[HandlerId]"],
+                        activity_id=UUID(bytes=row["[ActivityId]"]),
+                        type=row["[Type]"],
+                        payload=row["[Payload]"],
+                        payload_type=row["[PayloadType]"],
+                        tag=row["[Tag]"],
+                        group=row["[Group]"],
+                        boot_id=row["[BootId]"],
+                        expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
+                        _target=self.target,
+                        _user=user,
+                    )
+                    handler = handlers.get(row["[HandlerId]"])
 
-            for row in table.rows():
-                record = WpnDatabaseNotificationRecord(
-                    arrival_time=wintimestamp(row["[ArrivalTime]"]),
-                    expiry_time=wintimestamp(row["[ExpiryTime]"]),
-                    order=row["[Order]"],
-                    id=row["[Id]"],
-                    handler_id=row["[HandlerId]"],
-                    activity_id=UUID(bytes=row["[ActivityId]"]),
-                    type=row["[Type]"],
-                    payload=row["[Payload]"],
-                    payload_type=row["[PayloadType]"],
-                    tag=row["[Tag]"],
-                    group=row["[Group]"],
-                    boot_id=row["[BootId]"],
-                    expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
-                    _target=self.target,
-                    _user=user,
-                )
-                handler = handlers.get(row["[HandlerId]"])
-
-                if handler:
-                    yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
-                else:
-                    yield record
+                    if handler:
+                        yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
+                    else:
+                        yield record
