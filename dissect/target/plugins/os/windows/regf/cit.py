@@ -770,8 +770,9 @@ class CITPlugin(Plugin):
                         yield from _yield_bitmap_records(
                             self.target, cit, entry.use_data.bitmaps.foreground, CITProgramBitmapForegroundRecord
                         )
-                except Exception:
-                    self.target.log.exception("Failed to parse CIT value: %s", value.name)
+                except Exception as e:
+                    self.target.log.warning("Failed to parse CIT value: %s", value.name)
+                    self.target.log.debug("", exc_info=e)
 
     @export(record=CITPostUpdateUseInfoRecord)
     def puu(self) -> Iterator[CITPostUpdateUseInfoRecord]:
