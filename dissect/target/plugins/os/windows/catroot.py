@@ -227,8 +227,15 @@ class CatrootPlugin(Plugin):
 
                     for record in table.records():
                         file_digest = digest()
-                        setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
-                        catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+
+                        try:
+                            setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
+                            catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+
+                        except Exception as e:
+                            self.target.log.warning("Unable to parse catroot names for %s in %s", record, ese_file)
+                            self.target.log.debug("", exc_info=e)
+                            continue
 
                         for catroot_name in catroot_names:
                             yield CatrootRecord(
