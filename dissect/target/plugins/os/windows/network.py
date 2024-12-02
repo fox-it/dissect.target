@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from enum import IntEnum
 from functools import lru_cache
 from typing import Iterator
@@ -224,11 +225,13 @@ def _try_value(subkey: RegistryKey, value: str) -> str | list | None:
         return None
 
 
-def _get_config_value(key: RegistryKey, name: str) -> set:
+def _get_config_value(key: RegistryKey, name: str, sep: str | None = None) -> set:
     value = _try_value(key, name)
     if not value or value in ("", "0.0.0.0", None, [], ["0.0.0.0"]):
         return set()
-
+    if sep and isinstance(value, str):
+        re_sep = "|".join(map(re.escape, sep))
+        value = re.split(re_sep, value)
     if isinstance(value, list):
         return set(value)
 
@@ -281,7 +284,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     pass
 
                 # Extract the rest of the device information
-                device_info["mac"] = _try_value(subkey, "NetworkAddress")
+                if mac_address := _try_value(subkey, "NetworkAddress"):
+                    device_info["mac"] = [mac_address]
                 device_info["vlan"] = _try_value(subkey, "VlanID")
 
                 if timestamp := _try_value(subkey, "NetworkInterfaceInstallTimestamp"):
@@ -354,11 +358,11 @@ class WindowsNetworkPlugin(NetworkPlugin):
             dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
             dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
             dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
-            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer"))
+            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
 
             # Extract static configuration from the registry
             static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
-            static_config["dns"].update(_get_config_value(key, "NameServer"))
+            static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
             static_config["ip"].update(_get_config_value(key, "IPAddress"))
             static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))

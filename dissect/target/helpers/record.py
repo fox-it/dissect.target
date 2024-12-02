@@ -145,33 +145,40 @@ EmptyRecord = RecordDescriptor(
 
 COMMON_INTERFACE_ELEMENTS = [
     ("string", "name"),
+    ("string[]", "mac"),
     ("string", "type"),
     ("boolean", "enabled"),
-    ("string", "mac"),
     ("net.ipaddress[]", "dns"),
     ("net.ipaddress[]", "ip"),
     ("net.ipaddress[]", "gateway"),
+    ("net.ipnetwork[]", "network"),
     ("string", "source"),
 ]
 
 
 UnixInterfaceRecord = TargetRecordDescriptor(
     "unix/network/interface",
-    COMMON_INTERFACE_ELEMENTS,
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("boolean", "dhcp_ipv4"),  # NetworkManager allows for dual-stack configurations.
+        ("boolean", "dhcp_ipv6"),
+        ("datetime", "last_connected"),
+        ("varint[]", "vlan"),
+        ("string", "configurator"),
+    ],
 )
 
 WindowsInterfaceRecord = TargetRecordDescriptor(
     "windows/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
-        ("varint", "vlan"),
-        ("net.ipnetwork[]", "network"),
         ("varint", "metric"),
         ("stringlist", "search_domain"),
         ("datetime", "first_connected"),
         ("datetime", "last_connected"),
         ("net.ipaddress[]", "subnetmask"),
         ("boolean", "dhcp"),
+        ("varint", "vlan"),
     ],
 )
 
@@ -179,10 +186,9 @@ MacInterfaceRecord = TargetRecordDescriptor(
     "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
-        ("varint", "vlan"),
-        ("net.ipnetwork[]", "network"),
         ("varint", "interface_service_order"),
         ("boolean", "dhcp"),
+        ("varint", "vlan"),
     ],
 )
 
