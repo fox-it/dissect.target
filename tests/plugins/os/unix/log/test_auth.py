@@ -10,6 +10,7 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loaders.single import SingleFileLoader
 from dissect.target.plugins.os.unix.log.auth import AuthPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
@@ -311,3 +312,14 @@ def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesy
         results[0].message
         == "user : TTY=pts/0 ; PWD=/home/user ; USER=root ; COMMAND=/usr/bin/chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg"  # noqa: E501
     )
+
+
+def test_auth_plugin_single_file_mode(target_default: Target) -> None:
+    data_path = Path(absolute_path("_data/plugins/os/unix/log/auth/auth.log"))
+    single_file_loader = SingleFileLoader(data_path)
+    single_file_loader.map(target_default)
+
+    target_default.add_plugin(AuthPlugin)
+    results = list(target_default.authlog())
+
+    assert len(results) == 10

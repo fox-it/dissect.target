@@ -3,7 +3,8 @@ from __future__ import annotations
 import datetime
 import re
 from functools import lru_cache
-from typing import Any, Iterator
+from pathlib import Path
+from typing import Any, Iterable, Iterator
 
 from dissect.eventlog import evtx
 from dissect.eventlog.exceptions import MalformedElfChnkException
@@ -12,6 +13,7 @@ from flow.record import Record, utils
 from dissect.target import plugin
 from dissect.target.exceptions import FilesystemError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.plugins.os.windows.log.evt import WindowsEventlogsMixin
 
 re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
@@ -20,7 +22,7 @@ re_illegal_characters = re.compile(r"[\(\): \.\-#\/]")
 EVTX_GLOB = "*.evtx"
 
 
-class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
+class EvtxPlugin(WindowsEventlogsMixin, SingleFileMixin, plugin.Plugin):
     """Plugin for fetching and parsing Windows Eventlog Files (``*.evtx``)."""
 
     RECORD_NAME = "filesystem/windows/evtx"
@@ -28,6 +30,10 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
     NEEDLE = b"ElfChnk\x00"
     CHUNK_SIZE = 0x10000
+
+    def check_compatible(self) -> None:
+        if not self.single_file_mode:
+            WindowsEventlogsMixin.check_compatible(self)
 
     def __init__(self, target):
         super().__init__(target)
@@ -59,12 +65,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
             EventID (int): The EventID of the event.
         """
 
-        if logs_dir:
-            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
-        else:
-            log_paths = self.get_logs(filename_glob=log_file_glob)
-
-        for entry in log_paths:
+        for entry in self._get_files(logs_dir, log_file_glob):
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue
@@ -153,6 +154,14 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
     def _create_event_descriptor(self, record_fields) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
+
+    def _get_files(self, logs_dir: str | None, log_file_glob: str | None = "*") -> Iterable[Path]:
+        if self.single_file_mode:
+            return self.get_drop_files()
+        elif logs_dir:
+            return self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
+
+        return self.get_logs(filename_glob=log_file_glob)
 
 
 def format_value(value: Any) -> Any:

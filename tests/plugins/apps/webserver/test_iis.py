@@ -6,6 +6,7 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loaders.single import SingleFileLoader
 from dissect.target.plugins.apps.webserver import iis
 from tests._utils import absolute_path
 
@@ -210,3 +211,13 @@ def test_plugins_apps_webservers_iis_access_iis_format_noconfig(
     target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
     results = list(target_win_tzinfo.iis.access())
     assert len(results) > 0
+
+
+def test_plugins_apps_webservers_iis_single_file_mode(target_default: Target) -> None:
+    single_file_path = Path(absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log"))
+    single_file_loader = SingleFileLoader(single_file_path)
+    single_file_loader.map(target_default)
+    target_default.add_plugin(iis.IISLogsPlugin)
+
+    records = list(target_default.iis.logs())
+    assert len(records) == 10

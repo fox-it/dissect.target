@@ -1,15 +1,19 @@
 import shutil
+from pathlib import Path
 
 import pytest
 
 from dissect.target.exceptions import RegistryKeyNotFoundError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.loaders.single import SingleFileLoader
 from dissect.target.plugins.general import scrape
 from dissect.target.plugins.os.windows.log import evt
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
+def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: Path):
     # Mock eventlog registry key in a specific control set,
     # CurrentControlSet used in preconfigured value is a soft link
     registry_hive = target_win.registry._root
@@ -38,7 +42,9 @@ def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
         (True, True),
     ],
 )
-def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registry):
+def test_evt_plugin(
+    target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, is_in_directory: bool, is_in_registry: bool
+) -> None:
     target_win.add_plugin(evt.EvtPlugin)
 
     evt_log_file = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
@@ -76,7 +82,7 @@ def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registr
     assert len({str(rec.ts) for rec in records}) == 5
 
 
-def test_evt_scraping(target_win):
+def test_evt_scraping(target_win: Target) -> None:
     target_win.add_plugin(scrape.ScrapePlugin)
 
     plugin = evt.EvtPlugin(target_win)
@@ -89,3 +95,13 @@ def test_evt_scraping(target_win):
         scraped_records = list(plugin.scraped_evt())
 
     assert len(scraped_records) == 5
+
+
+def test_evt_single_file_mode(target_default: Target) -> None:
+    single_file_path = Path((absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")))
+    single_file_loader = SingleFileLoader(single_file_path)
+    single_file_loader.map(target_default)
+    target_default.add_plugin(evt.EvtPlugin)
+
+    records = list(target_default.evt())
+    assert len(records) == 5

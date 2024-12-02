@@ -1,11 +1,14 @@
 import shutil
+from pathlib import Path
 
 import pytest
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.loaders.single import SingleFileLoader
 from dissect.target.plugins.general import scrape
 from dissect.target.plugins.os.windows.log import evt, evtx
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
@@ -100,3 +103,13 @@ def test_evtx_scraping(target_win):
         scraped_records = list(plugin.scraped_evtx())
 
     assert len(scraped_records) == 5
+
+
+def test_evtx_single_file_mode(target_default: Target) -> None:
+    single_file_path = Path(absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx"))
+    single_file_loader = SingleFileLoader(single_file_path)
+    single_file_loader.map(target_default)
+    target_default.add_plugin(evtx.EvtxPlugin)
+
+    records = list(target_default.evtx())
+    assert len(records) == 5

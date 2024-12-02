@@ -298,3 +298,24 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "output": "record",
         "path": "os.windows.credential.sam.sam",
     }
+
+
+def test_target_query_single_file_unsupported(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """test if target-query prints an error if a plugin does not support single file mode."""
+
+    with monkeypatch.context() as m:
+        m.setattr(
+            "sys.argv",
+            [
+                "target-query",
+                "-f",
+                "runkeys",
+                "--single-file",
+                "tests/_data/plugins/os/windows/log/schedlgu/schedlgu.txt",
+            ],
+        )
+
+        target_query()
+
+        _, err = capsys.readouterr()
+        assert "Plugin `os.windows.regf.runkeys.runkeys` does not support single file mode" in err

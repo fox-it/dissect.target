@@ -8,12 +8,13 @@ from datetime import datetime
 from functools import lru_cache
 from itertools import chain
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
 
@@ -300,7 +301,7 @@ class AuthLogRecordBuilder:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
 
-class AuthPlugin(Plugin):
+class AuthPlugin(Plugin, SingleFileMixin):
     """Unix authentication log plugin."""
 
     def __init__(self, target: Target):
@@ -308,9 +309,10 @@ class AuthPlugin(Plugin):
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
     def check_compatible(self) -> None:
-        var_log = self.target.fs.path("/var/log")
-        if not any(var_log.glob("auth.log*")) and not any(var_log.glob("secure*")):
-            raise UnsupportedPluginError("No auth log files found")
+        if any(self._iter_log_paths()):
+            return
+
+        raise UnsupportedPluginError("No auth log files found")
 
     @alias("securelog")
     @export(record=DynamicDescriptor(["datetime", "path", "string"]))
@@ -338,8 +340,7 @@ class AuthPlugin(Plugin):
 
         tzinfo = self.target.datetime.tzinfo
 
-        var_log = self.target.fs.path("/var/log")
-        for auth_file in chain(var_log.glob("auth.log*"), var_log.glob("secure*")):
+        for auth_file in self._iter_log_paths():
             if is_iso_fmt(auth_file):
                 iterable = iso_readlines(auth_file)
             else:
@@ -347,6 +348,13 @@ class AuthPlugin(Plugin):
 
             for ts, line in iterable:
                 yield self._auth_log_builder.build_record(ts, auth_file, line)
+
+    def _iter_log_paths(self) -> Iterable[Path]:
+        if self.single_file_mode:
+            return chain(self.get_drop_files("auth.log*"), self.get_drop_files("secure*"))
+
+        var_log = self.target.fs.path("/var/log")
+        return chain(var_log.glob("auth.log*"), var_log.glob("secure*"))
 
 
 def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:

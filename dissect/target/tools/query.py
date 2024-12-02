@@ -18,6 +18,7 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
+from dissect.target.helpers.single_file import SingleFileMixin
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
@@ -118,12 +119,16 @@ def main():
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
+    parser.add_argument("--single-file", nargs="*", help="glob pattern to match files on local system")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
 
     # If loader is specified then map to uri
     targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
+
+    if args.single_file:
+        targets = args_to_uri(args.single_file, "single", [])  # Guess we piggyback on this uri scheme then.
 
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
@@ -205,7 +210,7 @@ def main():
 
         parser.exit()
 
-    if not targets:
+    if not targets and not args.single_file:
         parser.error("too few arguments")
 
     if not args.function:
@@ -293,6 +298,10 @@ def main():
 
                 if args.dry_run:
                     print(f"  execute: {func_def.name} ({func_def.path})")
+                    continue
+
+                if args.single_file and not issubclass(func_def.class_object, SingleFileMixin):
+                    target.log.error("Plugin `%s` does not support single file mode", func_def)
                     continue
 
                 try:
