@@ -632,8 +632,8 @@ def local_wintimestamp(target, ts):
 class CITPlugin(Plugin):
     """Plugin that parses CIT data from the registry.
 
-    Reference:
-    - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
+    References:
+        - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
     """
 
     __namespace__ = "cit"
@@ -641,7 +641,7 @@ class CITPlugin(Plugin):
     KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT"
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEY))) > 0:
+        if not list(self.target.registry.keys(self.KEY)):
             raise UnsupportedPluginError("No CIT registry key found")
 
     @export(record=get_args(CITRecords))
@@ -770,8 +770,9 @@ class CITPlugin(Plugin):
                         yield from _yield_bitmap_records(
                             self.target, cit, entry.use_data.bitmaps.foreground, CITProgramBitmapForegroundRecord
                         )
-                except Exception:
-                    self.target.log.exception("Failed to parse CIT value: %s", value.name)
+                except Exception as e:
+                    self.target.log.warning("Failed to parse CIT value: %s", value.name)
+                    self.target.log.debug("", exc_info=e)
 
     @export(record=CITPostUpdateUseInfoRecord)
     def puu(self) -> Iterator[CITPostUpdateUseInfoRecord]:
@@ -788,8 +789,14 @@ class CITPlugin(Plugin):
         for reg_key in keys:
             for key in self.target.registry.keys(reg_key):
                 try:
-                    puu = c_cit.CIT_POST_UPDATE_USE_INFO(key.value("PUUActive").value)
+                    key_value = key.value("PUUActive").value
+                    puu = c_cit.CIT_POST_UPDATE_USE_INFO(key_value)
                 except RegistryValueNotFoundError:
+                    continue
+
+                except EOFError as e:
+                    self.target.log.warning("Exception reading CIT structure in key %s", key.path)
+                    self.target.log.debug("Unable to parse value %s", key_value, exc_info=e)
                     continue
 
                 yield CITPostUpdateUseInfoRecord(
@@ -852,8 +859,14 @@ class CITPlugin(Plugin):
         for reg_key in keys:
             for key in self.target.registry.keys(reg_key):
                 try:
-                    dp = c_cit.CIT_DP_DATA(key.value("DP").value)
+                    key_value = key.value("DP").value
+                    dp = c_cit.CIT_DP_DATA(key_value)
                 except RegistryValueNotFoundError:
+                    continue
+
+                except EOFError as e:
+                    self.target.log.warning("Exception reading CIT structure in key %s", key.path)
+                    self.target.log.debug("Unable to parse value %s", key_value, exc_info=e)
                     continue
 
                 user = self.target.registry.get_user(key)
