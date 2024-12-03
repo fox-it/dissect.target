@@ -791,7 +791,6 @@ class CITPlugin(Plugin):
                 try:
                     key_value = key.value("PUUActive").value
                     puu = c_cit.CIT_POST_UPDATE_USE_INFO(key_value)
-
                 except RegistryValueNotFoundError:
                     continue
 
@@ -862,7 +861,6 @@ class CITPlugin(Plugin):
                 try:
                     key_value = key.value("DP").value
                     dp = c_cit.CIT_DP_DATA(key_value)
-
                 except RegistryValueNotFoundError:
                     continue
 
