@@ -246,3 +246,58 @@ def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFile
 
     assert len(target_unix.ips) == 1
     assert target_unix.ips == ["1.2.3.4"]
+
+
+def test_ips_dhcp_lease_files(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we can detect DHCP lease files from NetworkManager and dhclient."""
+
+    lease1 = """
+    # This is private data. Do not parse.
+    ADDRESS=1.2.3.4
+    """
+
+    lease2 = """
+    lease {
+        interface "eth0";
+        fixed-address 9.0.1.2;
+        option dhcp-lease-time 13337;
+        option routers 0.0.0.0;
+        option host-name "hostname";
+        renew 1 2023/12/31 13:37:00;
+        rebind 2 2023/01/01 01:00:00;
+        expire 3 2024/01/01 13:37:00;
+        # real leases contain more key/value pairs
+    }
+    lease {
+        interface "eth0";
+        fixed-address 5.6.7.8;
+        option dhcp-lease-time 13337;
+        option routers 0.0.0.0;
+        option host-name "hostname";
+        renew 1 2024/12/31 13:37:00;
+        rebind 2 2024/01/01 01:00:00;
+        expire 3 2025/01/01 13:37:00;
+        # real leases contain more key/value pairs
+    }
+    """
+
+    lease3 = """
+    some-other "value";
+    lease {
+        interface "eth1";
+        fixed-address 3.4.5.6;
+    }
+    """
+
+    fs_unix.map_file_fh("/var/lib/NetworkManager/internal-uuid-eth0.lease", BytesIO(textwrap.dedent(lease1).encode()))
+    fs_unix.map_file_fh("/var/lib/dhcp/dhclient.leases", BytesIO(textwrap.dedent(lease2).encode()))
+    fs_unix.map_file_fh("/var/lib/dhclient/dhclient.eth0.leases", BytesIO(textwrap.dedent(lease3).encode()))
+
+    syslog = "Apr  4 13:37:04 localhost dhclient[4]: bound to 1.3.3.7 -- renewal in 1337 seconds."
+    fs_unix.map_file_fh("/var/log/syslog", BytesIO(textwrap.dedent(syslog).encode()))
+
+    target_unix.add_plugin(LinuxPlugin)
+
+    # tests if we did not call :func:`parse_unix_dhcp_log_messages` since :func:`parse_unix_dhcp_leases` has results.
+    assert len(target_unix.ips) == 4
+    assert sorted(target_unix.ips) == sorted(["1.2.3.4", "5.6.7.8", "9.0.1.2", "3.4.5.6"])
