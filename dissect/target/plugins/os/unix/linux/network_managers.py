@@ -567,7 +567,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             continue
 
         # Debian and CentOS dhclient
-        if hasattr(record, "daemon") and record.daemon == "dhclient" and "bound to" in line:
+        if hasattr(record, "service") and record.service == "dhclient" and "bound to" in line:
             ip = line.split("bound to")[1].split(" ")[1].strip()
             ips.add(ip)
             continue
