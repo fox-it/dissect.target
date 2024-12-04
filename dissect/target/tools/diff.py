@@ -163,10 +163,10 @@ class TargetComparison:
             raise ValueError(f"{path} is not a directory on either the source or destination target!")
 
         src_target_entries = list(self.src_target.fs.scandir(path))
-        src_target_children_paths = set([entry.path for entry in src_target_entries])
+        src_target_children_paths = set(entry.path for entry in src_target_entries)
 
         dst_target_entries = list(self.dst_target.fs.scandir(path))
-        dst_target_children_paths = set([entry.path for entry in dst_target_entries])
+        dst_target_children_paths = set(entry.path for entry in dst_target_entries)
 
         paths_only_on_src_target = src_target_children_paths - dst_target_children_paths
         paths_only_on_dst_target = dst_target_children_paths - src_target_children_paths
