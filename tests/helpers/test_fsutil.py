@@ -226,10 +226,13 @@ def path_fs() -> Iterator[VirtualFilesystem]:
     vfs = VirtualFilesystem()
 
     vfs.makedirs("/some/dir")
+    vfs.makedirs("/some/dir/nested")
     vfs.symlink("/some/dir/file.txt", "/some/symlink.txt")
     vfs.symlink("nonexistent", "/some/dir/link.txt")
+    vfs.symlink("/some/dir/nested", "/some/dirlink")
     vfs.map_file_fh("/some/file.txt", io.BytesIO(b"content"))
     vfs.map_file_fh("/some/dir/file.txt", io.BytesIO(b""))
+    vfs.map_file_fh("/some/dir/nested/file.txt", io.BytesIO(b""))
 
     yield vfs
 
@@ -374,13 +377,47 @@ def test_target_path_glob(path_fs: VirtualFilesystem) -> None:
 
 
 def test_target_path_rglob(path_fs: VirtualFilesystem) -> None:
-    assert list(path_fs.path("/some").rglob("*.txt")) == [
-        path_fs.path("/some/symlink.txt"),
-        path_fs.path("/some/file.txt"),
-        path_fs.path("/some/dir/link.txt"),
-        path_fs.path("/some/dir/file.txt"),
+    assert list(map(str, path_fs.path("/some").rglob("*.txt"))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
     ]
+    assert list(path_fs.path("/some").rglob("*.TXT")) == []
     assert list(path_fs.path("/some").rglob("*.csv")) == []
+
+    with patch.object(path_fs, "case_sensitive", False):
+        assert list(map(str, path_fs.path("/some").rglob("*.TXT"))) == [
+            "/some/symlink.txt",
+            "/some/file.txt",
+            "/some/dir/link.txt",
+            "/some/dir/file.txt",
+            "/some/dir/nested/file.txt",
+        ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 12), reason="requires Python 3.12+")
+def test_target_path_rglob_case_sensitive(path_fs: VirtualFilesystem) -> None:
+    assert list(map(str, path_fs.path("/some").rglob("*.TXT", case_sensitive=False))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
+    ]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 13), reason="requires Python 3.13+")
+def test_target_path_rglob_recurse_symlinks(path_fs: VirtualFilesystem) -> None:
+    assert list(map(str, path_fs.path("/some").rglob("*.txt", recurse_symlinks=True))) == [
+        "/some/symlink.txt",
+        "/some/file.txt",
+        "/some/dirlink/file.txt",
+        "/some/dir/link.txt",
+        "/some/dir/file.txt",
+        "/some/dir/nested/file.txt",
+    ]
 
 
 def test_target_path_is_dir(path_fs: VirtualFilesystem) -> None:
@@ -439,14 +476,16 @@ def test_target_path_iterdir(path_fs: VirtualFilesystem) -> None:
     assert list(path_fs.path("/some").iterdir()) == [
         path_fs.path("/some/dir"),
         path_fs.path("/some/symlink.txt"),
+        path_fs.path("/some/dirlink"),
         path_fs.path("/some/file.txt"),
     ]
 
 
 def test_target_path_walk(path_fs: VirtualFilesystem) -> None:
     assert list(path_fs.path("/some").walk()) == [
-        (path_fs.path("/some"), ["dir"], ["symlink.txt", "file.txt"]),
-        (path_fs.path("/some/dir"), [], ["link.txt", "file.txt"]),
+        (path_fs.path("/some"), ["dir"], ["symlink.txt", "dirlink", "file.txt"]),
+        (path_fs.path("/some/dir"), ["nested"], ["link.txt", "file.txt"]),
+        (path_fs.path("/some/dir/nested"), [], ["file.txt"]),
     ]
 
 
@@ -625,8 +664,9 @@ def test_pure_dissect_path__from_parts_flavour(alt_separator: str, case_sensitiv
     vfs = VirtualFilesystem(alt_separator=alt_separator, case_sensitive=case_sensitive)
     pure_dissect_path = fsutil.PureDissectPath(vfs, "/some/dir")
 
-    assert pure_dissect_path._flavour.altsep == alt_separator
-    assert pure_dissect_path._flavour.case_sensitive == case_sensitive
+    obj = getattr(pure_dissect_path, "parser", None) or pure_dissect_path._flavour
+    assert obj.altsep == alt_separator
+    assert obj.case_sensitive == case_sensitive
 
 
 def test_pure_dissect_path__from_parts_no_fs_exception() -> None:
@@ -698,7 +738,9 @@ def test_reverse_readlines() -> None:
     ]
 
     vfs.map_file_fh("file_multi_long_single", io.BytesIO((("🦊" * 8000) + ("a" * 200)).encode()))
-    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [("🦊" * 8000) + ("a" * 200)]
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [
+        ("🦊" * 8000) + ("a" * 200)
+    ]
 
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []

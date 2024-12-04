@@ -37,7 +37,7 @@ splitext = posixpath.splitext
 splitdrive = posixpath.splitdrive
 
 
-def splitroot(path: str, alt_separator: str = "") -> tuple[str, str]:
+def splitroot(path: str, alt_separator: str = "") -> tuple[str, str, str]:
     return posixpath.splitroot(normalize(path, alt_separator=alt_separator))
 
 

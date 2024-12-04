@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import os
 import sys
 import traceback
@@ -76,21 +77,31 @@ class PluginNotFoundError(PluginError):
 class FileNotFoundError(FilesystemError, FileNotFoundError):
     """The requested path could not be found."""
 
+    errno = errno.ENOENT
+
 
 class IsADirectoryError(FilesystemError, IsADirectoryError):
     """The entry is a directory."""
+
+    errno = errno.EISDIR
 
 
 class NotADirectoryError(FilesystemError, NotADirectoryError):
     """The entry is not a directory."""
 
+    errno = errno.ENOTDIR
+
 
 class NotASymlinkError(FilesystemError):
     """The entry is not a symlink."""
 
+    errno = errno.EINVAL
+
 
 class SymlinkRecursionError(FilesystemError):
     """A symlink loop is detected for the entry."""
+
+    errno = errno.ELOOP
 
 
 class RegistryError(Error):
