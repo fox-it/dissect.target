@@ -21,5 +21,5 @@ from dissect.target.loaders.itunes import translate_file_path
         ),
     ],
 )
-def test_translate_file_path(domain: str, relative_path: str, result) -> None:
+def test_translate_file_path(domain: str, relative_path: str, result: str) -> None:
     assert translate_file_path(domain, relative_path) == result
