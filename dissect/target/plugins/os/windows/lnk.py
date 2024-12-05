@@ -1,4 +1,6 @@
-from typing import Iterator, Optional
+from __future__ import annotations
+
+from typing import Iterator
 
 from dissect.shellitem.lnk import Lnk
 from dissect.util import ts
@@ -34,7 +36,7 @@ LnkRecord = TargetRecordDescriptor(
 )
 
 
-def parse_lnk_file(target: Target, lnk_file: Lnk, lnk_path: TargetPath) -> Iterator[LnkRecord]:
+def parse_lnk_file(target: Target, lnk_file: Lnk, lnk_path: TargetPath) -> LnkRecord:
     # we need to get the active codepage from the system to properly decode some values
     codepage = target.codepage or "ascii"
 
@@ -132,7 +134,7 @@ class LnkPlugin(Plugin):
 
     @arg("--path", "-p", dest="path", default=None, help="Path to directory or .lnk file in target")
     @export(record=LnkRecord)
-    def lnk(self, path: Optional[str] = None) -> Iterator[LnkRecord]:
+    def lnk(self, path: str | None = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
@@ -160,10 +162,14 @@ class LnkPlugin(Plugin):
         """
 
         for entry in self.lnk_entries(path):
-            lnk_file = Lnk(entry.open())
-            yield parse_lnk_file(self.target, lnk_file, entry)
+            try:
+                lnk_file = Lnk(entry.open())
+                yield parse_lnk_file(self.target, lnk_file, entry)
+            except Exception as e:
+                self.target.log.warning("Failed to parse link file %s", lnk_file)
+                self.target.log.debug("", exc_info=e)
 
-    def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
+    def lnk_entries(self, path: str | None = None) -> Iterator[TargetPath]:
         if path:
             target_path = self.target.fs.path(path)
             if not target_path.exists():
