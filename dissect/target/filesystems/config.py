@@ -3,11 +3,11 @@ from __future__ import annotations
 import io
 import textwrap
 from logging import getLogger
-from typing import Any, BinaryIO, Iterator, Optional, Union
+from typing import Any, BinaryIO, Iterator, Optional
 
 from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
-from dissect.target.filesystem import Filesystem, FilesystemEntry, VirtualFilesystem
+from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
 
@@ -46,7 +46,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
         super().__init__(**kwargs)
         self.root.top = target.fs.get(path)
 
-    def _get_till_file(self, path: str, relentry: FilesystemEntry) -> tuple[list[str], FilesystemEntry]:
+    def _get_till_file(self, path: str, relentry: FilesystemEntry | None) -> tuple[list[str], FilesystemEntry]:
         """Searches for the file entry that is pointed to by ``path``.
 
         The ``path`` could contain ``key`` entries too, so it searches for the entry from
@@ -56,9 +56,13 @@ class ConfigurationFilesystem(VirtualFilesystem):
             A list of ``parts`` containing keys: [keys, into, the, file].
             And the resolved entry: Entry(filename)
         """
-        entry = relentry or self.root
 
-        path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
+        entry = relentry or self.root
+        root_path = relentry.path if relentry else self.root.top.path
+
+        # Calculate the relative path
+        relpath = fsutil.relpath(path, root_path, alt_separator=self.alt_separator)
+        path = fsutil.normalize(relpath, alt_separator=self.alt_separator).strip("/")
 
         if not path:
             return [], entry
@@ -85,10 +89,8 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return parts[idx:], entry
 
-    def get(
-        self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs
-    ) -> Union[FilesystemEntry, ConfigurationEntry]:
-        """Retrieve a :class:`ConfigurationEntry` or :class:`.FilesystemEntry` relative to the root or ``relentry``.
+    def get(self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs) -> ConfigurationEntry:
+        """Retrieve a :class:`ConfigurationEntry` relative to the root or ``relentry``.
 
         Raises:
             FileNotFoundError: if it could not find the entry.
@@ -96,7 +98,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
         parts, entry = self._get_till_file(path, relentry)
 
         if entry.is_dir():
-            return entry
+            return ConfigurationEntry(self, entry.path, entry, None)
 
         entry = self._convert_entry(entry, *args, **kwargs)
 
@@ -108,23 +110,21 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return entry
 
-    def _convert_entry(
-        self, file_entry: FilesystemEntry, *args, **kwargs
-    ) -> Union[ConfigurationEntry, FilesystemEntry]:
+    def _convert_entry(self, file_entry: FilesystemEntry, *args, **kwargs) -> ConfigurationEntry:
         """Creates a :class:`ConfigurationEntry` from a ``file_entry``.
 
         If an error occurs during the parsing of the file contents,
         the original ``file_entry`` is returned.
         """
         entry = file_entry
+        config_parser = None
         try:
             config_parser = parse(entry, *args, **kwargs)
-            entry = ConfigurationEntry(self, entry.path, entry, config_parser)
         except ConfigurationParsingError as e:
             # If a parsing error gets created, it should return the `entry`
             log.debug("Error when parsing %s with message '%s'", entry.path, e)
 
-        return entry
+        return ConfigurationEntry(self, entry.path, entry, config_parser)
 
 
 class ConfigurationEntry(FilesystemEntry):
@@ -133,7 +133,7 @@ class ConfigurationEntry(FilesystemEntry):
     Behaves like a ``directory`` when :attr:`parser_items` is a :class:`.ConfigurationParser` or a ``dict``.
     Behaves like a ``file`` otherwise.
 
-    Attributes:
+    Args:
         parser_items: A dict-like object containing all configuration entries and values.
             In most cases this is either a :class:`.ConfigurationParser` or ``dict``.
             Otherwise, its the entry's value
@@ -163,10 +163,10 @@ class ConfigurationEntry(FilesystemEntry):
 
     def __init__(
         self,
-        fs: Filesystem,
+        fs: ConfigurationFilesystem,
         path: str,
         entry: FilesystemEntry,
-        parser_items: Optional[Union[dict, ConfigurationParser, str, list]] = None,
+        parser_items: dict | ConfigurationParser | str | list | None = None,
     ) -> None:
         super().__init__(fs, path, entry)
         self.parser_items = parser_items
@@ -182,7 +182,7 @@ class ConfigurationEntry(FilesystemEntry):
 
         return f"<{self.__class__.__name__} {output}"
 
-    def get(self, key, default: Optional[Any] = None) -> Union[ConfigurationEntry, Any, None]:
+    def get(self, key, default: Any | None = None) -> ConfigurationEntry | Any | None:
         """Gets the dictionary key that belongs to this entry using ``key``.
         Behaves like ``dictionary.get()``.
 
@@ -197,13 +197,19 @@ class ConfigurationEntry(FilesystemEntry):
         if not key:
             raise TypeError("key should be defined")
 
-        if key in self.parser_items:
+        path = fsutil.join(self.path, key, alt_separator=self.fs.alt_separator)
+
+        if self.parser_items and key in self.parser_items:
             return ConfigurationEntry(
                 self.fs,
-                fsutil.join(self.path, key, alt_separator=self.fs.alt_separator),
+                path,
                 self.entry,
                 self.parser_items[key],
             )
+
+        if self.entry.is_dir():
+            return self.fs.get(path, self.entry)
+
         return default
 
     def _write_value_mapping(self, values: dict[str, Any], indentation_nr: int = 0) -> str:
@@ -241,9 +247,13 @@ class ConfigurationEntry(FilesystemEntry):
         Returns:
             A file-like object holding a byte representation of :attr:`parser_items`.
         """
+
         if isinstance(self.parser_items, ConfigurationParser):
             # Currently trying to open the underlying entry
             return self.entry.open()
+
+        if isinstance(self.parser_items, bytes):
+            return io.BytesIO(self.parser_items)
 
         output_data = self._write_value_mapping(self.parser_items)
         return io.BytesIO(bytes(output_data, "utf-8"))
@@ -257,6 +267,11 @@ class ConfigurationEntry(FilesystemEntry):
         if self.is_file():
             raise NotADirectoryError()
 
+        if self.parser_items is None and self.entry.is_dir():
+            for entry in self.entry.scandir():
+                yield ConfigurationEntry(self.fs, entry.name, entry, None)
+            return
+
         for key, values in self.parser_items.items():
             yield ConfigurationEntry(self.fs, key, self.entry, values)
 
@@ -266,7 +281,7 @@ class ConfigurationEntry(FilesystemEntry):
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         """Returns whether this :class:`ConfigurationEntry` can be considered a directory."""
         # if self.parser_items has keys (thus sub-values), we can consider it a directory.
-        return hasattr(self.parser_items, "keys")
+        return (self.parser_items is None and self.entry.is_dir()) or hasattr(self.parser_items, "keys")
 
     def is_symlink(self) -> bool:
         """Return whether this :class:`ConfigurationEntry` is a symlink or not.
@@ -284,7 +299,7 @@ class ConfigurationEntry(FilesystemEntry):
         Returns:
             Whether the ``entry`` and ``key`` exists
         """
-        return self.entry.exists() and key in self.parser_items
+        return self.parser_items and self.entry.exists() and key in self.parser_items
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         """Returns the stat from the underlying :class:`.FilesystemEntry` :attr:`entry`."""

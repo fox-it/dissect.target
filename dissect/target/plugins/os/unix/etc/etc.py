@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import fnmatch
 import re
 from pathlib import Path
@@ -23,14 +25,17 @@ UnixConfigTreeRecord = TargetRecordDescriptor(
 
 
 class EtcTree(ConfigurationTreePlugin):
+    """Unix etc configuration tree plugin."""
+
     __namespace__ = "etc"
 
     def __init__(self, target: Target):
         super().__init__(target, "/etc")
 
-    def _sub(self, items: ConfigurationEntry, entry: Path, pattern: str) -> Iterator[UnixConfigTreeRecord]:
+    def _sub(
+        self, items: ConfigurationEntry | dict, entry: Path, orig_path: Path, pattern: str
+    ) -> Iterator[UnixConfigTreeRecord]:
         index = 0
-        config_entry = items
         if not isinstance(items, dict):
             items = items.as_dict()
 
@@ -39,7 +44,7 @@ class EtcTree(ConfigurationTreePlugin):
             path = Path(entry) / Path(key)
 
             if isinstance(value, dict):
-                yield from self._sub(value, path, pattern)
+                yield from self._sub(value, path, orig_path, pattern)
                 continue
 
             if not isinstance(value, list):
@@ -48,7 +53,7 @@ class EtcTree(ConfigurationTreePlugin):
             if fnmatch.fnmatch(path, pattern):
                 data = {
                     "_target": self.target,
-                    "source": self.target.fs.path(config_entry.entry.path),
+                    "source": self.target.fs.path(orig_path),
                     "path": path,
                     "key": key,
                     "value": value,
@@ -62,13 +67,18 @@ class EtcTree(ConfigurationTreePlugin):
 
     @export(record=UnixConfigTreeRecord)
     @arg("--glob", dest="pattern", required=False, default="*", type=str, help="Glob-style pattern to search for")
-    def etc(self, pattern: str) -> Iterator[UnixConfigTreeRecord]:
-        for entry, subs, items in self.config_fs.walk("/"):
+    @arg("--root", dest="root", required=False, default="/", type=str, help="Path to use as root for search")
+    def etc(self, pattern: str, root: str) -> Iterator[UnixConfigTreeRecord]:
+        """Yield etc configuration records."""
+
+        for entry, subs, items in self.config_fs.walk(root):
             for item in items:
                 try:
-                    config_object = self.get(str(Path(entry) / Path(item)))
+                    path = Path(entry) / item
+                    config_object = self.get(str(path))
+
                     if isinstance(config_object, ConfigurationEntry):
-                        yield from self._sub(config_object, Path(entry) / Path(item), pattern)
+                        yield from self._sub(config_object, path, orig_path=path, pattern=pattern)
                 except Exception:
                     self.target.log.warning("Could not open configuration item: %s", item)
                     pass

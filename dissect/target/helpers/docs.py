@@ -46,7 +46,7 @@ def get_real_func_obj(func: Callable) -> Tuple[Type, Callable]:
     return (klass, func)
 
 
-def get_docstring(obj: Any, placeholder=NO_DOCS) -> str:
+def get_docstring(obj: Any, placeholder: str = NO_DOCS) -> str:
     """Get object's docstring or a placeholder if no docstring found"""
     # Use of `inspect.cleandoc()` is preferred to `textwrap.dedent()` here
     # because many multi-line docstrings in the codebase

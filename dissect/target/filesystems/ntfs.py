@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import stat
 from typing import BinaryIO, Iterator, Optional
 
@@ -47,12 +48,12 @@ class NtfsFilesystem(Filesystem):
         try:
             path = path.rsplit(":", maxsplit=1)[0]
             return self.ntfs.mft.get(path, root=root)
-        except NtfsFileNotFoundError:
-            raise FileNotFoundError(path)
+        except NtfsFileNotFoundError as e:
+            raise FileNotFoundError(path) from e
         except NtfsNotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except NtfsError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class NtfsFilesystemEntry(FilesystemEntry):
@@ -151,12 +152,14 @@ class NtfsFilesystemEntry(FilesystemEntry):
         record = self.dereference()
 
         size = 0
+        real_size = 0
         if self.is_symlink():
             mode = stat.S_IFLNK
         elif self.is_file():
             mode = stat.S_IFREG
             try:
                 size = record.size(self.ads)
+                real_size = record.size(self.ads, allocated=True)
             except NtfsFileNotFoundError as e:
                 # Occurs when it cannot find the the specific ads inside its attributes
                 raise FileNotFoundError from e
@@ -176,15 +179,28 @@ class NtfsFilesystemEntry(FilesystemEntry):
                 0,
                 size,
                 stdinfo.last_access_time.timestamp(),
-                stdinfo.last_change_time.timestamp(),
+                stdinfo.last_modification_time.timestamp(),
+                # ctime gets set to creation time for python <3.12 purposes
                 stdinfo.creation_time.timestamp(),
             ]
         )
 
         # Set the nanosecond resolution separately
         st_info.st_atime_ns = stdinfo.last_access_time_ns
-        st_info.st_mtime_ns = stdinfo.last_change_time_ns
+        st_info.st_mtime_ns = stdinfo.last_modification_time_ns
+
         st_info.st_ctime_ns = stdinfo.creation_time_ns
+
+        st_info.st_birthtime = stdinfo.creation_time.timestamp()
+        st_info.st_birthtime_ns = stdinfo.creation_time_ns
+
+        # real_size is none if the size is resident
+        st_info.st_blksize = record.ntfs.cluster_size
+        blocks = 0
+        if not record.resident:
+            blocks = math.ceil(real_size / 512)
+
+        st_info.st_blocks = blocks
 
         return st_info
 

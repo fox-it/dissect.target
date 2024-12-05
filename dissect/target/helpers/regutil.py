@@ -1,16 +1,18 @@
-""" Registry related abstractions """
+"""Registry related abstractions"""
+
 from __future__ import annotations
 
 import fnmatch
 import re
-import struct
 from collections import defaultdict
 from datetime import datetime
+from enum import IntEnum
+from functools import cached_property
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO, Iterator, Optional, TextIO, Union
 
-from dissect.regf import regf
+from dissect.regf import c_regf, regf
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -26,6 +28,36 @@ KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, re
 
 ValueType = Union[int, str, bytes, list[str]]
 """The possible value types that can be returned from the registry."""
+
+
+class RegistryValueType(IntEnum):
+    """Registry value types as defined in ``winnt.h``.
+
+    Resources:
+        - https://learn.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
+        - https://github.com/fox-it/dissect.regf/blob/main/dissect/regf/c_regf.py
+    """
+
+    NONE = c_regf.REG_NONE
+    SZ = c_regf.REG_SZ
+    EXPAND_SZ = c_regf.REG_EXPAND_SZ
+    BINARY = c_regf.REG_BINARY
+    DWORD = c_regf.REG_DWORD
+    DWORD_BIG_ENDIAN = c_regf.REG_DWORD_BIG_ENDIAN
+    LINK = c_regf.REG_LINK
+    MULTI_SZ = c_regf.REG_MULTI_SZ
+    RESOURCE_LIST = c_regf.REG_RESOURCE_LIST
+    FULL_RESOURCE_DESCRIPTOR = c_regf.REG_FULL_RESOURCE_DESCRIPTOR
+    RESOURCE_REQUIREMENTS_LIST = c_regf.REG_RESOURCE_REQUIREMENTS_LIST
+    QWORD = c_regf.REG_QWORD
+
+    @classmethod
+    def _missing_(cls, value: int) -> IntEnum:
+        # Allow values other than defined members
+        member = int.__new__(cls, value)
+        member._name_ = None
+        member._value_ = value
+        return member
 
 
 class RegistryHive:
@@ -296,6 +328,7 @@ class VirtualKey(RegistryKey):
         self._class_name = class_name
         self._values: dict[str, RegistryValue] = {}
         self._subkeys: dict[str, RegistryKey] = {}
+        self._timestamp: datetime = None
         self.top: RegistryKey = None
         super().__init__(hive=hive)
 
@@ -325,10 +358,18 @@ class VirtualKey(RegistryKey):
         return self._path
 
     @property
-    def timestamp(self) -> datetime:
+    def timestamp(self) -> datetime | None:
         if self.top:
             return self.top.timestamp
+
+        if self._timestamp:
+            return self._timestamp
+
         return None
+
+    @timestamp.setter
+    def timestamp(self, ts: datetime) -> None:
+        self._timestamp = ts
 
     def subkey(self, subkey: str) -> RegistryKey:
         try:
@@ -405,8 +446,8 @@ class VirtualValue(RegistryValue):
         return self._value
 
     @property
-    def type(self) -> int:
-        return None
+    def type(self) -> RegistryValueType:
+        return RegistryValueType.NONE
 
 
 class HiveCollection(RegistryHive):
@@ -622,7 +663,7 @@ class RegfHive(RegistryHive):
         try:
             return RegfKey(self, self.hive.open(key))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(key, cause=e)
+            raise RegistryKeyNotFoundError(key) from e
 
 
 class RegfKey(RegistryKey):
@@ -652,7 +693,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfKey(self.hive, self.key.subkey(subkey))
         except regf.RegistryKeyNotFoundError as e:
-            raise RegistryKeyNotFoundError(subkey, cause=e)
+            raise RegistryKeyNotFoundError(subkey) from e
 
     def subkeys(self) -> list[RegistryKey]:
         return [RegfKey(self.hive, k) for k in self.key.subkeys()]
@@ -661,7 +702,7 @@ class RegfKey(RegistryKey):
         try:
             return RegfValue(self.hive, self.key.value(value))
         except regf.RegistryValueNotFoundError as e:
-            raise RegistryValueNotFoundError(value, cause=e)
+            raise RegistryValueNotFoundError(value) from e
 
     def values(self) -> list[RegistryValue]:
         return [RegfValue(self.hive, v) for v in self.key.values()]
@@ -683,8 +724,8 @@ class RegfValue(RegistryValue):
         return self.kv.value
 
     @property
-    def type(self) -> int:
-        return self.kv.type
+    def type(self) -> RegistryValueType:
+        return RegistryValueType(self.kv.type)
 
 
 class RegFlex:
@@ -750,17 +791,22 @@ class RegFlexKey(VirtualKey):
 
 class RegFlexValue(VirtualValue):
     def __init__(self, hive: RegistryHive, name: str, value: ValueType):
-        self._parsed_value = None
         super().__init__(hive, name, value)
+
+    @cached_property
+    def _parse(self) -> tuple[RegistryValueType, ValueType]:
+        return parse_flex_value(self._value)
 
     @property
     def value(self) -> ValueType:
-        if not self._parsed_value:
-            self._parsed_value = parse_flex_value(self._value)
-        return self._parsed_value
+        return self._parse[1]
+
+    @property
+    def type(self) -> RegistryValueType:
+        return self._parse[0]
 
 
-def parse_flex_value(value: str) -> ValueType:
+def parse_flex_value(value: str) -> tuple[RegistryValueType, ValueType]:
     """Parse values from text registry exports.
 
     Args:
@@ -770,31 +816,31 @@ def parse_flex_value(value: str) -> ValueType:
         NotImplementedError: If ``value`` is not of a supported type for parsing.
     """
     if value.startswith('"'):
-        return value.strip('"')
+        return RegistryValueType.SZ, value.strip('"')
 
     vtype, _, value = value.partition(":")
     if vtype == "dword":
-        return struct.unpack(">i", bytes.fromhex(value))[0]
+        return RegistryValueType.DWORD, int.from_bytes(bytes.fromhex(value), "big", signed=True)
     elif "hex" in vtype:
         value = bytes.fromhex(value.replace(",", ""))
         if vtype == "hex":
-            return value
+            return RegistryValueType.BINARY, value
 
         # hex(T)
         # These values match regf type values
         vtype = int(vtype[4:5], 16)
         if vtype == regf.REG_NONE:
-            return value if value else None
+            decoded = value if value else None
         elif vtype == regf.REG_SZ:
-            return regf.try_decode_sz(value)
+            decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_EXPAND_SZ:
-            return regf.try_decode_sz(value)
+            decoded = regf.try_decode_sz(value)
         elif vtype == regf.REG_BINARY:
-            return value
+            decoded = value
         elif vtype == regf.REG_DWORD:
-            return struct.unpack("<I", value)[0]
+            decoded = int.from_bytes(value, "little", signed=False)
         elif vtype == regf.REG_DWORD_BIG_ENDIAN:
-            return struct.unpack(">I", value)[0]
+            decoded = int.from_bytes(value, "big", signed=False)
         elif vtype == regf.REG_MULTI_SZ:
             d = BytesIO(value)
 
@@ -806,11 +852,12 @@ def parse_flex_value(value: str) -> ValueType:
 
                 r.append(s)
 
-            return r
+            decoded = r
         elif vtype == regf.REG_QWORD:
-            return struct.unpack(">Q", value)[0]
+            decoded = int.from_bytes(value, "big", signed=False)
         else:
             raise NotImplementedError(f"Registry flex value type {vtype}")
+        return RegistryValueType(vtype), decoded
 
 
 def has_glob_magic(pattern: str) -> bool:

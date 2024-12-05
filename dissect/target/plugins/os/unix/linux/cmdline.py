@@ -16,6 +16,8 @@ CmdlineRecord = TargetRecordDescriptor(
 
 
 class CmdlinePlugin(Plugin):
+    """Linux volatile proc commandline plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 

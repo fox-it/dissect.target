@@ -35,14 +35,14 @@ class XfsFilesystem(Filesystem):
     def _get_node(self, path: str, node: Optional[xfs.INode] = None) -> xfs.INode:
         try:
             return self.xfs.get(path, node)
-        except xfs.FileNotFoundError:
-            raise FileNotFoundError(path)
-        except xfs.NotADirectoryError:
-            raise NotADirectoryError(path)
-        except xfs.NotASymlinkError:
-            raise NotASymlinkError(path)
+        except xfs.FileNotFoundError as e:
+            raise FileNotFoundError(path) from e
+        except xfs.NotADirectoryError as e:
+            raise NotADirectoryError(path) from e
+        except xfs.NotASymlinkError as e:
+            raise NotASymlinkError(path) from e
         except xfs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class XfsFilesystemEntry(FilesystemEntry):
@@ -130,8 +130,15 @@ class XfsFilesystemEntry(FilesystemEntry):
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
 
-        # XFS has a birth time, called crtime
+        st_info.st_blksize = self.fs.xfs.block_size
+        # Convert number of filesystem blocks to basic blocks
+        # Reference: https://github.com/torvalds/linux/blob/e32cde8d2bd7d251a8f9b434143977ddf13dcec6/fs/xfs/xfs_iops.c#L602 # noqa: E501
+        # Note that block size in XFS is always a multiple of 512, so the division below is safe
+        st_info.st_blocks = self.entry.nblocks * (self.fs.xfs.block_size // 512)
+
+        # XFS has a birth time, since inode version 3 (version 5 of filesystem)
         st_info.st_birthtime = self.entry.crtime.timestamp()
+        st_info.st_birthtime_ns = self.entry.crtime_ns
 
         return st_info
 

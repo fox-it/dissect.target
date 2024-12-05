@@ -1,4 +1,5 @@
 import datetime
+import math
 import stat
 from typing import BinaryIO, Iterator, Optional, Union
 
@@ -41,11 +42,11 @@ class FatFilesystem(Filesystem):
         try:
             return self.fatfs.get(path, dirent=entry)
         except fat_exc.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except fat_exc.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except fat_exc.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class FatFilesystemEntry(FilesystemEntry):
@@ -100,16 +101,21 @@ class FatFilesystemEntry(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = [
-            (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
-            self.entry.cluster,
-            id(self.fs),
-            1,
-            0,
-            0,
-            self.entry.size,
-            self.entry.atime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-            self.entry.mtime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-            self.entry.ctime.replace(tzinfo=self.fs.tzinfo).timestamp(),
-        ]
-        return fsutil.stat_result(st_info)
+        st_info = fsutil.stat_result(
+            [
+                (stat.S_IFDIR if self.is_dir() else stat.S_IFREG) | 0o777,
+                self.entry.cluster,
+                id(self.fs),
+                1,
+                0,
+                0,
+                self.entry.size,
+                self.entry.atime.replace(tzinfo=self.fs.tzinfo).timestamp(),
+                self.entry.mtime.replace(tzinfo=self.fs.tzinfo).timestamp(),
+                self.entry.ctime.replace(tzinfo=self.fs.tzinfo).timestamp(),
+            ]
+        )
+
+        st_info.st_blocks = math.ceil(self.entry.size / self.entry.fs.cluster_size)
+        st_info.st_blksize = self.entry.fs.cluster_size
+        return st_info
