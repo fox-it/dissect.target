@@ -38,7 +38,7 @@ def test_open_fallback_fh(tmp_path):
         (bytes(range(256)) * 2)
         + b"conectix"
         + (b"\x00" * 8)
-        + (b"\xFF" * 8)
+        + (b"\xff" * 8)
         + (b"\x00" * 24)
         + struct.pack(">Q", 512)
         + (b"\x00" * 455)

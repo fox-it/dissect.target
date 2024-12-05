@@ -26,10 +26,7 @@ from pathlib import Path, PurePath, _PosixFlavour
 from typing import IO, TYPE_CHECKING, Any, Callable, Iterator
 
 from dissect.target import filesystem
-from dissect.target.exceptions import (
-    FilesystemError,
-    SymlinkRecursionError,
-)
+from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
 from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 

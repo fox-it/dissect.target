@@ -615,7 +615,7 @@ class Target:
                     raise UnsupportedPluginError(
                         f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
                         extra=causes[1:] if len(causes) > 1 else None,
-                    ) from causes[0] if causes else None
+                    ) from (causes[0] if causes else None)
 
         # We still ended up with no compatible plugins
         if function not in self._functions:

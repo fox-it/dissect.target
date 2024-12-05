@@ -219,12 +219,9 @@ class TargetPath(Path, PureDissectPath):
         The children are yielded in arbitrary order, and the
         special entries '.' and '..' are not included.
         """
-        root_dir = str(self)
         with path_common.scandir(self) as scandir_it:
             for entry in scandir_it:
                 name = entry.name
-                if root_dir == ".":
-                    name = self._remove_leading_dot(name)
                 child_path = self.joinpath(name)
                 child_path._entry = entry
                 yield child_path
