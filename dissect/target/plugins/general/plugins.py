@@ -169,7 +169,7 @@ class PluginListPlugin(Plugin):
 
 
 def generate_plugins_json(plugins: list[Plugin]) -> Iterator[dict]:
-    """Generates JSON output of a list of :class:`Plugin`s."""
+    """Generates JSON output of a list of :class:`Plugin`."""
 
     for p in plugins:
         func = getattr(p.class_object, p.method_name)
