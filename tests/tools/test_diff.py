@@ -310,7 +310,7 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
 def test_target_diff_shell(capsys, monkeypatch) -> None:
     with monkeypatch.context() as m:
         m.setattr(fsutils, "LS_COLORS", {})
-        m.setenv("NO_COLOR", 1)
+        m.setenv("NO_COLOR", "1")
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
         m.setattr("sys.argv", ["target-diff", "--deep", "shell", src_target_path, dst_target_path])

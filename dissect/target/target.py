@@ -95,7 +95,7 @@ class Target:
         try:
             self._config = config.load(config_paths)
         except Exception as e:
-            self.log.warning("Error loading config file: %s", self.path)
+            self.log.warning("Error loading config file: %s", config_paths)
             self.log.debug("", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
