@@ -468,10 +468,10 @@ class Toml(ConfigurationParser):
 
 
 class Env(ConfigurationParser):
-    r"""Parses ``.env`` file contents according to Docker and bash specification.
+    """Parses ``.env`` file contents according to Docker and bash specification.
 
     Does not apply interpolation of substituted values, e.g. ``foo=${bar}`` and does not attempt to parse list or dict
-    strings. Does not support dynamic env files, e.g. foo=\`bar\`. Also does not support multi-line key/value
+    strings. Does not support dynamic env files, e.g. ``foo=`bar```. Also does not support multi-line key/value
     assignments (yet).
 
     Resources:
