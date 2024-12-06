@@ -37,7 +37,7 @@ splitext = posixpath.splitext
 splitdrive = posixpath.splitdrive
 
 
-def splitroot(path: str, alt_separator: str = "") -> tuple[str, str]:
+def splitroot(path: str, alt_separator: str = "") -> tuple[str, str, str]:
     return posixpath.splitroot(normalize(path, alt_separator=alt_separator))
 
 
@@ -71,3 +71,11 @@ def relpath(path: str, start: str, alt_separator: str = "") -> str:
 
 def commonpath(paths: list[str], alt_separator: str = "") -> str:
     return posixpath.commonpath([normalize(path, alt_separator=alt_separator) for path in paths])
+
+
+def isreserved(path: str) -> bool:
+    """Return True if the path is a reserved name.
+
+    We currently do not have any reserved names.
+    """
+    return False
