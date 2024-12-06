@@ -516,6 +516,7 @@ def chacha20_decrypt(fh: BinaryIO, key: ChaCha20Key) -> bytes:
     Args:
         fh: File-like object to the encrypted rootfs.gz file.
         key: ChaCha20Key.
+
     Returns:
         Decrypted bytes.
     """
@@ -534,6 +535,7 @@ def calculate_counter_increment(iv: bytes) -> int:
 
     Args:
         iv: 16 bytes IV.
+
     Returns:
         Custom CTR increment.
     """
@@ -549,6 +551,7 @@ def aes_decrypt(fh: BinaryIO, key: AesKey) -> bytes:
     Args:
         fh: File-like object to the encrypted rootfs.gz file.
         key: AesKey.
+
     Returns:
         Decrypted bytes.
     """

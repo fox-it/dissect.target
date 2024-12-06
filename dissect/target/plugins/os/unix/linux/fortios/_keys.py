@@ -1,5 +1,7 @@
 # flake8: noqa: E501
 # SHA256 hashes of kernel files
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 
@@ -8,11 +10,11 @@ class AesKey:
     key: bytes
     iv: bytes
 
-    def __init__(self, key, iv):
+    def __init__(self, key: bytes | str, iv: bytes | str):
         self.key = bytes.fromhex(key) if isinstance(key, str) else key
         self.iv = bytes.fromhex(iv) if isinstance(iv, str) else iv
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"AesKey(key={self.key.hex()!r}, iv={self.iv.hex()!r})"
 
 
@@ -21,11 +23,11 @@ class ChaCha20Key:
     key: bytes
     iv: bytes
 
-    def __init__(self, key, iv):
+    def __init__(self, key: bytes | str, iv: bytes | str):
         self.key = bytes.fromhex(key) if isinstance(key, str) else key
         self.iv = bytes.fromhex(iv) if isinstance(iv, str) else iv
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ChaCha20Key(key={self.key.hex()!r}, iv={self.iv.hex()!r})"
 
 
@@ -33,10 +35,10 @@ class ChaCha20Key:
 class ChaCha20Seed:
     key: bytes
 
-    def __init__(self, key):
+    def __init__(self, key: bytes | str):
         self.key = bytes.fromhex(key) if isinstance(key, str) else key
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ChaCha20Seed(key={self.key.hex()!r})"
 
 
