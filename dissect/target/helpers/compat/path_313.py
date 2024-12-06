@@ -115,7 +115,7 @@ class PureDissectPath(PurePath):
     def with_segments(self, *pathsegments) -> TargetPath:
         return type(self)(self._fs, *pathsegments)
 
-    # NOTE: This is copied from pathlib.py but turned into an instance method so we get access to the correct flavour
+    # NOTE: This is copied from pathlib/_local.py but turned into an instance method so we get access to the correct flavour
     def _parse_path(self, path: str) -> tuple[str, str, list[str]]:
         if not path:
             return "", "", []
@@ -393,4 +393,7 @@ class TargetPath(Path, PureDissectPath):
 
 class _GlobberTargetPath(TargetPath):
     def __str__(self) -> str:
+        # This is necessary because the _Globber class expects an added `/` at the end
+        # However, only PurePathBase properly adds that, PurePath doesn't
+        # We do want to operate on Path objects rather than strings, so do a little hack here
         return self._raw_path
