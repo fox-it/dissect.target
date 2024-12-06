@@ -63,7 +63,7 @@ def test_decrypt_rootfs() -> None:
         decrypt_rootfs(BytesIO(encrypted_rootfs_header), bad_key)
 
 
-def test_aes_decrypt():
+def test_aes_decrypt() -> None:
     # encrypted FGT_VM64_AZURE-v7.6.0.F-build3401-FORTINET.out/rootfs.gz
     encrypted_rootfs_header = bytes.fromhex(
         """
