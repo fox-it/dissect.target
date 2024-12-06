@@ -165,6 +165,26 @@ def test_relpath(path: str, start: str, alt_separator: str, result: str) -> None
     assert fsutil.relpath(path, start, alt_separator=alt_separator) == result
 
 
+@pytest.mark.parametrize(
+    ("paths, alt_separator, result"),
+    [
+        (["/some/dir/some/file", "/some/dir/some/other"], "", "/some/dir/some"),
+        (["/some/dir/some/file", "/some/dir/some/other"], "\\", "/some/dir/some"),
+        (["\\some\\dir\\some\\file", "\\some\\dir\\some\\other"], "\\", "/some/dir/some"),
+        (["/some/dir/some/file", "/some/dir/other"], "", "/some/dir"),
+        (["/some/dir/some/file", "/some/other"], "", "/some"),
+        (["/some/dir/some/file", "/some/other"], "\\", "/some"),
+    ],
+)
+def test_commonpath(paths: list[str], alt_separator: str, result: str) -> None:
+    assert fsutil.commonpath(paths, alt_separator=alt_separator) == result
+
+
+def test_isreserved() -> None:
+    assert not fsutil.isreserved("CON")
+    assert not fsutil.isreserved("foo")
+
+
 def test_generate_addr() -> None:
     slash_path = "/some/dir/some/file"
     slash_vfs = VirtualFilesystem(alt_separator="")
@@ -312,9 +332,10 @@ def test_target_path_is_relative_to(path_fs: VirtualFilesystem) -> None:
 
 
 def test_target_path_is_reserved(path_fs: VirtualFilesystem) -> None:
-    # We currently do not have any reserved names for TargetPath
-    assert not path_fs.path("CON").is_reserved()
-    assert not path_fs.path("foo").is_reserved()
+    if sys.version_info < (3, 13):
+        # We currently do not have any reserved names for TargetPath
+        assert not path_fs.path("CON").is_reserved()
+        assert not path_fs.path("foo").is_reserved()
 
 
 def test_target_path_join(path_fs: VirtualFilesystem) -> None:
