@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from dataclasses import dataclass
 from struct import pack
 from typing import Iterator
 from unittest.mock import MagicMock, patch
 
-import paho.mqtt.client as mqtt
 import pytest
 
 from dissect.target import Target
-from dissect.target.loaders.mqtt import Broker, MQTTConnection, case
 
 
 class MQTTMock(MagicMock):
-    disks = []
-    hostname = ""
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.disks: list = []
+        self.hostname: str = ""
 
     def fill_disks(self, sizes: list[int]) -> None:
         self.disks = []
@@ -96,7 +97,13 @@ def test_remote_loader_stream(
     read: int,
     expected: bytes,
 ) -> None:
-    monkeypatch.setattr(mqtt, "Client", MQTTMock)
+    mock_mqtt = MagicMock()
+    mock_mqtt.mqtt.client.Client.return_value = MQTTMock()
+    monkeypatch.setitem(sys.modules, "paho", mock_mqtt)
+    monkeypatch.setitem(sys.modules, "paho.mqtt", mock_mqtt.mqtt)
+    monkeypatch.setitem(sys.modules, "paho.mqtt.client", mock_mqtt.mqtt.client)
+
+    from dissect.target.loaders.mqtt import Broker
 
     broker = Broker("0.0.0.0", "1884", "key", "crt", "ca", "case1", "user", "pass")
     broker.connect()
@@ -117,6 +124,8 @@ def test_remote_loader_stream(
 
 
 def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
+    from dissect.target.loaders.mqtt import MQTTConnection
+
     connection = MQTTConnection(mock_broker, "")
     connection.prefetch_factor_inc = 10
     assert connection.factor == 1
@@ -156,6 +165,8 @@ def test_mqtt_loader_prefetch(mock_broker: MockBroker) -> None:
     ],
 )
 def test_case(case_name, parse_result: str | pytest.RaisesContext[argparse.ArgumentTypeError]) -> None:
+    from dissect.target.loaders.mqtt import case
+
     if isinstance(parse_result, str):
         assert case(case_name) == parse_result
     else:
