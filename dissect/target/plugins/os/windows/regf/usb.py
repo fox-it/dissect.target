@@ -1,29 +1,38 @@
+from __future__ import annotations
+
+import re
 import struct
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
-from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
+from dissect.target.exceptions import (
+    RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
+    UnsupportedPluginError,
+)
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.helpers.regutil import VirtualKey
+from dissect.target.plugin import Plugin, export
 
 UsbRegistryRecord = TargetRecordDescriptor(
     "windows/registry/usb",
     [
-        ("string", "device_type"),
+        ("string", "type"),
         ("string", "serial"),
-        ("string", "vid"),
-        ("string", "pid"),
-        ("string", "rev"),
-        ("string", "containerid"),
+        ("string", "container_id"),
         ("string", "vendor"),
         ("string", "product"),
-        ("string", "version"),
-        ("string", "friendlyname"),
+        ("string", "revision"),
+        ("string", "friendly_name"),
         ("datetime", "first_insert"),
         ("datetime", "first_install"),
         ("datetime", "last_insert"),
         ("datetime", "last_removal"),
-        ("string", "info_origin"),
+        ("string[]", "volumes"),
+        ("string[]", "mounts"),
+        ("string[]", "users"),
+        ("path", "source"),
     ],
 )
 
@@ -34,125 +43,185 @@ USB_DEVICE_PROPERTY_KEYS = {
     "last_removal": ("0067", "00000067"),  # Windows 8 and higer. USB device last removal date.
 }
 
+RE_DEVICE_NAME = re.compile(r"^(?P<type>.+?)&Ven_(?P<vendor>.+?)&Prod_(?P<product>.+?)(&Rev_(?P<revision>.+?))?$")
+
 
 class UsbPlugin(Plugin):
-    """USB plugin."""
+    """Windows USB history plugin.
 
-    # USB device locations
+    Parses Windows registry data about attached USB devices. Does not parse EVTX EventIDs
+    or ``C:\\Windows\\inf\\setupapi(.dev).log``.
+
+    To get a full picture of the USB history on a Windows machine, you should parse the
+    relevant EventIDs using the evtx plugin. For more research on event log USB forensics, see:
+
+        - https://www.researchgate.net/publication/318514858_USB_Storage_Device_Forensics_for_Windows_10
+        - https://dfir.pubpub.org/pub/h78di10n/release/2
+        - https://www.senturean.com/posts/19_08_03_usb_storage_forensics_1/#1-system-events
+
+    Resources:
+        - https://hatsoffsecurity.com/2014/06/05/usb-forensics-pt-1-serial-number/
+        - http://www.swiftforensics.com/2013/11/windows-8-new-registry-artifacts-part-1.html
+        - https://www.sans.org/blog/the-truth-about-usb-device-serial-numbers/
+    """
+
+    # Stores history of mounted USB devices
     USB_STOR = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR"
-    # DeviceContainers holds all USB information. Only present in windows 8 or higher
-    DEVICE_CONTAINERS = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceContainers"
-    USB = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USB"
-    HID = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\HID"
-    SCSI = "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\SCSI"
+
+    # Stores the relation between a USB container_id and the FriendlyName of mounted volume(s) (Windows 7 and up)
+    PORTABLE_DEVICES = "HKLM\\SOFTWARE\\Microsoft\\Windows Portable Devices\\Devices"
+
+    # Stores the most recent mapping of a mount letter and a container_id
+    MOUNT_LETTER_MAP = "HKLM\\SYSTEM\\MountedDevices"
+
+    # User history of mount points accesses in explorer.exe
+    USER_MOUNTS = "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Mountpoints2"
+
+    # Other artifacts we currently do not parse:
+    # - "sysvol\Windows\inf\setupapi(.dev).log"
+    # - "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USB"
+    # - "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\HID"
+    # - "HKLM\\SYSTEM\\CurrentControlSet\\Enum\\SCSI"
+    # - "HKLM\\SYSTEM\\CurrentControlSet\\Control\\DeviceContainers"
+    # - "SOFTWARE\Microsoft\Windows NT\CurrentVersion\EMDMgmt"
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.USB_STOR))) > 0:
+        if not list(self.target.registry.keys(self.USB_STOR)):
             raise UnsupportedPluginError(f"Registry key not found: {self.USB_STOR}")
 
-    @internal
-    def unpack_timestamps(self, usb_reg_properties):
-        """
-        Params:
-            usb_reg_properties (Regf): A registry object with USB properties
-        Returns:
-            timestamps (Dict): A dict containing parsed timestamps within passed registry object
-        """
-        usb_reg_properties = usb_reg_properties.subkey("{83da6326-97a6-4088-9453-a1923f573b29}")
-        timestamps = {}
-
-        for device_property, usbstor_values in USB_DEVICE_PROPERTY_KEYS.items():
-            for usb_val in usbstor_values:
-                if usb_val in [x.name for x in usb_reg_properties.subkeys()]:
-                    version_key = usb_reg_properties.subkey(usb_val)
-                    if "00000000" in version_key.subkeys():
-                        data_value = version_key.subkey("00000000").value("Data").value
-                    else:
-                        data_value = version_key.value("(Default)").value
-                    timestamps[device_property] = wintimestamp(struct.unpack("<Q", data_value)[0])
-                    break
-                else:
-                    timestamps[device_property] = None
-        return timestamps
-
-    @internal
-    def parse_device_name(self, device_name):
-        device_info = device_name.split("&")
-        device_type = device_info[0]
-        vendor = device_info[1].split("Ven_")[1]
-        product = device_info[2].split("Prod_")[1]
-        version = None if len(device_info) < 4 else device_info[3].split("Rev_")[1]
-
-        return dict(device_type=device_type, vendor=vendor, product=product, version=version)
-
     @export(record=UsbRegistryRecord)
-    def usb(self):
-        """Return information about attached USB devices.
+    def usb(self) -> Iterator[UsbRegistryRecord]:
+        """Yields information about (historically) attached USB storage devices on Windows.
 
-        Use the registry to find information about USB devices that have been attached to the system, for example the
-        HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR registry key.
-
-        Yields UsbRegistryRecord with fields:
-            hostname (string): The target hostname
-            domain (string): The target domain
-            type (string): Type of USB device
-            serial (string): Serial number of USB storage device
-            vid (string): Vendor ID of USB storage device
-            pid (string): Product ID of the USB storage device
-            rev (string): Version of the USB storage device
-            containerid (string):
-            friendlyname (string): Display name of the USB storage device
-            first_insert (datetime): First insertion date of USB storage device
-            first_install (datetime): First instalation date of USB storage device
-            last_insert (datetime): Most recent insertion (arrival) date of USB storage device
-            last_removal (datetime): Most recent removal (unplug) date of USB storage device
-            info_origin (string): Location of info present in output
+        Uses the registry to find information about USB storage devices that have been attached to the system.
+        Also tries to find the past volume name and mount letters of the USB device and what user(s) interacted
+        with them using ``explorer.exe``.
         """
 
-        for k in self.target.registry.keys(self.USB_STOR):
-            info_origin = "\\".join((k.path, k.name))
-            usb_stor = k.subkeys()
+        for key in self.target.registry.keys(self.USB_STOR):
+            for usb_type in key.subkeys():
+                try:
+                    device_info = parse_device_name(usb_type.name)
+                except ValueError:
+                    self.target.log.warning("Unable to parse USB device name: %s", usb_type.name)
+                    device_info = {"type": None, "vendor": None, "product": None, "revision": None}
 
-            for usb_type in usb_stor:
-                device_info = self.parse_device_name(usb_type.name)
-                usb_devices = usb_type.subkeys()
-                for usb_device in usb_devices:
-                    properties = list(usb_device.subkeys())
+                for usb_device in usb_type.subkeys():
                     serial = usb_device.name
+                    friendly_name = None
+                    container_id = None
+                    timestamps = {
+                        "first_install": None,
+                        "first_insert": None,
+                        "last_insert": None,
+                        "last_removal": None,
+                    }
+
                     try:
-                        friendlyname = usb_device.value("FriendlyName").value
-                        # NOTE: make this more gracefull, windows 10 does not have the LogConf subkey
-                        timestamps = (
-                            self.unpack_timestamps(properties[2])
-                            if len(properties) == 3
-                            else self.unpack_timestamps(properties[1])
-                        )
-                        # ContainerIDs can be found back in USB and WdpBusEnumRoot
-                        containerid = usb_device.value("ContainerID").value
+                        friendly_name = usb_device.value("FriendlyName").value
                     except RegistryValueNotFoundError:
-                        friendlyname = None
-                        timestamps = {
-                            "first_install": None,
-                            "first_insert": None,
-                            "last_insert": None,
-                            "last_removal": None,
-                        }
-                        containerid = None
+                        self.target.log.warning("No FriendlyName for USB with serial: %s", serial)
+                        pass
+
+                    try:
+                        container_id = usb_device.value("ContainerID").value
+                    except RegistryValueNotFoundError:
+                        self.target.log.warning("No ContainerID for USB with serial: %s", serial)
+
+                    try:
+                        timestamps = unpack_timestamps(usb_device.subkey("Properties"))
+                    except RegistryValueNotFoundError as e:
+                        self.target.log.warning("Unable to parse USBSTOR registry properties for serial: %s", serial)
+                        self.target.log.debug("", exc_info=e)
+
+                    # We can check if any HKCU hive(s) are populated with the Volume GUID of the USB storage device.
+                    # If a user has interacted with the mounted volume using explorer.exe we will get a match.
+                    volumes = list(self.find_volumes(serial))
+                    mounts = list(self.find_mounts(serial))
+                    users = [
+                        u.user.name for u in self.find_users([m[10:] for m in mounts if m.startswith("\\??\\Volume{")])
+                    ]
 
                     yield UsbRegistryRecord(
-                        device_type=device_info["device_type"],
-                        friendlyname=friendlyname,
+                        friendly_name=friendly_name,
                         serial=serial,
-                        vid=None,
-                        pid=None,
-                        vendor=device_info["vendor"],
-                        product=device_info["product"],
-                        version=device_info["version"],
-                        containerid=containerid,
-                        first_install=timestamps["first_install"],
-                        first_insert=timestamps["first_insert"],
-                        last_insert=timestamps["last_insert"],  # AKA first arrival
-                        last_removal=timestamps["last_removal"],
-                        info_origin=info_origin,
+                        container_id=container_id,
+                        **device_info,
+                        **timestamps,
+                        volumes=volumes,
+                        mounts=mounts,
+                        users=users,
+                        source=self.USB_STOR,
                         _target=self.target,
                     )
+
+    def find_volumes(self, serial: str) -> Iterator[str]:
+        """Attempts to find mounted volume names for the given serial."""
+        serial = serial.lower()
+        try:
+            for device in self.target.registry.key(self.PORTABLE_DEVICES).subkeys():
+                if serial in device.name.lower():
+                    yield device.value("FriendlyName").value
+        except RegistryKeyNotFoundError:
+            pass
+
+    def find_mounts(self, serial: str) -> Iterator[str]:
+        """Attempts to find drive letters the given serial has been mounted on."""
+        serial = serial.lower()
+        try:
+            for mount in self.target.registry.key(self.MOUNT_LETTER_MAP).values():
+                try:
+                    if serial in mount.value.decode("utf-16-le").lower():
+                        yield mount.name.replace("\\DosDevices\\", "")
+                except UnicodeDecodeError:
+                    pass
+        except RegistryKeyNotFoundError:
+            pass
+
+    def find_users(self, volume_guids: list[str]) -> Iterator[str]:
+        """Attempt to find Windows users that have interacted with the given volume GUIDs."""
+
+        for volume_guid in volume_guids:
+            try:
+                for key in self.target.registry.key(self.USER_MOUNTS + "\\" + volume_guid):
+                    yield self.target.registry.get_user_details(key)
+            except RegistryKeyNotFoundError:
+                pass
+
+
+def unpack_timestamps(usb_reg_properties: VirtualKey) -> dict[str, int]:
+    """Unpack relevant Windows timestamps from the provided USB registry properties subkey.
+
+    Args:
+        usb_reg_properties: A registry object with USB properties.
+
+    Returns:
+        A dict containing parsed timestamps within passed registry object.
+    """
+
+    usb_reg_properties = usb_reg_properties.subkey("{83da6326-97a6-4088-9453-a1923f573b29}")
+    timestamps = {}
+
+    for device_property, usbstor_values in USB_DEVICE_PROPERTY_KEYS.items():
+        for usb_val in usbstor_values:
+            if usb_val in [x.name for x in usb_reg_properties.subkeys()]:
+                version_key = usb_reg_properties.subkey(usb_val)
+                if "00000000" in version_key.subkeys():
+                    data_value = version_key.subkey("00000000").value("Data").value
+                else:
+                    data_value = version_key.value("(Default)").value
+                timestamps[device_property] = wintimestamp(struct.unpack("<Q", data_value)[0])
+                break
+            else:
+                timestamps[device_property] = None
+    return timestamps
+
+
+def parse_device_name(device_name: str) -> dict[str, str]:
+    """Parse a registry device name into components."""
+
+    match = RE_DEVICE_NAME.match(device_name)
+    if not match:
+        raise ValueError(f"Unable to parse USB device name: {device_name}")
+
+    return match.groupdict()

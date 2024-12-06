@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import traceback
@@ -7,13 +9,12 @@ from typing import Callable
 class Error(Exception):
     """Generic dissect.target error"""
 
-    def __init__(self, message=None, cause=None, extra=None):
+    def __init__(self, message: str | None = None, extra: list[Exception] | None = None):
         if extra:
             exceptions = "\n\n".join(["".join(traceback.format_exception_only(type(e), e)) for e in extra])
             message = f"{message}\n\nAdditionally, the following exceptions occurred:\n\n{exceptions}"
 
         super().__init__(message)
-        self.__cause__ = cause
         self.__extra__ = extra
 
 
@@ -72,15 +73,15 @@ class PluginNotFoundError(PluginError):
     """Plugin cannot be found."""
 
 
-class FileNotFoundError(FilesystemError):
+class FileNotFoundError(FilesystemError, FileNotFoundError):
     """The requested path could not be found."""
 
 
-class IsADirectoryError(FilesystemError):
+class IsADirectoryError(FilesystemError, IsADirectoryError):
     """The entry is a directory."""
 
 
-class NotADirectoryError(FilesystemError):
+class NotADirectoryError(FilesystemError, NotADirectoryError):
     """The entry is not a directory."""
 
 
@@ -114,3 +115,7 @@ class RegistryCorruptError(RegistryError):
 
 class ConfigurationParsingError(Error):
     """An error occurred during configuration parsing."""
+
+
+class TargetPathNotFoundError(TargetError):
+    """The path to the target does not exist."""

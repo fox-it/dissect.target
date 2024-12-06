@@ -2,7 +2,7 @@ import zlib
 from io import BytesIO
 from typing import BinaryIO, Iterator
 
-from dissect.cstruct import Instance, cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -178,8 +178,7 @@ struct tstat {
 };
 """  # noqa: E501
 
-c_atop = cstruct()
-c_atop.load(atop_def)
+c_atop = cstruct().load(atop_def)
 c_atop.load(atop_tstat_def, align=True)
 
 AtopRecord = TargetRecordDescriptor(
@@ -226,7 +225,7 @@ class AtopFile:
         self.header = c_atop.rawheader(self.fh)
         self.version = self.version()
 
-    def __iter__(self) -> Iterator[Instance]:
+    def __iter__(self) -> Iterator[c_atop.tstat]:
         while True:
             try:
                 record = c_atop.rawrecord(self.fh)
@@ -248,6 +247,8 @@ class AtopFile:
 
 
 class AtopPlugin(Plugin):
+    """Unix atop plugin."""
+
     ATOP_GLOB = "atop_*"
     ATOP_MAGIC = 0xFEEDBEEF
     ATOP_PATH = "/var/log/atop"
@@ -270,6 +271,9 @@ class AtopPlugin(Plugin):
             - https://diablohorn.com/2022/11/17/parsing-atop-files-with-python-dissect-cstruct/
 
         Yields AtopRecord with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             process (string): The process name.
             cmdline (string): The command-line of the process.

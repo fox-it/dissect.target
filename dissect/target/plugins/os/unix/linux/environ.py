@@ -16,6 +16,8 @@ EnvironmentVariableRecord = TargetRecordDescriptor(
 
 
 class EnvironPlugin(Plugin):
+    """Linux volatile proc environment plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 
@@ -27,6 +29,9 @@ class EnvironPlugin(Plugin):
         the environ(7) variable directly), this plugin will not reflect those changes.
 
         Yields EnvironmentVariableRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The modification timestamp of the processes' environ file.

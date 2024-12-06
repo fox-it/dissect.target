@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import platform
-from io import BytesIO
-from typing import BinaryIO, Iterable
+from typing import BinaryIO, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.stream import RangeStream
@@ -13,7 +12,11 @@ from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
 
 try:
-    import zstandard  # noqa
+    from zstandard import (
+        DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE,
+        ZstdCompressionDict,
+        ZstdDecompressor,
+    )
 
     HAS_ZSTD = True
 except ImportError:
@@ -32,7 +35,7 @@ struct header {
     uint64_t filename_index_offset_bytes;
 
     /* Version 1 and up only. */
-    uint32_t max_version;
+    uint32_t max_version;   // Nominally 1 or 2, but can be increased if more features are added in a backward-compatible way.
     uint32_t zstd_dictionary_length_bytes;
     uint64_t zstd_dictionary_offset_bytes;
 
@@ -44,6 +47,7 @@ struct header {
     uint64_t conf_block_length_bytes;
     uint64_t conf_block_offset_bytes;
 
+    // Only if max_version >= 2.
     uint8_t check_visibility;
     char padding[7];                         /* padding for alignment */
 };
@@ -51,7 +55,7 @@ struct header {
 struct file {
     char path[];
 };
-"""
+"""  # noqa : E501
 
 PLocateRecord = TargetRecordDescriptor(
     "linux/locate/plocate",
@@ -61,8 +65,7 @@ PLocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_plocate = cstruct()
-c_plocate.load(plocate_def)
+c_plocate = cstruct().load(plocate_def)
 
 
 class PLocateFile:
@@ -104,40 +107,46 @@ class PLocateFile:
         self.dict_data = None
 
         if self.header.zstd_dictionary_offset_bytes:
-            self.dict_data = zstandard.ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
+            self.dict_data = ZstdCompressionDict(self.fh.read(self.header.zstd_dictionary_length_bytes))
 
         self.compressed_length_bytes = (
             self.header.filename_index_offset_bytes - self.HEADER_SIZE - self.header.zstd_dictionary_length_bytes
         )
-        self.ctx = zstandard.ZstdDecompressor(dict_data=self.dict_data)
+        self.ctx = ZstdDecompressor(dict_data=self.dict_data)
         self.buf = RangeStream(self.fh, self.fh.tell(), self.compressed_length_bytes)
 
-    def __iter__(self) -> Iterable[PLocateFile]:
+    def __iter__(self) -> Iterator[PLocateFile]:
         # NOTE: This is a workaround for a PyPy bug
         # We don't know what breaks, but PyPy + zstandard = unhappy times
         # You just get random garbage data back instead of the decompressed data
         # This weird dance of using a decompressobj and unused data is the only way that seems to work
         # It's more expensive on memory, but at least it doesn't break
         if platform.python_implementation() == "PyPy":
-            obj = self.ctx.decompressobj()
             buf = self.buf.read()
 
-            tmp = obj.decompress(buf)
-            while unused_data := obj.unused_data:
-                obj = self.ctx.decompressobj()
-                tmp += obj.decompress(unused_data)
+            def reader(ctx: ZstdDecompressor) -> Iterator[bytes]:
+                obj = ctx.decompressobj()
 
-            reader = BytesIO(tmp)
+                yield obj.decompress(buf)
+                while unused_data := obj.unused_data:
+                    obj = self.ctx.decompressobj()
+                    yield obj.decompress(unused_data)
+
+            it = reader(self.ctx)
         else:
-            reader = self.ctx.stream_reader(self.buf)
+            # NOTE: The end of a zstandard frame does not include a final `0x00`.
+            # This causes the c_plocate `file` struct to parse the last path and the first path on the next frame as one
+            # since cstruct will read it across frame boundaries waiting for a `0x00`.
+            def reader() -> Iterator[bytes]:
+                with self.ctx.stream_reader(self.buf) as reader:
+                    while chunk := reader.read(DECOMPRESSION_RECOMMENDED_OUTPUT_SIZE):
+                        yield chunk
 
-        with reader:
-            try:
-                while True:
-                    file = c_plocate.file(reader)
-                    yield file.path.decode(errors="surrogateescape")
-            except EOFError:
-                return
+            it = reader()
+
+        for chunk in it:
+            for path in chunk.split(b"\x00"):
+                yield path.decode(errors="surrogateescape")
 
     def filename_index(self) -> bytes:
         """Return the filename index of the plocate.db file."""
@@ -154,6 +163,8 @@ class PLocateFile:
 
 
 class PLocatePlugin(BaseLocatePlugin):
+    """Unix plocate plugin."""
+
     __namespace__ = "plocate"
 
     path = "/var/lib/plocate/plocate.db"
@@ -168,7 +179,7 @@ class PLocatePlugin(BaseLocatePlugin):
             )
 
     @export(record=PLocateRecord)
-    def locate(self) -> PLocateRecord:
+    def locate(self) -> Iterator[PLocateRecord]:
         """Yield file and directory names from the plocate.db.
 
         ``plocate`` is the default package on Ubuntu 22 and newer to locate files.

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Iterator
+
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
@@ -37,7 +41,7 @@ class RegfPlugin(Plugin):
             raise UnsupportedPluginError("Registry plugin not loaded")
 
     @export(record=[RegistryKeyRecord, RegistryValueRecord])
-    def regf(self):
+    def regf(self) -> Iterator[RegistryKeyRecord | RegistryValueRecord]:
         """Return all registry keys and values.
 
         The Windows Registry is a hierarchical database that stores low-level settings for the Windows operating system
@@ -49,6 +53,9 @@ class RegfPlugin(Plugin):
         Yields RegistryKeyRecords and RegistryValueRecords
 
         RegistryKeyRecord fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified time.
@@ -57,6 +64,9 @@ class RegfPlugin(Plugin):
             source (string): The hive file path.
 
         RegistryValueRecord fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The registry key last modified time.

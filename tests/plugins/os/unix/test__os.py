@@ -1,12 +1,14 @@
 import tempfile
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
+from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.os.unix._os import parse_fstab
+from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
 from dissect.target.target import Target
 
 FSTAB_CONTENT = """
@@ -44,7 +46,7 @@ LABEL=foo                                 /foo         auto    default          
 """  # noqa
 
 
-def test_parse_fstab(tmp_path):
+def test_parse_fstab(tmp_path: Path) -> None:
     with tempfile.NamedTemporaryFile(dir=tmp_path, delete=False) as tf:
         tf.write(FSTAB_CONTENT.encode("ascii"))
         tf.close()
@@ -71,6 +73,29 @@ def test_parse_fstab(tmp_path):
     }
 
 
+def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
+    mock_fs = Mock()
+    mock_vol = Mock()
+
+    mock_vol.name = "test-volume"
+
+    mock_fs.__type__ = "ext"
+    mock_fs.extfs.volume_name = "ext-volume"
+    mock_fs.volume = mock_vol
+    mock_fs.exists.return_value = False
+
+    for expected_volume_name in ["test-volume", "ext-volume"]:
+        with patch(
+            "dissect.target.plugins.os.unix._os.parse_fstab",
+            return_value=[(None, expected_volume_name, "/mnt", "auto", "default")],
+        ):
+            target = Target()
+            target.filesystems.add(mock_fs)
+            UnixPlugin.create(target, fs_unix)
+
+            assert target.fs.mounts["/mnt"] == mock_fs
+
+
 @pytest.mark.parametrize(
     "path, expected_hostname, expected_domain, file_content",
     [
@@ -89,7 +114,7 @@ def test_parse_fstab(tmp_path):
         ("/etc/sysconfig/network", None, None, ""),
     ],
 )
-def test__parse_hostname_string(
+def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
@@ -103,3 +128,39 @@ def test__parse_hostname_string(
 
     assert hostname_dict["hostname"] == expected_hostname
     assert hostname_dict["domain"] == expected_domain
+
+
+def test_users(target_unix_users: Target) -> None:
+    users = list(target_unix_users.users())
+
+    assert len(users) == 2
+
+    assert users[0].name == "root"
+    assert users[0].uid == 0
+    assert users[0].gid == 0
+    assert users[0].home == posix_path("/root")
+    assert users[0].shell == "/bin/bash"
+
+    assert users[1].name == "user"
+    assert users[1].uid == 1000
+    assert users[1].gid == 1000
+    assert users[1].home == posix_path("/home/user")
+    assert users[1].shell == "/bin/bash"
+
+
+@pytest.mark.parametrize(
+    "expected_arch, elf_buf",
+    [
+        # https://launchpad.net/ubuntu/+source/coreutils/9.4-3.1ubuntu1
+        ("x86_64-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
+        ("aarch64-unix", "7f454c460201010000000000000000000300b70001000000405e000000000000"),  # arm64
+        ("aarch32-unix", "7f454c4601010100000000000000000003002800010000001d40000034000000"),  # armhf
+        ("x86_32-unix", "7f454c460101010000000000000000000300030001000000e042000034000000"),  # i386
+        ("powerpc64-unix", "7f454c4602010100000000000000000003001500010000007470000000000000"),  # ppc64el
+        ("riscv64-unix", "7f454c460201010000000000000000000300f30001000000685a000000000000"),  # riscv64
+    ],
+)
+def test_architecture(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
+    """test if we correctly parse unix architecture."""
+    fs_unix.map_file_fh("/bin/ls", BytesIO(bytes.fromhex(elf_buf)))
+    assert target_unix.architecture == expected_arch

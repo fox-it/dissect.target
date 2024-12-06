@@ -1,6 +1,6 @@
-from typing import BinaryIO
+from typing import BinaryIO, Iterator
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
@@ -36,8 +36,7 @@ struct entry {
 };
 """
 
-c_lastlog = cstruct.cstruct()
-c_lastlog.load(lastlog_def)
+c_lastlog = cstruct().load(lastlog_def)
 
 
 class LastLogFile:
@@ -53,13 +52,15 @@ class LastLogFile:
 
 
 class LastLogPlugin(Plugin):
+    """Unix lastlog plugin."""
+
     def check_compatible(self) -> None:
         lastlog = self.target.fs.path("/var/log/lastlog")
         if not lastlog.exists():
             raise UnsupportedPluginError("No lastlog file found")
 
-    @export(record=[LastLogRecord])
-    def lastlog(self):
+    @export(record=LastLogRecord)
+    def lastlog(self) -> Iterator[LastLogRecord]:
         """Return last logins information from /var/log/lastlog.
 
         The lastlog file contains the most recent logins of all users on a Unix based operating system.

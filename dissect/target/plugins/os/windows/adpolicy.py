@@ -1,7 +1,8 @@
 from struct import unpack
+from typing import Iterator
 
 from defusedxml import ElementTree
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.regf.c_regf import (
     REG_BINARY,
     REG_DWORD,
@@ -18,14 +19,13 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_def = """
+policy_def = """
 struct registry_policy_header {
     uint32   signature;
     uint32   version;
 };
 """
-c_adpolicy = cstruct.cstruct()
-c_adpolicy.load(c_def)
+c_adpolicy = cstruct().load(policy_def)
 
 ADPolicyRecord = TargetRecordDescriptor(
     "windows/adpolicy",
@@ -70,7 +70,10 @@ class ADPolicyPlugin(Plugin):
                 xml = task_file.read_text()
                 tree = ElementTree.fromstring(xml)
                 for task in tree.findall(".//{*}Task"):
-                    properties = task.find("Properties") or task
+                    # https://github.com/python/cpython/issues/83122
+                    if (properties := task.find("Properties")) is None:
+                        properties = task
+
                     task_data = ElementTree.tostring(task)
                     yield ADPolicyRecord(
                         last_modification_time=task_file_stat.st_mtime,
@@ -88,7 +91,7 @@ class ADPolicyPlugin(Plugin):
                 self.target.log.warning("Unable to read XML policy file: %s", error)
 
     @export(record=ADPolicyRecord)
-    def adpolicy(self):
+    def adpolicy(self) -> Iterator[ADPolicyRecord]:
         """Return all AD policies (also known as GPOs or Group Policy Objects).
 
         An Active Directory (AD) maintains global policies that should be adhered by all systems in the domain.

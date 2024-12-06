@@ -1,6 +1,6 @@
 import binascii
 from datetime import datetime
-from enum import IntEnum, auto
+from enum import IntEnum
 from io import BytesIO
 from typing import Callable, Generator, Optional, Tuple, Union
 
@@ -21,7 +21,7 @@ ShimcacheRecord = TargetRecordDescriptor(
     ],
 )
 
-c_shimdef = """
+shim_def = """
 struct NT61_HEADER {
     uint32 magic;
     uint32 num_entries;
@@ -99,8 +99,7 @@ struct WIN10_ENTRY_DATA {
     uint64 ts;
 };
 """
-c_shim = cstruct()
-c_shim.load(c_shimdef)
+c_shim = cstruct().load(shim_def)
 
 MAGIC_NT61 = 0xBADC0FEE
 MAGIC_NT52 = 0xBADC0FFE
@@ -109,7 +108,7 @@ MAGIC_WIN10 = 0x73743031
 
 
 class SHIMCACHE_WIN_TYPE(IntEnum):
-    """Specific shimcache versions"""
+    """Shimcache version mapping."""
 
     VERSION_WIN10_CREATORS = 0x1001
     VERSION_WIN10 = 0x1000
@@ -117,7 +116,7 @@ class SHIMCACHE_WIN_TYPE(IntEnum):
     VERSION_NT61 = 0x0601
     VERSION_NT52 = 0x0502
 
-    VERSION_WIN81_NO_HEADER = auto()
+    VERSION_WIN81_NO_HEADER = 0x1002  # auto()
 
 
 def win_10_path(ed: Structure) -> str:
@@ -318,6 +317,9 @@ class ShimcachePlugin(Plugin):
             - https://www.andreafortuna.org/2017/10/16/amcache-and-shimcache-in-forensic-analysis/
 
         Yields ShimcacheRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             last_modified (datetime): The last modified date.

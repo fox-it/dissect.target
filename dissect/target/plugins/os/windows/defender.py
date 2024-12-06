@@ -1,15 +1,39 @@
+from __future__ import annotations
+
+import re
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, Iterable, Iterator, Union
+from typing import Any, BinaryIO, Iterable, Iterator, TextIO
 
 import dissect.util.ts as ts
-from dissect.cstruct import Structure, cstruct
+from dissect.cstruct import cstruct
 from flow.record import Record
 
 from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.plugins.os.windows.defender_helpers.defender_patterns import (
+    DEFENDER_MPLOG_BLOCK_PATTERNS,
+    DEFENDER_MPLOG_LINE,
+    DEFENDER_MPLOG_PATTERNS,
+)
+from dissect.target.plugins.os.windows.defender_helpers.defender_records import (
+    DefenderMPLogBMTelemetryRecord,
+    DefenderMPLogDetectionAddRecord,
+    DefenderMPLogDetectionEventRecord,
+    DefenderMPLogEMSRecord,
+    DefenderMPLogExclusionRecord,
+    DefenderMPLogLowfiRecord,
+    DefenderMPLogMinFilBlockedFileRecord,
+    DefenderMPLogMinFilUSSRecord,
+    DefenderMPLogOriginalFileNameRecord,
+    DefenderMPLogProcessImageRecord,
+    DefenderMPLogResourceScanRecord,
+    DefenderMPLogRTPRecord,
+    DefenderMPLogThreatActionRecord,
+    DefenderMPLogThreatRecord,
+)
 
 DEFENDER_EVTX_FIELDS = [
     ("datetime", "ts"),
@@ -73,6 +97,7 @@ DEFENDER_LOG_FILENAME_GLOB = "Microsoft-Windows-Windows Defender*"
 EVTX_PROVIDER_NAME = "Microsoft-Windows-Windows Defender"
 
 DEFENDER_QUARANTINE_DIR = "sysvol/programdata/microsoft/windows defender/quarantine"
+DEFENDER_MPLOG_DIR = "sysvol/programdata/microsoft/windows defender/support"
 DEFENDER_KNOWN_DETECTION_TYPES = [b"internalbehavior", b"regkey", b"runkey"]
 
 DEFENDER_EXCLUSION_KEY = "HKLM\\SOFTWARE\\Microsoft\\Windows Defender\\Exclusions"
@@ -237,8 +262,7 @@ struct QuarantineEntryResourceField {
 };
 """
 
-c_defender = cstruct()
-c_defender.load(defender_def)
+c_defender = cstruct().load(defender_def)
 
 STREAM_ID = c_defender.STREAM_ID
 STREAM_ATTRIBUTES = c_defender.STREAM_ATTRIBUTES
@@ -333,7 +357,7 @@ class QuarantineEntry:
         resource_info = c_defender.QuarantineEntrySection2(resource_buf)
 
         # List holding all quarantine entry resources that belong to this quarantine entry.
-        self.resources = []
+        self.resources: list[QuarantineEntryResource] = []
 
         for offset in resource_info.EntryOffsets:
             resource_buf.seek(offset)
@@ -369,7 +393,7 @@ class QuarantineEntryResource:
             # Move pointer
             offset += 4 + field.Size
 
-    def _add_field(self, field: Structure):
+    def _add_field(self, field: c_defender.QuarantineEntryResourceField) -> None:
         if field.Identifier == FIELD_IDENTIFIER.CQuaResDataID_File:
             self.resource_id = field.Data.hex().upper()
         elif field.Identifier == FIELD_IDENTIFIER.PhysicalPath:
@@ -381,7 +405,7 @@ class QuarantineEntryResource:
             self.last_access_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
         elif field.Identifier == FIELD_IDENTIFIER.LastWriteTime:
             self.last_write_time = ts.wintimestamp(int.from_bytes(field.Data, "little"))
-        elif field.Identifier not in FIELD_IDENTIFIER.values.values():
+        elif field.Identifier not in FIELD_IDENTIFIER:
             self.unknown_fields.append(field)
 
 
@@ -410,7 +434,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No Defender objects found")
 
     @plugin.export(record=DefenderLogRecord)
-    def evtx(self) -> Generator[Record, None, None]:
+    def evtx(self) -> Iterator[DefenderLogRecord]:
         """Parse Microsoft Defender evtx log files"""
 
         defender_evtx_field_names = [field_name for _, field_name in DEFENDER_EVTX_FIELDS]
@@ -434,7 +458,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
             yield DefenderLogRecord(**record_fields, _target=self.target)
 
     @plugin.export(record=[DefenderQuarantineRecord, DefenderFileQuarantineRecord])
-    def quarantine(self) -> Iterator[Union[DefenderQuarantineRecord, DefenderFileQuarantineRecord]]:
+    def quarantine(self) -> Iterator[DefenderQuarantineRecord | DefenderFileQuarantineRecord]:
         """Parse the quarantine folder of Microsoft Defender for quarantine entry resources.
 
         Quarantine entry resources contain metadata about detected threats that Microsoft Defender has placed in
@@ -493,7 +517,203 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                         regf_mtime=exclusion_type_subkey.timestamp,
                         type=exclusion_type,
                         value=exclusion_value,
+                        _target=self.target,
                     )
+
+    def _mplog_processimage(self, data: dict) -> Iterator[DefenderMPLogProcessImageRecord]:
+        yield DefenderMPLogProcessImageRecord(**data)
+
+    def _mplog_minfiluss(self, data: dict) -> Iterator[DefenderMPLogMinFilUSSRecord]:
+        yield DefenderMPLogMinFilUSSRecord(**data)
+
+    def _mplog_blockedfile(self, data: dict) -> Iterator[DefenderMPLogMinFilBlockedFileRecord]:
+        yield DefenderMPLogMinFilBlockedFileRecord(**data)
+
+    def _mplog_bmtelemetry(self, data: dict) -> Iterator[DefenderMPLogBMTelemetryRecord]:
+        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+        yield DefenderMPLogBMTelemetryRecord(**data)
+
+    def _mplog_ems(self, data: dict) -> Iterator[DefenderMPLogEMSRecord]:
+        yield DefenderMPLogEMSRecord(**data)
+
+    def _mplog_originalfilename(self, data: dict) -> Iterator[DefenderMPLogOriginalFileNameRecord]:
+        yield DefenderMPLogOriginalFileNameRecord(**data)
+
+    def _mplog_exclusion(self, data: dict) -> Iterator[DefenderMPLogExclusionRecord]:
+        yield DefenderMPLogExclusionRecord(**data)
+
+    def _mplog_lowfi(self, data: dict) -> Iterator[DefenderMPLogLowfiRecord]:
+        yield DefenderMPLogLowfiRecord(**data)
+
+    def _mplog_detectionadd(self, data: dict) -> Iterator[DefenderMPLogDetectionAddRecord]:
+        yield DefenderMPLogDetectionAddRecord(**data)
+
+    def _mplog_threat(self, data: dict) -> Iterator[DefenderMPLogThreatRecord]:
+        yield DefenderMPLogThreatRecord(**data)
+
+    def _mplog_resourcescan(self, data: dict) -> Iterator[DefenderMPLogResourceScanRecord]:
+        data["start_time"] = datetime.strptime(data["start_time"], "%m-%d-%Y %H:%M:%S")
+        data["end_time"] = datetime.strptime(data["end_time"], "%m-%d-%Y %H:%M:%S")
+        data["ts"] = data["start_time"]
+        rest = data.pop("rest")
+        yield DefenderMPLogResourceScanRecord(
+            threats=re.findall("Threat Name:([^\n]+)", rest),
+            resources=re.findall("Resource Path:([^\n]+)", rest),
+            **data,
+        )
+
+    def _mplog_threataction(self, data: dict) -> Iterator[DefenderMPLogThreatActionRecord]:
+        data["ts"] = datetime.strptime(data["ts"], "%m-%d-%Y %H:%M:%S")
+        rest = data.pop("rest")
+        yield DefenderMPLogThreatActionRecord(
+            threats=re.findall("Threat Name:([^\n]+)", rest),
+            resources=re.findall("(?:Path|File Name):([^\n]+)", rest),
+            actions=re.findall("Action:([^\n]+)", rest),
+            **data,
+        )
+
+    def _mplog_rtp_log(self, data: dict) -> Iterator[DefenderMPLogRTPRecord]:
+        times = {}
+        for dtkey in ["ts", "last_perf", "first_rtp_scan"]:
+            try:
+                times[dtkey] = datetime.strptime(data[dtkey], "%m-%d-%Y %H:%M:%S")
+            except ValueError:
+                pass
+
+        yield DefenderMPLogRTPRecord(
+            _target=self.target,
+            source_log=data["source_log"],
+            **times,
+            plugin_states=re.findall(r"^\s+(.*)$", data["plugin_states"])[0],
+            process_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["process_exclusions"]),
+            path_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["path_exclusions"]),
+            ext_exclusions=re.findall(DEFENDER_MPLOG_LINE, data["ext_exclusions"]),
+        )
+
+    def _mplog_detectionevent(self, data: dict) -> Iterator[DefenderMPLogDetectionEventRecord]:
+        yield DefenderMPLogDetectionEventRecord(**data)
+
+    def _mplog_line(
+        self, mplog_line: str, source: Path
+    ) -> Iterator[
+        DefenderMPLogProcessImageRecord
+        | DefenderMPLogMinFilUSSRecord
+        | DefenderMPLogMinFilBlockedFileRecord
+        | DefenderMPLogEMSRecord
+        | DefenderMPLogOriginalFileNameRecord
+        | DefenderMPLogExclusionRecord
+        | DefenderMPLogLowfiRecord
+        | DefenderMPLogDetectionAddRecord
+        | DefenderMPLogThreatRecord
+        | DefenderMPLogDetectionEventRecord
+    ]:
+        for pattern, record in DEFENDER_MPLOG_PATTERNS:
+            if match := pattern.match(mplog_line):
+                data = match.groupdict()
+                data["_target"] = self.target
+                data["source_log"] = source
+                yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
+
+    def _mplog_block(
+        self, mplog_line: str, mplog: TextIO, source: Path
+    ) -> Iterator[DefenderMPLogResourceScanRecord | DefenderMPLogThreatActionRecord | DefenderMPLogRTPRecord]:
+        block = ""
+        for prefix, suffix, pattern, record in DEFENDER_MPLOG_BLOCK_PATTERNS:
+            if prefix.search(mplog_line):
+                block += mplog_line
+                break
+        if block:
+            while mplog_line := mplog.readline():
+                block += mplog_line
+                if suffix.search(mplog_line):
+                    break
+            match = pattern.match(block)
+            if not match:
+                return
+
+            data = match.groupdict()
+            data["_target"] = self.target
+            data["source_log"] = source
+            yield from getattr(self, f"_mplog_{record.name.split('/')[-1:][0]}")(data)
+
+    def _mplog(
+        self, mplog: TextIO, source: Path
+    ) -> Iterator[
+        DefenderMPLogProcessImageRecord
+        | DefenderMPLogMinFilUSSRecord
+        | DefenderMPLogMinFilBlockedFileRecord
+        | DefenderMPLogBMTelemetryRecord
+        | DefenderMPLogEMSRecord
+        | DefenderMPLogOriginalFileNameRecord
+        | DefenderMPLogExclusionRecord
+        | DefenderMPLogLowfiRecord
+        | DefenderMPLogDetectionAddRecord
+        | DefenderMPLogThreatRecord
+        | DefenderMPLogDetectionEventRecord
+        | DefenderMPLogResourceScanRecord
+        | DefenderMPLogThreatActionRecord
+        | DefenderMPLogRTPRecord
+    ]:
+        while mplog_line := mplog.readline():
+            yield from self._mplog_line(mplog_line, source)
+            yield from self._mplog_block(mplog_line, mplog, source)
+
+    @plugin.export(
+        record=[
+            DefenderMPLogProcessImageRecord,
+            DefenderMPLogMinFilUSSRecord,
+            DefenderMPLogMinFilBlockedFileRecord,
+            DefenderMPLogBMTelemetryRecord,
+            DefenderMPLogEMSRecord,
+            DefenderMPLogOriginalFileNameRecord,
+            DefenderMPLogExclusionRecord,
+            DefenderMPLogLowfiRecord,
+            DefenderMPLogDetectionAddRecord,
+            DefenderMPLogThreatRecord,
+            DefenderMPLogDetectionEventRecord,
+            DefenderMPLogResourceScanRecord,
+            DefenderMPLogThreatActionRecord,
+            DefenderMPLogRTPRecord,
+        ]
+    )
+    def mplog(
+        self,
+    ) -> Iterator[
+        DefenderMPLogProcessImageRecord
+        | DefenderMPLogMinFilUSSRecord
+        | DefenderMPLogMinFilBlockedFileRecord
+        | DefenderMPLogBMTelemetryRecord
+        | DefenderMPLogEMSRecord
+        | DefenderMPLogOriginalFileNameRecord
+        | DefenderMPLogExclusionRecord
+        | DefenderMPLogLowfiRecord
+        | DefenderMPLogDetectionAddRecord
+        | DefenderMPLogThreatRecord
+        | DefenderMPLogDetectionEventRecord
+        | DefenderMPLogResourceScanRecord
+        | DefenderMPLogThreatActionRecord
+        | DefenderMPLogRTPRecord
+    ]:
+        """Return the contents of the Defender MPLog file.
+
+        References:
+            - https://www.crowdstrike.com/blog/how-to-use-microsoft-protection-logging-for-forensic-investigations/
+            - https://www.intrinsec.com/hunt-mplogs/
+            - https://github.com/Intrinsec/mplog_parser
+        """
+        mplog_directory = self.target.fs.path(DEFENDER_MPLOG_DIR)
+
+        if not (mplog_directory.exists() and mplog_directory.is_dir()):
+            return
+
+        for mplog_file in mplog_directory.glob("MPLog-*"):
+            for encoding in ["UTF-16", "UTF-8"]:
+                try:
+                    with mplog_file.open("rt", encoding=encoding) as mplog:
+                        yield from self._mplog(mplog, self.target.fs.path(mplog_file))
+                    break
+                except UnicodeError:
+                    continue
 
     @plugin.arg(
         "--output",
@@ -526,7 +746,7 @@ class MicrosoftDefenderPlugin(plugin.Plugin):
                     subdir = resource.resource_id[0:2]
                     resourcedata_location = resourcedata_directory.joinpath(subdir).joinpath(resource.resource_id)
                     if not resourcedata_location.exists():
-                        self.target.log.warning(f"Could not find a ResourceData file for {entry.resource_id}.")
+                        self.target.log.warning(f"Could not find a ResourceData file for {resource.resource_id}.")
                         continue
                     if not resourcedata_location.is_file():
                         self.target.log.warning(f"{resourcedata_location} is not a file!")

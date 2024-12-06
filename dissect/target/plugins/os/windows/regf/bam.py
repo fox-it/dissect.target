@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
@@ -5,13 +7,12 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_bamdef = """
+bam_def = """
     struct entry {
         uint64 ts;
     };
     """
-c_bam = cstruct()
-c_bam.load(c_bamdef)
+c_bam = cstruct().load(bam_def)
 
 BamDamRecord = TargetRecordDescriptor(
     "windows/registry/bam",
@@ -37,10 +38,13 @@ class BamDamPlugin(Plugin):
             raise UnsupportedPluginError("No bam or dam registry keys not found")
 
     @export(record=BamDamRecord)
-    def bam(self):
+    def bam(self) -> Iterator[BamDamRecord]:
         """Parse bam and dam registry keys.
 
         Yields BamDamRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.

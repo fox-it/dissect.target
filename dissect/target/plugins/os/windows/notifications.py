@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import datetime
-from typing import Iterator, Optional
+from typing import Iterator
 from uuid import UUID
 
 from dissect.cstruct import cstruct
@@ -91,8 +93,7 @@ typedef struct {
 } Chunk;                               // size: 0x23810
 """
 
-c_appdb = cstruct(endian="<")
-c_appdb.load(appdb_def)
+c_appdb = cstruct(endian="<").load(appdb_def)
 
 APPDB_MAGIC = b"DNPW"
 NUM_APPDB_CHUNKS = 256
@@ -254,7 +255,7 @@ class NotificationsPlugin(Plugin):
         chunk: c_appdb.Chunk,
         chunk_num: int,
         user: WindowsUserRecord,
-    ) -> Optional[AppDBPushRecord]:
+    ) -> AppDBPushRecord | None:
         badge_record = None
         push_uri = chunk.Push.Uri.split(b"\x00")[0]
         push_uri = push_uri.decode("utf-8", errors="surrogateescape")
@@ -283,7 +284,7 @@ class NotificationsPlugin(Plugin):
         chunk: c_appdb.Chunk,
         chunk_num: int,
         user: WindowsUserRecord,
-    ) -> Optional[AppDBBadgeRecord]:
+    ) -> AppDBBadgeRecord | None:
         badge_record = None
         badge_id = chunk.Badge.Id
 
@@ -433,7 +434,7 @@ class NotificationsPlugin(Plugin):
                         yield toast_record
 
     @export(record=[WpnDatabaseNotificationRecord, WpnDatabaseNotificationHandlerRecord])
-    def wpndatabase(self):
+    def wpndatabase(self) -> Iterator[WpnDatabaseNotificationRecord | WpnDatabaseNotificationHandlerRecord]:
         """Returns Windows Notifications from wpndatabase.db (post Windows 10 Anniversary).
 
         References:
@@ -441,43 +442,45 @@ class NotificationsPlugin(Plugin):
         """
         for user, wpndatabase in self.wpndb_files:
             db = sqlite3.SQLite3(wpndatabase.open())
-
             handlers = {}
-            for row in db.table("NotificationHandler").rows():
-                handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
-                    created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S"),
-                    modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"),
-                    id=row["[RecordId]"],
-                    primary_id=row["[PrimaryId]"],
-                    wns_id=row["[WNSId]"],
-                    handler_type=row["[HandlerType]"],
-                    wnf_event_name=row["[WNFEventName]"],
-                    system_data_property_set=row["[SystemDataPropertySet]"],
-                    _target=self.target,
-                    _user=user,
-                )
 
-            for row in db.table("Notification").rows():
-                record = WpnDatabaseNotificationRecord(
-                    arrival_time=wintimestamp(row["[ArrivalTime]"]),
-                    expiry_time=wintimestamp(row["[ExpiryTime]"]),
-                    order=row["[Order]"],
-                    id=row["[Id]"],
-                    handler_id=row["[HandlerId]"],
-                    activity_id=UUID(bytes=row["[ActivityId]"]),
-                    type=row["[Type]"],
-                    payload=row["[Payload]"],
-                    payload_type=row["[PayloadType]"],
-                    tag=row["[Tag]"],
-                    group=row["[Group]"],
-                    boot_id=row["[BootId]"],
-                    expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
-                    _target=self.target,
-                    _user=user,
-                )
-                handler = handlers.get(row["[HandlerId]"])
+            if table := db.table("NotificationHandler"):
+                for row in table.rows():
+                    handlers[row["[RecordId]"]] = WpnDatabaseNotificationHandlerRecord(
+                        created_time=datetime.datetime.strptime(row["[CreatedTime]"], "%Y-%m-%d %H:%M:%S"),
+                        modified_time=datetime.datetime.strptime(row["[ModifiedTime]"], "%Y-%m-%d %H:%M:%S"),
+                        id=row["[RecordId]"],
+                        primary_id=row["[PrimaryId]"],
+                        wns_id=row["[WNSId]"],
+                        handler_type=row["[HandlerType]"],
+                        wnf_event_name=row["[WNFEventName]"],
+                        system_data_property_set=row["[SystemDataPropertySet]"],
+                        _target=self.target,
+                        _user=user,
+                    )
 
-                if handler:
-                    yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
-                else:
-                    yield record
+            if table := db.table("Notification"):
+                for row in table.rows():
+                    record = WpnDatabaseNotificationRecord(
+                        arrival_time=wintimestamp(row["[ArrivalTime]"]),
+                        expiry_time=wintimestamp(row["[ExpiryTime]"]),
+                        order=row["[Order]"],
+                        id=row["[Id]"],
+                        handler_id=row["[HandlerId]"],
+                        activity_id=UUID(bytes=row["[ActivityId]"]),
+                        type=row["[Type]"],
+                        payload=row["[Payload]"],
+                        payload_type=row["[PayloadType]"],
+                        tag=row["[Tag]"],
+                        group=row["[Group]"],
+                        boot_id=row["[BootId]"],
+                        expires_on_reboot=row["[ExpiresOnReboot]"] != "FALSE",
+                        _target=self.target,
+                        _user=user,
+                    )
+                    handler = handlers.get(row["[HandlerId]"])
+
+                    if handler:
+                        yield GroupedRecord("windows/notification/wpndatabase/grouped", [record, handler])
+                    else:
+                        yield record

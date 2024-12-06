@@ -79,11 +79,12 @@ class ChromiumMixin:
         users_dirs: list[tuple] = []
         for user_details in self.target.user_details.all_with_home():
             for d in hist_paths:
-                cur_dir: TargetPath = user_details.home_path.joinpath(d)
-                cur_dir = cur_dir.resolve()
-                if not cur_dir.exists() or (user_details, cur_dir) in users_dirs:
-                    continue
-                users_dirs.append((user_details, cur_dir))
+                home_dir: TargetPath = user_details.home_path
+                for cur_dir in home_dir.glob(d):
+                    cur_dir = cur_dir.resolve()
+                    if not cur_dir.exists() or (user_details.user, cur_dir) in users_dirs:
+                        continue
+                    users_dirs.append((user_details, cur_dir))
         return users_dirs
 
     def _iter_db(
@@ -148,6 +149,9 @@ class ChromiumMixin:
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts (datetime): Visit timestamp.
                 browser (string): The browser from which the records are generated from.
@@ -209,6 +213,9 @@ class ChromiumMixin:
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts_created (datetime): Cookie created timestamp.
                 ts_last_accessed (datetime): Cookie last accessed timestamp.
@@ -272,6 +279,7 @@ class ChromiumMixin:
                         is_http_only=bool(cookie.is_httponly),
                         same_site=bool(cookie.samesite),
                         source=db_file,
+                        _target=self.target,
                         _user=user.user,
                     )
             except SQLError as e:
@@ -284,6 +292,9 @@ class ChromiumMixin:
             browser_name: The name of the browser as a string.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts_start (datetime): Download start timestamp.
                 ts_end (datetime): Download end timestamp.
@@ -344,6 +355,9 @@ class ChromiumMixin:
             browser_name (str): Name of the browser to scan for extensions.
 
         Yields:
+
+        .. code-block:: text
+
             Records with the following fields:
                 ts_install (datetime): Extension install timestamp.
                 ts_update (datetime): Extension update timestamp.
@@ -594,6 +608,15 @@ def remove_padding(decrypted: bytes) -> bytes:
 
 
 def decrypt_v10(encrypted_password: bytes) -> str:
+    """Decrypt a version 10 encrypted password.
+
+    Args:
+        encrypted_password: The encrypted password bytes.
+
+    Returns:
+        Decrypted password string.
+    """
+
     if not HAS_CRYPTO:
         raise ValueError("Missing pycryptodome dependency for AES operation")
 
@@ -611,12 +634,24 @@ def decrypt_v10(encrypted_password: bytes) -> str:
 
 
 def decrypt_v10_2(encrypted_password: bytes, key: bytes) -> str:
-    """
-    struct chrome_pass {
-        byte signature[3] = 'v10';
-        byte iv[12];
-        byte ciphertext[EOF];
-    }
+    """Decrypt a version 10 type 2 password.
+
+    References:
+
+        .. code-block::
+
+            struct chrome_pass {
+                byte signature[3] = 'v10';
+                byte iv[12];
+                byte ciphertext[EOF];
+            }
+
+    Args:
+        encrypted_password: The encrypted password bytes.
+        key: The encryption key.
+
+    Returns:
+        Decrypted password string.
     """
 
     if not HAS_CRYPTO:

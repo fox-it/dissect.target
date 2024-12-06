@@ -1,6 +1,7 @@
 import codecs
+from typing import Iterator
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
@@ -14,13 +15,13 @@ from dissect.target.plugin import Plugin, export
 
 userassist_def = """
 struct VERSION5_ENTRY {
-    char padding[4];
+    char padding0[4];
     uint32 number_of_executions;
     uint32 application_focus_count;
     uint32 application_focus_duration;
-    char padding[44];
+    char padding1[44];
     uint64 timestamp;
-    char padding[4];
+    char padding2[4];
 };
 
 struct VERSION3_ENTRY {
@@ -29,8 +30,7 @@ struct VERSION3_ENTRY {
     uint64  timestamp;
 };
 """
-c_userassist = cstruct.cstruct()
-c_userassist.load(userassist_def)
+c_userassist = cstruct().load(userassist_def)
 
 UserAssistRecordDescriptor = create_extended_descriptor(
     [
@@ -61,7 +61,7 @@ class UserAssistPlugin(Plugin):
             raise UnsupportedPluginError("No UserAssist key found")
 
     @export(record=UserAssistRecord)
-    def userassist(self):
+    def userassist(self) -> Iterator[UserAssistRecord]:
         """Return the UserAssist information for each user.
 
         The UserAssist registry keys contain information about programs that were recently executed on the system.
@@ -72,6 +72,9 @@ class UserAssistPlugin(Plugin):
             - https://www.aldeid.com/wiki/Windows-userassist-keys
 
         Yields UserAssistRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The entry timestamp.

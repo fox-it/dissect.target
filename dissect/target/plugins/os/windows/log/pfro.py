@@ -1,5 +1,6 @@
 import datetime
 import re
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -29,7 +30,7 @@ class PfroPlugin(Plugin):
             raise UnsupportedPluginError("No PFRO log found")
 
     @export(record=PfroRecord)
-    def pfro(self):
+    def pfro(self) -> Iterator[PfroRecord]:
         """Return the content of sysvol/Windows/PFRO.log
 
         A Pending File Rename Operation log file (PFRO.log) holds information about the process of deleting or renaming
@@ -41,6 +42,9 @@ class PfroPlugin(Plugin):
             - https://community.ccleaner.com/topic/49106-pending-file-rename-operations-log/
 
         Yields PfroRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The parsed timestamp.

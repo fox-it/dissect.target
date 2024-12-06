@@ -1,19 +1,30 @@
+from __future__ import annotations
+
 import textwrap
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import pytest
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.configutil import (
+    Bin,
     ConfigurationParser,
+    CSVish,
     Default,
+    Env,
     Indentation,
     Json,
     ScopeManager,
     SystemD,
+    parse,
 )
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target import Target
+    from dissect.target.filesystem import VirtualFilesystem
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs) -> dict:
@@ -258,3 +269,96 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
     parser.parse_file(StringIO(data_string))
 
     assert parser.parsed_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "data, expected_data",
+    [
+        (b"\x00\x01\x02", {"binary": b"\x00\x01\x02", "size": "3"}),
+    ],
+)
+def test_bin_parser(data: bytes, expected_data: dict) -> None:
+    parser = Bin()
+    parser.parse_file(BytesIO(data))
+    assert parser.parsed_data == expected_data
+
+
+@pytest.mark.parametrize(
+    "fields, separator, comment, data_string, expected_data",
+    [
+        (["a", "b"], (r"\s+",), ("#",), "1 2", {"0": {"a": "1", "b": "2"}}),  # SSV
+        (["a", "b"], (r"\s+",), ("#",), "1 2\n3 4", {"0": {"a": "1", "b": "2"}, "1": {"a": "3", "b": "4"}}),  # SSV-2
+        (["a", "b"], (r"\s+",), ("#",), "1\t2", {"0": {"a": "1", "b": "2"}}),  # TSV
+        (["a", "b"], (r",",), ("#",), "1,2", {"0": {"a": "1", "b": "2"}}),  # CSV
+        (["a", "b"], (r"\|",), ("#",), "1|2", {"0": {"a": "1", "b": "2"}}),  # DSV
+        (["a", "b"], (r"\|",), ("#",), "#9|9\n1|2", {"0": {"a": "1", "b": "2"}}),  # comments
+        (["a", "b"], (r"\s+",), ("#",), "#9 9\n1 2 3", {"0": {"a": "1", "b": "2 3"}}),  # trailing column
+        (["a", "b"], (r"\s+",), ("#",), "x", {"0": {"line": "x"}}),  # unparsed
+    ],
+)
+def test_csv_syntax(fields, separator, comment, data_string: str, expected_data: dict) -> None:
+    parser = CSVish(fields=fields, separator=separator, comment_prefixes=comment)
+    parser.parse_file(StringIO(data_string))
+    assert parser.parsed_data == expected_data
+
+
+def test_parse(target_linux: Target, fs_linux: VirtualFilesystem, tmp_path: Path) -> None:
+    # File does not exist on the system in the first place
+    with pytest.raises(FileNotFoundError):
+        parse(target_linux.fs.path("/path/to/file"))
+
+    file_path = tmp_path.joinpath("path/to/file")
+    file_path.parent.mkdir(parents=True)
+    file_path.touch()
+
+    fs_linux.map_dir("/", tmp_path.absolute())
+
+    # Trying to read a directory
+    with pytest.raises(FileNotFoundError):
+        parse(target_linux.fs.path("/path/to"))
+
+    parse(target_linux.fs.path("/path/to/file"))
+
+
+@pytest.mark.parametrize(
+    "input,expected_output",
+    [
+        ("", {}),
+        ("foo=bar\n", {"foo": "bar"}),
+        ("foo = bar \n", {"foo": "bar"}),
+        ('foo = "bar"\n', {"foo": "bar"}),
+        ("foo=bar\nempty=\nhello=world\n", {"foo": "bar", "empty": "", "hello": "world"}),
+        # multiple delimiters
+        ("foo=option=foo,value=bar", {"foo": "option=foo,value=bar"}),
+        # types
+        ("foo=123", {"foo": 123}),
+        ("foo=1", {"foo": True}),
+        ("foo=0", {"foo": False}),
+        ("foo='1'", {"foo": True}),
+        ("foo=true", {"foo": True}),
+        ('foo="False"\nbar="true"\n', {"bar": True, "foo": False}),
+        # comments
+        ("foo=bar#\n", {"foo": "bar#"}),
+        ('foo="bar#"\n', {"foo": "bar#"}),
+        ("foo='bar#'\n", {"foo": "bar#"}),
+        ("foo=bar # comment\n", {"foo": "bar"}),
+        ("foo='bar' # comment\n", {"foo": "bar"}),
+        ("foo='bar #' # comment\n", {"foo": "bar #"}),
+        ("foo=bar# not a comment\n", {"foo": "bar# not a comment"}),
+        ("foo='bar # not a comment'\n", {"foo": "bar # not a comment"}),
+        (Path(absolute_path("_data/helpers/configutil/env")), {"foo": "'bar"}),
+        # whitespaces inside quotes
+        ("foo='bar '\n", {"foo": "bar "}),
+        # quotes inside values
+        ('foo=ba"r\n', {"foo": 'ba"r'}),
+    ],
+)
+def test_env_parser(input: str | Path, expected_output: dict) -> None:
+    parser = Env(comments=False)
+
+    if isinstance(input, str):
+        parser.parse_file(StringIO(input))
+    else:
+        parser.parse_file(input.open("r"))
+
+    assert parser.parsed_data == expected_output

@@ -14,10 +14,12 @@ from dissect.target.exceptions import (
     PluginError,
     PluginNotFoundError,
     TargetError,
+    TargetPathNotFoundError,
     UnsupportedPluginError,
     VolumeSystemError,
 )
 from dissect.target.helpers import config
+from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
@@ -85,10 +87,16 @@ class Target:
         self._errors = []
         self._applied = False
 
+        # We do not want to look for config files at the Target path if it is actually a child Target.
+        config_paths = [Path.cwd(), Path.home()]
+        if not isinstance(path, TargetPath):
+            config_paths = [self.path] + config_paths
+
         try:
-            self._config = config.load(self.path)
+            self._config = config.load(config_paths)
         except Exception as e:
-            self.log.debug("Error loading config file", exc_info=e)
+            self.log.warning("Error loading config file: %s", self.path)
+            self.log.debug("", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
         # Fill the disks and/or volumes and/or filesystems and apply() will
@@ -228,7 +236,7 @@ class Target:
             try:
                 loader_instance = loader_cls(path, parsed_path=parsed_path)
             except Exception as e:
-                raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {path}: {e}", cause=e)
+                raise TargetError(f"Failed to initiate {loader_cls.__name__} for target {path}: {e}") from e
             return cls._load(path, loader_instance)
         return cls.open_raw(path)
 
@@ -284,7 +292,11 @@ class Target:
                     try:
                         ldr = loader_cls(sub_entry, parsed_path=parsed_path)
                     except Exception as e:
-                        getlogger(sub_entry).error("Failed to initiate loader: %s", e)
+                        message = "Failed to initiate loader: %s"
+                        if isinstance(e, TargetPathNotFoundError):
+                            message = "%s"
+
+                        getlogger(sub_entry).error(message, e)
                         getlogger(sub_entry).debug("", exc_info=e)
                         continue
 
@@ -339,7 +351,7 @@ class Target:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
-                self.log.info("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
             except Exception:
                 self.log.exception(
                     "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
@@ -416,7 +428,7 @@ class Target:
             target.apply()
             return target
         except Exception as e:
-            raise TargetError(f"Failed to load target: {path}", cause=e)
+            raise TargetError(f"Failed to load target: {path}") from e
 
     def _init_os(self) -> None:
         """Internal function that attemps to load an OSPlugin for this target."""
@@ -529,7 +541,7 @@ class Target:
             except PluginError:
                 raise
             except Exception as e:
-                raise PluginError(f"An exception occurred while trying to initialize a plugin: {plugin_cls}", cause=e)
+                raise PluginError(f"An exception occurred while trying to initialize a plugin: {plugin_cls}") from e
         else:
             p = plugin_cls
 
@@ -544,8 +556,8 @@ class Target:
                 raise
             except Exception as e:
                 raise UnsupportedPluginError(
-                    f"An exception occurred while checking for plugin compatibility: {plugin_cls}", cause=e
-                )
+                    f"An exception occurred while checking for plugin compatibility: {plugin_cls}"
+                ) from e
 
         self._register_plugin_functions(p)
 
@@ -602,9 +614,8 @@ class Target:
                     # Just take the last known cause for now
                     raise UnsupportedPluginError(
                         f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
-                        cause=causes[0] if causes else None,
                         extra=causes[1:] if len(causes) > 1 else None,
-                    )
+                    ) from causes[0] if causes else None
 
         # We still ended up with no compatible plugins
         if function not in self._functions:

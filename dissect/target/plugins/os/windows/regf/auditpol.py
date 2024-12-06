@@ -1,14 +1,13 @@
 import io
+from typing import Iterator
 
-from dissect import cstruct
+from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-c_adtev = cstruct.cstruct()
-c_adtev.load(
-    """
+adtev_def = """
 struct header {
     uint16  unk0;
     uint16  unk1;
@@ -18,7 +17,8 @@ struct header {
     uint16  unk3;
 };
 """
-)
+
+c_adtev = cstruct().load(adtev_def)
 
 POLICY_CATEGORIES = [
     "System",
@@ -139,7 +139,7 @@ class AuditpolPlugin(Plugin):
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 
     @export(record=AuditPolicyRecord)
-    def auditpol(self):
+    def auditpol(self) -> Iterator[AuditPolicyRecord]:
         """Return audit policy settings from the registry.
 
         For Windows, the audit policy settings are stored in the HKEY_LOCAL_MACHINE\\Security\\Policy\\PolAdtEv registry

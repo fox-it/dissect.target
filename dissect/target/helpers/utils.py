@@ -1,16 +1,46 @@
+from __future__ import annotations
+
 import logging
 import re
 import urllib.parse
 from datetime import datetime, timezone, tzinfo
 from enum import Enum
 from pathlib import Path
-from typing import BinaryIO, Callable, Iterator, Optional, Union
+from typing import BinaryIO, Callable, Iterator, Optional, TypeVar, Union
 
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers import fsutil
 
 log = logging.getLogger(__name__)
+
+
+def findall(buf: bytes, needle: bytes) -> Iterator[int]:
+    offset = 0
+    while True:
+        offset = buf.find(needle, offset)
+        if offset == -1:
+            break
+
+        yield offset
+        offset += 1
+
+
+T = TypeVar("T")
+
+
+def to_list(value: T | list[T]) -> list[T]:
+    """Convert a single value or a list of values to a list.
+
+    Args:
+        value: The value to convert.
+
+    Returns:
+        A list of values.
+    """
+    if not isinstance(value, list):
+        return [value]
+    return value
 
 
 class StrEnum(str, Enum):

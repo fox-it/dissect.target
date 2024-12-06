@@ -1,16 +1,19 @@
+from __future__ import annotations
+
 import argparse
+import pathlib
 import platform
 import sys
 from io import BytesIO, StringIO
 from pathlib import Path
-from unittest.mock import MagicMock
+from typing import Callable, Iterator
+from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
-from dissect.target.exceptions import FileNotFoundError
-from dissect.target.filesystem import FilesystemEntry
-from dissect.target.helpers.fsutil import TargetPath, normalize, stat_result
-from dissect.target.tools import shell
+from dissect.target.helpers.fsutil import TargetPath, normalize
+from dissect.target.target import Target
+from dissect.target.tools import fsutils
 from dissect.target.tools.shell import (
     TargetCli,
     TargetHubCli,
@@ -32,7 +35,7 @@ INPUT_STREAM = f"""
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe():
+def test_build_pipe() -> None:
     pipeparts = [
         "grep",
         "test2",
@@ -49,7 +52,7 @@ def test_build_pipe():
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe_nonexisting_command():
+def test_build_pipe_nonexisting_command() -> None:
     dummy_command = "non-existing-command"
     pipeparts = ["grep", "test1", "|", dummy_command]
     input_stream = "input data test1"
@@ -64,7 +67,7 @@ def test_build_pipe_nonexisting_command():
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_build_pipe_broken_pipe():
+def test_build_pipe_broken_pipe() -> None:
     # `ls` command does not accept stdin, so pipe closes prematurely
     pipeparts = ["grep", "test1", "|", "ls"]
     input_stream = "input data test1"
@@ -78,7 +81,7 @@ def test_build_pipe_broken_pipe():
         print(input_stream, file=pipe_stdin)
 
 
-def test_targethubcli_autocomplete_enter(make_mock_targets):
+def test_targethubcli_autocomplete_enter(make_mock_targets: Callable) -> None:
     target1, target2 = make_mock_targets(2)
 
     target1.hostname = "dev-null-1.localhost"
@@ -101,28 +104,66 @@ def test_targethubcli_autocomplete_enter(make_mock_targets):
     assert suggestions == ["1"]
 
 
-def test_targetcli_autocomplete(target_bare):
+def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
     target_cli = TargetCli(target_bare)
 
-    base_path = "/base-path/"
-    subpath_match = "subpath1"
+    mock_subfolder = MagicMock(spec_set=TargetPath)
+    mock_subfolder.is_dir.return_value = True
+    mock_subfile = MagicMock(spec_set=TargetPath)
+    mock_subfile.is_dir.return_value = False
+
+    base_path = "/base-path"
+
+    subfolder_name = "subfolder"
+    subfile_name = "subfile"
     subpath_mismatch = "mismatch"
 
-    def dummy_scandir(path):
-        assert path == base_path
+    def dummy_scandir(path: TargetPath):
+        assert str(path) == base_path
         return [
-            (None, subpath_match),
+            (mock_subfolder, subfolder_name),
+            (mock_subfile, subfile_name),
             (None, subpath_mismatch),
         ]
 
-    target_cli.scandir = dummy_scandir
+    monkeypatch.setattr("dissect.target.tools.shell.ls_scandir", dummy_scandir)
+    suggestions = target_cli.completedefault("sub", f"ls {base_path}/sub", 3 + len(base_path), 3 + len(base_path) + 3)
 
-    suggestions = target_cli.completedefault("sub", f"ls {base_path}sub", 3 + len(base_path), 3 + len(base_path) + 3)
-    assert suggestions == [subpath_match]
+    # We expect folder suggestions to be trailed with a '/'
+    assert suggestions == [f"{subfolder_name}/", subfile_name]
+
+
+@pytest.fixture
+def targetrc_file() -> Iterator[list[str]]:
+    content = """
+    ls
+        # This is a comment line and should be ignored
+    ll
+    """
+
+    original_open = pathlib.Path.open
+
+    def custom_open(self: Path, *args, **kwargs):
+        if self.name.endswith(".targetrc"):
+            return mock_open(read_data=content)()
+        return original_open(self, *args, **kwargs)
+
+    with patch("pathlib.Path.open", custom_open):
+        yield ["ls", "ll"]
+
+
+def test_targetcli_targetrc(target_bare: Target, targetrc_file: list[str]) -> None:
+    with patch.object(TargetCli, "onecmd", autospec=True) as mock_onecmd:
+        cli = TargetCli(target_bare)
+
+        cli.preloop()
+
+        expected_calls = [call(cli, cmd) for cmd in targetrc_file]
+        mock_onecmd.assert_has_calls(expected_calls, any_order=False)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_pipe_symbol_parsing(capfd, target_bare):
+def test_pipe_symbol_parsing(capfd: pytest.CaptureFixture, target_bare: Target) -> None:
     cli = TargetCli(target_bare)
 
     def mock_func(func_args, func_stdout):
@@ -146,14 +187,12 @@ def test_pipe_symbol_parsing(capfd, target_bare):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
-def test_exec_target_command(capfd, target_default):
+def test_exec_target_command(capfd: pytest.CaptureFixture, target_default: Target) -> None:
     cli = TargetCli(target_default)
-    command = "users"
     # `users` from the general OSPlugin does not ouput any records, but as the
     # ouput is piped to, the records are transformed to a binary record stream,
     # so we pipe it through rdump to get a correct count of 0 from wc.
-    command_args_str = "| rdump | wc -l"
-    cli._exec_target(command, command_args_str)
+    cli.default("users | rdump | wc -l")
 
     sys.stdout.flush()
     sys.stderr.flush()
@@ -163,63 +202,15 @@ def test_exec_target_command(capfd, target_default):
     assert captured.out.endswith("0\n")
 
 
-def test_target_cli_ls(target_win, capsys, monkeypatch):
+def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     # disable colorful output in `target-shell`
-    monkeypatch.setattr(shell, "LS_COLORS", {})
+    monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = TargetCli(target_win)
     cli.onecmd("ls")
 
     captured = capsys.readouterr()
     assert captured.out == "\n".join(["c:", "sysvol"]) + "\n"
-
-
-def test_target_cli_print_extensive_file_stat(target_win, capsys):
-    mock_stat = stat_result([0o1777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
-    mock_entry = MagicMock(spec_set=FilesystemEntry)
-    mock_entry.lstat.return_value = mock_stat
-    mock_entry.is_symlink.return_value = False
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.return_value = mock_entry
-
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
-
-    captured = capsys.readouterr()
-    assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo\n"
-
-
-def test_target_cli_print_extensive_file_stat_symlink(target_win, capsys):
-    mock_stat = stat_result([0o1777, 1, 2, 3, 1337, 7331, 999, 0, 0, 0])
-    mock_entry = MagicMock(spec_set=FilesystemEntry)
-    mock_entry.lstat.return_value = mock_stat
-    mock_entry.is_symlink.return_value = True
-    mock_entry.readlink.return_value = "bar"
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.return_value = mock_entry
-
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
-
-    captured = capsys.readouterr()
-    assert captured.out == "-rwxrwxrwx 1337 7331    999 1970-01-01T00:00:00 foo -> bar\n"
-
-
-def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
-    mock_path = MagicMock(spec_set=TargetPath)
-    mock_path.get.side_effect = FileNotFoundError("ERROR")
-
-    mock_args = MagicMock()
-
-    cli = TargetCli(target_win)
-    cli.print_extensive_file_stat(mock_args, sys.stdout, mock_path, "foo")
-
-    captured = capsys.readouterr()
-    assert captured.out == "??????????    ?    ?      ? ????-??-??T??:??:??.?????? foo\n"
 
 
 @pytest.mark.parametrize(
@@ -238,7 +229,9 @@ def test_target_cli_print_extensive_file_stat_fail(target_win, capsys):
         ),
     ],
 )
-def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
+def test_target_cli_save(
+    target_win: Target, tmp_path: Path, folders: str, files: str, save: str, expected: str
+) -> None:
     output_dir = tmp_path / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -260,6 +253,17 @@ def test_target_cli_save(target_win, tmp_path, folders, files, save, expected):
     assert tree == expected
 
 
+def run_target_shell(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
+) -> tuple[bytes, bytes]:
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),
+        m.setattr("sys.stdin", StringIO(stdin))
+        m.setenv("NO_COLOR", "1")
+        target_shell()
+        return capsys.readouterr()
+
+
 @pytest.mark.parametrize(
     "provided_input, expected_output",
     [
@@ -277,13 +281,79 @@ def test_target_cli_unicode_argparse(
     provided_input: str,
     expected_output: str,
 ) -> None:
-    with monkeypatch.context() as m:
-        target_file = absolute_path("_data/tools/shell/unicode.tar")
-        m.setattr("sys.argv", ["target-shell", target_file])
-        m.setattr("sys.stdin", StringIO(f"ls unicode/charsets/{provided_input}"))
-        target_shell()
-        out, err = capsys.readouterr()
-        out = out.replace("unicode.tar />", "").strip()
+    out, err = run_target_shell(
+        monkeypatch, capsys, absolute_path("_data/tools/shell/unicode.tar"), f"ls unicode/charsets/{provided_input}"
+    )
+    out = out.replace("unicode.tar:/$", "").strip()
+    assert out == expected_output
+    assert "unrecognized arguments" not in err
 
-        assert out == expected_output
-        assert "unrecognized arguments" not in err
+
+def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """test if alias commands call their parent attribute correctly."""
+    target_path = absolute_path("_data/tools/info/image.tar")
+
+    # 'dir' and 'ls' should return the same output
+    dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
+    ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
+    assert dir_out == ls_out
+
+    # ll is not really a standard aliased command so we test that separately.
+    ls_la_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls -la")
+    ll_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ll")
+    assert ls_la_out == ll_out
+
+
+def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    target_path = absolute_path("_data/tools/info/image.tar")
+    dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
+    ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
+    assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
+
+
+def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+    """test if alias commands call their parent attribute correctly."""
+    target_path = absolute_path("_data/tools/info/image.tar")
+
+    # 'list' and 'ls' should return the same output after runtime aliasing
+    list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls xxl='ls -la'\nlist")
+    sys.stdout.flush()
+    ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
+    assert list_out == "ubuntu:/$ " + ls_out
+
+    # list aliases
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias list=ls\nalias xxl=ls -la\nubuntu:/$ \n"
+
+    # list single aliases
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list")
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
+
+    # unalias
+    sys.stdout.flush()
+    run_target_shell(monkeypatch, capsys, target_path, "unalias xxl")
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
+
+    # unalias multiple and non-existant
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "unalias list abc")
+    assert out == "ubuntu:/$ alias abc not found\nubuntu:/$ \n"
+
+    # alias multiple broken - b will be empty
+    sys.stdout.flush()
+    run_target_shell(monkeypatch, capsys, target_path, "alias a=1 b=")
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
+    assert out == "ubuntu:/$ alias a=1\nalias b=\nubuntu:/$ \n"
+
+    # alias set/get mixed
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b=1 a")
+    assert out == "ubuntu:/$ alias a=1\nubuntu:/$ \n"
+
+    # alias with other symbols not allowed due to parser difference
+    sys.stdout.flush()
+    out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b+1")
+    assert out.find("*** Unhandled error: Token not allowed") > -1

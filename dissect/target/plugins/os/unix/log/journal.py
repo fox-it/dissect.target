@@ -1,8 +1,11 @@
+from __future__ import annotations
+
+import logging
 import lzma
-from typing import BinaryIO, Callable, Iterator
+from typing import Any, BinaryIO, Callable, Iterator
 
 import zstandard
-from dissect.cstruct import Instance, cstruct
+from dissect.cstruct import cstruct
 from dissect.util import ts
 from dissect.util.compression import lz4
 
@@ -10,6 +13,8 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+log = logging.getLogger(__name__)
 
 # The events have undocumented fields that are not part of the record
 JournalRecord = TargetRecordDescriptor(
@@ -26,7 +31,7 @@ JournalRecord = TargetRecordDescriptor(
         ("varint", "errno"),
         ("string", "invocation_id"),
         ("string", "user_invocation_id"),
-        ("varint", "syslog_facility"),
+        ("string", "syslog_facility"),
         ("string", "syslog_identifier"),
         ("varint", "syslog_pid"),
         ("string", "syslog_raw"),
@@ -68,11 +73,13 @@ JournalRecord = TargetRecordDescriptor(
         ("path", "udev_devlink"),
         # Other fields
         ("string", "journal_hostname"),
-        ("path", "filepath"),
+        ("path", "source"),
     ],
 )
 
 journal_def = """
+#define HEADER_SIGNATURE b"LPKSHHRH"
+
 typedef uint8 uint8_t;
 typedef uint32 le32_t;
 typedef uint64 le64_t;
@@ -98,7 +105,7 @@ flag IncompatibleFlag : le32_t {
 };
 
 struct Header {
-    uint8_t           signature[8];
+    char              signature[8];
     le32_t            compatible_flags;
     IncompatibleFlag  incompatible_flags;
     State             state;
@@ -163,7 +170,7 @@ struct ObjectHeader {
 
 // The first four members are copied from ObjectHeader, so that the size can be used as the length of payload
 struct DataObject {
-    ObjectType  type;
+    // ObjectType  type;
     ObjectFlag  flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -179,7 +186,7 @@ struct DataObject {
 // If the HEADER_INCOMPATIBLE_COMPACT flag is set, two extra fields are stored to allow immediate access
 // to the tail entry array in the DATA object's entry array chain.
 struct DataObject_Compact {
-    ObjectType  type;
+    // ObjectType  type;
     ObjectFlag  flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -234,7 +241,7 @@ struct EntryObject_Compact {
 
 // The first four members are copied from from ObjectHeader, so that the size can be used as the length of entry_object_offsets
 struct EntryArrayObject {
-    ObjectType  type;
+    // ObjectType  type;
     uint8_t     flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -243,7 +250,7 @@ struct EntryArrayObject {
 };
 
 struct EntryArrayObject_Compact {
-    ObjectType  type;
+    // ObjectType  type;
     uint8_t     flags;
     uint8_t     reserved[6];
     le64_t      size;
@@ -252,13 +259,27 @@ struct EntryArrayObject_Compact {
 };
 """  # noqa: E501
 
-c_journal = cstruct()
-c_journal.load(journal_def)
+c_journal = cstruct().load(journal_def)
 
 
-def get_optional(value: str, to_type: Callable):
+def get_optional(value: str, to_type: Callable) -> Any | None:
     """Return the value if True, otherwise return None."""
-    return to_type(value) if value else None
+
+    if not value:
+        return None
+
+    try:
+        return to_type(value)
+
+    except ValueError as e:
+        log.error("Unable to cast '%s' to %s", value, to_type)
+        log.debug("", exc_info=e)
+        return None
+
+
+# Sometimes stringy None is inserted by external tools like Ansible
+def int_or_none(value: str) -> int | None:
+    return int(value) if value and value != "None" else None
 
 
 class JournalFile:
@@ -272,136 +293,138 @@ class JournalFile:
     def __init__(self, fh: BinaryIO, target: Target):
         self.fh = fh
         self.target = target
-        self.header = c_journal.Header(self.fh)
-        self.signature = "".join(chr(c) for c in self.header.signature)
-        self.entry_array_offset = self.header.entry_array_offset
 
-    def entry_object_offsets(self) -> Iterator[int]:
-        """Read object entry arrays."""
+        try:
+            self.header = c_journal.Header(self.fh)
+        except EOFError as e:
+            raise ValueError(f"Invalid systemd Journal file: {e}")
 
-        offset = self.entry_array_offset
+        if self.header.signature != c_journal.HEADER_SIGNATURE:
+            raise ValueError(f"Journal file has invalid magic header: {self.header.signature!r}'")
 
-        # Entry Array with next_entry_array_offset set to 0 is the last in the list
+    def decode_value(self, value: bytes) -> tuple[str, str]:
+        """Decode the given bytes to a key value pair."""
+        value = value.decode(errors="surrogateescape").strip().lstrip("_")
+        key, value = value.split("=", 1)
+        key = key.lower()
+        return key, value
+
+    def __iter__(self) -> Iterator[dict[str, int | str]]:
+        "Iterate over the entry objects to read payloads."
+
+        offset = self.header.entry_array_offset
         while offset != 0:
             self.fh.seek(offset)
 
-            object = c_journal.ObjectHeader(self.fh)
+            if self.fh.read(1)[0] != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
+                raise ValueError(f"Expected OBJECT_ENTRY_ARRAY at offset {offset}")
 
-            if object.type == c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
-                # After the object is checked, read again but with EntryArrayObject instead of ObjectHeader
-                self.fh.seek(offset)
+            if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
+            else:
+                entry_array_object = c_journal.EntryArrayObject(self.fh)
 
-                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                    entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)
-                else:
-                    entry_array_object = c_journal.EntryArrayObject(self.fh)
+            for entry_object_offset in entry_array_object.entry_object_offsets:
+                if entry_object_offset:
+                    yield from self._parse_entry_object(offset=entry_object_offset)
 
-                for entry_object_offset in entry_array_object.entry_object_offsets:
-                    # Check if the offset is not zero and points to nothing
-                    if entry_object_offset:
-                        yield entry_object_offset
+            offset = entry_array_object.next_entry_array_offset
 
-                offset = entry_array_object.next_entry_array_offset
+    def _parse_entry_object(self, offset: int) -> Iterator[dict]:
+        self.fh.seek(offset)
 
-    def decode_value(self, value: bytes) -> tuple[str, str]:
-        value = value.decode(encoding="utf-8", errors="surrogateescape").strip()
-
-        # Strip leading underscores part of the field name
-        value = value.lstrip("_")
-
-        key, value = value.split("=", 1)
-        key = key.lower()
-
-        return key, value
-
-    def __iter__(self) -> Iterator[Instance]:
-        "Iterate over the entry objects to read payloads."
-
-        for offset in self.entry_object_offsets():
-            self.fh.seek(offset)
-
+        try:
             if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                 entry = c_journal.EntryObject_Compact(self.fh)
             else:
                 entry = c_journal.EntryObject(self.fh)
 
-            event = {}
-            event["ts"] = ts.from_unix_us(entry.realtime)
+        except EOFError as e:
+            self.target.log.warning("Unable to read Journal EntryObject at offset %s in: %s", offset, self.fh)
+            self.target.log.debug("", exc_info=e)
+            return
 
-            for item in entry.items:
-                try:
-                    self.fh.seek(item.object_offset)
+        event = {"ts": ts.from_unix_us(entry.realtime)}
+        for item in entry.items:
+            try:
+                self.fh.seek(item.object_offset)
 
-                    object = c_journal.ObjectHeader(self.fh)
-
-                    if object.type == c_journal.ObjectType.OBJECT_DATA:
-                        self.fh.seek(item.object_offset)
-
-                        if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
-                            data_object = c_journal.DataObject_Compact(self.fh)
-                        else:
-                            data_object = c_journal.DataObject(self.fh)
-
-                        data = data_object.payload
-
-                        if not data:
-                            # If the payload is empty
-                            continue
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
-                            data = lzma.decompress(data)
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
-                            data = lz4.decompress(data[8:])
-                        elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
-                            data = zstandard.decompress(data)
-
-                        key, value = self.decode_value(data)
-                        event[key] = value
-
-                except Exception as e:
-                    self.target.log.warning(
-                        "The data object in Journal file %s could not be parsed",
-                        getattr(self.fh, "name", None),
-                        exc_info=e,
-                    )
+                if self.fh.read(1)[0] != c_journal.ObjectType.OBJECT_DATA:
                     continue
 
-            yield event
+                if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
+                    data_object = c_journal.DataObject_Compact(self.fh)
+                else:
+                    data_object = c_journal.DataObject(self.fh)
+
+                if not data_object.payload:
+                    continue
+
+                data = data_object.payload
+
+                if data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_XZ:
+                    data = lzma.decompress(data)
+
+                elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_LZ4:
+                    data = lz4.decompress(data[8:])
+
+                elif data_object.flags & c_journal.ObjectFlag.OBJECT_COMPRESSED_ZSTD:
+                    data = zstandard.decompress(data)
+
+                key, value = self.decode_value(data)
+                event[key] = value
+
+            except Exception as e:
+                self.target.log.warning(
+                    "Journal DataObject could not be parsed at offset %s in %s",
+                    item.object_offset,
+                    getattr(self.fh, "name", None),
+                )
+                self.target.log.debug("", exc_info=e)
+                continue
+
+        yield event
 
 
 class JournalPlugin(Plugin):
+    """Systemd Journal plugin."""
+
     JOURNAL_PATHS = ["/var/log/journal"]  # TODO: /run/systemd/journal
     JOURNAL_GLOB = "*/*.journal*"  # The extensions .journal and .journal~
-    JOURNAL_SIGNATURE = "LPKSHHRH"
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.journal_paths = []
+        self.journal_files = []
 
-        for _path in self.JOURNAL_PATHS:
-            self.journal_paths.extend(self.target.fs.path(_path).glob(self.JOURNAL_GLOB))
+        for journal_path in self.JOURNAL_PATHS:
+            self.journal_files.extend(self.target.fs.path(journal_path).glob(self.JOURNAL_GLOB))
 
     def check_compatible(self) -> None:
-        if not len(self.journal_paths):
+        if not self.journal_files:
             raise UnsupportedPluginError("No journald files found")
 
     @export(record=JournalRecord)
     def journal(self) -> Iterator[JournalRecord]:
-        """Return the content of Systemd Journal log files.
+        """Return the contents of Systemd Journal log files.
 
         References:
             - https://wiki.archlinux.org/title/Systemd/Journal
             - https://github.com/systemd/systemd/blob/9203abf79f1d05fdef9b039e7addf9fc5a27752d/man/systemd.journal-fields.xml
         """  # noqa: E501
-
         path_function = self.target.fs.path
 
-        for _path in self.journal_paths:
-            fh = _path.open()
+        for journal_file in self.journal_files:
+            if not journal_file.is_file():
+                self.target.log.warning("Unable to parse journal file as it is not a file: %s", journal_file)
+                continue
 
-            journal = JournalFile(fh, self.target)
+            try:
+                fh = journal_file.open()
+                journal = JournalFile(fh, self.target)
 
-            if not journal.signature == self.JOURNAL_SIGNATURE:
-                self.target.log.warning("The Journal log file %s has an invalid magic header", _path)
+            except Exception as e:
+                self.target.log.warning("Unable to parse journal file structure: %s: %s", journal_file, str(e))
+                self.target.log.debug("", exc_info=e)
                 continue
 
             for entry in journal:
@@ -409,30 +432,30 @@ class JournalPlugin(Plugin):
                     ts=entry.get("ts"),
                     message=entry.get("message"),
                     message_id=entry.get("message_id"),
-                    priority=get_optional(entry.get("priority"), int),
+                    priority=int_or_none(entry.get("priority")),
                     code_file=get_optional(entry.get("code_file"), path_function),
-                    code_line=get_optional(entry.get("code_line"), int),
+                    code_line=int_or_none(entry.get("code_line")),
                     code_func=entry.get("code_func"),
-                    errno=get_optional(entry.get("errno"), int),
+                    errno=int_or_none(entry.get("errno")),
                     invocation_id=entry.get("invocation_id"),
                     user_invocation_id=entry.get("user_invocation_id"),
-                    syslog_facility=get_optional(entry.get("syslog_facility"), int),
+                    syslog_facility=entry.get("syslog_facility"),
                     syslog_identifier=entry.get("syslog_identifier"),
-                    syslog_pid=get_optional(entry.get("syslog_pid"), int),
+                    syslog_pid=int_or_none(entry.get("syslog_pid")),
                     syslog_raw=entry.get("syslog_raw"),
                     documentation=entry.get("documentation"),
-                    tid=get_optional(entry.get("tid"), int),
+                    tid=int_or_none(entry.get("tid")),
                     unit=entry.get("unit"),
                     user_unit=entry.get("user_unit"),
-                    pid=get_optional(entry.get("pid"), int),
-                    uid=get_optional(entry.get("uid"), int),
-                    gid=get_optional(entry.get("gid"), int),
+                    pid=int_or_none(entry.get("pid")),
+                    uid=int_or_none(entry.get("uid")),
+                    gid=int_or_none(entry.get("gid")),
                     comm=entry.get("comm"),
                     exe=get_optional(entry.get("exe"), path_function),
                     cmdline=entry.get("cmdline"),
                     cap_effective=entry.get("cap_effective"),
-                    audit_session=get_optional(entry.get("audit_session"), int),
-                    audit_loginuid=get_optional(entry.get("audit_loginuid"), int),
+                    audit_session=int_or_none(entry.get("audit_session")),
+                    audit_loginuid=int_or_none(entry.get("audit_loginuid")),
                     systemd_cgroup=get_optional(entry.get("systemd_cgroup"), path_function),
                     systemd_slice=entry.get("systemd_slice"),
                     systemd_unit=entry.get("systemd_unit"),
@@ -455,6 +478,6 @@ class JournalPlugin(Plugin):
                     udev_devnode=get_optional(entry.get("udev_devnode"), path_function),
                     udev_devlink=get_optional(entry.get("udev_devlink"), path_function),
                     journal_hostname=entry.get("hostname"),
-                    filepath=_path,
+                    source=journal_file,
                     _target=self.target,
                 )

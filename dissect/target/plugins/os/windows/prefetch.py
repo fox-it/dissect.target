@@ -1,6 +1,9 @@
-from io import BytesIO
+from __future__ import annotations
 
-from dissect import cstruct
+from io import BytesIO
+from typing import Iterator
+
+from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
 from dissect.util.ts import wintimestamp
 
@@ -33,7 +36,7 @@ GroupedPrefetchRecord = TargetRecordDescriptor(
 )
 
 
-c_prefetch = """
+prefetch_def = """
     struct PREFETCH_HEADER_DETECT {
         char signature[4];
         uint32 size;
@@ -59,14 +62,14 @@ c_prefetch = """
         uint32 volumes_information_offset;
         uint32 number_of_volumes;
         uint32 volumes_information_size;
-        uint32 unknown[2];
+        uint32 unknown0[2];
         uint64 last_run_time;
         uint64 last_run_remains[7];
-        uint64 unknown[2];
+        uint64 unknown1[2];
         uint32 run_count;
-        uint32 unknown;
-        uint32 unknown;
-        char unknown[88];
+        uint32 unknown2;
+        uint32 unknown3;
+        char unknown4[88];
     };
 
     struct FILE_INFORMATION_17 {
@@ -80,9 +83,9 @@ c_prefetch = """
         uint32 number_of_volumes;
         uint32 volumes_information_size;
         uint32 last_run_time;
-        uint32 unknown;
+        uint32 unknown0;
         uint32 run_count;
-        uint32 unknown;
+        uint32 unknown1;
     };
 
     struct FILE_INFORMATION_23 {
@@ -99,9 +102,9 @@ c_prefetch = """
         uint64 last_run_time;
         uint64 last_run_remains[2];
         uint32 run_count;
-        uint32 unknown;
-        uint32 unknown;
-        char unknown[80];
+        uint32 unknown0;
+        uint32 unknown1;
+        char unknown2[80];
     };
 
     struct VOLUME_INFORMATION_17 {
@@ -125,19 +128,19 @@ c_prefetch = """
         uint32 file_reference_size;
         uint32 directory_strings_array_offset;
         uint32 number_of_directory_strings;
-        char unknown[4];
-        char unknown[24];
-        char unknown[4];
-        char unknown[24];
-        char unknown[4];
+        char unknown0[4];
+        char unknown1[24];
+        char unknown2[4];
+        char unknown3[24];
+        char unknown4[4];
     };
 
     struct TRACE_CHAIN_ARRAY_ENTRY_17 {
         uint32 next_array_entry_index;
         uint32 total_block_load_count;
-        uint32 unknown;
-        uint32 unknown;
-        uint32 unknown;
+        uint32 unknown0;
+        uint32 unknown1;
+        uint32 unknown2;
     };
 
     struct FILE_METRICS_ARRAY_ENTRY_17 {
@@ -158,25 +161,24 @@ c_prefetch = """
         uint64 ntfs_reference;
     };
     """
-prefetch = cstruct.cstruct()
-prefetch.load(c_prefetch)
+c_prefetch = cstruct().load(prefetch_def)
 
 prefetch_version_structs = {
-    17: (prefetch.FILE_INFORMATION_17, prefetch.FILE_METRICS_ARRAY_ENTRY_17),
-    23: (prefetch.FILE_INFORMATION_23, prefetch.FILE_METRICS_ARRAY_ENTRY_23),
-    30: (prefetch.FILE_INFORMATION_26, prefetch.FILE_METRICS_ARRAY_ENTRY_23),
+    17: (c_prefetch.FILE_INFORMATION_17, c_prefetch.FILE_METRICS_ARRAY_ENTRY_17),
+    23: (c_prefetch.FILE_INFORMATION_23, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
+    30: (c_prefetch.FILE_INFORMATION_26, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
 }
 
 
 class Prefetch:
     def __init__(self, fh):
-        header_detect = prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
+        header_detect = c_prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
         if header_detect.signature == b"MAM\x04":
             fh = BytesIO(lzxpress_huffman.decompress(fh))
 
         self.fh = fh
         self.fh.seek(0)
-        self.header = prefetch.PREFETCH_HEADER(self.fh)
+        self.header = c_prefetch.PREFETCH_HEADER(self.fh)
         self.version = self.identify()
         self.volumes = None
         self.metrics = None
@@ -238,6 +240,8 @@ class Prefetch:
 
 
 class PrefetchPlugin(Plugin):
+    """Windows prefetch plugin."""
+
     def __init__(self, target):
         super().__init__(target)
         self.prefetchdir = self.target.fs.path("sysvol/windows/prefetch")
@@ -248,7 +252,7 @@ class PrefetchPlugin(Plugin):
 
     @export(record=[PrefetchRecord, GroupedPrefetchRecord])
     @arg("--grouped", action="store_true", help="Group the prefetch record")
-    def prefetch(self, grouped=False):
+    def prefetch(self, grouped=False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
         """Return the content of all prefetch files.
 
         Prefetch is a memory management feature in Windows. It contains information (for example run count and
@@ -258,6 +262,9 @@ class PrefetchPlugin(Plugin):
             - https://www.geeksforgeeks.org/prefetch-files-in-windows/
 
         Yields PrefetchRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Run timestamp.
@@ -266,9 +273,12 @@ class PrefetchPlugin(Plugin):
             linkedfile (path): The linked file entry.
             runcount (int): The run count.
 
-        with --grouped:
+        with ``--grouped``:
 
         Yields PrefetchRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): Run timestamp.

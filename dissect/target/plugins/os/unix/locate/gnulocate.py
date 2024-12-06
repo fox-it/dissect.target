@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import BinaryIO, Iterable
+from typing import BinaryIO, Iterable, Iterator
 
 from dissect.cstruct import cstruct
 
@@ -26,8 +26,7 @@ GNULocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_gnulocate = cstruct()
-c_gnulocate.load(gnulocate_def)
+c_gnulocate = cstruct().load(gnulocate_def)
 
 
 class GNULocateFile:
@@ -70,6 +69,8 @@ class GNULocateFile:
 
 
 class GNULocatePlugin(BaseLocatePlugin):
+    """GNU locate plugin."""
+
     __namespace__ = "gnulocate"
 
     path = "/var/cache/locate/locatedb"
@@ -79,7 +80,7 @@ class GNULocatePlugin(BaseLocatePlugin):
             raise UnsupportedPluginError(f"No locatedb file found at {self.path}")
 
     @export(record=GNULocateRecord)
-    def locate(self) -> GNULocateRecord:
+    def locate(self) -> Iterator[GNULocateRecord]:
         """Yield file and directory names from GNU findutils' locatedb file.
 
         Resources:

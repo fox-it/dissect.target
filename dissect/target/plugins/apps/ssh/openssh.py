@@ -7,7 +7,6 @@ from typing import Iterator
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.ssh import SSHPrivateKey
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.ssh import (
     AuthorizedKeysRecord,
@@ -15,6 +14,7 @@ from dissect.target.plugins.apps.ssh.ssh import (
     PrivateKeyRecord,
     PublicKeyRecord,
     SSHPlugin,
+    SSHPrivateKey,
     calculate_fingerprints,
 )
 
@@ -31,6 +31,8 @@ def find_sshd_directory(target: Target) -> TargetPath:
 
 
 class OpenSSHPlugin(SSHPlugin):
+    """OpenSSH plugin."""
+
     __namespace__ = "openssh"
 
     SSHD_DIRECTORIES = ["/sysvol/ProgramData/ssh", "/etc/ssh"]

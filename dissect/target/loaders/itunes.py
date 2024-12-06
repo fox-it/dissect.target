@@ -163,8 +163,10 @@ class ITunesBackup:
 
     def files(self) -> Iterator[FileInfo]:
         """Iterate all the files in this backup."""
-        for row in self.manifest_db.table("Files").rows():
-            yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
+
+        if table := self.manifest_db.table("Files"):
+            for row in table.rows():
+                yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
 
 
 class FileInfo:
@@ -288,7 +290,7 @@ def translate_file_path(domain: str, relative_path: str) -> str:
         package_name = ""
 
     domain_path = fsutil.join(DOMAIN_TRANSLATION.get(domain, domain), package_name)
-    return fsutil.join(domain_path, relative_path)
+    return fsutil.join(domain_path, relative_path).rstrip("/")
 
 
 def parse_key_bag(buf: bytes) -> tuple[dict[str, bytes, int], dict[str, ClassKey]]:

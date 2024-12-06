@@ -74,6 +74,8 @@ SSHD_MULTIPLE_DEFINITIONS_ALLOWED_FIELDS = (
 
 
 class SSHServerPlugin(SSHPlugin):
+    """OpenSSHd server plugin."""
+
     __namespace__ = "opensshd"
 
     def __init__(self, target: Target):

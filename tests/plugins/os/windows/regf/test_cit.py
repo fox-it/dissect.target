@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cit import CITPlugin
 
@@ -174,7 +176,10 @@ def test_cit_telemetry_plugin(target_win, hive_hklm):
     assert results[0].version == 1705
     assert results[0].path == "\\Device\\HarddiskVolume2\\Windows\\System32\\taskhost.exe"
     assert results[0].value == "DEVICECHANGE"
-    assert results[1].value == "POWERBROADCAST|DEVICECHANGE"
+
+    output_value = results[1].value.split("|")
+    output_value = sorted(output_value)
+    assert output_value == ["DEVICECHANGE", "POWERBROADCAST"]
 
 
 def test_cit_modules_plugin(target_win, hive_hklm):

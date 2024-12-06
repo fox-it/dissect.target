@@ -64,6 +64,8 @@ PacketSocketRecord = TargetRecordDescriptor(
 
 
 class NetSocketPlugin(Plugin):
+    """Linux volatile net sockets plugin."""
+
     __namespace__ = "sockets"
 
     def __init__(self, target: Target):
@@ -78,6 +80,9 @@ class NetSocketPlugin(Plugin):
         """This plugin yields the packet sockets and available stats associated with them.
 
         Yields PacketSocketRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (int): The captured protocol i.e. 0003 is ETH_P_ALL
@@ -101,6 +106,9 @@ class NetSocketPlugin(Plugin):
         """This plugin yields the unix sockets and available stats associated with them.
 
         Yields UnixSocketRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -117,6 +125,9 @@ class NetSocketPlugin(Plugin):
         """This plugin yields the raw and raw6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -140,6 +151,9 @@ class NetSocketPlugin(Plugin):
         """This plugin yields the udp and udp6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.
@@ -163,6 +177,9 @@ class NetSocketPlugin(Plugin):
         """This plugin yields the tcp and tcp6 sockets and available stats associated with them.
 
         Yields NetSocketRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             protocol (string): The protocol used by the socket.

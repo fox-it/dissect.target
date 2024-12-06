@@ -142,3 +142,73 @@ EmptyRecord = RecordDescriptor(
     "empty",
     [],
 )
+
+COMMON_INTERFACE_ELEMENTS = [
+    ("string", "name"),
+    ("string[]", "mac"),
+    ("string", "type"),
+    ("boolean", "enabled"),
+    ("net.ipaddress[]", "dns"),
+    ("net.ipaddress[]", "ip"),
+    ("net.ipaddress[]", "gateway"),
+    ("net.ipnetwork[]", "network"),
+    ("string", "source"),
+]
+
+
+UnixInterfaceRecord = TargetRecordDescriptor(
+    "unix/network/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("boolean", "dhcp_ipv4"),  # NetworkManager allows for dual-stack configurations.
+        ("boolean", "dhcp_ipv6"),
+        ("datetime", "last_connected"),
+        ("varint[]", "vlan"),
+        ("string", "configurator"),
+    ],
+)
+
+WindowsInterfaceRecord = TargetRecordDescriptor(
+    "windows/network/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("varint", "metric"),
+        ("stringlist", "search_domain"),
+        ("datetime", "first_connected"),
+        ("datetime", "last_connected"),
+        ("net.ipaddress[]", "subnetmask"),
+        ("boolean", "dhcp"),
+        ("varint", "vlan"),
+    ],
+)
+
+MacInterfaceRecord = TargetRecordDescriptor(
+    "macos/network/interface",
+    [
+        *COMMON_INTERFACE_ELEMENTS,
+        ("varint", "interface_service_order"),
+        ("boolean", "dhcp"),
+        ("varint", "vlan"),
+    ],
+)
+
+
+COMMON_APPLICATION_FIELDS = [
+    ("datetime", "ts_modified"),
+    ("datetime", "ts_installed"),
+    ("string", "name"),
+    ("string", "version"),
+    ("string", "author"),
+    ("string", "type"),
+    ("path", "path"),
+]
+
+UnixApplicationRecord = TargetRecordDescriptor(
+    "unix/application",
+    COMMON_APPLICATION_FIELDS,
+)
+
+WindowsApplicationRecord = TargetRecordDescriptor(
+    "windows/application",
+    COMMON_APPLICATION_FIELDS,
+)

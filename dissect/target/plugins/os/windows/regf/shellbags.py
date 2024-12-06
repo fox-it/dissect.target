@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import io
 import logging
 import uuid
+from datetime import datetime
+from typing import Any, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import dostimestamp
@@ -13,7 +17,9 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
+from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -170,30 +176,30 @@ struct SHITEM_MTP_VOLUME_GUID {
 };
 
 struct SHITEM_MTP_VOLUME {
-    uint16  size;
-    uint8   type;
-    uint8   unk0;
-    uint16  data_size;
-    uint32  data_signature;
-    uint32  unk1;
-    uint16  unk2;
-    uint16  unk3;
-    uint16  unk4;
-    uint16  unk5;
-    uint32  unk6;
-    uint64  unk7;
-    uint32  unk8;
-    uint32  name_size;
-    uint32  identifier_size;
-    uint32  filesystem_size;
-    uint32  num_guid;
-    wchar   name[name_size];
-    wchar   identifier[identifier_size];
-    wchar   filesystem[filesystem_size];
-    SHITEM_MTP_VOLUME_GUID     guids[num_guid];
-    uint32  unk9;
-    char    class_identifier[16];
-    uint32  num_properties;
+    uint16                      size;
+    uint8                       type;
+    uint8                       unk0;
+    uint16                      data_size;
+    uint32                      data_signature;
+    uint32                      unk1;
+    uint16                      unk2;
+    uint16                      unk3;
+    uint16                      unk4;
+    uint16                      unk5;
+    uint32                      unk6;
+    uint64                      unk7;
+    uint32                      unk8;
+    uint32                      name_size;
+    uint32                      identifier_size;
+    uint32                      filesystem_size;
+    uint32                      num_guid;
+    wchar                       name[name_size];
+    wchar                       identifier[identifier_size];
+    wchar                       filesystem[filesystem_size];
+    SHITEM_MTP_VOLUME_GUID      guids[num_guid];
+    uint32                      unk9;
+    char                        class_identifier[16];
+    uint32                      num_properties;
 };
 
 struct SHITEM_USERS_PROPERTY_VIEW {
@@ -243,30 +249,447 @@ struct EXTENSION_BLOCK_HEADER {
     uint32  signature;
 };
 """
-c_bag = cstruct()
-c_bag.load(bag_def)
+c_bag = cstruct().load(bag_def)
 
 DELEGATE_ITEM_IDENTIFIER = b"\x74\x1a\x59\x5e\x96\xdf\xd3\x48\x8d\x67\x17\x33\xbc\xee\x28\xba"
+
+
+class SHITEM:
+    STRUCT = None
+
+    def __init__(self, buf):
+        self.buf = buf
+        self.fh = io.BytesIO(buf)
+        self.item = self.STRUCT(self.fh) if self.STRUCT is not None else None
+        self.size = self.item.size if self.item else len(self.buf)
+        self.type = self.item.type if self.item else None
+        self.parent = None
+        self.extensions = []
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
+    @property
+    def name(self) -> str:
+        return f"<SHITEM 0x{self.size:x}>"
+
+    @property
+    def creation_time(self) -> None:
+        return None
+
+    @property
+    def modification_time(self) -> None:
+        return None
+
+    @property
+    def access_time(self) -> None:
+        return None
+
+    @property
+    def file_size(self) -> None:
+        return None
+
+    @property
+    def file_reference(self) -> None:
+        return None
+
+    def extension(self, cls: Any) -> Any | None:
+        for ext in self.extensions:
+            if isinstance(ext, cls):
+                return ext
+        return None
+
+
+class UNKNOWN(SHITEM):
+    @property
+    def name(self) -> str:
+        type_number = hex(self.type) if self.type else self.type
+        return f"<UNKNOWN size=0x{self.size:04x} type={type_number}>"
+
+
+class UNKNOWN0(SHITEM):
+    STRUCT = c_bag.SHITEM_UNKNOWN0
+
+    def __init__(self, fh):
+        super().__init__(fh)
+        self.guid = None
+
+        if self.item.size == 0x20:
+            self.guid = uuid.UUID(bytes_le=fh.read(16))
+
+    @property
+    def name(self) -> str:
+        if self.guid:
+            GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
+            return GUID_name or f"<UNKNOWN0: {{{self.guid}}}>"
+        else:
+            return f"<UNKNOWN0 0x{self.size:x}>"
+
+
+class UNKNOWN1(SHITEM):
+    STRUCT = c_bag.SHITEM_UNKNOWN1
+
+    @property
+    def name(self) -> str:
+        return f"<UNKNOWN1 0x{self.size:x}>"
+
+
+class ROOT_FOLDER(SHITEM):
+    STRUCT = c_bag.SHITEM_ROOT_FOLDER
+
+    def __init__(self, fh):
+        super().__init__(fh)
+        self.guid = uuid.UUID(bytes_le=self.item.guid)
+        self.extension = None
+
+        if self.item.size > 20:
+            self.extension = None
+
+    @property
+    def name(self) -> str:
+        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
+        return GUID_name or f"{{{self.item.folder_id.name}: {self.guid}}}"
+
+
+class VOLUME(SHITEM):
+    STRUCT = c_bag.SHITEM_VOLUME
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.volume_name = None
+        self.identifier = None
+        if self.type == 0x2E:
+            self.identifier = uuid.UUID(bytes_le=buf[4:20].tobytes())
+        else:
+            self.volume_name = self.fh.read(20).rstrip(b"\x00").decode(errors="surrogateescape")
+            if self.size >= 41:
+                self.identifier = uuid.UUID(bytes_le=buf[25:41].tobytes())
+
+    @property
+    def name(self) -> str:
+        if self.volume_name:
+            return self.volume_name
+        if self.identifier:
+            GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.identifier))
+            return GUID_name or f"{{{self.identifier}}}"
+        return f"<VOLUME 0x{self.type:02x}>"
+
+
+class FILE_ENTRY(SHITEM):
+    STRUCT = c_bag.SHITEM_FILE_ENTRY
+
+    def __init__(self, buf):
+        super().__init__(buf)
+
+        has_swn1 = False
+        if buf[-30:] == b"S.W.N.1":
+            has_swn1 = True
+
+        if has_swn1 or self.type & 0x4:  # FILE_ENTRY_FLAG_IS_UNICODE
+            self.primary_name = c_bag.wchar[None](self.fh)
+            self.is_unicode = True
+        else:
+            self.primary_name = c_bag.char[None](self.fh).decode(errors="surrogateescape")
+            self.is_unicode = False
+
+        if self.fh.tell() % 2:
+            self.fh.read(1)
+
+        extension_size = c_bag.uint16(self.fh)
+        self.fh.seek(-2, io.SEEK_CUR)
+
+        self.is_pre_xp = False
+        if not has_swn1 and ((self.size - self.fh.tell() < 2) or extension_size > self.size):
+            self.is_pre_xp = True
+            if self.is_unicode:
+                self.secondary_name = c_bag.wchar[None](self.fh)
+            else:
+                self.secondary_name = c_bag.char[None](self.fh).decode(errors="surrogateescape")
+
+    @property
+    def name(self) -> str:
+        ext = self.extension(EXTENSION_BLOCK_BEEF0004)
+        if ext and ext.long_name:
+            return ext.long_name
+        return self.primary_name
+
+    @property
+    def modification_time(self) -> datetime | None:
+        ts = self.item.modification_time
+        if ts > 0:
+            return dostimestamp(ts, swap=True)
+        return None
+
+
+class NETWORK(SHITEM):
+    STRUCT = c_bag.SHITEM_NETWORK
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.description = None
+        self.comments = None
+
+        if self.item.flags & 0x80:
+            self.description = c_bag.char[None](self.fh)
+
+        if self.item.flags & 0x40:
+            self.comments = c_bag.char[None](self.fh)
+
+    @property
+    def name(self) -> str:
+        return self.item.location.decode(errors="surrogateescape")
+
+
+class COMPRESSED_FOLDER(SHITEM):
+    STRUCT = c_bag.SHITEM_COMPRESSED_FOLDER
+
+    @property
+    def name(self) -> str:
+        return "<COMPRESSED_FOLDER>"
+
+
+class URI(SHITEM):
+    STRUCT = c_bag.SHITEM_URI
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.uri = None
+        if self.item.data_size < self.size - 6:
+            self.data = self.fh.read(self.item.data_size - 2)
+            if self.item.flags & 0x80:
+                self.uri = c_bag.wchar[None](self.fh)
+            else:
+                self.uri = c_bag.char[None](self.fh).decode(errors="surrogateescape")
+
+    @property
+    def name(self) -> str:
+        return self.uri or "<URI>"
+
+
+class CONTROL_PANEL(SHITEM):
+    STRUCT = c_bag.SHITEM_CONTROL_PANEL
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.guid = uuid.UUID(bytes_le=self.item.guid)
+
+    @property
+    def name(self) -> str:
+        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
+        return GUID_name or f"<CONTROL_PANEL {self.guid}>"
+
+
+class CONTROL_PANEL_CATEGORY(SHITEM):
+    STRUCT = c_bag.SHITEM_CONTROL_PANEL_CATEGORY
+    CATEGORIES = {
+        0: "All Control Panel Items",
+        1: "Appearance and Personalization",
+        2: "Hardware and Sound",
+        3: "Network and Internet",
+        4: "Sounds, Speech, and Audio Devices",
+        5: "System and Security",
+        6: "Clock, Language, and Region",
+        7: "Ease of Access",
+        8: "Programs",
+        9: "User Accounts",
+        10: "Security Center",
+        11: "Mobile PC",
+    }
+
+    @property
+    def name(self) -> str:
+        categ_str = self.CATEGORIES.get(self.item.category)
+        if categ_str:
+            return categ_str
+        return f"<CONTROL_PANEL_CATEGORY 0x{self.item.unk1:08x}>"
+
+
+class CDBURN(SHITEM):
+    STRUCT = c_bag.SHITEM_CDBURN
+
+    @property
+    def name(self) -> str:
+        return "<CDBURN>"
+
+
+class GAME_FOLDER(SHITEM):
+    STRUCT = c_bag.SHITEM_GAME_FOLDER
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.guid = uuid.UUID(bytes_le=self.item.identifier)
+
+    @property
+    def name(self) -> str:
+        return f"<GAME_FOLDER {{{self.guid}}}>"
+
+
+class CONTROL_PANEL_CPL_FILE(SHITEM):
+    STRUCT = c_bag.SHITEM_CONTROL_PANEL_CPL_FILE
+
+    @property
+    def name(self) -> str:
+        return f"<CONTROL_PANEL_CPL_FILE path={self.item.cpl_path} name={self.item.name} comments={self.item.comments}>"
+
+
+class MTP_FILE_ENTRY(SHITEM):
+    STRUCT = c_bag.SHITEM_MTP_FILE_ENTRY
+
+    @property
+    def name(self) -> str:
+        return "<MTP_FILE_ENTRY>"
+
+    @property
+    def creation_time(self) -> datetime:
+        return self.item.creation_time
+
+    @property
+    def modification_time(self) -> datetime:
+        return self.item.modification_time
+
+
+class MTP_VOLUME(SHITEM):
+    STRUCT = c_bag.SHITEM_MTP_FILE_ENTRY
+
+    @property
+    def name(self) -> str:
+        return "<MTP_VOLUME>"
+
+
+class USERS_PROPERTY_VIEW(SHITEM):
+    STRUCT = c_bag.SHITEM_USERS_PROPERTY_VIEW
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.guid = None
+        self.identifier = self.item.data_signature
+
+        if self.item.identifier_size == 16:
+            self.guid = uuid.UUID(bytes_le=self.item.identifier)
+
+    @property
+    def name(self) -> str:
+        # As we don't know how to handle identifier_size other than 16 bytes, we fall back to data_signature
+        property_view = self.guid or self.identifier
+        return f"<USERS_PROPERTY_VIEW {{{property_view}}}>"
+
+
+class UNKNOWN_0x74(SHITEM):
+    STRUCT = c_bag.SHITEM_UNKNOWN_0x74
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.subitem = None
+        if self.item.subitem_size >= 16:
+            self.subitem = c_bag.SHITEM_UNKNOWN_0x74_SUBITEM(self.fh)
+
+    @property
+    def name(self) -> str:
+        return self.subitem.primary_name.decode(errors="surrogateescape") if self.subitem else "<UNKNOWN_0x74>"
+
+    @property
+    def modification_time(self) -> datetime | None:
+        if self.subitem.modification_time > 0:
+            return dostimestamp(self.subitem.modification_time, swap=True) if self.subitem else None
+        return None
+
+
+class DELEGATE(SHITEM):
+    STRUCT = c_bag.SHITEM_DELEGATE
+
+    def __init__(self, buf):
+        super().__init__(buf)
+        self.delegate_identifier = uuid.UUID(bytes_le=self.item.delegate_identifier)
+        self.shell_identifier = uuid.UUID(bytes_le=self.item.shell_identifier)
+
+    @property
+    def name(self) -> str:
+        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.shell_identifier))
+        return GUID_name if GUID_name else f"{{{self.shell_identifier}}}"
+
+
+class EXTENSION_BLOCK:
+    def __init__(self, buf):
+        self.buf = buf
+        self.fh = io.BytesIO(buf)
+        self.header = c_bag.EXTENSION_BLOCK_HEADER(self.fh)
+
+    def __repr__(self) -> str:
+        return f"<EXTENSION_BLOCK size=0x{self.size:04x} version=0x{self.version:04x} signature=0x{self.signature:08x}>"
+
+    @property
+    def size(self) -> int:
+        return self.header.size
+
+    @property
+    def data_size(self) -> int:
+        return self.size - 8  # minus header
+
+    @property
+    def version(self) -> int:
+        return self.header.version
+
+    @property
+    def signature(self) -> int:
+        return self.header.signature
+
+
+class EXTENSION_BLOCK_BEEF0004(EXTENSION_BLOCK):
+    def __init__(self, buf):
+        super().__init__(buf)
+        fh = self.fh
+        version = self.version
+        self.creation_time = c_bag.uint32(fh)
+        self.last_accessed = c_bag.uint32(fh)
+        self.identifier = c_bag.uint16(fh)
+        self.file_reference = None
+        self.long_name = None
+        self.localized_name = None
+        # Note that the c_bag.uintXX() etc. statements advance the pointer into
+        # the filebuffer, so the order of the if statements is important here.
+        if version >= 7:
+            c_bag.uint16(fh)
+            self.file_reference = c_bag.uint64(fh)
+            c_bag.uint64(fh)
+        if version >= 3:
+            # Start of strings
+            localized_name_offset = c_bag.uint16(fh)
+        if version >= 9:
+            c_bag.uint32(fh)
+        if version >= 8:
+            c_bag.uint32(fh)
+        if version >= 3:
+            self.long_name = c_bag.wchar[None](fh)
+
+        if 3 <= version < 7 and localized_name_offset > 0:
+            self.localized_name = c_bag.char[None](fh)
+
+        if version >= 7 and localized_name_offset > 0:
+            self.localized_name = c_bag.wchar[None](fh)
+
+
+class EXTENSION_BLOCK_BEEF0005(EXTENSION_BLOCK):
+    def __init__(self, buf):
+        super().__init__(buf)
+        c_bag.char[16](self.fh)  # GUID?
+        self.shell_items = self.fh.read(self.data_size - 18)
 
 
 ShellBagRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/shellbag",
     [
+        ("datetime", "ts_mtime"),
+        ("datetime", "ts_atime"),
+        ("datetime", "ts_btime"),
+        ("string", "type"),
         ("path", "path"),
-        ("datetime", "creation_time"),
-        ("datetime", "modification_time"),
-        ("datetime", "access_time"),
-        ("datetime", "regf_modification_time"),
+        ("datetime", "regf_mtime"),
     ],
 )
 
 
 class ShellBagsPlugin(Plugin):
-    """Windows Shellbags plugin.
-
-    References:
-        - https://github.com/libyal/libfwsi
-    """
+    """Windows Shellbags plugin."""
 
     KEYS = [
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell",
@@ -278,39 +701,41 @@ class ShellBagsPlugin(Plugin):
         "HKEY_CURRENT_USER\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU",
     ]
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
-        self.bagkeys = list(self.target.registry.keys(self.KEYS))
+        self.bagkeys: list[RegistryKey] = list(self.target.registry.keys(self.KEYS))
 
     def check_compatible(self) -> None:
-        if not len(self.bagkeys) > 0:
+        if not self.bagkeys:
             raise UnsupportedPluginError("No shellbags found")
 
     @export(record=ShellBagRecord)
-    def shellbags(self):
-        """Return Windows Shellbags.
+    def shellbags(self) -> Iterator[ShellBagRecord]:
+        """Yields Windows Shellbags.
 
-        Shellbags are registry keys to improve user experience when using Windows Explorer. It stores information about
-        for example file/folder creation time and access time.
+        Shellbags are registry keys to improve user experience when using Windows Explorer.
+        They contain information such as file and folder creation time and access time.
 
         References:
+            - https://github.com/libyal/libfwsi
+            - https://www.giac.org/paper/gcfa/9576/windows-shellbag-forensics-in-depth/128522
             - https://www.hackingarticles.in/forensic-investigation-shellbags/
         """
         for regkey in self.bagkeys:
             try:
-                bagsmru = regkey.subkey("BagMRU")
+                yield from self._walk_bags(regkey.subkey("BagMRU"), None)
 
-                for r in self._walk_bags(bagsmru, None):
-                    yield r
             except RegistryKeyNotFoundError:
                 continue
-            except Exception:  # noqa
-                self.target.log.exception("Exception while parsing shellbags")
+
+            except Exception as e:
+                self.target.log.error("Exception while parsing shellbags")
+                self.target.log.debug("", exc_info=e)
                 continue
 
-    def _walk_bags(self, key, path_prefix):
+    def _walk_bags(self, key: RegistryKey, path_prefix: str | None) -> Iterator[ShellBagRecord]:
+        """Recursively walk shellbags from the given RegistryKey location."""
         path_prefix = [] if path_prefix is None else [path_prefix]
-
         user = self.target.registry.get_user(key)
 
         for reg_val in key.values():
@@ -322,26 +747,28 @@ class ShellBagsPlugin(Plugin):
             for item in parse_shell_item_list(value):
                 path = "\\".join(path_prefix + [item.name])
                 yield ShellBagRecord(
+                    ts_mtime=item.modification_time,
+                    ts_atime=item.access_time,
+                    ts_btime=item.creation_time,
+                    type=item.__class__.__name__,
                     path=windows_path(path),
-                    creation_time=item.creation_time,
-                    modification_time=item.modification_time,
-                    access_time=item.access_time,
-                    regf_modification_time=key.ts,
-                    _target=self.target,
-                    _user=user,
+                    regf_mtime=key.ts,
                     _key=key,
+                    _user=user,
+                    _target=self.target,
                 )
 
-            for r in self._walk_bags(key.subkey(name), path):
-                yield r
+            yield from self._walk_bags(key.subkey(name), path)
 
 
-def parse_shell_item_list(buf):
+def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
+    """Parse a shellbag item from the given bytes."""
+
     offset = 0
     end = len(buf)
     list_buf = memoryview(buf)
-
     parent = None
+
     while offset < end:
         size = c_bag.uint16(list_buf[offset : offset + 2])
 
@@ -505,424 +932,5 @@ def parse_shell_item_list(buf):
                 extension_offset += extension_size
 
         parent = entry
-        yield entry
-
         offset += size
-
-
-class SHITEM:
-    STRUCT = None
-
-    def __init__(self, buf):
-        self.buf = buf
-        self.fh = io.BytesIO(buf)
-        self.item = self.STRUCT(self.fh) if self.STRUCT is not None else None
-        self.size = self.item.size if self.item else len(self.buf)
-        self.type = self.item.type if self.item else None
-        self.parent = None
-        self.extensions = []
-
-    @property
-    def name(self):
-        return f"<SHITEM 0x{self.size:x}>"
-
-    @property
-    def creation_time(self):
-        return None
-
-    @property
-    def modification_time(self):
-        return None
-
-    @property
-    def access_time(self):
-        return None
-
-    @property
-    def file_size(self):
-        return None
-
-    @property
-    def file_reference(self):
-        return None
-
-    def extension(self, cls):
-        for ext in self.extensions:
-            if isinstance(ext, cls):
-                return ext
-        return None
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__}>"
-
-
-class UNKNOWN(SHITEM):
-    @property
-    def name(self):
-        type_number = hex(self.type) if self.type else self.type
-        return f"<UNKNOWN size=0x{self.size:04x} type={type_number}>"
-
-
-class UNKNOWN0(SHITEM):
-    STRUCT = c_bag.SHITEM_UNKNOWN0
-
-    def __init__(self, fh):
-        super().__init__(fh)
-        self.guid = None
-
-        if self.item.size == 0x20:
-            self.guid = uuid.UUID(bytes_le=fh.read(16))
-
-    @property
-    def name(self):
-        if self.guid:
-            GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
-            return GUID_name or f"<UNKNOWN0: {{{self.guid}}}>"
-        else:
-            return f"<UNKNOWN0 0x{self.size:x}>"
-
-
-class UNKNOWN1(SHITEM):
-    STRUCT = c_bag.SHITEM_UNKNOWN1
-
-    @property
-    def name(self):
-        return f"<UNKNOWN1 0x{self.size:x}>"
-
-
-class ROOT_FOLDER(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_ROOT_FOLDER
-
-    def __init__(self, fh):
-        super().__init__(fh)
-        self.guid = uuid.UUID(bytes_le=self.item.guid)
-        self.extension = None
-
-        if self.item.size > 20:
-            self.extension = None
-
-    @property
-    def name(self):
-        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
-        return GUID_name or f"{{{self.item.folder_id.name}: {self.guid}}}"
-
-
-class VOLUME(SHITEM):
-    STRUCT = c_bag.SHITEM_VOLUME
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.volume_name = None
-        self.identifier = None
-        if self.type == 0x2E:
-            self.identifier = uuid.UUID(bytes_le=buf[4:20].tobytes())
-        else:
-            self.volume_name = self.fh.read(20).rstrip(b"\x00").decode()
-            if self.size >= 41:
-                self.identifier = uuid.UUID(bytes_le=buf[25:41].tobytes())
-
-    @property
-    def name(self):
-        if self.volume_name:
-            return self.volume_name
-        if self.identifier:
-            GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.identifier))
-            return GUID_name or f"{{{self.identifier}}}"
-        return f"<VOLUME 0x{self.type:02x}>"
-
-
-class FILE_ENTRY(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_FILE_ENTRY
-
-    def __init__(self, buf):
-        super().__init__(buf)
-
-        has_swn1 = False
-        if buf[-30:] == b"S.W.N.1":
-            has_swn1 = True
-
-        if has_swn1 or self.type & 0x4:  # FILE_ENTRY_FLAG_IS_UNICODE
-            self.primary_name = c_bag.wchar[None](self.fh)
-            self.is_unicode = True
-        else:
-            self.primary_name = c_bag.char[None](self.fh).decode()
-            self.is_unicode = False
-
-        if self.fh.tell() % 2:
-            self.fh.read(1)
-
-        extension_size = c_bag.uint16(self.fh)
-        self.fh.seek(-2, io.SEEK_CUR)
-
-        self.is_pre_xp = False
-        if not has_swn1 and ((self.size - self.fh.tell() < 2) or extension_size > self.size):
-            self.is_pre_xp = True
-            if self.is_unicode:
-                self.secondary_name = c_bag.wchar[None](self.fh)
-            else:
-                self.secondary_name = c_bag.char[None](self.fh).decode()
-
-    @property
-    def name(self):
-        ext = self.extension(EXTENSION_BLOCK_BEEF0004)
-        if ext and ext.long_name:
-            return ext.long_name
-        return self.primary_name
-
-    @property
-    def modification_time(self):
-        ts = self.item.modification_time
-        if ts > 0:
-            return dostimestamp(ts, swap=True)
-        return None
-
-
-class NETWORK(SHITEM):
-    STRUCT = c_bag.SHITEM_NETWORK
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.description = None
-        self.comments = None
-
-        if self.item.flags & 0x80:
-            self.description = c_bag.char[None](self.fh)
-
-        if self.item.flags & 0x40:
-            self.comments = c_bag.char[None](self.fh)
-
-    @property
-    def name(self):
-        return self.item.location.decode()
-
-
-class COMPRESSED_FOLDER(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_COMPRESSED_FOLDER
-
-    @property
-    def name(self):
-        return "<COMPRESSED_FOLDER>"
-
-
-class URI(SHITEM):
-    STRUCT = c_bag.SHITEM_URI
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.uri = None
-        if self.item.data_size < self.size - 6:
-            self.data = self.fh.read(self.item.data_size - 2)
-            if self.item.flags & 0x80:
-                self.uri = c_bag.wchar[None](self.fh)
-            else:
-                self.uri = c_bag.char[None](self.fh).decode()
-
-    @property
-    def name(self):
-        return self.uri or "<URI>"
-
-
-class CONTROL_PANEL(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_CONTROL_PANEL
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.guid = uuid.UUID(bytes_le=self.item.guid)
-
-    @property
-    def name(self):
-        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
-        return GUID_name or f"<CONTROL_PANEL {self.guid}>"
-
-
-class CONTROL_PANEL_CATEGORY(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_CONTROL_PANEL_CATEGORY
-    CATEGORIES = {
-        0: "All Control Panel Items",
-        1: "Appearance and Personalization",
-        2: "Hardware and Sound",
-        3: "Network and Internet",
-        4: "Sounds, Speech, and Audio Devices",
-        5: "System and Security",
-        6: "Clock, Language, and Region",
-        7: "Ease of Access",
-        8: "Programs",
-        9: "User Accounts",
-        10: "Security Center",
-        11: "Mobile PC",
-    }
-
-    @property
-    def name(self):
-        categ_str = self.CATEGORIES.get(self.item.category)
-        if categ_str:
-            return categ_str
-        return f"<CONTROL_PANEL_CATEGORY 0x{self.item.unk1:08x}>"
-
-
-class CDBURN(SHITEM):
-    STRUCT = c_bag.SHITEM_CDBURN
-
-    @property
-    def name(self):
-        return "<CDBURN>"
-
-
-class GAME_FOLDER(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_GAME_FOLDER
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.guid = uuid.UUID(bytes_le=self.item.identifier)
-
-    @property
-    def name(self):
-        return f"<GAME_FOLDER {{{self.guid}}}>"
-
-
-class CONTROL_PANEL_CPL_FILE(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_CONTROL_PANEL_CPL_FILE
-
-    @property
-    def name(self):
-        return f"<CONTROL_PANEL_CPL_FILE path={self.item.cpl_path} name={self.item.name} comments={self.item.comments}>"
-
-
-class MTP_FILE_ENTRY(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_MTP_FILE_ENTRY
-
-    @property
-    def name(self):
-        return "<MTP_FILE_ENTRY>"
-
-    @property
-    def creation_time(self):
-        return self.item.creation_time
-
-    @property
-    def modification_time(self):
-        return self.item.modification_time
-
-
-class MTP_VOLUME(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_MTP_FILE_ENTRY
-
-    @property
-    def name(self):
-        return "<MTP_VOLUME>"
-
-
-class USERS_PROPERTY_VIEW(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_USERS_PROPERTY_VIEW
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.guid = None
-        self.identifier = self.item.data_signature
-
-        if self.item.identifier_size == 16:
-            self.guid = uuid.UUID(bytes_le=self.item.identifier)
-
-    @property
-    def name(self):
-        # As we don't know how to handle identifier_size other than 16 bytes, we fall back to data_signature
-        property_view = self.guid or self.identifier
-        return f"<USERS_PROPERTY_VIEW {{{property_view}}}>"
-
-
-class UNKNOWN_0x74(SHITEM):  # noqa
-    STRUCT = c_bag.SHITEM_UNKNOWN_0x74
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.subitem = None
-        if self.item.subitem_size >= 16:
-            self.subitem = c_bag.SHITEM_UNKNOWN_0x74_SUBITEM(self.fh)
-
-    @property
-    def name(self):
-        return self.subitem.primary_name.decode() if self.subitem else "<UNKNOWN_0x74>"
-
-    @property
-    def modification_time(self):
-        if self.subitem.modification_time > 0:
-            return dostimestamp(self.subitem.modification_time, swap=True) if self.subitem else None
-        return None
-
-
-class DELEGATE(SHITEM):
-    STRUCT = c_bag.SHITEM_DELEGATE
-
-    def __init__(self, buf):
-        super().__init__(buf)
-        self.delegate_identifier = uuid.UUID(bytes_le=self.item.delegate_identifier)
-        self.shell_identifier = uuid.UUID(bytes_le=self.item.shell_identifier)
-
-    @property
-    def name(self):
-        GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.shell_identifier))
-        return GUID_name if GUID_name else f"{{{self.shell_identifier}}}"
-
-
-class EXTENSION_BLOCK:  # noqa
-    def __init__(self, buf):
-        self.buf = buf
-        self.fh = io.BytesIO(buf)
-        self.header = c_bag.EXTENSION_BLOCK_HEADER(self.fh)
-
-    @property
-    def size(self):
-        return self.header.size
-
-    @property
-    def data_size(self):
-        return self.size - 8  # minus header
-
-    @property
-    def version(self):
-        return self.header.version
-
-    @property
-    def signature(self):
-        return self.header.signature
-
-    def __repr__(self):
-        return f"<EXTENSION_BLOCK size=0x{self.size:04x} version=0x{self.version:04x} signature=0x{self.signature:08x}>"
-
-
-class EXTENSION_BLOCK_BEEF0004(EXTENSION_BLOCK):  # noqa
-    def __init__(self, buf):
-        super().__init__(buf)
-        fh = self.fh
-        version = self.version
-        self.creation_time = c_bag.uint32(fh)
-        self.last_accessed = c_bag.uint32(fh)
-        self.identifier = c_bag.uint16(fh)
-        self.file_reference = None
-        self.long_name = None
-        self.localized_name = None
-        # Note that the c_bag.uintXX() etc. statements advance the pointer into
-        # the filebuffer, so the order of the if statements is important here.
-        if version >= 7:
-            c_bag.uint16(fh)
-            self.file_reference = c_bag.uint64(fh)
-            c_bag.uint64(fh)
-        if version >= 3:
-            long_len = c_bag.uint16(fh)
-        if version >= 9:
-            c_bag.uint32(fh)
-        if version >= 8:
-            c_bag.uint32(fh)
-        if version >= 3:
-            self.long_name = c_bag.wchar[None](fh)
-        if 3 <= version < 7 and long_len > 0:
-            self.localized_name = c_bag.char[long_len](fh)
-        if version >= 7 and long_len > 0:
-            self.localized_name = c_bag.wchar[long_len](fh)
-
-
-class EXTENSION_BLOCK_BEEF0005(EXTENSION_BLOCK):  # noqa
-    def __init__(self, buf):
-        super().__init__(buf)
-        c_bag.char[16](self.fh)  # GUID?
-        self.shell_items = self.fh.read(self.data_size - 18)
+        yield entry

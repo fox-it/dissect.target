@@ -1,12 +1,10 @@
-# Resources:
-# - generaltel.dll
-# - win32k.sys (Windows 7)
-# - win32kbase.sys (Windows 10)
+from __future__ import annotations
 
 import datetime
 import struct
 from binascii import crc32
 from io import BytesIO
+from typing import Iterator, Union, get_args
 
 from dissect.cstruct import cstruct
 from dissect.util.compression import lznt1
@@ -20,6 +18,10 @@ from dissect.target.helpers.record import (
 )
 from dissect.target.plugin import Plugin, export
 
+# Resources:
+# - generaltel.dll
+# - win32k.sys (Windows 7)
+# - win32kbase.sys (Windows 10)
 cit_def = """
 typedef QWORD FILETIME;
 
@@ -212,8 +214,7 @@ typedef struct _CIT_DP_DATA {
 } CIT_DP_DATA;
 """
 
-c_cit = cstruct()
-c_cit.load(cit_def)
+c_cit = cstruct().load(cit_def)
 
 
 CITSystemRecord = TargetRecordDescriptor(
@@ -354,7 +355,7 @@ CITProgramBitmapForegroundRecord = TargetRecordDescriptor(
 )
 
 
-CIT_RECORDS = [
+CITRecords = Union[
     CITSystemRecord,
     CITSystemBitmapDisplayPowerRecord,
     CITSystemBitmapDisplayRequestChangeRecord,
@@ -603,7 +604,7 @@ class ProgramDataBitmaps(BaseUseDataBitmaps):
         self.foreground = self._parse_bitmap(0)
 
 
-def decode_name(name):
+def decode_name(name: str) -> bytes:
     """Decode the registry key name.
 
     The CIT key name in the registry has some strange encoding.
@@ -631,8 +632,8 @@ def local_wintimestamp(target, ts):
 class CITPlugin(Plugin):
     """Plugin that parses CIT data from the registry.
 
-    Reference:
-    - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
+    References:
+        - https://dfir.ru/2018/12/02/the-cit-database-and-the-syscache-hive/
     """
 
     __namespace__ = "cit"
@@ -640,11 +641,11 @@ class CITPlugin(Plugin):
     KEY = "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT"
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEY))) > 0:
+        if not list(self.target.registry.keys(self.KEY)):
             raise UnsupportedPluginError("No CIT registry key found")
 
-    @export(record=CIT_RECORDS)
-    def cit(self):
+    @export(record=get_args(CITRecords))
+    def cit(self) -> Iterator[CITRecords]:
         """Return CIT data from the registry for executed executable information.
 
         CIT data is stored at HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\CIT\\System.
@@ -769,11 +770,12 @@ class CITPlugin(Plugin):
                         yield from _yield_bitmap_records(
                             self.target, cit, entry.use_data.bitmaps.foreground, CITProgramBitmapForegroundRecord
                         )
-                except Exception:
-                    self.target.log.exception("Failed to parse CIT value: %s", value.name)
+                except Exception as e:
+                    self.target.log.warning("Failed to parse CIT value: %s", value.name)
+                    self.target.log.debug("", exc_info=e)
 
     @export(record=CITPostUpdateUseInfoRecord)
-    def puu(self):
+    def puu(self) -> Iterator[CITPostUpdateUseInfoRecord]:
         """Parse CIT PUU (Post Update Usage) data from the registry.
 
         Generally only available since Windows 10.
@@ -787,8 +789,14 @@ class CITPlugin(Plugin):
         for reg_key in keys:
             for key in self.target.registry.keys(reg_key):
                 try:
-                    puu = c_cit.CIT_POST_UPDATE_USE_INFO(key.value("PUUActive").value)
+                    key_value = key.value("PUUActive").value
+                    puu = c_cit.CIT_POST_UPDATE_USE_INFO(key_value)
                 except RegistryValueNotFoundError:
+                    continue
+
+                except EOFError as e:
+                    self.target.log.warning("Exception reading CIT structure in key %s", key.path)
+                    self.target.log.debug("Unable to parse value %s", key_value, exc_info=e)
                     continue
 
                 yield CITPostUpdateUseInfoRecord(
@@ -824,7 +832,7 @@ class CITPlugin(Plugin):
                 )
 
     @export(record=[CITDPRecord, CITDPDurationRecord])
-    def dp(self):
+    def dp(self) -> Iterator[CITDPRecord | CITDPDurationRecord]:
         """Parse CIT DP data from the registry.
 
         Generally only available since Windows 10.
@@ -851,8 +859,14 @@ class CITPlugin(Plugin):
         for reg_key in keys:
             for key in self.target.registry.keys(reg_key):
                 try:
-                    dp = c_cit.CIT_DP_DATA(key.value("DP").value)
+                    key_value = key.value("DP").value
+                    dp = c_cit.CIT_DP_DATA(key_value)
                 except RegistryValueNotFoundError:
+                    continue
+
+                except EOFError as e:
+                    self.target.log.warning("Exception reading CIT structure in key %s", key.path)
+                    self.target.log.debug("Unable to parse value %s", key_value, exc_info=e)
                     continue
 
                 user = self.target.registry.get_user(key)
@@ -879,7 +893,7 @@ class CITPlugin(Plugin):
                         )
 
     @export(record=CITTelemetryRecord)
-    def telemetry(self):
+    def telemetry(self) -> Iterator[CITTelemetryRecord]:
         """Parse CIT process telemetry answers from the registry.
 
         In some versions of Windows, processes would get "telemetry answers" set on their process struct, based on
@@ -900,7 +914,7 @@ class CITPlugin(Plugin):
                     )
 
     @export(record=CITModuleRecord)
-    def modules(self):
+    def modules(self) -> Iterator[CITModuleRecord]:
         """Parse CIT tracked module information from the registry.
 
         Contains applications that loaded a tracked module. By default these are:
