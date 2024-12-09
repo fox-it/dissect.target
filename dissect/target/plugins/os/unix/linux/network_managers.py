@@ -603,7 +603,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
 
 
 def parse_unix_dhcp_leases(target: Target) -> set[str]:
-    """Parse DHCP ``*.lease*`` files.
+    """Parse NetworkManager and dhclient DHCP ``.lease`` files.
 
     Resources:
         - https://linux.die.net/man/5/dhclient.conf
@@ -614,7 +614,6 @@ def parse_unix_dhcp_leases(target: Target) -> set[str]:
     Returns:
         A set of found DHCP IP addresses.
     """
-
     ips = set()
 
     for lease_file in chain(
