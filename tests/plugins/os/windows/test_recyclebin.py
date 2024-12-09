@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import Mock, mock_open, patch
@@ -103,7 +104,7 @@ def test_read_bin_file_unknown(target_win, path):
 
 
 def test_recyclebin_plugin_file(target_win, recycle_bin):
-    recycle_bin.map_file("$ihello_world", None)
+    recycle_bin.map_file_fh("$ihello_world", io.BytesIO(b""))
 
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
@@ -114,7 +115,7 @@ def test_recyclebin_plugin_file(target_win, recycle_bin):
 
 
 def test_recyclebin_plugin_wrong_prefix(target_win, recycle_bin):
-    recycle_bin.map_file("hello_world", None)
+    recycle_bin.map_file_fh("hello_world", io.BytesIO(b""))
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
