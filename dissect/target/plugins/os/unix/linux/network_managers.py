@@ -617,9 +617,9 @@ def parse_unix_dhcp_leases(target: Target) -> set[str]:
     ips = set()
 
     for lease_file in chain(
-        target.fs.path("/var/lib/NetworkManager").glob("*.lease"),
-        target.fs.path("/var/lib/dhcp").glob("*.leases"),
-        target.fs.path("/var/lib/dhclient").glob("*.lease"),
+        target.fs.path("/var/lib/NetworkManager").glob("*.lease*"),
+        target.fs.path("/var/lib/dhcp").glob("*.lease*"),
+        target.fs.path("/var/lib/dhclient").glob("*.lease*"),
     ):
         lease_text = lease_file.read_text()
 
