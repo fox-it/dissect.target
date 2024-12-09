@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
+requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0", "toml"]
 build-backend = "setuptools.build_meta"
 
 [project]
