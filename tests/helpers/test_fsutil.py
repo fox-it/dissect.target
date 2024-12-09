@@ -331,11 +331,11 @@ def test_target_path_is_relative_to(path_fs: VirtualFilesystem) -> None:
     assert not path_fs.path("/some/dir/file.txt").is_relative_to("/some/other")
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 13), reason="deprecated on Python 3.13+")
 def test_target_path_is_reserved(path_fs: VirtualFilesystem) -> None:
-    if sys.version_info < (3, 13):
-        # We currently do not have any reserved names for TargetPath
-        assert not path_fs.path("CON").is_reserved()
-        assert not path_fs.path("foo").is_reserved()
+    # We currently do not have any reserved names for TargetPath
+    assert not path_fs.path("CON").is_reserved()
+    assert not path_fs.path("foo").is_reserved()
 
 
 def test_target_path_join(path_fs: VirtualFilesystem) -> None:
@@ -759,7 +759,9 @@ def test_reverse_readlines() -> None:
     ]
 
     vfs.map_file_fh("file_multi_long_single", io.BytesIO((("🦊" * 8000) + ("a" * 200)).encode()))
-    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [("🦊" * 8000) + ("a" * 200)]
+    assert list(fsutil.reverse_readlines(vfs.path("file_multi_long_single").open("rt"))) == [
+        ("🦊" * 8000) + ("a" * 200)
+    ]
 
     vfs.map_file_fh("empty", io.BytesIO(b""))
     assert list(fsutil.reverse_readlines(vfs.path("empty").open("rt"))) == []
