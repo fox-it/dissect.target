@@ -290,7 +290,7 @@ def translate_file_path(domain: str, relative_path: str) -> str:
         package_name = ""
 
     domain_path = fsutil.join(DOMAIN_TRANSLATION.get(domain, domain), package_name)
-    return fsutil.join(domain_path, relative_path)
+    return fsutil.join(domain_path, relative_path).rstrip("/")
 
 
 def parse_key_bag(buf: bytes) -> tuple[dict[str, bytes, int], dict[str, ClassKey]]:
