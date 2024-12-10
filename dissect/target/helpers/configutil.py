@@ -305,7 +305,6 @@ class Txt(ConfigurationParser):
 
 
 class Bin(ConfigurationParser):
-
     """Read the file into ``binary`` and show the number of bytes read"""
 
     def parse_file(self, fh: io.BytesIO) -> None:

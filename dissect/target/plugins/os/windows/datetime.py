@@ -1,7 +1,6 @@
 import calendar
 from collections import namedtuple
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Dict, Tuple
 
 from dissect.cstruct import cstruct
 
@@ -88,7 +87,7 @@ def parse_systemtime_transition(systemtime: c_tz._SYSTEMTIME, year: int) -> date
     )
 
 
-def parse_dynamic_dst(key: RegistryKey) -> Dict[int, TimezoneInformation]:
+def parse_dynamic_dst(key: RegistryKey) -> dict[int, TimezoneInformation]:
     """Parse dynamic DST information from a given TimeZoneInformation registry key.
 
     If a timezone has dynamic DST information, there's a "Dynamic DST" subkey with values for each year.
@@ -121,7 +120,7 @@ def parse_tzi(tzi: bytes) -> TimezoneInformation:
     )
 
 
-def get_dst_range(tzi: TimezoneInformation, year: int) -> Tuple[datetime, datetime]:
+def get_dst_range(tzi: TimezoneInformation, year: int) -> tuple[datetime, datetime]:
     """Get the start and end date of DST for the given year."""
     start = parse_systemtime_transition(tzi.daylight_date, year)
     end = parse_systemtime_transition(tzi.standard_date, year)
@@ -160,9 +159,19 @@ class WindowsTimezone(tzinfo):
             flip = True
             start, end = end, start
 
-        # Can't compare naive to aware objects, so strip the timezone from
-        # dt first.
-        dt = dt.replace(tzinfo=None)
+        # Can't compare naive to aware objects, so strip the timezone from dt first
+        # Cast to a proper datetime object to avoid issues with subclassed datetime objects
+        dt = datetime(
+            dt.year,
+            dt.month,
+            dt.day,
+            dt.hour,
+            dt.minute,
+            dt.second,
+            dt.microsecond,
+            tzinfo=None,
+            fold=dt.fold,
+        )
 
         result = False
         if start + HOUR <= dt < end - HOUR:
