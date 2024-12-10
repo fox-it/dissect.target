@@ -34,4 +34,5 @@ class VmdkContainer(Container):
         return self.vmdk.tell()
 
     def close(self) -> None:
-        pass
+        for disk in self.vmdk.disks:
+            disk.fh.close()
