@@ -1535,6 +1535,9 @@ class LayerFilesystemEntry(FilesystemEntry):
         yielded = {".", ".."}
         selfentry = self._resolve()
         for fsentry in selfentry.entries:
+            if not fsentry.is_dir():
+                continue
+
             for entry_name in fsentry.iterdir():
                 name = entry_name if selfentry.fs.case_sensitive else entry_name.lower()
                 if name in yielded:
@@ -1550,6 +1553,9 @@ class LayerFilesystemEntry(FilesystemEntry):
         items = defaultdict(list)
         selfentry = self._resolve()
         for fsentry in selfentry.entries:
+            if not fsentry.is_dir():
+                continue
+
             for entry in fsentry.scandir():
                 name = entry.name if selfentry.fs.case_sensitive else entry.name.lower()
                 if name in (".", ".."):
