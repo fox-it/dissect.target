@@ -76,17 +76,8 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
 
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
     assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
-
-    paths = list(target_bare.fs.path("sysvol").iterdir())
-
-    assert paths[2].exists()
-    assert paths[2] == target_bare.fs.path("sysvol/C-DRIVE.txt")
-
-    assert paths[5].exists()
-    assert paths[5] == target_bare.fs.path("sysvol/other.txt")
-
     assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("Microsoft-Windows-Windows Defender%4WHC.evtx")
+    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%254WHC.evtx").exists()
 
 
 @pytest.mark.parametrize(
@@ -116,7 +107,7 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
     assert target_bare.fs.path("sysvol/.TEST").exists()
-    assert target_bare.fs.path("Microsoft-Windows-Windows Defender%4WHC.evtx")
+    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%4WHC.evtx").exists()
 
 
 @pytest.mark.parametrize(
