@@ -27,12 +27,7 @@ class DirectoryFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on DirectoryFilesystem class")
 
-    def get(self, path: str) -> FilesystemEntry:
-        path = path.strip("/")
-
-        if not path:
-            return DirectoryFilesystemEntry(self, "/", self.base_path)
-
+    def _resolve_path(self, path: str) -> Path:
         if not self.case_sensitive:
             searchpath = self.base_path
 
@@ -47,6 +42,14 @@ class DirectoryFilesystem(Filesystem):
             entry = searchpath
         else:
             entry = self.base_path.joinpath(path.strip("/"))
+
+        return entry
+
+    def get(self, path: str) -> FilesystemEntry:
+        if not (path := path.strip("/")):
+            return DirectoryFilesystemEntry(self, "/", self.base_path)
+
+        entry = self._resolve_path(path)
 
         try:
             entry.lstat()
