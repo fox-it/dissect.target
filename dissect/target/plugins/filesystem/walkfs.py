@@ -37,6 +37,15 @@ class WalkFSPlugin(Plugin):
     @arg("--walkfs-path", default="/", help="path to recursively walk")
     def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
+
+        if not self.target.fs.path(walkfs_path).exists():
+            self.target.log.error("No such file or directory: '%s'", walkfs_path)
+            return
+
+        if not self.target.fs.path(walkfs_path).is_dir():
+            self.target.log.error("Not a directory: '%s'", walkfs_path)
+            return
+
         for entry in self.target.fs.recurse(walkfs_path):
             try:
                 yield generate_record(self.target, entry)
