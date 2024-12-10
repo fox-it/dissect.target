@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 from unittest.mock import patch
 
@@ -32,7 +34,7 @@ def extended_win_fs(fs_win):
         ),
     ],
 )
-def test_resolver_plugin_resolve(target_win, target_unix, test_target, resolve_func):
+def test_resolver_plugin_resolve(target_win, target_unix, test_target, resolve_func) -> None:
     targets = {
         "target_win": target_win,
         "target_unix": target_unix,
@@ -50,11 +52,11 @@ def test_resolver_plugin_resolve_no_path(target_win):
     assert target_win.resolve(path) is path
 
 
-def mock_expand_env(path):
+def mock_expand_env(path, user_sid: str | None = None) -> str:
     return path
 
 
-def mock_user_env(user):
+def mock_user_env(user) -> OrderedDict[str, str]:
     path_envs = {
         None: OrderedDict(
             (("%path%", "sysvol/windows/syswow64"),),
@@ -147,7 +149,7 @@ def mock_user_env(user):
         ),
     ],
 )
-def test_resolver_plugin_resolve_windows(target_win, extended_win_fs, path, user, resolved_path):
+def test_resolver_plugin_resolve_windows(target_win, path, extended_win_fs, user, resolved_path) -> None:
     resolver_plugin = ResolverPlugin(target_win)
     target_win.pathext  # This will load the EnvironmentVariablePlugin
     env_plugin = next(plugin for plugin in target_win._plugins if type(plugin).__name__ == "EnvironmentVariablePlugin")
