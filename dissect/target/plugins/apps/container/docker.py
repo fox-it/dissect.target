@@ -260,9 +260,11 @@ class DockerPlugin(Plugin):
                             ts=log_entry.get("time"),
                             container=container.name,  # container hash
                             stream=log_entry.get("stream"),
-                            message=log_entry.get("log")
-                            if raw_messages
-                            else strip_log(log_entry.get("log"), remove_backspaces),
+                            message=(
+                                log_entry.get("log")
+                                if raw_messages
+                                else strip_log(log_entry.get("log"), remove_backspaces)
+                            ),
                             _target=self.target,
                         )
 
@@ -273,9 +275,9 @@ class DockerPlugin(Plugin):
                             ts=ts.from_unix_us(log_entry.ts // 1000),
                             container=container.parent.name,  # container hash
                             stream=log_entry.source,
-                            message=log_entry.message
-                            if raw_messages
-                            else strip_log(log_entry.message, remove_backspaces),
+                            message=(
+                                log_entry.message if raw_messages else strip_log(log_entry.message, remove_backspaces)
+                            ),
                             _target=self.target,
                         )
 

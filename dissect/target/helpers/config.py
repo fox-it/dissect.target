@@ -70,6 +70,9 @@ def _find_config_file(paths: list[Path | str] | None) -> Path | None:
     config_file = None
 
     for path in paths:
+        if not path:
+            continue
+
         path = Path(path)
         cur_path = path.absolute()
 
