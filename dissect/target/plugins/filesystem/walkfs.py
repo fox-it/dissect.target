@@ -38,11 +38,13 @@ class WalkFSPlugin(Plugin):
     def walkfs(self, walkfs_path: str = "/") -> Iterator[FilesystemRecord]:
         """Walk a target's filesystem and return all filesystem entries."""
 
-        if not self.target.fs.path(walkfs_path).exists():
+        path = self.target.fs.path(walkfs_path)
+
+        if not path.exists():
             self.target.log.error("No such file or directory: '%s'", walkfs_path)
             return
 
-        if not self.target.fs.path(walkfs_path).is_dir():
+        if not path.is_dir():
             self.target.log.error("Not a directory: '%s'", walkfs_path)
             return
 
