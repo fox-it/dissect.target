@@ -32,7 +32,7 @@ class Overlay2Filesystem(LayerFilesystem):
         # base_path is /foo/bar/image/overlay2/layerdb/mounts/<id> so we traverse up to /foo/bar to get to the root.
         root = path.parents[4]
 
-        layers = []
+        layers: list[tuple[str, Path]] = []
         parent_layer = path.joinpath("parent").read_text()
 
         # iterate over all image layers
@@ -96,15 +96,16 @@ class Overlay2Filesystem(LayerFilesystem):
                 )
                 continue
 
+            layer_fs = VirtualFilesystem()
+
             # mount points can be files
             if layer.is_file():
-                layer_fs = VirtualFilesystem()
-                layer_fs.map_file_fh(dest, layer.open("rb"))
+                layer_fs.map_file_entry(dest, layer.get())
 
             # regular overlay2 layers are directories
             # mount points can be directories too
             else:
-                layer_fs = DirectoryFilesystem(layer)
+                layer_fs.map_vdir("/", layer)
 
             log.info("Adding layer %s to destination %s", layer, dest)
             self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
