@@ -840,11 +840,12 @@ class FilesystemEntry:
 class VirtualDirectory(FilesystemEntry):
     """Virtual directory implementation. Backed by a dict."""
 
-    def __init__(self, fs, path):
+    def __init__(self, fs, path, stat: fsutil.stat_result | None = None):
         super().__init__(fs, path, None)
         self.up = None
         self.top = None
         self.entries = {}
+        self._stat = stat
 
     def __getitem__(self, item) -> FilesystemEntry:
         if not self.fs.case_sensitive:
@@ -903,19 +904,19 @@ class VirtualDirectory(FilesystemEntry):
                     continue
                 yield entry
 
-    def _stat(self) -> fsutil.stat_result:
+    def _fake_stat(self) -> fsutil.stat_result:
         path_addr = fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator)
         return fsutil.stat_result([stat.S_IFDIR, path_addr, id(self.fs), 1, 0, 0, 0, 0, 0, 0])
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if self.top:
             return self.top.stat(follow_symlinks=follow_symlinks)
-        return self._stat()
+        return self._stat if self._stat else self._fake_stat()
 
     def lstat(self) -> fsutil.stat_result:
         if self.top:
             return self.top.lstat()
-        return self._stat()
+        return self._stat if self._stat else self._fake_stat()
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         return True
@@ -1148,7 +1149,7 @@ class VirtualFilesystem(Filesystem):
 
         return entry
 
-    def makedirs(self, path: str) -> VirtualDirectory:
+    def makedirs(self, path: str, stat: fsutil.stat_result | None = None) -> VirtualDirectory:
         """Create virtual directories into the VFS from the given path."""
         path = fsutil.normalize(path, alt_separator=self.alt_separator).strip("/")
         directory = self.root
@@ -1159,7 +1160,11 @@ class VirtualFilesystem(Filesystem):
         parts = path.split("/")
         for i, part in enumerate(parts):
             if part not in directory:
-                vdir = VirtualDirectory(self, fsutil.join(*parts[: i + 1], alt_separator=self.alt_separator))
+                vdir = VirtualDirectory(
+                    fs=self,
+                    path=fsutil.join(*parts[: i + 1], alt_separator=self.alt_separator),
+                    stat=stat if i + 1 == len(parts) else None,
+                )
                 vdir.up = directory
 
                 directory.add(part, vdir)
@@ -1174,6 +1179,23 @@ class VirtualFilesystem(Filesystem):
         directory.top = fs.get("/")
 
     mount = map_fs
+
+    def map_vdir(self, vfspath: str, tpath: pathlib.Path) -> None:
+        """Recursively map a directory from a target into the VFS."""
+        if not isinstance(tpath, pathlib.Path):
+            raise ValueError("Argument %s should be a Path or TargetPath instance", tpath)
+
+        vfspath = fsutil.normalize(vfspath, alt_separator=self.alt_separator).strip("/")
+
+        for path in tpath.rglob("*"):
+            relpath = str(path).replace(str(tpath), "")
+            relpath = fsutil.normalize(relpath, alt_separator=os.path.sep)
+
+            if path.is_dir():
+                self.makedirs(relpath, stat=path.lstat())
+
+            else:
+                self.map_file_entry(relpath, path.get())
 
     def map_dir(self, vfspath: str, realpath: str) -> None:
         """Recursively map a directory from the host machine into the VFS."""
