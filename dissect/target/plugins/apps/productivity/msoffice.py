@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 from pathlib import Path
-from typing import Iterable, Iterator, Set
+from typing import Iterable, Iterator
 from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
@@ -53,17 +53,17 @@ class ClickOnceDeploymentManifestParser:
     def __init__(self, target: Target, user_sid: str) -> None:
         self._target = target
         self._user_sid = user_sid
-        self._visited_manifests: Set[Path] = set()
-        self._codebases: Set[Path] = set()
+        self._visited_manifests: set[Path] = set()
+        self._codebases: set[Path] = set()
 
-    def find_codebases(self, manifest_path: str) -> Iterable[str]:
+    def find_codebases(self, manifest_path: str) -> set[str]:
         """Dig for executables given a manifest"""
 
         self._visited_manifests.clear()
         self._codebases.clear()
         return self._parse_manifest(manifest_path)
 
-    def _parse_manifest(self, manifest_path_str: str) -> Set[Path]:
+    def _parse_manifest(self, manifest_path_str: str) -> set[Path]:
         # See https://learn.microsoft.com/en-us/visualstudio/deployment/clickonce-deployment-manifest?view=vs-2022
 
         manifest_path: Path = self._target.resolve(manifest_path_str, self._user_sid)
@@ -141,14 +141,6 @@ class MSOffice(Plugin):
     def check_compatible(self) -> None:
         if not self.target.has_function("registry") or not list(self.target.registry.keys(f"HKLM\\{self.OFFICE_KEY}")):
             raise UnsupportedPluginError("Registry key not found: %s", self.OFFICE_KEY)
-
-    @export(record=[OfficeWebAddinRecord, OfficeNativeAddinRecord, OfficeStartupItem])
-    def all(self) -> Iterator[OfficeWebAddinRecord | OfficeNativeAddinRecord | OfficeStartupItem]:
-        """Aggregate to list all add-in types and startup items"""
-
-        yield from self.startup()
-        yield from self.web()
-        yield from self.native()
 
     @export(record=OfficeWebAddinRecord)
     def web(self) -> Iterator[OfficeWebAddinRecord]:
@@ -246,7 +238,7 @@ class MSOffice(Plugin):
             except RegistryError:
                 pass
 
-    def _parse_vsto_manifest(self, manifest_path: str, user_sid: str) -> Iterable[str]:
+    def _parse_vsto_manifest(self, manifest_path: str, user_sid: str) -> set[str]:
         """Parse a vsto manifest.
 
         Non-local manifests, i.e. not ending with suffix "vstolocal" are listed but skipped.
@@ -254,16 +246,13 @@ class MSOffice(Plugin):
 
         if not manifest_path.endswith("vstolocal"):
             self.target.log.warning("Parsing of remote vsto manifest %s is not supported")
-            return [manifest_path]
+            return set(manifest_path)
 
         manifest_parser = ClickOnceDeploymentManifestParser(self.target, user_sid)
         return manifest_parser.find_codebases(manifest_path.removesuffix("|vstolocal"))
 
     def _parse_web_addin_manifest(self, manifest_path: Path) -> OfficeWebAddinRecord:
-        """Parses a web addin manifest.
-
-        See https://learn.microsoft.com/en-us/office/dev/add-ins/develop/xml-manifest-overview?tabs=tabid-1
-        """
+        """Parses a web addin manifest."""
 
         ns = {"": "http://schemas.microsoft.com/office/appforoffice/1.1"}
 
