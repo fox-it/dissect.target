@@ -86,7 +86,7 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
                 source=self.source,
                 last_connected=self.last_connected,
                 name=self.name,
-                mac=[self.mac_address] if self.mac_address else [],
+                mac=to_list(self.mac_address),
                 type=self.type,
                 dhcp_ipv4=self.dhcp_ipv4,
                 dhcp_ipv6=self.dhcp_ipv6,
