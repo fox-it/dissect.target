@@ -11,6 +11,7 @@ from dissect.target.exceptions import (
     HiveUnavailableError,
     RegistryError,
     RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
     UnsupportedPluginError,
 )
 from dissect.target.helpers.fsutil import TargetPath
@@ -287,15 +288,6 @@ class RegistryPlugin(Plugin):
         return res
 
     @internal
-    def key_or_empty(self, key: Optional[str] = None) -> KeyCollection:
-        """Like key, but return empty keycollection if it does not exist."""
-
-        try:
-            return self.key(key)
-        except RegistryKeyNotFoundError:
-            return KeyCollection()
-
-    @internal
     def value(self, key: str, value: str) -> ValueCollection:
         """Convenience method for accessing a specific value."""
         return self.key(key).value(value)
@@ -322,10 +314,10 @@ class RegistryPlugin(Plugin):
         yield from self.keys(keys)
 
     @internal
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
+    def keys(self, keys: Union[str, list[str]]) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
-        Automatically resolves CurrentVersion keys. Also unrolls KeyCollections.
+        Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
         """
         keys = [keys] if not isinstance(keys, list) else keys
 
@@ -335,6 +327,19 @@ class RegistryPlugin(Plugin):
             except RegistryKeyNotFoundError:
                 pass
             except HiveUnavailableError:
+                pass
+
+    @internal
+    def values(self, keys: Union[str, list[str]], value: str) -> Iterator[RegistryValue]:
+        """Yields all values that match the given queries.
+
+        Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
+        """
+
+        for key in self.keys(keys):
+            try:
+                yield key.value(value)
+            except RegistryValueNotFoundError:
                 pass
 
     def _iter_controlset_keypaths(self, keys: list[str]) -> Iterator[str]:

@@ -308,7 +308,7 @@ class SmbRegistryKey(RegistryKey):
 
         return subkeys
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> str:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:

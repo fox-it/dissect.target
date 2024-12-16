@@ -161,7 +161,7 @@ class CbRegistryKey(RegistryKey):
     def subkeys(self) -> list[CbRegistryKey]:
         return list(map(self.subkey, self.data["sub_keys"]))
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> str:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:

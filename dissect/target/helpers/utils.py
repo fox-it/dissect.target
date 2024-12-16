@@ -30,7 +30,7 @@ T = TypeVar("T")
 
 
 def to_list(value: T | list[T] | None) -> list[T]:
-    """Convert a single value or a list of values to a list. A value of `None` is converted to an empty list.
+    """Convert a single value or a list of values to a list. A value of ``None`` is converted to an empty list.
 
     Args:
         value: The value to convert.

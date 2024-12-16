@@ -11,7 +11,7 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import KeyCollection
+from dissect.target.helpers.regutil import KeyCollection, ValueCollection
 from dissect.target.helpers.utils import to_list
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -158,15 +158,13 @@ class MSOffice(Plugin):
         """List all native (COM / vsto) add-ins by parsing the registry and manifest files."""
 
         addin_path_tuples = itertools.product(self.HIVES, [self.OFFICE_KEY], self.OFFICE_COMPONENTS, [self.ADD_IN_KEY])
-        for addin_path_tuple in addin_path_tuples:
-            addin_path = "\\".join(addin_path_tuple)
-            addin_key: KeyCollection = self.target.registry.key_or_empty(addin_path)
-
-            for addin in itertools.chain.from_iterable(addin_key.subkeys()):
+        addin_paths = ["\\".join(addin_path_tuple) for addin_path_tuple in addin_path_tuples]
+        for addin_key in self.target.registry.keys(addin_paths):
+            for addin in addin_key.subkeys():
                 key_owner = self.target.registry.get_user(addin)
                 sid = key_owner.sid if key_owner else None
 
-                if manifest_path_str := addin.value_or_default("Manifest").value:
+                if manifest_path_str := addin.value("Manifest", None).value:
                     addin_type = "vsto"
                     executables = self._parse_vsto_manifest(manifest_path_str, sid)
                 else:
@@ -175,7 +173,7 @@ class MSOffice(Plugin):
                     executables = to_list(self.target.resolve(dll_str, sid))
 
                 yield OfficeNativeAddinRecord(
-                    name=addin.value_or_default("FriendlyName").value,
+                    name=addin.value("FriendlyName", None).value,
                     load_behavior=self._parse_load_behavior(addin),
                     type=addin_type,
                     manifest=windows_path(manifest_path_str) if manifest_path_str else None,
@@ -201,7 +199,8 @@ class MSOffice(Plugin):
         # Get items from alternate machine or user scoped startup folder
         for hive in self.HIVES:
             for options_key, startup_value in self.OFFICE_STARTUP_OPTIONS:
-                for alt_startup_folder in self.target.registry.value_or_empty(f"{hive}\\{options_key}", startup_value):
+                alt_startup_folders = self.target.registry.values(f"{hive}\\{options_key}", startup_value)
+                for alt_startup_folder in alt_startup_folders:
                     user = self.target.registry.get_user(alt_startup_folder)
                     user_sid = user.sid if user else None
                     yield from self._walk_startup_folder(alt_startup_folder.value, user_sid)
@@ -278,10 +277,10 @@ class MSOffice(Plugin):
         # Typically, all components share the same root.
         # Curiously enough, the "Common" component has no InstallRoot defined.
         key = f"HKLM\\{self.OFFICE_KEY}\\16.0\\{component}\\InstallRoot"
-        if office_key := self.target.registry.value_or_empty(key, "Path"):
-            return office_key.value
-
-        return self.OFFICE_DEFAULT_ROOT
+        try:
+            return self.target.registry.value(key, "Path").value
+        except RegistryError:
+            return self.OFFICE_DEFAULT_ROOT
 
     def _machine_startup_folders(self) -> Iterable[str]:
         """Return machine-scoped office startup folders"""
@@ -297,7 +296,7 @@ class MSOffice(Plugin):
         See https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins?view=vs-2022#LoadBehavior # noqa: E501
         """
 
-        load_behavior = addin.value_or_default("LoadBehavior").value
+        load_behavior = addin.value("LoadBehavior", None).value
         if load_behavior is None:
             return None
         elif load_behavior == 3 or load_behavior == 16:
