@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
 from tests._utils import absolute_path
@@ -73,7 +73,7 @@ def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     fs = TarFilesystem(bio)
     target.filesystems.add(fs)
     target.fs.mount("/", fs)
-    target._os_plugin = default.DefaultPlugin
+    target._os_plugin = DefaultPlugin
     target.apply()
     target.add_plugin(MessagesPlugin)
 

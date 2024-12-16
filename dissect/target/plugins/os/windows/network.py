@@ -13,7 +13,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.helpers.record import WindowsInterfaceRecord
 from dissect.target.helpers.regutil import RegistryKey
-from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.plugins.os.default.network import NetworkPlugin
 from dissect.target.target import Target
 
 

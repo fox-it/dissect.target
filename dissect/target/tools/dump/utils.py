@@ -32,7 +32,7 @@ from flow.record.adapter.jsonfile import JsonfileWriter
 from flow.record.jsonpacker import JsonRecordPacker
 
 from dissect.target import Target
-from dissect.target.plugin import PluginFunction
+from dissect.target.plugin import FunctionDescriptor
 
 log = structlog.get_logger(__name__)
 
@@ -74,13 +74,13 @@ def get_nested_attr(obj: Any, nested_attr: str) -> Any:
 
 
 @lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_target(target: Target, function: PluginFunction) -> Path:
+def get_sink_dir_by_target(target: Target, function: FunctionDescriptor) -> Path:
     func_first_name, _, _ = function.name.partition(".")
     return Path(target.name) / func_first_name
 
 
 @functools.lru_cache(maxsize=DEST_DIR_CACHE_SIZE)
-def get_sink_dir_by_func(target: Target, function: PluginFunction) -> Path:
+def get_sink_dir_by_func(target: Target, function: FunctionDescriptor) -> Path:
     func_first_name, _, _ = function.name.partition(".")
     return Path(func_first_name) / target.name
 

@@ -2,7 +2,7 @@ from typing import Union
 
 import pytest
 
-from dissect.target.plugins.general.default import DefaultPlugin
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.target import Target
 
 

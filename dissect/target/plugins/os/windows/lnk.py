@@ -166,7 +166,7 @@ class LnkPlugin(Plugin):
                 lnk_file = Lnk(entry.open())
                 yield parse_lnk_file(self.target, lnk_file, entry)
             except Exception as e:
-                self.target.log.warning("Failed to parse link file %s", lnk_file)
+                self.target.log.warning("Failed to parse link file %s", entry)
                 self.target.log.debug("", exc_info=e)
 
     def lnk_entries(self, path: str | None = None) -> Iterator[TargetPath]:

@@ -141,4 +141,4 @@ def test_mru_plugin(target_win_mru):
     assert len(mstsc) == 3
     assert len(msoffice) == 6
 
-    assert len(list(target_win_mru.mru.get_all_records())) == 23
+    assert len(list(target_win_mru.mru())) == 23
