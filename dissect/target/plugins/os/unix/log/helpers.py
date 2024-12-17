@@ -26,7 +26,7 @@ def iso_readlines(file: Path, max_lines: int | None = None) -> Iterator[tuple[da
     """Iterator reading the provided log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
     with open_decompress(file, "rt") as fh:
         for i, line in enumerate(fh):
-            if max_lines is not None and i > max_lines:
+            if max_lines is not None and i >= max_lines:
                 log.debug("Stopping iso_readlines enumeration in %s: max_lines=%s was reached", file, max_lines)
                 break
 
