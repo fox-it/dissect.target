@@ -8,48 +8,62 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegfKey, RegistryValueNotFoundError
+from dissect.target.helpers.regutil import (
+    RegfKey,
+    RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
+)
 from dissect.target.plugin import Plugin, export
+from dissect.target.target import Target
 
 CamRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/cam",
     [
-        ("datetime", "ts"),
+        ("string", "device"),
         ("string", "app_name"),
         ("datetime", "last_used_time_start"),
         ("datetime", "last_used_time_stop"),
     ],
 )
 
-
 class CamPlugin(Plugin):
     """Plugin that iterates various Capability Access Manager registry key locations."""
 
-    BASE_KEY = "{}\\Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\{}"
-    DB_LOCATION = "sysvol/ProgramData/Microsoft/Windows/CapabilityAccessManager/CapabilityAccessManager.db"
+    CONSENT_STORE = "{}\\Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore"
     KEYS = []
 
-    def set_keys(self):
-        for key in self.target.registry.keys("HKU\\"):
+    def __init__(self, target: Target):
+        super().__init__(target)
+        for key in target.registry.keys("HKU\\"):
             if not key.subkeys():
                 continue
 
             for subkey in key.subkeys():
-                for resource in ["webcam", "microphone"]:
-                    self.KEYS.append(self.BASE_KEY.format(f"HKU\\{subkey.name}", resource))
-                    self.KEYS.append(self.BASE_KEY.format("HKLM", resource))
+                hku_base = f"HKU\\{subkey.name}"
+
+                try:
+                    for k in target.registry.key(self.CONSENT_STORE.format(hku_base)).subkeys():
+                        full_key_path = f"{hku_base}\\{k.path}"
+                        self.KEYS.append(full_key_path)
+                except RegistryKeyNotFoundError:
+                    pass
+
+                try:
+                    for k in target.registry.key(self.CONSENT_STORE.format("HKLM")).subkeys():
+                        full_key_path = f"HKLM\\Software\\{k.path}"  # For some reason "Software" disappears so added it here
+                        self.KEYS.append(full_key_path)
+                except RegistryKeyNotFoundError:
+                    pass
 
     def check_compatible(self) -> None:
-        self.set_keys()
-        if not len(list(self.target.registry.keys(self.KEYS))):
+        if not len(list(self.KEYS)):
             raise UnsupportedPluginError("No Capability Access Manager keys found")
 
     def yield_apps(self) -> Iterator[RegfKey]:
         for base_key in self.KEYS:
             for key in self.target.registry.keys(base_key):
-                application_keys = key.subkeys()
 
-                if not application_keys:
+                if not (application_keys := key.subkeys()):
                     continue
 
                 for app in application_keys:
@@ -60,12 +74,11 @@ class CamPlugin(Plugin):
 
     @export(record=CamRecord)
     def cam(self) -> Iterator[CamRecord]:
-        """Iterate Capability Access Manager key locations. See source for all locations.
+        """Iterate Capability Access Manager key locations.
 
-        The Capability Access Manager keeps track of processes that access I/O like devices,
-        like the webcam or microphone of a machine. This information is stored in registry.
-        Applications are divided into packaged and non-packaged applications meaning
-        Microsoft or non-Microsoft applications.
+        The Capability Access Manager keeps track of processes that access I/O devices, like the webcam or microphone.
+        Applications are divided into packaged and non-packaged applications meaning Microsoft or
+        non-Microsoft applications.
 
         References:
             - https://docs.velociraptor.app/exchange/artifacts/pages/windows.registry.capabilityaccessmanager/
@@ -79,22 +92,31 @@ class CamPlugin(Plugin):
             domain (string): The target domain.
             ts (datetime): The registry key last modified timestamp.
             app_name (string): The name of the application.
-            last_used_time_start (datetime): When the app last started using the microphone/webcam.
-            last_used_time_start (datetime): When the app last stopped using the microphone/webcam.
+            last_used (datetime): When the application last started using the device.
+            last_used (datetime): When the application last stopped using the device.
         """
 
         for key in self.yield_apps():
-            try:
-                last_used_time_start = wintimestamp(key.value("LastUsedTimeStart").value)
-                last_used_time_stop = wintimestamp(key.value("LastUsedTimeStop").value)
-            except RegistryValueNotFoundError:
-                continue
-
+            last_used_time_start = None
+            last_used_time_stop = None
             app_name = key.name.rsplit("\\", 1)[0]
             app_name = app_name.replace("#", "\\")
+            device = key.path.split("\\")[-2]
+
+            try:
+                last_used_time_start = wintimestamp(key.value("LastUsedTimeStart").value)
+            except RegistryValueNotFoundError:
+                self.target.log.warning("No LastUsedTimeStart for application: %s", key.name)
+                continue
+
+            try:
+                last_used_time_stop = wintimestamp(key.value("LastUsedTimeStop").value)
+            except RegistryValueNotFoundError:
+                self.target.log.warning("No LastUsedTimeStop for application: %s", key.name)
+                continue
 
             yield CamRecord(
-                ts=key.timestamp,
+                device=device,
                 app_name=app_name,
                 last_used_time_start=last_used_time_start,
                 last_used_time_stop=last_used_time_stop,
