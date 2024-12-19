@@ -11,13 +11,14 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.helpers.regutil import KeyCollection, ValueCollection
+from dissect.target.helpers.regutil import KeyCollection
 from dissect.target.helpers.utils import to_list
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 OfficeStartupItem = TargetRecordDescriptor(
-    "productivity/msoffice/startup_item", [("path", "path"), ("datetime", "creation_time")]
+    "productivity/msoffice/startup_item",
+    [("path", "path"), ("datetime", "creation_time"), ("datetime", "modification_time")],
 )
 
 # Web add-in
@@ -41,6 +42,7 @@ OfficeNativeAddinRecord = TargetRecordDescriptor(
         ("path[]", "codebases"),
         ("string", "load_behavior"),
         ("path", "manifest"),
+        ("datetime", "modification_time"),
     ],
 )
 
@@ -50,7 +52,8 @@ class ClickOnceDeploymentManifestParser:
 
     XML_NAMESPACE = {"": "urn:schemas-microsoft-com:asm.v2"}
 
-    def __init__(self, target: Target, user_sid: str) -> None:
+    def __init__(self, root_manifest_path: Path, target: Target, user_sid: str) -> None:
+        self.root_manifest_path = root_manifest_path
         self._target = target
         self._user_sid = user_sid
         self._visited_manifests: set[Path] = set()
@@ -59,14 +62,11 @@ class ClickOnceDeploymentManifestParser:
     def find_codebases(self, manifest_path: str) -> set[str]:
         """Dig for executables given a manifest"""
 
-        self._visited_manifests.clear()
-        self._codebases.clear()
         return self._parse_manifest(manifest_path)
 
-    def _parse_manifest(self, manifest_path_str: str) -> set[Path]:
+    def _parse_manifest(self, manifest_path: Path) -> set[Path]:
         # See https://learn.microsoft.com/en-us/visualstudio/deployment/clickonce-deployment-manifest?view=vs-2022
 
-        manifest_path: Path = self._target.resolve(manifest_path_str, self._user_sid)
         if manifest_path in self._visited_manifests:
             return self._codebases  # Prevent cycles
 
@@ -99,7 +99,7 @@ class ClickOnceDeploymentManifestParser:
             return  # Ignore files which are not actually installed, for example due to language settings
 
         if codebase_path.name.endswith(".manifest"):
-            self._parse_manifest(str(codebase_path))  # Yes, a codebase can point to another manifest
+            self._parse_manifest(codebase_path)  # Yes, a codebase can point to another manifest
             return
 
         self._codebases.add(codebase_path)
@@ -174,6 +174,7 @@ class MSOffice(Plugin):
 
                 yield OfficeNativeAddinRecord(
                     name=addin.value("FriendlyName", None).value,
+                    modification_time=addin.timestamp,
                     load_behavior=self._parse_load_behavior(addin),
                     type=addin_type,
                     manifest=windows_path(manifest_path_str) if manifest_path_str else None,
@@ -218,13 +219,16 @@ class MSOffice(Plugin):
 
         resolved_startup_folder_str = self.target.resolve(startup_folder, user_sid)
         resolved_startup_folder: Path = self.target.fs.path(resolved_startup_folder_str)
-        if not resolved_startup_folder.exists() or not resolved_startup_folder.is_dir():
+        if not resolved_startup_folder.is_dir():
             return
 
         for current_path, _, plugin_files in resolved_startup_folder.walk():
             for plugin_file in plugin_files:
                 item_startup = current_path / plugin_file
-                yield OfficeStartupItem(path=item_startup, creation_time=item_startup.stat().st_birthtime)
+                stats = item_startup.stat()
+                yield OfficeStartupItem(
+                    path=item_startup, creation_time=stats.st_birthtime, modification_time=stats.st_mtime
+                )
 
     def _lookup_com_executable(self, prog_id: str) -> str | None:
         """Lookup the com executable given a prog id using the registry."""
@@ -237,18 +241,19 @@ class MSOffice(Plugin):
             except RegistryError:
                 pass
 
-    def _parse_vsto_manifest(self, manifest_path: str, user_sid: str) -> set[str]:
+    def _parse_vsto_manifest(self, manifest_path_str: str, user_sid: str) -> set[str]:
         """Parse a vsto manifest.
 
         Non-local manifests, i.e. not ending with suffix "vstolocal" are listed but skipped.
         """
 
-        if not manifest_path.endswith("vstolocal"):
+        if not manifest_path_str.endswith("vstolocal"):
             self.target.log.warning("Parsing of remote vsto manifest %s is not supported")
-            return set(manifest_path)
+            return set(manifest_path_str)
 
-        manifest_parser = ClickOnceDeploymentManifestParser(self.target, user_sid)
-        return manifest_parser.find_codebases(manifest_path.removesuffix("|vstolocal"))
+        manifest_path: Path = self.target.resolve(manifest_path_str.removesuffix("|vstolocal"), user_sid)
+        manifest_parser = ClickOnceDeploymentManifestParser(manifest_path, self.target, user_sid)
+        return manifest_parser.find_codebases(manifest_path)
 
     def _parse_web_addin_manifest(self, manifest_path: Path) -> OfficeWebAddinRecord:
         """Parses a web addin manifest."""
