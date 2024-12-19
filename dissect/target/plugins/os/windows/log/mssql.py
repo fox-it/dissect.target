@@ -90,7 +90,7 @@ class MssqlPlugin(Plugin):
                     buf += line
 
     def _find_instances(self) -> set[str, TargetPath]:
-        instances: set = set()
+        instances = set()
 
         for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB):
             if "." in subkey.name:
