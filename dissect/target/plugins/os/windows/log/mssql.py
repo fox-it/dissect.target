@@ -44,7 +44,7 @@ class MssqlPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.instances:
-            raise UnsupportedPluginError("No Microsoft SQL Server instances have been found.")
+            raise UnsupportedPluginError("No Microsoft SQL Server instances have been found")
 
     @export(record=MssqlErrorlogRecord)
     def errorlog(self) -> Iterator[MssqlErrorlogRecord]:
