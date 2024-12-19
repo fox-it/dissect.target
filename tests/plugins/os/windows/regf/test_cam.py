@@ -30,12 +30,12 @@ def test_cam(target_win_users: Target, hive_hku: VirtualHive):
     target_win_users.add_plugin(CamPlugin)
     results = list(target_win_users.cam())
 
-    assert len(results) == 2
+    assert len(results) == 3
     assert results[0].device == "webcam"
     assert results[0].app_name == "Microsoft.WindowsCamera_8wekyb3d8bbwe"
-    assert results[0].last_used_time_start == wintimestamp(133784711366495858)
-    assert results[0].last_used_time_stop == wintimestamp(133784711515887950)
+    assert results[0].last_started == wintimestamp(133784711366495858)
+    assert results[0].last_stopped == wintimestamp(133784711515887950)
     assert results[1].device == "webcam"
     assert results[1].app_name == "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
-    assert results[1].last_used_time_start == wintimestamp(133788466426086184)
-    assert results[1].last_used_time_stop == wintimestamp(133788466774490036)
+    assert results[1].last_started == wintimestamp(133788466426086184)
+    assert results[1].last_stopped == wintimestamp(133788466774490036)

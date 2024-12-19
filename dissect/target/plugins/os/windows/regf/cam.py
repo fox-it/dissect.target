@@ -21,10 +21,11 @@ CamRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserR
     [
         ("string", "device"),
         ("string", "app_name"),
-        ("datetime", "last_used_time_start"),
-        ("datetime", "last_used_time_stop"),
+        ("datetime", "last_started"),
+        ("datetime", "last_stopped"),
     ],
 )
+
 
 class CamPlugin(Plugin):
     """Plugin that iterates various Capability Access Manager registry key locations."""
@@ -50,7 +51,9 @@ class CamPlugin(Plugin):
 
                 try:
                     for k in target.registry.key(self.CONSENT_STORE.format("HKLM")).subkeys():
-                        full_key_path = f"HKLM\\Software\\{k.path}"  # For some reason "Software" disappears so added it here
+                        full_key_path = (
+                            f"HKLM\\Software\\{k.path}"  # For some reason "Software" disappears so added it here
+                        )
                         self.KEYS.append(full_key_path)
                 except RegistryKeyNotFoundError:
                     pass
@@ -62,15 +65,12 @@ class CamPlugin(Plugin):
     def yield_apps(self) -> Iterator[RegfKey]:
         for base_key in self.KEYS:
             for key in self.target.registry.keys(base_key):
+                if application_keys := key.subkeys():
+                    for app in application_keys:
+                        if "NonPackaged" in app.name:  # NonPackaged registry key has more apps, so yield those apps
+                            yield from app.subkeys()
 
-                if not (application_keys := key.subkeys()):
-                    continue
-
-                for app in application_keys:
-                    if "NonPackaged" in app.name:  # NonPackaged registry key has more apps, so yield those apps
-                        yield from app.subkeys()
-
-                    yield app
+                        yield app
 
     @export(record=CamRecord)
     def cam(self) -> Iterator[CamRecord]:
@@ -84,42 +84,41 @@ class CamPlugin(Plugin):
             - https://docs.velociraptor.app/exchange/artifacts/pages/windows.registry.capabilityaccessmanager/
             - https://svch0st.medium.com/can-you-track-processes-accessing-the-camera-and-microphone-7e6885b37072
 
-        Yields Capability Access Manager keys with fields:
+        Yields Cam records with the following fields:
 
         .. code-block:: text
 
             hostname (string): The target hostname.
             domain (string): The target domain.
-            ts (datetime): The registry key last modified timestamp.
             app_name (string): The name of the application.
-            last_used (datetime): When the application last started using the device.
-            last_used (datetime): When the application last stopped using the device.
+            last_started (datetime): When the application last started using the device.
+            last_stopped (datetime): When the application last stopped using the device.
         """
 
         for key in self.yield_apps():
-            last_used_time_start = None
-            last_used_time_stop = None
+            last_started = None
+            last_stopped = None
             app_name = key.name.rsplit("\\", 1)[0]
             app_name = app_name.replace("#", "\\")
             device = key.path.split("\\")[-2]
 
             try:
-                last_used_time_start = wintimestamp(key.value("LastUsedTimeStart").value)
+                last_started = wintimestamp(key.value("LastUsedTimeStart").value)
             except RegistryValueNotFoundError:
                 self.target.log.warning("No LastUsedTimeStart for application: %s", key.name)
-                continue
+                pass
 
             try:
-                last_used_time_stop = wintimestamp(key.value("LastUsedTimeStop").value)
+                last_stopped = wintimestamp(key.value("LastUsedTimeStop").value)
             except RegistryValueNotFoundError:
                 self.target.log.warning("No LastUsedTimeStop for application: %s", key.name)
-                continue
+                pass
 
             yield CamRecord(
                 device=device,
                 app_name=app_name,
-                last_used_time_start=last_used_time_start,
-                last_used_time_stop=last_used_time_stop,
+                last_started=last_started,
+                last_stopped=last_stopped,
                 _target=self.target,
                 _key=key,
                 _user=self.target.registry.get_user(key),
