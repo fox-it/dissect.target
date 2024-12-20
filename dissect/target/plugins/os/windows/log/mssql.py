@@ -35,7 +35,7 @@ class MssqlPlugin(Plugin):
 
     __namespace__ = "mssql"
 
-    MSSQL_KEY_GLOB = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*"
+    MSSQL_KEY_GLOB = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.*"
     FILE_GLOB = "ERRORLOG*"
 
     def __init__(self, target: Target):
@@ -93,11 +93,10 @@ class MssqlPlugin(Plugin):
         instances = set()
 
         for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB):
-            if "." in subkey.name:
-                instances.add(
-                    (
-                        subkey.name,
-                        self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent,
-                    )
+            instances.add(
+                (
+                    subkey.name,
+                    self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent,
                 )
+            )
         return instances
