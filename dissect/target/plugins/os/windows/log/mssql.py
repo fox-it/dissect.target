@@ -90,13 +90,7 @@ class MssqlPlugin(Plugin):
                     buf += line
 
     def _find_instances(self) -> set[str, TargetPath]:
-        instances = set()
-
-        for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB):
-            instances.add(
-                (
-                    subkey.name,
-                    self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent,
-                )
-            )
-        return instances
+        return {
+            (subkey.name, self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent)
+            for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB)
+        }
