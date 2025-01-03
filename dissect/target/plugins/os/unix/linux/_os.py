@@ -8,6 +8,7 @@ from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import (
     LinuxNetworkManager,
+    parse_unix_dhcp_leases,
     parse_unix_dhcp_log_messages,
 )
 from dissect.target.plugins.os.windows._os import WindowsPlugin
@@ -39,8 +40,11 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         for ip_set in self.network_manager.get_config_value("ips"):
             ips.update(ip_set)
 
-        for ip in parse_unix_dhcp_log_messages(self.target, iter_all=False):
-            ips.add(ip)
+        if dhcp_lease_ips := parse_unix_dhcp_leases(self.target):
+            ips.update(dhcp_lease_ips)
+
+        elif dhcp_log_ips := parse_unix_dhcp_log_messages(self.target, iter_all=False):
+            ips.update(dhcp_log_ips)
 
         return list(ips)
 

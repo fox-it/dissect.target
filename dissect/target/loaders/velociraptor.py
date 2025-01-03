@@ -4,7 +4,11 @@ import logging
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import quote, unquote
 
+from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.zip import ZipFilesystem
+from dissect.target.helpers.fsutil import basename, dirname, join
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -87,11 +91,13 @@ class VelociraptorLoader(DirLoader):
         super().__init__(path)
 
         if path.suffix == ".zip":
-            log.warning(
-                f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
-                "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
-            )
             self.root = zipfile.Path(path.open("rb"))
+            if self.root.root.getinfo("uploads.json").compress_type > 0:
+                log.warning(
+                    "Velociraptor target '%s' is compressed, which will slightly affect performance. "
+                    "Consider uncompressing the archive and passing the uncompressed folder to Dissect.",
+                    path,
+                )
         else:
             self.root = path
 
@@ -116,14 +122,28 @@ class VelociraptorLoader(DirLoader):
 
     def map(self, target: Target) -> None:
         os_type, dirs = find_fs_directories(self.root)
-        if os_type == OperatingSystem.WINDOWS:
-            # Velociraptor doesn't have the correct filenames for the paths "$J" and "$Secure:$SDS"
-            map_dirs(
-                target,
-                dirs,
-                os_type,
-                usnjrnl_path="$Extend/$UsnJrnl%3A$J",
-                sds_path="$Secure%3A$SDS",
-            )
-        else:
-            map_dirs(target, dirs, os_type)
+
+        # Velociraptor URL encodes paths before storing these in a collection, this leads plugins not being able to find
+        # these paths. To circumvent this issue, for a zip file the path names are URL decoded before mapping into the
+        # VFS and for a directory the paths are URL encoded at lookup time.
+        map_dirs(
+            target,
+            dirs,
+            os_type,
+            dirfs=VelociraptorDirectoryFilesystem,
+            zipfs=VelociraptorZipFilesystem,
+        )
+
+
+class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
+    def _resolve_path(self, path: str) -> Path:
+        path = quote(path, safe="$/% ")
+        if (fname := basename(path)).startswith("."):
+            path = join(dirname(path), fname.replace(".", "%2E", 1))
+
+        return super()._resolve_path(path)
+
+
+class VelociraptorZipFilesystem(ZipFilesystem):
+    def _resolve_path(self, path: str) -> str:
+        return unquote(super()._resolve_path(path))

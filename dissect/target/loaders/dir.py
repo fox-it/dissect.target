@@ -37,13 +37,24 @@ def find_entry_path(path: Path) -> str | None:
             return prefix
 
 
-def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, **kwargs) -> None:
+def map_dirs(
+    target: Target,
+    dirs: list[Path | tuple[str, Path]],
+    os_type: str,
+    *,
+    dirfs: type[DirectoryFilesystem] = DirectoryFilesystem,
+    zipfs: type[ZipFilesystem] = ZipFilesystem,
+    tarfs: type[TarFilesystem] = TarFilesystem,
+    **kwargs,
+) -> None:
     """Map directories as filesystems into the given target.
 
     Args:
         target: The target to map into.
         dirs: The directories to map as filesystems. If a list member is a tuple, the first element is the drive letter.
         os_type: The operating system type, used to determine how the filesystem should be mounted.
+        dirfs: The filesystem class to use for directory filesystems.
+        zipfs: The filesystem class to use for ZIP filesystems.
     """
     alt_separator = ""
     case_sensitive = True
@@ -60,11 +71,11 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
             drive_letter = path.name[0]
 
         if isinstance(path, zipfile.Path):
-            dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = zipfs(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
         elif hasattr(path, '_fs') and isinstance(path._fs, TarFilesystem):
-            dfs =  TarFilesystem(path._fs.tar.fileobj, str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs =  tarfs(path._fs.tar.fileobj, str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
-            dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
+            dfs = dirfs(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 
         drive_letter_map[drive_letter].append(dfs)
 

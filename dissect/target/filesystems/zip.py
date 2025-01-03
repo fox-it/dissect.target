@@ -56,13 +56,16 @@ class ZipFilesystem(Filesystem):
             if not mname.startswith(self.base) or mname == ".":
                 continue
 
-            rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
+            rel_name = self._resolve_path(mname)
             self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
         """Detect a zip file on a given file-like object."""
         return zipfile.is_zipfile(fh)
+
+    def _resolve_path(self, path: str) -> str:
+        return fsutil.normpath(path[len(self.base) :], alt_separator=self.alt_separator)
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
         """Returns a ZipFilesystemEntry object corresponding to the given path."""

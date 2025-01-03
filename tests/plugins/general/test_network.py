@@ -17,7 +17,7 @@ def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
         name="interface_name",
         type="physical",
         enabled=True,
-        mac="DE:AD:BE:EF:00:00",
+        mac=["DE:AD:BE:EF:00:00"],
         ip=["10.42.42.10"],
         gateway=["10.42.42.1"],
         dns=["8.8.8.8", "1.1.1.1"],
