@@ -3,53 +3,48 @@ from __future__ import annotations
 import logging
 import zipfile
 from pathlib import Path
-from typing import Union
 
-from dissect.target import target
-from dissect.target.filesystem import TarFilesystem
+from dissect.target.filesystems.tar import TarFilesystem
+from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.loader import Loader
 from dissect.target.loaders.dir import find_and_map_dirs
+from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 FILESYSTEMS_ROOT = "fs"
 
 
-def _get_root(path: Union[Path, str]):
-    if path.suffix == ".zip":
-        return zipfile.Path(path.open("rb"))
-    elif path.suffix == ".tar":
-        return TarFilesystem(path.open("rb")).path()
-    elif path.suffix in [".tar.gz", ".tgz"]:
-        log.warning(
-            f"Tar file {path!r} is compressed, which will affect performance. "
-            "Consider uncompressing the archive before passing the tar file to Dissect."
-        )
-        return TarFilesystem(path.open("rb")).path()
-    else:
-        return path
+def _get_root(path: Path):
+    if path.is_file():
+        fh = path.open("rb")
+        if TarFilesystem._detect(fh):
+            return TarFilesystem(fh).path()
+
+        # test this
+        if ZipFilesystem._detect(fh):
+            return zipfile.Path(path.open("rb"))
+
+    return None
 
 
 class AcquireLoader(Loader):
-    """
-    Load acquire collect files.
-        Supports both the zip and tar output
-        Only compatible with acquire >= 3.12 due to changed structure
-    """
-
-    def __init__(self, path: Union[Path, str], **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path)
 
         self.root = _get_root(path)
 
     @staticmethod
     def detect(path: Path) -> bool:
-        path = _get_root(path)
+        root = _get_root(path)
 
-        return path.joinpath(FILESYSTEMS_ROOT).exists()
+        if not root:
+            return False
 
-    def map(self, target: target.Target) -> None:
+        return root.joinpath(FILESYSTEMS_ROOT).exists()
+
+    def map(self, target: Target) -> None:
         find_and_map_dirs(
             target,
-            self.root.joinpath(FILESYSTEMS_ROOT),
+            self.root.joinpath(FILESYSTEMS_ROOT)
         )

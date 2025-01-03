@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
@@ -60,6 +61,8 @@ def map_dirs(target: Target, dirs: list[Path | tuple[str, Path]], os_type: str, 
 
         if isinstance(path, zipfile.Path):
             dfs = ZipFilesystem(path.root.fp, path.at, alt_separator=alt_separator, case_sensitive=case_sensitive)
+        elif hasattr(path, '_fs') and isinstance(path._fs, TarFilesystem):
+            dfs =  TarFilesystem(path._fs.tar.fileobj, str(path), alt_separator=alt_separator, case_sensitive=case_sensitive)
         else:
             dfs = DirectoryFilesystem(path, alt_separator=alt_separator, case_sensitive=case_sensitive)
 

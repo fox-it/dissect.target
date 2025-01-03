@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import tarfile
 from pathlib import Path
 
@@ -14,8 +13,6 @@ from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.loader import Loader
 
 log = logging.getLogger(__name__)
-
-ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
 
 class TarLoader(Loader):
@@ -37,14 +34,7 @@ class TarLoader(Loader):
 
     @staticmethod
     def detect(path: Path) -> bool:
-        if not path.name.lower().endswith((".tar", ".tar.gz", ".tgz")):
-            return False
-
-        # Check that this is not an acquire collect, that is handled by AcquireLoader
-        tar = tarfile.open(fileobj=path.open("rb"))
-        acquire_members = [m for m in tar.getmembers() if m.name.startswith(("/fs/", "fs/", "/sysvol/", "sysvol/"))]
-
-        return len(acquire_members) == 0
+        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
     def is_compressed(self, path: Path | str) -> bool:
         return str(path).lower().endswith((".tar.gz", ".tgz"))
