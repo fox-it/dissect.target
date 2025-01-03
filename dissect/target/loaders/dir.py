@@ -55,6 +55,7 @@ def map_dirs(
         os_type: The operating system type, used to determine how the filesystem should be mounted.
         dirfs: The filesystem class to use for directory filesystems.
         zipfs: The filesystem class to use for ZIP filesystems.
+        tarfs: The filesystem class to use for TAR filesystems.
     """
     alt_separator = ""
     case_sensitive = True
