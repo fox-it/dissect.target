@@ -135,7 +135,10 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
         for p in path.iterdir():
             # Look for directories like C or C:
             if p.is_dir() and (is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
-                dirs.append(p)
+                if p.name == "sysvol":
+                    dirs.append(('c', p))
+                else:
+                    dirs.append(p)
 
                 if not os_type:
                     os_type = os_type_from_path(p)

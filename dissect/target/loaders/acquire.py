@@ -13,6 +13,7 @@ from dissect.target.target import Target
 log = logging.getLogger(__name__)
 
 FILESYSTEMS_ROOT = "fs"
+FILESYSTEMS_LEGACY_ROOT = "sysvol"
 
 
 def _get_root(path: Path):
@@ -41,10 +42,15 @@ class AcquireLoader(Loader):
         if not root:
             return False
 
-        return root.joinpath(FILESYSTEMS_ROOT).exists()
+        return root.joinpath(FILESYSTEMS_ROOT).exists() or root.joinpath(FILESYSTEMS_LEGACY_ROOT).exists()
 
     def map(self, target: Target) -> None:
+        # Handle both root dir 'fs' and 'sysvol' (legacy)
+        fs_root = self.root
+        if fs_root.joinpath(FILESYSTEMS_ROOT).exists():
+            fs_root = fs_root.joinpath(FILESYSTEMS_ROOT)
+
         find_and_map_dirs(
             target,
-            self.root.joinpath(FILESYSTEMS_ROOT)
+            fs_root
         )
