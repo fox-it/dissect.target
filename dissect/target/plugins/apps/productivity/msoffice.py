@@ -232,7 +232,7 @@ class MSOffice(Plugin):
 
         for user_details in self.target.user_details.all_with_home():
             for manifest_path in user_details.home_path.glob(self.WEB_ADDIN_MANIFEST_GLOB):
-                if manifest_path.is_file():
+                if manifest_path.is_file() and manifest_path.suffix != ".metadata":
                     yield manifest_path
 
     def _walk_startup_folder(self, startup_folder: str, user_sid: str | None = None) -> Iterable[OfficeStartupItem]:
