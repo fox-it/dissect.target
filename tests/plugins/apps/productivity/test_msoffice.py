@@ -110,7 +110,8 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
     item, *_ = startup_items
     assert item.name == "An Excel vsto addin"
     assert item.type == "vsto"
-    assert item.load_behavior == "Manual"
+    assert item.load_behavior == "Autostart"
+    assert not item.loaded
     assert item.manifest == "c:\\vsto\\MicrosoftDataStreamerforExcel.vsto|vstolocal"
     assert item.codebases == ["c:\\vsto\\MicrosoftDataStreamerforExcel.dll"]
 

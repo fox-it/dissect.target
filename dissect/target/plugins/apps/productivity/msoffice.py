@@ -286,7 +286,7 @@ class MSOffice(Plugin):
         source_locations = [source_location.get("DefaultValue") for source_location in source_location_elements]
 
         display_name_element = manifest_tree.find(".//DisplayName", ns)
-        display_name = display_name_element.get("DefaultValue") if display_name_element else None
+        display_name = display_name_element.get("DefaultValue") if display_name_element is not None else None
 
         return OfficeWebAddinRecord(
             name=display_name,
