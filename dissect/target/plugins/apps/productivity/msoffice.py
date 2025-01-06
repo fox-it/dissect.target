@@ -54,6 +54,10 @@ class ClickOnceDeploymentManifestParser:
 
     XML_NAMESPACE = {"": "urn:schemas-microsoft-com:asm.v2"}
 
+    class Assembly(NamedTuple):
+        installed: bool
+        codebase: Path
+
     def __init__(self, root_manifest_path: Path, target: Target, user_sid: str) -> None:
         self.root_manifest_path = root_manifest_path
         self._target = target
@@ -61,12 +65,14 @@ class ClickOnceDeploymentManifestParser:
         self._visited_manifests: set[Path] = set()
         self._codebases: set[Path] = set()
 
-    def find_codebases(self, manifest_path: str) -> set[str]:
+    def find_codebases(self, manifest_path: str) -> set[Path]:
         """Dig for executables given a manifest"""
 
-        return self._parse_manifest(manifest_path)
+        assemblies = self._parse_manifest(manifest_path)
+        # Ignore pre-installed assemblies
+        return {assembly.codebase for assembly in assemblies if assembly.installed}
 
-    def _parse_manifest(self, manifest_path: Path) -> set[Path]:
+    def _parse_manifest(self, manifest_path: Path) -> set[Assembly]:
         # See https://learn.microsoft.com/en-us/visualstudio/deployment/clickonce-deployment-manifest?view=vs-2022
 
         if manifest_path in self._visited_manifests:
@@ -80,31 +86,29 @@ class ClickOnceDeploymentManifestParser:
             self._target.log.debug("", exc_info=e)
             return set()
 
-        dependent_assemblies = manifest_tree.findall(".//dependentAssembly", self.XML_NAMESPACE)
-        for dependent_assembly in dependent_assemblies:
-            self._parse_dependent_assembly(dependent_assembly, manifest_path.parent)
+        dependent_assemblies: set[self.Assembly] = set()
+        dependent_assembly_elements = manifest_tree.findall(".//dependentAssembly", self.XML_NAMESPACE)
+        for dependent_assembly_element in dependent_assembly_elements:
+            dependent_assemblies |= self._parse_dependent_assembly(dependent_assembly_element, manifest_path.parent)
 
-        return self._codebases
+        return dependent_assemblies
 
-    def _parse_dependent_assembly(self, dependent_assembly: Element, cwd: Path) -> None:
+    def _parse_dependent_assembly(self, dependent_assembly: Element, cwd: Path) -> set[Assembly]:
         # See https://learn.microsoft.com/en-us/visualstudio/deployment/dependency-element-clickonce-deployment?view=vs-2022#dependentassembly # noqa: E501
 
-        if dependent_assembly.get("dependencyType") != "install":
-            return  # Ignore prerequisites dependencies
-
         if not (codebase_str_path := dependent_assembly.get("codebase")):
-            return
+            return set()
 
         codebase_str_path = fsutil.abspath(codebase_str_path, str(cwd), alt_separator=self._target.fs.alt_separator)
         codebase_path: Path = self._target.fs.path(codebase_str_path)
         if not codebase_path.exists():
-            return  # Ignore files which are not actually installed, for example due to language settings
+            return set()     # Ignore files which are not actually installed, for example due to language settings
 
-        if codebase_path.name.endswith(".manifest"):
-            self._parse_manifest(codebase_path)  # Yes, a codebase can point to another manifest
-            return
+        installed = dependent_assembly.get("dependencyType") == "install"
+        if codebase_path.name.endswith(".manifest") and installed:
+            return self._parse_manifest(codebase_path)  # Yes, a codebase can point to another manifest
 
-        self._codebases.add(codebase_path)
+        return {self.Assembly(installed, codebase_path)}
 
 
 class LoadBehavior(Enum):
