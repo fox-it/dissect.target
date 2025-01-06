@@ -31,6 +31,7 @@ OfficeWebAddinRecord = TargetRecordDescriptor(
         ("path", "manifest"),
         ("string", "version"),
         ("string", "provider_name"),
+        ("datetime", "modification_time"),
     ],
 )
 
@@ -294,6 +295,7 @@ class MSOffice(Plugin):
             version=manifest_tree.findtext(".//Version", namespaces=ns),
             provider_name=manifest_tree.findtext(".//ProviderName", namespaces=ns),
             source_locations=filter(None, source_locations),
+            modification_time=manifest_path.stat().st_mtime,
         )
 
     def _office_install_root(self, component: str) -> str:
