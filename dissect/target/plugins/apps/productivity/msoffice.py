@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from enum import Enum
 import itertools
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, NamedTuple
 from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
@@ -40,6 +41,7 @@ OfficeNativeAddinRecord = TargetRecordDescriptor(
         ("string", "name"),
         ("string", "type"),
         ("path[]", "codebases"),
+        ("boolean", "loaded"),
         ("string", "load_behavior"),
         ("path", "manifest"),
         ("datetime", "modification_time"),
@@ -103,6 +105,18 @@ class ClickOnceDeploymentManifestParser:
             return
 
         self._codebases.add(codebase_path)
+
+
+class LoadBehavior(Enum):
+    Manual = 1
+    Autostart = 2
+    OnDemand = 3
+    FistTime = 4
+
+
+class NativePluginStatus(NamedTuple):
+    loaded: bool
+    load_behavior: LoadBehavior
 
 
 class MSOffice(Plugin):
@@ -172,10 +186,12 @@ class MSOffice(Plugin):
                     dll_str = self._lookup_com_executable(addin.name)
                     executables = to_list(self.target.resolve(dll_str, sid))
 
+                nativePluginStatus = self._parse_plugin_status(addin)
                 yield OfficeNativeAddinRecord(
                     name=addin.value("FriendlyName", None).value,
                     modification_time=addin.timestamp,
-                    load_behavior=self._parse_load_behavior(addin),
+                    loaded=nativePluginStatus.loaded if nativePluginStatus else None,
+                    load_behavior=nativePluginStatus.load_behavior.name if nativePluginStatus else None,
                     type=addin_type,
                     manifest=windows_path(manifest_path_str) if manifest_path_str else None,
                     codebases=executables,
@@ -266,7 +282,7 @@ class MSOffice(Plugin):
         source_locations = [source_location.get("DefaultValue") for source_location in source_location_elements]
 
         display_name_element = manifest_tree.find(".//DisplayName", ns)
-        display_name = display_name_element.get("DefaultValue") if display_name_element is not None else None
+        display_name = display_name_element.get("DefaultValue") if display_name_element else None
 
         return OfficeWebAddinRecord(
             name=display_name,
@@ -295,18 +311,29 @@ class MSOffice(Plugin):
         yield fsutil.join(self._office_install_root("Word"), "Templates", alt_separator="\\")
         yield fsutil.join(self._office_install_root("Word"), "Document Themes", alt_separator="\\")
 
-    def _parse_load_behavior(self, addin: KeyCollection) -> str | None:
+    def _parse_plugin_status(self, addin: KeyCollection) -> NativePluginStatus | None:
         """Parse the registry value which controls if the add-in autostarts.
 
         See https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins?view=vs-2022#LoadBehavior # noqa: E501
         """
 
         load_behavior = addin.value("LoadBehavior", None).value
+
         if load_behavior is None:
             return None
-        elif load_behavior == 3 or load_behavior == 16:
-            return "Autostart"
+        elif load_behavior == 0:
+            return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.Manual)
+        elif load_behavior == 1:
+            return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.Manual)
+        elif load_behavior == 2:
+            return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.Autostart)
+        elif load_behavior == 3:
+            return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.Autostart)
+        elif load_behavior == 8:
+            return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.OnDemand)
         elif load_behavior == 9:
-            return "OnDemand"
+            return NativePluginStatus(loaded=True, load_behavior=LoadBehavior.OnDemand)
+        elif load_behavior == 16:
+            return NativePluginStatus(loaded=False, load_behavior=LoadBehavior.FistTime)
 
-        return "Manual"
+        return None
