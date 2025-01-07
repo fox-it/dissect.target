@@ -9,7 +9,6 @@ from typing import Iterator, Optional, Union
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
-    RegistryError,
     RegistryKeyNotFoundError,
     RegistryValueNotFoundError,
     UnsupportedPluginError,
@@ -291,17 +290,6 @@ class RegistryPlugin(Plugin):
     def value(self, key: str, value: str) -> ValueCollection:
         """Convenience method for accessing a specific value."""
         return self.key(key).value(value)
-
-    @internal
-    def value_or_empty(self, key: str, value: str) -> ValueCollection:
-        """Convenience method for trying to access a specific value.
-
-        Returns a empty collection if the key or value does not exist.
-        """
-        try:
-            return self.value(key, value)
-        except RegistryError:
-            return ValueCollection()
 
     @internal
     def subkey(self, key: str, subkey: str) -> KeyCollection:

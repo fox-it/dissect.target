@@ -176,7 +176,6 @@ class MSOffice(Plugin):
         These add-ins can interact with the content in Office documents and provide additional features and capabilities.
         The WEF folder contains cached data and manifests for Office Web Add-ins.
         The manifest includes information about the add-ins, such as their source locations, display names, and other metadata.
-        The folder is used by Office applications to load and manage the add-ins.
 
         References:
             - https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins
@@ -190,7 +189,7 @@ class MSOffice(Plugin):
             name (string): The display name of the add-in.
             version (string): The version of the add-in.
             provider_name (string): The provider name of the add-in.
-            source_locations (string[]): URLs referencing the source code of the add-in.
+            source_locations (string[]): URLs referencing the web assets of the add-in (such as javascript and html files).
         """  # noqa: E501
 
         for manifest_file in self._wef_cache_folders():
