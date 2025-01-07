@@ -10,7 +10,7 @@ from enum import IntEnum
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, NewType, Optional, TextIO, Union
 
 from dissect.regf import c_regf, regf
 
@@ -161,9 +161,10 @@ class RegistryKey:
         """Returns a list of subkeys from this key."""
         raise NotImplementedError()
 
-    __marker = object()
+    Marker = NewType("Marker", object)
+    __marker = Marker(object())
 
-    def value(self, value: str, default: ValueType = __marker) -> RegistryValue:
+    def value(self, value: str, default: ValueType | Marker = __marker) -> RegistryValue:
         """Returns a specific value from this key.
 
         Args:

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import itertools
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, Iterator, NamedTuple
+from typing import Iterable, Iterator, Literal, NamedTuple
 from xml.etree.ElementTree import Element
 
 from defusedxml import ElementTree
@@ -51,7 +52,11 @@ OfficeNativeAddinRecord = TargetRecordDescriptor(
 
 
 class ClickOnceDeploymentManifestParser:
-    """Parser for information about vsto plugins"""
+    """Parser to extact information out ClickOnce deployment manifest files.
+
+    Currently only extracts codebase information. Also handles nested manifests.
+    Can be extended to a .NET assembly parser in the future.
+    """
 
     XML_NAMESPACE = {"": "urn:schemas-microsoft-com:asm.v2"}
 
@@ -133,16 +138,18 @@ class MSOffice(Plugin):
     OFFICE_KEY = "Software\\Microsoft\\Office"
     OFFICE_COMPONENTS = ["Access", "Excel", "Outlook", "PowerPoint", "Word", "OneNote"]
     ADD_IN_KEY = "Addins"
-    WEB_ADDIN_MANIFEST_GLOB = "AppData/Local/Microsoft/Office/16.0/Wef/**/Manifests/**/*"
     OFFICE_DEFAULT_USER_STARTUP = [
         "%APPDATA%/Microsoft/Templates",
         "%APPDATA%/Microsoft/Word/Startup",
         "%APPDATA%/Microsoft/Excel/XLSTART",
+        "%APPDATA%/Microsoft/Outlook/Startup",
+        "%APPDATA%/Microsoft/PowerPoint/Startup",
     ]
 
     OFFICE_DEFAULT_ROOT = "C:/Program Files/Microsoft Office/root/Office16/"
 
     # Office is fixed at version 16.0 since Microsoft Office 2016 (released in 2015)
+    # Powerpoint and Outlook do not have a alternate startup folder
     OFFICE_STARTUP_OPTIONS = [
         ("Software\\Microsoft\\Office\\16.0\\Word\\Options", "STARTUP-PATH"),
         ("Software\\Microsoft\\Office\\16.0\\Word\\Options", "UserTemplates"),
@@ -290,8 +297,9 @@ class MSOffice(Plugin):
     def _wef_cache_folders(self) -> Iterable[Path]:
         """List cache folders which contain office web-addin data."""
 
+        WEB_ADDIN_MANIFEST_GLOB = "AppData/Local/Microsoft/Office/16.0/Wef/**/Manifests/**/*"
         for user_details in self.target.user_details.all_with_home():
-            for manifest_path in user_details.home_path.glob(self.WEB_ADDIN_MANIFEST_GLOB):
+            for manifest_path in user_details.home_path.glob(WEB_ADDIN_MANIFEST_GLOB):
                 if manifest_path.is_file() and manifest_path.suffix != ".metadata":
                     yield manifest_path
 
@@ -358,7 +366,7 @@ class MSOffice(Plugin):
             modification_time=manifest_path.stat().st_mtime,
         )
 
-    def _office_install_root(self, component: str) -> str:
+    def _office_install_root(self, component: Literal["Word", "Excel"]) -> str:
         """Return the installation root for a office component"""
 
         # Typically, all components share the same root.
@@ -369,6 +377,7 @@ class MSOffice(Plugin):
         except RegistryError:
             return self.OFFICE_DEFAULT_ROOT
 
+    @lru_cache(16)
     def _machine_startup_folders(self) -> Iterable[str]:
         """Return machine-scoped office startup folders"""
 
