@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from enum import Enum
 import itertools
+from enum import Enum
 from pathlib import Path
 from typing import Iterable, Iterator, NamedTuple
 from xml.etree.ElementTree import Element
@@ -26,12 +26,12 @@ OfficeStartupItem = TargetRecordDescriptor(
 OfficeWebAddinRecord = TargetRecordDescriptor(
     "productivity/msoffice/web_addin",
     [
-        ("string[]", "source_locations"),
-        ("string", "name"),
         ("path", "manifest"),
+        ("datetime", "modification_time"),
+        ("string", "name"),
         ("string", "version"),
         ("string", "provider_name"),
-        ("datetime", "modification_time"),
+        ("string[]", "source_locations"),
     ],
 )
 
@@ -39,13 +39,13 @@ OfficeWebAddinRecord = TargetRecordDescriptor(
 OfficeNativeAddinRecord = TargetRecordDescriptor(
     "productivity/msoffice/native_addin",
     [
+        ("path", "manifest"),
+        ("datetime", "modification_time"),
         ("string", "name"),
         ("string", "type"),
         ("path[]", "codebases"),
         ("boolean", "loaded"),
         ("string", "load_behavior"),
-        ("path", "manifest"),
-        ("datetime", "modification_time"),
     ],
 )
 
@@ -103,7 +103,7 @@ class ClickOnceDeploymentManifestParser:
         codebase_str_path = fsutil.abspath(codebase_str_path, str(cwd), alt_separator=self._target.fs.alt_separator)
         codebase_path: Path = self._target.fs.path(codebase_str_path)
         if not codebase_path.exists():
-            return set()     # Ignore files which are not actually installed, for example due to language settings
+            return set()  # Ignore files which are not actually installed, for example due to language settings
 
         installed = dependent_assembly.get("dependencyType") == "install"
         if codebase_path.name.endswith(".manifest") and installed:
@@ -163,7 +163,28 @@ class MSOffice(Plugin):
 
     @export(record=OfficeWebAddinRecord)
     def web(self) -> Iterator[OfficeWebAddinRecord]:
-        """List all web add-ins by parsing the manifests in the web extension framework cache"""
+        """Returns all available Web add-ins cached in the WEF (Web Extension Framework) folder.
+
+        Office Web Add-ins are web-based applications that extend the functionality of Office applications like Word, Excel, and Outlook.
+        These add-ins can interact with the content in Office documents and provide additional features and capabilities.
+        The WEF folder contains cached data and manifests for Office Web Add-ins.
+        The manifest includes information about the add-ins, such as their source locations, display names, and other metadata.
+        The folder is used by Office applications to load and manage the add-ins.
+
+        References:
+            - https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins
+
+        Yields a OfficeWebAddinRecord with fields:
+
+        .. code-block:: text
+
+            manifest (path): The full path to the manifest in the WEF folder.
+            modification_time (datetime): The modification time of the manifest.
+            name (string): The display name of the add-in.
+            version (string): The version of the add-in.
+            provider_name (string): The provider name of the add-in.
+            source_locations (string[]): URLs referencing the source code of the add-in.
+        """  # noqa: E501
 
         for manifest_file in self._wef_cache_folders():
             try:
@@ -174,7 +195,33 @@ class MSOffice(Plugin):
 
     @export(record=OfficeNativeAddinRecord)
     def native(self) -> Iterator[OfficeNativeAddinRecord]:
-        """List all native (COM / vsto) add-ins by parsing the registry and manifest files."""
+        """Returns all native (COM / VSTO) add-ins by parsing the registry and manifest files.
+
+        COM (Component Object Model) is a binary-interface standard developed by Microsoft that enables software components to communicate with each other.
+        COM plugins for Microsoft Office applications, such as Word, Excel, and Outlook, are typically used to extend the functionality of these programs by integrating custom features.
+        COM plugins interact directly with Office applications through COM interfaces, offering a low-level approach to automation.
+
+        VSTO is a set of tools provided by Microsoft to create Office add-ins using the .NET Framework.
+        VSTO plugins are more modern than COM plugins and leverage managed code. They are typically developed in C# or VB.NET using Visual Studio.
+
+        Both COM and VSTO add-ins are registered in the Windows registry, where they are associated with specific Office applications and configured to load automatically or on demand.
+
+        References:
+            - https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins
+            - https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins
+
+        Yields a OfficeNativeAddinRecord with fields:
+
+        .. code-block:: text
+
+            manifest (path): The full path to the manifest of a VSTO plugin. ``None`` for COM plugins.
+            modification_time (datetime): The modification time of the registry key of the plugin.
+            name (string): The name of the add-in.
+            type (string): The type of the add-in, either "com" or "vsto".
+            codebases (path[]): The full paths to the executables associated with the add-in.
+            loaded (boolean): Whether the add-in is currently loaded.
+            load_behavior (string): The load behavior of the add-in, e.g., "Autostart", "Manual", "OnDemand", "FirstTime".
+        """  # noqa: E501
 
         addin_path_tuples = itertools.product(self.HIVES, [self.OFFICE_KEY], self.OFFICE_COMPONENTS, [self.ADD_IN_KEY])
         addin_paths = ["\\".join(addin_path_tuple) for addin_path_tuple in addin_path_tuples]
@@ -204,10 +251,23 @@ class MSOffice(Plugin):
 
     @export(record=OfficeStartupItem)
     def startup(self) -> Iterable[OfficeStartupItem]:
-        """List items in startup paths.
+        """Returns all startup items found in Microsoft Office startup folders.
 
-        Note that on Office 365, legacy addins such as .wll are no longer automatically loaded.
-        """
+        Office startup folders are specific directories where Microsoft Office looks add-ins, macros, templates, or custom scripts.
+        These are used to automatically load when the corresponding Office application starts up.
+        These folders allow users and administrators to automate launching add-ins, executing scripts, or applying custom settings.
+
+        References:
+            - https://pentestlab.blog/2019/12/11/persistence-office-application-startup/
+
+        Yields a OfficeNativeAddinRecord with fields:
+
+        .. code-block:: text
+
+            path (path): The full path to the startup item.
+            creation_time (datetime): The creation time of the startup item.
+            modification_time (datetime): The modification time of the startup item.
+        """  # noqa: E501
 
         # Get items from default machine-scoped startup folder
         for machine_startup_folder in self._machine_startup_folders():
