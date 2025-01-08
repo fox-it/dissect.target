@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import zipfile
 from collections import defaultdict
 from pathlib import Path
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from dissect.target import Target
 
 PREFIXES = ["", "fs"]
-
+ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
 class DirLoader(Loader):
     """Load a directory as a filesystem."""
@@ -91,7 +92,10 @@ def map_dirs(
                 vfs = dfs[0]
 
             fs_to_add.append(vfs)
-            target.fs.mount(drive_letter.lower() + ":", vfs)
+            mount_letter = drive_letter.lower()
+            if mount_letter != "$fs$":
+                mount_letter += ":"
+            target.fs.mount(mount_letter, vfs)
         else:
             fs_to_add.extend(dfs)
 
@@ -138,12 +142,18 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
                 if p.name == "sysvol":
                     dirs.append(('c', p))
                 else:
-                    dirs.append(p)
+                    dirs.append((p.name[0], p))
 
                 if not os_type:
                     os_type = os_type_from_path(p)
 
-        if not os_type:
+            if p.name == "$fs$":
+                dirs.append(('$fs$', p))
+                for anon_fs in p.iterdir():
+                    if ANON_FS_RE.match(anon_fs.name):
+                        dirs.append(anon_fs)
+
+        if len(dirs) == 0:
             os_type = os_type_from_path(path)
             dirs = [path]
 

@@ -16,7 +16,7 @@ FILESYSTEMS_ROOT = "fs"
 FILESYSTEMS_LEGACY_ROOT = "sysvol"
 
 
-def _get_root(path: Path) -> Path | None: 
+def _get_root(path: Path) -> Path | None:
     if path.is_file():
         fh = path.open("rb")
         if TarFilesystem._detect(fh):
