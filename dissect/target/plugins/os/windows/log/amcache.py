@@ -31,7 +31,7 @@ COMMON_ELEMENTS = [
     ("string", "bin_file_version"),
     ("string", "bin_product_version"),
     ("string", "binary_type"),
-    ("digest", "digests"),
+    ("digest", "digest"),
     ("wstring", "file_version"),
     ("wstring", "company_name"),
     ("wstring", "file_description"),
@@ -82,11 +82,11 @@ def create_record(
         size_of_image=install_properties.get("sizeofimage"),
         file_description=install_properties.get("filedescription"),
         size=install_properties.get("size"),
-        digests=[
+        digest=(
             None,
             install_properties.get("id")[4:],
             None,
-        ],  # remove leading zeros from the entry to create a sha1 hash
+        ),  # remove leading zeros from the entry to create a sha1 hash
         company_name=install_properties.get("companyname"),
         binary_type=install_properties.get("binarytype"),
         bin_product_version=install_properties.get("binproductversion"),
