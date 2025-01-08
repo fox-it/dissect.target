@@ -1,6 +1,7 @@
 import gzip
-from io import BytesIO
 import textwrap
+from io import BytesIO
+
 import pytest
 
 from dissect.target.filesystem import VirtualFilesystem
