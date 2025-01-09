@@ -223,7 +223,9 @@ def test_differentiate_plugins(src_target: Target, dst_target: Target) -> None:
     assert deleted[0].record.hostname == "src_target"
 
 
-def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
+def test_shell_ls(
+    src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
@@ -248,7 +250,9 @@ def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -
     assert captured.out == "\n".join(expected) + "\n"
 
 
-def test_shell_find(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
+def test_shell_find(
+    src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
@@ -275,7 +279,7 @@ def test_shell_find(src_target: Target, dst_target: Target, capsys, monkeypatch)
     assert captured.out == "\n".join(expected) + "\n"
 
 
-def test_shell_cat(src_target: Target, dst_target: Target, capsys) -> None:
+def test_shell_cat(src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture) -> None:
     cli = DifferentialCli(src_target, dst_target, deep=True)
 
     cli.onecmd("cat /changes/unchanged")
@@ -296,7 +300,7 @@ def test_shell_cat(src_target: Target, dst_target: Target, capsys) -> None:
     assert captured.out == "Hello From Destination Target\n"
 
 
-def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
+def test_shell_plugin(src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture) -> None:
     cli = DifferentialCli(src_target, dst_target, deep=True)
 
     cli.onecmd("plugin users")
@@ -307,7 +311,7 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
     assert "differential/record/deleted" in captured.out
 
 
-def test_target_diff_shell(capsys, monkeypatch) -> None:
+def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         m.setattr(fsutils, "LS_COLORS", {})
         m.setenv("NO_COLOR", "1")
@@ -333,7 +337,7 @@ def test_target_diff_shell(capsys, monkeypatch) -> None:
         assert "unrecognized arguments" not in err
 
 
-def test_target_diff_fs(capsys, monkeypatch) -> None:
+def test_target_diff_fs(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
@@ -346,7 +350,7 @@ def test_target_diff_fs(capsys, monkeypatch) -> None:
         assert "differential/file/deleted" in out
 
 
-def test_target_diff_query(capsys, monkeypatch) -> None:
+def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")

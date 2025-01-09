@@ -4,7 +4,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: VirtualFilesystem):
+def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     wireguard_config_file = absolute_path("_data/plugins/apps/vpn/wireguard/wg0.conf")
     fs_unix.map_file("/etc/wireguard/wg0.conf", wireguard_config_file)
 
