@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 from dissect.target.loaders.kape import KapeLoader
@@ -5,7 +6,7 @@ from tests._utils import absolute_path, mkdirs
 
 
 @patch("dissect.target.filesystems.dir.DirectoryFilesystem.ntfs", None, create=True)
-def test_kape_loader(target_bare, tmp_path):
+def test_kape_dir_loader(target_bare, tmp_path):
     root = tmp_path
     mkdirs(root, ["C/windows/system32", "C/$Extend", "D/test", "E/test"])
 
@@ -37,3 +38,17 @@ def test_kape_loader(target_bare, tmp_path):
     # The 3 found drive letters + sysvol + the fake NTFS filesystem at /$fs$
     assert len(target_bare.fs.mounts) == 5
     assert len(list(target_bare.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
+
+
+def test_kape_vhdx_loader(target_bare):
+    t = Path(absolute_path("_data/loaders/kape/test.vhdx"))
+
+    assert KapeLoader.detect(t)
+
+    loader = KapeLoader(t)
+    loader.map(target_bare)
+    target_bare.apply()
+
+    dirs = target_bare.fs.listdir("")
+    assert "sysvol" in dirs
+    assert "c:" in dirs
