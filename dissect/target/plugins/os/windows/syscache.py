@@ -11,7 +11,7 @@ SyscacheRecord = TargetRecordDescriptor(
     "windows/syscache/object",
     [
         ("datetime", "regf_mtime"),
-        ("digest", "digests"),
+        ("digest", "digest"),
         ("string", "program_id"),
         ("string", "file_id"),
         ("varint", "object_id"),
@@ -84,7 +84,7 @@ class SyscachePlugin(Plugin):
 
                 yield SyscacheRecord(
                     regf_mtime=subkey.ts,
-                    digests=[None, ae_file_id[4:] if ae_file_id else None, None],
+                    digest=(None, ae_file_id[4:] if ae_file_id else None, None),
                     program_id=ae_program_id,
                     file_id=f"{file_segment}#{file_id >> 48}",
                     object_id=subkey.value("_ObjectId_").value,
