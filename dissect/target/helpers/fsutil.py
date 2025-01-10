@@ -315,7 +315,7 @@ def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
 
     Args:
         pattern: A glob pattern to match names of filesystem entries against.
-        alt_separator: An alternative | Nonepath separator in use by the filesystem being matched.
+        alt_separator: An alternative path separator in use by the filesystem being matched.
 
     Returns:
         A tuple of a string with path parts up to the first path part that has a glob pattern and a string of

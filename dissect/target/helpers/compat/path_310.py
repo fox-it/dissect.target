@@ -88,7 +88,7 @@ class _DissectAccessor(_Accessor):
         return path_common.io_open(path, mode, buffering, encoding, errors, newline)
 
     @staticmethod
-    def listdir(path: TargetPath) -> Iterator[str]:
+    def listdir(path: TargetPath) -> list[str]:
         return path.get().listdir()
 
     @staticmethod

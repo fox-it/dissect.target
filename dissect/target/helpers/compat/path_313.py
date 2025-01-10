@@ -115,7 +115,8 @@ class PureDissectPath(PurePath):
     def with_segments(self, *pathsegments) -> TargetPath:
         return type(self)(self._fs, *pathsegments)
 
-    # NOTE: This is copied from pathlib/_local.py but turned into an instance method so we get access to the correct flavour
+    # NOTE: This is copied from pathlib/_local.py 
+    # but turned into an instance method so we get access to the correct flavour
     def _parse_path(self, path: str) -> tuple[str, str, list[str]]:
         if not path:
             return "", "", []
