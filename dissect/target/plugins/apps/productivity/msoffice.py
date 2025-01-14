@@ -64,7 +64,7 @@ class ClickOnceDeploymentManifestParser:
         installed: bool
         codebase: Path
 
-    def __init__(self, root_manifest_path: Path, target: Target, user_sid: str) -> None:
+    def __init__(self, root_manifest_path: Path, target: Target, user_sid: str):
         self.root_manifest_path = root_manifest_path
         self._target = target
         self._user_sid = user_sid
@@ -180,7 +180,7 @@ class MSOffice(Plugin):
         References:
             - https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins
 
-        Yields a OfficeWebAddinRecord with fields:
+        Yields a ``OfficeWebAddinRecord`` with fields:
 
         .. code-block:: text
 
@@ -216,7 +216,7 @@ class MSOffice(Plugin):
             - https://learn.microsoft.com/en-us/office/dev/add-ins/overview/office-add-ins
             - https://learn.microsoft.com/en-us/visualstudio/vsto/registry-entries-for-vsto-add-ins
 
-        Yields a OfficeNativeAddinRecord with fields:
+        Yields a ``OfficeNativeAddinRecord`` with fields:
 
         .. code-block:: text
 
@@ -266,7 +266,7 @@ class MSOffice(Plugin):
         References:
             - https://pentestlab.blog/2019/12/11/persistence-office-application-startup/
 
-        Yields a OfficeNativeAddinRecord with fields:
+        Yields a ``OfficeStartupItem`` with fields:
 
         .. code-block:: text
 
