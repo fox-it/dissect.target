@@ -42,7 +42,7 @@ COMMON_ELEMENTS = [
     ("string", "pe_image"),
     ("string", "pe_subsystem"),
     ("string", "crc_checksum"),
-    ("string", "filesize"),
+    ("filesize", "filesize"),
     ("wstring", "longname"),
     ("string", "msi"),
 ]
@@ -69,6 +69,7 @@ def create_record(
     create: str,
     target: Target,
 ) -> TargetRecordDescriptor:
+
     return description(
         start_time=_to_log_timestamp(install_properties.get("starttime")),
         stop_time=_to_log_timestamp(install_properties.get("stoptime")),
@@ -91,7 +92,7 @@ def create_record(
         binary_type=install_properties.get("binarytype"),
         bin_product_version=install_properties.get("binproductversion"),
         bin_file_version=install_properties.get("binfileversion"),
-        filesize=install_properties.get("filesize"),
+        filesize=int(install_properties.get("filesize", "0"), 16),
         pe_image=install_properties.get("peimagetype"),
         product_version=install_properties.get("productversion"),
         crc_checksum=install_properties.get("crcchecksum"),

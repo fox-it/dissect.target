@@ -15,7 +15,7 @@ def test_wireguard_plugin_global_log(target_unix_users, fs_unix):
     assert record.name == "wg0"
     assert str(record.address) == "10.13.37.1"
     assert record.private_key == "UHJpdmF0ZUtleQ=="
-    assert record.listen_port == "12345"
+    assert record.listen_port == 12345
     assert record.source == "etc/wireguard/wg0.conf"
     assert record.dns is None
 

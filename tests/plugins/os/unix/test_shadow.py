@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
@@ -25,12 +26,12 @@ def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     )  # noqa E501
     assert results[0].algorithm == "sha512"
     assert results[0].crypt_param is None
-    assert results[0].last_change == "18963"
-    assert results[0].min_age == 0
-    assert results[0].max_age == 99999
+    assert results[0].last_change == datetime(2021, 12, 2, 0, 0, 0, tzinfo=timezone.utc)  # 18963
+    assert results[0].min_age is None
+    assert results[0].max_age == datetime(2295, 9, 16, 0, 0, 0, tzinfo=timezone.utc)  # 99999
     assert results[0].warning_period == 7
-    assert results[0].inactivity_period == ""
-    assert results[0].expiration_date == ""
+    assert results[0].inactivity_period is None
+    assert results[0].expiration_date is None
     assert results[0].unused_field == ""
 
 
