@@ -26,7 +26,7 @@ GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str]]
+ValueType = Union[int, str, bytes, list[str], None]
 """The possible value types that can be returned from the registry."""
 
 

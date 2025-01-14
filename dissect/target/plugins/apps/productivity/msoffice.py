@@ -164,6 +164,10 @@ class MSOffice(Plugin):
         "HKLM\\SOFTWARE\\Wow6432Node\\Classes",
     ]
 
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self._office_install_root = lru_cache(32)(self._office_install_root)
+
     def check_compatible(self) -> None:
         if not self.target.has_function("registry") or not list(self.target.registry.keys(f"HKLM\\{self.OFFICE_KEY}")):
             raise UnsupportedPluginError("Registry key not found: %s", self.OFFICE_KEY)
@@ -376,7 +380,6 @@ class MSOffice(Plugin):
         except RegistryError:
             return self.OFFICE_DEFAULT_ROOT
 
-    @lru_cache(16)
     def _machine_startup_folders(self) -> Iterable[str]:
         """Return machine-scoped office startup folders"""
 
