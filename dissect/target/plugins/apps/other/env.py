@@ -31,9 +31,11 @@ class EnvironmentFilePlugin(Plugin):
 
         if not env_path:
             self.target.log.error("No ``--path`` provided!")
+            return
 
         if not (path := self.target.fs.path(env_path)).exists():
             self.target.log.error("Provided path %s does not exist!", path)
+            return
 
         for file in path.glob("**/*." + extension):
             if not file.is_file():
