@@ -29,9 +29,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
     SERVER_GLOBS = [
         # Windows >= Windows 7
         "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
-        "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/check-hwcodec-config/*.log",
-        "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/import-config/*.log",
-        "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/service/*.log",
 
         # Linux
         "var/log/rustdesk-server/*.log",
