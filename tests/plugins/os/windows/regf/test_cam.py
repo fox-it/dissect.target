@@ -5,7 +5,7 @@ from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.cam import CamPlugin
 
 
-def test_cam(target_win_users: Target, hive_hku: VirtualHive, hive_hklm) -> None:
+def test_cam(target_win_users: Target, hive_hku: VirtualHive, hive_hklm: VirtualHive) -> None:
     hku_cam_key = VirtualKey(
         hive_hku,
         "Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam",
