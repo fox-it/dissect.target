@@ -133,7 +133,7 @@ def test_parse_inventory_application_file(target_win, test_file_id, expected_fil
         else:
             call_kwargs = mock_record.call_args.kwargs
 
-        assert call_kwargs.get("digests", None) == [None, expected_file_id, None]
+        assert call_kwargs.get("digest", None) == (None, expected_file_id, None)
 
 
 def test_amcache_install_entry(target_win: Target):
