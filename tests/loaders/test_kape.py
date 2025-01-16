@@ -1,6 +1,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from dissect.target import Target
 from dissect.target.loaders.kape import KapeLoader
 from tests._utils import absolute_path, mkdirs
 
@@ -40,7 +41,7 @@ def test_kape_dir_loader(target_bare, tmp_path):
     assert len(list(target_bare.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
 
 
-def test_kape_vhdx_loader(target_bare):
+def test_kape_vhdx_loader(target_bare: Target):
     t = Path(absolute_path("_data/loaders/kape/test.vhdx"))
 
     assert KapeLoader.detect(t)
@@ -49,6 +50,5 @@ def test_kape_vhdx_loader(target_bare):
     loader.map(target_bare)
     target_bare.apply()
 
-    dirs = target_bare.fs.listdir("")
-    assert "sysvol" in dirs
-    assert "c:" in dirs
+    assert "sysvol" in target_bare.fs.mounts
+    assert "c:" in target_bare.fs.mounts
