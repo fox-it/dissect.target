@@ -85,13 +85,12 @@ class UnixPlugin(OSPlugin):
                     current_user = (pwent.get(0), pwent.get(5), pwent.get(6))
                     if current_user in seen_users:
                         continue
-
                     seen_users.add(current_user)
                     yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
-                        uid=pwent.get(2),
-                        gid=pwent.get(3),
+                        uid=pwent.get(2) if pwent.get(2) != "" else None,
+                        gid=pwent.get(3) if pwent.get(3) != "" else None,
                         gecos=pwent.get(4),
                         home=posix_path(pwent.get(5)),
                         shell=pwent.get(6),
