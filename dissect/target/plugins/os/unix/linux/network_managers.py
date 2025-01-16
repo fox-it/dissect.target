@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Match
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import PluginError
+from dissect.target.helpers import configutil
 
 if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import TargetPath
@@ -597,6 +598,40 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
             if not ips:
                 target.log.warning("No DHCP IP addresses found in first 10000 journal entries.")
             break
+
+    return ips
+
+
+def parse_unix_dhcp_leases(target: Target) -> set[str]:
+    """Parse NetworkManager and dhclient DHCP ``.lease`` files.
+
+    Resources:
+        - https://linux.die.net/man/5/dhclient.conf
+
+    Args:
+        target: Target to discover and obtain network information from.
+
+    Returns:
+        A set of found DHCP IP addresses.
+    """
+    ips = set()
+
+    for lease_file in chain(
+        target.fs.path("/var/lib/NetworkManager").glob("*.lease*"),
+        target.fs.path("/var/lib/dhcp").glob("*.lease*"),
+        target.fs.path("/var/lib/dhclient").glob("*.lease*"),
+    ):
+        lease_text = lease_file.read_text()
+
+        if "lease {" in lease_text:
+            for line in lease_text.split("\n"):
+                if "fixed-address" in line:
+                    ips.add(line.split(" ")[-1].strip(";"))
+
+        elif "ADDRESS=" in lease_text:
+            lease = configutil.parse(lease_file, hint="env")
+            if ip := lease.get("ADDRESS"):
+                ips.add(ip)
 
     return ips
 
