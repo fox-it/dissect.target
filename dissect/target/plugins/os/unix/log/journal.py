@@ -319,10 +319,12 @@ class JournalFile:
 
             if object_type == c_journal.ObjectType.OBJECT_UNUSED:
                 self.target.log.warning(
-                    "ObjectType OBJECT_UNUSED encountered for next OBJECT_ENTRY_ARRAY offset. ",
-                    "This indicates allocated space in file which is not used yet.",
+                    "ObjectType OBJECT_UNUSED encountered for next OBJECT_ENTRY_ARRAY offset at 0x%X. "
+                    "This indicates allocated space in the journal file which is not used yet.",
+                    offset,
                 )
                 break
+
             elif object_type != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
                 raise ValueError(f"Expected OBJECT_ENTRY_ARRAY or OBJECT_UNUSED at offset {offset}")
 
