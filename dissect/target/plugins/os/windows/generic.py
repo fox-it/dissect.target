@@ -611,11 +611,12 @@ class GenericPlugin(Plugin):
 
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
+            raw_sid = key.value("(Default)").value
 
             yield ComputerSidRecord(
                 ts=key.timestamp,
                 sidtype="Domain",
-                sid=read_sid(key.value("(Default)").value),
+                sid=read_sid(raw_sid) if raw_sid else None,
                 _target=self.target,
             )
         except (RegistryError, struct.error):

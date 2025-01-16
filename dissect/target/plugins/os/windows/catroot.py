@@ -217,15 +217,24 @@ class CatrootPlugin(Plugin):
             with ese_file.open("rb") as fh:
                 ese_db = EseDB(fh)
 
-                tables = [table.name for table in ese_db.tables()]
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
-                    if table_name not in tables:
+                    try:
+                        table = ese_db.table(table_name)
+                    except KeyError as e:
+                        self.target.log.warning("EseDB %s has no table %s", ese_file, table_name)
+                        self.target.log.debug("", exc_info=e)
                         continue
 
-                    for record in ese_db.table(table_name).records():
+                    for record in table.records():
                         file_digest = digest()
-                        setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
-                        catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+
+                        try:
+                            setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
+                            catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+                        except Exception as e:
+                            self.target.log.warning("Unable to parse catroot names for %s in %s", record, ese_file)
+                            self.target.log.debug("", exc_info=e)
+                            continue
 
                         for catroot_name in catroot_names:
                             yield CatrootRecord(

@@ -125,7 +125,7 @@ class CredHistFile:
                 yield CredHistEntry(
                     version=entry.dwVersion,
                     guid=UUID(bytes_le=entry.guidLink),
-                    user_sid=read_sid(entry.pSid),
+                    user_sid=read_sid(entry.pSid) if entry.pSid else None,
                     hash_alg=HashAlgorithm.from_id(entry.algHash),
                     cipher_alg=cipher_alg,
                     sha1=None,
