@@ -134,7 +134,7 @@ def test_parse_hostname_string(
 def test_users(target_unix_users: Target) -> None:
     users = list(target_unix_users.users())
 
-    assert len(users) == 2
+    assert len(users) == 3
 
     assert users[0].name == "root"
     assert users[0].uid == 0

@@ -75,7 +75,7 @@ class UnixPlugin(OSPlugin):
         # Yield users found in passwd files.
         for passwd_file in PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
-                for line in path.open("rt"):
+                for line in path.open("rt", errors="backslashreplace"):
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue
