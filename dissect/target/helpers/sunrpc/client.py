@@ -1,8 +1,10 @@
+from __future__ import annotations
+
+import random
 import socket
 from typing import Generic, NamedTuple, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
-import random
 from dissect.target.helpers.sunrpc.serializer import (
     AuthNullSerializer,
     AuthSerializer,
@@ -43,6 +45,7 @@ def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthS
     )
 
 
+# RdJ: Error handing is a bit minimalistic. Expand later on.
 class MismatchXidError(Exception):
     pass
 
@@ -139,8 +142,10 @@ class Client(Generic[Credentials, Verifier]):
 
             fragment_header = int.from_bytes(header, "big")
             fragment_size = fragment_header & 0x7FFFFFFF
-            fragment = self._sock.recv(fragment_size)
-            fragments.append(fragment)
+            while fragment_size > 0:
+                fragment = self._sock.recv(fragment_size)
+                fragments.append(fragment)
+                fragment_size -= len(fragment)
 
             # Check for last fragment or underflow
             if (fragment_header & 0x80000000) > 0 or len(fragment) < fragment_size:

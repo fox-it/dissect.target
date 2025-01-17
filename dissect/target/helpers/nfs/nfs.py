@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import ClassVar
+
+# See https://datatracker.ietf.org/doc/html/rfc1057
 
 
 class NfsStat(Enum):
@@ -125,7 +129,7 @@ class EntryPlus3:
     fileid: int
     name: str
     cookie: int
-    attrs: FileAttributes3 | None
+    attributes: FileAttributes3 | None
     handle: FileHandle3 | None
 
 
@@ -135,3 +139,18 @@ class ReadDirPlusResult3:
     cookieverf: CookieVerf3
     entries: list[EntryPlus3]
     eof: bool
+
+
+@dataclass
+class Read3args:
+    file: FileHandle3
+    offset: int
+    count: int
+
+
+@dataclass
+class Read3resok:
+    file_attributes: FileAttributes3 | None
+    count: int
+    eof: bool
+    data: bytes

@@ -1,4 +1,6 @@
-from typing import Generic, NamedTuple, TypeVar
+from __future__ import annotations
+
+from typing import Generic, Iterator, NamedTuple, TypeVar
 
 from dissect.target.helpers.nfs.nfs import (
     CookieVerf3,
@@ -6,9 +8,12 @@ from dissect.target.helpers.nfs.nfs import (
     FileAttributes3,
     FileHandle3,
     NfsStat,
+    Read3args,
     ReadDirPlusParams,
 )
 from dissect.target.helpers.nfs.serializer import (
+    Read3ArgsSerializer,
+    Read3ResultDeserializer,
     ReadDirPlusParamsSerializer,
     ReadDirPlusResultDeserializer,
 )
@@ -17,6 +22,10 @@ from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
+
+
+class ReadFileError(Exception):
+    pass
 
 
 class ReadDirResult(NamedTuple):
@@ -30,6 +39,7 @@ class ReadDirResult(NamedTuple):
 class Client(Generic[Credentials, Verifier]):
     DIR_COUNT = 4096  # See https://datatracker.ietf.org/doc/html/rfc1813#section-3.3.17
     MAX_COUNT = 32768
+    READ_CHUNK_SIZE = 1024 * 1024
 
     def __init__(self, rpc_client: SunRpcClient[Credentials, Verifier]):
         self._rpc_client = rpc_client
@@ -39,7 +49,7 @@ class Client(Generic[Credentials, Verifier]):
         rpc_client = SunRpcClient.connect(hostname, port, auth, local_port)
         return Client(rpc_client)
 
-    def readdirplus(self, dir: FileHandle3) -> list[EntryPlus3] | NfsStat:
+    def readdirplus(self, dir: FileHandle3) -> ReadDirResult | NfsStat:
         """Read the contents of a directory, including file attributes"""
 
         entries = list[EntryPlus3]()
@@ -61,3 +71,17 @@ class Client(Generic[Credentials, Verifier]):
 
             cookie = result.entries[-1].cookie
             cookieverf = result.cookieverf
+
+    def readfile_by_handle(self, handle: FileHandle3) -> Iterator[bytes]:
+        """Read a file by its file handle"""
+        offset = 0
+        count = self.READ_CHUNK_SIZE
+        while True:
+            params = Read3args(handle, offset, count)
+            result = self._rpc_client.call(100003, 3, 6, params, Read3ArgsSerializer(), Read3ResultDeserializer())
+            if isinstance(result, NfsStat):
+                raise ReadFileError(f"Failed to read file: {result}")
+            yield result.data
+            if result.eof:
+                return
+            offset += result.count

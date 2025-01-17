@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-
+import io
 from abc import ABC, abstractmethod
 from enum import Enum
-import io
 from typing import Generic, TypeVar
+
 from dissect.target.helpers.sunrpc import sunrpc
 
 ProcedureParams = TypeVar("ProcedureParams")

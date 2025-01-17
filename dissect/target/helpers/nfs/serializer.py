@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 
 from dissect.target.helpers.nfs.nfs import (
@@ -10,6 +12,8 @@ from dissect.target.helpers.nfs.nfs import (
     MountStat,
     NfsStat,
     NfsTime3,
+    Read3args,
+    Read3resok,
     ReadDirPlusParams,
     ReadDirPlusResult3,
     SpecData3,
@@ -25,13 +29,13 @@ from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 class MountResultDeserializer(Deserializer[MountOK | MountStat]):
     def deserialize(self, payload: io.BytesIO) -> MountOK | None:
-        mountStat = self._read_enum(payload, MountStat)
-        if mountStat != MountStat.MNT3_OK:
-            return mountStat
+        mount_stat = self._read_enum(payload, MountStat)
+        if mount_stat != MountStat.MNT3_OK:
+            return mount_stat
         filehandle_bytes = self._read_var_length_opaque(payload)
-        authFlavors = self._read_var_length(payload, Int32Serializer())
+        auth_flavors = self._read_var_length(payload, Int32Serializer())
 
-        return MountOK(FileHandle3(filehandle_bytes), authFlavors)
+        return MountOK(FileHandle3(filehandle_bytes), auth_flavors)
 
 
 class ReadDirPlusParamsSerializer(Serializer[ReadDirPlusParams]):
@@ -73,10 +77,10 @@ class FileAttributesSerializer(Deserializer[FileAttributes3]):
         rdev = SpecDataSerializer().deserialize(payload)
         fsid = self._read_uint64(payload)
         fileid = self._read_uint64(payload)
-        timeDeserializer = NfsTimeSerializer()
-        atime = timeDeserializer.deserialize(payload)
-        mtime = timeDeserializer.deserialize(payload)
-        ctime = timeDeserializer.deserialize(payload)
+        time_deserializer = NfsTimeSerializer()
+        atime = time_deserializer.deserialize(payload)
+        mtime = time_deserializer.deserialize(payload)
+        ctime = time_deserializer.deserialize(payload)
 
         return FileAttributes3(type, mode, nlink, uid, gid, size, used, rdev, fsid, fileid, atime, mtime, ctime)
 
@@ -87,8 +91,8 @@ class EntryPlusSerializer(Deserializer[EntryPlus3]):
         name = self._read_string(payload)
         cookie = self._read_uint64(payload)
         attributes = self._read_optional(payload, FileAttributesSerializer())
-        handleBytes = self._read_optional(payload, OpaqueVarLengthSerializer())
-        handle = FileHandle3(handleBytes) if handleBytes is not None else None
+        handle_bytes = self._read_optional(payload, OpaqueVarLengthSerializer())
+        handle = FileHandle3(handle_bytes) if handle_bytes is not None else None
 
         return EntryPlus3(fileid, name, cookie, attributes, handle)
 
@@ -110,6 +114,27 @@ class ReadDirPlusResultDeserializer(Deserializer[ReadDirPlusResult3 | NfsStat]):
 
             entries.append(entry)
 
-        eof = self._read_enum(payload, Bool)
+        eof = self._read_enum(payload, Bool) == Bool.TRUE
 
         return ReadDirPlusResult3(dir_attributes, CookieVerf3(cookieverf), entries, eof)
+
+
+class Read3ArgsSerializer(Serializer[ReadDirPlusParams]):
+    def serialize(self, args: Read3args) -> bytes:
+        result = self._write_var_length_opaque(args.file.opaque)
+        result += self._write_uint64(args.offset)
+        result += self._write_uint32(args.count)
+        return result
+
+
+class Read3ResultDeserializer(Deserializer[Read3resok]):
+    def deserialize(self, payload: io.BytesIO) -> Read3resok:
+        stat = self._read_enum(payload, NfsStat)
+        if stat != NfsStat.NFS3_OK:
+            return stat
+
+        file_attributes = self._read_optional(payload, FileAttributesSerializer())
+        count = self._read_uint32(payload)
+        eof = self._read_enum(payload, Bool) == Bool.TRUE
+        data = self._read_var_length_opaque(payload)
+        return Read3resok(file_attributes, count, eof, data)
