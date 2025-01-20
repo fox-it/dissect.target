@@ -32,9 +32,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
 
         # Linux
         "var/log/rustdesk-server/*.log",
-
-        # Mac
-        "Library/Logs/RustDesk/server/*.log",
     ]
 
     # User specific Rustdesk logs
@@ -46,7 +43,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
         ".local/share/logs/RustDesk/server/*.log",
 
         # Android
-        "/storage/emulated/0/RustDesk/logs/*.log",
+        "storage/emulated/0/RustDesk/logs/*.log",
 
         # Mac
         "Library/Logs/RustDesk/*.log",
