@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from typing import Union
 
 from dissect.target.helpers.nfs.nfs import (
     CookieVerf3,
@@ -27,8 +28,9 @@ from dissect.target.helpers.sunrpc.serializer import (
 from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 
-class MountResultDeserializer(Deserializer[MountOK | MountStat]):
-    def deserialize(self, payload: io.BytesIO) -> MountOK | None:
+# Used Union because 3.9 does not support '|' here even with future annotations
+class MountResultDeserializer(Deserializer[Union[MountOK, MountStat]]):
+    def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat:
         mount_stat = self._read_enum(payload, MountStat)
         if mount_stat != MountStat.MNT3_OK:
             return mount_stat
@@ -97,7 +99,8 @@ class EntryPlusSerializer(Deserializer[EntryPlus3]):
         return EntryPlus3(fileid, name, cookie, attributes, handle)
 
 
-class ReadDirPlusResultDeserializer(Deserializer[ReadDirPlusResult3 | NfsStat]):
+# Used Union because 3.9 does not support '|' here even with future annotations
+class ReadDirPlusResultDeserializer(Deserializer[Union[ReadDirPlusResult3, NfsStat]]):
     def deserialize(self, payload: io.BytesIO) -> ReadDirPlusResult3:
         stat = self._read_enum(payload, NfsStat)
         if stat != NfsStat.NFS3_OK:
