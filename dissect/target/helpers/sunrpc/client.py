@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import random
 import socket
-from typing import Generic, NamedTuple, TypeVar
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
@@ -20,7 +21,8 @@ Params = TypeVar("Params")
 Results = TypeVar("Results")
 
 
-class AuthScheme(Generic[Credentials, Verifier], NamedTuple):
+@dataclass
+class AuthScheme(Generic[Credentials, Verifier]):
     credentials: Credentials
     verifier: Verifier
     credentials_serializer: AuthSerializer[Credentials]
