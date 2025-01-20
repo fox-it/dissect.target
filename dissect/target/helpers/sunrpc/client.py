@@ -149,8 +149,8 @@ class Client(Generic[Credentials, Verifier]):
                 fragments.append(fragment)
                 fragment_size -= len(fragment)
 
-            # Check for last fragment or underflow
-            if (fragment_header & 0x80000000) > 0 or len(fragment) < fragment_size:
+            # Check for last fragment
+            if fragment_header & 0x80000000:
                 return b"".join(fragments)
 
     def __del__(self):
