@@ -124,7 +124,7 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(BytesIO(datafs_tar.open("rb").read())))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
         target.log.warning("Attempting to load XZ files, this can take a while.")
@@ -137,7 +137,7 @@ class FortiOSPlugin(LinuxPlugin):
             "syntax.tar.xz",
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
-                fh = xz.repair_checksum(tar.open("rb"))
+                fh = xz.repair_checksum(BytesIO(tar.open("rb").read()))
                 target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
