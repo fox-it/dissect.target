@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
@@ -67,10 +69,38 @@ class ShadowPlugin(Plugin):
                     seen_hashes.add(current_hash)
 
                     # improve readability
-                    last_change = shent.get(2)
-                    min_age = shent.get(3)
-                    max_age = shent.get(4)
-                    expiration_date = shent.get(7)
+                    last_change = None
+                    min_age = None
+                    max_age = None
+                    expiration_date = None
+
+                    try:
+                        last_change = int(shent.get(2)) if shent.get(2) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(2)
+                        )
+
+                    try:
+                        min_age = int(shent.get(3)) if shent.get(3) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(3)
+                        )
+
+                    try:
+                        max_age = int(shent.get(4)) if shent.get(4) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(4)
+                        )
+
+                    try:
+                        expiration_date = int(shent.get(7)) if shent.get(7) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(7)
+                        )
 
                     yield UnixShadowRecord(
                         name=shent.get(0),
@@ -79,16 +109,12 @@ class ShadowPlugin(Plugin):
                         crypt_param=crypt.get("param"),
                         salt=crypt.get("salt"),
                         hash=crypt.get("hash"),
-                        last_change=epoch_days_to_datetime(int(last_change)) if last_change else None,
-                        min_age=epoch_days_to_datetime(int(last_change) + int(min_age))
-                        if last_change and isinstance(min_age, int) and min_age > 0
-                        else None,
-                        max_age=epoch_days_to_datetime(int(last_change) + int(max_age))
-                        if last_change and max_age
-                        else None,
+                        last_change=epoch_days_to_datetime(last_change) if last_change else None,
+                        min_age=epoch_days_to_datetime(last_change + min_age) if last_change and min_age else None,
+                        max_age=epoch_days_to_datetime(last_change + max_age) if last_change and max_age else None,
                         warning_period=shent.get(5) if shent.get(5) else None,
                         inactivity_period=shent.get(6) if shent.get(6) else None,
-                        expiration_date=epoch_days_to_datetime(int(expiration_date)) if expiration_date else None,
+                        expiration_date=epoch_days_to_datetime(expiration_date) if expiration_date else None,
                         unused_field=shent.get(8),
                         _target=self.target,
                     )
