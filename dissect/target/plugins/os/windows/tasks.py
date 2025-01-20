@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import logging
-import warnings
-from typing import Iterator, Union
+from typing import Iterator
 
 from flow.record import GroupedRecord
 
 from dissect.target import Target
-from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.exceptions import InvalidTaskError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
 from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
-log = logging.getLogger(__name__)
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
@@ -118,7 +113,7 @@ class TasksPlugin(Plugin):
             raise UnsupportedPluginError("No task files")
 
     @export(record=DynamicDescriptor(["path", "datetime"]))
-    def tasks(self) -> Iterator[Union[TaskRecord, GroupedRecord]]:
+    def tasks(self) -> Iterator[TaskRecord | GroupedRecord]:
         """Return all scheduled tasks on a Windows system.
 
         On a Windows system, a scheduled task is a program or script that is executed on a specific time or at specific
@@ -132,7 +127,12 @@ class TasksPlugin(Plugin):
         """
         for task_file in self.task_files:
             if not task_file.suffix or task_file.suffix == ".xml":
-                task_objects = ScheduledTasks(task_file).tasks
+                try:
+                    task_objects = ScheduledTasks(task_file).tasks
+                except InvalidTaskError as e:
+                    self.target.log.warning("Invalid task file encountered: %s", task_file)
+                    self.target.log.debug("", exc_info=e)
+                    continue
             else:
                 task_objects = [AtTask(task_file, self.target)]
 
