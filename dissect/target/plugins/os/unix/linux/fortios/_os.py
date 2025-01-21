@@ -155,6 +155,11 @@ class FortiOSPlugin(LinuxPlugin):
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
 
+        # If there is no /migadmin at this point, check sysvol and map accordingly
+        if not target.fs.exists("/migadmin") and target.fs.exists("/data/migadmin"):
+            target.log.info("Directory migadmin found in sysvol, mapping /migadmin to /data/migadmin")
+            target.fs.map_file_entry("/migadmin", target.fs.get("/data/migadmin"))
+
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
         for fs in target.filesystems:
