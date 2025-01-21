@@ -101,7 +101,7 @@ def test_unix_shadow_invalid_shent(
     assert results[3].name == "no_int_fields"
     assert results[3].last_change is None
     assert (
-        "Unable to parse last_change shadow value in /etc/shadow: invalid literal for int() with base 10: 'string' ('string')"
+        "Unable to parse last_change shadow value in /etc/shadow: invalid literal for int() with base 10: 'string' ('string')"  # noqa:E501
         in caplog.text
     )
 
