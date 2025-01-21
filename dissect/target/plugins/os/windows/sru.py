@@ -176,8 +176,8 @@ VfuRecord = TargetRecordDescriptor(
         ("path", "app"),
         ("string", "user"),
         ("varint", "flags"),
-        ("varint", "start_time"),
-        ("varint", "end_time"),
+        ("datetime", "start_time"),
+        ("datetime", "end_time"),
         ("bytes", "usage"),
     ],
 )
