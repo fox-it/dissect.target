@@ -45,6 +45,20 @@ FortiOSUserRecord = TargetRecordDescriptor(
 )
 
 
+def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
+    """Create appropriate ``TarFilesytem`` based on file format.
+
+    Args:
+        fileobj: The file-like object of a tar or cpio file
+
+    Returns:
+        TarFilesystem with cpio handler if cpio format is detected.
+    """
+    if open_decompress(fileobj=fileobj).read(4) == b"0707":
+        return TarFilesystem(fileobj, tarinfo=cpio.CpioInfo)
+    return TarFilesystem(fileobj)
+
+
 class FortiOSPlugin(LinuxPlugin):
     """FortiOS plugin for various Fortinet appliances."""
 
@@ -94,10 +108,7 @@ class FortiOSPlugin(LinuxPlugin):
         vfs = None
 
         try:
-            if open_decompress(rootfs).read(4) == b"0707":
-                vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
-            else:
-                vfs = TarFilesystem(rootfs.open())
+            vfs = create_tar_filesystem(rootfs.open())
         except ReadError:
             # The rootfs.gz file could be encrypted.
             try:
@@ -107,7 +118,7 @@ class FortiOSPlugin(LinuxPlugin):
                 target.log.info("Trying to decrypt_rootfs using key: %r", key)
                 rfs_fh = decrypt_rootfs(rootfs.open(), key)
                 target.log.info("Decrypted fh: %r", rfs_fh)
-                vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
+                vfs = create_tar_filesystem(rfs_fh)
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
             except ValueError as e:
