@@ -527,6 +527,7 @@ def open_decompress(
         file = path.open("rb")
     else:
         file = fileobj
+        file.seek(0)
 
     magic = file.read(5)
     file.seek(0)
