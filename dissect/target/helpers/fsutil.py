@@ -512,10 +512,12 @@ def open_decompress(
         An binary or text IO stream, depending on the mode with which the file was opened.
 
     Example:
-        bytes_buf = open_decompress(Path("/dir/file.gz")).read()
+        .. code-block:: python
 
-        for line in open_decompress(Path("/dir/file.gz"), "rt"):
-            print(line)
+            bytes_buf = open_decompress(Path("/dir/file.gz")).read()
+
+            for line in open_decompress(Path("/dir/file.gz"), "rt"):
+                print(line)
     """
     if path and fileobj:
         raise ValueError("path and fileobj are mutually exclusive")
