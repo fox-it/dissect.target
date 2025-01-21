@@ -69,7 +69,6 @@ def create_record(
     create: str,
     target: Target,
 ) -> TargetRecordDescriptor:
-
     return description(
         start_time=_to_log_timestamp(install_properties.get("starttime")),
         stop_time=_to_log_timestamp(install_properties.get("stoptime")),
