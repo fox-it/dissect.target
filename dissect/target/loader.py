@@ -178,6 +178,7 @@ register("local", "LocalLoader")
 register("remote", "RemoteLoader")
 register("mqtt", "MQTTLoader")
 register("asdf", "AsdfLoader")
+register("containerimage", "ContainerImageLoader")  # Should be before TarLoader
 register("tar", "TarLoader")
 register("vmx", "VmxLoader")
 register("vmwarevm", "VmwarevmLoader")
