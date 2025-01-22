@@ -46,7 +46,7 @@ FortiOSUserRecord = TargetRecordDescriptor(
 
 
 def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
-    """Create appropriate ``TarFilesytem`` based on file format.
+    """Create appropriate ``TarFilesystem`` based on file format.
 
     Args:
         fileobj: The file-like object of a tar or cpio file
