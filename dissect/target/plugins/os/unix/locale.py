@@ -20,12 +20,14 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 
 
 def timezone_from_path(path: Path) -> str:
-    """Return timezone name for given zoneinfo path.
+    """Return timezone name for the given zoneinfo path.
 
-    /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
+    .. code-block::
+
+        /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
+        /usr/share/zoneinfo/UTC              -> UTC
     """
-    zoneinfo_path = str(path).split("/")
-    return "/".join(zoneinfo_path[-2:])
+    return "/".join([p for p in path.parts[-2:] if p != "zoneinfo"])
 
 
 class LocalePlugin(Plugin):
