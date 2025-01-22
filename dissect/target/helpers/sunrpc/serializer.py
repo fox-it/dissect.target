@@ -190,7 +190,7 @@ class AuthNullSerializer(AuthSerializer[sunrpc.AuthNull]):
         return AuthFlavor.AUTH_NULL.value
 
     def _write_body(self, _: AuthProtocol) -> bytes:
-        return bytes()
+        return b""
 
     def _read_body(self, _: io.BytesIO) -> AuthProtocol:
         return sunrpc.AuthNull()
@@ -235,30 +235,28 @@ class MessageSerializer(
         self._verifierSerializer = verifierSerializer
 
     def serialize(self, message: sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]) -> bytes:
+        if not isinstance(message.body, sunrpc.CallBody):
+            raise NotImplementedError("Only CALL messages are serializable")
+
         result = self._write_uint32(message.xid)
-
-        if isinstance(message.body, sunrpc.CallBody):
-            result += self._write_enum(MessageType.CALL)
-            return result + self._write_call_body(message.body)
-
-        raise NotImplementedError("Only CALL messages are serializable")
+        result += self._write_enum(MessageType.CALL)
+        return result + self._write_call_body(message.body)
 
     def deserialize(
         self, payload: io.BytesIO
     ) -> sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]:
         xid = self._read_uint32(payload)
-        messageType = self._read_enum(payload, MessageType)
+        message_type = self._read_enum(payload, MessageType)
+        if message_type != MessageType.REPLY:
+            raise NotImplementedError("Only REPLY messages are deserializable")
 
-        if messageType == MessageType.REPLY:
-            replyStat = self._read_enum(payload, ReplyStat)
-            if replyStat == ReplyStat.MSG_ACCEPTED:
-                reply = self._read_accepted_reply(payload)
-            elif replyStat == ReplyStat.MSG_DENIED:
-                reply = self._read_rejected_reply(payload)
+        reply_stat = self._read_enum(payload, ReplyStat)
+        if reply_stat == ReplyStat.MSG_ACCEPTED:
+            reply = self._read_accepted_reply(payload)
+        elif reply_stat == ReplyStat.MSG_DENIED:
+            reply = self._read_rejected_reply(payload)
 
-            return sunrpc.Message(xid, reply)
-
-        raise NotImplementedError("Only REPLY messages are deserializable")
+        return sunrpc.Message(xid, reply)
 
     def _write_call_body(self, call_body: sunrpc.CallBody) -> bytes:
         result = self._write_uint32(call_body.rpc_version)
@@ -286,10 +284,11 @@ class MessageSerializer(
     def _read_rejected_reply(self, payload: io.BytesIO) -> sunrpc.RejectedReply:
         reject_stat = self._read_enum(payload, sunrpc.RejectStat)
         if reject_stat == sunrpc.RejectStat.RPC_MISMATCH:
-            return self._read_mismatch(payload)
+            mismatch = self._read_mismatch(payload)
+            return sunrpc.RejectedReply(reject_stat, mismatch)
         elif reject_stat == sunrpc.RejectStat.AUTH_ERROR:
             auth_stat = self._read_enum(payload, sunrpc.AuthStat)
-            return auth_stat
+            return sunrpc.RejectedReply(reject_stat, auth_stat)
 
     def _read_mismatch(self, payload: io.BytesIO) -> sunrpc.Mismatch:
         low = self._read_uint32(payload)
@@ -298,9 +297,9 @@ class MessageSerializer(
 
 
 class PortMappingSerializer(Serializer[sunrpc.PortMapping]):
-    def serialize(self, portMapping: sunrpc.PortMapping) -> bytes:
-        result = self._write_uint32(portMapping.program)
-        result += self._write_uint32(portMapping.version)
-        result += self._write_enum(portMapping.protocol)
-        result += self._write_uint32(portMapping.port)
+    def serialize(self, port_mapping: sunrpc.PortMapping) -> bytes:
+        result = self._write_uint32(port_mapping.program)
+        result += self._write_uint32(port_mapping.version)
+        result += self._write_enum(port_mapping.protocol)
+        result += self._write_uint32(port_mapping.port)
         return result
