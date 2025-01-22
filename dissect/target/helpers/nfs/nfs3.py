@@ -1,35 +1,48 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
-from typing import ClassVar
+from enum import Enum, IntEnum
+from typing import ClassVar, NamedTuple
 
 # See https://datatracker.ietf.org/doc/html/rfc1057
 
 
-class NfsStat(Enum):
-    NFS3_OK = 0
-    NFS3ERR_PERM = 1
-    NFS3ERR_NOENT = 2
-    NFS3ERR_IO = 5
-    NFS3ERR_NXIO = 6
-    NFS3ERR_ACCES = 13
-    NFS3ERR_EXIST = 17
-    NFS3ERR_XDEV = 18
-    NFS3ERR_NODEV = 19
-    NFS3ERR_NOTDIR = 20
-    NFS3ERR_ISDIR = 21
-    NFS3ERR_INVAL = 22
-    NFS3ERR_FBIG = 27
-    NFS3ERR_NOSPC = 28
-    NFS3ERR_ROFS = 30
-    NFS3ERR_MLINK = 31
-    NFS3ERR_NAMETOOLONG = 63
-    NFS3ERR_NOTEMPTY = 66
-    NFS3ERR_DQUOT = 69
-    NFS3ERR_STALE = 70
-    NFS3ERR_REMOTE = 71
-    NFS3ERR_BADHANDLE = 10001
+class ProcedureDescriptor(NamedTuple):
+    program: int
+    version: int
+    procedure: int
+
+
+# List of procedure descriptors
+GetPortProc = ProcedureDescriptor(100000, 2, 3)
+MountProc = ProcedureDescriptor(100005, 3, 1)
+ReadDirPlusProc = ProcedureDescriptor(100003, 3, 17)
+ReadFileProc = ProcedureDescriptor(100003, 3, 6)
+
+
+class Nfs3Stat(Enum):
+    OK = 0
+    ERR_PERM = 1
+    ERR_NOENT = 2
+    ERR_IO = 5
+    ERR_NXIO = 6
+    ERR_ACCES = 13
+    ERR_EXIST = 17
+    ERR_XDEV = 18
+    ERR_NODEV = 19
+    ERR_NOTDIR = 20
+    ERR_ISDIR = 21
+    ERR_INVAL = 22
+    ERR_FBIG = 27
+    ERR_NOSPC = 28
+    ERR_ROFS = 30
+    ERR_MLINK = 31
+    ERR_NAMETOOLONG = 63
+    ERR_NOTEMPTY = 66
+    ERR_DQUOT = 69
+    ERR_STALE = 70
+    ERR_REMOTE = 71
+    ERR_BADHANDLE = 10001
 
 
 @dataclass
@@ -52,14 +65,14 @@ class CookieVerf3:
             raise ValueError(f"CookieVerf cannot exceed {self.MAXSIZE} bytes")
 
 
-class FileType3(Enum):
-    NF3REG = 1  # regular file
-    NF3DIR = 2  # directory
-    NF3BLK = 3  # block special
-    NF3CHR = 4  # character special
-    NF3LNK = 5  # symbolic link
-    NF3SOCK = 6  # socket
-    NF3FIFO = 7  # fifo
+class FileType3(IntEnum):
+    REG = 1  # regular file
+    DIR = 2  # directory
+    BLK = 3  # block special
+    CHR = 4  # character special
+    LNK = 5  # symbolic link
+    SOCK = 6  # socket
+    FIFO = 7  # fifo
 
 
 @dataclass
@@ -91,17 +104,17 @@ class FileAttributes3:
     ctime: NfsTime3
 
 
-class MountStat(Enum):
-    MNT3_OK = 0  # no error
-    MNT3ERR_PERM = 1  # Not owner
-    MNT3ERR_NOENT = 2  # No such file or directory
-    MNT3ERR_IO = 5  # I/O error
-    MNT3ERR_ACCES = 13  # Permission denied
-    MNT3ERR_NOTDIR = 20  # Not a directory
-    MNT3ERR_INVAL = 22  # Invalid argument
-    MNT3ERR_NAMETOOLONG = 63  # Filename too long
-    MNT3ERR_NOTSUPP = 10004  # Operation not supported
-    MNT3ERR_SERVERFAULT = 10006  # A failure on the server
+class MountStat3(IntEnum):
+    OK = 0  # no error
+    ERR_PERM = 1  # Not owner
+    ERR_NOENT = 2  # No such file or directory
+    ERR_IO = 5  # I/O error
+    ERR_ACCES = 13  # Permission denied
+    ERR_NOTDIR = 20  # Not a directory
+    ERR_INVAL = 22  # Invalid argument
+    ERR_NAMETOOLONG = 63  # Filename too long
+    ERR_NOTSUPP = 10004  # Operation not supported
+    ERR_SERVERFAULT = 10006  # A failure on the server
 
 
 @dataclass

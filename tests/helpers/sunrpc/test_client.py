@@ -6,12 +6,14 @@ import pytest
 
 from dissect.target.helpers.nfs.client import Client as NfsClient
 from dissect.target.helpers.nfs.client import ReadDirResult
-from dissect.target.helpers.nfs.nfs import (
+from dissect.target.helpers.nfs.nfs3 import (
     EntryPlus3,
     FileAttributes3,
     FileHandle3,
     FileType3,
+    GetPortProc,
     MountOK,
+    MountProc,
     NfsTime3,
     SpecData3,
 )
@@ -41,7 +43,7 @@ def test_portmap_call(mock_socket: MagicMock) -> None:
     mock_sock_instance = MagicMock()
     mock_socket.return_value = mock_sock_instance
 
-    client = Client.connectPortMapper("localhost")
+    client = Client.connect_port_mapper("localhost")
 
     # Prepare the portmap request and response
     portmap_params = PortMapping(program=100003, version=3, protocol=sunrpc.Protocol.TCP)
@@ -50,7 +52,7 @@ def test_portmap_call(mock_socket: MagicMock) -> None:
     response_fragment_header = (len(portmap_response) | 0x80000000).to_bytes(4, "big")
     mock_sock_instance.recv.side_effect = [response_fragment_header, portmap_response]
 
-    result = client.call(100000, 2, 3, portmap_params, PortMappingSerializer(), UInt32Serializer())
+    result = client.call(GetPortProc, portmap_params, PortMappingSerializer(), UInt32Serializer())
 
     # Verify that the request payload was sent
     portmap_request_fragment_header = (len(portmap_request) | 0x80000000).to_bytes(4, "big")
@@ -74,7 +76,7 @@ def test_mount_call(mock_socket: MagicMock) -> None:
     mock_sock_instance.recv.side_effect = [mount_response_fragment_header, mount_response]
 
     mount_client = Client.connect("localhost", 2049, auth_null())
-    result = mount_client.call(100005, 3, 1, "/home/roel", StringSerializer(), MountResultDeserializer())
+    result = mount_client.call(MountProc, "/home/roel", StringSerializer(), MountResultDeserializer())
 
     # Verify that the request payload was sent
     portmap_request_fragment_header = (len(mount_request) | 0x80000000).to_bytes(4, "big")
@@ -115,7 +117,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
     # Verify that the result of the call equals the readdir_result variable
     assert result == ReadDirResult(
         dir_attributes=FileAttributes3(
-            type=FileType3.NF3DIR,
+            type=FileType3.DIR,
             mode=509,
             nlink=2,
             uid=1000,
@@ -135,7 +137,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
                 name="test.txt",
                 cookie=4501976305947941983,
                 attributes=FileAttributes3(
-                    type=FileType3.NF3REG,
+                    type=FileType3.REG,
                     mode=436,
                     nlink=1,
                     uid=1000,
@@ -158,7 +160,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
                 name=".",
                 cookie=4857786061512671984,
                 attributes=FileAttributes3(
-                    type=FileType3.NF3DIR,
+                    type=FileType3.DIR,
                     mode=509,
                     nlink=2,
                     uid=1000,
@@ -181,7 +183,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
                 name="test2.txt",
                 cookie=7513711534648189502,
                 attributes=FileAttributes3(
-                    type=FileType3.NF3REG,
+                    type=FileType3.REG,
                     mode=436,
                     nlink=1,
                     uid=1000,

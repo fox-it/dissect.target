@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from typing import Generic, Iterator, NamedTuple, TypeVar
 
-from dissect.target.helpers.nfs.nfs import (
+from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf3,
     EntryPlus3,
     FileAttributes3,
     FileHandle3,
-    NfsStat,
+    Nfs3Stat,
     Read3args,
     ReadDirPlusParams,
+    ReadDirPlusProc,
+    ReadFileProc,
 )
 from dissect.target.helpers.nfs.serializer import (
     Read3ArgsSerializer,
@@ -49,7 +51,7 @@ class Client(Generic[Credentials, Verifier]):
         rpc_client = SunRpcClient.connect(hostname, port, auth, local_port)
         return Client(rpc_client)
 
-    def readdirplus(self, dir: FileHandle3) -> ReadDirResult | NfsStat:
+    def readdirplus(self, dir: FileHandle3) -> ReadDirResult | Nfs3Stat:
         """Read the contents of a directory, including file attributes"""
 
         entries = list[EntryPlus3]()
@@ -60,9 +62,9 @@ class Client(Generic[Credentials, Verifier]):
         while True:
             params = ReadDirPlusParams(dir, cookie, cookieverf, dir_count=self.DIR_COUNT, max_count=self.MAX_COUNT)
             result = self._rpc_client.call(
-                100003, 3, 17, params, ReadDirPlusParamsSerializer(), ReadDirPlusResultDeserializer()
+                ReadDirPlusProc, params, ReadDirPlusParamsSerializer(), ReadDirPlusResultDeserializer()
             )
-            if isinstance(result, NfsStat):
+            if isinstance(result, Nfs3Stat):
                 return result
 
             entries += result.entries
@@ -78,8 +80,8 @@ class Client(Generic[Credentials, Verifier]):
         count = self.READ_CHUNK_SIZE
         while True:
             params = Read3args(handle, offset, count)
-            result = self._rpc_client.call(100003, 3, 6, params, Read3ArgsSerializer(), Read3ResultDeserializer())
-            if isinstance(result, NfsStat):
+            result = self._rpc_client.call(ReadFileProc, params, Read3ArgsSerializer(), Read3ResultDeserializer())
+            if isinstance(result, Nfs3Stat):
                 raise ReadFileError(f"Failed to read file: {result}")
             yield result.data
             if result.eof:

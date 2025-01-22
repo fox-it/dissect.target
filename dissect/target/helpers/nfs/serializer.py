@@ -3,15 +3,15 @@ from __future__ import annotations
 import io
 from typing import Union
 
-from dissect.target.helpers.nfs.nfs import (
+from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf3,
     EntryPlus3,
     FileAttributes3,
     FileHandle3,
     FileType3,
     MountOK,
-    MountStat,
-    NfsStat,
+    MountStat3,
+    Nfs3Stat,
     NfsTime3,
     Read3args,
     Read3resok,
@@ -29,10 +29,10 @@ from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class MountResultDeserializer(Deserializer[Union[MountOK, MountStat]]):
-    def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat:
-        mount_stat = self._read_enum(payload, MountStat)
-        if mount_stat != MountStat.MNT3_OK:
+class MountResultDeserializer(Deserializer[Union[MountOK, MountStat3]]):
+    def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat3:
+        mount_stat = self._read_enum(payload, MountStat3)
+        if mount_stat != MountStat3.OK:
             return mount_stat
         filehandle_bytes = self._read_var_length_opaque(payload)
         auth_flavors = self._read_var_length(payload, Int32Serializer())
@@ -100,10 +100,10 @@ class EntryPlusSerializer(Deserializer[EntryPlus3]):
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class ReadDirPlusResultDeserializer(Deserializer[Union[ReadDirPlusResult3, NfsStat]]):
+class ReadDirPlusResultDeserializer(Deserializer[Union[ReadDirPlusResult3, Nfs3Stat]]):
     def deserialize(self, payload: io.BytesIO) -> ReadDirPlusResult3:
-        stat = self._read_enum(payload, NfsStat)
-        if stat != NfsStat.NFS3_OK:
+        stat = self._read_enum(payload, Nfs3Stat)
+        if stat != Nfs3Stat.OK:
             return stat
 
         dir_attributes = self._read_optional(payload, FileAttributesSerializer())
@@ -132,8 +132,8 @@ class Read3ArgsSerializer(Serializer[ReadDirPlusParams]):
 
 class Read3ResultDeserializer(Deserializer[Read3resok]):
     def deserialize(self, payload: io.BytesIO) -> Read3resok:
-        stat = self._read_enum(payload, NfsStat)
-        if stat != NfsStat.NFS3_OK:
+        stat = self._read_enum(payload, Nfs3Stat)
+        if stat != Nfs3Stat.OK:
             return stat
 
         file_attributes = self._read_optional(payload, FileAttributesSerializer())

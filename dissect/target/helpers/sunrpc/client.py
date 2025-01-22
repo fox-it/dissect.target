@@ -5,6 +5,7 @@ import socket
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
 from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
     AuthNullSerializer,
@@ -60,7 +61,7 @@ class Client(Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
     @classmethod
-    def connectPortMapper(cls, hostname: str) -> "Client":
+    def connect_port_mapper(cls, hostname: str) -> "Client":
         return cls.connect(hostname, cls.PMAP_PORT, auth_null())
 
     @classmethod
@@ -89,14 +90,21 @@ class Client(Generic[Credentials, Verifier]):
 
     def call(
         self,
-        program: int,
-        version: int,
-        procedure: int,
+        proc_desc: ProcedureDescriptor,
         params: Params,
         params_serializer: Serializer[Params],
         result_deserializer: Deserializer[Results],
     ) -> Results:
-        callBody = sunrpc.CallBody(program, version, procedure, self._auth.credentials, self._auth.verifier, params)
+        """Synchronously call an RPC procedure and return the result"""
+
+        callBody = sunrpc.CallBody(
+            proc_desc.program,
+            proc_desc.version,
+            proc_desc.procedure,
+            self._auth.credentials,
+            self._auth.verifier,
+            params,
+        )
         message = sunrpc.Message(self._xid, callBody)
         messageSerializer = MessageSerializer(
             params_serializer, result_deserializer, self._auth.credentials_serializer, self._auth.verifier_serializer
@@ -125,10 +133,9 @@ class Client(Generic[Credentials, Verifier]):
             fragment = data[offset : offset + self._fragment_size]
             fragment_size = len(fragment)
 
+            fragmentHeader = fragment_size
             if offset + fragment_size == data_size:
-                fragmentHeader = fragment_size | 0x80000000  # MSB set to indicate last fragment
-            else:
-                fragmentHeader = fragment_size
+                fragmentHeader = fragmentHeader | 0x80000000  # MSB set to indicate last fragment
 
             chunk = fragmentHeader.to_bytes(4, "big") + fragment
             self._sock.sendall(chunk)
