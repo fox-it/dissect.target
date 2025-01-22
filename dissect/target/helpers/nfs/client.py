@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
+from types import TracebackType
 from typing import Generic, Iterator, NamedTuple, TypeVar
 
 from dissect.target.helpers.nfs.nfs3 import (
@@ -38,13 +40,17 @@ class ReadDirResult(NamedTuple):
 # RdJ Bit annoying that the Credentials and Verifier keep propagating as type parameters of the class.
 # Alternatively, we could use type erasure and couple the auth data with the auth serializer,
 # and make the auth data in the `CallBody` class opaque.
-class Client(Generic[Credentials, Verifier]):
+class Client(AbstractContextManager, Generic[Credentials, Verifier]):
     DIR_COUNT = 4096  # See https://datatracker.ietf.org/doc/html/rfc1813#section-3.3.17
     MAX_COUNT = 32768
     READ_CHUNK_SIZE = 1024 * 1024
 
     def __init__(self, rpc_client: SunRpcClient[Credentials, Verifier]):
         self._rpc_client = rpc_client
+
+    def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
+        self._rpc_client.close()
+        return False  # Reraise exceptions
 
     @classmethod
     def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int) -> "Client":

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import random
 import socket
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Generic, TypeVar
 
 from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
@@ -61,7 +63,7 @@ class IncompleteMessage(Exception):
     pass
 
 
-class Client(Generic[Credentials, Verifier]):
+class Client(AbstractContextManager, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
     @classmethod
@@ -84,6 +86,10 @@ class Client(Generic[Credentials, Verifier]):
         self._auth = auth
         self._fragment_size = fragment_size
         self._xid = 1
+
+    def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
+        self.close()
+        return False  # Reraise exceptions
 
     def close(self) -> None:
         try:
