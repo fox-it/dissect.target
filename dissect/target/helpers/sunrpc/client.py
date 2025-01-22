@@ -57,6 +57,10 @@ class UnexpectedResponse(Exception):
     pass
 
 
+class IncompleteMessage(Exception):
+    pass
+
+
 class Client(Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
@@ -147,7 +151,7 @@ class Client(Generic[Credentials, Verifier]):
         while True:
             header = self._sock.recv(4)
             if not header:
-                return bytes()
+                raise IncompleteMessage("Expected a fragment header")
 
             fragment_header = int.from_bytes(header, "big")
             fragment_size = fragment_header & 0x7FFFFFFF
