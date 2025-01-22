@@ -23,7 +23,7 @@ class ContainerImageFilesystem(LayerFilesystem):
         - https://github.com/opencontainers/image-spec/
     """
 
-    __type__ = "container"
+    __type__ = "container_image"
 
     def __init__(self, path: Path, *args, **kwargs):
         super().__init__(*args, **kwargs)
