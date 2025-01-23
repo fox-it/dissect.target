@@ -75,7 +75,7 @@ class UnixPlugin(OSPlugin):
         # Yield users found in passwd files.
         for passwd_file in PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
-                for line in path.open("rt", errors="backslashreplace"):
+                for line in path.open("rt", errors="surrogateescape"):
                     line = line.strip()
                     if not line or line.startswith("#"):
                         continue
@@ -89,8 +89,8 @@ class UnixPlugin(OSPlugin):
                     yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
-                        uid=pwent.get(2) if pwent.get(2) != "" else None,
-                        gid=pwent.get(3) if pwent.get(3) != "" else None,
+                        uid=pwent.get(2) or None,
+                        gid=pwent.get(3) or None,
                         gecos=pwent.get(4),
                         home=posix_path(pwent.get(5)),
                         shell=pwent.get(6),
