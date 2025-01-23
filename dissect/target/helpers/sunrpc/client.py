@@ -13,9 +13,9 @@ from dissect.target.helpers.sunrpc.serializer import (
     AuthNullSerializer,
     AuthSerializer,
     AuthUnixSerializer,
-    Deserializer,
     MessageSerializer,
-    Serializer,
+    XdrDeserializer,
+    XdrSerializer,
 )
 
 Credentials = TypeVar("Credentials")
@@ -102,8 +102,8 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
         self,
         proc_desc: ProcedureDescriptor,
         params: Params,
-        params_serializer: Serializer[Params],
-        result_deserializer: Deserializer[Results],
+        params_serializer: XdrSerializer[Params],
+        result_deserializer: XdrDeserializer[Results],
     ) -> Results:
         """Synchronously call an RPC procedure and return the result"""
 

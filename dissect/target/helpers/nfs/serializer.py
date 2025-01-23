@@ -20,16 +20,16 @@ from dissect.target.helpers.nfs.nfs3 import (
     SpecData3,
 )
 from dissect.target.helpers.sunrpc.serializer import (
-    Deserializer,
     Int32Serializer,
     OpaqueVarLengthSerializer,
-    Serializer,
+    XdrDeserializer,
+    XdrSerializer,
 )
 from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class MountResultDeserializer(Deserializer[Union[MountOK, MountStat3]]):
+class MountResultDeserializer(XdrDeserializer[Union[MountOK, MountStat3]]):
     def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat3:
         mount_stat = self._read_enum(payload, MountStat3)
         if mount_stat != MountStat3.OK:
@@ -40,7 +40,7 @@ class MountResultDeserializer(Deserializer[Union[MountOK, MountStat3]]):
         return MountOK(FileHandle3(filehandle_bytes), auth_flavors)
 
 
-class ReadDirPlusParamsSerializer(Serializer[ReadDirPlusParams]):
+class ReadDirPlusParamsSerializer(XdrSerializer[ReadDirPlusParams]):
     def serialize(self, params: ReadDirPlusParams) -> bytes:
         result = self._write_var_length_opaque(params.dir.opaque)
         result += self._write_uint64(params.cookie)
@@ -51,7 +51,7 @@ class ReadDirPlusParamsSerializer(Serializer[ReadDirPlusParams]):
         return result
 
 
-class SpecDataSerializer(Deserializer[SpecData3]):
+class SpecDataSerializer(XdrDeserializer[SpecData3]):
     def deserialize(self, payload: io.BytesIO) -> bytes:
         specdata1 = self._read_uint32(payload)
         specdata2 = self._read_uint32(payload)
@@ -59,7 +59,7 @@ class SpecDataSerializer(Deserializer[SpecData3]):
         return SpecData3(specdata1, specdata2)
 
 
-class NfsTimeSerializer(Deserializer[NfsTime3]):
+class NfsTimeSerializer(XdrDeserializer[NfsTime3]):
     def deserialize(self, payload: io.BytesIO) -> bytes:
         seconds = self._read_uint32(payload)
         nseconds = self._read_uint32(payload)
@@ -67,7 +67,7 @@ class NfsTimeSerializer(Deserializer[NfsTime3]):
         return NfsTime3(seconds, nseconds)
 
 
-class FileAttributesSerializer(Deserializer[FileAttributes3]):
+class FileAttributesSerializer(XdrDeserializer[FileAttributes3]):
     def deserialize(self, payload: io.BytesIO) -> FileAttributes3:
         type = self._read_enum(payload, FileType3)
         mode = self._read_uint32(payload)
@@ -87,7 +87,7 @@ class FileAttributesSerializer(Deserializer[FileAttributes3]):
         return FileAttributes3(type, mode, nlink, uid, gid, size, used, rdev, fsid, fileid, atime, mtime, ctime)
 
 
-class EntryPlusSerializer(Deserializer[EntryPlus3]):
+class EntryPlusSerializer(XdrDeserializer[EntryPlus3]):
     def deserialize(self, payload: io.BytesIO) -> EntryPlus3:
         fileid = self._read_uint64(payload)
         name = self._read_string(payload)
@@ -100,7 +100,7 @@ class EntryPlusSerializer(Deserializer[EntryPlus3]):
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class ReadDirPlusResultDeserializer(Deserializer[Union[ReadDirPlusResult3, Nfs3Stat]]):
+class ReadDirPlusResultDeserializer(XdrDeserializer[Union[ReadDirPlusResult3, Nfs3Stat]]):
     def deserialize(self, payload: io.BytesIO) -> ReadDirPlusResult3:
         stat = self._read_enum(payload, Nfs3Stat)
         if stat != Nfs3Stat.OK:
@@ -122,7 +122,7 @@ class ReadDirPlusResultDeserializer(Deserializer[Union[ReadDirPlusResult3, Nfs3S
         return ReadDirPlusResult3(dir_attributes, CookieVerf3(cookieverf), entries, eof)
 
 
-class Read3ArgsSerializer(Serializer[ReadDirPlusParams]):
+class Read3ArgsSerializer(XdrSerializer[ReadDirPlusParams]):
     def serialize(self, args: Read3args) -> bytes:
         result = self._write_var_length_opaque(args.file.opaque)
         result += self._write_uint64(args.offset)
@@ -130,7 +130,7 @@ class Read3ArgsSerializer(Serializer[ReadDirPlusParams]):
         return result
 
 
-class Read3ResultDeserializer(Deserializer[Read3resok]):
+class Read3ResultDeserializer(XdrDeserializer[Read3resok]):
     def deserialize(self, payload: io.BytesIO) -> Read3resok:
         stat = self._read_enum(payload, Nfs3Stat)
         if stat != Nfs3Stat.OK:

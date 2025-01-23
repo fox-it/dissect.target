@@ -30,14 +30,67 @@ class Serializer(ABC, Generic[Serializable]):
     def serialize(self, _: Serializable) -> bytes:
         pass
 
-    # Unfortunately xdrlib is deprecated in Python 3.11, so we implement the following serialization methods
-    # to be used by descendants of the Serializer class.
-    # See https://datatracker.ietf.org/doc/html/rfc1014 for the XDR specification.
-    def _write_uint32(self, i: int) -> bytes:
+
+class Deserializer(ABC, Generic[Serializable]):
+    def deserialize_from_bytes(self, payload: bytes) -> Serializable:
+        return self.deserialize(io.BytesIO(payload))
+
+    @abstractmethod
+    def deserialize(self, _: io.BytesIO) -> Serializable:
+        pass
+
+
+# Unfortunately xdrlib is deprecated in Python 3.11, so we implement the following serialization classes
+# See https://datatracker.ietf.org/doc/html/rfc1014 for the XDR specification.
+
+
+class Int32Serializer(Serializer[int], Deserializer[int]):
+    def serialize(self, i: int) -> bytes:
+        return i.to_bytes(length=4, byteorder="big", signed=True)
+
+    def deserialize(self, payload: io.BytesIO) -> int:
+        return int.from_bytes(payload.read(4), byteorder="big", signed=True)
+
+
+class UInt32Serializer(Serializer[int], Deserializer[int]):
+    def serialize(self, i: int) -> bytes:
         return i.to_bytes(length=4, byteorder="big", signed=False)
 
+    def deserialize(self, payload: io.BytesIO) -> int:
+        return int.from_bytes(payload.read(4), byteorder="big", signed=False)
+
+
+class OpaqueVarLengthSerializer(Serializer[bytes], Deserializer[bytes]):
+    def serialize(self, body: bytes) -> bytes:
+        length = len(body)
+        result = UInt32Serializer().serialize(length)
+        result += body
+
+        padding_bytes = (ALIGNMENT - (length % ALIGNMENT)) % ALIGNMENT
+        return result + b"\x00" * padding_bytes
+
+    def deserialize(self, payload: io.BytesIO) -> bytes:
+        length = UInt32Serializer().deserialize(payload)
+        result = payload.read(length)
+        padding_bytes = (ALIGNMENT - (length % ALIGNMENT)) % ALIGNMENT
+        payload.read(padding_bytes)
+        return result
+
+
+class StringSerializer(Serializer[str], Deserializer[str]):
+    def serialize(self, s: str) -> bytes:
+        return OpaqueVarLengthSerializer().serialize(s.encode("ascii"))
+
+    def deserialize(self, payload: io.BytesIO) -> str:
+        return OpaqueVarLengthSerializer().deserialize(payload).decode("ascii")
+
+
+class XdrSerializer(Generic[Serializable], Serializer[Serializable]):
+    def _write_uint32(self, i: int) -> bytes:
+        return UInt32Serializer().serialize(i)
+
     def _write_int32(self, i: int) -> bytes:
-        return i.to_bytes(length=4, byteorder="big", signed=True)
+        return Int32Serializer().serialize(i)
 
     def _write_uint64(self, i: int) -> bytes:
         return i.to_bytes(length=8, byteorder="big", signed=False)
@@ -51,33 +104,18 @@ class Serializer(ABC, Generic[Serializable]):
         return result + b"".join(payload)
 
     def _write_var_length_opaque(self, body: bytes) -> bytes:
-        length = len(body)
-        result = self._write_uint32(length)
-        result += body
-
-        padding_bytes = (ALIGNMENT - (length % ALIGNMENT)) % ALIGNMENT
-        return result + b"\x00" * padding_bytes
+        return OpaqueVarLengthSerializer().serialize(body)
 
     def _write_string(self, s: str) -> bytes:
-        return self._write_var_length_opaque(s.encode("ascii"))
+        return StringSerializer().serialize(s)
 
 
-class Deserializer(ABC, Generic[Serializable]):
-    def deserialize_from_bytes(self, payload: bytes) -> Serializable:
-        return self.deserialize(io.BytesIO(payload))
-
-    @abstractmethod
-    def deserialize(self, _: io.BytesIO) -> Serializable:
-        pass
-
-    # Unfortunately xdrlib is deprecated in Python 3.11, so we implement the following serialization methods
-    # to be used by descendants of the Serializer class.
-    # See https://datatracker.ietf.org/doc/html/rfc1014 for the XDR specification.
+class XdrDeserializer(Generic[Serializable], Deserializer[Serializable]):
     def _read_uint32(self, payload: io.BytesIO) -> int:
-        return int.from_bytes(payload.read(4), byteorder="big", signed=False)
+        return UInt32Serializer().deserialize(payload)
 
     def _read_int32(self, payload: io.BytesIO) -> int:
-        return int.from_bytes(payload.read(4), byteorder="big", signed=True)
+        return Int32Serializer().deserialize(payload)
 
     def _read_uint64(self, payload: io.BytesIO) -> int:
         return int.from_bytes(payload.read(8), byteorder="big", signed=False)
@@ -86,61 +124,21 @@ class Deserializer(ABC, Generic[Serializable]):
         value = self._read_int32(payload)
         return enum(value)
 
-    def _read_var_length_opaque(self, payload: io.BytesIO) -> bytes:
-        length = self._read_uint32(payload)
-        result = payload.read(length)
-        padding_bytes = (ALIGNMENT - (length % ALIGNMENT)) % ALIGNMENT
-        payload.read(padding_bytes)
-        return result
-
     def _read_var_length(self, payload: io.BytesIO, deserializer: Deserializer[ElementType]) -> list[ElementType]:
         length = self._read_uint32(payload)
         return [deserializer.deserialize(payload) for _ in range(length)]
 
+    def _read_var_length_opaque(self, payload: io.BytesIO) -> bytes:
+        return OpaqueVarLengthSerializer().deserialize(payload)
+
     def _read_string(self, payload: io.BytesIO) -> str:
-        return self._read_var_length_opaque(payload).decode("ascii")
+        return StringSerializer().deserialize(payload)
 
     def _read_optional(self, payload: io.BytesIO, deserializer: Deserializer[ElementType]) -> ElementType | None:
         has_value = self._read_enum(payload, sunrpc.Bool)
         if has_value == sunrpc.Bool.FALSE:
             return None
         return deserializer.deserialize(payload)
-
-
-# RdJ: A bit clunky having to lift the primitives inside the Serializer/Deserializer class
-# to enable composition.
-# Possible design mistake, Alternatively, make serializers functions, since no state is kept.
-# But most of our stuff is OOP, so it would be inconsistent.
-class Int32Serializer(Serializer[int], Deserializer[int]):
-    def serialize(self, i: int) -> bytes:
-        return self._write_int32(i)
-
-    def deserialize(self, payload: io.BytesIO) -> int:
-        return self._read_int32(payload)
-
-
-class UInt32Serializer(Serializer[int], Deserializer[int]):
-    def serialize(self, i: int) -> bytes:
-        return self._write_uint32(i)
-
-    def deserialize(self, payload: io.BytesIO) -> int:
-        return self._read_uint32(payload)
-
-
-class StringSerializer(Serializer[str], Deserializer[str]):
-    def serialize(self, s: str) -> bytes:
-        return self._write_string(s)
-
-    def deserialize(self, payload: io.BytesIO) -> str:
-        return self._read_string(payload)
-
-
-class OpaqueVarLengthSerializer(Serializer[bytes], Deserializer[bytes]):
-    def serialize(self, body: bytes) -> bytes:
-        return self._write_var_length_opaque(body)
-
-    def deserialize(self, payload: io.BytesIO) -> bytes:
-        return self._read_var_length_opaque(payload)
 
 
 class ReplyStat(Enum):
@@ -155,7 +153,7 @@ class AuthFlavor(Enum):
     AUTH_DES = 3
 
 
-class AuthSerializer(Generic[AuthProtocol], Serializer[AuthProtocol], Deserializer[AuthProtocol]):
+class AuthSerializer(Generic[AuthProtocol], XdrSerializer[AuthProtocol], XdrDeserializer[AuthProtocol]):
     def serialize(self, protocol: AuthProtocol) -> bytes:
         flavor = self._flavor()
         result = self._write_int32(flavor)
@@ -219,13 +217,13 @@ class AuthUnixSerializer(AuthSerializer[sunrpc.AuthUnix]):
 
 class MessageSerializer(
     Generic[ProcedureParams, ProcedureResults, Credentials, Verifier],
-    Serializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
-    Deserializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
+    XdrSerializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
+    XdrDeserializer[sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]],
 ):
     def __init__(
         self,
-        paramsSerializer: Serializer[ProcedureParams],
-        resultsDeserializer: Deserializer[ProcedureResults],
+        paramsSerializer: XdrSerializer[ProcedureParams],
+        resultsDeserializer: XdrDeserializer[ProcedureResults],
         credentialsSerializer: AuthSerializer[Credentials],
         verifierSerializer: AuthSerializer[Verifier],
     ):
@@ -296,7 +294,7 @@ class MessageSerializer(
         return sunrpc.Mismatch(low, high)
 
 
-class PortMappingSerializer(Serializer[sunrpc.PortMapping]):
+class PortMappingSerializer(XdrSerializer[sunrpc.PortMapping]):
     def serialize(self, port_mapping: sunrpc.PortMapping) -> bytes:
         result = self._write_uint32(port_mapping.program)
         result += self._write_uint32(port_mapping.version)

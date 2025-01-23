@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, IntEnum
+from enum import IntEnum
 from typing import ClassVar, NamedTuple
 
 # See https://datatracker.ietf.org/doc/html/rfc1057
@@ -20,7 +20,7 @@ ReadDirPlusProc = ProcedureDescriptor(100003, 3, 17)
 ReadFileProc = ProcedureDescriptor(100003, 3, 6)
 
 
-class Nfs3Stat(Enum):
+class Nfs3Stat(IntEnum):
     OK = 0
     ERR_PERM = 1
     ERR_NOENT = 2

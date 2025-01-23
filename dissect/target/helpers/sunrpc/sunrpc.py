@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import IntEnum
 from typing import Generic, TypeVar
 
 
-class Bool(Enum):
+class Bool(IntEnum):
     FALSE = 0
     TRUE = 1
 
 
-class AcceptStat(Enum):
+class AcceptStat(IntEnum):
     SUCCESS = 0  # RPC executed successfully
     PROG_UNAVAIL = 1  # remote hasn't exported program
     PROG_MISMATCH = 2  # remote can't support version #
@@ -18,12 +18,12 @@ class AcceptStat(Enum):
     GARBAGE_ARGS = 4  # procedure can't decode params
 
 
-class RejectStat(Enum):
+class RejectStat(IntEnum):
     RPC_MISMATCH = 0
     AUTH_ERROR = 1
 
 
-class AuthStat(Enum):
+class AuthStat(IntEnum):
     AUTH_BADCRED = 1  # bad credentials (seal broken)
     AUTH_REJECTEDCRED = 2  # client must begin new session
     AUTH_BADVERF = 3  # bad verifier (seal broken)
@@ -94,7 +94,7 @@ class Message(Generic[ProcedureParams, ProcedureResults, Credentials, Verifier])
     body: CallBody[ProcedureParams, Credentials, Verifier] | AcceptedReply[ProcedureResults, Verifier] | RejectedReply
 
 
-class Protocol(Enum):
+class Protocol(IntEnum):
     TCP = 6
     UDP = 17
 
