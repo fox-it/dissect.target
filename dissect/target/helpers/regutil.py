@@ -179,7 +179,7 @@ class RegistryKey:
         except RegistryValueNotFoundError:
             if default is self.__marker:
                 raise
-            return VirtualValue(VirtualHive(), value, default)
+            return VirtualValue(self.hive, value, default)
 
     def _value(self, value: str) -> RegistryValue:
         raise NotImplementedError()
