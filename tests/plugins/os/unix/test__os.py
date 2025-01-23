@@ -148,6 +148,12 @@ def test_users(target_unix_users: Target) -> None:
     assert users[1].home == posix_path("/home/user")
     assert users[1].shell == "/bin/bash"
 
+    assert users[2].name == "+@ngtest"
+    assert users[2].uid is None
+    assert users[2].gid is None
+    assert users[2].home == posix_path("")
+    assert users[2].shell == ""
+
 
 @pytest.mark.parametrize(
     "expected_arch, elf_buf",
