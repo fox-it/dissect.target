@@ -311,7 +311,7 @@ class Target:
                     except Exception as e:
                         getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
 
-                    if target and include_children:
+                    if target is not None and include_children:
                         try:
                             yield from target.open_children()
                         except Exception as e:
