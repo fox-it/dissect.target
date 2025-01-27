@@ -222,15 +222,15 @@ class MessageSerializer(
 ):
     def __init__(
         self,
-        paramsSerializer: XdrSerializer[ProcedureParams],
-        resultsDeserializer: XdrDeserializer[ProcedureResults],
-        credentialsSerializer: AuthSerializer[Credentials],
-        verifierSerializer: AuthSerializer[Verifier],
+        params_serializer: XdrSerializer[ProcedureParams],
+        results_deserializer: XdrDeserializer[ProcedureResults],
+        credentials_serializer: AuthSerializer[Credentials],
+        verifier_serializer: AuthSerializer[Verifier],
     ):
-        self._paramsSerializer = paramsSerializer
-        self._resultsDeserializer = resultsDeserializer
-        self._credentialsSerializer = credentialsSerializer
-        self._verifierSerializer = verifierSerializer
+        self._params_serializer = params_serializer
+        self._results_deserializer = results_deserializer
+        self._credentials_serializer = credentials_serializer
+        self._verifier_serializer = verifier_serializer
 
     def serialize(self, message: sunrpc.Message[ProcedureParams, ProcedureResults, Credentials, Verifier]) -> bytes:
         if not isinstance(message.body, sunrpc.CallBody):
@@ -261,16 +261,16 @@ class MessageSerializer(
         result += self._write_uint32(call_body.program)
         result += self._write_uint32(call_body.version)
         result += self._write_uint32(call_body.procedure)
-        result += self._credentialsSerializer.serialize(call_body.cred)
-        result += self._verifierSerializer.serialize(call_body.verf)
-        result += self._paramsSerializer.serialize(call_body.params)
+        result += self._credentials_serializer.serialize(call_body.cred)
+        result += self._verifier_serializer.serialize(call_body.verf)
+        result += self._params_serializer.serialize(call_body.params)
         return result
 
     def _read_accepted_reply(self, payload: io.BytesIO) -> sunrpc.AcceptedReply[ProcedureResults, Verifier]:
-        verf = self._verifierSerializer.deserialize(payload)
+        verf = self._verifier_serializer.deserialize(payload)
         stat = self._read_enum(payload, sunrpc.AcceptStat)
         if stat == sunrpc.AcceptStat.SUCCESS:
-            results = self._resultsDeserializer.deserialize(payload)
+            results = self._results_deserializer.deserialize(payload)
         elif stat == sunrpc.AcceptStat.PROG_MISMATCH:
             results = self._read_mismatch(payload)
         else:

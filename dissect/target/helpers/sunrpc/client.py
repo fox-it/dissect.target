@@ -107,7 +107,7 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
     ) -> Results:
         """Synchronously call an RPC procedure and return the result"""
 
-        callBody = sunrpc.CallBody(
+        call_body = sunrpc.CallBody(
             proc_desc.program,
             proc_desc.version,
             proc_desc.procedure,
@@ -115,15 +115,15 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
             self._auth.verifier,
             params,
         )
-        message = sunrpc.Message(self._xid, callBody)
-        messageSerializer = MessageSerializer(
+        message = sunrpc.Message(self._xid, call_body)
+        message_serializer = MessageSerializer(
             params_serializer, result_deserializer, self._auth.credentials_serializer, self._auth.verifier_serializer
         )
-        requestPayload = messageSerializer.serialize(message)
-        self._send(requestPayload)
+        request_payload = message_serializer.serialize(message)
+        self._send(request_payload)
 
-        responsePayload = self._receive()
-        response = messageSerializer.deserialize_from_bytes(responsePayload)
+        response_payload = self._receive()
+        response = message_serializer.deserialize_from_bytes(response_payload)
         if response.xid != self._xid:
             raise MismatchXidError("Invalid response xid")
         if not isinstance(response.body, sunrpc.AcceptedReply):
@@ -143,11 +143,11 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
             fragment = data[offset : offset + self._fragment_size]
             fragment_size = len(fragment)
 
-            fragmentHeader = fragment_size
+            fragment_header = fragment_size
             if offset + fragment_size == data_size:
-                fragmentHeader = fragmentHeader | 0x80000000  # MSB set to indicate last fragment
+                fragment_header = fragment_header | 0x80000000  # MSB set to indicate last fragment
 
-            chunk = fragmentHeader.to_bytes(4, "big") + fragment
+            chunk = fragment_header.to_bytes(4, "big") + fragment
             self._sock.sendall(chunk)
             offset += fragment_size
 
