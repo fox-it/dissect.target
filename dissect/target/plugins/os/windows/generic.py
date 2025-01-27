@@ -60,7 +60,7 @@ NdisRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/ndis",
     [
         ("datetime", "ts"),
-        ("string", "network"),
+        ("string", "network_name"),
         ("string", "name"),
         ("string", "pnpinstanceid"),
     ],
@@ -113,7 +113,7 @@ WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
         ("path", "librarypath"),
         ("string", "displaystring"),
         ("bytes", "providerid"),
-        ("string", "enabled"),
+        ("boolean", "enabled"),
         ("string", "version"),
     ],
 )
@@ -408,7 +408,7 @@ class GenericPlugin(Plugin):
 
                     yield NdisRecord(
                         ts=network.ts,
-                        network=sub.name,
+                        network_name=sub.name,
                         name=name,
                         pnpinstanceid=pnpinstanceid,
                         _target=self.target,
@@ -611,11 +611,12 @@ class GenericPlugin(Plugin):
 
         try:
             key = self.target.registry.key("HKLM\\SECURITY\\Policy\\PolMachineAccountS")
+            raw_sid = key.value("(Default)").value
 
             yield ComputerSidRecord(
                 ts=key.timestamp,
                 sidtype="Domain",
-                sid=read_sid(key.value("(Default)").value),
+                sid=read_sid(raw_sid) if raw_sid else None,
                 _target=self.target,
             )
         except (RegistryError, struct.error):
