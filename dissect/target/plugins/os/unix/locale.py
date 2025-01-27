@@ -26,8 +26,9 @@ def timezone_from_path(path: Path) -> str:
 
         /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
         /usr/share/zoneinfo/UTC              -> UTC
+        Etc/UTC                              -> UTC
     """
-    return "/".join([p for p in path.parts[-2:] if p != "zoneinfo"])
+    return "/".join([p for p in path.parts[-2:] if p.lower() not in ["zoneinfo", "etc"]])
 
 
 class LocalePlugin(Plugin):
@@ -44,7 +45,7 @@ class LocalePlugin(Plugin):
         # on most unix systems
         if (path := self.target.fs.path("/etc/timezone")).exists():
             for line in path.open("rt"):
-                return line.strip()
+                return timezone_from_path(Path(line.strip()))
 
         # /etc/localtime can be a symlink, hardlink or a copy of:
         # eg. /usr/share/zoneinfo/America/New_York

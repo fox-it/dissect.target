@@ -87,6 +87,8 @@ def test_locale_etc_localtime_regular_file(target_unix_users: Target, fs_unix: V
     [
         ("/usr/share/zoneinfo/Europe/Amsterdam", "Europe/Amsterdam"),
         ("/usr/share/zoneinfo/UTC", "UTC"),
+        ("Europe/Amsterdam", "Europe/Amsterdam"),
+        ("Etc/UTC", "UTC"),
     ],
 )
 def test_locale_timezone_string_normalize(input: str, expected_output: str) -> None:
