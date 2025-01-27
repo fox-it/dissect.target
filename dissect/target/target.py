@@ -279,7 +279,6 @@ class Target:
         # Treat every path as a unique target spec
         for path in paths:
             loaded = False
-            target = None
             path, parsed_path = extract_path_info(path)
 
             # Search for targets one directory deep
@@ -304,14 +303,15 @@ class Target:
                     try:
                         # Attempt to load the target using this loader
                         target = cls._load(sub_entry, ldr)
+                    except Exception as e:
+                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
+                        continue
+                    else:
                         loaded = True
                         at_least_one_loaded = True
                         yield target
 
-                    except Exception as e:
-                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
-
-                    if target is not None and include_children:
+                    if include_children:
                         try:
                             yield from target.open_children()
                         except Exception as e:

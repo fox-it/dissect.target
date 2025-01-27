@@ -516,3 +516,21 @@ def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
 
         assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
         assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
+
+
+def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
+    """test that we don't attempt to load child targets on an invalid target"""
+    p = tmp_path.joinpath("empty-dir")
+    p.mkdir()
+
+    mock_loader = Mock()
+    mock_loader.find_all.return_value = [None]
+    mock_loader.return_value = None
+
+    with patch.object(loader, "find_loader", return_value=mock_loader):
+        try:
+            list(Target.open_all([p], include_children=True))
+        except Exception:
+            pass
+
+    assert "Failed to load child target from None" not in caplog.text
