@@ -441,6 +441,7 @@ def target_unix_users(target_unix: Target, fs_unix: Filesystem) -> Iterator[Targ
     passwd = """
     root:x:0:0:root:/root:/bin/bash
     user:x:1000:1000:user:/home/user:/bin/bash
+    +@ngtest:x:::::
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
