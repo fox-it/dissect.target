@@ -266,7 +266,7 @@ Source:     https://github.com/unicode-org/cldr/blob/main/common/supplemental/wi
 			<mapZone other="Cape Verde Standard Time" territory="ZZ" type="Etc/GMT+1"/>
 
 			<!-- (UTC) Coordinated Universal Time -->
-			<mapZone other="UTC" territory="001" type="Etc/UTC"/>
+			<mapZone other="UTC" territory="001" type="UTC"/> <!--// Changed to UTC to be consistent across operating systems. //-->
 			<mapZone other="UTC" territory="ZZ" type="Etc/UTC Etc/GMT"/>
 
 			<!-- (UTC+00:00) Dublin, Edinburgh, Lisbon, London -->
