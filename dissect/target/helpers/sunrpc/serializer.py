@@ -45,19 +45,17 @@ class Deserializer(ABC, Generic[Serializable]):
 
 
 class Int32Serializer(Serializer[int], Deserializer[int]):
+    _signed = True
+
     def serialize(self, i: int) -> bytes:
-        return i.to_bytes(length=4, byteorder="big", signed=True)
+        return i.to_bytes(length=4, byteorder="big", signed=self._signed)
 
     def deserialize(self, payload: io.BytesIO) -> int:
-        return int.from_bytes(payload.read(4), byteorder="big", signed=True)
+        return int.from_bytes(payload.read(4), byteorder="big", signed=self._signed)
 
 
-class UInt32Serializer(Serializer[int], Deserializer[int]):
-    def serialize(self, i: int) -> bytes:
-        return i.to_bytes(length=4, byteorder="big", signed=False)
-
-    def deserialize(self, payload: io.BytesIO) -> int:
-        return int.from_bytes(payload.read(4), byteorder="big", signed=False)
+class UInt32Serializer(Int32Serializer):
+    _signed = False
 
 
 class OpaqueVarLengthSerializer(Serializer[bytes], Deserializer[bytes]):

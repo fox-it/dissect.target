@@ -125,7 +125,7 @@ class MountParams:
 @dataclass
 class MountOK:
     filehandle: FileHandle3
-    authFlavors: list[int]
+    auth_flavors: list[int]
 
 
 @dataclass

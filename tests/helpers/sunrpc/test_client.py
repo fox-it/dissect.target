@@ -87,7 +87,7 @@ def test_mount_call(mock_socket: MagicMock) -> None:
         filehandle=FileHandle3(
             opaque=b"\x01\x00\x07\x00\x02\x00\xec\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4"
         ),
-        authFlavors=[1],
+        auth_flavors=[1],
     )
 
 
