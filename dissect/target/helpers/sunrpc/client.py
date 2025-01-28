@@ -67,13 +67,11 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
     @classmethod
-    def connect_port_mapper(cls, hostname: str) -> "Client":
+    def connect_port_mapper(cls, hostname: str) -> Client:
         return cls.connect(hostname, cls.PMAP_PORT, auth_null())
 
     @classmethod
-    def connect(
-        cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int = 0
-    ) -> "Client":
+    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int = 0) -> Client:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", local_port))

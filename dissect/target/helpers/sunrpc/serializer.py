@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Generic, Type, TypeVar, assert_never
+from typing import Generic, Type, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
 
@@ -254,7 +254,8 @@ class MessageSerializer(
         elif reply_stat == ReplyStat.MSG_DENIED:
             reply = self._read_rejected_reply(payload)
         else:
-            assert_never(reply_stat)
+            # assert_never is slightly better, but only available starting from Python 3.11
+            raise ValueError(f"Unexpected value for reply_stat {reply_stat}")
 
         return sunrpc.Message(xid, reply)
 
@@ -290,7 +291,8 @@ class MessageSerializer(
             auth_stat = self._read_enum(payload, sunrpc.AuthStat)
             return sunrpc.RejectedReply(reject_stat, auth_stat)
         else:
-            assert_never(reject_stat)
+            # assert_never is slightly better, but only available starting from Python 3.11
+            raise ValueError(f"Unexpected value for reject_stat: {reject_stat}")
 
     def _read_mismatch(self, payload: io.BytesIO) -> sunrpc.Mismatch:
         low = self._read_uint32(payload)

@@ -53,7 +53,7 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
         return False  # Reraise exceptions
 
     @classmethod
-    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int) -> "Client":
+    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int) -> Client:
         rpc_client = SunRpcClient.connect(hostname, port, auth, local_port)
         return Client(rpc_client)
 
