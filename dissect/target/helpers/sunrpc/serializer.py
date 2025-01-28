@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import io
 from abc import ABC, abstractmethod
-from enum import Enum
-from typing import Generic, TypeVar
+from enum import IntEnum
+from typing import Generic, Type, TypeVar, assert_never
 
 from dissect.target.helpers.sunrpc import sunrpc
 
@@ -13,11 +13,11 @@ Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
 Serializable = TypeVar("Serializable")
 AuthProtocol = TypeVar("AuthProtocol")
-EnumType = TypeVar("EN", bound=Enum)
+EnumType = TypeVar("EN", bound=IntEnum)
 ElementType = TypeVar("ET")
 
 
-class MessageType(Enum):
+class MessageType(IntEnum):
     CALL = 0
     REPLY = 1
 
@@ -120,7 +120,7 @@ class XdrDeserializer(Generic[Serializable], Deserializer[Serializable]):
     def _read_uint64(self, payload: io.BytesIO) -> int:
         return int.from_bytes(payload.read(8), byteorder="big", signed=False)
 
-    def _read_enum(self, payload: io.BytesIO, enum: EnumType) -> EnumType:
+    def _read_enum(self, payload: io.BytesIO, enum: Type[EnumType]) -> EnumType:
         value = self._read_int32(payload)
         return enum(value)
 
@@ -141,12 +141,12 @@ class XdrDeserializer(Generic[Serializable], Deserializer[Serializable]):
         return deserializer.deserialize(payload)
 
 
-class ReplyStat(Enum):
+class ReplyStat(IntEnum):
     MSG_ACCEPTED = 0
     MSG_DENIED = 1
 
 
-class AuthFlavor(Enum):
+class AuthFlavor(IntEnum):
     AUTH_NULL = 0
     AUTH_UNIX = 1
     AUTH_SHORT = 2
@@ -253,6 +253,8 @@ class MessageSerializer(
             reply = self._read_accepted_reply(payload)
         elif reply_stat == ReplyStat.MSG_DENIED:
             reply = self._read_rejected_reply(payload)
+        else:
+            assert_never(reply_stat)
 
         return sunrpc.Message(xid, reply)
 
@@ -287,6 +289,8 @@ class MessageSerializer(
         elif reject_stat == sunrpc.RejectStat.AUTH_ERROR:
             auth_stat = self._read_enum(payload, sunrpc.AuthStat)
             return sunrpc.RejectedReply(reject_stat, auth_stat)
+        else:
+            assert_never(reject_stat)
 
     def _read_mismatch(self, payload: io.BytesIO) -> sunrpc.Mismatch:
         low = self._read_uint32(payload)
