@@ -40,7 +40,7 @@ def to_list(value: T | list[T] | None) -> list[T]:
     """
     if value is None:
         return []
-    elif not isinstance(value, list):
+    if not isinstance(value, list):
         return [value]
 
     return value

@@ -248,12 +248,12 @@ class MSOffice(Plugin):
                     dll_str = self._lookup_com_executable(addin.name)
                     executables = to_list(self.target.resolve(dll_str, sid))
 
-                nativePluginStatus = self._parse_plugin_status(addin)
+                native_plugin_status = self._parse_plugin_status(addin)
                 yield OfficeNativeAddinRecord(
                     name=addin.value("FriendlyName", None).value,
                     modification_time=addin.timestamp,
-                    loaded=nativePluginStatus.loaded if nativePluginStatus else None,
-                    load_behavior=nativePluginStatus.load_behavior.name if nativePluginStatus else None,
+                    loaded=native_plugin_status.loaded if native_plugin_status else None,
+                    load_behavior=native_plugin_status.load_behavior.name if native_plugin_status else None,
                     type=addin_type,
                     manifest=windows_path(manifest_path_str) if manifest_path_str else None,
                     codebases=executables,

@@ -5,7 +5,7 @@ import re
 import warnings
 from collections import defaultdict
 from functools import lru_cache
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
@@ -297,12 +297,12 @@ class RegistryPlugin(Plugin):
         return self.key(key).subkey(subkey)
 
     @internal
-    def iterkeys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
+    def iterkeys(self, keys: str | list[str]) -> Iterator[KeyCollection]:
         warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning)
         yield from self.keys(keys)
 
     @internal
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[RegistryKey]:
+    def keys(self, keys: str | list[str]) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
@@ -318,7 +318,7 @@ class RegistryPlugin(Plugin):
                 pass
 
     @internal
-    def values(self, keys: Union[str, list[str]], value: str) -> Iterator[RegistryValue]:
+    def values(self, keys: str | list[str], value: str) -> Iterator[RegistryValue]:
         """Yields all values that match the given queries.
 
         Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
