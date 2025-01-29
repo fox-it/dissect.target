@@ -32,12 +32,15 @@ from dissect.target.plugin import (
     environment_variable_paths,
     export,
     find_functions,
+    find_functions_by_record_field_type,
+    functions,
     get_external_module_paths,
-    load,
     load_modules_from_paths,
     lookup,
     plugins,
 )
+from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
+from dissect.target.plugins.general.users import UsersPlugin
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.target import Target
 
@@ -946,20 +949,12 @@ def test_function_required_arguments(target_default: Target) -> None:
     # function without any arguments should have an args property with an empty list
     syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
-
-    # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
-    func = getattr(load(syslog_fd), syslog_fd.method_name)
-    assert not hasattr(func, "__args__")
+    assert not syslog_fd.args
 
     # function with an argument should have an args property filled
     envfile_fd = find_functions("envfile", target_default)[0][0]
     assert envfile_fd
-
-    # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
-    func = getattr(load(envfile_fd), envfile_fd.method_name)
-    assert hasattr(func, "__args__")
-
-    assert func.__args__ == [
+    assert envfile_fd.args == [
         (
             ("--env-path",),
             {
@@ -975,6 +970,47 @@ def test_function_required_arguments(target_default: Target) -> None:
             },
         ),
     ]
+
+
+def test_plugin_runtime_info() -> None:
+    plugin_desc = next(p for p in plugins() if p.path == "general.users")
+    assert plugin_desc.cls is UsersPlugin
+
+    func_desc = next(p for p in functions() if p.path == "apps.other.env.envfile")
+    assert func_desc.cls is EnvironmentFilePlugin
+    assert func_desc.func is EnvironmentFilePlugin.envfile
+    assert func_desc.record is EnvironmentFilePlugin.envfile.__record__
+    assert func_desc.args == EnvironmentFilePlugin.envfile.__args__
+
+
+def test_find_by_record_field_type(target_default: Target) -> None:
+    assert "filesystem.walkfs.walkfs" in [desc.path for desc in find_functions_by_record_field_type("path")]
+    assert "apps.other.env.envfile" in [
+        desc.path for desc in find_functions_by_record_field_type("path", target_default, compatibility=True)
+    ]
+
+    with patch(
+        "dissect.target.plugin.functions",
+        return_value=[
+            FunctionDescriptor(
+                name="test",
+                namespace=None,
+                path="test",
+                exported=True,
+                internal=False,
+                findable=True,
+                alias=False,
+                output="record",
+                method_name="test",
+                module="test",
+                qualname="Test",
+            )
+        ],
+    ):
+        with pytest.raises(PluginError, match="An exception occurred while trying to load a plugin: test"):
+            list(find_functions_by_record_field_type("path"))
+
+        assert list(find_functions_by_record_field_type("path", ignore_load_errors=True)) == []
 
 
 @pytest.mark.parametrize(
@@ -1140,6 +1176,7 @@ def test_plugin_alias(target_bare: Target) -> None:
 @pytest.mark.parametrize(
     "descriptor",
     find_functions("*", Target(), compatibility=False, show_hidden=True)[0],
+    ids=lambda d: d.path,
 )
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
@@ -1147,23 +1184,20 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     Resources:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    plugincls = load(descriptor)
-
     # Ignore DefaultPlugin and NamespacePlugin instances
-    if plugincls.__base__ is NamespacePlugin or plugincls is DefaultPlugin:
+    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultPlugin:
         return
 
     # Plugin method should specify what it returns
     assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor}"
 
-    py_func = getattr(plugincls, descriptor.method_name)
     annotations = None
 
-    if hasattr(py_func, "__annotations__"):
-        annotations = py_func.__annotations__
+    if hasattr(descriptor.func, "__annotations__"):
+        annotations = descriptor.func.__annotations__
 
-    elif isinstance(py_func, property):
-        annotations = py_func.fget.__annotations__
+    elif isinstance(descriptor.func, property):
+        annotations = descriptor.func.fget.__annotations__
 
     # Plugin method should have a return annotation
     assert annotations and "return" in annotations.keys(), f"No return type annotation for function {descriptor}"
@@ -1171,7 +1205,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
-    method_doc_str = py_func.__doc__
+    method_doc_str = descriptor.func.__doc__
     assert isinstance(method_doc_str, str), f"No docstring for function {descriptor}"
     assert method_doc_str != "", f"Empty docstring for function {descriptor}"
 
@@ -1179,9 +1213,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     assert_valid_rst(method_doc_str)
 
     # Plugin class should have a docstring
-    class_doc_str = plugincls.__doc__
-    assert isinstance(class_doc_str, str), f"No docstring for class {plugincls.__name__}"
-    assert class_doc_str != "", f"Empty docstring for class {plugincls.__name__}"
+    class_doc_str = descriptor.cls.__doc__
+    assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
+    assert class_doc_str != "", f"Empty docstring for class {descriptor.cls.__name__}"
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
