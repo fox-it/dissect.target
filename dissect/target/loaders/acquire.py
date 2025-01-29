@@ -49,7 +49,4 @@ class AcquireLoader(Loader):
         if fs_root.joinpath(FILESYSTEMS_ROOT).exists():
             fs_root = fs_root.joinpath(FILESYSTEMS_ROOT)
 
-        find_and_map_dirs(
-            target,
-            fs_root
-        )
+        find_and_map_dirs(target, fs_root)

@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
-from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import loaderutil
 from dissect.target.loader import Loader
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 PREFIXES = ["", "fs"]
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
+
 
 class DirLoader(Loader):
     """Load a directory as a filesystem."""

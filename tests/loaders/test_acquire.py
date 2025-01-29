@@ -4,10 +4,8 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.loaders.acquire import AcquireLoader
-from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
-
 
 
 def test_tar_sensitive_drive_letter(target_bare: Target) -> None:
