@@ -15,7 +15,7 @@ WireGuardInterfaceRecord = TargetRecordDescriptor(
         ("string", "name"),  # basename of .conf file if unset
         ("net.ipaddress", "address"),
         ("string", "private_key"),
-        ("string", "listen_port"),
+        ("varint", "listen_port"),
         ("string", "fw_mark"),
         ("string", "dns"),
         ("varint", "table"),
