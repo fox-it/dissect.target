@@ -646,8 +646,11 @@ def test_pure_dissect_path__from_parts_no_fs_exception() -> None:
 )
 def test_open_decompress(file_name: str, compressor: Callable, content: bytes) -> None:
     vfs = VirtualFilesystem()
-    vfs.map_file_fh(file_name, io.BytesIO(compressor(content)))
+    fh = io.BytesIO(compressor(content))
+    vfs.map_file_fh(file_name, fh)
     assert fsutil.open_decompress(vfs.path(file_name)).read() == content
+    fh.seek(2)
+    assert fsutil.open_decompress(fileobj=fh).read() == content
 
 
 def test_open_decompress_text_modes() -> None:
