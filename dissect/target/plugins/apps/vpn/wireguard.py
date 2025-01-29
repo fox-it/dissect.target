@@ -24,7 +24,7 @@ WireGuardInterfaceRecord = TargetRecordDescriptor(
         ("string", "postup"),
         ("string", "predown"),
         ("string", "postdown"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -37,7 +37,7 @@ WireGuardPeerRecord = TargetRecordDescriptor(
         ("net.ipnetwork[]", "allowed_ips"),
         ("string", "endpoint"),
         ("varint", "persistent_keep_alive"),
-        ("string", "source"),
+        ("path", "source"),
     ],
 )
 
@@ -77,7 +77,7 @@ class WireGuardPlugin(Plugin):
         super().__init__(target)
         self.configs: list[Path] = []
         for path in self.CONFIG_GLOBS:
-            self.configs.extend(self.target.fs.path().glob(path.lstrip("/")))
+            self.configs.extend(self.target.fs.path("/").glob(path.lstrip("/")))
 
     def check_compatible(self) -> None:
         if not self.configs:

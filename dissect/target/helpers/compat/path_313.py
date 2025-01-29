@@ -10,22 +10,23 @@ and code style is kept largely the same as the original pathlib.py.
 Yes, we know, this is playing with fire and it can break on new CPython releases.
 
 The implementation is split up in multiple files, one for each CPython version.
-You're currently looking at the CPython 3.12 implementation.
+You're currently looking at the CPython 3.13 implementation.
 
-Commit hash we're in sync with: f49221a
+Commit hash we're in sync with: 094d95f
 
 Notes:
-    - CPython 3.12 changed a lot in preparation of proper subclassing, so our patches differ
-      a lot from previous versions
-    - Flavours don't really exist anymore, but since we kind of "multi-flavour" we need to emulate it
+    - https://docs.python.org/3.13/whatsnew/3.13.html#pathlib
+    - https://github.com/python/cpython/blob/3.13/Lib/pathlib/_local.py
 """
 
 from __future__ import annotations
 
 import posixpath
 import sys
+from glob import _Globber
 from pathlib import Path, PurePath
-from typing import IO, TYPE_CHECKING, Iterator
+from pathlib._abc import PathBase, UnsupportedOperation
+from typing import IO, TYPE_CHECKING, Callable, Iterator
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from dissect.target.helpers.fsutil import stat_result
 
 
-class _DissectFlavour:
+class _DissectParser:
     sep = "/"
     altsep = ""
     case_sensitive = False
@@ -60,6 +61,9 @@ class _DissectFlavour:
     def normcase(self, s: str) -> str:
         return s if self.case_sensitive else s.lower()
 
+    def split(self, part: str) -> tuple[str, str]:
+        return polypath.split(part, alt_separator=self.altsep)
+
     splitdrive = staticmethod(posixpath.splitdrive)
 
     def splitroot(self, part: str) -> tuple[str, str, str]:
@@ -68,37 +72,24 @@ class _DissectFlavour:
     def join(self, *args) -> str:
         return polypath.join(*args, alt_separator=self.altsep)
 
-    # NOTE: Fallback implementation from older versions of pathlib.py
-    def ismount(self, path: TargetPath) -> bool:
-        # Need to exist and be a dir
-        if not path.exists() or not path.is_dir():
-            return False
-
-        try:
-            parent_dev = path.parent.stat().st_dev
-        except FilesystemError:
-            return False
-
-        dev = path.stat().st_dev
-        if dev != parent_dev:
-            return True
-        ino = path.stat().st_ino
-        parent_ino = path.parent.stat().st_ino
-        return ino == parent_ino
-
     isjunction = staticmethod(path_common.isjunction)
 
-    samestat = staticmethod(posixpath.samestat)
-
     def isabs(self, path: str) -> bool:
-        return polypath.isabs(path, alt_separator=self.altsep)
+        return polypath.isabs(str(path), alt_separator=self.altsep)
 
     realpath = staticmethod(path_common.realpath)
 
 
+class _DissectGlobber(_Globber):
+    @staticmethod
+    def add_slash(path: TargetPath) -> TargetPath:
+        return _GlobberTargetPath(path._fs, path, "")
+
+
 class PureDissectPath(PurePath):
     _fs: Filesystem
-    _flavour = _DissectFlavour(case_sensitive=False)
+    parser: _DissectParser = _DissectParser(case_sensitive=False)
+    _globber = _DissectGlobber
 
     def __reduce__(self) -> tuple:
         raise TypeError("TargetPath pickling is currently not supported")
@@ -119,20 +110,21 @@ class PureDissectPath(PurePath):
 
         super().__init__(*path_args)
         self._fs = fs
-        self._flavour = _DissectFlavour(alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
+        self.parser = _DissectParser(alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
 
     def with_segments(self, *pathsegments) -> TargetPath:
         return type(self)(self._fs, *pathsegments)
 
-    # NOTE: This is copied from pathlib.py but turned into an instance method so we get access to the correct flavour
+    # NOTE: This is copied from pathlib/_local.py
+    # but turned into an instance method so we get access to the correct flavour
     def _parse_path(self, path: str) -> tuple[str, str, list[str]]:
         if not path:
             return "", "", []
-        sep = self._flavour.sep
-        altsep = self._flavour.altsep
+        sep = self.parser.sep
+        altsep = self.parser.altsep
         if altsep:
             path = path.replace(altsep, sep)
-        drv, root, rel = self._flavour.splitroot(path)
+        drv, root, rel = self.parser.splitroot(path)
         if not root and drv.startswith(sep) and not drv.endswith(sep):
             drv_parts = drv.split(sep)
             if len(drv_parts) == 4 and drv_parts[2] not in "?.":
@@ -144,14 +136,13 @@ class PureDissectPath(PurePath):
         parsed = [sys.intern(str(x)) for x in rel.split(sep) if x and x != "."]
         return drv, root, parsed
 
-    def is_reserved(self) -> bool:
-        """Return True if the path contains one of the special names reserved
-        by the system, if any."""
-        return False
-
 
 class TargetPath(Path, PureDissectPath):
     __slots__ = ("_entry",)
+
+    @classmethod
+    def _unsupported_msg(cls, attribute: str) -> str:
+        return f"{cls.__name__}.{attribute} is unsupported"
 
     def get(self) -> FilesystemEntry:
         try:
@@ -169,6 +160,28 @@ class TargetPath(Path, PureDissectPath):
             return self.get().stat()
         else:
             return self.get().lstat()
+
+    def exists(self, *, follow_symlinks: bool = True) -> bool:
+        """
+        Whether this path exists.
+
+        This method normally follows symlinks; to check whether a symlink exists,
+        add the argument follow_symlinks=False.
+        """
+        try:
+            # .exists() must resolve possible symlinks
+            self.stat(follow_symlinks=follow_symlinks)
+            return True
+        except (FilesystemError, ValueError):
+            return False
+
+    is_mount = PathBase.is_mount
+
+    def is_junction(self) -> bool:
+        """
+        Whether this path is a junction.
+        """
+        return self.parser.isjunction(self)
 
     def open(
         self,
@@ -191,7 +204,7 @@ class TargetPath(Path, PureDissectPath):
         """
         Open the file in bytes mode, write to it, and close the file.
         """
-        raise NotImplementedError("TargetPath.write_bytes() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("write_bytes()"))
 
     def write_text(
         self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
@@ -199,42 +212,75 @@ class TargetPath(Path, PureDissectPath):
         """
         Open the file in text mode, write to it, and close the file.
         """
-        raise NotImplementedError("TargetPath.write_text() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("write_text()"))
 
     def iterdir(self) -> Iterator[TargetPath]:
-        """Iterate over the files in this directory.  Does not yield any
-        result for the special paths '.' and '..'.
-        """
-        for entry in path_common.scandir(self):
-            if entry.name in {".", ".."}:
-                # Yielding a path object for these makes little sense
-                continue
-            child_path = self._make_child_relpath(entry.name)
-            child_path._entry = entry
-            yield child_path
+        """Yield path objects of the directory contents.
 
-    def _scandir(self) -> path_common._DissectScandirIterator:
-        return path_common.scandir(self)
+        The children are yielded in arbitrary order, and the
+        special entries '.' and '..' are not included.
+        """
+        with path_common.scandir(self) as scandir_it:
+            for entry in scandir_it:
+                name = entry.name
+                child_path = self.joinpath(name)
+                child_path._entry = entry
+                yield child_path
+
+    def glob(
+        self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: bool = False
+    ) -> Iterator[TargetPath]:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        """
+        return PathBase.glob(self, pattern, case_sensitive=case_sensitive, recurse_symlinks=recurse_symlinks)
+
+    def rglob(
+        self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: str = False
+    ) -> Iterator[TargetPath]:
+        """Recursively yield all existing files (of any kind, including
+        directories) matching the given relative pattern, anywhere in
+        this subtree.
+        """
+        return PathBase.rglob(self, pattern, case_sensitive=case_sensitive, recurse_symlinks=recurse_symlinks)
+
+    def walk(
+        self, top_down: bool = True, on_error: Callable[[Exception], None] = None, follow_symlinks: bool = False
+    ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
+        """Walk the directory tree from this directory, similar to os.walk()."""
+        return PathBase.walk(self, top_down=top_down, on_error=on_error, follow_symlinks=follow_symlinks)
+
+    def absolute(self) -> TargetPath:
+        """Return an absolute version of this path
+        No normalization or symlink resolution is performed.
+
+        Use resolve() to resolve symlinks and remove '..' segments.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("absolute()"))
 
     @classmethod
     def cwd(cls) -> TargetPath:
         """Return a new path pointing to the current working directory."""
-        raise NotImplementedError("TargetPath.cwd() is unsupported")
+        raise UnsupportedOperation(cls._unsupported_msg("cwd()"))
+
+    def expanduser(self) -> TargetPath:
+        """Return a new path with expanded ~ and ~user constructs
+        (as returned by os.path.expanduser)
+        """
+        raise UnsupportedOperation(self._unsupported_msg("expanduser()"))
 
     @classmethod
     def home(cls) -> TargetPath:
         """Return a new path pointing to the user's home directory (as
         returned by os.path.expanduser('~')).
         """
-        raise NotImplementedError("TargetPath.home() is unsupported")
+        raise UnsupportedOperation(cls._unsupported_msg("home()"))
 
-    def absolute(self) -> TargetPath:
-        """Return an absolute version of this path by prepending the current
-        working directory. No normalization or symlink resolution is performed.
-
-        Use resolve() to get the canonical path to a file.
+    def readlink(self) -> TargetPath:
         """
-        raise NotImplementedError("TargetPath.absolute() is unsupported in Dissect")
+        Return the path to which the symbolic link points.
+        """
+        return self.with_segments(self.get().readlink())
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
     def resolve(self, strict: bool = False) -> TargetPath:
@@ -243,7 +289,7 @@ class TargetPath(Path, PureDissectPath):
         normalizing it.
         """
 
-        s = self._flavour.realpath(self, strict=strict)
+        s = self.parser.realpath(self, strict=strict)
         p = self.with_segments(s)
 
         # In non-strict mode, realpath() doesn't raise on symlink loops.
@@ -256,61 +302,32 @@ class TargetPath(Path, PureDissectPath):
                     raise
         return p
 
-    def owner(self) -> str:
+    def symlink_to(self, target: str, target_is_directory: bool = False) -> None:
         """
-        Return the login name of the file owner.
+        Make this path a symlink pointing to the target path.
+        Note the order of arguments (link, target) is the reverse of os.symlink.
         """
-        raise NotImplementedError("TargetPath.owner() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("symlink_to()"))
 
-    def group(self) -> str:
+    def hardlink_to(self, target: str) -> None:
         """
-        Return the group name of the file gid.
-        """
-        raise NotImplementedError("TargetPath.group() is unsupported")
+        Make this path a hard link pointing to the same file as *target*.
 
-    def readlink(self) -> TargetPath:
+        Note the order of arguments (self, target) is the reverse of os.link's.
         """
-        Return the path to which the symbolic link points.
-        """
-        return self.with_segments(self.get().readlink())
+        raise UnsupportedOperation(self._unsupported_msg("hardlink_to()"))
 
     def touch(self, mode: int = 0o666, exist_ok: bool = True) -> None:
         """
         Create this file with the given access mode, if it doesn't exist.
         """
-        raise NotImplementedError("TargetPath.touch() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("touch()"))
 
     def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
         """
         Create a new directory at this given path.
         """
-        raise NotImplementedError("TargetPath.mkdir() is unsupported")
-
-    def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
-        """
-        Change the permissions of the path, like os.chmod().
-        """
-        raise NotImplementedError("TargetPath.chmod() is unsupported")
-
-    def lchmod(self, mode: int) -> None:
-        """
-        Like chmod(), except if the path points to a symlink, the symlink's
-        permissions are changed, rather than its target's.
-        """
-        raise NotImplementedError("TargetPath.lchmod() is unsupported")
-
-    def unlink(self, missing_ok: bool = False) -> None:
-        """
-        Remove this file or link.
-        If the path is a directory, use rmdir() instead.
-        """
-        raise NotImplementedError("TargetPath.unlink() is unsupported")
-
-    def rmdir(self) -> None:
-        """
-        Remove this directory.  The directory must be empty.
-        """
-        raise NotImplementedError("TargetPath.rmdir() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("mkdir()"))
 
     def rename(self, target: str) -> TargetPath:
         """
@@ -322,7 +339,7 @@ class TargetPath(Path, PureDissectPath):
 
         Returns the new Path instance pointing to the target path.
         """
-        raise NotImplementedError("TargetPath.rename() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("rename()"))
 
     def replace(self, target: str) -> TargetPath:
         """
@@ -334,25 +351,50 @@ class TargetPath(Path, PureDissectPath):
 
         Returns the new Path instance pointing to the target path.
         """
-        raise NotImplementedError("TargetPath.replace() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("replace()"))
 
-    def symlink_to(self, target: str, target_is_directory: bool = False) -> None:
+    def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
         """
-        Make this path a symlink pointing to the target path.
-        Note the order of arguments (link, target) is the reverse of os.symlink.
+        Change the permissions of the path, like os.chmod().
         """
-        raise NotImplementedError("TargetPath.symlink_to() is unsupported")
+        raise UnsupportedOperation(self._unsupported_msg("chmod()"))
 
-    def hardlink_to(self, target: str) -> None:
+    def lchmod(self, mode: int) -> None:
         """
-        Make this path a hard link pointing to the same file as *target*.
+        Like chmod(), except if the path points to a symlink, the symlink's
+        permissions are changed, rather than its target's.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("lchmod()"))
 
-        Note the order of arguments (self, target) is the reverse of os.link's.
+    def unlink(self, missing_ok: bool = False) -> None:
         """
-        raise NotImplementedError("TargetPath.hardlink_to() is unsupported")
+        Remove this file or link.
+        If the path is a directory, use rmdir() instead.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("unlink()"))
 
-    def expanduser(self) -> TargetPath:
-        """Return a new path with expanded ~ and ~user constructs
-        (as returned by os.path.expanduser)
+    def rmdir(self) -> None:
         """
-        raise NotImplementedError("TargetPath.expanduser() is unsupported")
+        Remove this directory.  The directory must be empty.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("rmdir()"))
+
+    def owner(self) -> str:
+        """
+        Return the login name of the file owner.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("owner()"))
+
+    def group(self) -> str:
+        """
+        Return the group name of the file gid.
+        """
+        raise UnsupportedOperation(self._unsupported_msg("group()"))
+
+
+class _GlobberTargetPath(TargetPath):
+    def __str__(self) -> str:
+        # This is necessary because the _Globber class expects an added `/` at the end
+        # However, only PurePathBase properly adds that, PurePath doesn't
+        # We do want to operate on Path objects rather than strings, so do a little hack here
+        return self._raw_path
