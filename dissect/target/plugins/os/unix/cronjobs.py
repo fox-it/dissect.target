@@ -95,7 +95,7 @@ class CronjobPlugin(Plugin):
             if (file := self.target.fs.path(crontab_file)).exists():
                 yield file
 
-    @export(record=get_args([CronjobRecord, EnvironmentVariableRecord]))
+    @export(record=[CronjobRecord, EnvironmentVariableRecord])
     def cronjobs(self) -> Iterator[CronjobRecord | EnvironmentVariableRecord]:
         """Yield cronjobs on a unix system.
 
