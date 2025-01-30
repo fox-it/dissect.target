@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import argparse
 import dataclasses
 import textwrap
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any
 
 from dissect.target import Target
-from dissect.target.plugin import Plugin
+from dissect.target.plugin import FunctionDescriptor, Plugin, PluginRegistry
 from dissect.target.target import Event
 
 BLOCK_INDENT = 4 * " "
@@ -15,11 +17,11 @@ BLOCK_INDENT = 4 * " "
 class TargetExecutionReport:
     target: Target
 
-    incompatible_plugins: Set[str] = dataclasses.field(default_factory=set)
-    registered_plugins: Set[str] = dataclasses.field(default_factory=set)
+    incompatible_plugins: set[str] = dataclasses.field(default_factory=set)
+    registered_plugins: set[str] = dataclasses.field(default_factory=set)
 
-    func_errors: Dict[str, str] = dataclasses.field(default_factory=dict)
-    func_execs: Set[str] = dataclasses.field(default_factory=set)
+    func_errors: dict[str, str] = dataclasses.field(default_factory=dict)
+    func_execs: set[str] = dataclasses.field(default_factory=set)
 
     def add_incompatible_plugin(self, plugin_name: str) -> None:
         self.incompatible_plugins.add(plugin_name)
@@ -30,7 +32,7 @@ class TargetExecutionReport:
     def add_func_error(self, func, stacktrace: str) -> None:
         self.func_errors[func] = stacktrace
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "target": str(self.target),
             "incompatible_plugins": sorted(self.incompatible_plugins),
@@ -42,19 +44,19 @@ class TargetExecutionReport:
 
 @dataclass
 class ExecutionReport:
-    plugin_import_errors: Dict[str, str] = dataclasses.field(default_factory=dict)
+    plugin_import_errors: dict[str, str] = dataclasses.field(default_factory=dict)
 
-    target_reports: List[TargetExecutionReport] = dataclasses.field(default_factory=list)
+    target_reports: list[TargetExecutionReport] = dataclasses.field(default_factory=list)
 
-    cli_args: Dict[str, Any] = dataclasses.field(default_factory=dict)
+    cli_args: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def set_cli_args(self, args: argparse.Namespace) -> None:
         args = ((key, str(value)) for (key, value) in vars(args).items())
         self.cli_args.update(args)
 
-    def set_plugin_stats(self, plugins: Dict[str, Any]) -> None:
-        for details in plugins.get("_failed", []):
-            self.plugin_import_errors[details["module"]] = "".join(details["stacktrace"])
+    def set_plugin_stats(self, plugins: PluginRegistry) -> None:
+        for details in plugins.__failed__:
+            self.plugin_import_errors[details.module] = "".join(details.stacktrace)
 
     def get_formatted_report(self) -> str:
         blocks = [
@@ -76,15 +78,15 @@ class ExecutionReport:
         return target_report
 
     @staticmethod
-    def _get_plugin_name(plugin_cls):
+    def _get_plugin_name(plugin_cls) -> str:
         return f"{plugin_cls.__module__}.{plugin_cls.__qualname__}"
 
     def log_incompatible_plugin(
         self,
         target: Target,
         _,
-        plugin_cls: Optional[Type[Plugin]] = None,
-        plugin_desc: Optional[Dict[str, Any]] = None,
+        plugin_cls: type[Plugin] | None = None,
+        plugin_desc: FunctionDescriptor | None = None,
     ) -> None:
         if not plugin_cls and not plugin_desc:
             raise ValueError("Either `plugin_cls` or `plugin_desc` must be set")
@@ -94,7 +96,7 @@ class ExecutionReport:
         if plugin_cls:
             plugin_name = self._get_plugin_name(plugin_cls)
         elif plugin_desc:
-            plugin_name = plugin_desc["fullname"]
+            plugin_name = f"{plugin_desc.module}.{plugin_desc.qualname}"
 
         target_report.add_incompatible_plugin(plugin_name)
 
@@ -112,7 +114,7 @@ class ExecutionReport:
         target_report = self.get_target_report(target, create=True)
         target_report.func_execs.add(func)
 
-    def set_event_callbacks(self, target_cls: Type[Target]) -> None:
+    def set_event_callbacks(self, target_cls: type[Target]) -> None:
         target_cls.set_event_callback(
             event_type=Event.INCOMPATIBLE_PLUGIN,
             event_callback=self.log_incompatible_plugin,
@@ -130,7 +132,7 @@ class ExecutionReport:
             event_callback=self.log_func_error,
         )
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "plugin_import_errors": self.plugin_import_errors,
             "target_reports": [report.as_dict() for report in self.target_reports],
