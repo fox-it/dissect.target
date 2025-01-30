@@ -41,7 +41,7 @@ class WalkFSPlugin(Plugin):
         path = self.target.fs.path(walkfs_path)
 
         if not path.exists():
-            self.target.log.error("No such file or directory: '%s'", walkfs_path)
+            self.target.log.error("No such directory: '%s'", walkfs_path)
             return
 
         if not path.is_dir():
