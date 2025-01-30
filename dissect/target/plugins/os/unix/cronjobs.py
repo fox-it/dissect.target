@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterator, get_args
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -49,13 +49,7 @@ RE_CRONJOB = re.compile(
     """,
     re.VERBOSE,
 )
-RE_ENVVAR = re.compile(
-    r"""
-        ^
-        ([a-zA-Z_]+[a-zA-Z[0-9_])=(.*)
-    """,
-    re.VERBOSE,
-)
+RE_ENVVAR = re.compile(r"^(?P<key>[a-zA-Z_]+[a-zA-Z[0-9_])=(?P<value>.*)")
 
 
 class CronjobPlugin(Plugin):
@@ -107,6 +101,9 @@ class CronjobPlugin(Plugin):
             - https://linux.die.net/man/1/crontab
             - https://linux.die.net/man/5/crontab
             - https://en.wikipedia.org/wiki/Cron
+            - https://linux.die.net/man/8/anacron
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/crontab.5.html
+            - https://www.gnu.org/software/mcron/manual/mcron.html#Guile-Syntax
         """
 
         for file in self.crontabs:
@@ -122,10 +119,20 @@ class CronjobPlugin(Plugin):
                     user = None
                     if file.is_relative_to("/var/spool/cron/crontabs"):
                         user = file.name
-                    else:
-                        user, match["command"] = re.split(r"\s", match["command"], maxsplit=1)
 
-                    match["command"] = match["command"].strip()
+                    # We try to infer a possible user from the command. This can lead to false positives,
+                    # due to differing implementations of cron across operating systems, which is why
+                    # we choose not to change the 'command' from the cron line - unless the command
+                    # starts with the found username plus a tab character.
+                    else:
+                        try:
+                            inferred_user, _ = re.split(r"\s", match["command"], maxsplit=1)
+                            if not any(i in inferred_user for i in {"/", "="}):
+                                user = inferred_user.strip()
+                            if match["command"].startswith(inferred_user + "\t"):
+                                match["command"] = match["command"].replace(inferred_user + "\t", "", 1)
+                        except ValueError:
+                            pass
 
                     yield CronjobRecord(
                         **match,
@@ -134,10 +141,11 @@ class CronjobPlugin(Plugin):
                         _target=self.target,
                     )
 
+                # Some cron implementations allow for environment variables to be set inside crontab files.
                 elif match := RE_ENVVAR.search(line):
+                    match = match.groupdict()
                     yield EnvironmentVariableRecord(
-                        key=match.group(1),
-                        value=match.group(2),
+                        **match,
                         source=file,
                         _target=self.target,
                     )
