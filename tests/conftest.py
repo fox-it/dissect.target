@@ -14,7 +14,7 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
@@ -261,7 +261,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Iterator[Target]:
-    yield make_os_target(tmp_path, default.DefaultPlugin)
+    yield make_os_target(tmp_path, DefaultPlugin)
 
 
 @pytest.fixture
@@ -441,6 +441,7 @@ def target_unix_users(target_unix: Target, fs_unix: Filesystem) -> Iterator[Targ
     passwd = """
     root:x:0:0:root:/root:/bin/bash
     user:x:1000:1000:user:/home/user:/bin/bash
+    +@ngtest:x:::::
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix

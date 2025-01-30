@@ -24,5 +24,5 @@ def test_ual_plugin(target_win, fs_win):
     domains_seen_records = list(target_win.ual.domains_seen())
     assert len(domains_seen_records) == 12
 
-    ual_all_records = list(target_win.ual.get_all_records())
+    ual_all_records = list(target_win.ual())
     assert len(ual_all_records) == 123

@@ -133,7 +133,7 @@ def test_parse_inventory_application_file(target_win, test_file_id, expected_fil
         else:
             call_kwargs = mock_record.call_args.kwargs
 
-        assert call_kwargs.get("digests", None) == [None, expected_file_id, None]
+        assert call_kwargs.get("digest", None) == (None, expected_file_id, None)
 
 
 def test_amcache_install_entry(target_win: Target):
@@ -159,3 +159,4 @@ def test_amcache_install_entry(target_win: Target):
         assert str(entry.create) == create
         assert str(entry.path) == r"C:\Users\JohnCena"
         assert str(entry.longname) == r"7z2201-x64.exe"
+        assert entry.filesize == 1575742
