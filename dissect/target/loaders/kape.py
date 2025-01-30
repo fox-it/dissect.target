@@ -5,9 +5,7 @@ from typing import TYPE_CHECKING, Iterator
 
 from dissect.target import filesystem, volume
 from dissect.target.containers.vhdx import VhdxContainer
-from dissect.target.exceptions import LoaderError
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
-from dissect.target.helpers.loaderutil import add_virtual_ntfs_filesystem
+from dissect.target.filesystem import Filesystem
 from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
 
@@ -45,9 +43,7 @@ def is_valid_kape_dir(path: Path) -> bool:
 def is_valid_kape_vhdx(path: Path) -> bool:
     if path.suffix == ".vhdx":
         for fs in open_vhdx(path):
-            for path in USNJRNL_PATHS:
-                if fs.exists(f"C/{path}"):
-                    return True
+            return is_valid_kape_dir(fs.path())
 
     return False
 
@@ -76,24 +72,8 @@ class KapeLoader(DirLoader):
 
     def map_vhdx(self, target: Target) -> None:
         for fs in open_vhdx(self.path):
-            vfs = VirtualFilesystem(case_sensitive=False)
-
-            drive_letter = next((entry for entry in fs.iterdir("/") if is_drive_letter(entry)), None)
-
-            if drive_letter is None:
-                raise LoaderError
-
-            vfs.map_file_entry("/", fs.get(drive_letter))
-
-            target.filesystems.add(vfs)
-            add_virtual_ntfs_filesystem(
-                target=target,
-                fs=vfs,
-                boot_path="$Boot",
-                mft_path="$MFT",
-                usnjrnl_path="$Extend/$J",
-                sds_path="$Secure_$SDS",
-            )
+            self.path = fs.path()
+            self.map_dir(target)
 
     def map_dir(self, target: Target) -> None:
         find_and_map_dirs(
