@@ -41,12 +41,12 @@ def test_kape_dir_loader(target_bare, tmp_path):
     assert len(list(target_bare.fs.mounts["c:"].ntfs.usnjrnl.records())) == 1
 
 
-def test_kape_vhdx_loader(target_bare: Target):
-    t = Path(absolute_path("_data/loaders/kape/test.vhdx"))
+def test_kape_vhdx_loader(target_bare: Target) -> None:
+    p = Path(absolute_path("_data/loaders/kape/test.vhdx"))
 
-    assert KapeLoader.detect(t)
+    assert KapeLoader.detect(p)
 
-    loader = KapeLoader(t)
+    loader = KapeLoader(p)
     loader.map(target_bare)
     target_bare.apply()
 
