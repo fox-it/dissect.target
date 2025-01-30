@@ -134,7 +134,7 @@ def test_parse_hostname_string(
 def test_users(target_unix_users: Target) -> None:
     users = list(target_unix_users.users())
 
-    assert len(users) == 2
+    assert len(users) == 3
 
     assert users[0].name == "root"
     assert users[0].uid == 0
@@ -147,6 +147,12 @@ def test_users(target_unix_users: Target) -> None:
     assert users[1].gid == 1000
     assert users[1].home == posix_path("/home/user")
     assert users[1].shell == "/bin/bash"
+
+    assert users[2].name == "+@ngtest"
+    assert users[2].uid is None
+    assert users[2].gid is None
+    assert users[2].home == posix_path("")
+    assert users[2].shell == ""
 
 
 @pytest.mark.parametrize(
