@@ -5,7 +5,7 @@ from functools import cache, lru_cache
 from typing import Iterator
 
 from dissect.target.helpers.record import MacInterfaceRecord
-from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.plugins.os.default.network import NetworkPlugin
 from dissect.target.target import Target
 
 
