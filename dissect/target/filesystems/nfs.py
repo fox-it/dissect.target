@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+import stat
+from typing import BinaryIO, Callable, Iterator
+
+from dissect.util.stream import AlignedStream
+
+from dissect.target.filesystem import Filesystem, FilesystemEntry
+from dissect.target.helpers import fsutil
+from dissect.target.helpers.nfs.nfs3 import (
+    EntryPlus3,
+    FileAttributes3,
+    FileHandle3,
+    FileType3,
+)
+from dissect.target.helpers.nfs.nfs_client import Client
+
+ClientFactory = Callable[[], Client]
+
+
+class NfsFilesystem(Filesystem):
+    """Filesystem implementation of a NFS share
+
+    The client is lazily constructed
+    """
+
+    __type__ = "nfs"
+
+    def __init__(self, client_factory: ClientFactory, root_handle: FileHandle3):
+        super().__init__()
+        self._client_factory = client_factory
+        self._backing_client = None
+        self._root_handle = root_handle
+
+    @property
+    def _client(self) -> Client:
+        if self._backing_client is None:
+            self._backing_client = self._client_factory()
+        return self._backing_client
+
+    @staticmethod
+    def detect(_: BinaryIO) -> bool:
+        raise TypeError("Detect is not allowed on a NfsFilesystem class")  # :/
+
+    def get(self, path: str) -> NfsFilesystemEntry:
+        path = fsutil.normalize(path, self.alt_separator).strip("/")
+
+        if not path:
+            return NfsFilesystemEntry(self, "/", self._root_handle)
+
+        current_handle = self._root_handle
+        for segment in path.split("/"):
+            result = self._client.lookup(segment, current_handle)
+            current_handle = result.object
+
+        return NfsFilesystemEntry(self, path, result.object, result.obj_attributes)
+
+
+class NfsFilesystemEntry(FilesystemEntry):
+    def __init__(
+        self, fs: NfsFilesystem, path: str, file_handle: FileHandle3, attributes: FileAttributes3 | None = None
+    ):
+        super().__init__(fs, path, file_handle)
+        self._fs = fs
+        self._file_handle = file_handle
+        self._backing_attributes = attributes
+
+    @property
+    def _attributes(self) -> FileAttributes3:
+        if self._backing_attributes is None:
+            self._backing_attributes = self._fs._client.getattr(self._file_handle)
+        return self._backing_attributes
+
+    def get(self, path: str) -> NfsFilesystemEntry:
+        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
+        return self.fs.get(path)
+
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        # Not using _resolve since it upcasts. ("Self" from Python 3.11 would solve this)
+        # Or create a subclass of Filesystementry for symlinks.
+        if follow_symlinks and self.is_symlink():
+            return self.readlink_ext().is_file()
+
+        return self._attributes.type == FileType3.REG
+
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        if follow_symlinks and self.is_symlink():
+            return self.readlink_ext().is_dir()
+
+        return self._attributes.type == FileType3.DIR
+
+    def is_symlink(self) -> bool:
+        return self._attributes.type == FileType3.LNK
+
+    def readlink(self) -> str:
+        return self._fs._client.readlink(self._file_handle)
+
+    def readlink_ext(self) -> NfsFilesystemEntry:
+        target = self._fs._client.readlink(self._file_handle)
+        return self.get(target)
+
+    def _iterdir(self) -> Iterator[EntryPlus3]:
+        if not self.is_dir():
+            raise NotADirectoryError(self.path)
+
+        yield from self._fs._client.readdir(self._file_handle).entries
+
+    def iterdir(self) -> Iterator[str]:
+        for entry in self._iterdir():
+            yield entry.name
+
+    def scandir(self) -> Iterator[FilesystemEntry]:
+        for entry in self._iterdir():
+            yield NfsFilesystemEntry(self.fs, entry.name, entry.handle, entry.attributes)
+
+    def open(self) -> NfsStream:
+        return NfsStream(self._fs._client, self._file_handle)
+
+    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
+        if follow_symlinks and self.is_symlink():
+            return self.readlink_ext().lstat()
+
+        return self.lstat()
+
+    def lstat(self) -> fsutil.stat_result:
+        attributes = self._attributes
+
+        st_info = fsutil.stat_result(
+            [
+                attributes.mode | self._mode_file_type(attributes.type),
+                fsutil.generate_addr(self.path, alt_separator=self.fs.alt_separator),
+                attributes.fsid,
+                attributes.nlink,
+                attributes.uid,
+                attributes.gid,
+                attributes.size,
+                attributes.atime.seconds,
+                attributes.mtime.seconds,
+                attributes.ctime.seconds,
+            ]
+        )
+
+        st_info.st_atime_ns = attributes.atime.nseconds
+        st_info.st_mtime_ns = attributes.mtime.nseconds
+        st_info.st_ctime_ns = attributes.ctime.nseconds
+
+        return st_info
+
+    def _mode_file_type(self, type: FileType3) -> int:
+        if type == FileType3.DIR:
+            return stat.S_IFDIR
+        elif type == FileType3.REG:
+            return stat.S_IFREG
+        elif type == FileType3.LNK:
+            return stat.S_IFLNK
+        else:
+            return 0o000000
+
+
+class NfsStream(AlignedStream):
+    def __init__(self, client: Client, file_handle: FileHandle3):
+        super().__init__(None, Client.READ_CHUNK_SIZE)
+        self._client = client
+        self._file_handle = file_handle
+
+    def _read(self, offset, size: int) -> bytes:
+        data = self._client.readfile(self._file_handle, offset, size)
+        return b"".join(data)

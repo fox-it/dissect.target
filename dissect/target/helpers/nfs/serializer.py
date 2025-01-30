@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import io
-from typing import Union
+from typing import TypeVar, Union
 
 from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf3,
+    DirOpArgs3,
     EntryPlus3,
     FileAttributes3,
     FileHandle3,
     FileType3,
-    MountOK,
+    Lookup3resok,
+    MountOK3,
     MountStat3,
     Nfs3Stat,
     NfsTime3,
@@ -17,6 +19,7 @@ from dissect.target.helpers.nfs.nfs3 import (
     Read3resok,
     ReadDirPlusParams,
     ReadDirPlusResult3,
+    Readlink3resok,
     SpecData3,
 )
 from dissect.target.helpers.sunrpc.serializer import (
@@ -29,15 +32,16 @@ from dissect.target.helpers.sunrpc.sunrpc import Bool
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class MountResultDeserializer(XdrDeserializer[Union[MountOK, MountStat3]]):
-    def deserialize(self, payload: io.BytesIO) -> MountOK | MountStat3:
+class MountResultDeserializer(XdrDeserializer[Union[MountOK3, MountStat3]]):
+    def deserialize(self, payload: io.BytesIO) -> MountOK3 | MountStat3:
         mount_stat = self._read_enum(payload, MountStat3)
         if mount_stat != MountStat3.OK:
             return mount_stat
+
         filehandle_bytes = self._read_var_length_opaque(payload)
         auth_flavors = self._read_var_length(payload, Int32Serializer())
 
-        return MountOK(FileHandle3(filehandle_bytes), auth_flavors)
+        return MountOK3(FileHandle3(filehandle_bytes), auth_flavors)
 
 
 class ReadDirPlusParamsSerializer(XdrSerializer[ReadDirPlusParams]):
@@ -100,12 +104,8 @@ class EntryPlusSerializer(XdrDeserializer[EntryPlus3]):
 
 
 # Used Union because 3.9 does not support '|' here even with future annotations
-class ReadDirPlusResultDeserializer(XdrDeserializer[Union[ReadDirPlusResult3, Nfs3Stat]]):
+class ReadDirPlusResultDeserializer(XdrDeserializer[ReadDirPlusResult3]):
     def deserialize(self, payload: io.BytesIO) -> ReadDirPlusResult3:
-        stat = self._read_enum(payload, Nfs3Stat)
-        if stat != Nfs3Stat.OK:
-            return stat
-
         dir_attributes = self._read_optional(payload, FileAttributesSerializer())
         cookieverf = self._read_var_length_opaque(payload)
 
@@ -130,14 +130,56 @@ class Read3ArgsSerializer(XdrSerializer[ReadDirPlusParams]):
         return result
 
 
+# In contrast to rfc we do not return file attributes on failure
 class Read3ResultDeserializer(XdrDeserializer[Read3resok]):
     def deserialize(self, payload: io.BytesIO) -> Read3resok:
-        stat = self._read_enum(payload, Nfs3Stat)
-        if stat != Nfs3Stat.OK:
-            return stat
-
         file_attributes = self._read_optional(payload, FileAttributesSerializer())
         count = self._read_uint32(payload)
         eof = self._read_enum(payload, Bool) == Bool.TRUE
         data = self._read_var_length_opaque(payload)
         return Read3resok(file_attributes, count, eof, data)
+
+
+class DirOpArgs3Serializer(XdrSerializer[DirOpArgs3]):
+    def serialize(self, args: DirOpArgs3) -> bytes:
+        result = self._write_var_length_opaque(args.handle.opaque)
+        result += self._write_string(args.filename)
+        return result
+
+
+class Lookup3ResultDeserializer(XdrDeserializer[Lookup3resok]):
+    def deserialize(self, payload: io.BytesIO) -> Lookup3resok:
+        handle_bytes = self._read_var_length_opaque(payload)
+        attribute_serializer = FileAttributesSerializer()
+        object_attributes = self._read_optional(payload, attribute_serializer)
+        dir_attributes = self._read_optional(payload, attribute_serializer)
+
+        return Lookup3resok(
+            object=FileHandle3(handle_bytes), obj_attributes=object_attributes, dir_attributes=dir_attributes
+        )
+
+
+class ReadLink3ResultDeserializer(XdrDeserializer[Readlink3resok]):
+    def deserialize(self, payload: io.BytesIO) -> Readlink3resok:
+        attributes = self._read_optional(payload, FileAttributesSerializer())
+        target = self._read_string(payload)
+
+        return Readlink3resok(attributes, target)
+
+
+ResultType = TypeVar("RT")
+
+
+# RdJ: Consider implementing in terms of a monadic bind, using generators
+class ResultDeserializer(XdrDeserializer[Union[ResultType, Nfs3Stat]]):
+    """A higher order deserializer that returns a result or an NFS status"""
+
+    def __init__(self, deserializer: XdrDeserializer[ResultType]):
+        self._deserializer = deserializer
+
+    def deserialize(self, payload: io.BytesIO) -> Union[ResultType, Nfs3Stat]:
+        stat = self._read_enum(payload, Nfs3Stat)
+        if stat != Nfs3Stat.OK:
+            return stat
+
+        return self._deserializer.deserialize(payload)
