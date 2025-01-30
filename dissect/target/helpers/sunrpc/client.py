@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import socket
+from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, TypeVar
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
+ConCredentials = TypeVar("ConCredentials")
+ConVerifier = TypeVar("ConVerifier")
 Params = TypeVar("Params")
 Results = TypeVar("Results")
 
@@ -54,7 +57,6 @@ def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthS
     )
 
 
-# RdJ: Error handing is a bit minimalistic. Expand later on.
 class MismatchXidError(Exception):
     pass
 
@@ -67,27 +69,79 @@ class IncompleteMessage(Exception):
     pass
 
 
-class Client(AbstractContextManager, Generic[Credentials, Verifier]):
+class AbstractClient(ABC):
+    @abstractmethod
+    def call(
+        self,
+        proc_desc: ProcedureDescriptor,
+        params: Params,
+        params_serializer: XdrSerializer[Params],
+        result_deserializer: XdrDeserializer[Results],
+    ) -> Results:
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        pass
+
+    @abstractmethod
+    def rebind_auth(self, auth: AuthScheme[ConCredentials, ConVerifier]) -> None:
+        pass
+
+
+class FreePrivilegedPortType:
+    pass
+
+
+"""Marker type indicating Client should search for a free privileged port"""
+FreePrivilegedPort = FreePrivilegedPortType()
+
+
+class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
     @classmethod
-    def connect_port_mapper(cls, hostname: str) -> Client:
+    def connect_port_mapper(cls, hostname: str) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
         return cls.connect(hostname, cls.PMAP_PORT, auth_null())
 
     @classmethod
-    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int = 0) -> Client:
+    def connect(
+        cls,
+        hostname: str,
+        port: int,
+        auth: AuthScheme[ConCredentials, ConVerifier],
+        local_port: int | FreePrivilegedPortType = 0,
+    ) -> Client[ConCredentials, ConVerifier]:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("", local_port))
+        if local_port is FreePrivilegedPort:
+            cls._bind_free_privileged_port(sock)
+        else:
+            sock.bind(("", local_port))
         sock.connect((hostname, port))
 
         return Client(sock, auth)
+
+    @classmethod
+    def _bind_free_privileged_port(cls, sock: socket.socket) -> None:
+        for port in range(1, 1024):
+            try:
+                sock.bind(("", port))
+                return
+            except OSError:
+                continue
+
+        raise OSError("No free privileged port available")
 
     def __init__(self, sock: socket.socket, auth: AuthScheme[Credentials, Verifier], fragment_size: int = 8192):
         self._sock = sock
         self._auth = auth
         self._fragment_size = fragment_size
         self._xid = 1
+
+    def __enter__(self) -> Client:
+        """Return `self` upon entering the runtime context."""
+        return self  # type: Necessary for type checker
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
         self.close()
@@ -99,6 +153,12 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
         except OSError:
             pass  # Ignore errors if the socket is already closed
         self._sock.close()
+
+    def rebind_auth(self, auth: AuthScheme[ConCredentials, ConVerifier]) -> Client[ConCredentials, ConVerifier]:
+        """Return a new client with the same socket, but different authentication credentials"""
+        fd = self._sock.detach()  # Move underlying file descriptor to new socket
+        new_sock = socket.socket(fileno=fd)
+        return Client(new_sock, auth, self._fragment_size)
 
     def call(
         self,
