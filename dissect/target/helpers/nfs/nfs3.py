@@ -2,22 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import ClassVar, NamedTuple
+from typing import ClassVar
+
+from dissect.target.helpers.sunrpc.sunrpc import ProcedureDescriptor
 
 # See https://datatracker.ietf.org/doc/html/rfc1057
 
 
-class ProcedureDescriptor(NamedTuple):
-    program: int
-    version: int
-    procedure: int
-
+NfsProgram = 100003
+MountProgram = 100005
+NfsVersion = 3
 
 # List of procedure descriptors
-GetPortProc = ProcedureDescriptor(100000, 2, 3)
-MountProc = ProcedureDescriptor(100005, 3, 1)
-ReadDirPlusProc = ProcedureDescriptor(100003, 3, 17)
-ReadFileProc = ProcedureDescriptor(100003, 3, 6)
+MountProc = ProcedureDescriptor(MountProgram, NfsVersion, 1)
+ReadDirPlusProc = ProcedureDescriptor(NfsProgram, NfsVersion, 17)
+ReadFileProc = ProcedureDescriptor(NfsProgram, NfsVersion, 6)
+LookupProc = ProcedureDescriptor(NfsProgram, NfsVersion, 3)
+GetAttrProc = ProcedureDescriptor(NfsProgram, NfsVersion, 1)
+ReadLinkProc = ProcedureDescriptor(NfsProgram, NfsVersion, 5)
 
 
 class Nfs3Stat(IntEnum):
@@ -118,12 +120,7 @@ class MountStat3(IntEnum):
 
 
 @dataclass
-class MountParams:
-    dirpath: str
-
-
-@dataclass
-class MountOK:
+class MountOK3:
     filehandle: FileHandle3
     auth_flavors: list[int]
 
@@ -167,3 +164,22 @@ class Read3resok:
     count: int
     eof: bool
     data: bytes
+
+
+@dataclass
+class DirOpArgs3:
+    handle: FileHandle3
+    filename: str
+
+
+@dataclass
+class Lookup3resok:
+    object: FileHandle3
+    obj_attributes: FileAttributes3 | None
+    dir_attributes: FileAttributes3 | None
+
+
+@dataclass
+class Readlink3resok:
+    obj_attributes: FileAttributes3 | None
+    target: str  # named "data" in the NFC
