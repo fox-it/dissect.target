@@ -28,7 +28,7 @@ class UsnjrnlPlugin(Plugin):
     """NFTS UsnJrnl plugin."""
 
     def check_compatible(self) -> None:
-        if not any([fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]):
+        if not any(fs for fs in self.target.filesystems if fs.__type__ == "ntfs"):
             raise UnsupportedPluginError("No NTFS filesystem(s) found on target")
 
     @export(record=UsnjrnlRecord)
