@@ -9,8 +9,31 @@ from typing import Iterator
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import Filesystem
+from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.nfs.mount_client import Client as MountClient
+from dissect.target.helpers.nfs.nfs3 import (
+    MountOK3,
+    MountProc,
+    Nfs3Stat,
+    NfsProgram,
+    NfsVersion,
+)
+from dissect.target.helpers.nfs.nfs_client import Client as NfsClient
+from dissect.target.helpers.nfs.nfs_client import NfsError
 from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.sunrpc.client import (
+    Client,
+    FreePrivilegedPort,
+    auth_null,
+    auth_unix,
+)
+from dissect.target.helpers.sunrpc.serializer import (
+    AuthFlavor,
+    PortMappingSerializer,
+    UInt32Serializer,
+)
+from dissect.target.helpers.sunrpc.sunrpc import GetPortProc, PortMapping, Protocol
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
@@ -227,7 +250,12 @@ class UnixPlugin(OSPlugin):
     def _add_mounts(self) -> None:
         fstab = self.target.fs.path("/etc/fstab")
 
-        for dev_id, volume_name, mount_point, _, options in parse_fstab(fstab, self.target.log):
+        for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
+            # Mount nfs, but only when target is local
+            if fs_type == "nfs" and str(self.target.path) == "local":
+                self._add_nfs(dev_id, volume_name, mount_point)
+                continue
+
             opts = parse_options_string(options)
             subvol = opts.get("subvol", None)
             subvolid = opts.get("subvolid", None)
@@ -265,6 +293,49 @@ class UnixPlugin(OSPlugin):
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
+
+    def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        with Client.connect_port_mapper(address) as port_mapper_client:
+            params_mount = PortMapping(program=MountProc.program, version=MountProc.version, protocol=Protocol.TCP)
+            mount_port = port_mapper_client.call(GetPortProc, params_mount, PortMappingSerializer(), UInt32Serializer())
+            params_nfs = PortMapping(program=NfsProgram, version=NfsVersion, protocol=Protocol.TCP)
+            nfs_port = port_mapper_client.call(GetPortProc, params_nfs, PortMappingSerializer(), UInt32Serializer())
+
+        with MountClient.connect(address, mount_port, FreePrivilegedPort) as mount_client:
+            mount_result = mount_client.mount(exported_dir)
+            if not isinstance(mount_result, MountOK3):
+                self.target.log.warning(f"Mounting NFS gives error code {mount_result}")
+                return
+
+        if AuthFlavor.AUTH_UNIX not in mount_result.auth_flavors:
+            self.target.log.warning("No AUTH_UNIX auth flavor supported")
+            return
+
+        # Lazily create client because users info is available after os plugin is fully initialized
+        def client_factory() -> NfsClient:
+            nfs_client = NfsClient.connect(address, nfs_port, auth_null(), FreePrivilegedPort)
+
+            # Try all users to see if we can access the share
+            for user in self.users():
+                if user.uid is None or user.gid is None:
+                    continue
+                auth = auth_unix("machine", user.uid, user.gid, [])
+                nfs_client.rebind_auth(auth)
+                try:
+                    self.target.log.info(f"Trying to read NFS share with uid {user.uid} and gid {user.gid}")
+                    # Use a readdir to check if we have access.
+                    # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
+                    nfs_client.readdir(mount_result.filehandle)
+                    return nfs_client
+                except NfsError as e:
+                    if e.nfsstat != Nfs3Stat.ERR_ACCES:
+                        self.target.log.warning(f"Reading NFS share gives {e.nfsstat}")
+                        nfs_client.close()
+                        raise e
+
+        self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
+        nfs = NfsFilesystem(client_factory, mount_result.filehandle)
+        self.target.fs.mount(mount_point, nfs)
 
     def _add_devices(self) -> None:
         """Add some virtual block devices to the target.
@@ -395,6 +466,12 @@ def parse_fstab(
             dev_id = dev.split("=")[1]
         elif dev.startswith("LABEL="):
             volume_name = dev.split("=")[1]
+        elif fs_type == "nfs":
+            # Put the nfs server address in dev_id and the root path in volume_name
+            dev_id, sep, volume_name = dev.partition(":")
+            if sep != ":":
+                log.warning("Invalid NFS mount: %s", dev)
+                continue
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue
