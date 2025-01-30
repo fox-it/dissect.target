@@ -3,6 +3,7 @@ from typing import Callable, Generator, Iterator, Union
 from flow.record import GroupedRecord
 
 from dissect.target import plugin
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 OSInfoRecord = TargetRecordDescriptor(
@@ -18,7 +19,8 @@ class OSInfoPlugin(plugin.Plugin):
     """Convenience plugin that wraps _os.* functions in records."""
 
     def check_compatible(self) -> None:
-        pass
+        if not self.target._os_plugin:
+            raise UnsupportedPluginError("No operating system detected on target")
 
     @plugin.export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
