@@ -43,19 +43,23 @@ def main():
 
     auth = auth_unix("twigtop", args.uid, args.gid, [])
     with NfsClient.connect(args.hostname, nfs_port, auth, args.port) as nfs_client:
-        readdir_result = nfs_client.readdirplus(mount_result.filehandle)
-        for index, entry in enumerate(readdir_result.entries, start=1):
-            if entry.attributes:
-                print(f"{index:<5} {entry.name:<30} {entry.attributes.size:<10}")
+        look_result = nfs_client.lookup(".", mount_result.filehandle)
+        attr_result = nfs_client.getattr(mount_result.filehandle)
+        print(attr_result)
+        
+        # readdir_result = nfs_client.readdirplus(mount_result.filehandle)
+        # for index, entry in enumerate(readdir_result.entries, start=1):
+        #     if entry.attributes:
+        #         print(f"{index:<5} {entry.name:<30} {entry.attributes.size:<10}")
 
-        if args.index < 0:
-            return
-        file_entry: EntryPlus3 = readdir_result.entries[args.index - 1]
-        if file_entry.attributes:
-            file_contents = nfs_client.readfile_by_handle(file_entry.handle)
-            with open(file_entry.name, "wb") as f:
-                for chunk in file_contents:
-                    f.write(chunk)
+        # if args.index < 0:
+        #     return
+        # file_entry: EntryPlus3 = readdir_result.entries[args.index - 1]
+        # if file_entry.attributes:
+        #     file_contents = nfs_client.readfile_by_handle(file_entry.handle)
+        #     with open(file_entry.name, "wb") as f:
+        #         for chunk in file_contents:
+        #             f.write(chunk)
 
 
 if __name__ == "__main__":

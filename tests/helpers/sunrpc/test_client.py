@@ -106,7 +106,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
     auth = auth_unix("twigtop", 1000, 1000, [])
     auth.credentials.stamp = 1909822276
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
-    result = nfs_client.readdirplus(
+    result = nfs_client.readdir(
         FileHandle3(opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4")
     )
 

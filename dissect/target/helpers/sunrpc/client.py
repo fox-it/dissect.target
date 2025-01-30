@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import random
 import socket
 from contextlib import AbstractContextManager
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
+ConCredentials = TypeVar("ConCredentials")
+ConVerifier = TypeVar("ConVerifier")
 Params = TypeVar("Params")
 Results = TypeVar("Results")
 
@@ -67,7 +70,23 @@ class IncompleteMessage(Exception):
     pass
 
 
-class Client(AbstractContextManager, Generic[Credentials, Verifier]):
+class AbstractClient(ABC):
+    @abstractmethod
+    def call(
+        self,
+        proc_desc: ProcedureDescriptor,
+        params: Params,
+        params_serializer: XdrSerializer[Params],
+        result_deserializer: XdrDeserializer[Results],
+    ) -> Results:
+        pass
+
+    @abstractmethod
+    def close(self) -> None:
+        pass
+
+
+class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
 
     @classmethod
@@ -75,19 +94,25 @@ class Client(AbstractContextManager, Generic[Credentials, Verifier]):
         return cls.connect(hostname, cls.PMAP_PORT, auth_null())
 
     @classmethod
-    def connect(cls, hostname: str, port: int, auth: AuthScheme[Credentials, Verifier], local_port: int = 0) -> Client:
+    def connect(
+        cls, hostname: str, port: int, auth: AuthScheme[ConCredentials, ConVerifier], local_port: int = 0
+    ) -> Client[ConCredentials, ConVerifier]:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", local_port))
         sock.connect((hostname, port))
 
-        return Client(sock, auth)
+        return Client[ConCredentials, ConVerifier](sock, auth)
 
     def __init__(self, sock: socket.socket, auth: AuthScheme[Credentials, Verifier], fragment_size: int = 8192):
         self._sock = sock
         self._auth = auth
         self._fragment_size = fragment_size
         self._xid = 1
+
+    def __enter__(self) -> Client:
+        """Return `self` upon entering the runtime context."""
+        return self     # type: Necessary for type checker 
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
         self.close()

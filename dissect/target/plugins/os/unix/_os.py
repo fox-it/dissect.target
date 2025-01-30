@@ -9,8 +9,15 @@ from typing import Iterator
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import Filesystem
+from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.nfs.serializer import MountResultDeserializer
 from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.nfs.nfs3 import MountOK, MountProc, NfsProgram, NfsVersion
+from dissect.target.helpers.nfs.client import Client as NfsClient
+from dissect.target.helpers.sunrpc.client import Client, auth_null, auth_unix
+from dissect.target.helpers.sunrpc.serializer import PortMappingSerializer, StringSerializer, UInt32Serializer
+from dissect.target.helpers.sunrpc.sunrpc import PortMapping, Protocol, GetPortProc
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
@@ -224,6 +231,7 @@ class UnixPlugin(OSPlugin):
         return hosts_string
 
     def _add_mounts(self) -> None:
+        self._add_nfs()
         fstab = self.target.fs.path("/etc/fstab")
 
         for dev_id, volume_name, mount_point, _, options in parse_fstab(fstab, self.target.log):
@@ -264,6 +272,24 @@ class UnixPlugin(OSPlugin):
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
+
+    def _add_nfs(self) -> None:
+        port_mapper_client = Client.connect_port_mapper("localhost")
+        params_mount = PortMapping(program=MountProc.program, version=MountProc.version, protocol=Protocol.TCP)
+        mount_port = port_mapper_client.call(GetPortProc, params_mount, PortMappingSerializer(), UInt32Serializer())
+        params_nfs = PortMapping(program=NfsProgram, version=NfsVersion, protocol=Protocol.TCP)
+        nfs_port = port_mapper_client.call(GetPortProc, params_nfs, PortMappingSerializer(), UInt32Serializer())
+
+        mount_client = Client.connect("localhost", mount_port, auth_null(), 666)
+        mount_result = mount_client.call(MountProc, "/home/roel/nfstest", StringSerializer(), MountResultDeserializer())
+        if not isinstance(mount_result, MountOK):
+            print(f"Failed to mount NFS with error code {mount_result}")
+            return
+
+        auth = auth_unix("twigtop", 1000, 1000, [])
+        nfs_client = NfsClient.connect("localhost", nfs_port, auth, 666)
+        nfs = NfsFilesystem(nfs_client, mount_result.filehandle)
+        self.target.fs.mount("/mnt/nfs", nfs)
 
     def _add_devices(self) -> None:
         """Add some virtual block devices to the target.
