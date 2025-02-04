@@ -25,7 +25,7 @@ class VmxLoader(Loader):
         self.vmx = vmx.VMX.parse(self.path.read_text())
 
     @staticmethod
-    def detect(path) -> bool:
+    def detect(path: Path) -> bool:
         return path.suffix.lower() in (".vmx", ".vmtx")
 
     def map(self, target: Target) -> None:
