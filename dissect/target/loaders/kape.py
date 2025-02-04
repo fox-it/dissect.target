@@ -26,7 +26,7 @@ class KapeLoader(DirLoader):
     def detect(path: Path) -> bool:
         os_type, dirs = find_dirs(path)
         if os_type == OperatingSystem.WINDOWS:
-            for dir_path in dirs:
+            for volume, dir_path in dirs:
                 for path in USNJRNL_PATHS:
                     if dir_path.joinpath(path).exists():
                         return True
