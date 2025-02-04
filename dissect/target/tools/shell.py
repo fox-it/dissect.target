@@ -33,7 +33,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import PluginFunction, alias, arg, clone_alias
+from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.fsutils import (
     fmt_ls_colors,
@@ -100,6 +100,7 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
+        self.use_rawinput = False
         self.debug = False
         self.cyber = cyber
         self.identchars += "."
@@ -395,13 +396,13 @@ class TargetCmd(ExtendedCmd):
         # execution
         command, command_args_str, line = self.parseline(line)
 
-        if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return self._exec_target(plugins, command_args_str)
+        if functions := list(find_and_filter_plugins(command, self.target)):
+            return self._exec_target(functions, command_args_str)
 
         # We didn't execute a function on the target
         return None
 
-    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> bool:
+    def _exec_target(self, funcs: list[FunctionDescriptor], command_args_str: str) -> bool:
         """Command exection helper for target plugins."""
 
         def _exec_(argparts: list[str], stdout: TextIO) -> None:

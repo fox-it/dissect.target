@@ -1,4 +1,5 @@
-import itertools
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime
@@ -22,12 +23,17 @@ RE_LINE = re.compile(
 )
 
 
-def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:
+def iso_readlines(file: Path, max_lines: int | None = None) -> Iterator[tuple[datetime, str]]:
     """Iterator reading the provided log file in ISO format. Mimics ``year_rollover_helper`` behaviour."""
     with open_decompress(file, "rt") as fh:
-        for line in fh:
+        for i, line in enumerate(fh):
+            if max_lines is not None and i >= max_lines:
+                log.debug("Stopping iso_readlines enumeration in %s: max_lines=%s was reached", file, max_lines)
+                break
+
             if not (match := RE_TS_ISO.match(line)):
-                log.warning("No timestamp found in one of the lines in %s!", file)
+                if not max_lines:
+                    log.warning("No timestamp found in one of the lines in %s!", file)
                 log.debug("Skipping line: %s", line)
                 continue
 
@@ -43,4 +49,6 @@ def iso_readlines(file: Path) -> Iterator[tuple[datetime, str]]:
 
 def is_iso_fmt(file: Path) -> bool:
     """Determine if the provided log file uses ISO 8601 timestamp format logging or not."""
-    return any(itertools.islice(iso_readlines(file), 0, 2))
+    # We do not want to iterate of the entire file so we limit iso_readlines to the first few lines.
+    # We can not use islice here since that would only work if the file is ISO formatted and thus yields results.
+    return any(iso_readlines(file, max_lines=3))
