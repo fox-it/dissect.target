@@ -1,5 +1,5 @@
-import re
 import logging
+import re
 from datetime import datetime
 from typing import Iterator
 
@@ -13,6 +13,8 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     RemoteAccessPlugin,
 )
 from dissect.target.plugins.general.users import UserDetails
+
+
 log = logging.getLogger(__name__)
 
 class RustdeskPlugin(RemoteAccessPlugin):
@@ -20,9 +22,8 @@ class RustdeskPlugin(RemoteAccessPlugin):
 
     __namespace__ = "rustdesk"
 
-
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-        "remoteaccess/restdesk/log", GENERIC_LOG_RECORD_FIELDS
+        "remoteaccess/rustdesk/log", GENERIC_LOG_RECORD_FIELDS
     )
 
     # Rustdesk logs when installed as a service/server
@@ -49,7 +50,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
         "Library/Logs/RustDesk/*.log",
     ]
 
-
     def __init__(self, target):
         super().__init__(target)
 
@@ -70,7 +70,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
     def check_compatible(self) -> None:
         if not self.log_files:
             raise UnsupportedPluginError("No Rustdesk log files found on target")
-    
+
     @export(record=RemoteAccessLogRecord)
     def logs(self) -> Iterator[RemoteAccessLogRecord]:
         """Parse Rustdesk log files.
