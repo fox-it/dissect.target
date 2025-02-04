@@ -5,6 +5,7 @@ from dissect.target.plugins.apps.remoteaccess.rustdesk import RustdeskPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
+
 def test_rustdesk_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file(
         "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/TestRustdesk.log",
@@ -22,6 +23,7 @@ def test_rustdesk_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem
     assert records[0].username is None
     assert records[0].user_id is None
     assert records[0].user_home is None
+
 
 def test_rustdesk_plugin_user_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
     fs_win.map_file(
