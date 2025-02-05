@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from types import TracebackType
-from typing import Generic, Iterator, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Generic, Iterator, NamedTuple, TypeVar
 
 from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf3,
@@ -23,6 +22,9 @@ from dissect.target.helpers.nfs.serializer import (
 )
 from dissect.target.helpers.sunrpc.client import AuthScheme
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")

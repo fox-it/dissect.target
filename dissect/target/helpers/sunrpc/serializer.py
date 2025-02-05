@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Generic, Type, TypeVar
+from typing import Generic, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
 
@@ -118,7 +118,7 @@ class XdrDeserializer(Generic[Serializable], Deserializer[Serializable]):
     def _read_uint64(self, payload: io.BytesIO) -> int:
         return int.from_bytes(payload.read(8), byteorder="big", signed=False)
 
-    def _read_enum(self, payload: io.BytesIO, enum: Type[EnumType]) -> EnumType:
+    def _read_enum(self, payload: io.BytesIO, enum: type[EnumType]) -> EnumType:
         value = self._read_int32(payload)
         return enum(value)
 
@@ -288,9 +288,9 @@ class MessageSerializer(
         elif reject_stat == sunrpc.RejectStat.AUTH_ERROR:
             auth_stat = self._read_enum(payload, sunrpc.AuthStat)
             return sunrpc.RejectedReply(reject_stat, auth_stat)
-        else:
-            # assert_never is slightly better, but only available starting from Python 3.11
-            raise ValueError(f"Unexpected value for reject_stat: {reject_stat}")
+
+        # assert_never is slightly better, but only available starting from Python 3.11
+        raise ValueError(f"Unexpected value for reject_stat: {reject_stat}")
 
     def _read_mismatch(self, payload: io.BytesIO) -> sunrpc.Mismatch:
         low = self._read_uint32(payload)

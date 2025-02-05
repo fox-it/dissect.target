@@ -4,10 +4,8 @@ import random
 import socket
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from types import TracebackType
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
 from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
     AuthNullSerializer,
@@ -17,6 +15,12 @@ from dissect.target.helpers.sunrpc.serializer import (
     XdrDeserializer,
     XdrSerializer,
 )
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
+
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
