@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dissect.target.loaders.vbk import VBKLoader
+from dissect.target.loaders.vbk import VbkLoader
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -8,7 +8,7 @@ from tests._utils import absolute_path
 def test_vbk_loader(target_default: Target):
     archive_path = Path(absolute_path("_data/loaders/vbk/test9.vbk"))
 
-    loader = VBKLoader(archive_path)
+    loader = VbkLoader(archive_path)
     loader.map(target_default)
     target_default.apply()
 
