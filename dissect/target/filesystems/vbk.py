@@ -5,6 +5,7 @@ from typing import BinaryIO, Iterator
 
 from dissect.archive import vbk
 
+from dissect.target import exceptions
 from dissect.target.exceptions import (
     NotASymlinkError,
 )
@@ -35,7 +36,10 @@ class VbkFilesystem(Filesystem):
             return False
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
-        return VbkFilesystemEntry(self, path, self.vbk.get(path))
+        try:
+            return VbkFilesystemEntry(self, path.__str__(), self.vbk.get(path))
+        except FileNotFoundError:
+            raise exceptions.FileNotFoundError(f"File not found: {path}")
 
 
 class VbkFilesystemEntry(FilesystemEntry):
