@@ -51,6 +51,7 @@ full = [
     "dissect.btrfs>=1,<2",
     "dissect.cim>=3,<4",
     "dissect.clfs>=1,<2",
+    "dissect.disc>=1.0.dev,<2.0.dev",
     "dissect.esedb>=3,<4",
     "dissect.etl>=3,<4",
     "dissect.extfs>=3,<4",
