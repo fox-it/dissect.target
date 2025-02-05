@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import logging
 import stat
-from pathlib import Path
 from typing import BinaryIO, Iterator
 
 from dissect.archive import vbk
@@ -13,9 +11,8 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import (
     Filesystem,
     FilesystemEntry,
-    VirtualFilesystem, )
+)
 from dissect.target.helpers import fsutil
-
 
 
 class VbkFilesystem(Filesystem):
@@ -27,39 +24,35 @@ class VbkFilesystem(Filesystem):
         super().__init__(fh, *args, **kwargs)
 
         self.vbk = vbk.VBK(fh)
-        self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
-
-        def map_entries(directory, parent_path) -> None:
-            for entry in directory.iterdir():
-                entry_path = parent_path.joinpath(entry.name)
-                if entry.is_dir():
-                    map_entries(entry, entry_path)
-                else:
-                    self._fs.map_file_entry(entry_path.__str__(), VBKFilesystemEntry(self, str(entry_path), entry))
-
-        map_entries(self.vbk.get("/"), Path("/"))
+        self._fs = None
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
-        raise TypeError("Detect is not allowed on VBKFilesystem class")
+        try:
+            vbk.VBK(fh)
+            return True
+        except vbk.VBKError:
+            return False
 
     def get(self, path: str, relentry: FilesystemEntry = None) -> FilesystemEntry:
-        """Returns a VBKFilesystemEntry object corresponding to the given path."""
-        return self._fs.get(path, relentry=relentry)
+        return VbkFilesystemEntry(self, path, self.vbk.get(path))
 
 
 class VbkFilesystemEntry(FilesystemEntry):
-    fs: VBKFilesystem
+    fs: VbkFilesystem
     entry: vbk.MetaItem
 
     def get(self, path: str) -> FilesystemEntry:
         return self.fs.get(fsutil.join(self.path, path, alt_separator=self.fs.alt_separator))
 
     def iterdir(self) -> Iterator[str]:
-        return self.entry.iterdir()
+        for entry in self.entry.iterdir():
+            yield entry.name
 
     def scandir(self) -> Iterator[FilesystemEntry]:
-        return self.entry.iterdir()
+        for entry in self.entry.iterdir():
+            path = fsutil.join(self.path, entry.name)
+            yield VbkFilesystemEntry(self.fs, path, entry)
 
     def open(self) -> None:
         return self.entry.open()
@@ -81,6 +74,7 @@ class VbkFilesystemEntry(FilesystemEntry):
 
     def lstat(self) -> fsutil.stat_result:
         mode = stat.S_IFDIR if self.is_dir() else stat.S_IFREG
+        size = 0 if self.is_dir() else self.entry.size
 
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
         st_info = [
@@ -90,7 +84,7 @@ class VbkFilesystemEntry(FilesystemEntry):
             1,
             0,
             0,
-            self.entry.size,
+            size,
             0,
             0,
             0,
