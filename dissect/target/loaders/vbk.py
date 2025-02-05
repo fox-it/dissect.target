@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from dissect.target import target
 from dissect.target.filesystems.vbk import VbkFilesystem
 from dissect.target.loader import Loader
 
@@ -10,9 +13,9 @@ class VbkLoader(Loader):
         self.path = path
 
     @staticmethod
-    def detect(path):
+    def detect(path: Path) -> bool:
         return path.suffix.lower() == ".vbk"
 
-    def map(self, target):
+    def map(self, target: target.Target) -> None:
         fs = VbkFilesystem(self.path.open("rb"))
         target.filesystems.add(fs)
