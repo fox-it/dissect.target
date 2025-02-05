@@ -16,21 +16,14 @@ from dissect.target.filesystem import (
     VirtualFilesystem, )
 from dissect.target.helpers import fsutil
 
-log = logging.getLogger(__name__)
 
 
-class VBKFilesystem(Filesystem):
-    """Filesystem implementation for VBK files.
-    """
+class VbkFilesystem(Filesystem):
+    """Filesystem implementation for VBK files."""
 
     __type__ = "vbk"
 
-    def __init__(
-            self,
-            fh: BinaryIO,
-            *args,
-            **kwargs,
-    ):
+    def __init__(self, fh: BinaryIO, *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
 
         self.vbk = vbk.VBK(fh)
@@ -55,7 +48,7 @@ class VBKFilesystem(Filesystem):
         return self._fs.get(path, relentry=relentry)
 
 
-class VBKFilesystemEntry(FilesystemEntry):
+class VbkFilesystemEntry(FilesystemEntry):
     fs: VBKFilesystem
     entry: vbk.MetaItem
 
