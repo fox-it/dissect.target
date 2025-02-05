@@ -2,9 +2,8 @@ from dissect.target.filesystems.vbk import VBKFilesystem
 from dissect.target.loader import Loader
 
 
-class VBKLoader(Loader):
-    """Load Veaam Backup (VBK) files.
-    """
+class VbkLoader(Loader):
+    """Load Veaam Backup (VBK) files."""
 
     def __init__(self, path, **kwargs):
         super().__init__(path, **kwargs)
