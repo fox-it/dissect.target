@@ -20,11 +20,11 @@ class EnvironmentFilePlugin(Plugin):
     """Environment file plugin."""
 
     def check_compatible(self) -> None:
-        # `--env-path` is provided at runtime
+        # `--env-path` is required at runtime
         pass
 
     @export(record=EnvironmentFileRecord)
-    @arg("--env-path", help="path to scan environment files in")
+    @arg("--env-path", help="path to scan environment files in", required=True)
     @arg("--extension", help="extension of files to scan", default="env")
     def envfile(self, env_path: str, extension: str = "env") -> Iterator[EnvironmentFileRecord]:
         """Yield environment variables found in ``.env`` files at the provided path."""

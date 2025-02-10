@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 from unittest.mock import patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
+from dissect.target.target import Target
 
 
 @pytest.fixture
-def extended_win_fs(fs_win):
+def extended_win_fs(fs_win: VirtualFilesystem) -> VirtualFilesystem:
     fs_win.map_file_entry("windows/system32/calc.exe", VirtualFile(fs_win, "windows/system32/calc.exe", None))
     fs_win.map_file_entry("windows/syswow64/calc.exe", VirtualFile(fs_win, "windows/syswow64/calc.exe", None))
     fs_win.map_file_entry("some dir with spaces/calc.exe", VirtualFile(fs_win, "some dir with spaces/calc.exe", None))
@@ -32,7 +35,7 @@ def extended_win_fs(fs_win):
         ),
     ],
 )
-def test_resolver_plugin_resolve(target_win, target_unix, test_target, resolve_func):
+def test_resolver_plugin_resolve(target_win: Target, target_unix: Target, test_target: str, resolve_func: str) -> None:
     targets = {
         "target_win": target_win,
         "target_unix": target_unix,
@@ -45,16 +48,16 @@ def test_resolver_plugin_resolve(target_win, target_unix, test_target, resolve_f
         resolve_func.assert_called()
 
 
-def test_resolver_plugin_resolve_no_path(target_win):
+def test_resolver_plugin_resolve_no_path(target_win: Target) -> None:
     path = ""
     assert target_win.resolve(path) is path
 
 
-def mock_expand_env(path):
+def mock_expand_env(path: str, user_sid: str | None = None) -> str:
     return path
 
 
-def mock_user_env(user):
+def mock_user_env(user: str | None) -> OrderedDict[str, str]:
     path_envs = {
         None: OrderedDict(
             (("%path%", "sysvol/windows/syswow64"),),
@@ -147,7 +150,9 @@ def mock_user_env(user):
         ),
     ],
 )
-def test_resolver_plugin_resolve_windows(target_win, extended_win_fs, path, user, resolved_path):
+def test_resolver_plugin_resolve_windows(
+    target_win: Target, path: str, extended_win_fs: VirtualFilesystem, user: str | None, resolved_path: str
+) -> None:
     resolver_plugin = ResolverPlugin(target_win)
     target_win.pathext  # This will load the EnvironmentVariablePlugin
     env_plugin = next(plugin for plugin in target_win._plugins if type(plugin).__name__ == "EnvironmentVariablePlugin")
@@ -182,6 +187,6 @@ def test_resolver_plugin_resolve_windows(target_win, extended_win_fs, path, user
         ),
     ],
 )
-def test_resolver_plugin_resolve_default(target_unix, path, user, resolved_path):
+def test_resolver_plugin_resolve_default(target_unix: Target, path: str, user: str, resolved_path: str):
     resolver_plugin = ResolverPlugin(target_unix)
     assert resolver_plugin.resolve_default(path, user_id=user) == resolved_path
