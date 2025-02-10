@@ -310,7 +310,7 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
 def test_target_diff_shell(capsys, monkeypatch) -> None:
     with monkeypatch.context() as m:
         m.setattr(fsutils, "LS_COLORS", {})
-        m.setenv("NO_COLOR", 1)
+        m.setenv("NO_COLOR", "1")
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
         m.setattr("sys.argv", ["target-diff", "--deep", "shell", src_target_path, dst_target_path])
@@ -357,3 +357,25 @@ def test_target_diff_query(capsys, monkeypatch) -> None:
         assert "differential/record/created" in out
         assert "differential/record/unchanged" in out
         assert "differential/record/deleted" in out
+
+
+def test_target_diff_fs_reverse_read(target_unix_factory) -> None:
+    """test if we detect the difference in an appended file correctly."""
+
+    src_target, fs_src = target_unix_factory.new("src_target")
+    dst_target, fs_dst = target_unix_factory.new("dst_target")
+    fs_src.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20))
+    fs_dst.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20 + b"B" * 1024))
+
+    comparison = TargetComparison(src_target, dst_target, deep=True)
+    diff = comparison.scandir("/var/log")
+
+    assert len(diff.modified) == 1
+    assert diff.modified[0].path == "/var/log/example.log"
+    assert diff.modified[0].diff == [
+        b"--- \n",
+        b"+++ \n",
+        b"@@ -1 +1 @@\n",
+        b"-" + b"A" * 10 * 1024,
+        b"+" + (b"A" * 9216) + (b"B" * 1024),
+    ]

@@ -235,14 +235,23 @@ class TargetComparison:
             src_fh = src_entry.open()
             dst_fh = dst_entry.open()
 
+            # We reverse read the file object.
+            chunk_size = 1024 * 10
+            chunks_a = fsutil.reverse_read(src_fh, chunk_size, reverse_chunk=False)
+            chunks_b = fsutil.reverse_read(dst_fh, chunk_size, reverse_chunk=False)
+
+            chunk_count = 0
+
             while True:
-                chunk_a = src_fh.read(BLOCK_SIZE)
-                chunk_b = dst_fh.read(BLOCK_SIZE)
+                chunk_a = next(chunks_a, None)
+                chunk_b = next(chunks_b, None)
+                chunk_count += 1
+
                 if chunk_a != chunk_b:
                     # We immediately break after discovering a difference in file contents
                     # This means that we won't return a full diff of the file, merely the first block where a difference
-                    # is observed
-                    content_difference = list(diff_bytes(unified_diff, [chunk_a], [chunk_b]))
+                    # is observed. The chunk is not reversed, so the difference is human-readable.
+                    content_difference = list(diff_bytes(unified_diff, [chunk_a or b""], [chunk_b or ""]))
                     differential_entry = DifferentialEntry(
                         entry_path,
                         src_entry.name,
@@ -253,11 +262,11 @@ class TargetComparison:
                     modified.append(differential_entry)
                     break
 
-                if src_fh.tell() > self.file_limit:
+                if self.file_limit and chunk_count * chunk_size > self.file_limit:
                     unchanged.append(src_entry)
                     break
 
-                if len(chunk_a) == 0:
+                if chunk_a is None or len(chunk_a) == 0:
                     # End of file
                     unchanged.append(src_entry)
                     break
@@ -282,7 +291,18 @@ class TargetComparison:
 
         already_iterated.append(path)
 
+        # Do not scan the given path if it matches any excluded path.
+        if exclude and next((pattern for pattern in exclude if fnmatch(path, pattern)), None):
+            return
+
         diff = self.scandir(path)
+
+        # Check if diff contains excluded paths
+        if exclude:
+            for t in ["created", "unchanged", "modified", "deleted"]:
+                for i, d in enumerate(getattr(diff, t)):
+                    if next((pattern for pattern in exclude if fnmatch(d.path, pattern)), None):
+                        del getattr(diff, t)[i]
         yield diff
 
         subentries = diff.created + diff.unchanged + diff.deleted
@@ -983,6 +1003,7 @@ def main() -> None:
 
         except Exception as e:
             log.error(e)
+            log.debug("", exc_info=e)
             parser.exit(1)
 
 

@@ -722,6 +722,21 @@ def test_reverse_readlines() -> None:
     ]
 
 
+def test_reverse_read() -> None:
+    """test if we read the bytes of a file in reverse succesfully."""
+    fs = VirtualFilesystem()
+
+    fs.map_file_fh("file", io.BytesIO(b"1234567890"))
+    assert list(fsutil.reverse_read(fs.path("file").open("rb"), chunk_size=2)) == [b"09", b"87", b"65", b"43", b"21"]
+
+    fs.map_file_fh("large_emoji", io.BytesIO(("🐱" * 10_000).encode()))
+    content = list(fsutil.reverse_read(fs.path("large_emoji").open("rb")))
+    assert len(content) == 4
+    assert len(content[0]) == 1024 * 10
+    assert len(content[-1]) == 9280
+    assert b"".join(content) == bytes(reversed(("🐱" * 10_000).encode()))
+
+
 @pytest.fixture
 def xattrs() -> dict[str, bytes]:
     return {"some_key": b"some_value"}
