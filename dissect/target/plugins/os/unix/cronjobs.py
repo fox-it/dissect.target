@@ -109,7 +109,7 @@ class CronjobPlugin(Plugin):
         for file in self.crontabs:
             for line in file.open("rt"):
                 line = line.strip()
-                if line.startswith("#") or not len(line):
+                if line.startswith("#") or not line:
                     continue
 
                 if match := RE_CRONJOB.search(line):
