@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.plugins.general.network import UnixInterfaceRecord
+from dissect.target.plugins.os.default.network import UnixInterfaceRecord
 from dissect.target.plugins.os.unix.linux.network import (
     LinuxNetworkConfigParser,
     LinuxNetworkPlugin,

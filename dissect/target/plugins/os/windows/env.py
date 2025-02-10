@@ -3,13 +3,13 @@ from collections import OrderedDict, namedtuple
 from typing import Iterator, List, Optional, Set
 
 from dissect.target import Target
-from dissect.target.exceptions import RegistryError
+from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import (
     TargetRecordDescriptor,
     create_extended_descriptor,
 )
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import OperatingSystem, Plugin, export, internal
 
 EnvironmentRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "windows/environment",
@@ -303,7 +303,8 @@ class EnvironmentVariablePlugin(Plugin):
         return env_vars
 
     def check_compatible(self) -> None:
-        pass
+        if self.target.os != OperatingSystem.WINDOWS:
+            raise UnsupportedPluginError("Target operating system is not Windows")
 
     @internal
     def expand_env(self, path: str, user_sid: Optional[str] = None) -> str:
