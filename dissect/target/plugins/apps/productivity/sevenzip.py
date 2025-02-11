@@ -1,54 +1,53 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Iterator, Union
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.helpers.regutil import RegistryKey
+from dissect.target.plugin import Plugin, alias, export
 
 PanelPathRecord = TargetRecordDescriptor(
-    "windows/registry/sevenzip/panelpath",
+    "application/productivity/sevenzip/panelpath",
     [
         ("datetime", "ts"),
         ("path", "path"),
     ],
 )
-
 
 ArcHistoryRecord = TargetRecordDescriptor(
-    "windows/registry/sevenzip/archistory",
+    "application/productivity/sevenzip/archistory",
     [
         ("datetime", "ts"),
         ("path", "path"),
     ],
 )
-
 
 PathHistoryRecord = TargetRecordDescriptor(
-    "windows/registry/sevenzip/pathhistory",
+    "application/productivity/sevenzip/pathhistory",
     [
         ("datetime", "ts"),
         ("path", "path"),
     ],
 )
-
 
 CopyHistoryRecord = TargetRecordDescriptor(
-    "windows/registry/sevenzip/copyhistory",
+    "application/productivity/sevenzip/copyhistory",
     [
         ("datetime", "ts"),
         ("path", "path"),
     ],
 )
-
 
 FolderHistoryRecord = TargetRecordDescriptor(
-    "windows/registry/sevenzip/folderhistory",
+    "application/productivity/sevenzip/folderhistory",
     [
         ("datetime", "ts"),
         ("path", "path"),
     ],
 )
+
+SevenZipRecord = Union[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord]
 
 
 class SevenZipPlugin(Plugin):
@@ -57,10 +56,12 @@ class SevenZipPlugin(Plugin):
     KEY = "HKCU\\Software\\7-Zip"
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEY))) > 0:
+        if not self.target.has_function("registry") or not list(self.target.registry.keys(self.KEY)):
             raise UnsupportedPluginError("7-Zip registry key not found")
 
-    def parse_key(self, key, keyname, valuename, record):
+    def parse_key(
+        self, key: RegistryKey, keyname: str, valuename: str, record: TargetRecordDescriptor
+    ) -> Iterator[TargetRecordDescriptor]:
         try:
             subkey = key.subkey(keyname)
             value = subkey.value(valuename).value
@@ -76,15 +77,14 @@ class SevenZipPlugin(Plugin):
         except RegistryError:
             pass
 
-    @export(record=[PanelPathRecord, ArcHistoryRecord, PathHistoryRecord, CopyHistoryRecord, FolderHistoryRecord])
-    def sevenzip(
-        self,
-    ) -> Iterator[PanelPathRecord | ArcHistoryRecord | PathHistoryRecord | CopyHistoryRecord | FolderHistoryRecord]:
-        """Return 7-Zip history information from the registry.
+    @export(record=SevenZipRecord)
+    @alias("7zip")
+    def sevenzip(self) -> Iterator[SevenZipRecord]:
+        """Return 7-Zip GUI history information from the registry.
 
         7-Zip is an open source file archiver. If the HKCU\\Software\\7-Zip registry key exists, it checks for
         additional registry keys, such as ArcHistory and FolderHistory. This might provide insight in which files have
-        been archived by 7-Zip.
+        been archived by the 7-Zip GUI.
 
         References:
             - https://www.7-zip.org/
@@ -102,14 +102,7 @@ class SevenZipPlugin(Plugin):
             except RegistryError:
                 pass
 
-            for record in self.parse_key(key, "Compression", "ArcHistory", ArcHistoryRecord):
-                yield record
-
-            for record in self.parse_key(key, "Extraction", "PathHistory", PathHistoryRecord):
-                yield record
-
-            for record in self.parse_key(key, "FM", "CopyHistory", CopyHistoryRecord):
-                yield record
-
-            for record in self.parse_key(key, "FM", "FolderHistory", FolderHistoryRecord):
-                yield record
+            yield from self.parse_key(key, "Compression", "ArcHistory", ArcHistoryRecord)
+            yield from self.parse_key(key, "Extraction", "PathHistory", PathHistoryRecord)
+            yield from self.parse_key(key, "FM", "CopyHistory", CopyHistoryRecord)
+            yield from self.parse_key(key, "FM", "FolderHistory", FolderHistoryRecord)
