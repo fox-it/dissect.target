@@ -731,9 +731,9 @@ def test_reverse_read() -> None:
 
     fs.map_file_fh("large_emoji", io.BytesIO(("🐱" * 10_000).encode()))
     content = list(fsutil.reverse_read(fs.path("large_emoji").open("rb")))
-    assert len(content) == 4
-    assert len(content[0]) == 1024 * 10
-    assert len(content[-1]) == 9280
+    assert len(content) == 5
+    assert len(content[0]) == 1024 * 8
+    assert len(content[-1]) == 7232
     assert b"".join(content) == bytes(reversed(("🐱" * 10_000).encode()))
 
 
