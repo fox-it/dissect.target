@@ -10,7 +10,7 @@ from enum import IntEnum
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, NewType, Optional, TextIO, Union
 
 from dissect.regf import c_regf, regf
 
@@ -26,7 +26,7 @@ GLOB_MAGIC_REGEX = re.compile(r"[*?[]")
 KeyType = Union[regf.IndexLeaf, regf.FastLeaf, regf.HashLeaf, regf.IndexRoot, regf.NamedKey]
 """The possible key types that can be returned from the registry."""
 
-ValueType = Union[int, str, bytes, list[str]]
+ValueType = Union[int, str, bytes, list[str], None]
 """The possible value types that can be returned from the registry."""
 
 
@@ -161,15 +161,27 @@ class RegistryKey:
         """Returns a list of subkeys from this key."""
         raise NotImplementedError()
 
-    def value(self, value: str) -> RegistryValue:
+    Marker = NewType("Marker", object)
+    __marker = Marker(object())
+
+    def value(self, value: str, default: ValueType | Marker = __marker) -> RegistryValue:
         """Returns a specific value from this key.
 
         Args:
             value: The name of the value to retrieve.
+            default: An optional argument that specifies the default return value in case the value cannot be found.
 
         Raises:
-            RegistryValueNotFoundError: If this key has no value with the requested name.
+            RegistryValueNotFoundError: If this key has no value with the requested name and default is not defined.
         """
+        try:
+            return self._value(value)
+        except RegistryValueNotFoundError:
+            if default is self.__marker:
+                raise
+            return VirtualValue(self.hive, value, default)
+
+    def _value(self, value: str) -> RegistryValue:
         raise NotImplementedError()
 
     def values(self) -> list[RegistryValue]:
@@ -400,7 +412,7 @@ class VirtualKey(RegistryKey):
 
         return res.values()
 
-    def value(self, value: str) -> RegistryValue:
+    def _value(self, value: str) -> RegistryValue:
         try:
             return self._values[value.lower()]
         except KeyError:
@@ -588,7 +600,7 @@ class KeyCollection(RegistryKey):
 
         return ret.values()
 
-    def value(self, value: str) -> ValueCollection:
+    def _value(self, value: str) -> ValueCollection:
         ret = ValueCollection()
         for key in self:
             try:
@@ -698,7 +710,7 @@ class RegfKey(RegistryKey):
     def subkeys(self) -> list[RegistryKey]:
         return [RegfKey(self.hive, k) for k in self.key.subkeys()]
 
-    def value(self, value: str) -> RegistryValue:
+    def _value(self, value: str) -> RegistryValue:
         try:
             return RegfValue(self.hive, self.key.value(value))
         except regf.RegistryValueNotFoundError as e:
