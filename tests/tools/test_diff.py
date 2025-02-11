@@ -52,7 +52,7 @@ def target_unix_factory(tmp_path: Path) -> TargetUnixFactory:
 
 
 @pytest.fixture
-def src_target(target_unix_factory) -> Iterator[Target]:
+def src_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
     target, fs_unix = target_unix_factory.new("src_target")
 
     passwd_contents = PASSWD_CONTENTS + "\nsrc_user:x:1001:1001:src_user:/home/src_user:/bin/bash"
@@ -72,7 +72,7 @@ def src_target(target_unix_factory) -> Iterator[Target]:
 
 
 @pytest.fixture
-def dst_target(target_unix_factory) -> Iterator[Target]:
+def dst_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
     target, fs_unix = target_unix_factory.new("dst_target")
 
     passwd_contents = PASSWD_CONTENTS + "\ndst_user:x:1002:1002:dst_user:/home/dst_user:/bin/bash"
@@ -223,7 +223,9 @@ def test_differentiate_plugins(src_target: Target, dst_target: Target) -> None:
     assert deleted[0].record.hostname == "src_target"
 
 
-def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
+def test_shell_ls(
+    src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
@@ -248,7 +250,9 @@ def test_shell_ls(src_target: Target, dst_target: Target, capsys, monkeypatch) -
     assert captured.out == "\n".join(expected) + "\n"
 
 
-def test_shell_find(src_target: Target, dst_target: Target, capsys, monkeypatch) -> None:
+def test_shell_find(
+    src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(fsutils, "LS_COLORS", {})
 
     cli = DifferentialCli(src_target, dst_target, deep=True)
@@ -275,7 +279,7 @@ def test_shell_find(src_target: Target, dst_target: Target, capsys, monkeypatch)
     assert captured.out == "\n".join(expected) + "\n"
 
 
-def test_shell_cat(src_target: Target, dst_target: Target, capsys) -> None:
+def test_shell_cat(src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture) -> None:
     cli = DifferentialCli(src_target, dst_target, deep=True)
 
     cli.onecmd("cat /changes/unchanged")
@@ -296,7 +300,7 @@ def test_shell_cat(src_target: Target, dst_target: Target, capsys) -> None:
     assert captured.out == "Hello From Destination Target\n"
 
 
-def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
+def test_shell_plugin(src_target: Target, dst_target: Target, capsys: pytest.CaptureFixture) -> None:
     cli = DifferentialCli(src_target, dst_target, deep=True)
 
     cli.onecmd("plugin users")
@@ -307,10 +311,10 @@ def test_shell_plugin(src_target: Target, dst_target: Target, capsys) -> None:
     assert "differential/record/deleted" in captured.out
 
 
-def test_target_diff_shell(capsys, monkeypatch) -> None:
+def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         m.setattr(fsutils, "LS_COLORS", {})
-        m.setenv("NO_COLOR", 1)
+        m.setenv("NO_COLOR", "1")
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
         m.setattr("sys.argv", ["target-diff", "--deep", "shell", src_target_path, dst_target_path])
@@ -333,7 +337,7 @@ def test_target_diff_shell(capsys, monkeypatch) -> None:
         assert "unrecognized arguments" not in err
 
 
-def test_target_diff_fs(capsys, monkeypatch) -> None:
+def test_target_diff_fs(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
@@ -346,7 +350,7 @@ def test_target_diff_fs(capsys, monkeypatch) -> None:
         assert "differential/file/deleted" in out
 
 
-def test_target_diff_query(capsys, monkeypatch) -> None:
+def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     with monkeypatch.context() as m:
         src_target_path = absolute_path("_data/tools/diff/src.tar")
         dst_target_path = absolute_path("_data/tools/diff/dst.tar")
@@ -357,3 +361,25 @@ def test_target_diff_query(capsys, monkeypatch) -> None:
         assert "differential/record/created" in out
         assert "differential/record/unchanged" in out
         assert "differential/record/deleted" in out
+
+
+def test_target_diff_fs_reverse_read(target_unix_factory: TargetUnixFactory) -> None:
+    """test if we detect the difference in an appended file correctly."""
+
+    src_target, fs_src = target_unix_factory.new("src_target")
+    dst_target, fs_dst = target_unix_factory.new("dst_target")
+    fs_src.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20))
+    fs_dst.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20 + b"B" * 1024))
+
+    comparison = TargetComparison(src_target, dst_target, deep=True)
+    diff = comparison.scandir("/var/log")
+
+    assert len(diff.modified) == 1
+    assert diff.modified[0].path == "/var/log/example.log"
+    assert diff.modified[0].diff == [
+        b"--- \n",
+        b"+++ \n",
+        b"@@ -1 +1 @@\n",
+        b"-" + b"A" * 10 * 1024,
+        b"+" + (b"A" * 9216) + (b"B" * 1024),
+    ]
