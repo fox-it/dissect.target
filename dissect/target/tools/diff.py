@@ -266,7 +266,7 @@ class TargetComparison:
                     unchanged.append(src_entry)
                     break
 
-                if not chunk_a == 0:
+                if not chunk_a:
                     # End of file
                     unchanged.append(src_entry)
                     break

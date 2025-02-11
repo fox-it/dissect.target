@@ -572,8 +572,8 @@ def reverse_read(
         chunk_size: The chunk size to use for iterating over bytes (default: 8KB).
         reverse_chunk: Whether we should reverse the bytes of each chunk (default: True).
 
-        Returns:
-            An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
+    Returns:
+        An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
     """
 
     offset = fh.seek(0, io.SEEK_END)
