@@ -563,15 +563,15 @@ def open_decompress(
 
 
 def reverse_read(fh: io.BytesIO, chunk_size: int = 1024 * 10, reverse_chunk: bool = True) -> Iterator[bytes]:
-    """Like iterating over a ``BytesIO`` file-like object, but starting from the end of the file.
+    """Like iterating over chunks of a ``BytesIO`` file-like object, but starting from the end of the file.
 
     Args:
         fh: The file-like object (opened in binary mode) to read from.
         chunk_size: The chunk size to use for iterating over bytes (default: 10KB).
-        reverse_chunk: Whether we should reverse the bytes of each read chunk (default: True).
+        reverse_chunk: Whether we should reverse the bytes of each chunk (default: True).
 
         Returns:
-            An iterator of reversed bytes.
+            An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
     """
 
     offset = fh.seek(0, io.SEEK_END)

@@ -243,15 +243,15 @@ class TargetComparison:
             chunk_count = 0
 
             while True:
-                chunk_a = next(chunks_a, None)
-                chunk_b = next(chunks_b, None)
+                chunk_a = next(chunks_a, b"")
+                chunk_b = next(chunks_b, b"")
                 chunk_count += 1
 
                 if chunk_a != chunk_b:
                     # We immediately break after discovering a difference in file contents
                     # This means that we won't return a full diff of the file, merely the first block where a difference
                     # is observed. The chunk is not reversed, so the difference is human-readable.
-                    content_difference = list(diff_bytes(unified_diff, [chunk_a or b""], [chunk_b or ""]))
+                    content_difference = list(diff_bytes(unified_diff, [chunk_a], [chunk_b]))
                     differential_entry = DifferentialEntry(
                         entry_path,
                         src_entry.name,
@@ -266,7 +266,7 @@ class TargetComparison:
                     unchanged.append(src_entry)
                     break
 
-                if chunk_a is None or len(chunk_a) == 0:
+                if not chunk_a == 0:
                     # End of file
                     unchanged.append(src_entry)
                     break
