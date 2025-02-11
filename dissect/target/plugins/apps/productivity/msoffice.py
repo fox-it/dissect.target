@@ -19,13 +19,13 @@ from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
 OfficeStartupItem = TargetRecordDescriptor(
-    "productivity/msoffice/startup_item",
+    "application/productivity/msoffice/startup_item",
     [("path", "path"), ("datetime", "creation_time"), ("datetime", "modification_time")],
 )
 
 # Web add-in
 OfficeWebAddinRecord = TargetRecordDescriptor(
-    "productivity/msoffice/web_addin",
+    "application/productivity/msoffice/web_addin",
     [
         ("path", "manifest"),
         ("datetime", "modification_time"),
@@ -38,7 +38,7 @@ OfficeWebAddinRecord = TargetRecordDescriptor(
 
 # COM and VSTO add-ins
 OfficeNativeAddinRecord = TargetRecordDescriptor(
-    "productivity/msoffice/native_addin",
+    "application/productivity/msoffice/native_addin",
     [
         ("path", "manifest"),
         ("datetime", "modification_time"),
