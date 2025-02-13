@@ -88,6 +88,8 @@ class Client(AbstractContextManager):
         return Client(rpc_client)
 
     def rebind_auth(self, auth: AuthScheme[Credentials, Verifier]) -> None:
+        """Change the authentication scheme of the underlying sunrpc client"""
+
         self._rpc_client = self._rpc_client.rebind_auth(auth)
 
     def readdir(self, dir: FileHandle3) -> ReadDirResult | Nfs3Stat:
@@ -142,6 +144,8 @@ class Client(AbstractContextManager):
         return result
 
     def getattr(self, handle: FileHandle3) -> FileAttributes3:
+        """Get the attributes of a file by its file handle"""
+
         attr_deserializer = NfsResultDeserializer(FileAttributesSerializer())
         result = self._rpc_client.call(GetAttrProc, handle.opaque, OpaqueVarLengthSerializer(), attr_deserializer)
         if isinstance(result, Nfs3Stat):
@@ -150,6 +154,7 @@ class Client(AbstractContextManager):
         return result
 
     def readlink(self, handle: FileHandle3) -> str:
+        """Read the target of a symlink by its file handle"""
         link_deserializer = NfsResultDeserializer(ReadLink3ResultDeserializer())
         result = self._rpc_client.call(ReadLinkProc, handle.opaque, OpaqueVarLengthSerializer(), link_deserializer)
         if isinstance(result, Nfs3Stat):
