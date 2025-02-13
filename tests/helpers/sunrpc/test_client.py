@@ -4,7 +4,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dissect.target.helpers.nfs.mount_client import Client as MountClient
+from dissect.target.helpers.nfs.client.mount import Client as MountClient
+from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+from dissect.target.helpers.nfs.client.nfs import ReadDirResult
 from dissect.target.helpers.nfs.nfs3 import (
     EntryPlus3,
     FileAttributes3,
@@ -15,15 +17,7 @@ from dissect.target.helpers.nfs.nfs3 import (
     NfsTime3,
     SpecData3,
 )
-from dissect.target.helpers.nfs.nfs_client import Client as NfsClient
-from dissect.target.helpers.nfs.nfs_client import ReadDirResult
-from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.client import Client, auth_unix
-from dissect.target.helpers.sunrpc.serializer import (
-    PortMappingSerializer,
-    UInt32Serializer,
-)
-from dissect.target.helpers.sunrpc.sunrpc import GetPortProc, PortMapping
 
 
 @pytest.fixture
@@ -43,14 +37,11 @@ def test_portmap_call(mock_socket: MagicMock) -> None:
 
     client = Client.connect_port_mapper("localhost")
 
-    # Prepare the portmap request and response
-    portmap_params = PortMapping(program=100003, version=3, protocol=sunrpc.Protocol.TCP)
-
     # Set up the mock to return the response payload
     response_fragment_header = (len(portmap_response) | 0x80000000).to_bytes(4, "big")
     mock_sock_instance.recv.side_effect = [response_fragment_header, portmap_response]
 
-    result = client.call(GetPortProc, portmap_params, PortMappingSerializer(), UInt32Serializer())
+    result = client.query_port_mapping(program=100003, version=3)
 
     # Verify that the request payload was sent
     portmap_request_fragment_header = (len(portmap_request) | 0x80000000).to_bytes(4, "big")

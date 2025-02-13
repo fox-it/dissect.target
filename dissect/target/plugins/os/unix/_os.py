@@ -11,7 +11,9 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.nfs.mount_client import Client as MountClient
+from dissect.target.helpers.nfs.client.mount import Client as MountClient
+from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+from dissect.target.helpers.nfs.client.nfs import NfsError
 from dissect.target.helpers.nfs.nfs3 import (
     MountOK3,
     MountProc,
@@ -19,8 +21,6 @@ from dissect.target.helpers.nfs.nfs3 import (
     NfsProgram,
     NfsVersion,
 )
-from dissect.target.helpers.nfs.nfs_client import Client as NfsClient
-from dissect.target.helpers.nfs.nfs_client import NfsError
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import (
     Client,
@@ -28,13 +28,9 @@ from dissect.target.helpers.sunrpc.client import (
     auth_null,
     auth_unix,
 )
-from dissect.target.helpers.sunrpc.serializer import (
-    AuthFlavor,
-    PortMappingSerializer,
-    UInt32Serializer,
-)
-from dissect.target.helpers.sunrpc.sunrpc import GetPortProc, PortMapping, Protocol
+from dissect.target.helpers.sunrpc.serializer import AuthFlavor
 from dissect.target.helpers.utils import parse_options_string
+from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -251,8 +247,8 @@ class UnixPlugin(OSPlugin):
         fstab = self.target.fs.path("/etc/fstab")
 
         for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
-            # Mount nfs, but only when target is local
-            if fs_type == "nfs" and str(self.target.path) == "local":
+            # Mount nfs, but only when target has been mapped by the `LocalLoader`
+            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
                 self._add_nfs(dev_id, volume_name, mount_point)
                 continue
 
@@ -296,15 +292,17 @@ class UnixPlugin(OSPlugin):
 
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
         with Client.connect_port_mapper(address) as port_mapper_client:
-            params_mount = PortMapping(program=MountProc.program, version=MountProc.version, protocol=Protocol.TCP)
-            mount_port = port_mapper_client.call(GetPortProc, params_mount, PortMappingSerializer(), UInt32Serializer())
-            params_nfs = PortMapping(program=NfsProgram, version=NfsVersion, protocol=Protocol.TCP)
-            nfs_port = port_mapper_client.call(GetPortProc, params_nfs, PortMappingSerializer(), UInt32Serializer())
+            try:
+                mount_port = port_mapper_client.query_port_mapping(MountProc.program, version=MountProc.version)
+                nfs_port = port_mapper_client.query_port_mapping(NfsProgram, version=NfsVersion)
+            except Exception as e:
+                self.target.log.warning("Failed to connect to portmapper: %s", e)
+                return
 
         with MountClient.connect(address, mount_port, FreePrivilegedPort) as mount_client:
             mount_result = mount_client.mount(exported_dir)
             if not isinstance(mount_result, MountOK3):
-                self.target.log.warning(f"Mounting NFS gives error code {mount_result}")
+                self.target.log.warning("Mounting NFS gives error code %d", mount_result)
                 return
 
         if AuthFlavor.AUTH_UNIX not in mount_result.auth_flavors:
@@ -322,14 +320,14 @@ class UnixPlugin(OSPlugin):
                 auth = auth_unix("machine", user.uid, user.gid, [])
                 nfs_client.rebind_auth(auth)
                 try:
-                    self.target.log.info(f"Trying to read NFS share with uid {user.uid} and gid {user.gid}")
+                    self.target.log.debug("Trying to read NFS share with uid %d and gid %d", user.uid, user.gid)
                     # Use a readdir to check if we have access.
                     # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
                     nfs_client.readdir(mount_result.filehandle)
                     return nfs_client
                 except NfsError as e:
                     if e.nfsstat != Nfs3Stat.ERR_ACCES:
-                        self.target.log.warning(f"Reading NFS share gives {e.nfsstat}")
+                        self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
                         nfs_client.close()
                         raise e
 

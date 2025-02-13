@@ -33,7 +33,7 @@ class Client(AbstractContextManager):
         self._rpc_client = rpc_client
 
     def __enter__(self) -> Client:
-        """Return `self` upon entering the runtime context."""
+        """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:

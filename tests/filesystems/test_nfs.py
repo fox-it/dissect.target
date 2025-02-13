@@ -17,7 +17,7 @@ from dissect.target.helpers.nfs.nfs3 import (
 
 @pytest.fixture
 def mock_nfs_client() -> Iterator[MagicMock]:
-    with patch("dissect.target.helpers.nfs.nfs_client.Client", autospec=True) as mock_client:
+    with patch("dissect.target.helpers.nfs.client.nfs.Client", autospec=True) as mock_client:
         yield mock_client
 
 
@@ -53,7 +53,7 @@ def test_get_root(nfs_filesystem: NfsFilesystem) -> None:
     entry = nfs_filesystem.get("/")
     assert isinstance(entry, NfsFilesystemEntry)
     assert entry.path == "/"
-    assert entry._file_handle.opaque == b"root_handle"
+    assert entry.entry.opaque == b"root_handle"
 
 
 def test_get_subdirectory(nfs_filesystem: NfsFilesystem, mock_nfs_client: MagicMock) -> None:
@@ -64,7 +64,7 @@ def test_get_subdirectory(nfs_filesystem: NfsFilesystem, mock_nfs_client: MagicM
     mock_nfs_client.lookup.assert_called_with("subdir", FileHandle3(opaque=b"root_handle"))
     assert isinstance(entry, NfsFilesystemEntry)
     assert entry.path == "subdir"
-    assert entry._file_handle.opaque == b"subdir_handle"
+    assert entry.entry.opaque == b"subdir_handle"
 
 
 def test_is_file(nfs_filesystem_entry: NfsFilesystemEntry) -> None:

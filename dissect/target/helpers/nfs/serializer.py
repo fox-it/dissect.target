@@ -177,7 +177,7 @@ class ResultDeserializer(XdrDeserializer[Union[ResultType, Nfs3Stat]]):
     def __init__(self, deserializer: XdrDeserializer[ResultType]):
         self._deserializer = deserializer
 
-    def deserialize(self, payload: io.BytesIO) -> Union[ResultType, Nfs3Stat]:
+    def deserialize(self, payload: io.BytesIO) -> ResultType | Nfs3Stat:
         stat = self._read_enum(payload, Nfs3Stat)
         if stat != Nfs3Stat.OK:
             return stat
