@@ -14,13 +14,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import (
-    MountOK3,
-    MountProc,
-    Nfs3Stat,
-    NfsProgram,
-    NfsVersion,
-)
+from dissect.target.helpers.nfs.nfs3 import MountProc, Nfs3Stat, NfsProgram, NfsVersion
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import (
     Client,
@@ -300,9 +294,10 @@ class UnixPlugin(OSPlugin):
                 return
 
         with MountClient.connect(address, mount_port, FreePrivilegedPort) as mount_client:
-            mount_result = mount_client.mount(exported_dir)
-            if not isinstance(mount_result, MountOK3):
-                self.target.log.warning("Mounting NFS gives error code %d", mount_result)
+            try:
+                mount_result = mount_client.mount(exported_dir)
+            except Exception as e:
+                self.target.log.warning("Mounting NFS gives error code %s", e)
                 return
 
         if AuthFlavor.AUTH_UNIX not in mount_result.auth_flavors:
