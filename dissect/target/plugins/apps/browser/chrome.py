@@ -25,14 +25,21 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     DIRS = [
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
+        "AppData/Local/Google/Chrome/User Data/Profile*",
         "AppData/Local/Google/Chrome/User Data/Snapshots/*/Default",
+        "AppData/Local/Google/Chrome/User Data/Snapshots/*/Profile*",
         "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
+        "AppData/Local/Google/Chrome/continuousUpdates/User Data/Profile*",
         "Local Settings/Application Data/Google/Chrome/User Data/Default",
+        "Local Settings/Application Data/Google/Chrome/User Data/Profile*",
         # Linux
         ".config/google-chrome/Default",
+        ".config/google-chrome/Profile*",
         ".var/app/com.google.Chrome/config/google-chrome/Default",
+        ".var/app/com.google.Chrome/config/google-chrome/Profile*",
         # Macos
         "Library/Application Support/Google/Chrome/Default",
+        "Library/Application Support/Google/Chrome/Profile*",
     ]
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
