@@ -33,6 +33,7 @@ from dissect.target.plugin import (
     get_external_module_paths,
     load,
     load_modules_from_paths,
+    lookup,
     plugins,
 )
 from dissect.target.plugins.os.default._os import DefaultPlugin
@@ -426,6 +427,24 @@ def test_namespace_plugin(target_win: Target) -> None:
             @export(output="yield")
             def test(self):
                 yield "faulty"
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_namespace_plugin_registration(mock_plugins: PluginRegistry) -> None:
+    class _TestNSPlugin(NamespacePlugin):
+        __namespace__ = "NS"
+
+    class _TestSubPlugin1(_TestNSPlugin):
+        __namespace__ = "t1"
+
+        @export(record=TestRecord)
+        def test(self):
+            ...
+
+    assert next(lookup("NS")).exported
+    assert next(lookup("NS.test")).exported
+    assert next(lookup("t1")).exported
+    assert next(lookup("t1.test")).exported
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
