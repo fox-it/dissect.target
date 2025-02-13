@@ -48,7 +48,7 @@ class UnixPlugin(OSPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
-        """If the ``/var`` and ``/etc`` folders exist on a filesystem it is treated as a Unix-like filesystem."""
+        # If the ``/var`` and ``/etc`` folders exist on a filesystem it is treated as a Unix-like filesystem
         for fs in target.filesystems:
             if fs.exists("/var") and fs.exists("/etc"):
                 return fs

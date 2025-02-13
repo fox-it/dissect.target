@@ -50,7 +50,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
         }
 
         for fs in target.filesystems:
-            # We explicitly exclude filesystems that look more like a MacOS or Windows sysvol.
+            # We explicitly exclude filesystems that look more like a macOS or Windows sysvol.
             if MacPlugin.detect(target) or WindowsPlugin.detect(target):
                 continue
 
