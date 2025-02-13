@@ -30,7 +30,6 @@ class NginxPlugin(WebserverPlugin):
         if not len(self.log_paths):
             raise UnsupportedPluginError("No NGINX directories found")
 
-    @plugin.internal
     def get_log_paths(self) -> list[Path]:
         log_paths = []
 

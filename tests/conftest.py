@@ -14,7 +14,7 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
@@ -261,7 +261,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Iterator[Target]:
-    yield make_os_target(tmp_path, default.DefaultPlugin)
+    yield make_os_target(tmp_path, DefaultPlugin)
 
 
 @pytest.fixture
