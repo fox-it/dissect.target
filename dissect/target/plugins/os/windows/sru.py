@@ -413,11 +413,10 @@ class SRUPlugin(Plugin):
             for column, value in column_values:
                 new_value = value
                 if new_value and (transform := TRANSFORMS.get(column)):
-                    _transformed_value = transform(new_value)
-                    if isinstance(_transformed_value, str):
-                        new_value = self.target.fs.path(transform(new_value))
+                    if isinstance((transformed_value := transform(new_value)), str):
+                        new_value = self.target.fs.path(transformed_value)
                     else:
-                        new_value = _transformed_value
+                        new_value = transformed_value
                 new_column = FIELD_MAPPINGS.get(column, column)
                 record_values[new_column] = new_value
 
