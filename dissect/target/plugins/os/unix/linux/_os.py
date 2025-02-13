@@ -46,6 +46,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
             "/boot/initrd.img",
             "/boot/vmlinuz",
             "/boot/vmlinux",
+            "/opt",  # Backwards compatibility for previous Linux detection.
         }
 
         for fs in target.filesystems:
