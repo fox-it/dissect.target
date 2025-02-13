@@ -485,6 +485,12 @@ def register(plugincls: type[Plugin]) -> None:
     exports = []
     functions = []
     module_path = _module_path(plugincls)
+
+    # This enables plugin directories, e.g.:
+    # <plugin>/_plugin.py
+    # <plugin>/helpers.py
+    module_path = module_path.removesuffix("._plugin")
+
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
     if not issubclass(plugincls, ChildTargetPlugin):
