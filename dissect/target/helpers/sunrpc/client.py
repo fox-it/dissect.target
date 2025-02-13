@@ -12,9 +12,11 @@ from dissect.target.helpers.sunrpc.serializer import (
     AuthNullSerializer,
     AuthSerializer,
     AuthUnixSerializer,
+    Deserializer,
     MessageSerializer,
-    XdrDeserializer,
-    XdrSerializer,
+    PortMappingSerializer,
+    Serializer,
+    UInt32Serializer,
 )
 
 if TYPE_CHECKING:
@@ -69,14 +71,18 @@ class IncompleteMessage(Exception):
     pass
 
 
+class InvalidPortMapping(Exception):
+    pass
+
+
 class AbstractClient(ABC):
     @abstractmethod
     def call(
         self,
         proc_desc: ProcedureDescriptor,
         params: Params,
-        params_serializer: XdrSerializer[Params],
-        result_deserializer: XdrDeserializer[Results],
+        params_serializer: Serializer[Params],
+        result_deserializer: Deserializer[Results],
     ) -> Results:
         pass
 
@@ -124,6 +130,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
 
     @classmethod
     def _bind_free_privileged_port(cls, sock: socket.socket) -> None:
+        """Bind to a free privileged port (1-1023)"""
         for port in range(1, 1024):
             try:
                 sock.bind(("", port))
@@ -140,7 +147,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         self._xid = 1
 
     def __enter__(self) -> Client:
-        """Return `self` upon entering the runtime context."""
+        """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
@@ -160,12 +167,20 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         new_sock = socket.socket(fileno=fd)
         return Client(new_sock, auth, self._fragment_size)
 
+    def query_port_mapping(self, program: int, version: int) -> int:
+        """Query port number of specified program and version"""
+        arg = sunrpc.PortMapping(program=program, version=version, protocol=sunrpc.Protocol.TCP)
+        result = self.call(sunrpc.GetPortProc, arg, PortMappingSerializer(), UInt32Serializer())
+        if result == 0:
+            raise InvalidPortMapping("Invalid port mapping")
+        return result
+
     def call(
         self,
         proc_desc: ProcedureDescriptor,
         params: Params,
-        params_serializer: XdrSerializer[Params],
-        result_deserializer: XdrDeserializer[Results],
+        params_serializer: Serializer[Params],
+        result_deserializer: Deserializer[Results],
     ) -> Results:
         """Synchronously call an RPC procedure and return the result"""
 

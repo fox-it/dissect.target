@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import stat
+from functools import cached_property
 from typing import BinaryIO, Callable, Iterator
 
 from dissect.util.stream import AlignedStream
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+from dissect.target.helpers.nfs.client.nfs import Client
 from dissect.target.helpers.nfs.nfs3 import (
     EntryPlus3,
     FileAttributes3,
     FileHandle3,
     FileType3,
 )
-from dissect.target.helpers.nfs.nfs_client import Client
 
 ClientFactory = Callable[[], Client]
 
@@ -32,11 +33,9 @@ class NfsFilesystem(Filesystem):
         self._backing_client = None
         self._root_handle = root_handle
 
-    @property
+    @cached_property
     def _client(self) -> Client:
-        if self._backing_client is None:
-            self._backing_client = self._client_factory()
-        return self._backing_client
+        return self._client_factory()
 
     @staticmethod
     def detect(_: BinaryIO) -> bool:
@@ -57,18 +56,19 @@ class NfsFilesystem(Filesystem):
 
 
 class NfsFilesystemEntry(FilesystemEntry):
+    fs: NfsFilesystem
+    entry: FileHandle3
+
     def __init__(
         self, fs: NfsFilesystem, path: str, file_handle: FileHandle3, attributes: FileAttributes3 | None = None
     ):
         super().__init__(fs, path, file_handle)
-        self._fs = fs
-        self._file_handle = file_handle
         self._backing_attributes = attributes
 
     @property
     def _attributes(self) -> FileAttributes3:
         if self._backing_attributes is None:
-            self._backing_attributes = self._fs._client.getattr(self._file_handle)
+            self._backing_attributes = self.fs._client.getattr(self.entry)
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
@@ -93,17 +93,17 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._attributes.type == FileType3.LNK
 
     def readlink(self) -> str:
-        return self._fs._client.readlink(self._file_handle)
+        return self.fs._client.readlink(self.entry)
 
     def readlink_ext(self) -> NfsFilesystemEntry:
-        target = self._fs._client.readlink(self._file_handle)
+        target = self.fs._client.readlink(self.entry)
         return self.get(target)
 
     def _iterdir(self) -> Iterator[EntryPlus3]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
-        yield from self._fs._client.readdir(self._file_handle).entries
+        yield from self.fs._client.readdir(self.entry).entries
 
     def iterdir(self) -> Iterator[str]:
         for entry in self._iterdir():
@@ -114,7 +114,7 @@ class NfsFilesystemEntry(FilesystemEntry):
             yield NfsFilesystemEntry(self.fs, entry.name, entry.handle, entry.attributes)
 
     def open(self) -> NfsStream:
-        return NfsStream(self._fs._client, self._file_handle)
+        return NfsStream(self.fs._client, self.entry)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if follow_symlinks and self.is_symlink():
