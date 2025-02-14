@@ -95,7 +95,7 @@ class Cache:
         target = args[0].target
 
         output = getattr(self.wrapper, "__output__", None)
-        if output not in ("record", "yield"):
+        if output not in ("record", "yield", "none"):
             # Cache property and default outputs on the target object itself
             func_cache = target._cache.setdefault(self.fname, {})
             key = (args[1:], frozenset(sorted(kwargs.items())))
