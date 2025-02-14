@@ -29,7 +29,6 @@ from dissect.target.plugins.general.plugins import (
 )
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -134,14 +133,6 @@ def main() -> None:
         help="list (matching) available plugins and loaders",
     )
 
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
-    )
-
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -172,15 +163,12 @@ def main() -> None:
 
     args, rest = parser.parse_known_args()
 
-    # If loader is specified then map to uri
-    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
         parser.print_help()
         parser.exit()
 
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -222,10 +210,10 @@ def main() -> None:
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
-        list_plugins(targets, args.list, args.children, args.json, rest)
+        list_plugins(args.targets, args.list, args.children, args.json, rest)
         parser.exit()
 
-    if not targets:
+    if not args.targets:
         parser.error("too few arguments")
 
     if not args.function:
@@ -276,7 +264,7 @@ def main() -> None:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(targets, args.children):
+        for target in Target.open_all(args.targets, args.children):
             if args.child:
                 try:
                     target = target.open_child(args.child)

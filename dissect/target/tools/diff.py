@@ -352,7 +352,7 @@ class TargetComparison:
 class DifferentialCli(ExtendedCmd):
     """CLI for browsing the differential between two or more targets."""
 
-    doc_header_prefix = "target-diff\n" "==========\n"
+    doc_header_prefix = "target-diff\n==========\n"
     doc_header_suffix = "\n\nDocumented commands (type help <topic>):"
     doc_header_multiple_targets = "Use 'list', 'prev' and 'next' to list and select targets to differentiate between."
 
@@ -958,8 +958,8 @@ def main() -> None:
 
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     if len(args.targets) < 2:
         print("At least two targets are required for target-diff.")
