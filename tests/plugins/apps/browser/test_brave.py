@@ -10,7 +10,8 @@ from tests._utils import absolute_path
 
 @pytest.fixture
 def target_brave(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
-    base_path = "Users\\John\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default"
+    base_path_default = "Users\\John\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default"
+    base_path_profile = "Users\\John\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Profile 1"
     files = [
         ("History", "_data/plugins/apps/browser/chrome/History"),
         ("Preferences", "_data/plugins/apps/browser/chrome/Preferences"),
@@ -20,7 +21,8 @@ def target_brave(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterato
     ]
 
     for filename, test_path in files:
-        fs_win.map_file("\\".join([base_path, filename]), absolute_path(test_path))
+        fs_win.map_file("\\".join([base_path_default, filename]), absolute_path(test_path))
+        fs_win.map_file("\\".join([base_path_profile, filename]), absolute_path(test_path))
 
     target_win_users.add_plugin(brave.BravePlugin)
 
@@ -29,29 +31,29 @@ def target_brave(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterato
 
 def test_brave_history(target_brave: Target) -> None:
     records = list(target_brave.brave.history())
-    assert len(records) == 5
+    assert len(records) == 10
 
 
 def test_brave_downloads(target_brave: Target) -> None:
     records = list(target_brave.brave.downloads())
-    assert len(records) == 1
+    assert len(records) == 2
 
 
 def test_brave_extensions(target_brave: Target) -> None:
     records = list(target_brave.brave.extensions())
-    assert len(records) == 8
+    assert len(records) == 16
 
 
 def test_brave_cookies(target_brave: Target) -> None:
     records = list(target_brave.brave.cookies())
-    assert len(records) == 5
+    assert len(records) == 10
     assert all(record.host == ".tweakers.net" for record in records)
 
 
 def test_windows_edge_passwords_plugin(target_brave: Target) -> None:
     records = list(target_brave.brave.passwords())
 
-    assert len(records) == 2
+    assert len(records) == 4
 
     for record in records:
         assert record.browser == "brave"
