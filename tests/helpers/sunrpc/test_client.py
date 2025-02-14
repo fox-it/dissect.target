@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+import os
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -15,6 +16,8 @@ from dissect.target.helpers.nfs.nfs3 import (
     Lookup3resok,
     MountOK3,
     NfsTime3,
+    Read3args,
+    ReadFileProc,
     SpecData3,
 )
 from dissect.target.helpers.sunrpc.client import Client, auth_unix
@@ -24,6 +27,11 @@ from dissect.target.helpers.sunrpc.client import Client, auth_unix
 def mock_socket():
     with patch("socket.socket") as mock_socket:
         yield mock_socket
+
+
+@pytest.fixture
+def rpc_client():
+    return MagicMock(spec=Client)
 
 
 def test_portmap_call(mock_socket: MagicMock) -> None:
@@ -325,3 +333,37 @@ def test_readlink(mock_socket: MagicMock) -> None:
 
     # Verify that the result of the call equals the result
     assert result == "dir1/dir2/dir3"
+
+
+def test_readfile(rpc_client: MagicMock) -> None:
+    nfs_client = NfsClient(rpc_client)
+    file_handle = FileHandle3(opaque=b"file_handle")
+
+    # Generate random binary data of 2.5 times the READ_CHUNK_SIZE
+    data_size = int(2.5 * NfsClient.READ_CHUNK_SIZE)
+    random_data = os.urandom(data_size)
+
+    # Mock the responses to return the relevant chunks
+    chunks = [random_data[i : i + NfsClient.READ_CHUNK_SIZE] for i in range(0, data_size, NfsClient.READ_CHUNK_SIZE)]
+    responses = []
+    for i, chunk in enumerate(chunks):
+        eof = i == len(chunks) - 1
+        response = MagicMock()
+        response.data = chunk
+        response.count = len(chunk)
+        response.eof = eof
+        responses.append(response)
+
+    rpc_client.call.side_effect = responses
+
+    # Read the file using the readfile method
+    received_data = b"".join(nfs_client.readfile(file_handle))
+
+    # Compare the received file with the generated one
+    assert received_data == random_data
+    assert rpc_client.call.call_count == len(chunks)
+    for i, chunk in enumerate(chunks):
+        offset = i * NfsClient.READ_CHUNK_SIZE
+        rpc_client.call.assert_any_call(
+            ReadFileProc, Read3args(file_handle, offset, NfsClient.READ_CHUNK_SIZE), ANY, ANY
+        )
