@@ -22,7 +22,12 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystems.smb import SmbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
+from dissect.target.helpers.regutil import (
+    RegistryHive,
+    RegistryKey,
+    RegistryValue,
+    ValueType,
+)
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
@@ -308,7 +313,7 @@ class SmbRegistryKey(RegistryKey):
 
         return subkeys
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> SmbRegistryValue:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:
@@ -351,7 +356,7 @@ class SmbRegistryValue(RegistryValue):
         return self._name
 
     @property
-    def value(self) -> str:
+    def value(self) -> ValueType:
         return self._value
 
     @property

@@ -11,7 +11,7 @@ from dissect.target.helpers import fsutil, utils
 def test_to_list_single_value() -> None:
     assert utils.to_list(1) == [1]
     assert utils.to_list("a") == ["a"]
-    assert utils.to_list(None) == [None]
+    assert utils.to_list(None) == []
 
 
 def test_to_list_list_value() -> None:

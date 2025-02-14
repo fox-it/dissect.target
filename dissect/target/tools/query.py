@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
-from flow.record.base import AbstractWriter
+from flow.record.adapter import AbstractWriter
 
 from dissect.target import Target, plugin
 from dissect.target.exceptions import (

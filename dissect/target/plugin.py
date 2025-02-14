@@ -485,6 +485,12 @@ def register(plugincls: type[Plugin]) -> None:
     exports = []
     functions = []
     module_path = _module_path(plugincls)
+
+    # This enables plugin directories, e.g.:
+    # <plugin>/_plugin.py
+    # <plugin>/helpers.py
+    module_path = module_path.removesuffix("._plugin")
+
     module_key = f"{module_path}.{plugincls.__qualname__}"
 
     if not issubclass(plugincls, ChildTargetPlugin):
@@ -515,10 +521,6 @@ def register(plugincls: type[Plugin]) -> None:
 
                     path = f"{module_path}.{attr.__name__}"
 
-                    members = function_index.setdefault(name, {})
-                    if module_key in members:
-                        continue
-
                     descriptor = FunctionDescriptor(
                         name=name,
                         namespace=plugincls.__namespace__,
@@ -533,39 +535,36 @@ def register(plugincls: type[Plugin]) -> None:
                     )
 
                     # Register the functions in the lookup
-                    members[module_key] = descriptor
+                    function_index.setdefault(name, {})[module_key] = descriptor
 
     if plugincls.__namespace__:
         # Namespaces are also callable, so register the namespace itself as well
-        if module_key not in function_index.get(plugincls.__namespace__, {}):
-            functions.append("__call__")
-            if len(exports):
-                exports.append("__call__")
+        # NamespacePlugin needs to register itself for every additional subclass, so allow overwrites here
+        functions.append("__call__")
+        if len(exports):
+            exports.append("__call__")
 
-            if plugincls.__register__:
-                descriptor = FunctionDescriptor(
-                    name=plugincls.__namespace__,
-                    namespace=plugincls.__namespace__,
-                    path=module_path,
-                    exported=bool(len(exports)),
-                    internal=bool(len(functions)) and not bool(len(exports)),
-                    findable=plugincls.__findable__,
-                    output=getattr(plugincls.__call__, "__output__", None),
-                    method_name="__call__",
-                    module=plugincls.__module__,
-                    qualname=plugincls.__qualname__,
-                )
+        if plugincls.__register__:
+            descriptor = FunctionDescriptor(
+                name=plugincls.__namespace__,
+                namespace=plugincls.__namespace__,
+                path=module_path,
+                exported=bool(len(exports)),
+                internal=bool(len(functions)) and not bool(len(exports)),
+                findable=plugincls.__findable__,
+                output=getattr(plugincls.__call__, "__output__", None),
+                method_name="__call__",
+                module=plugincls.__module__,
+                qualname=plugincls.__qualname__,
+            )
 
-                function_index.setdefault(plugincls.__namespace__, {})[module_key] = descriptor
+            function_index.setdefault(plugincls.__namespace__, {})[module_key] = descriptor
 
     # Update the class with the plugin attributes
     plugincls.__functions__ = functions
     plugincls.__exports__ = exports
 
     if plugincls.__register__:
-        if module_key in plugin_index:
-            return
-
         plugin_index[module_key] = PluginDescriptor(
             module=plugincls.__module__,
             qualname=plugincls.__qualname__,
