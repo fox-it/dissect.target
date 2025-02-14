@@ -114,7 +114,9 @@ class NfsFilesystemEntry(FilesystemEntry):
             yield NfsFilesystemEntry(self.fs, entry.name, entry.handle, entry.attributes)
 
     def open(self) -> NfsStream:
-        return NfsStream(self.fs._client, self.entry)
+        # Pass size if available but don't sweat it
+        size = self._backing_attributes.size if self._backing_attributes else None
+        return NfsStream(self.fs._client, self.entry, size)
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         if follow_symlinks and self.is_symlink():
@@ -158,8 +160,8 @@ class NfsFilesystemEntry(FilesystemEntry):
 
 
 class NfsStream(AlignedStream):
-    def __init__(self, client: Client, file_handle: FileHandle3):
-        super().__init__(None, Client.READ_CHUNK_SIZE)
+    def __init__(self, client: Client, file_handle: FileHandle3, size: int | None):
+        super().__init__(size, Client.READ_CHUNK_SIZE)
         self._client = client
         self._file_handle = file_handle
 
