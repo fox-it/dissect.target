@@ -16,8 +16,8 @@ from dissect.target.helpers.nfs.nfs3 import (
     LookupResult,
     MountOK,
     NfsTime,
-    Read3args,
     ReadFileProc,
+    ReadParams,
     SpecData,
 )
 from dissect.target.helpers.sunrpc.client import Client, auth_unix
@@ -365,5 +365,5 @@ def test_readfile(rpc_client: MagicMock) -> None:
     for i, chunk in enumerate(chunks):
         offset = i * NfsClient.READ_CHUNK_SIZE
         rpc_client.call.assert_any_call(
-            ReadFileProc, Read3args(file_handle, offset, NfsClient.READ_CHUNK_SIZE), ANY, ANY
+            ReadFileProc, ReadParams(file_handle, offset, NfsClient.READ_CHUNK_SIZE), ANY, ANY
         )
