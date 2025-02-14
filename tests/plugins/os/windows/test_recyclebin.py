@@ -106,11 +106,12 @@ def test_recyclebin_plugin_file(target_win, recycle_bin):
     recycle_bin.map_file("$ihello_world", None)
 
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
+    target_win.fs.mount("D:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
     with patch.object(RecyclebinPlugin, "read_bin_file") as mocked_bin_file:
         recycle_bin_entries = list(target_win.recyclebin())
-        assert recycle_bin_entries == [mocked_bin_file.return_value]
+        assert recycle_bin_entries == [mocked_bin_file.return_value, mocked_bin_file.return_value]
 
 
 def test_recyclebin_plugin_wrong_prefix(target_win, recycle_bin):
