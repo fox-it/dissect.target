@@ -132,7 +132,8 @@ def test_open(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMo
     stream = nfs_filesystem_entry.open()
     assert isinstance(stream, NfsStream)
     assert stream._client == mock_nfs_client
-    assert stream._file_handle.opaque == b"file_handle"
+    assert stream._file_handle.opaque == nfs_filesystem_entry.entry.opaque
+    assert stream.size == nfs_filesystem_entry._attributes.size
 
 
 def test_stream_read(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMock) -> None:
