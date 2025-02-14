@@ -22,14 +22,14 @@ def mock_nfs_client() -> Iterator[MagicMock]:
 
 
 @pytest.fixture
-def nfs_filesystem(mock_nfs_client) -> NfsFilesystem:
+def nfs_filesystem(mock_nfs_client: MagicMock) -> NfsFilesystem:
     client_factory = MagicMock(return_value=mock_nfs_client)
     root_handle = FileHandle3(opaque=b"root_handle")
     return NfsFilesystem(client_factory, root_handle)
 
 
 @pytest.fixture
-def nfs_filesystem_entry(nfs_filesystem) -> NfsFilesystemEntry:
+def nfs_filesystem_entry(nfs_filesystem: NfsFilesystem) -> NfsFilesystemEntry:
     file_handle = FileHandle3(opaque=b"file_handle")
     attributes = FileAttributes3(
         type=FileType3.REG,
