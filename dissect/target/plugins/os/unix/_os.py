@@ -290,7 +290,7 @@ class UnixPlugin(OSPlugin):
                     # Use a readdir to check if we have access.
                     # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
                     nfs_client.readdir(filehandle)
-                    return nfs_client
+                    return  # We have access
                 except NfsError as e:
                     if e.nfsstat != NfsStat.ERR_ACCES:
                         self.target.log.warning("Reading NFS share gives %s", e.nfsstat)

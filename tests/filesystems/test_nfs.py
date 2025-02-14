@@ -141,4 +141,4 @@ def test_stream_read(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: 
     stream = nfs_filesystem_entry.open()
     data = stream.read()
     assert data == b"hello world"
-    mock_nfs_client.readfile.assert_called_with(FileHandle(opaque=b"file_handle"), 0, -1)
+    mock_nfs_client.readfile.assert_called_with(FileHandle(opaque=b"file_handle"), 0, 1024 * 1024)

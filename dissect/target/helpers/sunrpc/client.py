@@ -110,6 +110,9 @@ FreePrivilegedPort = FreePrivilegedPortType()
 
 class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifier]):
     PMAP_PORT = 111
+    TCP_KEEPIDLE = 60
+    TCP_KEEPINTVL = 10
+    TCP_KEEPCNT = 3
 
     @classmethod
     def connect_port_mapper(cls, hostname: str) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
@@ -124,7 +127,13 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         local_port: int | FreePrivilegedPortType = 0,
     ) -> Client[ConCredentials, ConVerifier]:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, cls.TCP_KEEPIDLE)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, cls.TCP_KEEPCNT)
+
         if local_port is FreePrivilegedPort:
             cls._bind_free_privileged_port(sock)
         else:
