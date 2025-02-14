@@ -9,16 +9,16 @@ from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import ReadDirResult
 from dissect.target.helpers.nfs.nfs3 import (
-    EntryPlus3,
-    FileAttributes3,
-    FileHandle3,
-    FileType3,
-    Lookup3resok,
-    MountOK3,
-    NfsTime3,
+    EntryPlus,
+    FileAttributes,
+    FileHandle,
+    FileType,
+    LookupResult,
+    MountOK,
+    NfsTime,
     Read3args,
     ReadFileProc,
-    SpecData3,
+    SpecData,
 )
 from dissect.target.helpers.sunrpc.client import Client, auth_unix
 
@@ -80,8 +80,8 @@ def test_mount_call(mock_socket: MagicMock) -> None:
     mock_sock_instance.sendall.assert_called_with(portmap_request_fragment_header + mount_request)
 
     # Verify that the result of the call equals the mount_result variable
-    assert result == MountOK3(
-        filehandle=FileHandle3(
+    assert result == MountOK(
+        filehandle=FileHandle(
             opaque=b"\x01\x00\x07\x00\x02\x00\xec\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4"
         ),
         auth_flavors=[1],
@@ -104,7 +104,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
     auth.credentials.stamp = 1909822276
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
     result = nfs_client.readdir(
-        FileHandle3(opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4")
+        FileHandle(opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4")
     )
 
     # Verify that the request payload was sent
@@ -113,92 +113,92 @@ def test_readdir(mock_socket: MagicMock) -> None:
 
     # Verify that the result of the call equals the readdir_result variable
     assert result == ReadDirResult(
-        dir_attributes=FileAttributes3(
-            type=FileType3.DIR,
+        dir_attributes=FileAttributes(
+            type=FileType.DIR,
             mode=509,
             nlink=2,
             uid=1000,
             gid=1000,
             size=4096,
             used=4096,
-            rdev=SpecData3(specdata1=0, specdata2=0),
+            rdev=SpecData(specdata1=0, specdata2=0),
             fsid=6445101292235666701,
             fileid=49161946,
-            atime=NfsTime3(seconds=1737126586, nseconds=702003758),
-            mtime=NfsTime3(seconds=1737126550, nseconds=416780604),
-            ctime=NfsTime3(seconds=1737126550, nseconds=416780604),
+            atime=NfsTime(seconds=1737126586, nseconds=702003758),
+            mtime=NfsTime(seconds=1737126550, nseconds=416780604),
+            ctime=NfsTime(seconds=1737126550, nseconds=416780604),
         ),
         entries=[
-            EntryPlus3(
+            EntryPlus(
                 fileid=49185817,
                 name="test.txt",
                 cookie=4501976305947941983,
-                attributes=FileAttributes3(
-                    type=FileType3.REG,
+                attributes=FileAttributes(
+                    type=FileType.REG,
                     mode=436,
                     nlink=1,
                     uid=1000,
                     gid=1000,
                     size=5,
                     used=4096,
-                    rdev=SpecData3(specdata1=0, specdata2=0),
+                    rdev=SpecData(specdata1=0, specdata2=0),
                     fsid=6445101292235666701,
                     fileid=49185817,
-                    atime=NfsTime3(seconds=1737126251, nseconds=228898702),
-                    mtime=NfsTime3(seconds=1737126247, nseconds=294873337),
-                    ctime=NfsTime3(seconds=1737126247, nseconds=294873337),
+                    atime=NfsTime(seconds=1737126251, nseconds=228898702),
+                    mtime=NfsTime(seconds=1737126247, nseconds=294873337),
+                    ctime=NfsTime(seconds=1737126247, nseconds=294873337),
                 ),
-                handle=FileHandle3(
+                handle=FileHandle(
                     opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x19\x84\xee\x02\xc1\x8a\x8c\\"  # noqa: E501
                 ),
             ),
-            EntryPlus3(
+            EntryPlus(
                 fileid=49161946,
                 name=".",
                 cookie=4857786061512671984,
-                attributes=FileAttributes3(
-                    type=FileType3.DIR,
+                attributes=FileAttributes(
+                    type=FileType.DIR,
                     mode=509,
                     nlink=2,
                     uid=1000,
                     gid=1000,
                     size=4096,
                     used=4096,
-                    rdev=SpecData3(specdata1=0, specdata2=0),
+                    rdev=SpecData(specdata1=0, specdata2=0),
                     fsid=6445101292235666701,
                     fileid=49161946,
-                    atime=NfsTime3(seconds=1737126586, nseconds=702003758),
-                    mtime=NfsTime3(seconds=1737126550, nseconds=416780604),
-                    ctime=NfsTime3(seconds=1737126550, nseconds=416780604),
+                    atime=NfsTime(seconds=1737126586, nseconds=702003758),
+                    mtime=NfsTime(seconds=1737126550, nseconds=416780604),
+                    ctime=NfsTime(seconds=1737126550, nseconds=416780604),
                 ),
-                handle=FileHandle3(
+                handle=FileHandle(
                     opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4"
                 ),
             ),
-            EntryPlus3(
+            EntryPlus(
                 fileid=49185799,
                 name="test2.txt",
                 cookie=7513711534648189502,
-                attributes=FileAttributes3(
-                    type=FileType3.REG,
+                attributes=FileAttributes(
+                    type=FileType.REG,
                     mode=436,
                     nlink=1,
                     uid=1000,
                     gid=1000,
                     size=6,
                     used=4096,
-                    rdev=SpecData3(specdata1=0, specdata2=0),
+                    rdev=SpecData(specdata1=0, specdata2=0),
                     fsid=6445101292235666701,
                     fileid=49185799,
-                    atime=NfsTime3(seconds=1737126550, nseconds=416780604),
-                    mtime=NfsTime3(seconds=1737126558, nseconds=731831818),
-                    ctime=NfsTime3(seconds=1737126558, nseconds=731831818),
+                    atime=NfsTime(seconds=1737126550, nseconds=416780604),
+                    mtime=NfsTime(seconds=1737126558, nseconds=731831818),
+                    ctime=NfsTime(seconds=1737126558, nseconds=731831818),
                 ),
-                handle=FileHandle3(
+                handle=FileHandle(
                     opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x07\x84\xee\x02\x9524*"  # noqa: E501
                 ),
             ),
-            EntryPlus3(fileid=49020930, name="..", cookie=9223372036854775807, attributes=None, handle=None),
+            EntryPlus(fileid=49020930, name="..", cookie=9223372036854775807, attributes=None, handle=None),
         ],
     )
 
@@ -218,7 +218,7 @@ def test_lookup(mock_socket: MagicMock) -> None:
     auth = auth_unix("machine", 1000, 1000, [])
     auth.credentials.stamp = 1746967341
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
-    parent_handle = FileHandle3(
+    parent_handle = FileHandle(
         opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4"
     )
     result = nfs_client.lookup("dir1", parent_handle)
@@ -228,39 +228,39 @@ def test_lookup(mock_socket: MagicMock) -> None:
     mock_sock_instance.sendall.assert_called_with(readdir_request_header + lookup_request)
 
     # Verify that the result of the call equals the result
-    assert result == Lookup3resok(
-        object=FileHandle3(
+    assert result == LookupResult(
+        object=FileHandle(
             opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb41\x12\xf2\x02\x8f\x9958"  # noqa: E501
         ),
-        obj_attributes=FileAttributes3(
-            type=FileType3.DIR,
+        obj_attributes=FileAttributes(
+            type=FileType.DIR,
             mode=509,
             nlink=3,
             uid=1000,
             gid=1000,
             size=4096,
             used=4096,
-            rdev=SpecData3(specdata1=0, specdata2=0),
+            rdev=SpecData(specdata1=0, specdata2=0),
             fsid=6445101292235666701,
             fileid=49418801,
-            atime=NfsTime3(seconds=1739291223, nseconds=956482801),
-            mtime=NfsTime3(seconds=1739177123, nseconds=781565699),
-            ctime=NfsTime3(seconds=1739177123, nseconds=781565699),
+            atime=NfsTime(seconds=1739291223, nseconds=956482801),
+            mtime=NfsTime(seconds=1739177123, nseconds=781565699),
+            ctime=NfsTime(seconds=1739177123, nseconds=781565699),
         ),
-        dir_attributes=FileAttributes3(
-            type=FileType3.DIR,
+        dir_attributes=FileAttributes(
+            type=FileType.DIR,
             mode=504,
             nlink=3,
             uid=1000,
             gid=1000,
             size=4096,
             used=4096,
-            rdev=SpecData3(specdata1=0, specdata2=0),
+            rdev=SpecData(specdata1=0, specdata2=0),
             fsid=6445101292235666701,
             fileid=49161946,
-            atime=NfsTime3(seconds=1739292123, nseconds=592615646),
-            mtime=NfsTime3(seconds=1739186229, nseconds=338841899),
-            ctime=NfsTime3(seconds=1739291612, nseconds=691600114),
+            atime=NfsTime(seconds=1739292123, nseconds=592615646),
+            mtime=NfsTime(seconds=1739186229, nseconds=338841899),
+            ctime=NfsTime(seconds=1739291612, nseconds=691600114),
         ),
     )
 
@@ -280,7 +280,7 @@ def test_getattr(mock_socket: MagicMock) -> None:
     auth = auth_unix("machine", 1000, 1000, [])
     auth.credentials.stamp = 3824037191
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
-    file_handle = FileHandle3(
+    file_handle = FileHandle(
         opaque=b"\x01\x00\x07\x00\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4"
     )
     result = nfs_client.getattr(file_handle)
@@ -290,20 +290,20 @@ def test_getattr(mock_socket: MagicMock) -> None:
     mock_sock_instance.sendall.assert_called_with(readdir_request_header + getattr_request)
 
     # Verify that the result of the call equals the result
-    assert result == FileAttributes3(
-        type=FileType3.DIR,
+    assert result == FileAttributes(
+        type=FileType.DIR,
         mode=504,
         nlink=3,
         uid=1000,
         gid=1000,
         size=4096,
         used=4096,
-        rdev=SpecData3(specdata1=0, specdata2=0),
+        rdev=SpecData(specdata1=0, specdata2=0),
         fsid=6445101292235666701,
         fileid=49161946,
-        atime=NfsTime3(seconds=1739435765, nseconds=521324780),
-        mtime=NfsTime3(seconds=1739186229, nseconds=338841899),
-        ctime=NfsTime3(seconds=1739291612, nseconds=691600114),
+        atime=NfsTime(seconds=1739435765, nseconds=521324780),
+        mtime=NfsTime(seconds=1739186229, nseconds=338841899),
+        ctime=NfsTime(seconds=1739291612, nseconds=691600114),
     )
 
 
@@ -322,7 +322,7 @@ def test_readlink(mock_socket: MagicMock) -> None:
     auth = auth_unix("machine", 1000, 1000, [])
     auth.credentials.stamp = 1668888506
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
-    file_handle = FileHandle3(
+    file_handle = FileHandle(
         opaque=b"\x01\x00\x07\x02\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x0f{\xee\x02\xefoz\xef\xda&\xee\x02'/\x00\x91"  # noqa: E501
     )
     result = nfs_client.readlink(file_handle)
@@ -337,7 +337,7 @@ def test_readlink(mock_socket: MagicMock) -> None:
 
 def test_readfile(rpc_client: MagicMock) -> None:
     nfs_client = NfsClient(rpc_client)
-    file_handle = FileHandle3(opaque=b"file_handle")
+    file_handle = FileHandle(opaque=b"file_handle")
 
     # Generate random binary data of 2.5 times the READ_CHUNK_SIZE
     data_size = int(2.5 * NfsClient.READ_CHUNK_SIZE)
