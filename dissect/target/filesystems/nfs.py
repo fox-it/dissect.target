@@ -10,10 +10,10 @@ from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.nfs.client.nfs import Client
 from dissect.target.helpers.nfs.nfs3 import (
-    EntryPlus3,
-    FileAttributes3,
-    FileHandle3,
-    FileType3,
+    EntryPlus,
+    FileAttributes,
+    FileHandle,
+    FileType,
 )
 
 ClientFactory = Callable[[], Client]
@@ -27,7 +27,7 @@ class NfsFilesystem(Filesystem):
 
     __type__ = "nfs"
 
-    def __init__(self, client_factory: ClientFactory, root_handle: FileHandle3):
+    def __init__(self, client_factory: ClientFactory, root_handle: FileHandle):
         super().__init__()
         self._client_factory = client_factory
         self._backing_client = None
@@ -57,16 +57,14 @@ class NfsFilesystem(Filesystem):
 
 class NfsFilesystemEntry(FilesystemEntry):
     fs: NfsFilesystem
-    entry: FileHandle3
+    entry: FileHandle
 
-    def __init__(
-        self, fs: NfsFilesystem, path: str, file_handle: FileHandle3, attributes: FileAttributes3 | None = None
-    ):
+    def __init__(self, fs: NfsFilesystem, path: str, file_handle: FileHandle, attributes: FileAttributes | None = None):
         super().__init__(fs, path, file_handle)
         self._backing_attributes = attributes
 
     @property
-    def _attributes(self) -> FileAttributes3:
+    def _attributes(self) -> FileAttributes:
         if self._backing_attributes is None:
             self._backing_attributes = self.fs._client.getattr(self.entry)
         return self._backing_attributes
@@ -81,16 +79,16 @@ class NfsFilesystemEntry(FilesystemEntry):
         if follow_symlinks and self.is_symlink():
             return self.readlink_ext().is_file()
 
-        return self._attributes.type == FileType3.REG
+        return self._attributes.type == FileType.REG
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         if follow_symlinks and self.is_symlink():
             return self.readlink_ext().is_dir()
 
-        return self._attributes.type == FileType3.DIR
+        return self._attributes.type == FileType.DIR
 
     def is_symlink(self) -> bool:
-        return self._attributes.type == FileType3.LNK
+        return self._attributes.type == FileType.LNK
 
     def readlink(self) -> str:
         return self.fs._client.readlink(self.entry)
@@ -99,7 +97,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         target = self.fs._client.readlink(self.entry)
         return self.get(target)
 
-    def _iterdir(self) -> Iterator[EntryPlus3]:
+    def _iterdir(self) -> Iterator[EntryPlus]:
         if not self.is_dir():
             raise NotADirectoryError(self.path)
 
@@ -148,19 +146,19 @@ class NfsFilesystemEntry(FilesystemEntry):
 
         return st_info
 
-    def _mode_file_type(self, type: FileType3) -> int:
-        if type == FileType3.DIR:
+    def _mode_file_type(self, type: FileType) -> int:
+        if type == FileType.DIR:
             return stat.S_IFDIR
-        elif type == FileType3.REG:
+        elif type == FileType.REG:
             return stat.S_IFREG
-        elif type == FileType3.LNK:
+        elif type == FileType.LNK:
             return stat.S_IFLNK
         else:
             return 0o000000
 
 
 class NfsStream(AlignedStream):
-    def __init__(self, client: Client, file_handle: FileHandle3, size: int | None):
+    def __init__(self, client: Client, file_handle: FileHandle, size: int | None):
         super().__init__(size, Client.READ_CHUNK_SIZE)
         self._client = client
         self._file_handle = file_handle

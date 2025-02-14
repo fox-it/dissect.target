@@ -4,20 +4,20 @@ from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Iterator, NamedTuple, TypeVar
 
 from dissect.target.helpers.nfs.nfs3 import (
-    CookieVerf3,
-    DirOpArgs3,
-    EntryPlus3,
-    FileAttributes3,
-    FileHandle3,
+    CookieVerf,
+    DirOpArgs,
+    EntryPlus,
+    FileAttributes,
+    FileHandle,
     GetAttrProc,
-    Lookup3resok,
     LookupProc,
-    Nfs3Stat,
-    Read3args,
+    LookupResult,
+    NfsStat,
     ReadDirPlusParams,
     ReadDirPlusProc,
     ReadFileProc,
     ReadLinkProc,
+    ReadParams,
 )
 from dissect.target.helpers.nfs.serializer import (
     DirOpArgs3Serializer,
@@ -46,7 +46,7 @@ Verifier = TypeVar("Verifier")
 
 
 class NfsError(Exception):
-    def __init__(self, message: str, nfsstat: Nfs3Stat):
+    def __init__(self, message: str, nfsstat: NfsStat):
         super().__init__(message)
         self.message = message
         self.nfsstat = nfsstat
@@ -56,8 +56,8 @@ class NfsError(Exception):
 
 
 class ReadDirResult(NamedTuple):
-    dir_attributes: FileAttributes3 | None
-    entries: list[EntryPlus3]
+    dir_attributes: FileAttributes | None
+    entries: list[EntryPlus]
 
 
 class Client(AbstractContextManager):
@@ -92,12 +92,12 @@ class Client(AbstractContextManager):
 
         self._rpc_client = self._rpc_client.rebind_auth(auth)
 
-    def readdir(self, dir: FileHandle3) -> ReadDirResult | Nfs3Stat:
+    def readdir(self, dir: FileHandle) -> ReadDirResult | NfsStat:
         """Read the contents of a directory, including file attributes."""
 
-        entries = list[EntryPlus3]()
+        entries = list[EntryPlus]()
         cookie = 0
-        cookieverf = CookieVerf3(b"\x00")
+        cookieverf = CookieVerf(b"\x00")
         read_deserializer = NfsResultDeserializer(ReadDirPlusResultDeserializer())
 
         # Multiple calls might be needed to read the entire directory
@@ -105,7 +105,7 @@ class Client(AbstractContextManager):
             args = ReadDirPlusParams(dir, cookie, cookieverf, dir_count=self.DIR_COUNT, max_count=self.MAX_COUNT)
 
             result = self._rpc_client.call(ReadDirPlusProc, args, ReadDirPlusParamsSerializer(), read_deserializer)
-            if isinstance(result, Nfs3Stat):
+            if isinstance(result, NfsStat):
                 raise NfsError("Failed to read dir", result)
 
             entries += result.entries
@@ -115,15 +115,15 @@ class Client(AbstractContextManager):
             cookie = result.entries[-1].cookie
             cookieverf = result.cookieverf
 
-    def readfile(self, handle: FileHandle3, offset: int = 0, size: int = -1) -> Iterator[bytes]:
+    def readfile(self, handle: FileHandle, offset: int = 0, size: int = -1) -> Iterator[bytes]:
         """Read a file by its file handle."""
         bytes_left = size
         read_deserializer = NfsResultDeserializer(Read3ResultDeserializer())
         while size == -1 or bytes_left > 0:
             count = self.READ_CHUNK_SIZE if size == -1 else min(self.READ_CHUNK_SIZE, size)
-            params = Read3args(handle, offset, count)
+            params = ReadParams(handle, offset, count)
             result = self._rpc_client.call(ReadFileProc, params, Read3ArgsSerializer(), read_deserializer)
-            if isinstance(result, Nfs3Stat):
+            if isinstance(result, NfsStat):
                 raise NfsError("Failed to read file", result)
             yield result.data
             if result.eof:
@@ -131,32 +131,32 @@ class Client(AbstractContextManager):
             offset += result.count
             bytes_left -= result.count
 
-    def lookup(self, name: str, parent: FileHandle3) -> Lookup3resok:
+    def lookup(self, name: str, parent: FileHandle) -> LookupResult:
         """Lookup a file by name in a directory."""
 
-        args = DirOpArgs3(parent, name)
+        args = DirOpArgs(parent, name)
         lookup_deserializer = NfsResultDeserializer(Lookup3ResultDeserializer())
         result = self._rpc_client.call(LookupProc, args, DirOpArgs3Serializer(), lookup_deserializer)
-        if isinstance(result, Nfs3Stat):
+        if isinstance(result, NfsStat):
             raise NfsError("Failed to lookup file", result)
 
         return result
 
-    def getattr(self, handle: FileHandle3) -> FileAttributes3:
+    def getattr(self, handle: FileHandle) -> FileAttributes:
         """Get the attributes of a file by its file handle."""
 
         attr_deserializer = NfsResultDeserializer(FileAttributesSerializer())
         result = self._rpc_client.call(GetAttrProc, handle.opaque, OpaqueVarLengthSerializer(), attr_deserializer)
-        if isinstance(result, Nfs3Stat):
+        if isinstance(result, NfsStat):
             raise NfsError("Failed to get attributes", result)
 
         return result
 
-    def readlink(self, handle: FileHandle3) -> str:
+    def readlink(self, handle: FileHandle) -> str:
         """Read the target of a symlink by its file handle."""
         link_deserializer = NfsResultDeserializer(ReadLink3ResultDeserializer())
         result = self._rpc_client.call(ReadLinkProc, handle.opaque, OpaqueVarLengthSerializer(), link_deserializer)
-        if isinstance(result, Nfs3Stat):
+        if isinstance(result, NfsStat):
             raise NfsError("Failed to read link", result)
 
         return result.target

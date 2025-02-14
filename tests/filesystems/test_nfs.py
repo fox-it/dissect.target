@@ -6,12 +6,12 @@ import pytest
 
 from dissect.target.filesystems.nfs import NfsFilesystem, NfsFilesystemEntry, NfsStream
 from dissect.target.helpers.nfs.nfs3 import (
-    EntryPlus3,
-    FileAttributes3,
-    FileHandle3,
-    FileType3,
-    NfsTime3,
-    SpecData3,
+    EntryPlus,
+    FileAttributes,
+    FileHandle,
+    FileType,
+    NfsTime,
+    SpecData,
 )
 
 
@@ -24,27 +24,27 @@ def mock_nfs_client() -> Iterator[MagicMock]:
 @pytest.fixture
 def nfs_filesystem(mock_nfs_client: MagicMock) -> NfsFilesystem:
     client_factory = MagicMock(return_value=mock_nfs_client)
-    root_handle = FileHandle3(opaque=b"root_handle")
+    root_handle = FileHandle(opaque=b"root_handle")
     return NfsFilesystem(client_factory, root_handle)
 
 
 @pytest.fixture
 def nfs_filesystem_entry(nfs_filesystem: NfsFilesystem) -> NfsFilesystemEntry:
-    file_handle = FileHandle3(opaque=b"file_handle")
-    attributes = FileAttributes3(
-        type=FileType3.REG,
+    file_handle = FileHandle(opaque=b"file_handle")
+    attributes = FileAttributes(
+        type=FileType.REG,
         mode=0o644,
         nlink=1,
         uid=1000,
         gid=1000,
         size=1024,
         used=1024,
-        rdev=SpecData3(8, 9),
+        rdev=SpecData(8, 9),
         fsid=0,
         fileid=0,
-        atime=NfsTime3(1, 2),
-        mtime=NfsTime3(3, 4),
-        ctime=NfsTime3(5, 6),
+        atime=NfsTime(1, 2),
+        mtime=NfsTime(3, 4),
+        ctime=NfsTime(5, 6),
     )
     return NfsFilesystemEntry(nfs_filesystem, "/file", file_handle, attributes)
 
@@ -58,59 +58,59 @@ def test_get_root(nfs_filesystem: NfsFilesystem) -> None:
 
 def test_get_subdirectory(nfs_filesystem: NfsFilesystem, mock_nfs_client: MagicMock) -> None:
     mock_nfs_client.lookup.return_value = MagicMock(
-        object=FileHandle3(opaque=b"subdir_handle"), obj_attributes=MagicMock()
+        object=FileHandle(opaque=b"subdir_handle"), obj_attributes=MagicMock()
     )
     entry = nfs_filesystem.get("/subdir")
-    mock_nfs_client.lookup.assert_called_with("subdir", FileHandle3(opaque=b"root_handle"))
+    mock_nfs_client.lookup.assert_called_with("subdir", FileHandle(opaque=b"root_handle"))
     assert isinstance(entry, NfsFilesystemEntry)
     assert entry.path == "subdir"
     assert entry.entry.opaque == b"subdir_handle"
 
 
 def test_is_file(nfs_filesystem_entry: NfsFilesystemEntry) -> None:
-    nfs_filesystem_entry._attributes.type = FileType3.REG
+    nfs_filesystem_entry._attributes.type = FileType.REG
     assert nfs_filesystem_entry.is_file()
 
 
 def test_is_dir(nfs_filesystem_entry: NfsFilesystemEntry) -> None:
-    nfs_filesystem_entry._attributes.type = FileType3.DIR
+    nfs_filesystem_entry._attributes.type = FileType.DIR
     assert nfs_filesystem_entry.is_dir()
 
 
 def test_is_symlink(nfs_filesystem_entry: NfsFilesystemEntry) -> None:
-    nfs_filesystem_entry._attributes.type = FileType3.LNK
+    nfs_filesystem_entry._attributes.type = FileType.LNK
     assert nfs_filesystem_entry.is_symlink()
 
 
 def test_readlink(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMock) -> None:
     mock_nfs_client.readlink.return_value = "/target"
     target = nfs_filesystem_entry.readlink()
-    mock_nfs_client.readlink.assert_called_with(FileHandle3(opaque=b"file_handle"))
+    mock_nfs_client.readlink.assert_called_with(FileHandle(opaque=b"file_handle"))
     assert target == "/target"
 
 
 def test_iterdir(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: MagicMock) -> None:
-    nfs_filesystem_entry._attributes.type = FileType3.DIR
+    nfs_filesystem_entry._attributes.type = FileType.DIR
     mock_nfs_client.readdir.return_value = MagicMock(
         entries=[
-            EntryPlus3(
+            EntryPlus(
                 fileid=1,
                 cookie=1,
                 name="file1",
-                handle=FileHandle3(opaque=b"file1_handle"),
+                handle=FileHandle(opaque=b"file1_handle"),
                 attributes=nfs_filesystem_entry._attributes,
             ),
-            EntryPlus3(
+            EntryPlus(
                 fileid=2,
                 cookie=2,
                 name="file2",
-                handle=FileHandle3(opaque=b"file2_handle"),
+                handle=FileHandle(opaque=b"file2_handle"),
                 attributes=nfs_filesystem_entry._attributes,
             ),
         ]
     )
     entries = list(nfs_filesystem_entry.iterdir())
-    mock_nfs_client.readdir.assert_called_with(FileHandle3(opaque=b"file_handle"))
+    mock_nfs_client.readdir.assert_called_with(FileHandle(opaque=b"file_handle"))
     assert entries == ["file1", "file2"]
 
 
@@ -141,4 +141,4 @@ def test_stream_read(nfs_filesystem_entry: NfsFilesystemEntry, mock_nfs_client: 
     stream = nfs_filesystem_entry.open()
     data = stream.read()
     assert data == b"hello world"
-    mock_nfs_client.readfile.assert_called_with(FileHandle3(opaque=b"file_handle"), 0, -1)
+    mock_nfs_client.readfile.assert_called_with(FileHandle(opaque=b"file_handle"), 0, -1)

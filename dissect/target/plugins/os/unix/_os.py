@@ -14,7 +14,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import MountProc, Nfs3Stat, NfsProgram, NfsVersion
+from dissect.target.helpers.nfs.nfs3 import MountProc, NfsProgram, NfsStat, NfsVersion
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.helpers.sunrpc.client import (
     Client,
@@ -321,7 +321,7 @@ class UnixPlugin(OSPlugin):
                     nfs_client.readdir(mount_result.filehandle)
                     return nfs_client
                 except NfsError as e:
-                    if e.nfsstat != Nfs3Stat.ERR_ACCES:
+                    if e.nfsstat != NfsStat.ERR_ACCES:
                         self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
                         nfs_client.close()
                         raise e
