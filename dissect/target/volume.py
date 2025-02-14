@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, BinaryIO, Iterator
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers import keychain
@@ -10,7 +10,6 @@ from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.utils import readinto
 
 if TYPE_CHECKING:
-    from dissect.target.container import Container
     from dissect.target.filesystem import Filesystem
     from dissect.target.volumes.disk import DissectVolumeSystem
 
@@ -53,7 +52,7 @@ class VolumeSystem:
 
     Args:
         fh: The source file-like object(s) on which to open the volume system.
-        dsk: A reference to the source disk or container.
+        disk: A reference to the source disk or container. Defaults to ``fh`` if not provided.
         serial: Serial number of the volume system, if any.
     """
 
@@ -63,10 +62,10 @@ class VolumeSystem:
     """A short string identifying the type of volume system."""
 
     def __init__(
-        self, fh: Union[BinaryIO, list[BinaryIO]], dsk: Optional[Container] = None, serial: Optional[str] = None
+        self, fh: BinaryIO | list[BinaryIO], disk: BinaryIO | list[BinaryIO] | None = None, serial: str | None = None
     ):
         self.fh = fh
-        self.disk = dsk or fh  # Provide shorthand access to source disk
+        self.disk = disk or fh
         self.serial = serial
         self._volumes_list: list[Volume] = None
 
@@ -243,7 +242,7 @@ class Volume(io.IOBase):
         name: The name of the volume.
         guid: The unique identifier of the volume.
         raw: A reference to the implementation specific object that the volume system uses for representing the volume.
-        disk: A reference to the associated :class:`~dissect.volume.disk.Disk`.
+        disk: A reference to the associated :class:`~dissect.target.container.Container`.
         vs: A reference to the associated :class:`VolumeSystem`.
         fs: A reference to the :class:`~dissect.target.filesystem.Filesystem` that is on this ``Volume``.
         drive_letter: The letter associated to the ``Volume``, such as `c` or `d` in Windows.
@@ -253,16 +252,16 @@ class Volume(io.IOBase):
         self,
         fh: BinaryIO,
         number: int,
-        offset: Optional[int],
+        offset: int | None,
         size: int,
-        vtype: Optional[int],
-        name: Optional[str],
-        guid: Optional[str] = None,
-        raw: Optional[BinaryIO] = None,
-        disk: Optional[BinaryIO] = None,
-        vs: Optional[VolumeSystem] = None,
-        fs: Optional[Filesystem] = None,
-        drive_letter: Optional[str] = None,
+        vtype: int | None,
+        name: str | None,
+        guid: str | None = None,
+        raw: Any | None = None,
+        disk: BinaryIO | list[BinaryIO] | None = None,
+        vs: VolumeSystem | None = None,
+        fs: Filesystem | None = None,
+        drive_letter: str | None = None,
     ):
         self.fh = fh
         self.number = number

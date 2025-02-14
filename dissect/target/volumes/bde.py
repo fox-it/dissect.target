@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import pathlib
-from typing import BinaryIO, Iterator, Union
+from typing import BinaryIO, Iterator
 
 from dissect.fve import bde
 from dissect.util.stream import AlignedStream
@@ -19,7 +21,7 @@ class BitlockerVolumeSystemError(VolumeSystemError):
 class BitlockerVolumeSystem(EncryptedVolumeSystem):
     __type__ = "bitlocker"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.bde = bde.BDE(fh)
 
@@ -49,6 +51,7 @@ class BitlockerVolumeSystem(EncryptedVolumeSystem):
             fh=stream,
             size=stream.size,
             raw=self.fh,
+            disk=self.disk,
             vs=self,
             **volume_details,
         )
