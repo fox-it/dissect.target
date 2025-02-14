@@ -67,7 +67,7 @@ def generate_argparse_for_bound_method(
     method: Callable,
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
-    """Generate an ``argparse.ArgumentParser`` for a bound ``Plugin` class method."""
+    """Generate an ``argparse.ArgumentParser`` for a bound ``Plugin`` class method."""
 
     # allow functools.partial wrapped method
     while hasattr(method, "func"):

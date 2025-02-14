@@ -1,4 +1,5 @@
 import os
+import textwrap
 from functools import reduce
 from pathlib import Path
 from typing import Iterator, Optional
@@ -31,6 +32,8 @@ from dissect.target.plugin import (
     find_functions,
     get_external_module_paths,
     load,
+    load_modules_from_paths,
+    lookup,
     plugins,
 )
 from dissect.target.plugins.os.default._os import DefaultPlugin
@@ -75,6 +78,96 @@ def test_load_module_paths() -> None:
 def test_load_paths_with_env() -> None:
     with patch.object(os, "environ", {"DISSECT_PLUGINS": ":"}):
         assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
+    code = """
+        from dissect.target.plugin import Plugin, export
+
+        class MyPlugin(Plugin):
+            __namespace__ = {!r}
+
+            @export
+            def my_function(self):
+                return "My function"
+    """
+
+    (tmp_path / "myplugin").mkdir()
+    (tmp_path / "myplugin" / "__init__.py").write_text("")
+    (tmp_path / "myplugin" / "_plugin.py").write_text(textwrap.dedent(code.format(None)))
+
+    (tmp_path / "mypluginns").mkdir()
+    (tmp_path / "mypluginns" / "__init__.py").write_text("")
+    (tmp_path / "mypluginns" / "_plugin.py").write_text(textwrap.dedent(code.format("myns")))
+
+    load_modules_from_paths([tmp_path])
+
+    assert mock_plugins.__functions__.__regular__ == {
+        "my_function": {
+            "myplugin.MyPlugin": FunctionDescriptor(
+                name="my_function",
+                namespace=None,
+                path="myplugin.my_function",
+                exported=True,
+                internal=False,
+                findable=True,
+                output="default",
+                method_name="my_function",
+                module="myplugin._plugin",
+                qualname="MyPlugin",
+            )
+        },
+        "myns": {
+            "mypluginns.MyPlugin": FunctionDescriptor(
+                name="myns",
+                namespace="myns",
+                path="mypluginns",
+                exported=True,
+                internal=False,
+                findable=True,
+                output=None,
+                method_name="__call__",
+                module="mypluginns._plugin",
+                qualname="MyPlugin",
+            )
+        },
+        "myns.my_function": {
+            "mypluginns.MyPlugin": FunctionDescriptor(
+                name="myns.my_function",
+                namespace="myns",
+                path="mypluginns.my_function",
+                exported=True,
+                internal=False,
+                findable=True,
+                output="default",
+                method_name="my_function",
+                module="mypluginns._plugin",
+                qualname="MyPlugin",
+            )
+        },
+    }
+
+    assert mock_plugins.__plugins__.__regular__ == {
+        "myplugin.MyPlugin": PluginDescriptor(
+            module="myplugin._plugin",
+            qualname="MyPlugin",
+            namespace=None,
+            path="myplugin",
+            findable=True,
+            functions=["my_function"],
+            exports=["my_function"],
+        ),
+        "mypluginns.MyPlugin": PluginDescriptor(
+            module="mypluginns._plugin",
+            qualname="MyPlugin",
+            namespace="myns",
+            path="mypluginns",
+            findable=True,
+            functions=["my_function", "__call__"],
+            exports=["my_function", "__call__"],
+        ),
+    }
 
 
 class MockOSWarpPlugin(OSPlugin):
@@ -334,6 +427,24 @@ def test_namespace_plugin(target_win: Target) -> None:
             @export(output="yield")
             def test(self):
                 yield "faulty"
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_namespace_plugin_registration(mock_plugins: PluginRegistry) -> None:
+    class _TestNSPlugin(NamespacePlugin):
+        __namespace__ = "NS"
+
+    class _TestSubPlugin1(_TestNSPlugin):
+        __namespace__ = "t1"
+
+        @export(record=TestRecord)
+        def test(self):
+            ...
+
+    assert next(lookup("NS")).exported
+    assert next(lookup("NS.test")).exported
+    assert next(lookup("t1")).exported
+    assert next(lookup("t1.test")).exported
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
