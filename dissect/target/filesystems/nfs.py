@@ -2,39 +2,94 @@ from __future__ import annotations
 
 import stat
 from functools import cached_property
-from typing import BinaryIO, Callable, Iterator
+from typing import BinaryIO, Callable, Iterator, TypeVar
 
 from dissect.util.stream import AlignedStream
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
-from dissect.target.helpers.nfs.client.nfs import Client
+from dissect.target.helpers.nfs.client.mount import Client as MountClient
+from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.nfs3 import (
     EntryPlus,
     FileAttributes,
     FileHandle,
     FileType,
+    MountProc,
+    NfsProgram,
+    NfsVersion,
 )
+from dissect.target.helpers.sunrpc.client import AuthScheme
+from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
+from dissect.target.helpers.sunrpc.client import FreePrivilegedPortType, auth_null
 
-ClientFactory = Callable[[], Client]
+ConCredentials = TypeVar("ConCredentials")
+ConVerifier = TypeVar("ConVerifier")
+
+ClientFactory = Callable[[], NfsClient]
+
+# Set auth scheme programmatically, given a root filehandle and a list of supported auth flavors
+# Example: Trying multiple auth schemes until one works
+AuthSetter = Callable[[NfsClient, FileHandle, list[int]], None]
+
+
+class AuthFlavorNotSupported(Exception):
+    def __init__(self, supported_flavors: list[int], provided_flavor: int):
+        self.supported = supported_flavors
+        self.provided = provided_flavor
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__} Auth flavor {self.provided} not supported. Supported flavors: {self.supported}"  # noqa: E501
 
 
 class NfsFilesystem(Filesystem):
     """Filesystem implementation of a NFS share
 
-    The client is lazily constructed
+    The connection is lazily established to not waste resources.
+    Use the ``connect`` method to conveniently create a new instance.
     """
 
     __type__ = "nfs"
 
+    @classmethod
+    def connect(
+        cls,
+        address: str,
+        exported_dir: str,
+        auth: AuthScheme[ConCredentials, ConVerifier] | AuthSetter,
+        local_port: int | FreePrivilegedPortType = 0,
+    ) -> NfsFilesystem:
+        """Utility function to setup a connection to a NFS share.
+
+        Specify a ``AuthSetter`` function to try multiple auth schemes until one works, for example.
+        """
+        with SunRpcClient.connect_port_mapper(address) as port_mapper_client:
+            mount_port = port_mapper_client.query_port_mapping(MountProc.program, version=MountProc.version)
+            nfs_port = port_mapper_client.query_port_mapping(NfsProgram, version=NfsVersion)
+
+        # We eagerly mount the share because the root file handle is required for succesful mounting
+        with MountClient.connect(address, mount_port, local_port) as mount_client:
+            mount = mount_client.mount(exported_dir)
+
+        def client_factory() -> NfsClient:
+            if isinstance(auth, AuthScheme):
+                if auth.flavor not in mount.auth_flavors:
+                    raise AuthFlavorNotSupported(mount.auth_flavors, auth.flavor)
+                return NfsClient.connect(address, nfs_port, auth, local_port)
+
+            client = NfsClient.connect(address, nfs_port, auth_null(), local_port)
+            auth(client, mount.filehandle, mount.auth_flavors)
+            return client
+
+        return NfsFilesystem(client_factory, mount.filehandle)
+
     def __init__(self, client_factory: ClientFactory, root_handle: FileHandle):
         super().__init__()
         self._client_factory = client_factory
-        self._backing_client = None
         self._root_handle = root_handle
 
     @cached_property
-    def _client(self) -> Client:
+    def _client(self) -> NfsClient:
         return self._client_factory()
 
     @staticmethod
@@ -158,8 +213,8 @@ class NfsFilesystemEntry(FilesystemEntry):
 
 
 class NfsStream(AlignedStream):
-    def __init__(self, client: Client, file_handle: FileHandle, size: int | None):
-        super().__init__(size, Client.READ_CHUNK_SIZE)
+    def __init__(self, client: NfsClient, file_handle: FileHandle, size: int | None):
+        super().__init__(size, NfsClient.READ_CHUNK_SIZE)
         self._client = client
         self._file_handle = file_handle
 

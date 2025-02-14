@@ -11,18 +11,11 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.nfs.client.mount import Client as MountClient
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
-from dissect.target.helpers.nfs.nfs3 import MountProc, NfsProgram, NfsStat, NfsVersion
+from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.helpers.sunrpc.client import (
-    Client,
-    FreePrivilegedPort,
-    auth_null,
-    auth_unix,
-)
-from dissect.target.helpers.sunrpc.serializer import AuthFlavor
+from dissect.target.helpers.sunrpc.client import FreePrivilegedPort, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
@@ -285,30 +278,8 @@ class UnixPlugin(OSPlugin):
                     self.target.fs.mount(mount_point, fs)
 
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
-        with Client.connect_port_mapper(address) as port_mapper_client:
-            try:
-                mount_port = port_mapper_client.query_port_mapping(MountProc.program, version=MountProc.version)
-                nfs_port = port_mapper_client.query_port_mapping(NfsProgram, version=NfsVersion)
-            except Exception as e:
-                self.target.log.warning("Failed to connect to portmapper: %s", e)
-                return
-
-        with MountClient.connect(address, mount_port, FreePrivilegedPort) as mount_client:
-            try:
-                mount_result = mount_client.mount(exported_dir)
-            except Exception as e:
-                self.target.log.warning("Mounting NFS gives error code %s", e)
-                return
-
-        if AuthFlavor.AUTH_UNIX not in mount_result.auth_flavors:
-            self.target.log.warning("No AUTH_UNIX auth flavor supported")
-            return
-
-        # Lazily create client because users info is available after os plugin is fully initialized
-        def client_factory() -> NfsClient:
-            nfs_client = NfsClient.connect(address, nfs_port, auth_null(), FreePrivilegedPort)
-
-            # Try all users to see if we can access the share
+        # Try all users to see if we can access the share
+        def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
             for user in self.users():
                 if user.uid is None or user.gid is None:
                     continue
@@ -318,7 +289,7 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Trying to read NFS share with uid %d and gid %d", user.uid, user.gid)
                     # Use a readdir to check if we have access.
                     # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
-                    nfs_client.readdir(mount_result.filehandle)
+                    nfs_client.readdir(filehandle)
                     return nfs_client
                 except NfsError as e:
                     if e.nfsstat != NfsStat.ERR_ACCES:
@@ -326,9 +297,13 @@ class UnixPlugin(OSPlugin):
                         nfs_client.close()
                         raise e
 
-        self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
-        nfs = NfsFilesystem(client_factory, mount_result.filehandle)
-        self.target.fs.mount(mount_point, nfs)
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
+            nfs = NfsFilesystem.connect(address, exported_dir, auth_setter, FreePrivilegedPort)
+            self.target.fs.mount(mount_point, nfs)
+        except Exception as e:
+            self.target.log.warning("Failed to mount NFS share %s:%s at %s", address, exported_dir, mount_point)
+            self.target.log.debug("", exc_info=e)
 
     def _add_devices(self) -> None:
         """Add some virtual block devices to the target.

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
 from dissect.target.helpers.sunrpc.serializer import (
+    AuthFlavor,
     AuthNullSerializer,
     AuthSerializer,
     AuthUnixSerializer,
@@ -35,6 +36,7 @@ Results = TypeVar("Results")
 
 @dataclass
 class AuthScheme(Generic[Credentials, Verifier]):
+    flavor: int
     credentials: Credentials
     verifier: Verifier
     credentials_serializer: AuthSerializer[Credentials]
@@ -42,7 +44,9 @@ class AuthScheme(Generic[Credentials, Verifier]):
 
 
 def auth_null() -> AuthScheme[sunrpc.AuthNull, sunrpc.AuthNull]:
-    return AuthScheme(sunrpc.AuthNull(), sunrpc.AuthNull(), AuthNullSerializer(), AuthNullSerializer())
+    return AuthScheme(
+        AuthFlavor.AUTH_NULL.value, sunrpc.AuthNull(), sunrpc.AuthNull(), AuthNullSerializer(), AuthNullSerializer()
+    )
 
 
 def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthScheme[sunrpc.AuthUnix, sunrpc.AuthNull]:
@@ -52,6 +56,7 @@ def auth_unix(machine: str | None, uid: int, gid: int, gids: list[int]) -> AuthS
         machine = "dissect"
 
     return AuthScheme(
+        AuthFlavor.AUTH_UNIX.value,
         sunrpc.AuthUnix(stamp, machine, uid, gid, gids),
         sunrpc.AuthNull(),
         AuthUnixSerializer(),
