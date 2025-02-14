@@ -117,7 +117,6 @@ class Client(AbstractContextManager):
 
     def readfile(self, handle: FileHandle3, offset: int = 0, size: int = -1) -> Iterator[bytes]:
         """Read a file by its file handle"""
-        offset = 0
         bytes_left = size
         read_deserializer = NfsResultDeserializer(Read3ResultDeserializer())
         while size == -1 or bytes_left > 0:
