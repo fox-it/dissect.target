@@ -30,12 +30,16 @@ from dissect.target.plugin import (
     environment_variable_paths,
     export,
     find_functions,
+    find_functions_by_record_field_type,
+    functions,
     get_external_module_paths,
     load,
     load_modules_from_paths,
     lookup,
     plugins,
 )
+from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
+from dissect.target.plugins.general.users import UsersPlugin
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.target import Target
 
@@ -809,6 +813,24 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     default_os_plugin_desc = plugins(osfilter=target_default._os_plugin, index="__os__")
 
     assert len(list(default_os_plugin_desc)) == 1
+
+
+def test_plugin_runtime_info() -> None:
+    plugin_desc = next(p for p in plugins() if p.path == "general.users")
+    assert plugin_desc.cls is UsersPlugin
+
+    func_desc = next(p for p in functions() if p.path == "apps.other.env.envfile")
+    assert func_desc.cls is EnvironmentFilePlugin
+    assert func_desc.func is EnvironmentFilePlugin.envfile
+    assert func_desc.record is EnvironmentFilePlugin.envfile.__record__
+    assert func_desc.args == EnvironmentFilePlugin.envfile.__args__
+
+
+def test_find_by_record_field_type(target_default: Target) -> None:
+    assert "filesystem.walkfs.walkfs" in [desc.path for desc in find_functions_by_record_field_type("path")]
+    assert "apps.other.env.envfile" in [
+        desc.path for desc in find_functions_by_record_field_type("path", target_default, compatibility=True)
+    ]
 
 
 @pytest.mark.parametrize(
