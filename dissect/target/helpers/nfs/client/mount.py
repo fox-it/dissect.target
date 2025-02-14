@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 
-from dissect.target.helpers.nfs.nfs3 import MountOK3, MountProc, MountStat3
+from dissect.target.helpers.nfs.nfs3 import MountOK, MountProc, MountStat
 from dissect.target.helpers.nfs.serializer import MountResultDeserializer
 from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class MountError(Exception):
-    def __init__(self, message: str, mount_stat: MountStat3):
+    def __init__(self, message: str, mount_stat: MountStat):
         super().__init__(message)
         self.message = message
         self.mount_stat = mount_stat
@@ -48,9 +48,9 @@ class Client(AbstractContextManager):
     def close(self) -> None:
         self._rpc_client.close()
 
-    def mount(self, remote_path: str) -> MountOK3:
+    def mount(self, remote_path: str) -> MountOK:
         result = self._rpc_client.call(MountProc, remote_path, StringSerializer(), MountResultDeserializer())
-        if isinstance(result, MountStat3):
+        if isinstance(result, MountStat):
             raise MountError("Failed to mount nfs share", result)
 
         return result
