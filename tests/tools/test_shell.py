@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Callable, Iterator
 from unittest.mock import MagicMock, call, mock_open, patch
 
-import pexpect
 import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
@@ -26,6 +25,13 @@ from dissect.target.tools.shell import (
 )
 from dissect.target.tools.shell import main as target_shell
 from tests._utils import absolute_path
+
+try:
+    import pexpect
+
+    HAS_PEXPECT = True
+except ImportError:
+    HAS_PEXECPT = False
 
 GREP_MATCH = "test1 and test2"
 GREP_MISSING = "test2 alone"
@@ -363,7 +369,7 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     assert out.find("*** Unhandled error: Token not allowed") > -1
 
 
-@pytest.mark.skipif(platform.system() == "Windows", reason="Test requires pexpect which is not available on Windows.")
+@pytest.mark.skipif(not HAS_PEXPECT, reason="requires pexpect")
 def test_shell_prompt_autocomplete() -> None:
     """Test the prompt autocompletion."""
     target_path = absolute_path("_data/tools/info/image.tar")
