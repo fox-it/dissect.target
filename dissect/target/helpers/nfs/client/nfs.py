@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, Iterator, NamedTuple, TypeVar
 
+from dissect.target.exceptions import Error
 from dissect.target.helpers.nfs.nfs3 import (
     CookieVerf,
     DirOpArgs,
@@ -45,7 +46,7 @@ Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
 
 
-class NfsError(Exception):
+class NfsError(Error):
     def __init__(self, message: str, nfsstat: NfsStat):
         super().__init__(message)
         self.message = message

@@ -8,6 +8,7 @@ from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -296,6 +297,8 @@ class UnixPlugin(OSPlugin):
                         self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
                         nfs_client.close()
                         raise e
+
+            raise FilesystemError("No user has access to NFS share")
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
