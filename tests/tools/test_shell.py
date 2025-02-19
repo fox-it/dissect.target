@@ -363,6 +363,7 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     assert out.find("*** Unhandled error: Token not allowed") > -1
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Test requires pexpect which is not available on Windows.")
 def test_shell_prompt_autocomplete() -> None:
     """Test the prompt autocompletion."""
     target_path = absolute_path("_data/tools/info/image.tar")
