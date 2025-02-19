@@ -115,8 +115,16 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
     TCP_KEEPCNT = 3
 
     @classmethod
-    def connect_port_mapper(cls, hostname: str) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
-        return cls.connect(hostname, cls.PMAP_PORT, auth_null())
+    def connect_port_mapper(
+        cls, hostname: str, timeout_in_seconds: float | None = 5.0
+    ) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
+        return cls.connect(
+            hostname,
+            cls.PMAP_PORT,
+            auth_null(),
+            local_port=0,
+            timeout_in_seconds=timeout_in_seconds,
+        )
 
     @classmethod
     def connect(
@@ -125,6 +133,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         port: int,
         auth: AuthScheme[ConCredentials, ConVerifier],
         local_port: int | FreePrivilegedPortType = 0,
+        timeout_in_seconds: float | None = 5.0,
     ) -> Client[ConCredentials, ConVerifier]:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -138,7 +147,10 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
             cls._bind_free_privileged_port(sock)
         else:
             sock.bind(("", local_port))
+
+        sock.settimeout(timeout_in_seconds)
         sock.connect((hostname, port))
+        sock.settimeout(None)  # Back to blocking mode
 
         return Client(sock, auth)
 

@@ -83,8 +83,9 @@ class Client(AbstractContextManager):
         port: int,
         auth: AuthScheme[Credentials, Verifier],
         local_port: int | FreePrivilegedPortType = 0,
+        timeout_in_seconds: float | None = 5.0,
     ) -> Client:
-        rpc_client = SunRpcClient.connect(hostname, port, auth, local_port)
+        rpc_client = SunRpcClient.connect(hostname, port, auth, local_port, timeout_in_seconds)
         return Client(rpc_client)
 
     def rebind_auth(self, auth: AuthScheme[Credentials, Verifier]) -> None:
