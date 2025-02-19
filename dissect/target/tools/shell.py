@@ -99,7 +99,6 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.use_rawinput = False
         self.debug = False
         self.cyber = cyber
         self.identchars += "."
