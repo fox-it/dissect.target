@@ -31,7 +31,7 @@ try:
 
     HAS_PEXPECT = True
 except ImportError:
-    HAS_PEXECPT = False
+    HAS_PEXPECT = False
 
 GREP_MATCH = "test1 and test2"
 GREP_MISSING = "test2 alone"
