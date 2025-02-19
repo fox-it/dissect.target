@@ -278,7 +278,7 @@ def arg(*args, **kwargs) -> Callable[..., Any]:
         if not hasattr(obj, "__args__"):
             obj.__args__ = []
 
-        obj.__args__.append((args, kwargs))
+        obj.__args__.insert(0, (args, kwargs))
 
         return obj
 
