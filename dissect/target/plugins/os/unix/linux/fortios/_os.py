@@ -45,6 +45,20 @@ FortiOSUserRecord = TargetRecordDescriptor(
 )
 
 
+def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
+    """Create appropriate ``TarFilesystem`` based on file format.
+
+    Args:
+        fileobj: The file-like object of a tar or cpio file
+
+    Returns:
+        TarFilesystem with cpio handler if cpio format is detected.
+    """
+    if open_decompress(fileobj=fileobj).read(4) == b"0707":
+        return TarFilesystem(fileobj, tarinfo=cpio.CpioInfo)
+    return TarFilesystem(fileobj)
+
+
 class FortiOSPlugin(LinuxPlugin):
     """FortiOS plugin for various Fortinet appliances."""
 
@@ -94,10 +108,7 @@ class FortiOSPlugin(LinuxPlugin):
         vfs = None
 
         try:
-            if open_decompress(rootfs).read(4) == b"0707":
-                vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
-            else:
-                vfs = TarFilesystem(rootfs.open())
+            vfs = create_tar_filesystem(rootfs.open())
         except ReadError:
             # The rootfs.gz file could be encrypted.
             try:
@@ -107,7 +118,7 @@ class FortiOSPlugin(LinuxPlugin):
                 target.log.info("Trying to decrypt_rootfs using key: %r", key)
                 rfs_fh = decrypt_rootfs(rootfs.open(), key)
                 target.log.info("Decrypted fh: %r", rfs_fh)
-                vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
+                vfs = create_tar_filesystem(rfs_fh)
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
             except ValueError as e:
@@ -124,7 +135,7 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(BytesIO(datafs_tar.open("rb").read())))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
         target.log.warning("Attempting to load XZ files, this can take a while.")
@@ -137,12 +148,17 @@ class FortiOSPlugin(LinuxPlugin):
             "syntax.tar.xz",
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
-                fh = xz.repair_checksum(tar.open("rb"))
+                fh = xz.repair_checksum(BytesIO(tar.open("rb").read()))
                 target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
+
+        # If there is no /migadmin at this point, check sysvol and map accordingly
+        if not target.fs.exists("/migadmin") and target.fs.exists("/data/migadmin"):
+            target.log.info("Directory migadmin found in sysvol, mapping /migadmin to /data/migadmin")
+            target.fs.map_file_entry("/migadmin", target.fs.get("/data/migadmin"))
 
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.

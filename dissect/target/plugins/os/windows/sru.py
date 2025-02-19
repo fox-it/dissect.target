@@ -1,7 +1,11 @@
-from typing import Iterator, Optional, Union
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Iterator, Union
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import sru
+from dissect.util.ts import wintimestamp
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -340,7 +344,7 @@ FIELD_MAPPINGS = {
 }
 
 
-def transform_app_id(value: Optional[Union[bytes, str]]) -> Optional[str]:
+def transform_app_id(value: bytes | str | None) -> str | None:
     if value is not None:
         if isinstance(value, bytes):
             value = value.decode()
@@ -349,8 +353,16 @@ def transform_app_id(value: Optional[Union[bytes, str]]) -> Optional[str]:
     return value
 
 
+def transform_timestamp(value: int | datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    return wintimestamp(value)
+
+
 TRANSFORMS = {
     "AppId": transform_app_id,
+    "StartTime": transform_timestamp,
+    "EndTime": transform_timestamp,
 }
 
 
@@ -401,7 +413,10 @@ class SRUPlugin(Plugin):
             for column, value in column_values:
                 new_value = value
                 if new_value and (transform := TRANSFORMS.get(column)):
-                    new_value = self.target.fs.path(transform(new_value))
+                    if isinstance((transformed_value := transform(new_value)), str):
+                        new_value = self.target.fs.path(transformed_value)
+                    else:
+                        new_value = transformed_value
                 new_column = FIELD_MAPPINGS.get(column, column)
                 record_values[new_column] = new_value
 
