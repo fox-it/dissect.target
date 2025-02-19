@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 
+from dissect.target.exceptions import Error
 from dissect.target.helpers.nfs.nfs3 import MountOK, MountProc, MountStat
 from dissect.target.helpers.nfs.serializer import MountResultDeserializer
 from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 
-class MountError(Exception):
+class MountError(Error):
     def __init__(self, message: str, mount_stat: MountStat):
         super().__init__(message)
         self.message = message
