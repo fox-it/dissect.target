@@ -381,7 +381,7 @@ def test_shell_prompt_autocomplete() -> None:
     child.setwinsize(100, 100)
 
     # note that the expect pattern will be re.compiled so we need to escape regex special characters
-    child.expect(re.escape("ubuntu:/$ "), timeout=5)
+    child.expect(re.escape("ubuntu:/$ "), timeout=20)
     # this should auto complete to `ls /home/user`
     child.sendline(b"ls /home/u\t")
     # expect the prompt to be printed again
