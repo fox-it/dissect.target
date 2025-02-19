@@ -58,12 +58,13 @@ class NfsFilesystem(Filesystem):
         exported_dir: str,
         auth: AuthScheme[ConCredentials, ConVerifier] | AuthSetter,
         local_port: int | FreePrivilegedPortType = 0,
+        timeout_in_seconds: float | None = 5.0,
     ) -> NfsFilesystem:
         """Utility function to setup a connection to a NFS share.
 
         Specify a ``AuthSetter`` function to try multiple auth schemes until one works, for example.
         """
-        with SunRpcClient.connect_port_mapper(address) as port_mapper_client:
+        with SunRpcClient.connect_port_mapper(address, timeout_in_seconds) as port_mapper_client:
             mount_port = port_mapper_client.query_port_mapping(MountProc.program, version=MountProc.version)
             nfs_port = port_mapper_client.query_port_mapping(NfsProgram, version=NfsVersion)
 

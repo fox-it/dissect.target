@@ -41,8 +41,14 @@ class Client(AbstractContextManager):
         return False  # Reraise exceptions
 
     @classmethod
-    def connect(cls, hostname: str, port: int, local_port: int | FreePrivilegedPortType = 0) -> Client:
-        rpc_client = SunRpcClient.connect(hostname, port, auth_null(), local_port)
+    def connect(
+        cls,
+        hostname: str,
+        port: int,
+        local_port: int | FreePrivilegedPortType = 0,
+        timeout_in_seconds: float | None = 5.0,
+    ) -> Client:
+        rpc_client = SunRpcClient.connect(hostname, port, auth_null(), local_port, timeout_in_seconds)
         return Client(rpc_client)
 
     def close(self) -> None:
