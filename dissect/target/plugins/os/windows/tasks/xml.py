@@ -9,7 +9,7 @@ from flow.record import GroupedRecord, RecordDescriptor
 
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.plugins.os.windows.task_helpers.tasks_records import (
+from dissect.target.plugins.os.windows.tasks.records import (
     BootTriggerRecord,
     ComHandlerRecord,
     EventTriggerRecord,

@@ -52,7 +52,7 @@ def target_unix_factory(tmp_path: Path) -> TargetUnixFactory:
 
 
 @pytest.fixture
-def src_target(target_unix_factory) -> Iterator[Target]:
+def src_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
     target, fs_unix = target_unix_factory.new("src_target")
 
     passwd_contents = PASSWD_CONTENTS + "\nsrc_user:x:1001:1001:src_user:/home/src_user:/bin/bash"
@@ -72,7 +72,7 @@ def src_target(target_unix_factory) -> Iterator[Target]:
 
 
 @pytest.fixture
-def dst_target(target_unix_factory) -> Iterator[Target]:
+def dst_target(target_unix_factory: TargetUnixFactory) -> Iterator[Target]:
     target, fs_unix = target_unix_factory.new("dst_target")
 
     passwd_contents = PASSWD_CONTENTS + "\ndst_user:x:1002:1002:dst_user:/home/dst_user:/bin/bash"
@@ -361,3 +361,25 @@ def test_target_diff_query(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
         assert "differential/record/created" in out
         assert "differential/record/unchanged" in out
         assert "differential/record/deleted" in out
+
+
+def test_target_diff_fs_reverse_read(target_unix_factory: TargetUnixFactory) -> None:
+    """test if we detect the difference in an appended file correctly."""
+
+    src_target, fs_src = target_unix_factory.new("src_target")
+    dst_target, fs_dst = target_unix_factory.new("dst_target")
+    fs_src.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20))
+    fs_dst.map_file_fh("var/log/example.log", BytesIO(b"A" * 1024 * 20 + b"B" * 1024))
+
+    comparison = TargetComparison(src_target, dst_target, deep=True)
+    diff = comparison.scandir("/var/log")
+
+    assert len(diff.modified) == 1
+    assert diff.modified[0].path == "/var/log/example.log"
+    assert diff.modified[0].diff == [
+        b"--- \n",
+        b"+++ \n",
+        b"@@ -1 +1 @@\n",
+        b"-" + b"A" * 10 * 1024,
+        b"+" + (b"A" * 9216) + (b"B" * 1024),
+    ]

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Literal, NamedTuple
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import UnixInterfaceRecord
 from dissect.target.helpers.utils import to_list
-from dissect.target.plugins.general.network import NetworkPlugin
+from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
     from ipaddress import IPv4Address, IPv4Interface, IPv6Address, IPv6Interface
@@ -86,7 +86,7 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
                 source=self.source,
                 last_connected=self.last_connected,
                 name=self.name,
-                mac=[self.mac_address] if self.mac_address else [],
+                mac=to_list(self.mac_address),
                 type=self.type,
                 dhcp_ipv4=self.dhcp_ipv4,
                 dhcp_ipv6=self.dhcp_ipv6,

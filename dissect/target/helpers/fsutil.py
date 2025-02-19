@@ -91,6 +91,7 @@ __all__ = [
     "PureDissectPath",
     "relpath",
     "resolve_link",
+    "reverse_read",
     "reverse_readlines",
     "split",
     "splitdrive",
@@ -563,6 +564,29 @@ def open_decompress(
         return path.open(mode, encoding=encoding, errors=errors, newline=newline)
 
     return file
+
+
+def reverse_read(fh: BinaryIO, chunk_size: int = io.DEFAULT_BUFFER_SIZE, reverse_chunk: bool = True) -> Iterator[bytes]:
+    """Like iterating over chunks of a binary file-like object, but starting from the end of the file.
+
+    Args:
+        fh: The file-like object (opened in binary mode) to read from.
+        chunk_size: The chunk size to use for iterating over bytes (default: 8KB).
+        reverse_chunk: Whether we should reverse the bytes of each chunk (default: True).
+
+    Returns:
+        An iterator of byte chunks, starting from the end of the file-like object and moving to the start.
+    """
+
+    offset = fh.seek(0, io.SEEK_END)
+
+    while offset > 0:
+        if offset < chunk_size:
+            chunk_size = offset
+        offset -= chunk_size
+        fh.seek(offset)
+        buf = fh.read(chunk_size)
+        yield bytes(reversed(buf)) if reverse_chunk else buf
 
 
 def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator[str]:

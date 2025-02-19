@@ -1,20 +1,25 @@
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import arg, find_plugin_functions
+from dissect.target.plugin import arg, find_functions
 from dissect.target.tools.utils import (
     args_to_uri,
     generate_argparse_for_unbound_method,
-    get_target_attribute,
     persist_execution_report,
 )
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
-def test_persist_execution_report():
+
+def test_persist_execution_report() -> None:
     output_path = Path("/tmp/test/path")
     report_data = {
         "item1": {
@@ -62,12 +67,12 @@ def test_args_to_uri(targets: list[str], loader_name: str, rest: list[str], uris
 @pytest.mark.parametrize(
     "pattern, expected_function",
     [
-        ("passwords", "dissect.target.plugins.os.unix.shadow.ShadowPlugin"),
-        ("firefox.passwords", "Unsupported function `firefox` for target"),
+        ("passwords", "dissect.target.plugins.os.unix.shadow"),
+        ("firefox.passwords", "Unsupported function `firefox.passwords`"),
     ],
 )
-def test_plugin_name_confusion_regression(target_unix_users, pattern, expected_function):
-    plugins, _ = find_plugin_functions(target_unix_users, pattern)
+def test_plugin_name_confusion_regression(target_unix_users: Target, pattern: str, expected_function: str) -> None:
+    plugins, _ = find_functions(pattern, target_unix_users)
     assert len(plugins) == 1
 
     # We don't expect these functions to work since our target_unix_users fixture
@@ -75,7 +80,7 @@ def test_plugin_name_confusion_regression(target_unix_users, pattern, expected_f
     # only interested in the plugin or namespace that was called so we check
     # the exception stack trace.
     with pytest.raises(UnsupportedPluginError) as exc_info:
-        get_target_attribute(target_unix_users, plugins[0])
+        target_unix_users.get_function(plugins[0])
 
     assert expected_function in str(exc_info.value)
 
