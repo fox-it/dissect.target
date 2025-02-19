@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import platform
+import re
 import sys
+from collections import ChainMap
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Callable, Iterator
 from unittest.mock import MagicMock, call, mock_open, patch
 
+import pexpect
 import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
@@ -357,3 +361,45 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b+1")
     assert out.find("*** Unhandled error: Token not allowed") > -1
+
+
+def test_shell_prompt_autocomplete() -> None:
+    """Test the prompt autocompletion."""
+    target_path = absolute_path("_data/tools/info/image.tar")
+
+    # We set NO_COLOR=1 so that the output is not colored and easier to match
+    child = pexpect.spawn("target-shell", args=[target_path], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+
+    # increase window size to avoid line wrapping
+    child.setwinsize(100, 100)
+
+    # note that the expect pattern will be re.compiled so we need to escape regex special characters
+    child.expect(re.escape("ubuntu:/$ "), timeout=5)
+    # this should auto complete to `ls /home/user`
+    child.sendline(b"ls /home/u\t")
+    # expect the prompt to be printed again
+    child.expect(re.escape("ls /home/user/\r\n"), timeout=5)
+    # execute the autocompleted command
+    child.send(b"\n")
+    # we expect the files in /home/user to be printed
+    child.expect(re.escape(b".bash_history\r\n.zsh_history\r\n"), timeout=5)
+    child.expect(re.escape("ubuntu:/$ "), timeout=5)
+
+    # send partial ls /etc/ command
+    child.send(b"ls /etc/")
+
+    # we send two TABS to get the list of files in /etc/
+    child.send(b"\t\t")
+
+    # expect the files in /etc/ to be printed
+    child.expect("hosts       localtime   network/    os-release  passwd      shadow      timezone\r\n", timeout=5)
+
+    # send newline to just list everything in /etc/
+    child.send(b"\n")
+    # expect the last few files in /etc/ to be printed
+    child.expect(b"shadow\r\ntimezone\r\n", timeout=5)
+
+    # exit the shell
+    child.expect(re.escape("ubuntu:/$ "), timeout=5)
+    child.sendline("exit")
+    child.expect(pexpect.EOF, timeout=5)
