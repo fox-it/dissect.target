@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import struct
 from io import BytesIO
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import Mock, patch
 
 import pytest
@@ -11,7 +14,7 @@ from dissect.target.exceptions import ContainerError
 
 
 @pytest.fixture
-def mocked_ewf_detect():
+def mocked_ewf_detect() -> Iterator[Mock]:
     mocked_ewf = Mock()
     mocked_ewf.EwfContainer.detect.return_value = True
     mocked_ewf.EwfContainer.detect
@@ -27,18 +30,18 @@ def mocked_ewf_detect():
         ([Path("hello")], [Path("hello")]),
     ],
 )
-def test_open_inputs(mocked_ewf_detect: Mock, path, expected_output):
+def test_open_inputs(mocked_ewf_detect: Mock, path: str | list[str] | Path, expected_output: Path | list[Path]) -> None:
     container.open(path)
     mocked_ewf_detect.assert_called_with(expected_output)
 
 
-def test_open_fallback_fh(tmp_path):
+def test_open_fallback_fh(tmp_path: Path) -> None:
     # Create a valid VHD file
     fake_vhd = (
         (bytes(range(256)) * 2)
         + b"conectix"
         + (b"\x00" * 8)
-        + (b"\xFF" * 8)
+        + (b"\xff" * 8)
         + (b"\x00" * 24)
         + struct.pack(">Q", 512)
         + (b"\x00" * 455)
