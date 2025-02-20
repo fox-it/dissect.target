@@ -370,8 +370,12 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
 
 
 @pytest.mark.skipif(not HAS_PEXPECT, reason="requires pexpect")
-def test_shell_prompt_autocomplete() -> None:
-    """Test the prompt autocompletion."""
+@pytest.mark.skipif(
+    platform.python_implementation() == "PyPy",
+    reason="PyPy's prompt contains too much ANSI escape codes",
+)
+def test_shell_prompt_tab_autocomplete() -> None:
+    """Test the prompt tab-autocompletion."""
     target_path = absolute_path("_data/tools/info/image.tar")
 
     # We set NO_COLOR=1 so that the output is not colored and easier to match
