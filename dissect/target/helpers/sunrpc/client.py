@@ -104,7 +104,7 @@ class FreePrivilegedPortType:
     pass
 
 
-"""Marker type indicating Client should search for a free privileged port"""
+"""Marker type indicating Client should search for a free privileged port."""
 FreePrivilegedPort = FreePrivilegedPortType()
 
 
@@ -118,6 +118,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
     def connect_port_mapper(
         cls, hostname: str, timeout_in_seconds: float | None = 5.0
     ) -> Client[sunrpc.AuthNull, sunrpc.AuthNull]:
+        """Connect to the port mapper service on a remote host."""
         return cls.connect(
             hostname,
             cls.PMAP_PORT,
@@ -135,6 +136,18 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         local_port: int | FreePrivilegedPortType = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> Client[ConCredentials, ConVerifier]:
+        """Connect to a RPC server.
+
+        Args:
+            hostname: The remote hostname.
+            port: The remote port.
+            auth: The authentication scheme.
+            local_port: The local port to bind to.
+                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
+                If ``0``, bind to any free port.
+            timeout_in_seconds: The timeout for making the connection.
+        """
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -156,7 +169,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
 
     @classmethod
     def _bind_free_privileged_port(cls, sock: socket.socket) -> None:
-        """Bind to a free privileged port (1-1023)"""
+        """Bind to a free privileged port (1-1023)."""
         for port in range(1, 1024):
             try:
                 sock.bind(("", port))
@@ -188,13 +201,13 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         self._sock.close()
 
     def rebind_auth(self, auth: AuthScheme[ConCredentials, ConVerifier]) -> Client[ConCredentials, ConVerifier]:
-        """Return a new client with the same socket, but different authentication credentials"""
+        """Return a new client with the same socket, but different authentication credentials."""
         fd = self._sock.detach()  # Move underlying file descriptor to new socket
         new_sock = socket.socket(fileno=fd)
         return Client(new_sock, auth, self._fragment_size)
 
     def query_port_mapping(self, program: int, version: int) -> int:
-        """Query port number of specified program and version"""
+        """Query port number of specified program and version."""
         arg = sunrpc.PortMapping(program=program, version=version, protocol=sunrpc.Protocol.TCP)
         result = self.call(sunrpc.GetPortProc, arg, PortMappingSerializer(), UInt32Serializer())
         if result == 0:
@@ -208,7 +221,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         params_serializer: Serializer[Params],
         result_deserializer: Deserializer[Results],
     ) -> Results:
-        """Synchronously call an RPC procedure and return the result"""
+        """Synchronously call an RPC procedure and return the result."""
 
         call_body = sunrpc.CallBody(
             proc_desc.program,

@@ -172,7 +172,7 @@ ResultType = TypeVar("RT")
 
 # RdJ: Consider implementing in terms of a monadic bind, using generators
 class ResultDeserializer(XdrDeserializer[Union[ResultType, NfsStat]]):
-    """A higher order deserializer that returns a result or an NFS status"""
+    """A higher order deserializer that returns a result or an NFS status."""
 
     def __init__(self, deserializer: XdrDeserializer[ResultType]):
         self._deserializer = deserializer
