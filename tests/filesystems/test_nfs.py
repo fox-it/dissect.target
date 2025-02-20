@@ -67,6 +67,17 @@ def test_get_subdirectory(nfs_filesystem: NfsFilesystem, mock_nfs_client: MagicM
     assert entry.entry.opaque == b"subdir_handle"
 
 
+def test_get_from_entry(mock_nfs_client: MagicMock, nfs_filesystem_entry: NfsFilesystemEntry) -> None:
+    mock_nfs_client.lookup.return_value = MagicMock(
+        object=FileHandle(opaque=b"subdir_handle"), obj_attributes=MagicMock()
+    )
+    entry = nfs_filesystem_entry.get("subdir")
+    mock_nfs_client.lookup.assert_called_with("subdir", nfs_filesystem_entry.entry)
+    assert isinstance(entry, NfsFilesystemEntry)
+    assert entry.path == "subdir"
+    assert entry.entry.opaque == b"subdir_handle"
+
+
 def test_is_file(nfs_filesystem_entry: NfsFilesystemEntry) -> None:
     nfs_filesystem_entry._attributes.type = FileType.REG
     assert nfs_filesystem_entry.is_file()
