@@ -8,8 +8,8 @@ from dissect.target import Target
 from dissect.target.exceptions import InvalidTaskError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.os.windows.task_helpers.tasks_job import AtTask
-from dissect.target.plugins.os.windows.task_helpers.tasks_xml import ScheduledTasks
+from dissect.target.plugins.os.windows.tasks.job import AtTask
+from dissect.target.plugins.os.windows.tasks.xml import ScheduledTasks
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",

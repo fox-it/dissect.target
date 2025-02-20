@@ -25,11 +25,21 @@ class BravePlugin(ChromiumMixin, BrowserPlugin):
     DIRS = [
         # Windows
         "AppData/Local/BraveSoftware/Brave-Browser/User Data/Default",
+        "AppData/Local/BraveSoftware/Brave-Browser/User Data/Profile*",
         "AppData/Roaming/BraveSoftware/Brave-Browser/User Data/Default",
+        "AppData/Roaming/BraveSoftware/Brave-Browser/User Data/Profile*",
         # Linux
         ".config/BraveSoftware/Default",
+        ".config/BraveSoftware/Profile*",
+        ".config/BraveSoftware/Brave-Browser/Default",
+        ".config/BraveSoftware/Brave-Browser/Profile*",
+        "snap/brave/*/.config/BraveSoftware/Brave-Browser/Default",
+        "snap/brave/*/.config/BraveSoftware/Brave-Browser/Profile*",
         # Macos
         "Library/Application Support/BraveSoftware/Default",
+        "Library/Application Support/BraveSoftware/Brave-Browser/Default",
+        "Library/Application Support/BraveSoftware/Profile*",
+        "Library/Application Support/BraveSoftware/Brave-Browser/Profile*",
     ]
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
