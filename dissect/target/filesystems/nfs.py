@@ -67,7 +67,14 @@ class NfsFilesystem(Filesystem):
     ) -> NfsFilesystem:
         """Utility function to setup a connection to a NFS share.
 
-        Specify a ``AuthSetter`` function to try multiple auth schemes until one works, for example.
+        Args:
+            hostname: The remote hostname.
+            port: The remote port.
+            auth: The authentication scheme.
+            local_port: The local port to bind to.
+                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
+                If ``0``, bind to any free port.
+            timeout_in_seconds: The timeout for making the connection.
         """
         with SunRpcClient.connect_port_mapper(address, timeout_in_seconds) as port_mapper_client:
             mount_port = port_mapper_client.query_port_mapping(MountProc.program, version=MountProc.version)

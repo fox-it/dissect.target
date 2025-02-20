@@ -86,6 +86,19 @@ class Client(AbstractContextManager):
         local_port: int | FreePrivilegedPortType = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> Client:
+        """Connect to a NFS server.
+
+        Args:
+            hostname: The remote hostname.
+            port: The remote port.
+            auth: The authentication scheme.
+            local_port: The local port to bind to.
+                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
+                NFS servers usually require a privileged port for the client.
+                If ``0``, bind to any free port.
+            timeout_in_seconds: The timeout for making the connection.
+        """
+
         rpc_client = SunRpcClient.connect(hostname, port, auth, local_port, timeout_in_seconds)
         return Client(rpc_client)
 
