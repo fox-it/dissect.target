@@ -51,6 +51,11 @@ class NfsFilesystem(Filesystem):
 
     __type__ = "nfs"
 
+    def __init__(self, client_factory: ClientFactory, root_handle: FileHandle):
+        super().__init__()
+        self._client_factory = client_factory
+        self._root_handle = root_handle
+
     @classmethod
     def connect(
         cls,
@@ -84,11 +89,6 @@ class NfsFilesystem(Filesystem):
 
         return NfsFilesystem(client_factory, mount.filehandle)
 
-    def __init__(self, client_factory: ClientFactory, root_handle: FileHandle):
-        super().__init__()
-        self._client_factory = client_factory
-        self._root_handle = root_handle
-
     @cached_property
     def _client(self) -> NfsClient:
         return self._client_factory()
@@ -97,13 +97,20 @@ class NfsFilesystem(Filesystem):
     def detect(_: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on a NfsFilesystem class")  # :/
 
-    def get(self, path: str) -> NfsFilesystemEntry:
+    def get(self, path: str, relentry: NfsFilesystemEntry | None = None) -> NfsFilesystemEntry:
+        """Get a filesystem entry.
+
+        Args:
+            path: The path to the entry. The path is relative to ``relentry``, if provided.
+            relentry: The relative entry to start from. If not provided, the root entry is used.
+        """
+
+        current_handle = relentry.entry if relentry else self._root_handle
         path = fsutil.normalize(path, self.alt_separator).strip("/")
 
         if not path:
-            return NfsFilesystemEntry(self, "/", self._root_handle)
+            return NfsFilesystemEntry(self, "/", current_handle)
 
-        current_handle = self._root_handle
         for segment in path.split("/"):
             result = self._client.lookup(segment, current_handle)
             current_handle = result.object
@@ -126,8 +133,8 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
-        path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        return self.fs.get(path)
+        """Get a new filesystem entry relative to this entry"""
+        return self.fs.get(path, relentry=self)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         # Not using _resolve since it upcasts. ("Self" from Python 3.11 would solve this)
@@ -151,7 +158,7 @@ class NfsFilesystemEntry(FilesystemEntry):
 
     def readlink_ext(self) -> NfsFilesystemEntry:
         target = self.fs._client.readlink(self.entry)
-        return self.get(target)
+        return self.fs.get(target)  # The target is an absolute path
 
     def _iterdir(self) -> Iterator[EntryPlus]:
         if not self.is_dir():
