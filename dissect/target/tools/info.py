@@ -13,7 +13,6 @@ from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
@@ -56,12 +55,9 @@ def main():
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
     parser.add_argument("-j", "--json", action="store_true", help="output records as pretty json")
     parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
-    parser.add_argument("-L", "--loader", action="store", default=None, help="select a specific loader (i.e. vmx, raw)")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
-
-    process_generic_arguments(args)
 
     if not args.targets and not args.from_file:
         parser.error("too few arguments")
@@ -75,10 +71,10 @@ def main():
             targets = targets[:-1]
         args.targets = targets
 
-    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
+    process_generic_arguments(args, rest)
 
     try:
-        for i, target in enumerate(Target.open_all(targets)):
+        for i, target in enumerate(Target.open_all(args.targets)):
             try:
                 if args.jsonlines:
                     print(json.dumps(get_target_info(target), default=str))
