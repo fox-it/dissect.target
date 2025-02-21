@@ -359,7 +359,7 @@ class TargetCmd(ExtendedCmd):
             self.prompt_ps1 = "{base}:{cwd}$ "
 
         else:
-            self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
+            self.prompt_ps1 = "\x01\x1b[1;32m\x02{base}\x01\x1b[0m\x02:\x01\x1b[1;34m\x02{cwd}\x01\x1b[0m\x02$ "
 
         super().__init__(self.target.props.get("cyber"))
 
