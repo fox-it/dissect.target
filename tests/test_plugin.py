@@ -112,6 +112,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
                 exported=True,
                 internal=False,
                 findable=True,
+                alias=False,
                 output="default",
                 method_name="my_function",
                 module="myplugin._plugin",
@@ -126,6 +127,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
                 exported=True,
                 internal=False,
                 findable=True,
+                alias=False,
                 output=None,
                 method_name="__call__",
                 module="mypluginns._plugin",
@@ -140,6 +142,7 @@ def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
                 exported=True,
                 internal=False,
                 findable=True,
+                alias=False,
                 output="default",
                 method_name="my_function",
                 module="mypluginns._plugin",
@@ -198,6 +201,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f3",
                         module="test.x13",
@@ -212,6 +216,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f3",
                         module="os",
@@ -226,6 +231,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=False,
+                        alias=False,
                         output="record",
                         method_name="f22",
                         module="test.x69",
@@ -242,6 +248,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f6",
                         module="os.warp._os",
@@ -503,6 +510,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="mail",
                     module="apps.mail",
@@ -517,6 +525,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app1",
                     module="os.apps.app1",
@@ -531,6 +540,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app2",
                     module="os.apps.app2",
@@ -543,6 +553,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app2",
                     module="os.fooos.apps.app2",
@@ -557,6 +568,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foo_app",
                     module="os.foos.apps.foo_app",
@@ -571,6 +583,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="bar_app",
                     module="os.foos.apps.bar_app",
@@ -585,6 +598,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foobar",
                     module="os.foos.foobar",
@@ -601,6 +615,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="generic_os",
                     module="os._os",
@@ -615,6 +630,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foo_os",
                     module="os.fooos._os",
@@ -809,6 +825,60 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     default_os_plugin_desc = plugins(osfilter=target_default._os_plugin, index="__os__")
 
     assert len(list(default_os_plugin_desc)) == 1
+
+
+def test_function_aliases(target_default: Target) -> None:
+    """test if alias functions are tagged as such correctly."""
+
+    # function that is an alias should have an alias property set to True
+    syslog_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "syslog")
+    assert syslog_fd
+    assert syslog_fd.path == "os.unix.log.messages.syslog"
+    assert syslog_fd.exported
+    assert syslog_fd.alias
+
+    # function that is not an alias should have an alias property set to False
+    messages_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "messages")
+    assert messages_fd
+    assert messages_fd.path == "os.unix.log.messages.messages"
+    assert not messages_fd.alias
+
+
+def test_function_required_arguments(target_default: Target) -> None:
+    """test if functions with required arguments are tagged as such correctly."""
+
+    # function without any arguments should have an args property with an empty list
+    syslog_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "syslog")
+    assert syslog_fd
+
+    # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
+    func = getattr(load(syslog_fd), syslog_fd.method_name)
+    assert not hasattr(func, "__args__")
+
+    # function with an argument should have an args property filled
+    envfile_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "envfile")
+    assert envfile_fd
+
+    # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
+    func = getattr(load(envfile_fd), envfile_fd.method_name)
+    assert hasattr(func, "__args__")
+
+    assert func.__args__ == [
+        (
+            ("--env-path",),
+            {
+                "help": "path to scan environment files in",
+                "required": True,
+            },
+        ),
+        (
+            ("--extension",),
+            {
+                "default": "env",
+                "help": "extension of files to scan",
+            },
+        ),
+    ]
 
 
 @pytest.mark.parametrize(

@@ -93,6 +93,7 @@ class FunctionDescriptor:
         "exported",
         "internal",
         "findable",
+        "alias",
         "output",
         "method_name",
         "module",
@@ -105,6 +106,7 @@ class FunctionDescriptor:
     exported: bool
     internal: bool
     findable: bool
+    alias: bool
     output: str | None
     method_name: str
     module: str
@@ -323,6 +325,9 @@ def clone_alias(cls: type, attr: Callable[..., Any], alias: str) -> None:
     clone.__name__ = alias
     clone.__qualname__ = f"{cls.__name__}.{alias}"
 
+    # Mark this clone as an alias
+    clone.__alias__ = True
+
     setattr(cls, alias, clone)
 
 
@@ -358,6 +363,7 @@ class Plugin:
     Finally. :func:`args` decorator sets the ``__args__`` attribute.
 
     The :func:`alias` decorator populates the ``__aliases__`` private attribute of :class:`Plugin` methods.
+    Resulting clones of the :class:`Plugin` are populated with the boolean ``__alias__`` attribute set to ``True``.
 
     Args:
         target: The :class:`~dissect.target.target.Target` object to load the plugin for.
@@ -528,6 +534,7 @@ def register(plugincls: type[Plugin]) -> None:
                         exported=exported,
                         internal=internal,
                         findable=plugincls.__findable__,
+                        alias=getattr(attr, "__alias__", False),
                         output=getattr(attr, "__output__", None),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
@@ -552,6 +559,7 @@ def register(plugincls: type[Plugin]) -> None:
                 exported=bool(len(exports)),
                 internal=bool(len(functions)) and not bool(len(exports)),
                 findable=plugincls.__findable__,
+                alias=getattr(attr, "__alias__", False),
                 output=getattr(plugincls.__call__, "__output__", None),
                 method_name="__call__",
                 module=plugincls.__module__,

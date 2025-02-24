@@ -67,6 +67,7 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
                 "type": getattr(arg.get("type"), "__name__", None),
                 "help": arg.get("help"),
                 "default": arg.get("default"),
+                "required": arg.get("required", False),
             }
             for name, arg in getattr(func, "__args__", [])
         ]
@@ -78,6 +79,7 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
                 "description": docstring,
                 "arguments": arguments,
                 "path": desc.path,
+                "alias": desc.alias,
             }
         )
 
