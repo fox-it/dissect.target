@@ -5,10 +5,14 @@ from pathlib import Path
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.plugin import Plugin, export
 
-CronjobRecord = TargetRecordDescriptor(
+CronjobRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/cronjob",
     [
         ("string", "minute"),
@@ -16,7 +20,6 @@ CronjobRecord = TargetRecordDescriptor(
         ("string", "day"),
         ("string", "month"),
         ("string", "weekday"),
-        ("string", "user"),
         ("string", "command"),
         ("path", "source"),
     ],
@@ -107,6 +110,11 @@ class CronjobPlugin(Plugin):
         """
 
         for file in self.crontabs:
+            # Cronjobs in user crontab files do not have a user field specified.
+            user = None
+            if file.is_relative_to("/var/spool/cron/crontabs"):
+                user = self.target.user_details.find(username=file.name)
+
             for line in file.open("rt"):
                 line = line.strip()
                 if line.startswith("#") or not line:
@@ -115,20 +123,19 @@ class CronjobPlugin(Plugin):
                 if match := RE_CRONJOB.search(line):
                     match = match.groupdict()
 
-                    # Cronjobs in user crontab files do not have a user field specified.
-                    user = None
-                    if file.is_relative_to("/var/spool/cron/crontabs"):
-                        user = file.name
-
                     # We try to infer a possible user from the command. This can lead to false positives,
                     # due to differing implementations of cron across operating systems, which is why
                     # we choose not to change the 'command' from the cron line - unless the command
-                    # starts with the found username plus a tab character.
-                    else:
+                    # starts with the found username plus a tab character. We try to weed out false
+                    # positives by checking the inferred user with the target's users.
+                    if not user:
                         try:
                             inferred_user, _ = re.split(r"\s", match["command"], maxsplit=1)
-                            if not any(i in inferred_user for i in {"/", "="}):
-                                user = inferred_user.strip()
+                            # If the inferred username exists on the target we assign that user to this cronjob.
+                            if user := self.target.user_details.find(username=inferred_user.strip()):
+                                pass
+
+                            # If the inferred username is followed by a tab we remove the username from the command.
                             if match["command"].startswith(inferred_user + "\t"):
                                 match["command"] = match["command"].replace(inferred_user + "\t", "", 1)
                         except ValueError:
@@ -136,8 +143,8 @@ class CronjobPlugin(Plugin):
 
                     yield CronjobRecord(
                         **match,
-                        user=user,
                         source=file,
+                        _user=user.user if user else None,
                         _target=self.target,
                     )
 
