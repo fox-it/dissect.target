@@ -162,6 +162,7 @@ def mock_find_functions(patterns: str, *args, **kwargs) -> tuple[list[FunctionDe
                 exported=True,
                 internal=False,
                 findable=True,
+                alias=False,
                 output="record",
                 method_name=pattern,
                 module=pattern,
@@ -275,6 +276,7 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "description": "Return the users available in the target.",
         "output": "record",
         "arguments": [],
+        "alias": False,
         "path": "os.default._os.users",
     }
 
@@ -285,6 +287,7 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "description": "Yield file and directory names from the plocate.db.",
         "output": "record",
         "arguments": [],
+        "alias": False,
         "path": "os.unix.locate.plocate.locate",
     }
 
@@ -295,5 +298,6 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "description": "Dump SAM entries",
         "output": "record",
         "arguments": [],
+        "alias": False,
         "path": "os.windows.credential.sam.sam",
     }

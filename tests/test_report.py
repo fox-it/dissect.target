@@ -263,6 +263,7 @@ def test_execution_report_log_incompatible_plugin_plugin_desc(
         exported=True,
         internal=False,
         findable=True,
+        alias=False,
         output=None,
         method_name="plugin1",
         module="test_module",
