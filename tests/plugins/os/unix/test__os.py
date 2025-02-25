@@ -97,22 +97,23 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
-    "path, expected_hostname, expected_domain, file_content",
+    ("path", "expected_hostname", "expected_domain", "file_content"),
     [
-        ("/etc/hostname", "myhost", "mydomain.com", "myhost.mydomain.com"),
-        ("/etc/HOSTNAME", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
+        ("/etc/HOSTNAME", "myhost", "mydomain.com", b"myhost.mydomain.com"),
         (
             "/etc/sysconfig/network",
             "myhost",
             "mydomain.com",
-            "NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+            b"NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
         ),
-        ("/etc/hostname", "myhost", None, "myhost"),
-        ("/etc/sysconfig/network", "myhost", None, "NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
-        ("/not_a_valid_hostname_path", None, None, ""),
-        ("/etc/hostname", None, None, ""),
-        ("/etc/sysconfig/network", None, None, ""),
-        ("/proc/sys/kernel/hostname", "myhost", None, "myhost"),
+        ("/etc/hostname", "myhost", None, b"myhost"),
+        ("/etc/sysconfig/network", "myhost", None, b"NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
+        ("/not_a_valid_hostname_path", None, None, b""),
+        ("/etc/hostname", None, None, b""),
+        ("/etc/sysconfig/network", None, None, b""),
+        ("/proc/sys/kernel/hostname", "myhost", None, b"myhost"),
+        ("/etc/hostname", "hostname\\x00", None, b"hostname\x00"),
     ],
 )
 def test_parse_hostname_string(
@@ -123,7 +124,7 @@ def test_parse_hostname_string(
     expected_domain: str,
     file_content: str,
 ) -> None:
-    fs_unix.map_file_fh(path, BytesIO(file_content.encode("ascii")))
+    fs_unix.map_file_fh(path, BytesIO(file_content))
 
     hostname_dict = target_unix._os._parse_hostname_string()
 

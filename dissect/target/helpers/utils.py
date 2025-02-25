@@ -162,3 +162,9 @@ def year_rollover_helper(
                 continue
 
             yield relative_ts.replace(tzinfo=tzinfo), line
+
+
+def sanitize_string(value: str) -> str:
+    """Sanitize the given string from nullbytes."""
+
+    return value.replace("\00", "\\x00")

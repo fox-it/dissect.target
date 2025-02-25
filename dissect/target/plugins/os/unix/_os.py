@@ -11,7 +11,7 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.helpers.utils import parse_options_string
+from dissect.target.helpers.utils import parse_options_string, sanitize_string
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -175,8 +175,7 @@ class UnixPlugin(OSPlugin):
         return hostname
 
     def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
-        """
-        Returns a dict containing the hostname and domain name portion of the path(s) specified
+        """Returns a dict containing the hostname and domain name portion of the path(s) specified.
 
         Args:
             paths (list): list of paths
@@ -204,6 +203,10 @@ class UnixPlugin(OSPlugin):
             else:
                 hostname_dict = {"hostname": None, "domain": None}
             break  # break whenever a valid hostname is found
+
+        # Sanitize hostname by 'escaping' null bytes
+        hostname_dict = {k: sanitize_string(v) if v else None for k, v in hostname_dict.items()}
+
         return hostname_dict
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
