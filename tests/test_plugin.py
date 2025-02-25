@@ -831,14 +831,14 @@ def test_function_aliases(target_default: Target) -> None:
     """test if alias functions are tagged as such correctly."""
 
     # function that is an alias should have an alias property set to True
-    syslog_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "syslog")
+    syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
     assert syslog_fd.path == "os.unix.log.messages.syslog"
     assert syslog_fd.exported
     assert syslog_fd.alias
 
     # function that is not an alias should have an alias property set to False
-    messages_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "messages")
+    messages_fd = find_functions("messages", target_default)[0][0]
     assert messages_fd
     assert messages_fd.path == "os.unix.log.messages.messages"
     assert not messages_fd.alias
@@ -848,7 +848,7 @@ def test_function_required_arguments(target_default: Target) -> None:
     """test if functions with required arguments are tagged as such correctly."""
 
     # function without any arguments should have an args property with an empty list
-    syslog_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "syslog")
+    syslog_fd = find_functions("syslog", target_default)[0][0]
     assert syslog_fd
 
     # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
@@ -856,7 +856,7 @@ def test_function_required_arguments(target_default: Target) -> None:
     assert not hasattr(func, "__args__")
 
     # function with an argument should have an args property filled
-    envfile_fd = next(f for f in find_functions("*", target_default)[0] if f.name == "envfile")
+    envfile_fd = find_functions("envfile", target_default)[0][0]
     assert envfile_fd
 
     # args property does not exist until https://github.com/fox-it/dissect.target/pull/1007 is merged
