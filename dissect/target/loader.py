@@ -101,6 +101,26 @@ class Loader:
         raise NotImplementedError()
 
 
+class SubLoader:
+    """A base class for loading arbitary data and coupling it to a :class:`Target <dissect.target.target.Target>`.
+
+    Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader` and :class:`TarSubLoader` implementations.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
+    @staticmethod
+    def detect(*args) -> bool:
+        raise NotImplementedError()
+
+    def map(target: Target) -> None:
+        raise NotImplementedError()
+
+
 def register(module_name: str, class_name: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
@@ -178,7 +198,6 @@ register("local", "LocalLoader")
 register("remote", "RemoteLoader")
 register("mqtt", "MQTTLoader")
 register("asdf", "AsdfLoader")
-register("containerimage", "ContainerImageLoader")  # Should be before TarLoader
 register("tar", "TarLoader")
 register("vmx", "VmxLoader")
 register("vmwarevm", "VmwarevmLoader")

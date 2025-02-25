@@ -11,7 +11,7 @@ from dissect.target.filesystems.tar import (
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
-from dissect.target.loader import Loader
+from dissect.target.loader import Loader, SubLoader
 
 log = logging.getLogger(__name__)
 
@@ -34,14 +34,94 @@ class TarLoader(Loader):
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
 
-        self.tar = tarfile.open(fileobj=path.open("rb"))
+        from dissect.target.loaders.containerimage import ContainerImageTarSubLoader
+
+        self.SUB_LOADERS = [
+            ContainerImageTarSubLoader,
+            GenericTarSubLoader,  # should be last
+        ]
+
+        self.fh = path.open("rb")
+        self.tar = tarfile.open(mode="r:*", fileobj=self.fh)
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
+        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
 
-    def is_compressed(self, path: Path | str) -> bool:
-        return str(path).lower().endswith((".tar.gz", ".tgz"))
+    def is_compressed(self, path: Path) -> bool:
+        return str(path).lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
+
+    def map(self, target: target.Target) -> None:
+        for candidate in self.SUB_LOADERS:
+            if candidate.detect(self.tar):
+                self.subloader = candidate(self.tar)
+                self.subloader.map(target)
+                break
+
+
+TAR_EXT_COMP = (
+    ".tar.gz",
+    ".tar.xz",
+    ".tar.bz",
+    ".tar.bz2",
+    ".tgz",
+    ".txz",
+    ".tbz",
+    ".tbz2",
+)
+TAR_EXT = (".tar",)
+
+TAR_MAGIC_COMP = (
+    # gzip
+    b"\x1f\x8b",
+    # bzip2
+    b"\x42\x5A\x68",
+    # xz
+    b"\xfd\x37\x7a\x58\x5a\x00",
+)
+TAR_MAGIC = (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
+
+
+def is_tar_magic(path: Path, magics: tuple) -> bool:
+    with path.open("rb") as fh:
+        headers = [fh.read(6)]
+        fh.seek(257)
+        headers.append(fh.read(8))
+        for header in headers:
+            for magic in magics:
+                if len(magic) > len(header):
+                    continue
+                if header[: len(magic)] == magic:
+                    return True
+    return False
+
+
+class TarSubLoader(SubLoader):
+    """Tar implementation of a :class:`SubLoader`."""
+
+    def __init__(self, tar: tarfile.TarFile, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tar = tar
+
+    @staticmethod
+    def detect(tar: tarfile.TarFile) -> bool:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError()
+
+    def map(target: target.Target) -> None:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError()
+
+
+class GenericTarSubLoader(TarSubLoader):
+    """Generic tar sub loader.
+
+    Recognises acquire tar files and regular tar files. Attempts to map sysvol and c: volume names.
+    """
+
+    @staticmethod
+    def detect(tar: tarfile.TarFile) -> bool:
+        return True
 
     def map(self, target: target.Target) -> None:
         volumes = {}
