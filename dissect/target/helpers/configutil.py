@@ -726,7 +726,7 @@ class SystemD(Indentation):
     ) -> bool:
         scope_char = ("[", "]")
         changed = False
-        if line.startswith(scope_char):
+        if line.lstrip().startswith(scope_char):
             if not manager.is_root():
                 changed = manager.pop()
             stripped_characters = "".join(scope_char)
