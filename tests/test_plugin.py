@@ -109,7 +109,7 @@ def test_filter_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "filename, empty_list",
+    ("filename", "empty_list"),
     [
         ("__init__.py", True),
         ("__pycache__/help.pyc", True),
@@ -128,7 +128,7 @@ def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool) -> No
 
 
 @pytest.mark.parametrize(
-    "filename, expected_module",
+    ("filename", "expected_module"),
     [
         ("test.py", "test"),
         ("hello_world/help.py", "hello_world.help"),
