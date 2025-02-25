@@ -1,4 +1,5 @@
 import os
+import sys
 import textwrap
 from functools import reduce
 from pathlib import Path
@@ -24,6 +25,7 @@ from dissect.target.plugin import (
     PluginDescriptor,
     PluginDescriptorLookup,
     PluginRegistry,
+    _find_py_files,
     _generate_long_paths,
     _save_plugin_import_failure,
     alias,
@@ -78,6 +80,100 @@ def test_load_module_paths() -> None:
 def test_load_paths_with_env() -> None:
     with patch.object(os, "environ", {"DISSECT_PLUGINS": ":"}):
         assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
+
+
+def test_load_environment_variable_empty_string() -> None:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
+        load_modules_from_paths([])
+        mocked_find_py_files.assert_not_called()
+
+
+def test_load_environment_variable_comma_seperated_string() -> None:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
+        load_modules_from_paths([Path(""), Path("")])
+        mocked_find_py_files.assert_called_with(Path(""))
+
+
+def test_filter_file(tmp_path: Path) -> None:
+    file = tmp_path / "hello.py"
+    file.touch()
+
+    assert list(_find_py_files(file)) == [file]
+
+    test_file = tmp_path / "non_existent_file"
+    assert list(_find_py_files(test_file)) == []
+
+    test_file = tmp_path / "__init__.py"
+    test_file.touch()
+    assert list(_find_py_files(test_file)) == []
+
+
+@pytest.mark.parametrize(
+    ("filename", "empty_list"),
+    [
+        ("__init__.py", True),
+        ("__pycache__/help.pyc", True),
+        ("hello/test.py", False),
+    ],
+)
+def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool) -> None:
+    file = tmp_path / filename
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.touch()
+
+    if empty_list:
+        assert list(_find_py_files(tmp_path)) == []
+    else:
+        assert file in list(_find_py_files(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_module"),
+    [
+        ("test.py", "test"),
+        ("hello_world/help.py", "hello_world.help"),
+        ("path/to/file.py", "path.to.file"),
+    ],
+)
+def test_filesystem_module_registration(tmp_path: Path, filename: str, expected_module: str) -> None:
+    path = tmp_path / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+
+    load_modules_from_paths([tmp_path])
+
+    assert expected_module in sys.modules.keys()
+
+
+def test_plugin_registration(tmp_path: Path) -> None:
+    code = """
+        from dissect.target.plugin import Plugin, export
+
+
+        class TestPlugin(Plugin):
+            __register__ = False
+
+            def check_compatible(self) -> None:
+                return None
+
+            @export(output="default")
+            def hello_world(self):
+                for x in self.target.fs.iterdir(""):
+                    print(f"hello {x}")
+    """
+    (tmp_path / "plugin.py").write_text(textwrap.dedent(code))
+
+    with patch("dissect.target.plugin.register") as mock_register:
+        load_modules_from_paths([tmp_path])
+
+        mock_register.assert_called_once()
+        assert mock_register.call_args[0][0].__name__ == "TestPlugin"
+
+    with patch("dissect.target.plugin.register") as mock_register:
+        load_modules_from_paths([tmp_path / "plugin.py"])
+
+        mock_register.assert_called_once()
+        assert mock_register.call_args[0][0].__name__ == "TestPlugin"
 
 
 @patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
