@@ -15,9 +15,9 @@ RE_TS_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+\d{2}:\d{2
 RE_LINE = re.compile(
     r"""
     \d{2}:\d{2}\s                           # First match on the similar ending of the different timestamps
-    (?:\S+)\s                               # The hostname, but do not capture it
-    (?P<service>\S+?)(\[(?P<pid>\d+)\])?:    # The service / daemon with optionally the PID between brackets
-    \s*(?P<message>.+?)\s*$                 # The log message stripped from spaces left and right
+    ((?:\S+)\s)?                            # The hostname (optional), but do not capture it
+    (?P<service>\S+?)(\[(?P<pid>\d+?)\])?:  # The service / daemon with optionally the PID between brackets
+    (\s*(?P<message>.+?)\s*)?$              # The log message stripped from spaces left and right
     """,
     re.VERBOSE,
 )
