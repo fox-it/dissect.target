@@ -59,7 +59,7 @@ class ServicesPlugin(Plugin):
                     continue
 
                 try:
-                    parsed_config = configutil.parse(service_file, hint="ini")
+                    parsed_config = configutil.parse(service_file, hint="systemd")
                     config = {}
                     types = []
                     for segment, configuration in parsed_config.items():
