@@ -242,6 +242,8 @@ class ApachePlugin(WebserverPlugin):
             - https://unix.stackexchange.com/a/269090
         """
 
+        self.seen_confs = set()
+
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
             self.access_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
@@ -262,7 +264,12 @@ class ApachePlugin(WebserverPlugin):
         return self.access_paths, self.error_paths
 
     def _process_conf_file(self, path: Path) -> None:
-        """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include`` and ``OptionalInclude``."""
+        """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include`` and ``OptionalInclude`` directives."""
+
+        if path in self.seen_confs:
+            self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
+            return
+        self.seen_confs.add(path)
 
         for line in path.open("rt"):
             line = line.strip()
