@@ -94,7 +94,7 @@ class CronjobPlugin(Plugin):
 
     @export(record=[CronjobRecord, EnvironmentVariableRecord])
     def cronjobs(self) -> Iterator[CronjobRecord | EnvironmentVariableRecord]:
-        """Yield cronjobs on a unix system.
+        """Yield cronjobs, and their configured environment variables on a Unix system
 
         A cronjob is a scheduled task/command on a Unix based system. Adversaries may use cronjobs to gain
         persistence on the system.
@@ -112,7 +112,7 @@ class CronjobPlugin(Plugin):
         for file in self.crontabs:
             # Cronjobs in user crontab files do not have a user field specified.
             user = None
-            if file.is_relative_to("/var/spool/cron/crontabs"):
+            if file.is_relative_to("/var/spool/cron/crontabs") or file.is_relative_to("/var/spool/cron/"):
                 user = self.target.user_details.find(username=file.name)
 
             for line in file.open("rt"):
