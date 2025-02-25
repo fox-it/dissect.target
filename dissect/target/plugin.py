@@ -325,9 +325,6 @@ def clone_alias(cls: type, attr: Callable[..., Any], alias: str) -> None:
     clone.__name__ = alias
     clone.__qualname__ = f"{cls.__name__}.{alias}"
 
-    # Mark this clone as an alias
-    clone.__alias__ = True
-
     setattr(cls, alias, clone)
 
 
@@ -534,7 +531,7 @@ def register(plugincls: type[Plugin]) -> None:
                         exported=exported,
                         internal=internal,
                         findable=plugincls.__findable__,
-                        alias=getattr(attr, "__alias__", False),
+                        alias=name in getattr(attr, "__aliases__", []),
                         output=getattr(attr, "__output__", None),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
@@ -559,7 +556,7 @@ def register(plugincls: type[Plugin]) -> None:
                 exported=bool(len(exports)),
                 internal=bool(len(functions)) and not bool(len(exports)),
                 findable=plugincls.__findable__,
-                alias=getattr(attr, "__alias__", False),
+                alias=False,
                 output=getattr(plugincls.__call__, "__output__", None),
                 method_name="__call__",
                 module=plugincls.__module__,
