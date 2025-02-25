@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Iterator
 
 from dissect.target import filesystem, volume
 from dissect.target.containers.vhdx import VhdxContainer
+from dissect.target.exceptions import VolumeSystemError
 from dissect.target.filesystem import Filesystem
 from dissect.target.loaders.dir import DirLoader, find_and_map_dirs, find_dirs
 from dissect.target.plugin import OperatingSystem
@@ -38,8 +39,11 @@ def is_valid_kape_dir(path: Path) -> bool:
 
 def is_valid_kape_vhdx(path: Path) -> bool:
     if path.suffix == ".vhdx":
-        for fs in open_vhdx(path):
-            return is_valid_kape_dir(fs.path())
+        try:
+            for fs in open_vhdx(path):
+                return is_valid_kape_dir(fs.path())
+        except VolumeSystemError:
+            return False
 
     return False
 
