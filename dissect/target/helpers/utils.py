@@ -164,7 +164,6 @@ def year_rollover_helper(
             yield relative_ts.replace(tzinfo=tzinfo), line
 
 
-def escape_null(value: str) -> str:
-    """Sanitize the given string from nullbytes."""
-
-    return value.replace("\00", "\\x00")
+def escape_str(value: str) -> str:
+    """Escape non-ASCII, unicode characters and bytes to a printable form."""
+    return repr(value).strip("'")
