@@ -30,8 +30,16 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     """test if we detect different build.prop locations correctly."""
 
     fs = VirtualFilesystem()
+    fs.makedirs("/data")
+    fs.makedirs("/system")
+    fs.makedirs("/vendor")
+    fs.makedirs("/product")
+
     for prop, prop_file in build_prop_locations:
         fs.map_file(prop, prop_file)
+
+    # prop file that should not be found
+    fs.map_file("/foo/bar/too/deep/build.prop", another_prop)
 
     target_bare._os_plugin = AndroidPlugin
     target_bare.filesystems.add(fs)
@@ -47,3 +55,6 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     # test if mutual exclusive properties from different build.prop files are added to the dict.
     if "/foo/build.prop" in target_bare._os.build_prop_paths:
         assert target_bare._os.props.get("ro.foo") == "bar"
+
+    # test if glob does not go too deep.
+    assert "/foo/bar/too/deep/build.prop" not in target_bare._os.build_prop_paths

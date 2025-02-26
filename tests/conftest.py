@@ -218,6 +218,10 @@ def fs_bsd() -> Iterator[VirtualFilesystem]:
 @pytest.fixture
 def fs_android() -> Iterator[VirtualFilesystem]:
     fs = VirtualFilesystem()
+    fs.makedirs("/data")
+    fs.makedirs("/system")
+    fs.makedirs("/vendor")
+    fs.makedirs("/product")
     fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
     yield fs
 

@@ -12,11 +12,18 @@ from dissect.target.target import Target
 
 
 class AndroidPlugin(LinuxPlugin):
+    ANDROID_ROOT_FOLDERS = (
+        "data",
+        "system",
+        "vendor",
+        "product",
+    )
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
 
-        self.build_prop_paths = set(self._find_build_props(self.target.fs))
+        self.build_prop_paths = set(find_build_props(self.target.fs))
         self.props = {}
 
         for build_prop in self.build_prop_paths:
@@ -26,16 +33,10 @@ class AndroidPlugin(LinuxPlugin):
                 self.target.log.warning("Unable to parse Android build.prop file %s: %s", build_prop, e)
                 pass
 
-    @staticmethod
-    def _find_build_props(fs: Filesystem) -> Iterator[Path]:
-        for prop in fs.path("/").glob("**/build.prop"):
-            if prop.is_file():
-                yield prop
-
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if any(cls._find_build_props(fs)):
+            if any(find_build_props(fs)) and all(fs.exists(p) for p in cls.ANDROID_ROOT_FOLDERS):
                 return fs
 
     @classmethod
@@ -71,3 +72,13 @@ class AndroidPlugin(LinuxPlugin):
     @export(record=EmptyRecord)
     def users(self) -> Iterator[EmptyRecord]:
         yield from ()
+
+
+def find_build_props(fs: Filesystem) -> Iterator[Path]:
+    """Search for Android ``build.prop`` files on the provided :class:`Filesystem`."""
+    if (root_prop := fs.path("/build.prop")).is_file():
+        yield root_prop
+
+    for prop in fs.path("/").glob("*/build.prop"):
+        if prop.is_file():
+            yield prop
