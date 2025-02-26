@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterator, Union
+from typing import Iterator, Union, get_args
 
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -77,7 +77,7 @@ class SevenZipPlugin(Plugin):
         except RegistryError:
             pass
 
-    @export(record=SevenZipRecord)
+    @export(record=get_args(SevenZipRecord))
     @alias("7zip")
     def sevenzip(self) -> Iterator[SevenZipRecord]:
         """Return 7-Zip GUI history information from the registry.
