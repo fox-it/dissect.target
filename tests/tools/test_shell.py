@@ -357,3 +357,20 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b+1")
     assert out.find("*** Unhandled error: Token not allowed") > -1
+
+
+def test_shell_hostname_escaping(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
+) -> None:
+    """test if we properly escape hostnames in the base prompt."""
+
+    tmp_path.joinpath("etc").mkdir()
+    tmp_path.joinpath("var").mkdir()
+    tmp_path.joinpath("opt").mkdir()
+    tmp_path.joinpath("etc/hostname").write_bytes(b"hostname\x00\x01\x02\x03")
+
+    sys.stdout.flush()
+    out, err = run_target_shell(monkeypatch, capsys, str(tmp_path), "\n")
+
+    assert not err
+    assert "hostname\\x00\\x01\\x02\\x03" in out

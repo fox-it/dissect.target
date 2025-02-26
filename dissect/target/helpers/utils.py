@@ -162,8 +162,3 @@ def year_rollover_helper(
                 continue
 
             yield relative_ts.replace(tzinfo=tzinfo), line
-
-
-def escape_str(value: str) -> str:
-    """Escape non-ASCII, unicode characters and bytes to a printable form."""
-    return repr(value).strip("'")

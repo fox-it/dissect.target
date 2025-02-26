@@ -113,7 +113,6 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
         ("/etc/hostname", None, None, b""),
         ("/etc/sysconfig/network", None, None, b""),
         ("/proc/sys/kernel/hostname", "myhost", None, b"myhost"),
-        ("/etc/hostname", "hostname\\x00", None, b"hostname\x00"),
     ],
 )
 def test_parse_hostname_string(

@@ -294,3 +294,8 @@ def find_and_filter_plugins(
         executed_plugins.add(func_def.name)
 
         yield func_def
+
+
+def escape_str(value: str) -> str:
+    """Escape non-ASCII, unicode characters and bytes to a printable form."""
+    return repr(value).strip("'")

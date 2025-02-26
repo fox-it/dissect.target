@@ -9,7 +9,6 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
-from dissect.target.helpers.utils import escape_str
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
 from dissect.target.target import Target
 
@@ -104,7 +103,7 @@ class WindowsPlugin(OSPlugin):
     def hostname(self) -> str | None:
         key = "HKLM\\SYSTEM\\ControlSet001\\Control\\Computername\\Computername"
         try:
-            return escape_str(self.target.registry.value(key, "Computername").value)
+            return self.target.registry.value(key, "Computername").value
         except RegistryError:
             return None
 

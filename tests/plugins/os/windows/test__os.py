@@ -274,7 +274,6 @@ def test_windows_user(target_win_users: Target) -> None:
     ("registry_value", "expected_hostname"),
     [
         (b"DESKTOP-EXAMPLE", "DESKTOP-EXAMPLE"),
-        (b"DESKTOP\x00", "DESKTOP\\x00"),
     ],
 )
 def test_windows_hostname(
