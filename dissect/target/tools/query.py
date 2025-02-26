@@ -27,7 +27,7 @@ from dissect.target.plugins.general.plugins import (
     generate_functions_json,
     generate_functions_overview,
 )
-from dissect.target.report import ExecutionReport
+from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,

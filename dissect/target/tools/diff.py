@@ -28,6 +28,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
     ExtendedCmd,
     TargetCli,
+    _target_name,
     arg_str_to_arg_list,
     build_pipe_stdout,
     fmt_ls_colors,
@@ -390,10 +391,15 @@ class DifferentialCli(ExtendedCmd):
 
     @property
     def prompt(self) -> str:
-        if self.comparison.src_target.name != self.comparison.dst_target.name:
-            prompt_base = f"{self.comparison.src_target.name}/{self.comparison.dst_target.name}"
+        """Determine the prompt of the cli."""
+
+        src_name = _target_name(self.comparison.src_target)
+        dst_name = _target_name(self.comparison.dst_target)
+
+        if src_name != dst_name:
+            prompt_base = f"{src_name}/{dst_name}"
         else:
-            prompt_base = self.comparison.src_target.name
+            prompt_base = src_name
 
         if os.getenv("NO_COLOR"):
             suffix = f"{prompt_base}:{self.cwd}$ "
