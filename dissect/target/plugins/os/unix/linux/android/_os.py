@@ -36,7 +36,7 @@ class AndroidPlugin(LinuxPlugin):
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if any(find_build_props(fs)) and all(fs.exists(p) for p in cls.ANDROID_ROOT_FOLDERS):
+            if all(fs.exists(p) for p in cls.ANDROID_ROOT_FOLDERS) and any(find_build_props(fs)):
                 return fs
 
     @classmethod
