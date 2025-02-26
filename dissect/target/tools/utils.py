@@ -298,4 +298,4 @@ def find_and_filter_plugins(
 
 def escape_str(value: str) -> str:
     """Escape non-ASCII, unicode characters and bytes to a printable form."""
-    return repr(value).strip("'")
+    return repr(value)[1:-1]
