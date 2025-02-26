@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import stat
+import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
@@ -34,6 +35,7 @@ from dissect.target.filesystems.extfs import ExtFilesystem, ExtFilesystemEntry
 from dissect.target.filesystems.ffs import FfsFilesystemEntry
 from dissect.target.filesystems.tar import TarFilesystemEntry
 from dissect.target.filesystems.xfs import XfsFilesystemEntry
+from dissect.target.plugin import load_modules_from_paths
 
 try:
     from dissect.target.filesystems.vmfs import VmfsFilesystemEntry
@@ -57,6 +59,42 @@ def vfs() -> VirtualFilesystem:
     vfs.map_fs("/path/to/other", vfs)
 
     return vfs
+
+
+def test_registration(tmp_path: Path) -> None:
+    code = """
+        from __future__ import annotations
+
+        from typing import BinaryIO
+
+        from dissect.target.filesystem import Filesystem, FilesystemEntry, register
+        from dissect.target.volume import Volume
+
+
+        class TestFilesystem(Filesystem):
+            __type__ = "test"
+
+            def __init__(self, case_sensitive: bool = True, alt_separator: str = None, volume: Volume = None):
+                super().__init__(case_sensitive, alt_separator, volume)
+                print("Helloworld from TestFilesystem")
+
+            def get(self, path: str) -> FilesystemEntry:
+                pass
+
+            def detect(fh: BinaryIO) -> bool:
+                return False
+
+
+        register(__name__, TestFilesystem.__name__, internal=False)
+    """
+
+    (tmp_path / "filesystem.py").write_text(textwrap.dedent(code))
+
+    with patch("dissect.target.filesystem.FILESYSTEMS", []) as mocked_filesystems:
+        load_modules_from_paths([tmp_path])
+
+        assert len(mocked_filesystems) == 1
+        assert mocked_filesystems[0].__name__ == "TestFilesystem"
 
 
 def test_get(vfs: VirtualFilesystem) -> None:
