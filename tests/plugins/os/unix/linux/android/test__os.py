@@ -1,3 +1,5 @@
+from io import BytesIO
+
 import pytest
 
 from dissect.target import Target
@@ -15,7 +17,7 @@ def test_android_os(target_android: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "build_prop_locations",
+    ("build_prop_locations"),
     [
         ([("/build.prop", "build.prop")]),
         ([("/system/build.prop", "build.prop")]),
@@ -32,10 +34,10 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     fs.makedirs("/product")
 
     for prop, prop_file in build_prop_locations:
-        fs.map_file(prop, absolute_path("_data/plugins/os/unix/linux/android/{prop_file}"))
+        fs.map_file(prop, absolute_path(f"_data/plugins/os/unix/linux/android/{prop_file}"))
 
     # prop file that should not be found
-    fs.map_file("/foo/bar/too/deep/build.prop", another_prop)
+    fs.map_file_fh("/foo/bar/too/deep/build.prop", BytesIO(b"ro.not.found='true'"))
 
     target_bare._os_plugin = AndroidPlugin
     target_bare.filesystems.add(fs)
