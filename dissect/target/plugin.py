@@ -82,6 +82,10 @@ class PluginDescriptor:
     functions: list[str]
     exports: list[str]
 
+    @property
+    def cls(self) -> type[Plugin]:
+        return load(self)
+
 
 @dataclass(frozen=True, eq=True)
 class FunctionDescriptor:
@@ -93,6 +97,7 @@ class FunctionDescriptor:
         "exported",
         "internal",
         "findable",
+        "alias",
         "output",
         "method_name",
         "module",
@@ -105,10 +110,27 @@ class FunctionDescriptor:
     exported: bool
     internal: bool
     findable: bool
+    alias: bool
     output: str | None
     method_name: str
     module: str
     qualname: str
+
+    @property
+    def cls(self) -> type[Plugin]:
+        return load(self)
+
+    @property
+    def func(self) -> Callable[..., Any]:
+        return getattr(self.cls, self.method_name)
+
+    @property
+    def record(self) -> RecordDescriptor | list[RecordDescriptor] | None:
+        return getattr(self.func, "__record__", None)
+
+    @property
+    def args(self) -> list[tuple[list[str], dict[str, Any]]]:
+        return getattr(self.func, "__args__", [])
 
 
 @dataclass(frozen=True, eq=True)
@@ -189,7 +211,7 @@ def export(*args, **kwargs) -> Callable[..., Any]:
         cache (bool): Whether the result of this function should be cached.
 
         record (RecordDescriptor): The :class:`flow.record.RecordDescriptor` for the records that this function yields.
-            If multiple record types are yielded, specificy each descriptor in a list.
+            If multiple record types are yielded, specificy each descriptor in a list or tuple.
             If the records are dynamically made, use :func:`dissect.target.helpers.record.DynamicDescriptor` instead.
 
         output (str): The output type of this function. Must be one of:
@@ -225,8 +247,13 @@ def export(*args, **kwargs) -> Callable[..., Any]:
         if record is not None:
             output = "record"
 
+            if not isinstance(record, (list, RecordDescriptor)) and not (
+                isinstance(record, (list, tuple)) and all(isinstance(r, RecordDescriptor) for r in record)
+            ):
+                raise TypeError("record must be an instance of RecordDescriptor or a list of RecordDescriptor")
+
         obj.__output__ = output
-        obj.__record__ = record
+        obj.__record__ = list(record) if isinstance(record, tuple) else record
         obj.__exported__ = True
 
         if kwargs.get("property", False):
@@ -358,6 +385,7 @@ class Plugin:
     Finally. :func:`args` decorator sets the ``__args__`` attribute.
 
     The :func:`alias` decorator populates the ``__aliases__`` private attribute of :class:`Plugin` methods.
+    Resulting clones of the :class:`Plugin` are populated with the boolean ``__alias__`` attribute set to ``True``.
 
     Args:
         target: The :class:`~dissect.target.target.Target` object to load the plugin for.
@@ -528,6 +556,7 @@ def register(plugincls: type[Plugin]) -> None:
                         exported=exported,
                         internal=internal,
                         findable=plugincls.__findable__,
+                        alias=name in getattr(attr, "__aliases__", []),
                         output=getattr(attr, "__output__", None),
                         method_name=attr.__name__,
                         module=plugincls.__module__,
@@ -552,6 +581,7 @@ def register(plugincls: type[Plugin]) -> None:
                 exported=bool(len(exports)),
                 internal=bool(len(functions)) and not bool(len(exports)),
                 findable=plugincls.__findable__,
+                alias=False,
                 output=getattr(plugincls.__call__, "__output__", None),
                 method_name="__call__",
                 module=plugincls.__module__,
@@ -836,6 +866,43 @@ def find_functions(
     return result, invalid_functions
 
 
+def find_functions_by_record_field_type(
+    field_types: str | list[str],
+    target: Target | None = None,
+    compatibility: bool = False,
+    ignore_load_errors: bool = False,
+) -> Iterator[FunctionDescriptor]:
+    """Find functions that yield records with a specific field type.
+
+    Args:
+        field_types: The field type to search for.
+        target: The target to check compatibility with.
+        compatibility: Whether to check compatibility with the target.
+        ignore_load_errors: Whether to ignore load errors.
+    """
+
+    def _search(search_types: list[str]) -> Iterator[FunctionDescriptor]:
+        for descriptor in functions():
+            try:
+                if descriptor.output != "record" or (record_descriptors := descriptor.record) is None:
+                    continue
+            except Exception:
+                if ignore_load_errors:
+                    continue
+                raise
+
+            for rd in record_descriptors if isinstance(record_descriptors, list) else [record_descriptors]:
+                if any(type_name in search_types for type_name, _ in rd._field_tuples):
+                    yield descriptor
+                    break
+
+    search_types = field_types if isinstance(field_types, list) else [field_types]
+    if compatibility and target is not None:
+        yield from _filter_compatible(_search(search_types), target, ignore_load_errors)
+    else:
+        yield from _search(search_types)
+
+
 def _filter_exact_match(
     pattern: str, os_filter: str, exact_match: bool, exact_os_match: bool
 ) -> Iterator[FunctionDescriptor]:
@@ -894,6 +961,7 @@ def _filter_compatible(
             raise
 
         if plugincls not in seen:
+            seen.add(plugincls)
             try:
                 if not plugincls(target).is_compatible():
                     continue

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterator, Union
+from typing import Any, Iterator, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
 from flow.record.fieldtypes.net.ipv4 import Address, addr_long, addr_str, mask_to_bits
@@ -41,7 +41,7 @@ class NetworkPlugin(Plugin):
             else:
                 yield output
 
-    @export(record=InterfaceRecord)
+    @export(record=get_args(InterfaceRecord))
     def interfaces(self) -> Iterator[InterfaceRecord]:
         """Yield interfaces."""
         # Only search for the interfaces once

@@ -49,6 +49,7 @@ def test_categorize_plugins(mocked_plugins: MagicMock, mocked_load: MagicMock) -
             exported=True,
             internal=False,
             findable=True,
+            alias=False,
             output=None,
             method_name="data",
             module="other.root.something.data",
