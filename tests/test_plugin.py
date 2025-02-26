@@ -406,6 +406,12 @@ def test_find_functions_linux(target_linux: Target) -> None:
     assert found[0].path == "os.unix.linux.services.services"
 
 
+def test_find_functions_compatible_check(target_linux: Target) -> None:
+    """test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
+    found, _ = find_functions("*", target_linux, compatibility=True)
+    assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
+
+
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "application/test",
     [
