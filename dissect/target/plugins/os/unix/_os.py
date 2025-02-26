@@ -11,7 +11,7 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.helpers.utils import parse_options_string, sanitize_string
+from dissect.target.helpers.utils import parse_options_string, escape_null
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -205,7 +205,7 @@ class UnixPlugin(OSPlugin):
             break  # break whenever a valid hostname is found
 
         # Sanitize hostname by 'escaping' null bytes
-        hostname_dict = {k: sanitize_string(v) if v else None for k, v in hostname_dict.items()}
+        hostname_dict = {k: escape_null(v) if v else None for k, v in hostname_dict.items()}
 
         return hostname_dict
 
