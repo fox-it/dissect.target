@@ -12,13 +12,6 @@ from dissect.target.target import Target
 
 
 class AndroidPlugin(LinuxPlugin):
-    ANDROID_ROOT_FOLDERS = (
-        "data",
-        "system",
-        "vendor",
-        "product",
-    )
-
     def __init__(self, target: Target):
         super().__init__(target)
         self.target = target
@@ -35,8 +28,15 @@ class AndroidPlugin(LinuxPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
+        ANDROID_PATHS = (
+            "data",
+            "system",
+            "vendor",
+            "product",
+        )
+
         for fs in target.filesystems:
-            if all(fs.exists(p) for p in cls.ANDROID_ROOT_FOLDERS) and any(find_build_props(fs)):
+            if all(fs.exists(p) for p in ANDROID_PATHS) and any(find_build_props(fs)):
                 return fs
 
     @classmethod

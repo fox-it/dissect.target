@@ -14,16 +14,12 @@ def test_android_os(target_android: Target) -> None:
     assert target_android.hostname == "TMG28071935"
 
 
-normal_prop = absolute_path("_data/plugins/os/unix/linux/android/build.prop")
-another_prop = absolute_path("_data/plugins/os/unix/linux/android/another.prop")
-
-
 @pytest.mark.parametrize(
     "build_prop_locations",
     [
-        ([("/build.prop", normal_prop)]),
-        ([("/system/build.prop", normal_prop)]),
-        ([("/build.prop", normal_prop), ("/foo/build.prop", another_prop)]),
+        ([("/build.prop", "build.prop")]),
+        ([("/system/build.prop", "build.prop")]),
+        ([("/build.prop", "build.prop"), ("/foo/build.prop", "another.prop")]),
     ],
 )
 def test_android_os_detect_props(target_bare: Target, build_prop_locations: list[tuple[str, str]]) -> None:
@@ -36,7 +32,7 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     fs.makedirs("/product")
 
     for prop, prop_file in build_prop_locations:
-        fs.map_file(prop, prop_file)
+        fs.map_file(prop, absolute_path("_data/plugins/os/unix/linux/android/{prop_file}"))
 
     # prop file that should not be found
     fs.map_file("/foo/bar/too/deep/build.prop", another_prop)
