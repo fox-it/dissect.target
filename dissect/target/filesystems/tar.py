@@ -33,15 +33,20 @@ class TarFilesystem(Filesystem):
     def __init__(
         self,
         fh: BinaryIO,
-        base: Optional[str] = None,
-        tarinfo: Optional[tarfile.TarInfo] = None,
+        base: str | None = None,
+        tarinfo: tarfile.TarInfo | None = None,
+        _tarfile: tarfile.TarFile | None = None,
         *args,
         **kwargs,
     ):
         super().__init__(fh, *args, **kwargs)
-        fh.seek(0)
 
-        self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+        if _tarfile:
+            self.tar = _tarfile
+        else:
+            fh.seek(0)
+            self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+
         self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
