@@ -44,7 +44,7 @@ class ScrapePlugin(Plugin):
             all: Whether to yield all disks and volumes, regardless of their type.
 
         Yields:
-            A tuple of the disk (or volume, in the case of an LVM volume) and a stream of that disk.
+            A tuple containing the disk (or volume, in the case of an LVM volume) and a stream of that disk.
         """
         # Create a map of disk regions we want to scrape
         scrape_map = defaultdict(dict)
@@ -113,8 +113,8 @@ class ScrapePlugin(Plugin):
         needles: Needle | list[Needle],
         lock_seek: bool = True,
         block_size: int = io.DEFAULT_BUFFER_SIZE,
-        progress: Callable[[int, int, int], None] | None = None,
-    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int]]:  # TODO
+        progress: Callable[[Container | Volume, int, int], None] | None = None,
+    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int]]:
         """Yields needles and their offsets found in all disks and volumes of a target.
 
         Args:
@@ -122,6 +122,7 @@ class ScrapePlugin(Plugin):
             lock_seek:  Whether the file position is maintained by the scraper or the consumer.
                         Setting this to ``False`` wil allow the consumer to seek the file pointer, i.e. to skip forward.
             block_size: The block size to use for reading from the byte stream.
+            progress: A function to call with the current disk, offset and size of the stream.
         """
         for disk, stream in self.create_streams():
             for needle, offset in find_needles(

@@ -5,6 +5,7 @@ import re
 import string
 import sys
 from pathlib import Path
+from typing import Callable
 
 from dissect.cstruct import utils
 
@@ -21,7 +22,7 @@ class QFindPlugin(Plugin):
     def check_compatible(self) -> None:
         pass
 
-    @arg("-n", "--needles", type=str, nargs="*", metavar="NEEDLES", help="needle to search for")
+    @arg("-n", "--needles", type=str, nargs="*", metavar="NEEDLES", help="needles to search for")
     @arg("-nf", "--needle-file", type=Path, help="file containing the needles to search for")
     @arg("-e", "--encoding", type=str, help="encode text needles with these comma separated encodings")
     @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
@@ -43,7 +44,26 @@ class QFindPlugin(Plugin):
         unique: bool = False,
         window: int = 256,
     ) -> None:
-        """Find a needle in a haystack."""
+        """Find a needle in a haystack.
+
+        Example:
+            .. code-block::
+
+                # find all instances of "malware" in the target
+                target-qfind <TARGET> --needles malware
+
+                # find all instances of "malware" in the target, ignoring case
+                target-qfind <TARGET> --needles MaLwArE --ignore-case
+
+                # find all instances of "malware" in the target and show raw hex dumps
+                target-qfind <TARGET> --needles malware --raw
+
+                # find all instances of "malware" in the target, in UTF-8 and UTF-16-LE (UTF-8 is default)
+                target-qfind <TARGET> --needles malware --encoding utf-16-le
+
+                # use target-query instead of target-qfind
+                target-query <TARGET> -f qfind --needles malware
+        """
         all_needles = set(needles or [])
         if needle_file and needle_file.exists():
             with needle_file.open("r") as fh:
@@ -97,7 +117,7 @@ class QFindPlugin(Plugin):
             needle_len = len(needle.pattern if isinstance(needle, re.Pattern) else needle)
             before_offset = max(0, offset - window)
             stream.seek(before_offset)
-            buf = stream.read((offset - before_offset) + window)
+            buf = stream.read((offset - before_offset) + max(window, needle_len))
 
             header = f"\r[{offset:#08x} @ {original_needle} ({codec})]"
 
@@ -128,7 +148,8 @@ class QFindPlugin(Plugin):
                 print(hit)
 
 
-def progress(target: Target) -> None:
+def progress(target: Target) -> Callable[[Container | Volume, int, int], None]:
+    """Progress handler of the qfind plugin."""
     current_disk = None
 
     def update(disk: Container | Volume, offset: int, size: int) -> None:

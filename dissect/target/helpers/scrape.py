@@ -30,9 +30,12 @@ def find_needles(
     Args:
         fh: The byte stream to search for needles.
         needles: The list of bytes needles to search for.
+        start: The offset to start searching from.
+        end: The offset to stop searching at.
         lock_seek: Whether the file position is maintained by the scraper or the consumer.
                    Setting this to ``False`` will allow the consumer to seek the file pointer, i.e. to skip forward.
         block_size: The block size to use for reading from the byte stream.
+        progress: A function to call with the current offset.
     """
 
     if not isinstance(needles, list):
