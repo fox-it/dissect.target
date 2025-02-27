@@ -77,7 +77,7 @@ except ImportError:
     readline = None
 
 
-def readline_escape(s: str | dict[str, str]):
+def readline_escape(s: str | dict[str, str]) -> str | dict[str, str]:
     """Escape a string or values in dictionary for readline prompt.
 
     Used to embed terminal-specific escape sequences in prompts.
