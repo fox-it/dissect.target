@@ -164,6 +164,10 @@ def test_regression_running_container_parsing(target_unix: Target, fs_unix: Virt
                 "1337/udp": {},
             },
             "Image": "docker.io/debian",
+            "Env": [
+                "FOO=bar",
+                "HELLO=world",
+            ],
         },
         "NetworkSettings": {
             "Ports": {},
@@ -198,5 +202,6 @@ def test_regression_running_container_parsing(target_unix: Target, fs_unix: Virt
     assert results[0].ports == str({"1337/tcp": "0.0.0.0:1337", "1337/udp": "0.0.0.0:1337"})
     assert results[0].names == "foo"
     assert results[0].volumes == ["/somewhere/on/host/file.txt:/dest/file.txt"]
+    assert results[0].environment == ["FOO=bar", "HELLO=world"]
     assert results[0].mount_path == "/var/lib/docker/image/overlay2/layerdb/mounts/deadbeef"
     assert results[0].config_path == "/var/lib/docker/containers/deadbeef/config.v2.json"

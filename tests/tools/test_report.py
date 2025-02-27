@@ -5,14 +5,14 @@ import pytest
 
 from dissect.target import Target
 from dissect.target.plugin import FailureDescriptor, FunctionDescriptor, PluginRegistry
-from dissect.target.report import (
+from dissect.target.target import Event
+from dissect.target.tools.report import (
     ExecutionReport,
     TargetExecutionReport,
     format_target_report,
     make_cli_args_overview,
     make_plugin_import_errors_overview,
 )
-from dissect.target.target import Event
 
 
 @pytest.fixture
@@ -206,9 +206,9 @@ def test_execution_report_get_formatted_report(
     target_report1: TargetExecutionReport,
     target_report2: TargetExecutionReport,
 ) -> None:
-    with patch("dissect.target.report.make_cli_args_overview", return_value="line_1"):
-        with patch("dissect.target.report.make_plugin_import_errors_overview", return_value="line_2"):
-            with patch("dissect.target.report.format_target_report", return_value="line_x"):
+    with patch("dissect.target.tools.report.make_cli_args_overview", return_value="line_1"):
+        with patch("dissect.target.tools.report.make_plugin_import_errors_overview", return_value="line_2"):
+            with patch("dissect.target.tools.report.format_target_report", return_value="line_x"):
                 assert execution_report.get_formatted_report() == "line_1\nline_2\nline_x\nline_x"
 
 
@@ -263,6 +263,7 @@ def test_execution_report_log_incompatible_plugin_plugin_desc(
         exported=True,
         internal=False,
         findable=True,
+        alias=False,
         output=None,
         method_name="plugin1",
         module="test_module",

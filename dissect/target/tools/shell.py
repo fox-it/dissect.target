@@ -47,6 +47,7 @@ from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
+    escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_bound_method,
@@ -1388,12 +1389,12 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 
 def _target_name(target: Target) -> str:
-    """Return a target name for cmd.Cmd base prompts."""
+    """Return a printable FQDN target name for cmd.Cmd base prompts."""
 
     if target.has_function("domain") and target.domain:
-        return f"{target.name}.{target.domain}"
+        return escape_str(f"{target.name}.{target.domain}")
 
-    return target.name
+    return escape_str(target.name)
 
 
 @contextmanager

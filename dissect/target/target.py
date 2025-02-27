@@ -95,7 +95,7 @@ class Target:
         try:
             self._config = config.load(config_paths)
         except Exception as e:
-            self.log.warning("Error loading config file: %s", self.path)
+            self.log.warning("Error loading config file: %s", config_paths)
             self.log.debug("", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
@@ -688,7 +688,7 @@ class Target:
                         raise UnsupportedPluginError(
                             f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
                             extra=causes[1:] if len(causes) > 1 else None,
-                        ) from causes[0] if causes else None
+                        ) from (causes[0] if causes else None)
 
         # We still ended up with no compatible plugins
         if function_name not in self._functions:

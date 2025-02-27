@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterator, Optional
+from pathlib import Path
+from typing import Iterator
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers import configutil
@@ -15,16 +16,28 @@ class AndroidPlugin(LinuxPlugin):
         super().__init__(target)
         self.target = target
 
+        self.build_prop_paths = set(find_build_props(self.target.fs))
         self.props = {}
-        if (build_prop := self.target.fs.path("/build.prop")).exists():
-            self.props = configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data
+
+        for build_prop in self.build_prop_paths:
+            try:
+                self.props.update(configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data)
+            except Exception as e:
+                self.target.log.warning("Unable to parse Android build.prop file %s: %s", build_prop, e)
+                pass
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
+        ANDROID_PATHS = (
+            "data",
+            "system",
+            "vendor",
+            "product",
+        )
+
         for fs in target.filesystems:
-            if fs.exists("/build.prop"):
+            if all(fs.exists(p) for p in ANDROID_PATHS) and any(find_build_props(fs)):
                 return fs
-        return None
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> AndroidPlugin:
@@ -32,7 +45,7 @@ class AndroidPlugin(LinuxPlugin):
         return cls(target)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         return self.props.get("ro.build.host")
 
     @export(property=True)
@@ -59,3 +72,13 @@ class AndroidPlugin(LinuxPlugin):
     @export(record=EmptyRecord)
     def users(self) -> Iterator[EmptyRecord]:
         yield from ()
+
+
+def find_build_props(fs: Filesystem) -> Iterator[Path]:
+    """Search for Android ``build.prop`` files on the provided :class:`Filesystem`."""
+    if (root_prop := fs.path("/build.prop")).is_file():
+        yield root_prop
+
+    for prop in fs.path("/").glob("*/build.prop"):
+        if prop.is_file():
+            yield prop

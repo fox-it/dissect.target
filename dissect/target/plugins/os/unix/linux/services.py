@@ -2,6 +2,7 @@ from itertools import chain
 from typing import Iterator
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
+from dissect.target.helpers import configutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export, internal
 
@@ -58,10 +59,13 @@ class ServicesPlugin(Plugin):
                     continue
 
                 try:
-                    parsed_file = self.target.config_tree(service_file, as_dict=True)
+                    parsed_config = configutil.parse(service_file, hint="systemd")
                     config = {}
                     types = []
-                    for segment, configuration in parsed_file.items():
+                    for segment, configuration in parsed_config.items():
+                        if not configuration:
+                            continue
+
                         for key, value in configuration.items():
                             _value = value or None
                             _key = f"{segment}_{key}"
