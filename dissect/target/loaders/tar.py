@@ -108,7 +108,7 @@ class TarSubLoader(SubLoader):
         """Only to be called internally by :class:`TarLoader`."""
         raise NotImplementedError()
 
-    def map(target: target.Target) -> None:
+    def map(self, target: target.Target) -> None:
         """Only to be called internally by :class:`TarLoader`."""
         raise NotImplementedError()
 

@@ -117,7 +117,7 @@ class SubLoader:
     def detect(*args) -> bool:
         raise NotImplementedError()
 
-    def map(target: Target) -> None:
+    def map(self, target: Target) -> None:
         raise NotImplementedError()
 
 

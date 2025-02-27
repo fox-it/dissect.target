@@ -47,8 +47,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
         try:
             self.tarfs = TarFilesystem(None, _tarfile=tar)
         except Exception as e:
-            raise ValueError(f"Unable to open {str(tarfile)} as TarFilesystem: {str(e)}")
-
+            raise ValueError(f"Unable to open {str(tar)} as TarFilesystem: {str(e)}")
         try:
             self.manifest = json.loads(self.tarfs.path("/manifest.json").read_text())[0]
             self.name = self.manifest.get("RepoTags", [None])[0]
