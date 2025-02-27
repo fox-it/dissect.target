@@ -106,6 +106,7 @@ dev = [
     "dissect.vmfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
+    "pexpect",
 ]
 yara = [
     # Grab the dependencies for dissect.target
