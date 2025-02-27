@@ -374,6 +374,10 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     platform.python_implementation() == "PyPy",
     reason="PyPy's prompt contains too much ANSI escape codes",
 )
+@pytest.mark.skipif(
+    platform.system() == "Windows",
+    reason="pexpect.spawn not available on Windows",
+)
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
     target_path = absolute_path("_data/tools/info/image.tar")
@@ -387,28 +391,28 @@ def test_shell_prompt_tab_autocomplete() -> None:
     # note that the expect pattern will be re.compiled so we need to escape regex special characters
     child.expect(re.escape("ubuntu:/$ "), timeout=20)
     # this should auto complete to `ls /home/user`
-    child.sendline(b"ls /home/u\t")
+    child.sendline("ls /home/u\t")
     # expect the prompt to be printed again
     child.expect(re.escape("ls /home/user/\r\n"), timeout=5)
     # execute the autocompleted command
-    child.send(b"\n")
+    child.send("\n")
     # we expect the files in /home/user to be printed
-    child.expect(re.escape(b".bash_history\r\n.zsh_history\r\n"), timeout=5)
+    child.expect(re.escape(".bash_history\r\n.zsh_history\r\n"), timeout=5)
     child.expect(re.escape("ubuntu:/$ "), timeout=5)
 
     # send partial ls /etc/ command
-    child.send(b"ls /etc/")
+    child.send("ls /etc/")
 
     # we send two TABS to get the list of files in /etc/
-    child.send(b"\t\t")
+    child.send("\t\t")
 
     # expect the files in /etc/ to be printed
     child.expect("hosts       localtime   network/    os-release  passwd      shadow      timezone\r\n", timeout=5)
 
     # send newline to just list everything in /etc/
-    child.send(b"\n")
+    child.send("\n")
     # expect the last few files in /etc/ to be printed
-    child.expect(b"shadow\r\ntimezone\r\n", timeout=5)
+    child.expect("shadow\r\ntimezone\r\n", timeout=5)
 
     # exit the shell
     child.expect(re.escape("ubuntu:/$ "), timeout=5)
