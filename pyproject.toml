@@ -141,6 +141,7 @@ target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
+target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.black]
 line-length = 120
