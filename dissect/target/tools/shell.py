@@ -74,6 +74,9 @@ except ImportError:
     log.warning("Readline module is not available")
     readline = None
 
+RL_PROMPT_START_IGNORE = "\001"
+RL_PROMPT_END_IGNORE = "\002"
+
 
 class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
@@ -359,7 +362,9 @@ class TargetCmd(ExtendedCmd):
             self.prompt_ps1 = "{base}:{cwd}$ "
 
         else:
-            self.prompt_ps1 = "\x01\x1b[1;32m\x02{base}\x01\x1b[0m\x02:\x01\x1b[1;34m\x02{cwd}\x01\x1b[0m\x02$ "
+            self.prompt_ps1 = (
+                RL_PROMPT_START_IGNORE + "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ " + RL_PROMPT_END_IGNORE
+            )
 
         super().__init__(self.target.props.get("cyber"))
 
