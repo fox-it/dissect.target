@@ -118,7 +118,7 @@ class AnsiColors(StrEnum):
     BOLD_WHITE = "\033[1;37m"
 
     @classmethod
-    def as_dict(cls):
+    def as_dict(cls) -> dict[str, str]:
         """Return ANSI color escape sequences as a dictionary."""
         return {item.name: item.value for item in cls}
 
