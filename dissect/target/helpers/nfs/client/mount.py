@@ -8,7 +8,7 @@ from dissect.target.helpers.nfs.nfs3 import MountOK, MountProc, MountStat
 from dissect.target.helpers.nfs.serializer import MountResultDeserializer
 from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
-from dissect.target.helpers.sunrpc.client import FreePrivilegedPortType, auth_null
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_null
 from dissect.target.helpers.sunrpc.serializer import StringSerializer
 
 if TYPE_CHECKING:
@@ -46,7 +46,7 @@ class Client(AbstractContextManager):
         cls,
         hostname: str,
         port: int,
-        local_port: int | FreePrivilegedPortType = 0,
+        local_port: int | LocalPortPolicy = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> Client:
         """Utility function to setup a connection to a NFS Mount Server
@@ -55,8 +55,9 @@ class Client(AbstractContextManager):
             hostname: The remote hostname.
             port: The remote port.
             local_port: The local port to bind to.
-                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
-                If ``0``, bind to any free port.
+                If equal to ``LocalPortPolicy.PRIVILEGED`` or -1, bind to the first free privileged port.
+                If equal to ``LocalPortPolicy.ANY`` or 0, bind to any free port.
+                Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
         rpc_client = SunRpcClient.connect(hostname, port, auth_null(), local_port, timeout_in_seconds)

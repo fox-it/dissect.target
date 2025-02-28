@@ -16,7 +16,7 @@ from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
 from dissect.target.helpers.nfs.client.nfs import NfsError
 from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
 from dissect.target.helpers.record import UnixUserRecord
-from dissect.target.helpers.sunrpc.client import FreePrivilegedPort, auth_unix
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
@@ -302,7 +302,7 @@ class UnixPlugin(OSPlugin):
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
-            nfs = NfsFilesystem.connect(address, exported_dir, auth_setter, FreePrivilegedPort)
+            nfs = NfsFilesystem.connect(address, exported_dir, auth_setter, LocalPortPolicy.PRIVILEGED)
             self.target.fs.mount(mount_point, nfs)
         except Exception as e:
             self.target.log.warning("Failed to mount NFS share %s:%s at %s", address, exported_dir, mount_point)

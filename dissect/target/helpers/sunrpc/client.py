@@ -5,6 +5,7 @@ import socket
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from dissect.target.helpers.sunrpc import sunrpc
@@ -100,12 +101,11 @@ class AbstractClient(ABC):
         pass
 
 
-class FreePrivilegedPortType:
-    pass
+class LocalPortPolicy(IntEnum):
+    """Policy for binding to a local port."""
 
-
-"""Marker type indicating Client should search for a free privileged port."""
-FreePrivilegedPort = FreePrivilegedPortType()
+    ANY = 0  # Bind to any free port
+    PRIVILEGED = -1  # Bind to the first free privileged port
 
 
 class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifier]):
@@ -133,7 +133,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         hostname: str,
         port: int,
         auth: AuthScheme[ConCredentials, ConVerifier],
-        local_port: int | FreePrivilegedPortType = 0,
+        local_port: int | LocalPortPolicy = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> Client[ConCredentials, ConVerifier]:
         """Connect to a RPC server.
@@ -143,8 +143,9 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
             port: The remote port.
             auth: The authentication scheme.
             local_port: The local port to bind to.
-                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
-                If ``0``, bind to any free port.
+                If equal to ``LocalPortPolicy.PRIVILEGED`` or -1, bind to the first free privileged port.
+                If equal to ``LocalPortPolicy.ANY`` or 0, bind to any free port.
+                Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
 
@@ -156,10 +157,11 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, cls.TCP_KEEPCNT)
 
-        if local_port is FreePrivilegedPort:
+        local_port_int = local_port.value if isinstance(local_port, LocalPortPolicy) else local_port
+        if local_port_int == LocalPortPolicy.PRIVILEGED:
             cls._bind_free_privileged_port(sock)
         else:
-            sock.bind(("", local_port))
+            sock.bind(("", local_port_int))
 
         sock.settimeout(timeout_in_seconds)
         sock.connect((hostname, port))
