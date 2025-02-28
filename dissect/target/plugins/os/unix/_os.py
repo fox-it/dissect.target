@@ -237,7 +237,15 @@ class UnixPlugin(OSPlugin):
         for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
             # Mount nfs, but only when target has been mapped by the `LocalLoader`
             if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
-                self._add_nfs(dev_id, volume_name, mount_point)
+                if "enable-nfs" in self.target.path_query:
+                    self._add_nfs(dev_id, volume_name, mount_point)
+                else:
+                    log.warning(
+                        "NFS mount %s:%s at %s is disabled, to enable pass --enable-nfs to local loader",
+                        dev_id,
+                        volume_name,
+                        mount_point,
+                    )
                 continue
 
             opts = parse_options_string(options)
