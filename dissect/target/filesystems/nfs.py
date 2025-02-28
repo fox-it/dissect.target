@@ -21,7 +21,7 @@ from dissect.target.helpers.nfs.nfs3 import (
 )
 from dissect.target.helpers.sunrpc.client import AuthScheme
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
-from dissect.target.helpers.sunrpc.client import FreePrivilegedPortType, auth_null
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_null
 
 ConCredentials = TypeVar("ConCredentials")
 ConVerifier = TypeVar("ConVerifier")
@@ -62,7 +62,7 @@ class NfsFilesystem(Filesystem):
         address: str,
         exported_dir: str,
         auth: AuthScheme[ConCredentials, ConVerifier] | AuthSetter,
-        local_port: int | FreePrivilegedPortType = 0,
+        local_port: int | LocalPortPolicy = 0,
         timeout_in_seconds: float | None = 5.0,
     ) -> NfsFilesystem:
         """Utility function to setup a connection to a NFS share.
@@ -72,8 +72,9 @@ class NfsFilesystem(Filesystem):
             port: The remote port.
             auth: The authentication scheme.
             local_port: The local port to bind to.
-                If equal to ``FreePrivilegedPort``, bind to the first free privileged port.
-                If ``0``, bind to any free port.
+                If equal to ``LocalPortPolicy.PRIVILEGED`` or -1, bind to the first free privileged port.
+                If equal to ``LocalPortPolicy.ANY`` or 0, bind to any free port.
+                Otherwise, bind to the specified port.
             timeout_in_seconds: The timeout for making the connection.
         """
         with SunRpcClient.connect_port_mapper(address, timeout_in_seconds) as port_mapper_client:
