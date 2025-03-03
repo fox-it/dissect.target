@@ -52,25 +52,29 @@ class MacNetworkPlugin(NetworkPlugin):
             _type = device.get("Type")
             vlan = vlan_lookup.get(name)
             dhcp = False
-            subnetmask = []
             network = []
+            ifaces = set()
             interface_service_order = service_order.index(_id) if _id in service_order else None
             try:
                 for addr in interface.get("DNS", {}).get("ServerAddresses", {}):
                     dns.add(addr)
+
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
-                    subnetmask += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
+                    _iface = ""
                     if router := addresses.get("Router"):
                         gateways.add(router)
-                    if addresses.get("ConfigMethod", "") == "DHCP":
-                        ips.add(self._plistlease(name).get("IPAddress"))
-                        dhcp = True
-                    else:
-                        for addr in addresses.get("Addresses", []):
-                            ips.add(addr)
 
-                if subnetmask:
-                    network = self.calculate_network(ips, subnetmask)
+                    if addresses.get("ConfigMethod", "") == "DHCP":
+                        _iface = self._plistlease(name).get("IPAddress")
+                        dhcp = True
+                    elif addr := addresses.get("Addresses", []):
+                        _iface = addr[0]
+
+                    if _subnet_mask := list(filter(None, addresses.get("SubnetMasks", []))):
+                        _iface = f"{_iface}/{_subnet_mask[0]}"
+
+                    if _iface:
+                        ifaces.update({_iface})
 
                 yield MacInterfaceRecord(
                     name=name,
@@ -83,6 +87,7 @@ class MacNetworkPlugin(NetworkPlugin):
                     vlan=vlan,
                     network=network,
                     interface_service_order=interface_service_order,
+                    interface=ifaces,
                     dhcp=dhcp,
                     mac=[],
                     _target=self.target,
