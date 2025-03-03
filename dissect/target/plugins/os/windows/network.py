@@ -238,6 +238,20 @@ def _get_config_value(key: RegistryKey, name: str, sep: str | None = None) -> se
     return {value}
 
 
+def _construct_interface(key: RegistryKey, ip_key: str, subnet_key: str) -> set[str]:
+    interface = ""
+    if ip := _get_config_value(key, ip_key):
+        interface = next(iter(ip))
+
+    if subnet := _get_config_value(key, subnet_key):
+        interface = f"{interface}/{next(iter(subnet))}"
+
+    if not interface:
+        return set()
+
+    return {interface}
+
+
 class WindowsNetworkPlugin(NetworkPlugin):
     """Windows network interface plugin."""
 
@@ -325,6 +339,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
             "gateway": set(),
             "ip": set(),
             "dns": set(),
+            "interface": set(),
             "subnetmask": set(),
             "search_domain": set(),
             "network": set(),
@@ -333,6 +348,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
         static_config = {
             "ip": set(),
             "dns": set(),
+            "interface": set(),
             "subnetmask": set(),
             "search_domain": set(),
             "gateway": set(),
@@ -354,17 +370,19 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         for key in keys:
             # Extract DHCP configuration from the registry
-            dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
-            dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
-            dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
-            dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
             dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
+            dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
+            dhcp_config["interface"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
+            dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
+            dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
+            dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
 
             # Extract static configuration from the registry
-            static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
             static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
-            static_config["search_domain"].update(_get_config_value(key, "Domain"))
+            static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
+            static_config["interface"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
             static_config["ip"].update(_get_config_value(key, "IPAddress"))
+            static_config["search_domain"].update(_get_config_value(key, "Domain"))
             static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))
 
         if len(dhcp_config) > 0:
@@ -374,11 +392,6 @@ class WindowsNetworkPlugin(NetworkPlugin):
         if len(static_config) > 0:
             static_config["enabled"] = None
             static_config["dhcp"] = False
-
-        # Iterate over combined ip/subnet lists
-        for config in (dhcp_config, static_config):
-            if (ips := config.get("ip")) and (masks := config.get("subnetmask")):
-                config["network"].update(set(self.calculate_network(ips, masks)))
 
         # Return both configurations
         return [dhcp_config, static_config]

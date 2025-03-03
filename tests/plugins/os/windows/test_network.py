@@ -49,6 +49,7 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "gateway": ["10.10.10.1"],
                 "mac": ["DE:AD:BE:EF:DE:AD"],
                 "network": ["10.10.10.0/24"],
+                "interface": ["10.10.10.10/24"],
                 "subnetmask": ["255.255.255.0"],
                 "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "type": "OTHER",
@@ -82,6 +83,7 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "mac": ["DE:AD:BE:EF:DE:AD"],
                 "subnetmask": ["255.255.255.0"],
                 "network": ["10.10.10.0/24"],
+                "interface": ["10.10.10.10/24"],
                 "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "type": "ETHERNET_CSMACD",
                 "vlan": 11,
@@ -186,7 +188,8 @@ def test_windows_network(
         assert network.macs() == expected_values["mac"]
 
         network_interface = list(network.interfaces())[0]
-        assert network_interface.network == expected_values["network"]
+        # assert network_interface.network == expected_values["network"]
+        assert network_interface.interface == expected_values.get("interface", [])
         assert network_interface.first_connected == expected_values["first_connected"]
         assert network_interface.type == expected_values["type"]
         assert network_interface.vlan == expected_values["vlan"]
@@ -273,7 +276,7 @@ def test_windows_network_none(
                     "gateway": ["192.168.0.1"],
                     "mac": ["FE:EE:EE:EE:EE:ED"],
                     "subnetmask": ["255.255.255.0"],
-                    "network": ["192.168.0.0/24"],
+                    "interface": ["192.168.0.10/24"],
                     "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                     "type": "SOFTWARE_LOOPBACK",
                     "vlan": 10,
@@ -289,7 +292,7 @@ def test_windows_network_none(
                     "gateway": ["10.0.0.1"],
                     "mac": ["FE:EE:EE:EE:EE:ED"],
                     "subnetmask": ["255.255.255.0"],
-                    "network": ["10.0.0.0/24"],
+                    "interface": ["10.0.0.10/24"],
                     "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                     "type": "SOFTWARE_LOOPBACK",
                     "vlan": 10,
@@ -341,7 +344,7 @@ def test_network_dhcp_and_static(
         macs = set()
 
         for interface, expected in zip(interfaces, expected_values):
-            ips.update(interface.ip)
+            ips.update({iface.ip for iface in interface.interface})
             dns.update(interface.dns)
             gateways.update(interface.gateway)
             macs.update(interface.mac)
@@ -350,7 +353,7 @@ def test_network_dhcp_and_static(
             assert sorted(map(str, interface.dns)) == expected["dns"]
             assert interface.gateway == expected["gateway"]
             assert interface.mac == expected["mac"]
-            assert interface.network == expected["network"]
+            assert interface.interface == expected["interface"]
             assert interface.first_connected == expected["first_connected"]
             assert interface.type == expected["type"]
             assert interface.vlan == expected["vlan"]
