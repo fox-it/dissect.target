@@ -165,7 +165,6 @@ def test_windows_network(
         assert network.macs() == expected_values.get("mac", [])
 
         network_interface = next(iter(network.interfaces()))
-        # assert network_interface.network == expected_values["network"]
         assert network_interface.interface == expected_values.get("interface", [])
         assert network_interface.first_connected == expected_values.get("first_connected")
         assert network_interface.type == expected_values.get("type")
