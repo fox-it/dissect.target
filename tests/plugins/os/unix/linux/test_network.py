@@ -1,7 +1,7 @@
 import posixpath
+from collections import Counter
 from datetime import datetime
-from ipaddress import ip_address, ip_network
-from typing import Counter
+from ipaddress import ip_address, ip_interface
 from unittest.mock import MagicMock, patch
 
 from dissect.target import Target
@@ -28,12 +28,11 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
     assert wired.name == "enp0s3"
     assert wired.type == "ethernet"
     assert wired.mac == ["08:00:27:5B:4A:EB"]
-    assert Counter(wired.ip) == Counter([ip_address("192.168.2.138"), ip_address("10.1.1.10")])
+    assert Counter(wired.interface) == Counter([ip_interface("192.168.2.138/24"), ip_interface("10.1.1.10/16")])
     assert wired.dns == [ip_address("88.88.88.88")]
     assert Counter(wired.gateway) == Counter(
         [ip_address("192.168.2.2"), ip_address("2620:52:0:2219:222:68ff:fe11:5403"), ip_address("192.168.2.3")]
     )
-    assert Counter(wired.network) == Counter([ip_network("192.168.2.0/24"), ip_network("10.1.0.0/16")])
     assert not wired.dhcp_ipv4
     assert not wired.dhcp_ipv6
     assert wired.enabled is None
@@ -45,10 +44,8 @@ def test_networkmanager_parser(target_linux: Target, fs_linux: VirtualFilesystem
     assert wireless.name == "wlp2s0"
     assert wireless.type == "wifi"
     assert wireless.mac == []
-    assert wireless.ip == []
     assert wireless.dns == []
     assert wireless.gateway == []
-    assert wireless.network == []
     assert wireless.dhcp_ipv4
     assert wireless.dhcp_ipv6
     assert wireless.enabled is None
@@ -91,10 +88,9 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert wired_static.name == "enp1s0"
     assert wired_static.type is None
     assert wired_static.mac == ["aa::bb::cc::dd::ee::ff"]
-    assert wired_static.ip == [ip_address("10.1.10.9")]
     assert wired_static.dns == [ip_address("10.1.10.1")]
     assert wired_static.gateway == [ip_address("10.1.10.1")]
-    assert wired_static.network == [ip_network("10.1.10.0/24")]
+    assert wired_static.interface == ["10.1.10.9/24"]
     assert not wired_static.dhcp_ipv4
     assert not wired_static.dhcp_ipv6
     assert wired_static.enabled is None
@@ -108,14 +104,15 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert Counter(wired_static_complex.mac) == Counter(
         ["aa::bb::cc::dd::ee::ff", "ff::ee::dd::cc::bb::aa", "cc::ff::bb::aa::dd", "bb::aa::dd::cc::ff"]
     )
-    assert Counter(wired_static_complex.ip) == Counter([ip_address("10.1.10.9"), ip_address("10.1.9.10")])
+    assert Counter(wired_static_complex.interface) == Counter(
+        [ip_interface("10.1.10.9/16"), ip_interface("10.1.9.10/24")]
+    )
     assert Counter(wired_static_complex.dns) == Counter(
         [ip_address("10.1.10.1"), ip_address("10.1.10.2"), ip_address("1111:2222::3333")]
     )
     assert Counter(wired_static_complex.gateway) == Counter(
         [ip_address("10.1.6.3"), ip_address("10.1.10.2"), ip_address("10.1.9.3")]
     )
-    assert Counter(wired_static_complex.network) == Counter([ip_network("10.1.0.0/16"), ip_network("10.1.9.0/24")])
     assert not wired_static_complex.dhcp_ipv4
     assert not wired_static_complex.dhcp_ipv6
     assert wired_static_complex.enabled is None
@@ -127,10 +124,9 @@ def test_systemd_network_parser(target_linux: Target, fs_linux: VirtualFilesyste
     assert wireless.name == "wlp2s0"
     assert wireless.type == "wifi"
     assert wireless.mac == []
-    assert wireless.ip == []
     assert wireless.dns == []
     assert wireless.gateway == []
-    assert wireless.network == []
+    assert wireless.interface == []
     assert wireless.dhcp_ipv4
     assert wireless.dhcp_ipv6
     assert wireless.enabled is None
