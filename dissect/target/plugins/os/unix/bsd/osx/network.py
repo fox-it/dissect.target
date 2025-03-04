@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import plistlib
 from functools import cache, lru_cache
-from typing import Iterator
+from typing import TYPE_CHECKING
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.record import MacInterfaceRecord
 from dissect.target.plugins.os.default.network import NetworkPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 
 class MacNetworkPlugin(NetworkPlugin):
@@ -25,6 +30,8 @@ class MacNetworkPlugin(NetworkPlugin):
     def _plistnetwork(self) -> dict:
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
+
+        raise FileNotFoundError("Couldn't find preferences file.")
 
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
         plistnetwork = self._plistnetwork()
@@ -46,13 +53,11 @@ class MacNetworkPlugin(NetworkPlugin):
         for _id, interface in network.items():
             dns = set()
             gateways = set()
-            ips = set()
             device = interface.get("Interface", {})
             name = device.get("DeviceName")
             _type = device.get("Type")
             vlan = vlan_lookup.get(name)
             dhcp = False
-            network = []
             ifaces = set()
             interface_service_order = service_order.index(_id) if _id in service_order else None
             try:
@@ -74,18 +79,16 @@ class MacNetworkPlugin(NetworkPlugin):
                         _iface = f"{_iface}/{_subnet_mask[0]}"
 
                     if _iface:
-                        ifaces.update({_iface})
+                        ifaces.add(_iface)
 
                 yield MacInterfaceRecord(
                     name=name,
                     type=_type,
                     enabled=not interface.get("__INACTIVE__", False),
                     dns=list(dns),
-                    ip=list(ips),
                     gateway=list(gateways),
                     source="NetworkServices",
                     vlan=vlan,
-                    network=network,
                     interface_service_order=interface_service_order,
                     interface=ifaces,
                     dhcp=dhcp,

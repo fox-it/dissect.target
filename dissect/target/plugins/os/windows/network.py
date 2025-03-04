@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from enum import IntEnum
 from functools import lru_cache
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 
@@ -14,7 +14,12 @@ from dissect.target.exceptions import (
 from dissect.target.helpers.record import WindowsInterfaceRecord
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugins.os.default.network import NetworkPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 
 class IfTypes(IntEnum):
@@ -315,9 +320,8 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     if not conf or not any(
                         [
                             conf["dns"],
-                            conf["ip"],
                             conf["gateway"],
-                            conf["subnetmask"],
+                            conf["interface"],
                             conf["search_domain"],
                         ]
                     ):
@@ -336,23 +340,17 @@ class WindowsNetworkPlugin(NetworkPlugin):
         """Extract network device configuration from the given interface_id for all ControlSets on the system."""
 
         dhcp_config = {
-            "gateway": set(),
-            "ip": set(),
             "dns": set(),
+            "gateway": set(),
             "interface": set(),
-            "subnetmask": set(),
             "search_domain": set(),
-            "network": set(),
         }
 
         static_config = {
-            "ip": set(),
             "dns": set(),
-            "interface": set(),
-            "subnetmask": set(),
-            "search_domain": set(),
             "gateway": set(),
-            "network": set(),
+            "interface": set(),
+            "search_domain": set(),
         }
 
         # Get the registry keys for the given interface id
@@ -373,17 +371,13 @@ class WindowsNetworkPlugin(NetworkPlugin):
             dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
             dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
             dhcp_config["interface"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
-            dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
             dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
-            dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
 
             # Extract static configuration from the registry
             static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
             static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
             static_config["interface"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
-            static_config["ip"].update(_get_config_value(key, "IPAddress"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
-            static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))
 
         if len(dhcp_config) > 0:
             dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1

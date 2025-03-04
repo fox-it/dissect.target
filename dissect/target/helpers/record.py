@@ -150,9 +150,7 @@ COMMON_INTERFACE_ELEMENTS = [
     ("boolean", "enabled"),
     ("net.ipaddress[]", "dns"),
     ("net.ipinterface[]", "interface"),
-    ("net.ipaddress[]", "ip"),
     ("net.ipaddress[]", "gateway"),
-    ("net.ipnetwork[]", "network"),
     ("string", "source"),
 ]
 
@@ -177,7 +175,6 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
         ("stringlist", "search_domain"),
         ("datetime", "first_connected"),
         ("datetime", "last_connected"),
-        ("net.ipaddress[]", "subnetmask"),
         ("boolean", "dhcp"),
         ("varint", "vlan"),
     ],
