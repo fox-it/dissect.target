@@ -12,7 +12,6 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 from dissect.target.helpers.record import WindowsInterfaceRecord
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugins.os.default.network import NetworkPlugin
 
 if TYPE_CHECKING:
