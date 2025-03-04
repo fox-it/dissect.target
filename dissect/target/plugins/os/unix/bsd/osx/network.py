@@ -31,7 +31,7 @@ class MacNetworkPlugin(NetworkPlugin):
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
 
-        raise FileNotFoundError("Couldn't find preferences file.")
+        raise FileNotFoundError("Couldn't find preferences file")
 
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
         plistnetwork = self._plistnetwork()
