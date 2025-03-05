@@ -280,7 +280,7 @@ class ApachePlugin(WebserverPlugin):
             elif "ServerRoot" in line:
                 match = RE_CONFIG_ROOT.match(line)
                 if not match:
-                    self.target.log.warning("Unexpected Apache 'ServerRoot' configuration in %s: '%s'", path, line)
+                    self.target.log.warning("Unexpected Apache 'ServerRoot' configuration in %s: %r", path, line)
                     continue
                 directive = match.groupdict()
                 self.server_root = self.target.fs.path(directive["location"])
@@ -291,7 +291,7 @@ class ApachePlugin(WebserverPlugin):
             elif "Include" in line:
                 match = RE_CONFIG_INCLUDE.match(line)
                 if not match:
-                    self.target.log.warning("Unexpected Apache 'Include' configuration in %s: '%s'", path, line)
+                    self.target.log.warning("Unexpected Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
                 directive = match.groupdict()
@@ -303,7 +303,7 @@ class ApachePlugin(WebserverPlugin):
                     elif not root.startswith("/") and self.server_root:
                         root = self.server_root.joinpath(root)
                     elif not self.server_root:
-                        self.target.log.warning("Unable to resolve relative Include in %s: '%s'", path, line)
+                        self.target.log.warning("Unable to resolve relative Include in %s: %r", path, line)
                         continue
 
                     for found_conf in root.glob(f"*{rest}"):
@@ -311,7 +311,7 @@ class ApachePlugin(WebserverPlugin):
 
                 elif (
                     self.server_root
-                    and (include_path := self.target.fs.path(self.server_root).joinpath(directive["location"])).exists()
+                    and (include_path := self.server_root.joinpath(directive["location"])).exists()
                 ):
                     self._process_conf_file(include_path)
 
@@ -319,7 +319,7 @@ class ApachePlugin(WebserverPlugin):
                     self._process_conf_file(include_path)
 
                 else:
-                    self.target.log.warning("Unable to resolve Apache Include in %s: '%s'", path, line)
+                    self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
 
     def _process_conf_line(self, path: Path, line: str) -> None:
         """Parse and resolve the given ``CustomLog`` or ``ErrorLog`` directive found in a Apache ``.conf`` file."""
@@ -335,14 +335,12 @@ class ApachePlugin(WebserverPlugin):
 
         match = pattern.match(line)
         if not match:
-            self.target.log.warning("Unexpected Apache 'ErrorLog' or 'CustomLog' configuration in %s: '%s'", path, line)
+            self.target.log.warning("Unexpected Apache 'ErrorLog' or 'CustomLog' configuration in %s: %r", path, line)
             return
 
         directive = match.groupdict()
         custom_log = self.target.fs.path(directive["location"])
-        match = RE_ENV_VAR_IN_STRING.match(directive["location"])
-
-        if match:
+        if match := RE_ENV_VAR_IN_STRING.match(directive["location"]):
             envvar_directive = match.groupdict()
             apache_log_dir = self._read_apache_envvar(envvar_directive["env_var"])
             if apache_log_dir is None:
@@ -353,7 +351,7 @@ class ApachePlugin(WebserverPlugin):
 
             custom_log = self.target.fs.path(
                 directive["location"].replace(
-                    r"${" + envvar_directive["env_var"] + "}", apache_log_dir.replace("$SUFFIX", "")
+                    f"${{{envvar_directive['env_var']}}}", apache_log_dir.replace("$SUFFIX", "")
                 )
             )
 
