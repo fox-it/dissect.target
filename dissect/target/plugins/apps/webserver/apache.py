@@ -261,13 +261,15 @@ class ApachePlugin(WebserverPlugin):
 
         return self.access_paths, self.error_paths
 
-    def _process_conf_file(self, path: Path, seen: set[Path] | None) -> None:
-        """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include`` and ``OptionalInclude`` directives."""
-        seen = seen or set()
+    def _process_conf_file(self, path: Path, seen: set[Path] | None = set()) -> None:
+        """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
+        and ``OptionalInclude`` directives.
+        """
 
         if path in seen:
-            self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
+            self.target.log.info("Detected recursion in Apache configuration, file already parsed: %s", path)
             return
+
         seen.add(path)
 
         for line in path.open("rt"):
@@ -279,7 +281,7 @@ class ApachePlugin(WebserverPlugin):
             elif "ServerRoot" in line:
                 match = RE_CONFIG_ROOT.match(line)
                 if not match:
-                    self.target.log.warning("Unexpected Apache 'ServerRoot' configuration in %s: %r", path, line)
+                    self.target.log.warning("Unable to parse Apache 'ServerRoot' configuration in %s: %r", path, line)
                     continue
                 directive = match.groupdict()
                 self.server_root = self.target.fs.path(directive["location"])
@@ -290,7 +292,7 @@ class ApachePlugin(WebserverPlugin):
             elif "Include" in line:
                 match = RE_CONFIG_INCLUDE.match(line)
                 if not match:
-                    self.target.log.warning("Unexpected Apache 'Include' configuration in %s: %r", path, line)
+                    self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
                 directive = match.groupdict()
