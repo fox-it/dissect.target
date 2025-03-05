@@ -412,7 +412,7 @@ def test_find_functions_compatible_check(target_linux: Target) -> None:
     found, _ = find_functions("*", target_linux, compatibility=True)
     assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
 
-    with (patch("dissect.target.plugins.apps.browser.chrome.ChromePlugin.check_compatible", return_value=None)):
+    with patch("dissect.target.plugins.apps.browser.chrome.ChromePlugin.check_compatible", return_value=None):
         found, _ = find_functions("*", target_linux, compatibility=True)
         functions = [f.path for f in found]
         assert "apps.browser.chrome.cookies" in functions
