@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-import tarfile
+import tarfile as tf
 from pathlib import Path
 
 from dissect.target import filesystem, target
@@ -11,53 +11,15 @@ from dissect.target.filesystems.tar import (
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
+from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
 
+ContainerImageTarSubLoader: TarSubLoader = import_lazy(
+    "dissect.target.loaders.containerimage"
+).ContainerImageTarSubLoader
+GenericTarSubLoader: TarSubLoader = import_lazy("dissect.target.loaders.tar").GenericTarSubLoader
+
 log = logging.getLogger(__name__)
-
-
-ANON_FS_RE = re.compile(r"^fs[0-9]+$")
-
-
-class TarLoader(Loader):
-    """Load tar files."""
-
-    def __init__(self, path: Path | str, **kwargs):
-        super().__init__(path)
-
-        if isinstance(path, str):
-            path = Path(path)
-
-        if self.is_compressed(path):
-            log.warning(
-                f"Tar file {path!r} is compressed, which will affect performance. "
-                "Consider uncompressing the archive before passing the tar file to Dissect."
-            )
-
-        from dissect.target.loaders.containerimage import ContainerImageTarSubLoader
-
-        self.SUB_LOADERS = [
-            ContainerImageTarSubLoader,
-            GenericTarSubLoader,  # should be last
-        ]
-
-        self.fh = path.open("rb")
-        self.tar = tarfile.open(mode="r:*", fileobj=self.fh)
-
-    @staticmethod
-    def detect(path: Path) -> bool:
-        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
-
-    def is_compressed(self, path: Path) -> bool:
-        return str(path).lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
-
-    def map(self, target: target.Target) -> None:
-        for candidate in self.SUB_LOADERS:
-            if candidate.detect(self.tar):
-                self.subloader = candidate(self.tar)
-                self.subloader.map(target)
-                break
-
 
 TAR_EXT_COMP = (
     ".tar.gz",
@@ -79,32 +41,74 @@ TAR_MAGIC_COMP = (
     # xz
     b"\xfd\x37\x7a\x58\x5a\x00",
 )
-TAR_MAGIC = (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
+TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
+
+ANON_FS_RE = re.compile(r"^fs[0-9]+$")
+
+
+class TarLoader(Loader):
+    """Load tar files."""
+
+    __subloaders__ = [
+        ContainerImageTarSubLoader,
+        GenericTarSubLoader,  # should be last
+    ]
+
+    def __init__(self, path: Path | str, **kwargs):
+        super().__init__(path)
+
+        if isinstance(path, str):
+            path = Path(path)
+
+        if self.is_compressed(path):
+            log.warning(
+                f"Tar file {path!r} is compressed, which will affect performance. "
+                "Consider uncompressing the archive before passing the tar file to Dissect."
+            )
+
+        self.fh = path.open("rb")
+        self.tar = tf.open(mode="r:*", fileobj=self.fh)
+        self.subloader = None
+
+    @staticmethod
+    def detect(path: Path) -> bool:
+        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
+
+    def is_compressed(self, path: Path) -> bool:
+        return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
+
+    def map(self, target: target.Target) -> None:
+        for candidate in self.__subloaders__:
+            if candidate.detect(self.tar):
+                self.subloader = candidate(self.tar)
+                self.subloader.map(target)
+                break
 
 
 def is_tar_magic(path: Path, magics: tuple) -> bool:
+    if not path.is_file():
+        return False
+
     with path.open("rb") as fh:
         headers = [fh.read(6)]
         fh.seek(257)
         headers.append(fh.read(8))
         for header in headers:
             for magic in magics:
-                if len(magic) > len(header):
-                    continue
                 if header[: len(magic)] == magic:
                     return True
     return False
 
 
-class TarSubLoader(SubLoader):
+class TarSubLoader(SubLoader[tf.TarFile]):
     """Tar implementation of a :class:`SubLoader`."""
 
-    def __init__(self, tar: tarfile.TarFile, *args, **kwargs):
+    def __init__(self, tar: tf.TarFile, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.tar = tar
 
     @staticmethod
-    def detect(tar: tarfile.TarFile) -> bool:
+    def detect(tarfile: tf.TarFile) -> bool:
         """Only to be called internally by :class:`TarLoader`."""
         raise NotImplementedError()
 
@@ -120,7 +124,7 @@ class GenericTarSubLoader(TarSubLoader):
     """
 
     @staticmethod
-    def detect(tar: tarfile.TarFile) -> bool:
+    def detect(tarfile: tf.TarFile) -> bool:
         return True
 
     def map(self, target: target.Target) -> None:

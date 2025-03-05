@@ -45,7 +45,7 @@ class ContainerImageTarSubLoader(TarSubLoader):
         self.config = None
 
         try:
-            self.tarfs = TarFilesystem(None, _tarfile=tar)
+            self.tarfs = TarFilesystem(None, tarfile=tar)
         except Exception as e:
             raise ValueError(f"Unable to open {str(tar)} as TarFilesystem: {str(e)}")
         try:
@@ -61,7 +61,6 @@ class ContainerImageTarSubLoader(TarSubLoader):
 
     @staticmethod
     def detect(tar: tarfile.TarFile) -> bool:
-        # NOTE: tar.getmembers() / tar.getnames() is still inefficient for large tarballs, how should be prevent this?
         names = tar.getnames()
         return OCI_IMAGE.issubset(names) or DOCKER_ARCHIVE_IMAGE.issubset(names)
 
