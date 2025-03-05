@@ -951,7 +951,9 @@ def _filter_compatible(
     descriptors: list[FunctionDescriptor], target: Target, ignore_load_errors: bool = False
 ) -> Iterator[FunctionDescriptor]:
     """Filter a list of function descriptors based on compatibility with a target."""
-    seen = set()
+    compatible = set()
+    incompatible = set()
+
     for descriptor in descriptors:
         try:
             plugincls = load(descriptor)
@@ -960,13 +962,20 @@ def _filter_compatible(
                 continue
             raise
 
-        if descriptor.path not in seen:
-            seen.add(descriptor.path)
-            try:
-                if plugincls(target).is_compatible():
-                    yield descriptor
-            except Exception:
-                continue
+        if plugincls in compatible:
+            yield descriptor
+            continue
+
+        if plugincls in incompatible:
+            continue
+
+        try:
+            if plugincls(target).is_compatible():
+                compatible.add(plugincls)
+                yield descriptor
+        except Exception:
+            incompatible.add(plugincls)
+            continue
 
 
 def generate() -> dict[str, Any]:
