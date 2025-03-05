@@ -229,8 +229,8 @@ class ApachePlugin(WebserverPlugin):
         if not len(self.access_paths) and not len(self.error_paths):
             raise UnsupportedPluginError("No Apache directories found")
 
-        if self.target.os in [OperatingSystem.CITRIX, OperatingSystem.FORTIOS]:
-            raise UnsupportedPluginError("Use other Apache plugin instead")
+        if self.target.os == OperatingSystem.CITRIX:
+            raise UnsupportedPluginError(f"Use {self.target.os} Apache plugin instead")
 
     def find_logs(self) -> tuple[list[Path], list[Path]]:
         """Discover any present Apache log paths on the target system.
@@ -241,8 +241,6 @@ class ApachePlugin(WebserverPlugin):
             - https://www.cyberciti.biz/faq/apache-logs/
             - https://unix.stackexchange.com/a/269090
         """
-
-        self.seen_confs = set()
 
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
@@ -263,13 +261,14 @@ class ApachePlugin(WebserverPlugin):
 
         return self.access_paths, self.error_paths
 
-    def _process_conf_file(self, path: Path) -> None:
+    def _process_conf_file(self, path: Path, seen: set[Path] | None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include`` and ``OptionalInclude`` directives."""
+        seen = seen or set()
 
-        if path in self.seen_confs:
+        if path in seen:
             self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
             return
-        self.seen_confs.add(path)
+        seen.add(path)
 
         for line in path.open("rt"):
             line = line.strip()
@@ -295,9 +294,10 @@ class ApachePlugin(WebserverPlugin):
                     continue
 
                 directive = match.groupdict()
+                location = directive["location"]
 
-                if "*" in directive["location"]:
-                    root, rest = directive["location"].split("*", 1)
+                if "*" in location:
+                    root, rest = location.split("*", 1)
                     if root.startswith("/"):
                         root = self.target.fs.path(root)
                     elif not root.startswith("/") and self.server_root:
@@ -307,16 +307,13 @@ class ApachePlugin(WebserverPlugin):
                         continue
 
                     for found_conf in root.glob(f"*{rest}"):
-                        self._process_conf_file(found_conf)
+                        self._process_conf_file(found_conf, seen)
 
-                elif (
-                    self.server_root
-                    and (include_path := self.server_root.joinpath(directive["location"])).exists()
-                ):
-                    self._process_conf_file(include_path)
+                elif self.server_root and (include_path := self.server_root.joinpath(location)).exists():
+                    self._process_conf_file(include_path, seen)
 
-                elif (include_path := self.target.fs.path(directive["location"])).exists():
-                    self._process_conf_file(include_path)
+                elif (include_path := self.target.fs.path(location)).exists():
+                    self._process_conf_file(include_path, seen)
 
                 else:
                     self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
@@ -339,20 +336,19 @@ class ApachePlugin(WebserverPlugin):
             return
 
         directive = match.groupdict()
-        custom_log = self.target.fs.path(directive["location"])
-        if match := RE_ENV_VAR_IN_STRING.match(directive["location"]):
+        location = directive["location"]
+        custom_log = self.target.fs.path(location)
+
+        if match := RE_ENV_VAR_IN_STRING.match(location):
             envvar_directive = match.groupdict()
-            apache_log_dir = self._read_apache_envvar(envvar_directive["env_var"])
+            env_var = envvar_directive["env_var"]
+            apache_log_dir = self._read_apache_envvar(env_var)
             if apache_log_dir is None:
-                self.target.log.warning(
-                    "%s does not exist, cannot resolve '%s' in %s", envvar_directive["env_var"], custom_log, path
-                )
+                self.target.log.warning("%s does not exist, cannot resolve '%s' in %s", env_var, custom_log, path)
                 return
 
             custom_log = self.target.fs.path(
-                directive["location"].replace(
-                    f"${{{envvar_directive['env_var']}}}", apache_log_dir.replace("$SUFFIX", "")
-                )
+                directive["location"].replace(f"${{{env_var}}}", apache_log_dir.replace("$SUFFIX", ""))
             )
 
         set_to_update.update(path for path in custom_log.parent.glob(f"*{custom_log.name}*"))
