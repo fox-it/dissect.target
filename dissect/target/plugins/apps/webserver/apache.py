@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import re
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
 from typing import Iterator, NamedTuple
 
@@ -226,14 +227,15 @@ class ApachePlugin(WebserverPlugin):
         self.find_logs()
 
     def check_compatible(self) -> None:
-        if not len(self.access_paths) and not len(self.error_paths):
-            raise UnsupportedPluginError("No Apache directories found")
+        if not self.access_paths and not self.error_paths:
+            raise UnsupportedPluginError("No Apache log files found")
 
         if self.target.os == OperatingSystem.CITRIX:
             raise UnsupportedPluginError(f"Use {self.target.os} Apache plugin instead")
 
-    def find_logs(self) -> tuple[list[Path], list[Path]]:
+    def find_logs(self) -> None:
         """Discover any present Apache log paths on the target system.
+        Populates ``self.access_paths`` and ``self.error_paths``.
 
         References:
             - https://httpd.apache.org/docs/2.4/logs.html
@@ -249,25 +251,28 @@ class ApachePlugin(WebserverPlugin):
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ERROR_LOG_NAMES):
             self.error_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
 
+        seen = set()
+
         # Check default Apache configs for CustomLog or ErrorLog directives
         for config in self.DEFAULT_CONFIG_PATHS:
-            if (path := self.target.fs.path(config)).exists():
+            if (path := self.target.fs.path(config)).exists() and path not in seen:
+                seen.add(path)
                 self._process_conf_file(path)
 
         # Check all .conf files inside the server root
         if self.server_root:
             for path in self.server_root.rglob("*.conf"):
-                self._process_conf_file(path)
-
-        return self.access_paths, self.error_paths
+                if path not in seen:
+                    seen.add(path)
+                    self._process_conf_file(path)
 
     def _process_conf_file(self, path: Path, seen: set[Path] | None = set()) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
-        and ``OptionalInclude`` directives.
+        and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
         """
 
         if path in seen:
-            self.target.log.info("Detected recursion in Apache configuration, file already parsed: %s", path)
+            self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
             return
 
         seen.add(path)
@@ -283,8 +288,8 @@ class ApachePlugin(WebserverPlugin):
                 if not match:
                     self.target.log.warning("Unable to parse Apache 'ServerRoot' configuration in %s: %r", path, line)
                     continue
-                directive = match.groupdict()
-                self.server_root = self.target.fs.path(directive["location"])
+                location = match.groupdict().get("location")
+                self.server_root = self.target.fs.path(location)
 
             elif "CustomLog" in line or "ErrorLog" in line:
                 self._process_conf_line(path, line)
@@ -295,8 +300,7 @@ class ApachePlugin(WebserverPlugin):
                     self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
-                directive = match.groupdict()
-                location = directive["location"]
+                location = match.groupdict().get("location")
 
                 if "*" in location:
                     root, rest = location.split("*", 1)
@@ -337,30 +341,31 @@ class ApachePlugin(WebserverPlugin):
             self.target.log.warning("Unexpected Apache 'ErrorLog' or 'CustomLog' configuration in %s: %r", path, line)
             return
 
-        directive = match.groupdict()
-        location = directive["location"]
+        location = match.groupdict().get("location")
         custom_log = self.target.fs.path(location)
 
-        if match := RE_ENV_VAR_IN_STRING.match(location):
-            envvar_directive = match.groupdict()
+        if env_var_match := RE_ENV_VAR_IN_STRING.match(location):
+            envvar_directive = env_var_match.groupdict()
             env_var = envvar_directive["env_var"]
-            apache_log_dir = self._read_apache_envvar(env_var)
+            apache_log_dir = self.env_vars.get(env_var)
             if apache_log_dir is None:
                 self.target.log.warning("%s does not exist, cannot resolve '%s' in %s", env_var, custom_log, path)
                 return
 
-            custom_log = self.target.fs.path(
-                directive["location"].replace(f"${{{env_var}}}", apache_log_dir.replace("$SUFFIX", ""))
-            )
+            custom_log = self.target.fs.path(location.replace(f"${{{env_var}}}", apache_log_dir.replace("$SUFFIX", "")))
 
         set_to_update.update(path for path in custom_log.parent.glob(f"*{custom_log.name}*"))
 
-    def _read_apache_envvar(self, envvar: str) -> str | None:
+    @cached_property
+    def env_vars(self) -> dict:
+        variables = {}
         for envvar_file in self.DEFAULT_ENVVAR_PATHS:
-            if (envvars := self.target.fs.path(envvar_file)).exists():
-                for line in envvars.read_text().split("\n"):
-                    if f"export {envvar}" in line:
-                        return line.split("=", maxsplit=1)[-1].strip("\"'")
+            if (file := self.target.fs.path(envvar_file)).exists():
+                for line in file.read_text().split("\n"):
+                    key, _, value = line.partition("=")
+                    if key:
+                        variables[key.replace("export ", "")] = value.strip("\"'")
+        return variables
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
