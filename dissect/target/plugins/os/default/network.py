@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Callable, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
@@ -35,7 +36,6 @@ class NetworkPlugin(Plugin):
         yield from ()
 
     def _get_record_type(self, field_name: str, func: Callable[[Any], Any] | None = None) -> Iterator[Any]:
-        func = func or (lambda _: _)
         for record in self.interfaces():
             if (output := getattr(record, field_name, None)) is None:
                 continue
@@ -43,7 +43,7 @@ class NetworkPlugin(Plugin):
             if not isinstance(output, list):
                 output = [output]
 
-            yield from map(func, output)
+            yield from (map(func, output) if func else output)
 
     @export(record=get_args(InterfaceRecord))
     def interfaces(self) -> Iterator[InterfaceRecord]:
@@ -57,7 +57,7 @@ class NetworkPlugin(Plugin):
     @export
     def ips(self) -> list[IPAddress]:
         """Return IP addresses as list of :class:`IPAddress`."""
-        return list(set(self._get_record_type("interface", lambda x: x.ip)))
+        return list(set(self._get_record_type("interface", attrgetter("ip"))))
 
     @export
     def gateways(self) -> list[IPAddress]:
@@ -76,18 +76,21 @@ class NetworkPlugin(Plugin):
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
+        """Yield all InterfaceRecords that use ``ip_addr``."""
         for interface in self.interfaces():
             if any(iface.ip == ip_addr for iface in interface.interface):
                 yield interface
 
     @internal
     def with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
+        """Yield all InterfaceRecords that use ``mac``."""
         for interface in self.interfaces():
             if mac in interface.mac:
                 yield interface
 
     @internal
     def in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
+        """Yield all InterfaceRecords that have an :class:`IPAddress` inside ``cidr``."""
         cidr = IPNetwork(cidr)
         for interface in self.interfaces():
             if any(iface.ip in cidr for iface in interface.interface):
