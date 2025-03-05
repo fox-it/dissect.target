@@ -4,7 +4,6 @@ from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Callable, Union, get_args
 
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
-from flow.record.fieldtypes.net.ipv4 import Address, addr_long, addr_str, mask_to_bits
 
 from dissect.target.helpers.record import (
     MacInterfaceRecord,
