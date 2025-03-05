@@ -65,21 +65,21 @@ class MacNetworkPlugin(NetworkPlugin):
                     dns.add(addr)
 
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
-                    _iface = ""
+                    iface = ""
                     if router := addresses.get("Router"):
                         gateways.add(router)
 
                     if addresses.get("ConfigMethod", "") == "DHCP":
-                        _iface = self._plistlease(name).get("IPAddress")
+                        iface = self._plistlease(name).get("IPAddress")
                         dhcp = True
                     elif addr := addresses.get("Addresses", []):
-                        _iface = addr[0]
+                        iface = addr[0]
 
                     if _subnet_mask := list(filter(None, addresses.get("SubnetMasks", []))):
-                        _iface = f"{_iface}/{_subnet_mask[0]}"
+                        iface = f"{iface}/{_subnet_mask[0]}"
 
-                    if _iface:
-                        ifaces.add(_iface)
+                    if iface:
+                        ifaces.add(iface)
 
                 yield MacInterfaceRecord(
                     name=name,
