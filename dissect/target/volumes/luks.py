@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import pathlib
-from typing import BinaryIO, Iterator, Optional, Union
+from typing import BinaryIO, Iterator
 
 from dissect.fve import luks
 from dissect.util.stream import AlignedStream
@@ -19,7 +21,7 @@ class LUKSVolumeSystemError(VolumeSystemError):
 class LUKSVolumeSystem(EncryptedVolumeSystem):
     __type__ = "luks"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         super().__init__(fh, *args, **kwargs)
         self.luks = luks.LUKS(fh)
 
@@ -48,12 +50,13 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             fh=stream,
             size=stream.size,
             raw=self.fh,
+            disk=self.disk,
             vs=self,
             **volume_details,
         )
 
     def unlock_with_volume_encryption_key(
-        self, key: bytes, keyslot: Optional[int] = None, is_wildcard: bool = False
+        self, key: bytes, keyslot: int | None = None, is_wildcard: bool = False
     ) -> None:
         try:
             if keyslot is None:
@@ -73,7 +76,7 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
             if not is_wildcard:
                 log.exception("Failed to unlock LUKS volume with provided volume encryption key")
 
-    def unlock_with_passphrase(self, passphrase: str, keyslot: Optional[int] = None, is_wildcard: bool = False) -> None:
+    def unlock_with_passphrase(self, passphrase: str, keyslot: int | None = None, is_wildcard: bool = False) -> None:
         try:
             self.luks.unlock_with_passphrase(passphrase, keyslot)
             log.debug("Unlocked LUKS volume with provided passphrase")
@@ -82,7 +85,7 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
                 log.exception("Failed to unlock LUKS volume with provided passphrase")
 
     def unlock_with_key_file(
-        self, key_file: pathlib.Path, keyslot: Optional[int] = None, is_wildcard: bool = False
+        self, key_file: pathlib.Path, keyslot: int | None = None, is_wildcard: bool = False
     ) -> None:
         if not key_file.exists():
             if not is_wildcard:

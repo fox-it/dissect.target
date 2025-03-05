@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import io
 import os
 import random
+from unittest.mock import Mock
 
-from dissect.target.plugins.general import scrape
+import pytest
+
+from dissect.target.helpers import scrape
 
 
-def test_scrape_plugin_one_needle(target_win):
-    target_win.add_plugin(scrape.ScrapePlugin)
-
+def test_one_needle() -> None:
     needle = b"ABCD"
     content_size = 50
     chunk_size = len(needle) + content_size
@@ -48,7 +51,7 @@ def test_scrape_plugin_one_needle(target_win):
 
     stream = io.BytesIO(data)
 
-    found_needles = list(target_win.scrape.find_needles(stream, needles=[needle], block_size=block_size))
+    found_needles = list(scrape.find_needles(stream, needles=[needle], block_size=block_size))
     assert found_needles == [
         (needle, needle_offsets[0]),
         (needle, needle_offsets[1]),
@@ -65,7 +68,7 @@ def test_scrape_plugin_one_needle(target_win):
         return chunks[needle_offsets.index(offset)]
 
     found_chunks = list(
-        target_win.scrape.find_needle_chunks(
+        scrape.find_needle_chunks(
             stream,
             needle_chunk_size_map={needle: chunk_size},
             chunk_reader=chunk_reader,
@@ -89,7 +92,7 @@ def test_scrape_plugin_one_needle(target_win):
         yield chunk[len(needle)]
 
     records = list(
-        target_win.scrape.scrape_chunks(
+        scrape.scrape_chunks(
             stream,
             needle_chunk_size_map={needle: chunk_size},
             chunk_parser=chunk_parser,
@@ -99,9 +102,7 @@ def test_scrape_plugin_one_needle(target_win):
     assert records == [ord(c) for c in [b"a", b"b", b"c"]]
 
 
-def test_scrape_plugin_multiple_needles(target_win):
-    target_win.add_plugin(scrape.ScrapePlugin)
-
+def test_multiple_needles() -> None:
     needle1 = b"ABCD"
     chunk_size1 = 50
 
@@ -165,9 +166,7 @@ def test_scrape_plugin_multiple_needles(target_win):
 
     stream = io.BytesIO(data)
 
-    found_needles = list(
-        target_win.scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size)
-    )
+    found_needles = list(scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size))
     assert found_needles == [
         (needle1, needle_offsets[0]),
         (needle2, needle_offsets[1]),
@@ -179,7 +178,7 @@ def test_scrape_plugin_multiple_needles(target_win):
     stream.seek(0)
 
     found_chunks = list(
-        target_win.scrape.find_needle_chunks(
+        scrape.find_needle_chunks(
             stream,
             needle_chunk_size_map={
                 needle1: chunk_size1,
@@ -199,9 +198,7 @@ def test_scrape_plugin_multiple_needles(target_win):
     ]
 
 
-def test_scrape_plugin_multiple_overlapping_needles(target_win):
-    target_win.add_plugin(scrape.ScrapePlugin)
-
+def test_multiple_overlapping_needles() -> None:
     needle1 = b"AAA"
     needle2 = b"BBB"
     needle3 = b"BBA"
@@ -218,9 +215,7 @@ def test_scrape_plugin_multiple_overlapping_needles(target_win):
     # BYYYYYYBBA
     # AAZZZ
 
-    found_needles = list(
-        target_win.scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size)
-    )
+    found_needles = list(scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size))
     # 2 full needles + 2 from overlapping 'YYYBBAAAZZZ'
     assert found_needles == [
         (needle1, 0),
@@ -228,3 +223,47 @@ def test_scrape_plugin_multiple_overlapping_needles(target_win):
         (needle3, 17),
         (needle1, 19),
     ]
+
+
+def test_find_needle() -> None:
+    buf = b"A" * 100 + b"needle" + b"B" * 100
+
+    assert list(scrape.find_needles(io.BytesIO(buf), [b"needle"])) == [(b"needle", 100)]
+    assert list(scrape.find_needles(io.BytesIO(buf), b"needle")) == [(b"needle", 100)]
+
+    with pytest.raises(ValueError, match="At least one needle value must be provided"):
+        list(scrape.find_needles(io.BytesIO(buf), []))
+
+    with pytest.raises(ValueError, match="Start offset must be less than end offset"):
+        list(scrape.find_needles(io.BytesIO(buf), [b"needle"], start=100, end=100))
+
+    mock_progress = Mock()
+    list(scrape.find_needles(io.BytesIO(buf), [b"needle"], progress=mock_progress))
+    mock_progress.assert_called_once_with(0)
+
+    buf = io.BytesIO(b"A" * 100 + b"needle" + b"B" * 100 + b"needle" + b"C" * 100 + b"needle" + b"D" * 100)
+    for i, (needle, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
+        if i == 0:
+            assert offset == 100
+            buf.seek(300)
+
+        if i == 1:
+            assert offset == 312
+
+    assert i == 1
+
+
+@pytest.mark.parametrize(
+    ("buf", "encoding", "reverse", "ascii", "expected"),
+    [
+        (b"foo\xaa\xaa", "utf-8", False, True, "foo"),
+        (b"\xaa\xaafoo", "utf-8", True, True, "foo"),
+        (b"foo\x00bar", "utf-8", False, True, "foo"),
+        (b"foo\x00bar", "utf-8", True, True, "bar"),
+        (b"f\x00o\x00o\x00\xee\xee", "utf-16-le", False, True, "foo"),
+        (b"f\x00o\x00o\x00\xee\xee", "utf-16-le", False, False, "foo\ueeee"),
+        (b"\xee\xee\x00f\x00o\x00o\x00", "utf-16-le", True, True, "foo"),
+    ],
+)
+def test_recover_string(buf: bytes, encoding: str, reverse: bool, ascii: bool, expected: str) -> None:
+    assert scrape.recover_string(buf, encoding, reverse=reverse, ascii=ascii) == expected
