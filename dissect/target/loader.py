@@ -107,7 +107,8 @@ T = TypeVar("T")
 class SubLoader(Generic[T]):
     """A base class for loading arbitary data and coupling it to a :class:`Target <dissect.target.target.Target>`.
 
-    Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader` and :class:`TarSubLoader` implementations.
+    Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader`
+    and :class:`TarSubLoader` implementations.
     """
 
     def __repr__(self) -> str:
