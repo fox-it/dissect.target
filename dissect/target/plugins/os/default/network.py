@@ -75,21 +75,21 @@ class NetworkPlugin(Plugin):
 
     @internal
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
-        """Yield all InterfaceRecords that use ``ip_addr``."""
+        """Yield all interfaces with the given IP address."""
         for interface in self.interfaces():
             if any(iface.ip == ip_addr for iface in interface.interface):
                 yield interface
 
     @internal
     def with_mac(self, mac: str) -> Iterator[InterfaceRecord]:
-        """Yield all InterfaceRecords that use ``mac``."""
+        """Yield all interfaces with the given full or partial MAC address."""
         for interface in self.interfaces():
             if mac in interface.mac:
                 yield interface
 
     @internal
     def in_cidr(self, cidr: str) -> Iterator[InterfaceRecord]:
-        """Yield all InterfaceRecords that have an :class:`IPAddress` inside ``cidr``."""
+        """Yield all interfaces with IP addresses in the given CIDR range."""
         cidr = IPNetwork(cidr)
         for interface in self.interfaces():
             if any(iface.ip in cidr for iface in interface.interface):
