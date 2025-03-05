@@ -963,12 +963,10 @@ def _filter_compatible(
         if plugincls not in seen:
             seen.add(plugincls)
             try:
-                if not plugincls(target).is_compatible():
-                    continue
+                if plugincls(target).is_compatible():
+                    yield descriptor
             except Exception:
                 continue
-
-        yield descriptor
 
 
 def generate() -> dict[str, Any]:

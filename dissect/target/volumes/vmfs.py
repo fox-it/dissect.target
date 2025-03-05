@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
-from typing import BinaryIO, Iterator, Union
+from typing import BinaryIO, Iterator
 
 from dissect.vmfs import lvm
 from dissect.vmfs.c_vmfs import c_vmfs
@@ -13,7 +15,7 @@ log = logging.getLogger(__name__)
 class VmfsVolumeSystem(LogicalVolumeSystem):
     __type__ = "vmfs"
 
-    def __init__(self, fh: Union[BinaryIO, list[BinaryIO]], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | list[BinaryIO], *args, **kwargs):
         self.lvm = lvm.LVM(fh)
         super().__init__(fh, *args, **kwargs)
 
@@ -59,5 +61,6 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
             name,
             self.lvm.uuid,
             raw=self.lvm,
+            disk=self.disk,
             vs=self,
         )

@@ -106,6 +106,7 @@ dev = [
     "dissect.vmfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
+    "pexpect",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -140,6 +141,7 @@ target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
+target-qfind = "dissect.target.tools.qfind:main"
 
 [tool.black]
 line-length = 120
