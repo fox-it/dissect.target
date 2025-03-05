@@ -960,8 +960,8 @@ def _filter_compatible(
                 continue
             raise
 
-        if plugincls not in seen:
-            seen.add(plugincls)
+        if descriptor.path not in seen:
+            seen.add(descriptor.path)
             try:
                 if plugincls(target).is_compatible():
                     yield descriptor
