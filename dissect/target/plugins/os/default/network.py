@@ -95,10 +95,3 @@ class NetworkPlugin(Plugin):
         for interface in self.interfaces():
             if any(iface.ip in cidr for iface in interface.interface):
                 yield interface
-
-    def calculate_network(self, ips: int | Address, subnets: int | Address) -> Iterator[str]:
-        for ip, subnet_mask in zip(ips, subnets):
-            subnet_mask_int = addr_long(subnet_mask)
-            cidr = mask_to_bits(subnet_mask_int)
-            network_address = addr_str(addr_long(ip) & subnet_mask_int)
-            yield f"{network_address}/{cidr}"
