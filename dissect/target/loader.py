@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import urllib
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Generic, Iterator, Optional, TypeVar, Union
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import extract_path_info
@@ -98,6 +98,27 @@ class Loader:
         Args:
             target: The target that we're mapping into.
         """
+        raise NotImplementedError()
+
+
+T = TypeVar("T")
+
+
+class SubLoader(Generic[T]):
+    """A base class for loading arbitary data and coupling it to a :class:`Target <dissect.target.target.Target>`.
+
+    Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader`
+    and :class:`TarSubLoader` implementations.
+    """
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
+    @staticmethod
+    def detect(value: T) -> bool:
+        raise NotImplementedError()
+
+    def map(self, target: Target) -> None:
         raise NotImplementedError()
 
 

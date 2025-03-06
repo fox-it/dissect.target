@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import stat
-import tarfile
+import tarfile as tf
 from typing import BinaryIO, Iterator, Optional
 
 from dissect.util.stream import BufferedStream
@@ -33,15 +33,20 @@ class TarFilesystem(Filesystem):
     def __init__(
         self,
         fh: BinaryIO,
-        base: Optional[str] = None,
-        tarinfo: Optional[tarfile.TarInfo] = None,
-        *args,
+        base: str | None = None,
+        *,
+        tarinfo: tf.TarInfo | None = None,
+        tarfile: tf.TarFile | None = None,
         **kwargs,
     ):
-        super().__init__(fh, *args, **kwargs)
-        fh.seek(0)
+        super().__init__(fh, **kwargs)
 
-        self.tar = tarfile.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+        if tarfile:
+            self.tar = tarfile
+        else:
+            fh.seek(0)
+            self.tar = tf.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+
         self.base = base or ""
 
         self._fs = VirtualFilesystem(alt_separator=self.alt_separator, case_sensitive=self.case_sensitive)
@@ -63,7 +68,7 @@ class TarFilesystem(Filesystem):
         fh = fsutil.open_decompress(fileobj=fh)
 
         fh.seek(257)
-        return fh.read(8) in (tarfile.GNU_MAGIC, tarfile.POSIX_MAGIC)
+        return fh.read(8) in (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
     def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
@@ -147,7 +152,7 @@ class TarFilesystemEntry(VirtualFile):
 
 
 class TarFilesystemDirectoryEntry(VirtualDirectory):
-    def __init__(self, fs: TarFilesystem, path: str, entry: tarfile.TarInfo):
+    def __init__(self, fs: TarFilesystem, path: str, entry: tf.TarInfo):
         super().__init__(fs, path)
         self.entry = entry
 
