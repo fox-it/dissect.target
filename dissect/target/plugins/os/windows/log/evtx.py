@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import re
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Iterator
 
 from dissect.eventlog import evtx
@@ -75,8 +76,10 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 self.target.log.exception("Failed to open event log: %s", entry)
                 continue
 
+            self.target.log.info("Processing event log file %s", entry)
+
             for event in evtx.Evtx(entry_data):
-                yield self._build_record(event)
+                yield self._build_record(event, entry)
 
     @plugin.export(record=DynamicDescriptor(["datetime"]))
     def scraped_evtx(self) -> Iterator[DynamicDescriptor]:
@@ -91,16 +94,19 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         chnk = evtx.ElfChnk(chunk)
         try:
             for event in chnk.read():
-                yield self._build_record(event)
+                yield self._build_record(event, None)
         except MalformedElfChnkException:
             pass
 
-    def _build_record(self, evtx_record) -> Record:
+    def _build_record(self, evtx_record: dict, source: Path) -> Record:
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         evtx_record_fields = sorted(evtx_record.items())
 
-        record_values = {"_target": self.target}
+        record_values = {
+            "_target": self.target,
+            "evtx_source": source,
+        }
         record_fields = [
             ("datetime", "ts"),
             ("string", "Provider_Name"),
@@ -147,6 +153,8 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
                 record_fields.append(("string", key))
 
+        record_fields.append(("path", "evtx_source"))
+
         # tuple conversion here is needed for lru_cache
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
@@ -156,7 +164,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
 
 def format_value(value: Any) -> Any:
-    if value is None:
+    if value is None or value == "-":
         return
 
     if isinstance(value, evtx.BxmlSub):
