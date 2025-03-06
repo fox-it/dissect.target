@@ -955,6 +955,13 @@ def _filter_compatible(
     incompatible = set()
 
     for descriptor in descriptors:
+        if descriptor.qualname in compatible:
+            yield descriptor
+            continue
+
+        if descriptor.qualname in incompatible:
+            continue
+
         try:
             plugincls = load(descriptor)
         except Exception:
@@ -962,19 +969,12 @@ def _filter_compatible(
                 continue
             raise
 
-        if plugincls in compatible:
-            yield descriptor
-            continue
-
-        if plugincls in incompatible:
-            continue
-
         try:
             if plugincls(target).is_compatible():
-                compatible.add(plugincls)
+                compatible.add(descriptor.qualname)
                 yield descriptor
         except Exception:
-            incompatible.add(plugincls)
+            incompatible.add(descriptor.qualname)
             continue
 
 
