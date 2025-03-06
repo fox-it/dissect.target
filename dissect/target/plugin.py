@@ -966,6 +966,7 @@ def _filter_compatible(
             plugincls = load(descriptor)
         except Exception:
             if ignore_load_errors:
+                incompatible.add(descriptor.qualname)
                 continue
             raise
 
