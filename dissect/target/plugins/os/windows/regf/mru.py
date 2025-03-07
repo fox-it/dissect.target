@@ -462,6 +462,7 @@ def parse_office_mru_key(target, key, record):
             _key=key,
         )
 
+
 def get_filepath_from_bag(parsed_bag):
     filepath = ""
     for element in parsed_bag:
