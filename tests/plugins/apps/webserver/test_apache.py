@@ -11,6 +11,7 @@ from dissect.target.plugins.apps.webserver.apache import (
 )
 from dissect.target.target import Target
 from tests._utils import absolute_path
+from tests.conftest import TargetUnixFactory
 
 
 def test_infer_access_log_format_combined() -> None:
@@ -164,20 +165,30 @@ def test_logrotate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(target_unix.apache.error_paths) == 0
 
 
-def test_custom_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("etc/apache2/apache2.conf", BytesIO(b'CustomLog "/custom/log/location/access.log" common'))
-    fs_unix.map_file_fh("custom/log/location/access.log", BytesIO(b"Foo"))
-    fs_unix.map_file_fh("custom/log/location/access.log.1", BytesIO(b"Foo1"))
-    fs_unix.map_file_fh("custom/log/location/access.log.2", BytesIO(b"Foo2"))
-    fs_unix.map_file_fh("custom/log/location/access.log.3", BytesIO(b"Foo3"))
+def test_custom_config(target_unix_factory: TargetUnixFactory) -> None:
+    target_unix, fs_unix = target_unix_factory.new()
+    fs_unix.map_file_fh(
+        "/etc/apache2/apache2.conf", BytesIO(b'CustomLog "/very/custom/log/location/access.log" common')
+    )
+    fs_unix.map_file_fh("/very/custom/log/location/access.log", BytesIO(b"Foo"))
+    fs_unix.map_file_fh("/very/custom/log/location/access.log.1", BytesIO(b"Foo1"))
+    fs_unix.map_file_fh("/very/custom/log/location/access.log.2", BytesIO(b"Foo2"))
+    fs_unix.map_file_fh("/very/custom/log/location/access.log.3", BytesIO(b"Foo3"))
 
     target_unix.add_plugin(ApachePlugin)
 
-    assert len(target_unix.apache.access_paths) == 4
+    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
+        "/very/custom/log/location/access.log",
+        "/very/custom/log/location/access.log.1",
+        "/very/custom/log/location/access.log.2",
+        "/very/custom/log/location/access.log.3",
+    ]
     assert len(target_unix.apache.error_paths) == 0
 
 
-def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_config_commented_logs(target_unix_factory: TargetUnixFactory) -> None:
+    target_unix, fs_unix = target_unix_factory.new()
+
     config = """
     # CustomLog "/custom/log/location/old.log" common
     CustomLog "/custom/log/location/new.log" common
@@ -204,8 +215,10 @@ def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) 
     ]
 
 
-def test_config_vhosts_httpd(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_config_vhosts_httpd(target_unix_factory: TargetUnixFactory) -> None:
     """test if we detect httpd CustomLog and ErrorLog directives using IncludeOptional configuration."""
+
+    target_unix, fs_unix = target_unix_factory.new()
 
     config = """
     ServerRoot "/etc/httpd"
@@ -230,19 +243,20 @@ def test_config_vhosts_httpd(target_unix: Target, fs_unix: VirtualFilesystem) ->
     fs_unix.map_file_fh("custom/log/location/vhost_2.error", BytesIO(b"Err 2"))
     target_unix.add_plugin(ApachePlugin)
 
-    access_log_paths, error_log_paths = target_unix.apache.find_logs()
-    assert sorted(list(map(str, access_log_paths))) == [
+    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
         "/custom/log/location/vhost_1.log",
         "/custom/log/location/vhost_2.log",
     ]
-    assert sorted(list(map(str, error_log_paths))) == [
+    assert sorted(list(map(str, target_unix.apache.error_paths))) == [
         "/custom/log/location/vhost_1.error",
         "/custom/log/location/vhost_2.error",
     ]
 
 
-def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+def test_config_vhosts_apache2(target_unix_factory: TargetUnixFactory) -> None:
     """test if we detect apache2 CustomLog and ErrorLog directives using IncludeOptional configuration."""
+
+    target_unix, fs_unix = target_unix_factory.new()
 
     config = r"""
     ServerRoot "/etc/apache2"
@@ -286,9 +300,8 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     fs_unix.map_file_fh("/path/to/disabled/access.log.2", BytesIO(b""))
 
     fs_unix.map_file_fh("/var/log/apache2/some-other-vhost-old-log.access.log", BytesIO(b""))
-
-    fs_unix.map_file_fh("/var/log/apache2/error.log", BytesIO(b""))
     fs_unix.map_file_fh("/var/log/apache2/access.log", BytesIO(b""))
+    fs_unix.map_file_fh("/var/log/apache2/error.log", BytesIO(b""))
 
     target_unix.add_plugin(ApachePlugin)
 
