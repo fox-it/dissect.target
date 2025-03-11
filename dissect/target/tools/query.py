@@ -8,7 +8,7 @@ import logging
 import pathlib
 import sys
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Generator
 
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
 from flow.record.adapter import AbstractWriter
@@ -268,13 +268,14 @@ def main() -> None:
             if args.child:
                 try:
                     target = target.open_child(args.child)
-                except Exception:
-                    target.log.exception("Exception while opening child '%s'", args.child)
+                except Exception as e:
+                    target.log.exception("Exception while opening child %r: %s", args.child, e)
+                    target.log.debug("", exc_info=e)
 
             if args.dry_run:
                 print(f"Dry run on: {target}")
 
-            record_entries = []
+            record_entries: list[Generator] = []
             basic_entries = []
             yield_entries = []
 
@@ -310,10 +311,9 @@ def main() -> None:
                 except FatalError as fatal:
                     fatal.emit_last_message(target.log.error)
                     parser.exit(1)
-                except Exception:
-                    target.log.error(
-                        "Exception while executing function `%s` (`%s`)", func_def.name, func_def.path, exc_info=True
-                    )
+                except Exception as e:
+                    target.log.error("Exception while executing function %s (%s): %s", func_def.name, func_def.path, e)
+                    target.log.debug("", exc_info=e)
                     target.log.debug("Function info: %s", func_def)
                     continue
 
@@ -373,23 +373,27 @@ def main() -> None:
                 continue
 
             rs = record_output(args.strings, args.json)
-            for entry in record_entries:
+            for func_generator in record_entries:
                 try:
-                    for record_entries in entry:
-                        rs.write(modifier_func(target, record_entries))
+                    for record in func_generator:
+                        rs.write(modifier_func(target, record))
                         count += 1
                         if args.limit is not None and count >= args.limit:
                             break_out = True
                             break
+
                 except Exception as e:
-                    # Ignore errors if multiple functions
-                    if len(funcs) > 1:
-                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    # Ignore errors if multiple functions or multiple targets
+                    if len(record_entries) > 1 or len(args.targets) > 1:
+                        likely_func_name = getattr(func_generator, "__qualname__", "unknown (chained) iterator")
+                        target.log.error("Exception occurred while processing output of %s: %s", likely_func_name, e)
+                        target.log.debug("", exc_info=e)
                     else:
                         raise e
 
                 if break_out:
                     break
+
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)
