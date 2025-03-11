@@ -256,20 +256,26 @@ class ApachePlugin(WebserverPlugin):
         # Check default Apache configs for CustomLog or ErrorLog directives
         for config in self.DEFAULT_CONFIG_PATHS:
             if (path := self.target.fs.path(config)).exists() and path not in seen:
+                self._process_conf_file(path, seen=None)
                 seen.add(path)
-                self._process_conf_file(path)
 
         # Check all .conf files inside the server root
         if self.server_root:
             for path in self.server_root.rglob("*.conf"):
                 if path not in seen:
+                    self._process_conf_file(path, seen=None)
                     seen.add(path)
-                    self._process_conf_file(path)
 
     def _process_conf_file(self, path: Path, seen: set[Path] | None = set()) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
         and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
         """
+
+        self.target.log.debug("Processing conf file: %s", path)
+        self.target.log.debug("Current seen conf files: %s", seen)
+
+        if not seen:
+            seen = set()
 
         if path in seen:
             self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)

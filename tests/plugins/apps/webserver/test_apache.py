@@ -10,6 +10,7 @@ from dissect.target.plugins.apps.webserver.apache import (
     ApachePlugin,
 )
 from dissect.target.target import Target
+
 from tests._utils import absolute_path
 from tests.conftest import TargetUnixFactory
 
@@ -241,6 +242,7 @@ def test_config_vhosts_httpd(target_unix_factory: TargetUnixFactory) -> None:
     fs_unix.map_file_fh("custom/log/location/vhost_2.log", BytesIO(b"Log 2"))
     fs_unix.map_file_fh("custom/log/location/vhost_1.error", BytesIO(b"Err 1"))
     fs_unix.map_file_fh("custom/log/location/vhost_2.error", BytesIO(b"Err 2"))
+
     target_unix.add_plugin(ApachePlugin)
 
     assert sorted(list(map(str, target_unix.apache.access_paths))) == [
