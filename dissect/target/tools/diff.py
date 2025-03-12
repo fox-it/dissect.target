@@ -28,6 +28,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
     ExtendedCmd,
     TargetCli,
+    _target_name,
     arg_str_to_arg_list,
     build_pipe_stdout,
     fmt_ls_colors,
@@ -235,13 +236,22 @@ class TargetComparison:
             src_fh = src_entry.open()
             dst_fh = dst_entry.open()
 
+            # We reverse read the file object.
+            chunk_size = 1024 * 10
+            chunks_a = fsutil.reverse_read(src_fh, chunk_size, reverse_chunk=False)
+            chunks_b = fsutil.reverse_read(dst_fh, chunk_size, reverse_chunk=False)
+
+            chunk_count = 0
+
             while True:
-                chunk_a = src_fh.read(BLOCK_SIZE)
-                chunk_b = dst_fh.read(BLOCK_SIZE)
+                chunk_a = next(chunks_a, b"")
+                chunk_b = next(chunks_b, b"")
+                chunk_count += 1
+
                 if chunk_a != chunk_b:
                     # We immediately break after discovering a difference in file contents
                     # This means that we won't return a full diff of the file, merely the first block where a difference
-                    # is observed
+                    # is observed. The chunk is not reversed, so the difference is human-readable.
                     content_difference = list(diff_bytes(unified_diff, [chunk_a], [chunk_b]))
                     differential_entry = DifferentialEntry(
                         entry_path,
@@ -253,11 +263,11 @@ class TargetComparison:
                     modified.append(differential_entry)
                     break
 
-                if src_fh.tell() > self.file_limit:
+                if self.file_limit and chunk_count * chunk_size > self.file_limit:
                     unchanged.append(src_entry)
                     break
 
-                if len(chunk_a) == 0:
+                if not chunk_a:
                     # End of file
                     unchanged.append(src_entry)
                     break
@@ -282,7 +292,18 @@ class TargetComparison:
 
         already_iterated.append(path)
 
+        # Do not scan the given path if it matches any excluded path.
+        if exclude and next((pattern for pattern in exclude if fnmatch(path, pattern)), None):
+            return
+
         diff = self.scandir(path)
+
+        # Check if diff contains excluded paths
+        if exclude:
+            for t in ["created", "unchanged", "modified", "deleted"]:
+                for i, d in enumerate(getattr(diff, t)):
+                    if next((pattern for pattern in exclude if fnmatch(d.path, pattern)), None):
+                        del getattr(diff, t)[i]
         yield diff
 
         subentries = diff.created + diff.unchanged + diff.deleted
@@ -332,7 +353,7 @@ class TargetComparison:
 class DifferentialCli(ExtendedCmd):
     """CLI for browsing the differential between two or more targets."""
 
-    doc_header_prefix = "target-diff\n" "==========\n"
+    doc_header_prefix = "target-diff\n==========\n"
     doc_header_suffix = "\n\nDocumented commands (type help <topic>):"
     doc_header_multiple_targets = "Use 'list', 'prev' and 'next' to list and select targets to differentiate between."
 
@@ -370,10 +391,15 @@ class DifferentialCli(ExtendedCmd):
 
     @property
     def prompt(self) -> str:
-        if self.comparison.src_target.name != self.comparison.dst_target.name:
-            prompt_base = f"{self.comparison.src_target.name}/{self.comparison.dst_target.name}"
+        """Determine the prompt of the cli."""
+
+        src_name = _target_name(self.comparison.src_target)
+        dst_name = _target_name(self.comparison.dst_target)
+
+        if src_name != dst_name:
+            prompt_base = f"{src_name}/{dst_name}"
         else:
-            prompt_base = self.comparison.src_target.name
+            prompt_base = src_name
 
         if os.getenv("NO_COLOR"):
             suffix = f"{prompt_base}:{self.cwd}$ "
@@ -938,8 +964,8 @@ def main() -> None:
 
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     if len(args.targets) < 2:
         print("At least two targets are required for target-diff.")
@@ -983,6 +1009,7 @@ def main() -> None:
 
         except Exception as e:
             log.error(e)
+            log.debug("", exc_info=e)
             parser.exit(1)
 
 

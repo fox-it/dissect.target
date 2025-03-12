@@ -48,6 +48,7 @@ class UnixPlugin(OSPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
+        # If the ``/var`` and ``/etc`` folders exist on a filesystem it is treated as a Unix-like filesystem
         for fs in target.filesystems:
             if fs.exists("/var") and fs.exists("/etc"):
                 return fs
@@ -174,8 +175,7 @@ class UnixPlugin(OSPlugin):
         return hostname
 
     def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
-        """
-        Returns a dict containing the hostname and domain name portion of the path(s) specified
+        """Returns a dict containing the hostname and domain name portion of the path(s) specified.
 
         Args:
             paths (list): list of paths
@@ -203,6 +203,7 @@ class UnixPlugin(OSPlugin):
             else:
                 hostname_dict = {"hostname": None, "domain": None}
             break  # break whenever a valid hostname is found
+
         return hostname_dict
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:

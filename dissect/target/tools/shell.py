@@ -33,7 +33,8 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
-from dissect.target.plugin import PluginFunction, alias, arg, clone_alias
+from dissect.target.helpers.utils import StrEnum
+from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.fsutils import (
     fmt_ls_colors,
@@ -44,9 +45,9 @@ from dissect.target.tools.fsutils import (
 )
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
+    escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_bound_method,
@@ -76,6 +77,56 @@ except ImportError:
     readline = None
 
 
+def readline_escape(s: str | dict[str, str]) -> str | dict[str, str]:
+    """Escape a string or values in dictionary for readline prompt.
+
+    Used to embed terminal-specific escape sequences in prompts.
+
+    References:
+        - https://wiki.hackzine.org/development/misc/readline-color-prompt.html
+        - http://stackoverflow.com/a/9468954/148845
+        - RL_PROMPT_START_IGNORE = "\001"
+        - RL_PROMPT_END_IGNORE = "\002"
+    """
+    if isinstance(s, dict):
+        return {k: f"\001{v}\002" for k, v in s.items()}
+    return f"\001{s}\002"
+
+
+class AnsiColors(StrEnum):
+    """ANSI color escape sequences."""
+
+    # Base formatting
+    RESET = "\033[0m"
+
+    # Basic colors
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    # Bold colors
+    BOLD_RED = "\033[1;31m"
+    BOLD_GREEN = "\033[1;32m"
+    BOLD_YELLOW = "\033[1;33m"
+    BOLD_BLUE = "\033[1;34m"
+    BOLD_MAGENTA = "\033[1;35m"
+    BOLD_CYAN = "\033[1;36m"
+    BOLD_WHITE = "\033[1;37m"
+
+    @classmethod
+    def as_dict(cls) -> dict[str, str]:
+        """Return ANSI color escape sequences as a dictionary."""
+        return {item.name: item.value for item in cls}
+
+
+# ANSI color escape sequences for readline prompt
+ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+
+
 class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
 
@@ -100,7 +151,6 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.use_rawinput = False
         self.debug = False
         self.cyber = cyber
         self.identchars += "."
@@ -361,7 +411,7 @@ class TargetCmd(ExtendedCmd):
             self.prompt_ps1 = "{base}:{cwd}$ "
 
         else:
-            self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
+            self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
 
         super().__init__(self.target.props.get("cyber"))
 
@@ -396,13 +446,13 @@ class TargetCmd(ExtendedCmd):
         # execution
         command, command_args_str, line = self.parseline(line)
 
-        if plugins := list(find_and_filter_plugins(self.target, command, [])):
-            return self._exec_target(plugins, command_args_str)
+        if functions := list(find_and_filter_plugins(command, self.target)):
+            return self._exec_target(functions, command_args_str)
 
         # We didn't execute a function on the target
         return None
 
-    def _exec_target(self, funcs: list[PluginFunction], command_args_str: str) -> bool:
+    def _exec_target(self, funcs: list[FunctionDescriptor], command_args_str: str) -> bool:
         """Command exection helper for target plugins."""
 
         def _exec_(argparts: list[str], stdout: TextIO) -> None:
@@ -548,7 +598,7 @@ class TargetCli(TargetCmd):
 
     @property
     def prompt(self) -> str:
-        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
@@ -1200,7 +1250,7 @@ class RegistryCli(TargetCmd):
 
     @property
     def prompt(self) -> str:
-        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = line[:begidx].rsplit(" ")[-1]
@@ -1339,12 +1389,12 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 
 def _target_name(target: Target) -> str:
-    """Return a target name for cmd.Cmd base prompts."""
+    """Return a printable FQDN target name for cmd.Cmd base prompts."""
 
     if target.has_function("domain") and target.domain:
-        return f"{target.name}.{target.domain}"
+        return escape_str(f"{target.name}.{target.domain}")
 
-    return target.name
+    return escape_str(target.name)
 
 
 @contextmanager
@@ -1516,18 +1566,11 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
-    )
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
+
     args, rest = parser.parse_known_args()
-    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:

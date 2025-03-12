@@ -7,7 +7,7 @@ from dissect.util.ts import from_unix
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import basename, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export, internal
+from dissect.target.plugin import Plugin, export
 
 AuditRecord = TargetRecordDescriptor(
     "linux/log/audit",
@@ -34,7 +34,6 @@ class AuditPlugin(Plugin):
         if not len(self.log_paths):
             raise UnsupportedPluginError("No audit path found")
 
-    @internal
     def get_log_paths(self) -> list[Path]:
         log_paths = []
 

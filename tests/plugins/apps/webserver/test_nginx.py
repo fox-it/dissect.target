@@ -2,11 +2,13 @@ import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.nginx import NginxPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_plugins_apps_webservers_nginx_txt(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log")
     fs_unix.map_file("var/log/nginx/access.log", data_file)
 
@@ -26,7 +28,7 @@ def test_plugins_apps_webservers_nginx_txt(target_unix, fs_unix):
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_ipv6(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_ipv6(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log")
     fs_unix.map_file("var/log/nginx/access.log", data_file)
 
@@ -45,7 +47,7 @@ def test_plugins_apps_webservers_nginx_ipv6(target_unix, fs_unix):
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_gz(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log.gz")
     fs_unix.map_file("var/log/nginx/access.log.1.gz", data_file)
 
@@ -64,7 +66,7 @@ def test_plugins_apps_webservers_nginx_gz(target_unix, fs_unix):
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_bz2(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_bz2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/apps/webserver/nginx/access.log.bz2")
     fs_unix.map_file("var/log/nginx/access.log.1.bz2", data_file)
 
@@ -83,20 +85,19 @@ def test_plugins_apps_webservers_nginx_bz2(target_unix, fs_unix):
     assert record.bytes_sent == 123
 
 
-def test_plugins_apps_webservers_nginx_config(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/nginx/nginx.conf")
     fs_unix.map_file("etc/nginx/nginx.conf", config_file)
 
     for i, log in enumerate(["access.log", "domain1.access.log", "domain2.access.log", "big.server.access.log"]):
         fs_unix.map_file_fh(f"opt/logs/{i}/{log}", BytesIO(b"Foo"))
 
-    target_unix.add_plugin(NginxPlugin)
-    log_paths = target_unix.nginx.get_log_paths()
+    log_paths = NginxPlugin(target_unix).get_log_paths()
 
     assert len(log_paths) == 4
 
 
-def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config_file = absolute_path("_data/plugins/apps/webserver/nginx/nginx.conf")
     fs_unix.map_file("etc/nginx/nginx.conf", config_file)
     fs_unix.map_file_fh("opt/logs/0/access.log", BytesIO(b"Foo1"))
@@ -105,13 +106,12 @@ def test_plugins_apps_webservers_nginx_config_logs_logrotated(target_unix, fs_un
     fs_unix.map_file_fh("opt/logs/1/domain1.access.log", BytesIO(b"Foo4"))
     fs_unix.map_file_fh("var/log/nginx/access.log", BytesIO(b"Foo5"))
 
-    target_unix.add_plugin(NginxPlugin)
-    log_paths = target_unix.nginx.get_log_paths()
+    log_paths = NginxPlugin(target_unix).get_log_paths()
 
     assert len(log_paths) == 5
 
 
-def test_plugins_apps_webservers_nginx_config_commented_logs(target_unix, fs_unix):
+def test_plugins_apps_webservers_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config = """
     # access_log      /foo/bar/old.log main;
     access_log      /foo/bar/new.log main;
@@ -119,8 +119,7 @@ def test_plugins_apps_webservers_nginx_config_commented_logs(target_unix, fs_uni
     fs_unix.map_file_fh("etc/nginx/nginx.conf", BytesIO(textwrap.dedent(config).encode()))
     fs_unix.map_file_fh("foo/bar/new.log", BytesIO(b"New"))
     fs_unix.map_file_fh("foo/bar/old.log", BytesIO(b"Old"))
-    target_unix.add_plugin(NginxPlugin)
 
-    log_paths = target_unix.nginx.get_log_paths()
+    log_paths = NginxPlugin(target_unix).get_log_paths()
     assert str(log_paths[0]) == "/foo/bar/old.log"
     assert str(log_paths[1]) == "/foo/bar/new.log"

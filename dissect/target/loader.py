@@ -61,7 +61,7 @@ class Loader:
     def __init__(self, path: Path, **kwargs):
         self.path = path
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}('{self.path}')"
 
     @staticmethod

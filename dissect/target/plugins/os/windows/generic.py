@@ -98,14 +98,6 @@ FileRenameOperationRecord = UserRegistryRecordDescriptor(
     ],
 )
 
-WinRarRecord = UserRegistryRecordDescriptor(
-    "filesystem/registry/winrar",
-    [
-        ("datetime", "ts"),
-        ("path", "path"),
-    ],
-)
-
 WinSockNamespaceProviderRecord = UserRegistryRecordDescriptor(
     "filesystem/registry/winsocknamespaceprovider",
     [
@@ -131,7 +123,7 @@ ComputerSidRecord = TargetRecordDescriptor(
 class GenericPlugin(Plugin):
     """Generic Windows plugin.
 
-    Provides some plugins that don't fit in a separate plugin.
+    Provides Windows operating system plugins too small to fit in a separate plugin.
     """
 
     def check_compatible(self) -> None:
@@ -527,27 +519,6 @@ class GenericPlugin(Plugin):
                     _user=user,
                     _key=r,
                 )
-
-    @export(record=WinRarRecord)
-    def winrar(self) -> Iterator[WinRarRecord]:
-        """Return all available WinRAR history registry key values."""
-        keys = [
-            "HKEY_CURRENT_USER\\Software\\WinRAR\\ArcHistory",
-            "HKEY_CURRENT_USER\\Software\\WinRAR\\DialogEditHistory\\ArcName",
-            "HKEY_CURRENT_USER\\Software\\WinRAR\\DialogEditHistory\\ExtrPath",
-        ]
-
-        for key in keys:
-            for r in self.target.registry.keys(key):
-                user = self.target.registry.get_user(r)
-                for v in r.values():
-                    yield WinRarRecord(
-                        ts=r.ts,
-                        path=self.target.fs.path(v.value),
-                        _target=self.target,
-                        _user=user,
-                        _key=r,
-                    )
 
     @export(record=WinSockNamespaceProviderRecord)
     def winsocknamespaceprovider(self) -> Iterator[WinSockNamespaceProviderRecord]:
