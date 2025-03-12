@@ -28,7 +28,7 @@ def open_vhdx(path: Path) -> Iterator[Filesystem]:
 def is_valid_kape_dir(path: Path) -> bool:
     os_type, dirs = find_dirs(path)
     if os_type == OperatingSystem.WINDOWS:
-        for dir_path in dirs:
+        for volume, dir_path in dirs:
             for path in USNJRNL_PATHS:
                 if dir_path.joinpath(path).exists():
                     return True
