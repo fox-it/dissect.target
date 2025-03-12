@@ -120,7 +120,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     map_dirs(target, dirs, os_type, **kwargs)
 
 
-def find_dirs(path: Path) -> tuple[str, list[Path]]:
+def find_dirs(path: Path) -> tuple[str, list[tuple[str, Path] | Path]]:
     """Try to find if ``path`` contains an operating system directory layout and return the OS type and detected
     directories.
 
@@ -131,10 +131,11 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
         path: The path to check.
 
     Returns:
-        A tuple consisting of the found operating system layout and a list of all detected directories.
+        A tuple consisting of the found operating system layout and a list of all detected directories
+            (which contains either a Path, or a tuple of drive letter + Path).
     """
-    dirs = []
-    os_type = None
+    dirs : list[tuple[str, Path] | Path] = []
+    os_type : str | None = None
 
     if path.is_dir():
         for p in path.iterdir():
