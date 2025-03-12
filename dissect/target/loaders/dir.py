@@ -141,7 +141,7 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
             # Look for directories like C or C:
             if p.is_dir() and (is_drive_letter_path(p) or p.name in ("sysvol", "$rootfs$")):
                 if p.name == "sysvol":
-                    dirs.append(('c', p))
+                    dirs.append(("c", p))
                 else:
                     dirs.append((p.name[0], p))
 
