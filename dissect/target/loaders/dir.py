@@ -149,7 +149,7 @@ def find_dirs(path: Path) -> tuple[str, list[Path]]:
                     os_type = os_type_from_path(p)
 
             if p.name == "$fs$":
-                dirs.append(('$fs$', p))
+                dirs.append(("$fs$", p))
                 for anon_fs in p.iterdir():
                     if ANON_FS_RE.match(anon_fs.name):
                         dirs.append(anon_fs)
