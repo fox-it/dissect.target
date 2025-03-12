@@ -241,7 +241,7 @@ class UnixPlugin(OSPlugin):
                     self._add_nfs(dev_id, volume_name, mount_point)
                 else:
                     log.warning(
-                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?force-directory-fs&enable-nfs",  # noqa: E501
+                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
                         dev_id,
                         volume_name,
                         mount_point,
