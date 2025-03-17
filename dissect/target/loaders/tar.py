@@ -105,7 +105,7 @@ class TarSubLoader(SubLoader[tf.TarFile]):
     """Tar implementation of a :class:`SubLoader`."""
 
     def __init__(self, tar: tf.TarFile, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(tar, *args, **kwargs)
         self.tar = tar
 
     @staticmethod
