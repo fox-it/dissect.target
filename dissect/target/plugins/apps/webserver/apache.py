@@ -352,7 +352,8 @@ class ApachePlugin(WebserverPlugin):
         variables = {}
         for envvar_file in self.DEFAULT_ENVVAR_PATHS:
             if (file := self.target.fs.path(envvar_file)).exists():
-                for line in file.read_text().split("\n"):
+                for line in file.open("rt").readlines():
+                    line = line.strip()
                     key, _, value = line.partition("=")
                     if key:
                         variables[key.replace("export ", "")] = value.strip("\"'")
