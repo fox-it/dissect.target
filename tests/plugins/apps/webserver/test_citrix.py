@@ -87,7 +87,7 @@ def test_access_logs_webserver_namespace(target_citrix: Target, fs_bsd: VirtualF
     data_file = absolute_path("_data/plugins/apps/webserver/citrix/httpaccess.log")
     fs_bsd.map_file("var/log/httpaccess.log", data_file)
 
-    with pytest.raises(UnsupportedPluginError):
+    with pytest.raises(UnsupportedPluginError, match="Use the 'apps.webserver.citrix' apache plugin instead"):
         target_citrix.add_plugin(ApachePlugin)
 
     target_citrix.add_plugin(CitrixWebserverPlugin)

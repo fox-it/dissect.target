@@ -231,7 +231,7 @@ class ApachePlugin(WebserverPlugin):
             raise UnsupportedPluginError("No Apache log files found")
 
         if self.target.os == OperatingSystem.CITRIX:
-            raise UnsupportedPluginError(f"Use {self.target.os} Apache plugin instead")
+            raise UnsupportedPluginError("Use the 'apps.webserver.citrix' apache plugin instead")
 
     def find_logs(self) -> None:
         """Discover any present Apache log paths on the target system.
