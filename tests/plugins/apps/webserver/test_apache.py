@@ -10,7 +10,6 @@ from dissect.target.plugins.apps.webserver.apache import (
     ApachePlugin,
 )
 from dissect.target.target import Target
-
 from tests._utils import absolute_path
 
 
