@@ -266,7 +266,7 @@ class ApachePlugin(WebserverPlugin):
                     self._process_conf_file(path, seen=None)
                     seen.add(path)
 
-    def _process_conf_file(self, path: Path, seen: set[Path] | None = set()) -> None:
+    def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
         and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
         """
@@ -274,8 +274,7 @@ class ApachePlugin(WebserverPlugin):
         self.target.log.debug("Processing conf file: %s", path)
         self.target.log.debug("Current seen conf files: %s", seen)
 
-        if not seen:
-            seen = set()
+        seen = seen or set()
 
         if path in seen:
             self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
