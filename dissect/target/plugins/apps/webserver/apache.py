@@ -279,14 +279,11 @@ class ApachePlugin(WebserverPlugin):
         seen.add(path)
 
         for line in path.open("rt"):
-            line = line.strip()
-
-            if not line:
+            if not (line := line.strip()):
                 continue
 
-            elif "ServerRoot" in line:
-                match = RE_CONFIG_ROOT.match(line)
-                if not match:
+            if "ServerRoot" in line:
+                if not (match := RE_CONFIG_ROOT.match(line)):
                     self.target.log.warning("Unable to parse Apache 'ServerRoot' configuration in %s: %r", path, line)
                     continue
                 location = match.groupdict().get("location")
@@ -296,8 +293,7 @@ class ApachePlugin(WebserverPlugin):
                 self._process_conf_line(path, line)
 
             elif "Include" in line:
-                match = RE_CONFIG_INCLUDE.match(line)
-                if not match:
+                if not (match := RE_CONFIG_INCLUDE.match(line)):
                     self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
 
@@ -327,18 +323,14 @@ class ApachePlugin(WebserverPlugin):
 
     def _process_conf_line(self, path: Path, line: str) -> None:
         """Parse and resolve the given ``CustomLog`` or ``ErrorLog`` directive found in a Apache ``.conf`` file."""
-        line = line.strip()
-
         if "ErrorLog" in line:
             pattern = RE_CONFIG_ERRORLOG_DIRECTIVE
             set_to_update = self.error_paths
-
         else:
             pattern = RE_CONFIG_CUSTOM_LOG_DIRECTIVE
             set_to_update = self.access_paths
 
-        match = pattern.match(line)
-        if not match:
+        if not (match := pattern.match(line)):
             self.target.log.warning("Unexpected Apache 'ErrorLog' or 'CustomLog' configuration in %s: %r", path, line)
             return
 
@@ -346,10 +338,8 @@ class ApachePlugin(WebserverPlugin):
         custom_log = self.target.fs.path(location)
 
         if env_var_match := RE_ENV_VAR_IN_STRING.match(location):
-            envvar_directive = env_var_match.groupdict()
-            env_var = envvar_directive["env_var"]
-            apache_log_dir = self.env_vars.get(env_var)
-            if apache_log_dir is None:
+            env_var = env_var_match.groupdict()["env_var"]
+            if (apache_log_dir := self.env_vars.get(env_var)) is None:
                 self.target.log.warning("%s does not exist, cannot resolve '%s' in %s", env_var, custom_log, path)
                 return
 
@@ -358,7 +348,7 @@ class ApachePlugin(WebserverPlugin):
         set_to_update.update(path for path in custom_log.parent.glob(f"*{custom_log.name}*"))
 
     @cached_property
-    def env_vars(self) -> dict:
+    def env_vars(self) -> dict[str, str]:
         variables = {}
         for envvar_file in self.DEFAULT_ENVVAR_PATHS:
             if (file := self.target.fs.path(envvar_file)).exists():
