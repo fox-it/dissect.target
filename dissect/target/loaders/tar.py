@@ -4,6 +4,7 @@ import logging
 import re
 import tarfile as tf
 from pathlib import Path
+from typing import Iterable
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import (
@@ -60,7 +61,7 @@ class TarLoader(Loader):
         if isinstance(path, str):
             path = Path(path)
 
-        if self.is_compressed(path):
+        if is_compressed(path):
             log.warning(
                 f"Tar file {path!r} is compressed, which will affect performance. "
                 "Consider uncompressing the archive before passing the tar file to Dissect."
@@ -73,9 +74,6 @@ class TarLoader(Loader):
     @staticmethod
     def detect(path: Path) -> bool:
         return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
-
-    def is_compressed(self, path: Path) -> bool:
-        return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
 
     def map(self, target: target.Target) -> None:
         for candidate in self.__subloaders__:
@@ -97,6 +95,10 @@ def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
             if header.startswith(magics):
                 return True
     return False
+
+
+def is_compressed(path: Path) -> bool:
+    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
 
 
 class TarSubLoader(SubLoader[tf.TarFile]):

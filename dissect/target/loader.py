@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import urllib
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic, Iterator, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Generic, Iterator, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import extract_path_info
@@ -147,8 +147,8 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None, fallbacks: list[Loader] = [DirLoader]
-) -> Optional[Loader]:
+    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[Loader] = [DirLoader]
+) -> Loader | None:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -178,7 +178,7 @@ def find_loader(
             log.debug("", exc_info=exception)
 
 
-def open(item: Union[str, Path], *args, **kwargs) -> Loader:
+def open(item: str | Path, *args, **kwargs) -> Loader:
     """Opens a :class:`Loader` for a specific ``item``.
 
     This instantiates a :class:`Loader` for a specific ``item``.
