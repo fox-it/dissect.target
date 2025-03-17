@@ -12,7 +12,6 @@ from dissect.target.plugins.apps.webserver.apache import (
 from dissect.target.target import Target
 
 from tests._utils import absolute_path
-from tests.conftest import TargetUnixFactory
 
 
 def test_infer_access_log_format_combined() -> None:
@@ -166,8 +165,7 @@ def test_logrotate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     assert len(target_unix.apache.error_paths) == 0
 
 
-def test_custom_config(target_unix_factory: TargetUnixFactory) -> None:
-    target_unix, fs_unix = target_unix_factory.new()
+def test_custom_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh(
         "/etc/apache2/apache2.conf", BytesIO(b'CustomLog "/very/custom/log/location/access.log" common')
     )
@@ -187,9 +185,7 @@ def test_custom_config(target_unix_factory: TargetUnixFactory) -> None:
     assert len(target_unix.apache.error_paths) == 0
 
 
-def test_config_commented_logs(target_unix_factory: TargetUnixFactory) -> None:
-    target_unix, fs_unix = target_unix_factory.new()
-
+def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config = """
     # CustomLog "/custom/log/location/old.log" common
     CustomLog "/custom/log/location/new.log" common
@@ -216,11 +212,8 @@ def test_config_commented_logs(target_unix_factory: TargetUnixFactory) -> None:
     ]
 
 
-def test_config_vhosts_httpd(target_unix_factory: TargetUnixFactory) -> None:
+def test_config_vhosts_httpd(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """test if we detect httpd CustomLog and ErrorLog directives using IncludeOptional configuration."""
-
-    target_unix, fs_unix = target_unix_factory.new()
-
     config = """
     ServerRoot "/etc/httpd"
     IncludeOptional conf/vhosts/*/*.conf
@@ -255,11 +248,8 @@ def test_config_vhosts_httpd(target_unix_factory: TargetUnixFactory) -> None:
     ]
 
 
-def test_config_vhosts_apache2(target_unix_factory: TargetUnixFactory) -> None:
+def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     """test if we detect apache2 CustomLog and ErrorLog directives using IncludeOptional configuration."""
-
-    target_unix, fs_unix = target_unix_factory.new()
-
     config = r"""
     ServerRoot "/etc/apache2"
     ErrorLog ${APACHE_LOG_DIR}/error.log
