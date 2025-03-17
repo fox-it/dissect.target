@@ -111,15 +111,18 @@ class SubLoader(Generic[T]):
     and :class:`TarSubLoader` implementations.
     """
 
+    def __init__(self, value: T):
+        pass
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
     @staticmethod
     def detect(value: T) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def map(self, target: Target) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 def register(module_name: str, class_name: str, internal: bool = True) -> None:

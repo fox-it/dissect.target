@@ -47,17 +47,17 @@ class ContainerImageTarSubLoader(TarSubLoader):
         try:
             self.tarfs = TarFilesystem(None, tarfile=tar)
         except Exception as e:
-            raise ValueError(f"Unable to open {str(tar)} as TarFilesystem: {str(e)}")
+            raise ValueError(f"Unable to open {str(tar)} as TarFilesystem: {str(e)}") from e
         try:
             self.manifest = json.loads(self.tarfs.path("/manifest.json").read_text())[0]
             self.name = self.manifest.get("RepoTags", [None])[0]
         except Exception as e:
-            raise ValueError(f"Unable to read manifest.json inside docker image filesystem: {str(e)}")
+            raise ValueError(f"Unable to read manifest.json inside docker image filesystem: {str(e)}") from e
 
         try:
             self.config = json.loads(self.tarfs.path(self.manifest.get("Config")).read_text())
         except Exception as e:
-            raise ValueError(f"Unable to read config inside docker image filesystem: {str(e)}")
+            raise ValueError(f"Unable to read config inside docker image filesystem: {str(e)}") from e
 
     @staticmethod
     def detect(tar: tarfile.TarFile) -> bool:

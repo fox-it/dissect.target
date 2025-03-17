@@ -85,7 +85,7 @@ class TarLoader(Loader):
                 break
 
 
-def is_tar_magic(path: Path, magics: tuple) -> bool:
+def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
     if not path.is_file():
         return False
 
@@ -94,9 +94,8 @@ def is_tar_magic(path: Path, magics: tuple) -> bool:
         fh.seek(257)
         headers.append(fh.read(8))
         for header in headers:
-            for magic in magics:
-                if header[: len(magic)] == magic:
-                    return True
+            if header.startswith(magics):
+                return True
     return False
 
 
@@ -110,11 +109,11 @@ class TarSubLoader(SubLoader[tf.TarFile]):
     @staticmethod
     def detect(tarfile: tf.TarFile) -> bool:
         """Only to be called internally by :class:`TarLoader`."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def map(self, target: target.Target) -> None:
         """Only to be called internally by :class:`TarLoader`."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class GenericTarSubLoader(TarSubLoader):
