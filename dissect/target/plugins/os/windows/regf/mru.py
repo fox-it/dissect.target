@@ -191,30 +191,7 @@ class MRUPlugin(Plugin):
         PIDL_KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU"
 
         for key in self.target.registry.keys(KEY):
-            user = self.target.registry.get_user(key)
-
-            try:
-                mrulist = key.value("MRUList").value
-            except RegistryError:
-                mrulist = None
-
-            for value in key.values():
-                if value.name == "MRUList":
-                    continue
-
-                entry_index = mrulist.index(value.name) if mrulist else None
-                filename, path, _ = value.value.rsplit(b"\x00\x00")
-
-                yield LastVisitedMRURecord(
-                    regf_mtime=key.ts,
-                    index=entry_index,
-                    filename=filename.decode("utf-16-le"),
-                    path=path.decode("utf-16-le"),
-                    key=key.path,
-                    _target=self.target,
-                    _user=user,
-                    _key=key,
-                )
+            yield from parse_mru_key(self.target, key, LastVisitedMRURecord)
 
         for key in self.target.registry.keys(PIDL_KEY):
             yield from parse_mru_ex_key(self.target, key, LastVisitedMRURecord)
@@ -342,18 +319,33 @@ def parse_mru_key(target, key, record):
         if value.name == "MRUList":
             continue
 
-        entry_index = mrulist.index(value.name) if mrulist else None
-        entry_value = value.value
+        if record == LastVisitedMRURecord:
+            entry_index = mrulist.index(value.name) if mrulist else None
+            filename, path, _ = value.value.rsplit(b"\x00\x00")
 
-        yield record(
-            regf_mtime=key.ts,
-            index=entry_index,
-            value=entry_value,
-            key=key.path,
-            _target=target,
-            _user=user,
-            _key=key,
-        )
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                filename=filename.decode("utf-16-le"),
+                path=path.decode("utf-16-le"),
+                key=key.path,
+                _target=target,
+                _user=user,
+                _key=key,
+            )
+        else:
+            entry_index = mrulist.index(value.name) if mrulist else None
+            entry_value = value.value
+
+            yield record(
+                regf_mtime=key.ts,
+                index=entry_index,
+                value=entry_value,
+                key=key.path,
+                _target=target,
+                _user=user,
+                _key=key,
+            )
 
     for subkey in key.subkeys():
         yield from parse_mru_key(target, subkey, record)
