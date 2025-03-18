@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
@@ -75,26 +75,26 @@ class IISLogsPlugin(WebserverPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
-        self.log_dirs = self.get_log_dirs()
 
         self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
 
     def check_compatible(self) -> None:
-        if not self.log_dirs:
+        if not self.target.minimal and not self.log_dirs:
             raise UnsupportedPluginError("No IIS log files found")
 
-    def get_log_dirs(self) -> list[tuple[str, Path]]:
-        log_paths = set()
+    @cached_property
+    def log_dirs(self) -> dict[str, set[Path]]:
+        log_paths = {"auto": set(), "W3C": set(), "IIS": set()}
 
         if (sysvol_files := self.target.fs.path("sysvol/files")).exists():
-            log_paths.add(("auto", sysvol_files))
+            log_paths["auto"].add(sysvol_files)
 
         try:
             xml_data = ElementTree.fromstring(self.config.open().read(), forbid_dtd=True)
             for log_file_element in xml_data.findall("*/sites/*/logFile"):
                 log_format = log_file_element.get("logFormat") or "W3C"
                 if log_dir := log_file_element.get("directory"):
-                    log_paths.add((log_format, self.target.resolve(log_dir)))
+                    log_paths[log_format].add(self.target.resolve(log_dir))
 
         except (ElementTree.ParseError, DissectFileNotFoundError) as e:
             self.target.log.warning("Error while parsing %s:%s", self.config, e)
@@ -108,20 +108,25 @@ class IISLogsPlugin(WebserverPlugin):
                 continue
 
             if not has_glob_magic(str(log_dir)) and log_dir.exists():
-                log_paths.add(("auto", log_dir))
+                log_paths["auto"].add(log_dir)
                 continue
 
             for _log_dir_str in self.target.fs.glob(str(log_dir)):
                 if not (_log_dir := self.target.fs.path(_log_dir_str)).is_dir():
                     continue
-                log_paths.add(("auto", _log_dir))
+                log_paths["auto"].add(_log_dir)
 
-        return list(log_paths)
+        return log_paths
 
-    def iter_log_format_path_pairs(self) -> list[tuple[str, str]]:
-        for log_format, log_dir_path in self.log_dirs:
-            for log_file in log_dir_path.glob("*/*.log"):
-                yield (log_format, log_file)
+    def _get_files(self, format: str) -> Iterator[Path]:
+        for log_dir_path in self.log_dirs.get(format, []):
+            yield from log_dir_path.glob("*/*.log")
+
+    def _get_minimal_files(self, format: str) -> Iterator[Path]:
+        if format == "auto":
+            yield from super()._get_minimal_files()
+
+        return
 
     def parse_autodetect_format_log(self, path: Path) -> Iterator[BasicRecordDescriptor]:
         first_line = path.open().readline().decode("utf-8", errors="backslashreplace").strip()
@@ -310,18 +315,21 @@ class IISLogsPlugin(WebserverPlugin):
         web. Logs files might, for example, contain traces that indicate that the web server has been exploited.
         Supported log formats: IIS, W3C.
         """
-        for log_format, log_file in self.iter_log_format_path_pairs():
-            if log_format == "IIS":
-                parse_func = self.parse_iis_format_log
-            elif log_format == "W3C":
-                parse_func = self.parse_w3c_format_log
-            elif log_format == "auto":
-                parse_func = self.parse_autodetect_format_log
-            else:
-                raise ValueError(f"Unsupported IIS log format: {log_format}")
 
-            self.target.log.info("Parsing IIS log file %s in %s format", log_file, log_format)
-            yield from parse_func(log_file)
+        iisFiles = self.get_files("IIS")
+        for iisFile in iisFiles:
+            self.target.log.info("Parsing IIS log file %s in IIS format", iisFile)
+            yield from self.parse_iis_format_log(iisFile)
+
+        w3cFiles = self.get_files("W3C")
+        for w3cFile in w3cFiles:
+            self.target.log.info("Parsing IIS log file %s in W3C format", w3cFile)
+            yield from self.parse_w3c_format_log(w3cFile)
+
+        auto = self.get_files("auto")
+        for autoFile in auto:
+            self.target.log.info("Parsing IIS log file %s in unknown format", autoFile)
+            yield from self.parse_autodetect_format_log(autoFile)
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:

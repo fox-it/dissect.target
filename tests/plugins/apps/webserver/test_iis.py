@@ -215,3 +215,12 @@ def test_iis_access_iis_format_noconfig(
     target_win_tzinfo.add_plugin(iis.IISLogsPlugin)
     results = list(target_win_tzinfo.iis.access())
     assert len(results) > 0
+
+
+def test_plugins_apps_webservers_iis_single_file_mode() -> None:
+    data_path = Path(absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log"))
+
+    target = Target.empty([data_path])
+    records = list(target.iis.logs())
+
+    assert len(records) == 10

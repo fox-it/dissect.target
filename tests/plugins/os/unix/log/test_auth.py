@@ -331,3 +331,12 @@ def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesy
         results[0].message
         == "user : TTY=pts/0 ; PWD=/home/user ; USER=root ; COMMAND=/usr/bin/chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg"  # noqa: E501
     )
+
+
+def test_auth_plugin_single_file_mode() -> None:
+    data_path = Path(absolute_path("_data/plugins/os/unix/log/auth/auth.log"))
+
+    target = Target.empty([data_path])
+    results = list(target.authlog())
+
+    assert len(results) == 10

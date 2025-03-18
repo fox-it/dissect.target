@@ -18,7 +18,7 @@ from dissect.target.exceptions import (
     VolumeSystemError,
 )
 from dissect.target.helpers import config
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.fsutil import TargetPath, glob_split
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
 from dissect.target.plugins.os.default._os import DefaultPlugin
@@ -70,7 +70,7 @@ class Target:
         path: The path of a target.
     """
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, minimal: bool = False):
         # WIP, part of the introduction of URI-style paths.
         # Since pathlib.Path does not support URIs, bigger refactoring
         # is needed in order to fully utilise URI's scheme / path / query
@@ -123,6 +123,31 @@ class Target:
         self.filesystems = FilesystemCollection(self)
 
         self.fs = filesystem.RootFilesystem(self)
+        self.minimal = minimal  # Flag indicating that the target is minimal
+
+    @classmethod
+    def empty(cls, paths: Iterator[str]):
+        """Create a minimal target, primarily to lookup other plugins."""
+        target = Target(minimal=True)
+        target._os_plugin = DefaultPlugin
+        target._os = target.add_plugin(DefaultPlugin.create(target, target.fs))
+
+        target.fs = filesystem.VirtualFilesystem()
+        for index, path_str in enumerate(paths):
+            prefix, pattern = glob_split(os.path.expanduser(path_str))
+
+            if pattern:
+                for glob_file in Path(prefix).glob(pattern):
+                    # Map results of search to a unique directory
+                    results_dir = Path(f"root{index}") / glob_file.relative_to(prefix)
+                    target.fs.makedirs(str(results_dir))
+                    target.fs.map_file(str(results_dir), str(glob_file))
+            else:
+                results_dir = Path(f"root{index}") / Path(prefix).name
+                target.fs.makedirs(str(results_dir))
+                target.fs.map_file(str(results_dir), path_str)
+
+        return target
 
     def __repr__(self) -> str:
         return f"<Target {self.path}>"

@@ -34,7 +34,7 @@ from dissect.target.helpers.record import EmptyRecord
 from dissect.target.helpers.utils import StrEnum
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 
     from typing_extensions import Self
 
@@ -476,6 +476,23 @@ class Plugin:
             except Exception as e:
                 self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name)  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
+
+    def get_files(self, *args, **kwargs) -> Iterable[Path]:
+        if self.target.minimal:
+            yield from self._get_minimal_files(*args, **kwargs)
+        else:
+            yield from self._get_files(*args, **kwargs)
+
+    def _get_minimal_files(self, *args, **kwargs) -> Iterable[Path]:
+        entries = self.target.fs.path().rglob("*")
+        return filter(lambda entry: entry.is_file(), entries)
+
+    def _get_files(self, *args, **kwargs) -> Iterable[Path]:
+        """Return all files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        pass
 
 
 def register(plugincls: type[Plugin]) -> None:

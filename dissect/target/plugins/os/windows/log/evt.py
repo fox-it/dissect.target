@@ -53,6 +53,12 @@ class WindowsEventlogsMixin:
     EVENTLOG_REGISTRY_KEY = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Eventlog"
     LOGS_DIR_PATH = None
 
+    def _get_files(self, logs_dir: str, filename_glob: str) -> Iterator[Path]:
+        if logs_dir:
+            yield from self.get_logs_from_dir(logs_dir, filename_glob=filename_glob)
+        else:
+            yield from self.get_logs(filename_glob=filename_glob)
+
     def get_logs(self, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
@@ -110,7 +116,7 @@ class WindowsEventlogsMixin:
         return file_paths
 
     def check_compatible(self) -> None:
-        if not self.target.fs.path(self.LOGS_DIR_PATH).exists():
+        if not self.target.minimal and not self.target.fs.path(self.LOGS_DIR_PATH).exists():
             raise UnsupportedPluginError(f'Event log directory "{self.LOGS_DIR_PATH}" not found')
 
 
@@ -140,12 +146,7 @@ class EvtPlugin(WindowsEventlogsMixin, Plugin):
             EventID (int): The EventID of the event.
         """
 
-        if logs_dir:
-            log_paths = self.get_logs_from_dir(logs_dir, filename_glob=log_file_glob)
-        else:
-            log_paths = self.get_logs(filename_glob=log_file_glob)
-
-        for entry in log_paths:
+        for entry in self.get_files(logs_dir=logs_dir, filename_glob=log_file_glob):
             if not entry.exists():
                 self.target.log.warning("Event log file does not exist: %s", entry)
                 continue
