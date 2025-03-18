@@ -159,6 +159,7 @@ def main() -> None:
         type=pathlib.Path,
         help="write the query report file to the given directory",
     )
+    parser.add_argument("--single-file", nargs="*", help="glob pattern to match files on local system")
     configure_generic_arguments(parser)
 
     args, rest = parser.parse_known_args()
@@ -213,7 +214,7 @@ def main() -> None:
         list_plugins(args.targets, args.list, args.children, args.json, rest)
         parser.exit()
 
-    if not args.targets:
+    if not args.targets and not args.single_file:
         parser.error("too few arguments")
 
     if not args.function:
@@ -264,7 +265,12 @@ def main() -> None:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(args.targets, args.children):
+        if args.single_file is None:
+            targets = Target.open_all(args.targets, args.children)
+        else:
+            targets = [Target.empty(args.single_file)]
+
+        for target in targets:
             if args.child:
                 try:
                     target = target.open_child(args.child)

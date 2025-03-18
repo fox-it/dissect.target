@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
 
 try:
     from typing import TypeAlias  # novermin
@@ -472,6 +472,23 @@ class Plugin:
                 yield from method()
             except Exception:
                 self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name, exc_info=True)
+
+    def get_files(self, *args, **kwargs) -> Iterable[Path]:
+        if self.target.minimal:
+            yield from self._get_minimal_files(*args, **kwargs)
+        else:
+            yield from self._get_files(*args, **kwargs)
+
+    def _get_minimal_files(self, *args, **kwargs) -> Iterable[Path]:
+        entries = self.target.fs.path().rglob("*")
+        return filter(lambda entry: entry.is_file(), entries)
+
+    def _get_files(self, *args, **kwargs) -> Iterable[Path]:
+        """Return all files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        pass
 
 
 def register(plugincls: type[Plugin]) -> None:
