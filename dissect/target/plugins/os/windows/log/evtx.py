@@ -105,7 +105,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
         record_values = {
             "_target": self.target,
-            "evtx_source": source,
+            "source": source,
         }
         record_fields = [
             ("datetime", "ts"),
@@ -146,6 +146,9 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 if key == "EventID":
                     value = int(value)
 
+                if key.lower() in (lower_keys := {k.lower() for k in record_values.keys()}):
+                    key = unique_key(key, lower_keys)
+
                 record_values[key] = value
 
                 if key in ("Provider_Name", "EventID"):
@@ -153,7 +156,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
 
                 record_fields.append(("string", key))
 
-        record_fields.append(("path", "evtx_source"))
+        record_fields.append(("path", "source"))
 
         # tuple conversion here is needed for lru_cache
         desc = self._create_event_descriptor(tuple(record_fields))
@@ -177,3 +180,19 @@ def format_value(value: Any) -> Any:
         return utils.to_str(value)
     except UnicodeDecodeError:
         return repr(value)
+
+
+def unique_key(key: str, keys: set[str], count: int | None = None) -> str:
+    """Return a unique key for a given set of keys.
+
+    Makes the returned key unique by appending an incrementing integer after the given key name (e.g. ``key_2``).
+    Search is case sensitive so provide lower-cased ``key`` and ``keys`` arguments if case-insensitiveness is desired.
+    """
+    count = count or 2
+    new_key = f"{key}_{count}"
+
+    if new_key in keys:
+        return unique_key(key, keys, count + 1)
+
+    else:
+        return new_key

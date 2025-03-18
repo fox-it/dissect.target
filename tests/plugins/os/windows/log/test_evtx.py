@@ -135,7 +135,7 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
     assert records[0].Computer == "DESKTOP-L7A1DDP"
     assert records[0].Correlation_ActivityID is None
     assert records[0].SubjectUserSid == "S-1-5-18"
-    assert records[0].evtx_source == "sysvol\\windows\\system32\\winevt\\logs\\Security.evtx"
+    assert records[0].source == "sysvol\\windows\\system32\\winevt\\logs\\Security.evtx"
 
     assert records[69].ts == datetime(2025, 3, 4, 10, 28, 2, 905350, tzinfo=timezone.utc)
     assert records[69].PrivilegeList is None
@@ -143,3 +143,16 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
 
     # Should contain None instead of string "-"
     assert {getattr(r, "IpAddress", None) for r in records} == {None, "127.0.0.1"}
+
+
+@pytest.mark.parametrize(
+    ("key", "keys", "expected_key"),
+    [
+        ("source", {"source", "_target"}, "source_2"),
+        ("source", {"source", "source_2", "_target"}, "source_3"),
+    ],
+)
+def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
+    """test if ``unique_keys`` correctly deduplicates key values."""
+
+    assert evtx.unique_key(key, keys) == expected_key
