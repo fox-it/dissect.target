@@ -70,7 +70,7 @@ class ExamplePlugin(Plugin):
         pass
 
     @export(output="default")
-    @arg("--flag", action="store_true", help="optional example flag")
+    @arg("--flag", action="store_true", default=False, help="optional example flag")
     def example(self, flag: bool = False) -> str:
         """Example plugin function.
 

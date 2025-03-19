@@ -25,6 +25,7 @@ class ICatPlugin(Plugin):
     @arg(
         "--fs",
         type=int,
+        required=False,
         help="optional filesystem index, zero indexed. Defaults to the 'sysvol' or '/' filesystem otherwise",
     )
     @arg("--ads", type=str, default="", help="Alternate Data Stream name")

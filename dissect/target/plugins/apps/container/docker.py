@@ -226,11 +226,15 @@ class DockerPlugin(Plugin):
     @arg(
         "--raw-messages",
         action="store_true",
+        default=False,
+        required=False,
         help="preserve ANSI escape sequences and trailing newlines from log messages",
     )
     @arg(
         "--remove-backspaces",
         action="store_true",
+        default=False,
+        required=False,
         help="alter messages by removing ASCII backspaces and the corresponding characters",
     )
     def logs(self, raw_messages: bool = False, remove_backspaces: bool = False) -> Iterator[DockerLogRecord]:

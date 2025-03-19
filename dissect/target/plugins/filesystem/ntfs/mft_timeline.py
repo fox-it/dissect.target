@@ -101,7 +101,7 @@ class MftTimelinePlugin(Plugin):
             raise UnsupportedPluginError("No MFT timelines found")
 
     @export(output="yield")
-    @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
+    @arg("--ignore-dos", action="store_true", required=False, default=False, help="ignore DOS file names")
     def mft_timeline(self, ignore_dos: bool = False) -> Iterator[str]:
         """Return the MFT records of all NTFS filesystems in a human readable format (unsorted).
 
