@@ -3,16 +3,19 @@ from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
+from dissect.target import Target
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
     parse_shell_item_list,
+    SHITEM,
 )
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
@@ -305,7 +308,7 @@ class MRUPlugin(Plugin):
                         pass
 
 
-def parse_mru_key(target, key, record):
+def parse_mru_key(target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor) -> Iterator[UserRegistryRecordDescriptor]:
     user = target.registry.get_user(key)
 
     try:
@@ -347,7 +350,7 @@ def parse_mru_key(target, key, record):
         yield from parse_mru_key(target, subkey, record)
 
 
-def parse_mru_ex_key(target, key, record):
+def parse_mru_ex_key(target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor) -> Iterator[UserRegistryRecordDescriptor]:
     user = target.registry.get_user(key)
 
     try:
@@ -406,7 +409,7 @@ def parse_mru_ex_key(target, key, record):
         yield from parse_mru_ex_key(target, subkey, record)
 
 
-def parse_office_mru(target, key, record):
+def parse_office_mru(target: Target, key: RegistryKey, record: MSOfficeMRURecord) -> Iterator[MSOfficeMRURecord]:
     try:
         yield from parse_office_mru_key(target, key.subkey("File MRU"), record)
     except RegistryError:
@@ -424,7 +427,7 @@ def parse_office_mru(target, key, record):
         pass
 
 
-def parse_office_mru_key(target, key, record):
+def parse_office_mru_key(target: Target, key: RegistryKey, record: MSOfficeMRURecord) -> Iterator[MSOfficeMRURecord]:
     user = target.registry.get_user(key)
 
     for value in key.values():
@@ -447,7 +450,7 @@ def parse_office_mru_key(target, key, record):
         )
 
 
-def get_filepath_from_bag(parsed_bag):
+def get_filepath_from_bag(parsed_bag: list[SHITEM]) -> str:
     filepath = ""
     for element in parsed_bag:
         if element.name.endswith("\\"):
