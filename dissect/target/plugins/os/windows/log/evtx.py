@@ -146,8 +146,8 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 if key == "EventID":
                     value = int(value)
 
-                if key.lower() in (lower_keys := {k.lower() for k in record_values.keys()}):
-                    key = unique_key(key, lower_keys)
+                if key in (keys := set(record_values.keys())):
+                    key = unique_key(key, keys)
 
                 record_values[key] = value
 
