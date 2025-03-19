@@ -14,8 +14,8 @@ from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
-    parse_shell_item_list,
     SHITEM,
+    parse_shell_item_list,
 )
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
@@ -308,7 +308,9 @@ class MRUPlugin(Plugin):
                         pass
 
 
-def parse_mru_key(target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor) -> Iterator[UserRegistryRecordDescriptor]:
+def parse_mru_key(
+    target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor
+) -> Iterator[UserRegistryRecordDescriptor]:
     user = target.registry.get_user(key)
 
     try:
@@ -350,7 +352,9 @@ def parse_mru_key(target: Target, key: RegistryKey, record: UserRegistryRecordDe
         yield from parse_mru_key(target, subkey, record)
 
 
-def parse_mru_ex_key(target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor) -> Iterator[UserRegistryRecordDescriptor]:
+def parse_mru_ex_key(
+    target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor
+) -> Iterator[UserRegistryRecordDescriptor]:
     user = target.registry.get_user(key)
 
     try:
