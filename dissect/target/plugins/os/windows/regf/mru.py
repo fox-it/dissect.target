@@ -16,6 +16,7 @@ from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
     SHITEM,
     parse_shell_item_list,
+    SHITEM,
 )
 
 if TYPE_CHECKING:
