@@ -10,6 +10,7 @@ from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPlugi
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log import evt, evtx
 from dissect.target.plugins.scrape import scrape
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -163,3 +164,12 @@ def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> 
     """Test if ``unique_keys`` correctly deduplicates key values."""
 
     assert evtx.unique_key(key, keys) == expected_key
+
+
+def test_evtx_single_file_mode(target_default: Target) -> None:
+    data_path = absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx")
+
+    target = Target.minimal([data_path])
+    records = list(target.evtx())
+
+    assert len(records) == 5

@@ -218,9 +218,9 @@ def test_iis_access_iis_format_noconfig(
 
 
 def test_plugins_apps_webservers_iis_single_file_mode() -> None:
-    data_path = Path(absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log"))
+    data_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log")
 
-    target = Target.empty([data_path])
+    target = Target.minimal([data_path])
     records = list(target.iis.logs())
 
     assert len(records) == 10

@@ -276,7 +276,7 @@ def main() -> int:
         if args.single_file is None:
             targets = Target.open_all(args.targets, args.children)
         else:
-            targets = [Target.empty(args.single_file)]
+            targets = [Target.minimal(args.single_file)]
 
         for target in targets:
             if args.child:

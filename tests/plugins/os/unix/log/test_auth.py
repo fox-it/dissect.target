@@ -334,9 +334,9 @@ def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesy
 
 
 def test_auth_plugin_single_file_mode() -> None:
-    data_path = Path(absolute_path("_data/plugins/os/unix/log/auth/auth.log"))
+    data_path = absolute_path("_data/plugins/os/unix/log/auth/auth.log")
 
-    target = Target.empty([data_path])
+    target = Target.minimal([data_path])
     results = list(target.authlog())
 
     assert len(results) == 10

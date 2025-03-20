@@ -105,9 +105,9 @@ def test_evt_scraping(target_win: Target) -> None:
 
 
 def test_evt_single_file_mode(target_default: Target) -> None:
-    data_path = Path((absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")))
+    data_path = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
 
-    target = Target.empty([data_path])
+    target = Target.minimal([data_path])
     records = list(target.evt())
 
     assert len(records) == 5
