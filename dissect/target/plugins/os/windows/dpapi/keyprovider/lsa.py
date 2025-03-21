@@ -32,10 +32,11 @@ class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
         """Yield Windows LSA DefaultPassword strings."""
-        if default_pass := self.target.lsa._secrets.get("DefaultPassword"):
-            try:
-                value = c_defaultpassword.DefaultPassword(default_pass).data
-            except Exception:
-                self.target.log.warning("Failed to parse LSA DefaultPassword value")
-                return
-            yield self.__namespace__, value
+        for secret in ["DefaultPassword", "DefaultPassword_OldVal", "DefaulPassword", "DefaulPassword_OldVal"]:
+            if default_pass := self.target.lsa._secrets.get(secret):
+                try:
+                    value = c_defaultpassword.DefaultPassword(default_pass).data
+                except Exception:
+                    self.target.log.warning("Failed to parse LSA %s value", secret)
+                    continue
+                yield self.__namespace__, value
