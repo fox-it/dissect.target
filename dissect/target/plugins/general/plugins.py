@@ -151,12 +151,12 @@ class PluginListPlugin(Plugin):
         pass
 
     @export(output="none", cache=False)
-    @arg("--docs", dest="print_docs", action="store_true")
+    @arg("--docs", dest="print_docs", action="store_true", default=False, help="Output docstrings")
     # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
     # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
     # https://github.com/fox-it/dissect.target/pull/841
     # https://github.com/fox-it/dissect.target/issues/889
-    @arg("--as-json", dest="as_json", action="store_true")
+    @arg("--as-json", dest="as_json", action="store_true", default=False, help="Output in JSON format")
     def plugins(self, print_docs: bool = False, as_json: bool = False) -> None:
         """Print all available plugins."""
         if as_json:

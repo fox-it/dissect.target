@@ -973,6 +973,7 @@ def test_function_required_arguments(target_default: Target) -> None:
             {
                 "help": "path to scan environment files in",
                 "required": True,
+                "type": str,
             },
         ),
         (
@@ -980,6 +981,7 @@ def test_function_required_arguments(target_default: Target) -> None:
             {
                 "default": "env",
                 "help": "extension of files to scan",
+                "type": str,
             },
         ),
     ]
@@ -1232,6 +1234,24 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)
+
+    # Arguments of the plugin should define their type and if they are required.
+    for arg in descriptor.args:
+        names, settings = arg
+        is_action = settings.get("action") in ["store_true", "store_false"]
+        assert names, f"No argument names for argument of function {descriptor.qualname}"
+        assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.qualname}"
+        assert (
+            settings.get("type") or is_action
+        ), f"No type defined for argument {names[0]} in function {descriptor.qualname}"
+        assert (
+            isinstance(settings.get("required"), bool) or "default" in settings
+        ), f"No required or default attribute for argument {names[0]} in function {descriptor.qualname}"
+
+        if is_action:
+            assert (
+                "type" not in settings
+            ), f"Type cannot be set for store_true or store_false in {names[0]} in function {descriptor.qualname}"
 
 
 def assert_valid_rst(src: str) -> None:
