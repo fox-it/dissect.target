@@ -132,6 +132,15 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
             id="sshd: failed password",
         ),
         pytest.param(
+            "Jun 4 22:14:15 ubuntu-1 sshd[12345]: reverse mapping checking getaddrinfo for some-hostname-with-digits-012.34.56.78.example.com [90.12.34.56] failed - POSSIBLE BREAK-IN ATTEMPT!",  # noqa: E501
+            {
+                "service": "sshd",
+                "pid": 12345,
+                "remote_ips": ["12.34.56.78", "90.12.34.56"],
+            },
+            id="sshd: reverse dns ip addr",
+        ),
+        pytest.param(
             "Mar 27 13:08:09 ubuntu-1 sshd[1361]: Accepted publickey for test_user "
             "from 8.8.8.8 port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio",
             {
