@@ -491,3 +491,25 @@ def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Ite
     mock_target.fs.mount("/", fs_docker)
     mock_target.apply()
     yield mock_target
+
+
+class TargetUnixFactory:
+    def __init__(self, tmp_path: pathlib.Path):
+        self.tmp_path = tmp_path
+
+    def new(self, hostname: str = "hostname") -> tuple[Target, VirtualFilesystem]:
+        """Initialize a virtual unix target."""
+        fs = VirtualFilesystem()
+
+        fs.makedirs("var")
+        fs.makedirs("etc")
+        fs.map_file_fh("/etc/hostname", BytesIO(hostname.encode()))
+
+        return make_os_target(self.tmp_path, UnixPlugin, root_fs=fs), fs
+
+
+@pytest.fixture
+def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
+    """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
+    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
+    return TargetUnixFactory(tmp_path)
