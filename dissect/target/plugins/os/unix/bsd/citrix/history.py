@@ -85,7 +85,9 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
         """Parse bash.log* contents."""
-        for ts, line in year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S "):
+        for i, (ts, line) in enumerate(
+            year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S ")
+        ):
             line = line.strip()
             if not line:
                 continue
@@ -101,6 +103,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,
+                order=-i,
                 shell="citrix-netscaler-bash",
                 source=path,
                 _target=self.target,
@@ -125,6 +128,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
             yield CommandHistoryRecord(
                 ts=None,
                 command=line,
+                order=idx,
                 shell="citrix-netscaler-cli",
                 source=history_file,
                 _target=self.target,

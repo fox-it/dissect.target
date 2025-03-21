@@ -15,6 +15,7 @@ CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension
     [
         ("datetime", "ts"),
         ("string", "command"),
+        ("varint", "order"),
         ("string", "shell"),
         ("path", "source"),
     ],
@@ -95,7 +96,7 @@ class CommandHistoryPlugin(Plugin):
         """
         next_cmd_ts = None
 
-        for line in file.open("rt", errors="replace"):
+        for line_number, line in enumerate(file.open("rt", errors="replace")):
             ts = None
             line = line.strip()
 
@@ -113,6 +114,7 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=line,
+                order=line_number,
                 shell=shell,
                 source=file,
                 _target=self.target,
@@ -133,7 +135,7 @@ class CommandHistoryPlugin(Plugin):
         Resources:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
-        for line in file.open("rt", errors="replace"):
+        for line_number, line in enumerate(file.open("rt", errors="replace")):
             line = line.strip()
 
             if not line or line == ": :;":
@@ -149,6 +151,7 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,
+                order=line_number,
                 shell="zsh",
                 source=file,
                 _target=self.target,
@@ -182,10 +185,11 @@ class CommandHistoryPlugin(Plugin):
         with history_file.open("r") as h_file:
             history_data = h_file.read()
 
-        for command, ts in RE_FISH.findall(history_data):
+        for command_no, (command, ts) in enumerate(RE_FISH.findall(history_data)):
             yield CommandHistoryRecord(
                 ts=from_unix(int(ts)),
                 command=command,
+                order=command_no,
                 shell="fish",
                 source=history_file,
                 _target=self.target,
