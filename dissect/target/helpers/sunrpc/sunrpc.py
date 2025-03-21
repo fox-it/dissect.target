@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
+
+
+class ProcedureDescriptor(NamedTuple):
+    program: int
+    version: int
+    procedure: int
+
+
+GetPortProc = ProcedureDescriptor(100000, 2, 3)
 
 
 class Bool(IntEnum):
