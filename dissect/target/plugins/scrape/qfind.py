@@ -28,28 +28,24 @@ class QFindPlugin(Plugin):
     @arg(
         "--no-hex-decode",
         action="store_true",
-        default=False,
         help="do not automatically add decoded hex needles (only in raw mode)",
     )
     @arg(
         "-R",
         "--raw",
         action="store_true",
-        default=False,
         help="show raw hex dumps instead of post-processed string output",
     )
-    @arg("-i", "--ignore-case", action="store_true", default=False, help="case insensitive search")
+    @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")
     @arg(
         "--allow-non-ascii",
         action="store_true",
-        default=False,
         help="allow non-ASCII characters in the output",
     )
     @arg(
         "-u",
         "--unique",
         action="store_true",
-        default=False,
         help="only show unique string hits (does not apply to raw output)",
     )
     @arg("-W", "--window", type=int, default=256, help="maximum window size in bytes for context around each hit")

@@ -259,7 +259,7 @@ class PrefetchPlugin(Plugin):
             raise UnsupportedPluginError("No prefetch files found")
 
     @export(record=[PrefetchRecord, GroupedPrefetchRecord])
-    @arg("--grouped", action="store_true", default=False, help="Group the prefetch record")
+    @arg("--grouped", action="store_true", help="Group the prefetch record")
     def prefetch(self, grouped=False) -> Iterator[PrefetchRecord | GroupedPrefetchRecord]:
         """Return the content of all prefetch files.
 

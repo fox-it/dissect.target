@@ -145,7 +145,6 @@ class MftPlugin(Plugin):
         "--compact",
         group="fmt",
         action="store_true",
-        default=False,
         help="compacts the MFT entry timestamps into a single record",
     )
     @arg("--fs", type=int, default=None, help="optional filesystem index, zero indexed")
@@ -155,7 +154,6 @@ class MftPlugin(Plugin):
         "--macb",
         group="fmt",
         action="store_true",
-        default=False,
         help="compacts MFT timestamps into MACB bitfield (format: MACB[standard|ads]/MACB[filename])",
     )
     def mft(

@@ -1239,13 +1239,17 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     for arg in descriptor.args:
         names, settings = arg
         is_action = settings.get("action") in ["store_true", "store_false"]
+
         assert names, f"No argument names for argument of function {descriptor.qualname}"
+
         assert settings.get("help"), f"No help text for argument {names[0]} in function {descriptor.qualname}"
+
         assert (
             settings.get("type") or is_action
         ), f"No type defined for argument {names[0]} in function {descriptor.qualname}"
+
         assert (
-            isinstance(settings.get("required"), bool) or "default" in settings
+            isinstance(settings.get("required"), bool) or "default" in settings or is_action
         ), f"No required or default attribute for argument {names[0]} in function {descriptor.qualname}"
 
         if is_action:

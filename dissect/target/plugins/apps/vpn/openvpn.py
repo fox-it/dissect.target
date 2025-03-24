@@ -161,8 +161,6 @@ class OpenVPNPlugin(Plugin):
         "--export-key",
         help="Export private keys to records",
         action="store_true",
-        default=False,
-        required=False,
     )
     def config(self, export_key: bool = False) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
         """Parses config files from openvpn interfaces."""
