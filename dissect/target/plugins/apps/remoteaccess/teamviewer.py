@@ -118,8 +118,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                     if not line:
                         break
 
-                    line = line.strip()
-                    if not line or line.startswith("# "):
+                    if not (line := line.strip()) or line.startswith("# "):
                         continue
 
                     if line.startswith("Start:"):
@@ -136,33 +135,35 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                         continue
 
                     log = match.groupdict()
+                    date = log["date"]
+                    time = log["time"]
 
                     # Older TeamViewer versions first mention the start time and then leave out the year,
                     # so we have to correct for the missing year in date.
-                    if log["date"].count("/") == 1:
+                    if date.count("/") == 1:
                         if not start_date:
                             self.target.log.warning("Missing year in log line, skipping line %r in %s", line, logfile)
                             continue
-                        log["date"] = f"{start_date.year}/{log['date']}"
+                        date = f"{start_date.year}/{log['date']}"
 
                     # Correct for year if short notation for 2000 is used
-                    if log["date"].count("/") == 2 and len(log["date"].split("/")[0]) == 2:
-                        log["date"] = "20" + log["date"]
+                    if date.count("/") == 2 and len(date.split("/")[0]) == 2:
+                        date = "20" + date
 
                     # Correct for ``:`` separator of milliseconds
-                    if log["time"].count(":") == 3:
-                        hms, _, ms = log["time"].rpartition(":")
-                        log["time"] = f"{hms}.{ms}"
+                    if time.count(":") == 3:
+                        hms, _, ms = time.rpartition(":")
+                        time = f"{hms}.{ms}"
 
                     # Convert milliseconds to microseconds
-                    if "." in log["time"]:
-                        hms, _, ms = log["time"].rpartition(".")
-                        log["time"] = f"{hms}.{ms:06}"
+                    if "." in time:
+                        hms, _, ms = time.rpartition(".")
+                        time = f"{hms}.{ms:06}"
                     else:
-                        log["time"] += ".000000"
+                        time += ".000000"
 
                     try:
-                        timestamp = datetime.strptime(f"{log['date']} {log['time']}", "%Y/%m/%d %H:%M:%S.%f").replace(
+                        timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
                             tzinfo=start_date.tzinfo if start_date else target_tz
                         )
                     except Exception as e:
