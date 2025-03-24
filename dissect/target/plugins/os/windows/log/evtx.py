@@ -146,8 +146,8 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
                 if key == "EventID":
                     value = int(value)
 
-                if key in (keys := set(record_values.keys())):
-                    key = unique_key(key, keys)
+                if key in record_values:
+                    key = unique_key(key, record_values)
 
                 record_values[key] = value
 
@@ -182,17 +182,18 @@ def format_value(value: Any) -> Any:
         return repr(value)
 
 
-def unique_key(key: str, keys: set[str], count: int | None = None) -> str:
-    """Return a unique key for a given set of keys.
+def unique_key(key: str, dictionary: dict[str, Any], count: int | None = None) -> str:
+    """Return a unique key for a given dict of key value pairs.
 
     Makes the returned key unique by appending an incrementing integer after the given key name (e.g. ``key_2``).
-    Search is case sensitive so provide lower-cased ``key`` and ``keys`` arguments if case-insensitiveness is desired.
+    Search is case sensitive so provide lower-cased ``key`` and ``dictionary`` arguments if case-insensitiveness
+    is desired.
     """
     count = count or 2
     new_key = f"{key}_{count}"
 
-    if new_key in keys:
-        return unique_key(key, keys, count + 1)
+    if new_key in dictionary:
+        return unique_key(key, dictionary, count + 1)
 
     else:
         return new_key
