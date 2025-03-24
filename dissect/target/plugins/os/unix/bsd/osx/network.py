@@ -85,14 +85,14 @@ class MacNetworkPlugin(NetworkPlugin):
                     name=name,
                     type=_type,
                     enabled=not interface.get("__INACTIVE__", False),
-                    dns=list(dns),
                     cidr=ifaces,
                     gateway=list(gateways),
+                    dns=list(dns),
+                    mac=[],
                     source="NetworkServices",
-                    vlan=vlan,
                     interface_service_order=interface_service_order,
                     dhcp=dhcp,
-                    mac=[],
+                    vlan=vlan,
                     _target=self.target,
                 )
 

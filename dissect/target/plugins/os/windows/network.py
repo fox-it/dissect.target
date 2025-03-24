@@ -339,16 +339,16 @@ class WindowsNetworkPlugin(NetworkPlugin):
         """Extract network device configuration from the given interface_id for all ControlSets on the system."""
 
         dhcp_config = {
-            "dns": set(),
             "cidr": set(),
             "gateway": set(),
+            "dns": set(),
             "search_domain": set(),
         }
 
         static_config = {
-            "dns": set(),
             "cidr": set(),
             "gateway": set(),
+            "dns": set(),
             "search_domain": set(),
         }
 
@@ -378,13 +378,11 @@ class WindowsNetworkPlugin(NetworkPlugin):
             static_config["cidr"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
 
-        if len(dhcp_config) > 0:
-            dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1
-            dhcp_config["dhcp"] = True
+        dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1
+        dhcp_config["dhcp"] = True
 
-        if len(static_config) > 0:
-            static_config["enabled"] = None
-            static_config["dhcp"] = False
+        static_config["enabled"] = None
+        static_config["dhcp"] = False
 
         # Return both configurations
         return [dhcp_config, static_config]

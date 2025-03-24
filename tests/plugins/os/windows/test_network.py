@@ -44,19 +44,19 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "EnableDHCP": 1,
             },
             {
-                "ip": ["10.10.10.10"],
-                "dns": ["10.10.10.2"],
-                "gateway": ["10.10.10.1"],
-                "mac": ["DE:AD:BE:EF:DE:AD"],
-                "cidr": ["10.10.10.10/24"],
-                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                "type": "OTHER",
-                "vlan": 12,
                 "name": "ETHERNET 0",
-                "search_domain": ["work"],
-                "metric": 15,
-                "dhcp": True,
+                "type": "OTHER",
                 "enabled": True,
+                "cidr": ["10.10.10.10/24"],
+                "ip": ["10.10.10.10"],
+                "gateway": ["10.10.10.1"],
+                "dns": ["10.10.10.2"],
+                "mac": ["DE:AD:BE:EF:DE:AD"],
+                "metric": 15,
+                "search_domain": ["work"],
+                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                "dhcp": True,
+                "vlan": 12,
             },
             id="DHCP enabled",
         ),
@@ -76,17 +76,17 @@ REGISTRY_KEY_CONNECTION = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Network\\{4
                 "EnableDHCP": 0,
             },
             {
-                "ip": ["10.10.10.10"],
-                "dns": ["10.10.10.2"],
-                "gateway": ["10.10.10.1"],
-                "mac": ["DE:AD:BE:EF:DE:AD"],
-                "cidr": ["10.10.10.10/24"],
-                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "type": "ETHERNET_CSMACD",
-                "vlan": 11,
-                "search_domain": ["local"],
+                "cidr": ["10.10.10.10/24"],
+                "ip": ["10.10.10.10"],
+                "gateway": ["10.10.10.1"],
+                "dns": ["10.10.10.2"],
+                "mac": ["DE:AD:BE:EF:DE:AD"],
                 "metric": 5,
+                "search_domain": ["local"],
+                "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
                 "dhcp": False,
+                "vlan": 11,
             },
             id="DHCP disabled",
         ),
@@ -165,15 +165,15 @@ def test_windows_network(
         assert network.macs() == expected_values.get("mac", [])
 
         network_interface = next(iter(network.interfaces()))
-        assert network_interface.cidr == expected_values.get("cidr", [])
-        assert network_interface.first_connected == expected_values.get("first_connected")
-        assert network_interface.type == expected_values.get("type")
-        assert network_interface.vlan == expected_values.get("vlan")
         assert network_interface.name == expected_values.get("name")
-        assert network_interface.search_domain == expected_values.get("search_domain", [])
-        assert network_interface.metric == expected_values.get("metric")
-        assert network_interface.dhcp == expected_values.get("dhcp")
+        assert network_interface.type == expected_values.get("type")
         assert network_interface.enabled == expected_values.get("enabled")
+        assert network_interface.cidr == expected_values.get("cidr", [])
+        assert network_interface.metric == expected_values.get("metric")
+        assert network_interface.search_domain == expected_values.get("search_domain", [])
+        assert network_interface.first_connected == expected_values.get("first_connected")
+        assert network_interface.dhcp == expected_values.get("dhcp")
+        assert network_interface.vlan == expected_values.get("vlan")
 
 
 @pytest.mark.parametrize(
@@ -246,35 +246,34 @@ def test_windows_network_none(
             },
             [
                 {
-                    "ip": ["192.168.0.10"],
-                    "dns": ["192.168.0.2"],
-                    "gateway": ["192.168.0.1"],
-                    "mac": ["FE:EE:EE:EE:EE:ED"],
-                    "subnetmask": ["255.255.255.0"],
-                    "cidr": ["192.168.0.10/24"],
-                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                    "type": "SOFTWARE_LOOPBACK",
-                    "vlan": 10,
                     "name": None,
-                    "search_domain": ["corp"],
-                    "metric": 20,
-                    "dhcp": True,
+                    "type": "SOFTWARE_LOOPBACK",
                     "enabled": True,
+                    "cidr": ["192.168.0.10/24"],
+                    "ip": ["192.168.0.10"],
+                    "gateway": ["192.168.0.1"],
+                    "dns": ["192.168.0.2"],
+                    "mac": ["FE:EE:EE:EE:EE:ED"],
+                    "metric": 20,
+                    "search_domain": ["corp"],
+                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                    "dhcp": True,
+                    "vlan": 10,
                 },
                 {
-                    "ip": ["10.0.0.10"],
-                    "dns": ["10.0.0.2", "10.0.0.3"],
-                    "gateway": ["10.0.0.1"],
-                    "mac": ["FE:EE:EE:EE:EE:ED"],
-                    "cidr": ["10.0.0.10/24"],
-                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
-                    "type": "SOFTWARE_LOOPBACK",
-                    "vlan": 10,
                     "name": None,
-                    "search_domain": ["corp"],
-                    "metric": 20,
-                    "dhcp": False,
+                    "type": "SOFTWARE_LOOPBACK",
                     "enabled": None,
+                    "cidr": ["10.0.0.10/24"],
+                    "ip": ["10.0.0.10"],
+                    "gateway": ["10.0.0.1"],
+                    "dns": ["10.0.0.2", "10.0.0.3"],
+                    "mac": ["FE:EE:EE:EE:EE:ED"],
+                    "metric": 20,
+                    "search_domain": ["corp"],
+                    "first_connected": datetime.fromisoformat("2012-12-21 00:00:00+00:00"),
+                    "dhcp": False,
+                    "vlan": 10,
                 },
             ],
         ),
@@ -325,17 +324,17 @@ def test_network_dhcp_and_static(
 
             assert sorted(str(x.ip) for x in interface.cidr) == expected["ip"]
             assert sorted(map(str, interface.dns)) == expected["dns"]
+            assert interface.name == expected["name"]
+            assert interface.type == expected["type"]
+            assert interface.enabled == expected["enabled"]
+            assert interface.cidr == expected["cidr"]
             assert interface.gateway == expected["gateway"]
             assert interface.mac == expected["mac"]
-            assert interface.cidr == expected["cidr"]
             assert interface.first_connected == expected["first_connected"]
-            assert interface.type == expected["type"]
-            assert interface.vlan == expected["vlan"]
-            assert interface.name == expected["name"]
-            assert interface.search_domain == expected["search_domain"]
             assert interface.metric == expected["metric"]
+            assert interface.search_domain == expected["search_domain"]
             assert interface.dhcp == expected["dhcp"]
-            assert interface.enabled == expected["enabled"]
+            assert interface.vlan == expected["vlan"]
 
         assert network.ips() == list(ips)
         assert network.dns() == list(dns)

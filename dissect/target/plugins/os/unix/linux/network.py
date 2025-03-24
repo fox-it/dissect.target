@@ -83,18 +83,19 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
 
         def to_record(self) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
-                source=self.source,
-                last_connected=self.last_connected,
                 name=self.name,
-                mac=to_list(self.mac_address),
                 type=self.type,
+                enabled=None,
                 cidr=self.ip_interfaces,
+                gateway=list(self.gateways),
+                dns=list(self.dns),
+                mac=to_list(self.mac_address),
                 dhcp_ipv4=self.dhcp_ipv4,
                 dhcp_ipv6=self.dhcp_ipv6,
-                dns=list(self.dns),
-                gateway=list(self.gateways),
+                last_connected=self.last_connected,
                 vlan=list(self.vlan),
                 configurator="NetworkManager",
+                source=self.source,
             )
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
@@ -283,16 +284,16 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                 dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
                 yield UnixInterfaceRecord(
-                    source=str(config_file),
+                    name=match_section.get("Name"),
                     type=match_section.get("Type"),
                     enabled=None,  # Unknown, dependent on run-time state
-                    dhcp_ipv4=dhcp_ipv4,
-                    dhcp_ipv6=dhcp_ipv6,
-                    name=match_section.get("Name"),
+                    cidr=ip_interfaces,
+                    gateway=list(gateways),
                     dns=list(dns),
                     mac=list(mac_addresses),
-                    interface=ip_interfaces,
-                    gateway=list(gateways),
+                    source=str(config_file),
+                    dhcp_ipv4=dhcp_ipv4,
+                    dhcp_ipv6=dhcp_ipv6,
                     vlan=list(vlan_ids),
                     configurator="systemd-networkd",
                 )
