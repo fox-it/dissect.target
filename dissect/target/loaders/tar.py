@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import re
-import tarfile
+import tarfile as tf
 from pathlib import Path
+from typing import Iterable
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import (
@@ -11,10 +12,37 @@ from dissect.target.filesystems.tar import (
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
-from dissect.target.loader import Loader
+from dissect.target.helpers.lazy import import_lazy
+from dissect.target.loader import Loader, SubLoader
+
+ContainerImageTarSubLoader: TarSubLoader = import_lazy(
+    "dissect.target.loaders.containerimage"
+).ContainerImageTarSubLoader
+GenericTarSubLoader: TarSubLoader = import_lazy("dissect.target.loaders.tar").GenericTarSubLoader
 
 log = logging.getLogger(__name__)
 
+TAR_EXT_COMP = (
+    ".tar.gz",
+    ".tar.xz",
+    ".tar.bz",
+    ".tar.bz2",
+    ".tgz",
+    ".txz",
+    ".tbz",
+    ".tbz2",
+)
+TAR_EXT = (".tar",)
+
+TAR_MAGIC_COMP = (
+    # gzip
+    b"\x1f\x8b",
+    # bzip2
+    b"\x42\x5A\x68",
+    # xz
+    b"\xfd\x37\x7a\x58\x5a\x00",
+)
+TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
@@ -22,26 +50,83 @@ ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 class TarLoader(Loader):
     """Load tar files."""
 
+    __subloaders__ = [
+        ContainerImageTarSubLoader,
+        GenericTarSubLoader,  # should be last
+    ]
+
     def __init__(self, path: Path | str, **kwargs):
         super().__init__(path)
 
         if isinstance(path, str):
             path = Path(path)
 
-        if self.is_compressed(path):
+        if is_compressed(path):
             log.warning(
                 f"Tar file {path!r} is compressed, which will affect performance. "
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
 
-        self.tar = tarfile.open(fileobj=path.open("rb"))
+        self.fh = path.open("rb")
+        self.tar = tf.open(mode="r:*", fileobj=self.fh)
+        self.subloader = None
 
     @staticmethod
     def detect(path: Path) -> bool:
-        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
+        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
 
-    def is_compressed(self, path: Path | str) -> bool:
-        return str(path).lower().endswith((".tar.gz", ".tgz"))
+    def map(self, target: target.Target) -> None:
+        for candidate in self.__subloaders__:
+            if candidate.detect(self.tar):
+                self.subloader = candidate(self.tar)
+                self.subloader.map(target)
+                break
+
+
+def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
+    if not path.is_file():
+        return False
+
+    with path.open("rb") as fh:
+        headers = [fh.read(6)]
+        fh.seek(257)
+        headers.append(fh.read(8))
+        for header in headers:
+            if header.startswith(magics):
+                return True
+    return False
+
+
+def is_compressed(path: Path) -> bool:
+    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
+
+
+class TarSubLoader(SubLoader[tf.TarFile]):
+    """Tar implementation of a :class:`SubLoader`."""
+
+    def __init__(self, tar: tf.TarFile, *args, **kwargs):
+        super().__init__(tar, *args, **kwargs)
+        self.tar = tar
+
+    @staticmethod
+    def detect(tarfile: tf.TarFile) -> bool:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError
+
+    def map(self, target: target.Target) -> None:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError
+
+
+class GenericTarSubLoader(TarSubLoader):
+    """Generic tar sub loader.
+
+    Recognises acquire tar files and regular tar files. Attempts to map sysvol and c: volume names.
+    """
+
+    @staticmethod
+    def detect(tarfile: tf.TarFile) -> bool:
+        return True
 
     def map(self, target: target.Target) -> None:
         volumes = {}
