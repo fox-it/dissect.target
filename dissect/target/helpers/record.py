@@ -149,7 +149,7 @@ COMMON_INTERFACE_ELEMENTS = [
     ("string", "type"),
     ("boolean", "enabled"),
     ("net.ipaddress[]", "dns"),
-    ("net.ipinterface[]", "interface"),
+    ("net.ipinterface[]", "cidr"),
     ("net.ipaddress[]", "gateway"),
     ("string", "source"),
 ]

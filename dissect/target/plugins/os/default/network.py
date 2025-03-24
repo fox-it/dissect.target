@@ -56,7 +56,7 @@ class NetworkPlugin(Plugin):
     @export
     def ips(self) -> list[IPAddress]:
         """Return IP addresses as list of :class:`IPAddress`."""
-        return list(set(self._get_record_type("interface", attrgetter("ip"))))
+        return list(set(self._get_record_type("cidr", attrgetter("ip"))))
 
     @export
     def gateways(self) -> list[IPAddress]:
@@ -77,7 +77,7 @@ class NetworkPlugin(Plugin):
     def with_ip(self, ip_addr: str) -> Iterator[InterfaceRecord]:
         """Yield all interfaces with the given IP address."""
         for interface in self.interfaces():
-            if any(iface.ip == ip_addr for iface in interface.interface):
+            if any(iface.ip == ip_addr for iface in interface.cidr):
                 yield interface
 
     @internal
@@ -92,5 +92,5 @@ class NetworkPlugin(Plugin):
         """Yield all interfaces with IP addresses in the given CIDR range."""
         cidr = IPNetwork(cidr)
         for interface in self.interfaces():
-            if any(iface.ip in cidr for iface in interface.interface):
+            if any(iface.ip in cidr for iface in interface.cidr):
                 yield interface

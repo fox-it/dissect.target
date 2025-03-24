@@ -320,7 +320,7 @@ class WindowsNetworkPlugin(NetworkPlugin):
                         [
                             conf["dns"],
                             conf["gateway"],
-                            conf["interface"],
+                            conf["cidr"],
                             conf["search_domain"],
                         ]
                     ):
@@ -340,15 +340,15 @@ class WindowsNetworkPlugin(NetworkPlugin):
 
         dhcp_config = {
             "dns": set(),
+            "cidr": set(),
             "gateway": set(),
-            "interface": set(),
             "search_domain": set(),
         }
 
         static_config = {
             "dns": set(),
+            "cidr": set(),
             "gateway": set(),
-            "interface": set(),
             "search_domain": set(),
         }
 
@@ -369,13 +369,13 @@ class WindowsNetworkPlugin(NetworkPlugin):
             # Extract DHCP configuration from the registry
             dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
             dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
-            dhcp_config["interface"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
+            dhcp_config["cidr"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
             dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
 
             # Extract static configuration from the registry
             static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
             static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
-            static_config["interface"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
+            static_config["cidr"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
 
         if len(dhcp_config) > 0:

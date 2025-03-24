@@ -88,7 +88,7 @@ def dhcp(fake_plist: dict) -> dict:
                 (0, "domain", ["None"]),
                 (0, "name", ["en0"]),
                 (0, "type", ["Ethernet"]),
-                (0, "interface", ["192.122.13.34/32"]),
+                (0, "cidr", ["192.122.13.34/32"]),
                 (0, "gateway", ["8.8.8.8"]),
                 (0, "dns", ["8.8.8.8"]),
                 (0, "vlan", ["None"]),
@@ -103,7 +103,7 @@ def dhcp(fake_plist: dict) -> dict:
             {"IPAddress": "10.0.0.2"},
             "dhcp",
             [
-                (0, "interface", sorted(["10.0.0.2/32"])),
+                (0, "cidr", sorted(["10.0.0.2/32"])),
             ],
             1,
         ),
@@ -127,7 +127,7 @@ def dhcp(fake_plist: dict) -> dict:
             {},
             "ipv6",
             [
-                (0, "interface", ["::1/128"]),
+                (0, "cidr", ["::1/128"]),
             ],
             1,
         ),
