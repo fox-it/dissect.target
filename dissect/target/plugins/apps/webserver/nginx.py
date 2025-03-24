@@ -135,7 +135,7 @@ class NginxPlugin(WebserverPlugin):
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
         """Parse the given nginx ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
 
-        seen = seen or set()
+        seen = set() if seen is None else seen
 
         if path in seen:
             self.target.log.warning("Detected recursion in Nginx configuration, file already parsed: %s", path)
@@ -148,8 +148,7 @@ class NginxPlugin(WebserverPlugin):
             return
 
         for line in path.open("rt").readlines():
-            line = line.strip()
-            if not line:
+            if not (line := line.strip()):
                 continue
 
             if "access_log " in line:
