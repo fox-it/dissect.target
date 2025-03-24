@@ -31,8 +31,16 @@ class LSADefaultPasswordKeyProviderPlugin(KeyProviderPlugin):
 
     @export(output="yield")
     def keys(self) -> Iterator[tuple[str, str]]:
-        """Yield Windows LSA DefaultPassword strings."""
-        for secret in ["DefaultPassword", "DefaultPassword_OldVal", "DefaulPassword", "DefaulPassword_OldVal"]:
+        """Yield Windows LSA DefaultPassword strings.
+
+        Currently extracts decrypted ``DefaultPassword`` values from LSA.
+        Does not yet parse ``HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon\\DefaultPassword``.
+
+        Resources:
+            - https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
+        """
+
+        for secret in ["DefaultPassword", "DefaultPassword_OldVal"]:
             if default_pass := self.target.lsa._secrets.get(secret):
                 try:
                     value = c_defaultpassword.DefaultPassword(default_pass).data

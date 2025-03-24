@@ -84,7 +84,11 @@ class LSAPlugin(Plugin):
 
     @cached_property
     def _secrets(self) -> dict[str, bytes] | None:
-        """Return dict of Windows system decrypted LSA secrets."""
+        """Return dict of Windows system decrypted LSA secrets.
+
+        Includes current values (``CurrVal``) and the previous value (``OldVal``).
+        Key names are suffixed with ``_OldVal`` if an old value is found in the registry.
+        """
         if not self.target.ntversion:
             raise ValueError("Unable to determine Windows NT version")
 
