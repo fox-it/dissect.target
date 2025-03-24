@@ -154,7 +154,8 @@ class DPAPIPlugin(InternalPlugin):
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
 
-        Returns: decrypted bytes
+        Returns:
+            Decrypted bytes.
         """
         return self.decrypt_user_blob(data, sid=self.SYSTEM_SID, **kwargs)
 
@@ -165,12 +166,13 @@ class DPAPIPlugin(InternalPlugin):
             data: Bytes of DPAPI blob to decrypt.
             username: Username of the owner of the DPAPI blob.
             sid: SID of the owner of the DPAPI blob.
-            kwargs: Arbitrary named arguments to pass to DPAPIBlob.decrypt function.
+            **kwargs: Arbitrary named arguments to pass to DPAPIBlob.decrypt function.
 
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
 
-        Returns: decrypted bytes
+        Returns:
+            Decrypted bytes.
         """
 
         if not sid and not username:
@@ -205,7 +207,8 @@ class DPAPIPlugin(InternalPlugin):
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
 
-        Returns: decrypted bytes
+        Returns:
+            Decrypted bytes.
         """
         try:
             blob = DPAPIBlob(data)
