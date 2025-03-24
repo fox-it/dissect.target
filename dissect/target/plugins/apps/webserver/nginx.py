@@ -202,8 +202,7 @@ class NginxPlugin(WebserverPlugin):
                 continue
 
             for line in open_decompress(path, "rt"):
-                line = line.strip()
-                if not line:
+                if not (line := line.strip()):
                     continue
 
                 log: dict[str, str] = {}
@@ -257,13 +256,10 @@ class NginxPlugin(WebserverPlugin):
                 continue
 
             for line in open_decompress(path, "rt"):
-                line = line.strip()
-                if not line:
+                if not (line := line.strip()):
                     continue
 
-                match = RE_ERROR_LOG.search(line)
-
-                if not match:
+                if not (match := RE_ERROR_LOG.search(line)):
                     self.target.log.warning("Unable to match NGINX error log message %r in %s", line, path)
                     continue
 
