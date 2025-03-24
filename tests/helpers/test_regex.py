@@ -80,7 +80,7 @@ from dissect.target.helpers.regex.ipaddress import extract_ips
         ("to be exact, it is 15:00:01 at the moment.", None),
     ],
 )
-def test_ip_regexes(input_ip: str, expected_output: str | None):
+def test_ip_regexes(input_ip: str, expected_output: str | None) -> None:
     if expected_output is None:
         assert extract_ips(input_ip) == []
     else:
