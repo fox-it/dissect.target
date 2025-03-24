@@ -62,7 +62,12 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
         arguments = []
 
         for name, arg in desc.args:
-            is_bool_action = arg.get("action", "").startswith(("store_true", "store_false",))
+            is_bool_action = arg.get("action", "").startswith(
+                (
+                    "store_true",
+                    "store_false",
+                )
+            )
             arg_desc = {
                 "name": name[0],
                 "type": "bool" if is_bool_action else getattr(arg.get("type"), "__name__", None),
