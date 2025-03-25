@@ -132,7 +132,7 @@ class LnkPlugin(Plugin):
                 return None
         raise UnsupportedPluginError("No folders containing link files found")
 
-    @arg("--path", "-p", dest="path", default=None, help="Path to directory or .lnk file in target")
+    @arg("--path", "-p", type=str, dest="path", default=None, help="Path to directory or .lnk file in target")
     @export(record=LnkRecord)
     def lnk(self, path: str | None = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
