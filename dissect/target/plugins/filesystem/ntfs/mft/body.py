@@ -1,7 +1,7 @@
 from typing import Iterator
 
-from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import export
+from dissect.target.plugins.filesystem.ntfs.mft.mft import MftPlugin
 from dissect.target.plugins.filesystem.ntfs.utils import get_drive_letter
 
 
@@ -11,16 +11,14 @@ def format_info(
     return f"{md5}|{name}|{inode}|{mode_as_string}|{uid}|{gid}|{size}|{atime}|{mtime}|{ctime}|{crtime}"
 
 
-class MftBodyPlugin(Plugin):
+class MftBodyPlugin(MftPlugin):
     """NTFS MFT body plugin."""
 
     def check_compatible(self) -> None:
-        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
-        if not len(ntfs_filesystems):
-            raise UnsupportedPluginError("No NTFS filesystem found")
+        super().check_compatible()
 
     @export(output="yield")
-    def mft_body(self) -> Iterator[str]:
+    def body(self) -> Iterator[str]:
         """Return the MFT records of all NTFS filesystems in bodyfile format.
 
         The file mode is not accurate. This value was only added to indicate
