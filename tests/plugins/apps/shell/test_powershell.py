@@ -31,4 +31,5 @@ def test_plugins_os_windows_powershell(target, fs, target_file, request):
 
     assert len(records) == 4
     assert records[0].command == 'Write-Host "Hello World!"'
+    assert records[0].order == 0
     assert str(records[0].source) == target_file
