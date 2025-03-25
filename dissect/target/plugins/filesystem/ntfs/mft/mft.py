@@ -12,7 +12,7 @@ from flow.record.fieldtypes import windows_path
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugin import NamespacePlugin, arg, export
 from dissect.target.plugins.filesystem.ntfs.utils import (
     InformationType,
     get_drive_letter,
@@ -122,16 +122,40 @@ COMPACT_RECORD_TYPES = {
 }
 
 
-class MftPlugin(Plugin):
-    """NTFS MFT plugin."""
+class MftPlugin(NamespacePlugin):
+    __namespace__ = "mft"
 
     def __init__(self, target):
         super().__init__(target)
         self.ntfs_filesystems = {index: fs for index, fs in enumerate(self.target.filesystems) if fs.__type__ == "ntfs"}
 
+    def __call__(self, *args, **kwargs):
+        return MftRecordPlugin(self.target).mft()
+
     def check_compatible(self) -> None:
         if not len(self.ntfs_filesystems):
             raise UnsupportedPluginError("No NTFS filesystems found")
+
+    def mft(
+        self, compact: bool = False, fs: int | None = None, start: int = 0, end: int = -1, macb: bool = False
+    ) -> Iterator[Record]:
+        """Return the MFT records of all NTFS filesystems."""
+        raise NotImplementedError
+
+    def body(self) -> Iterator[str]:
+        """Return the MFT records of all NTFS filesystems in bodyfile format."""
+        raise NotImplementedError
+
+    def timeline(self, ignore_dos: bool = False) -> Iterator[str]:
+        """Return the MFT records of all NTFS filesystems in a human readable format (unsorted)."""
+        raise NotImplementedError
+
+
+class MftRecordPlugin(MftPlugin):
+    """NTFS MFT plugin."""
+
+    def check_compatible(self):
+        return super().check_compatible()
 
     @export(
         record=[

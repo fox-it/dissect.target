@@ -9,13 +9,13 @@ from dissect.ntfs.exceptions import Error
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.plugins.filesystem.ntfs.mft import (
+from dissect.target.plugins.filesystem.ntfs.mft.mft import (
     FilesystemFilenameRecord,
     FilesystemStdRecord,
     MftPlugin,
     macb_aggr,
 )
-from dissect.target.plugins.filesystem.ntfs.mft_timeline import MftTimelinePlugin
+from dissect.target.plugins.filesystem.ntfs.mft.timeline import MftTimelinePlugin
 from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
     get_owner_and_group,

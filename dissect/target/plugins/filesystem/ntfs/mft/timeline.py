@@ -5,9 +5,9 @@ from dissect.ntfs.attr import FileName, StandardInformation
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
 
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugin import arg, export
+from dissect.target.plugins.filesystem.ntfs.mft.mft import MftPlugin
 from dissect.target.plugins.filesystem.ntfs.utils import (
     InformationType,
     get_drive_letter,
@@ -92,17 +92,15 @@ def format_info(
         yield f"{base_info} - {extras.format()}{postfix}"
 
 
-class MftTimelinePlugin(Plugin):
+class MftTimelinePlugin(MftPlugin):
     """NTFS MFT timeline plugin."""
 
     def check_compatible(self) -> None:
-        ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
-        if not len(ntfs_filesystems):
-            raise UnsupportedPluginError("No MFT timelines found")
+        super().check_compatible()
 
     @export(output="yield")
     @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
-    def mft_timeline(self, ignore_dos: bool = False) -> Iterator[str]:
+    def timeline(self, ignore_dos: bool = False) -> Iterator[str]:
         """Return the MFT records of all NTFS filesystems in a human readable format (unsorted).
 
         The Master File Table (MFT) contains metadata about every file and folder on a NFTS filesystem.
