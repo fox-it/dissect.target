@@ -145,13 +145,12 @@ EmptyRecord = RecordDescriptor(
 
 COMMON_INTERFACE_ELEMENTS = [
     ("string", "name"),
-    ("string[]", "mac"),
     ("string", "type"),
     ("boolean", "enabled"),
-    ("net.ipaddress[]", "dns"),
-    ("net.ipaddress[]", "ip"),
+    ("net.ipinterface[]", "cidr"),
     ("net.ipaddress[]", "gateway"),
-    ("net.ipnetwork[]", "network"),
+    ("net.ipaddress[]", "dns"),
+    ("string[]", "mac"),
     ("string", "source"),
 ]
 
@@ -176,7 +175,6 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
         ("stringlist", "search_domain"),
         ("datetime", "first_connected"),
         ("datetime", "last_connected"),
-        ("net.ipaddress[]", "subnetmask"),
         ("boolean", "dhcp"),
         ("varint", "vlan"),
     ],

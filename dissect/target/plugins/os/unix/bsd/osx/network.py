@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import plistlib
 from functools import cache, lru_cache
-from typing import Iterator
+from typing import TYPE_CHECKING
 
+from dissect.target.exceptions import FileNotFoundError
 from dissect.target.helpers.record import MacInterfaceRecord
 from dissect.target.plugins.os.default.network import NetworkPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 
 class MacNetworkPlugin(NetworkPlugin):
@@ -25,6 +30,8 @@ class MacNetworkPlugin(NetworkPlugin):
     def _plistnetwork(self) -> dict:
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
+
+        raise FileNotFoundError("Couldn't find preferences file")
 
     def _interfaces(self) -> Iterator[MacInterfaceRecord]:
         plistnetwork = self._plistnetwork()
@@ -46,45 +53,46 @@ class MacNetworkPlugin(NetworkPlugin):
         for _id, interface in network.items():
             dns = set()
             gateways = set()
-            ips = set()
             device = interface.get("Interface", {})
             name = device.get("DeviceName")
             _type = device.get("Type")
             vlan = vlan_lookup.get(name)
             dhcp = False
-            subnetmask = []
-            network = []
+            ifaces = set()
             interface_service_order = service_order.index(_id) if _id in service_order else None
             try:
                 for addr in interface.get("DNS", {}).get("ServerAddresses", {}):
                     dns.add(addr)
+
                 for addresses in [interface.get("IPv4", {}), interface.get("IPv6", {})]:
-                    subnetmask += filter(lambda mask: mask != "", addresses.get("SubnetMasks", []))
+                    iface = ""
                     if router := addresses.get("Router"):
                         gateways.add(router)
-                    if addresses.get("ConfigMethod", "") == "DHCP":
-                        ips.add(self._plistlease(name).get("IPAddress"))
-                        dhcp = True
-                    else:
-                        for addr in addresses.get("Addresses", []):
-                            ips.add(addr)
 
-                if subnetmask:
-                    network = self.calculate_network(ips, subnetmask)
+                    if addresses.get("ConfigMethod", "") == "DHCP":
+                        iface = self._plistlease(name).get("IPAddress")
+                        dhcp = True
+                    elif addr := addresses.get("Addresses", []):
+                        iface = addr[0]
+
+                    if _subnet_mask := list(filter(None, addresses.get("SubnetMasks", []))):
+                        iface = f"{iface}/{_subnet_mask[0]}"
+
+                    if iface:
+                        ifaces.add(iface)
 
                 yield MacInterfaceRecord(
                     name=name,
                     type=_type,
                     enabled=not interface.get("__INACTIVE__", False),
-                    dns=list(dns),
-                    ip=list(ips),
+                    cidr=ifaces,
                     gateway=list(gateways),
+                    dns=list(dns),
+                    mac=[],
                     source="NetworkServices",
-                    vlan=vlan,
-                    network=network,
                     interface_service_order=interface_service_order,
                     dhcp=dhcp,
-                    mac=[],
+                    vlan=vlan,
                     _target=self.target,
                 )
 
