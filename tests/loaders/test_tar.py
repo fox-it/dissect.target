@@ -1,4 +1,5 @@
 import pathlib
+import tarfile
 
 import pytest
 
@@ -6,6 +7,7 @@ from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
+from tests.filesystems.test_tar import _mkdir
 
 
 def test_tar_loader_compressed_tar_file(target_win: Target) -> None:
@@ -76,6 +78,32 @@ def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str,
     assert WindowsPlugin.detect(target_default)
     # NOTE: for the sysvol archives, this also tests the backwards compatibility
     assert sorted(target_default.fs.mounts.keys()) == [expected_drive_letter]
+
+
+def test_tar_loader_windows_case_sensitivity(target_default: Target, tmp_path: pathlib.Path) -> None:
+    """test if we correctly map a tar with Windows folder structure as a case-insensitive filesystem."""
+
+    tar_path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tf:
+        _mkdir(tf, "Windows")
+        _mkdir(tf, "Windows/System32")
+
+    loader = TarLoader(tar_path)
+    loader.map(target_default)
+
+    # Make sure the case sensitiveness is changed to False and make sure we detect the target as Windows.
+    assert not target_default.filesystems[0].case_sensitive
+    assert WindowsPlugin.detect(target_default)
+
+    # We also test the inverse, make sure a random Linux target is not marked as case-insensitive.
+    tar_path = tmp_path.joinpath("second_target.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tf:
+        _mkdir(tf, "etc")
+        _mkdir(tf, "var")
+        _mkdir(tf, "opt")
+    loader = TarLoader(tar_path)
+    loader.map(target_default)
+    assert target_default.filesystems[1].case_sensitive
 
 
 def test_tar_anonymous_filesystems(target_default: Target) -> None:
