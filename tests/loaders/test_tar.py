@@ -1,3 +1,5 @@
+import pathlib
+
 import pytest
 
 from dissect.target import Target
@@ -89,3 +91,37 @@ def test_tar_anonymous_filesystems(target_default: Target) -> None:
     assert "/" in target_default.fs.mounts.keys()
     assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
     assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"
+
+
+@pytest.mark.parametrize(
+    ("should_detect", "filename", "buffer"),
+    [
+        # regular tar file
+        (True, "file.tar", ""),
+        (True, "file", "00" * 257 + "7573746172202000"),
+        # gzip tar file
+        (True, "file.tar.gz", ""),
+        (True, "file.tgz", ""),
+        (True, "file", "1f8b0800000000000000"),
+        # bzip2 tar file
+        (True, "file.tar.bz2", ""),
+        (True, "file.tar.bz", ""),
+        (True, "file.tbz", ""),
+        (True, "file.tbz2", ""),
+        (True, "file", "425a6839314159265359"),
+        # xz tar file
+        (True, "file.tar.xz", ""),
+        (True, "file.txz", ""),
+        (True, "file", "fd377a585a000004e6d6"),
+        # some things it should not detect
+        (False, "file", "00010203"),
+        (False, "file.zip", "504b0304"),
+    ],
+)
+def test_tar_detect(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
+    """test if we detect the given buffer as a (compressed) tar file or not."""
+    tmp_tar = tmp_path.joinpath(filename)
+    tmp_tar.touch()
+    with tmp_tar.open("wb") as fh:
+        fh.write(bytes.fromhex(buffer))
+    assert TarLoader.detect(tmp_tar) == should_detect

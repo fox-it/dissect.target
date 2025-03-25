@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import itertools
 import re
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
-from typing import Iterator, NamedTuple, Optional
+from typing import Iterator, NamedTuple
 
-from dissect.target import plugin
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
+from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverErrorLogRecord,
@@ -18,6 +21,31 @@ from dissect.target.target import Target
 class LogFormat(NamedTuple):
     name: str
     pattern: re.Pattern
+
+
+# e.g. ServerRoot "/etc/httpd"
+RE_CONFIG_ROOT = re.compile(
+    r"""
+        [\s#]*                          # Optionally prefixed by space(s) or pound sign(s).
+        ServerRoot
+        \s
+        "?(?P<location>[^"\s]+)"
+        $
+    """,
+    re.VERBOSE,
+)
+
+# e.g. Include conf.modules.d/*.conf and IncludeOptional conf.d/*.conf
+RE_CONFIG_INCLUDE = re.compile(
+    r"""
+        [\s#]*                          # Optionally prefixed by space(s) or pound sign(s).
+        (Include|IncludeOptional)       # Directive indicating that additional config files are loaded.
+        \s
+        ?(?P<location>[^"\s]+)
+        $
+    """,
+    re.VERBOSE,
+)
 
 
 # e.g. CustomLog "/custom/log/location/access.log" common
@@ -40,7 +68,7 @@ RE_CONFIG_ERRORLOG_DIRECTIVE = re.compile(
         [\s#]*                          # Optionally prefixed by space(s) or pound sign(s).
         ErrorLog                        # Directive indicating that a custom error log location / format is used.
         \s
-        "?(?P<location>[^"\s$]+)"?      # Location to log to, optionally wrapped in double quotes.
+        "?(?P<location>[^"\s]+)"?       # Location to log to, optionally wrapped in double quotes.
         $
     """,
     re.VERBOSE,
@@ -111,6 +139,8 @@ RE_ERROR_COMMON_PATTERN = r"""
     ((?P<error_code>\w+)\:\s)?          # APR/OS error status code and string (optional).
     (?P<message>.*)                     # The actual log message.
 """
+
+RE_ENV_VAR_IN_STRING = re.compile(r"\$\{(?P<env_var>[^\"\s$]+)\}", re.VERBOSE)
 
 LOG_FORMAT_ACCESS_COMMON = LogFormat(
     "common",
@@ -187,65 +217,149 @@ class ApachePlugin(WebserverPlugin):
         "/etc/httpd/conf/httpd.conf",
         "/etc/httpd.conf",
     ]
+    DEFAULT_ENVVAR_PATHS = ["/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf"]
 
     def __init__(self, target: Target):
         super().__init__(target)
-        self.access_log_paths, self.error_log_paths = self.get_log_paths()
+        self.server_root = None
+        self.access_paths = set()
+        self.error_paths = set()
+        self.find_logs()
 
     def check_compatible(self) -> None:
-        if not len(self.access_log_paths) and not len(self.error_log_paths):
-            raise UnsupportedPluginError("No Apache directories found")
+        if not self.access_paths and not self.error_paths:
+            raise UnsupportedPluginError("No Apache log files found")
 
-    def get_log_paths(self) -> tuple[list[Path], list[Path]]:
-        """
-        Discover any present Apache log paths on the target system.
+        if self.target.os == OperatingSystem.CITRIX:
+            raise UnsupportedPluginError("Use the 'apps.webserver.citrix' apache plugin instead")
+
+    def find_logs(self) -> None:
+        """Discover any present Apache log paths on the target system.
+        Populates ``self.access_paths`` and ``self.error_paths``.
 
         References:
+            - https://httpd.apache.org/docs/2.4/logs.html
+            - https://httpd.apache.org/docs/2.4/mod/mod_log_config.html
             - https://www.cyberciti.biz/faq/apache-logs/
             - https://unix.stackexchange.com/a/269090
         """
 
-        access_log_paths = set()
-        error_log_paths = set()
-
         # Check if any well known default Apache log locations exist
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ACCESS_LOG_NAMES):
-            access_log_paths.update(self.target.fs.path(log_dir).glob(f"{log_name}*"))
+            self.access_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
 
         for log_dir, log_name in itertools.product(self.DEFAULT_LOG_DIRS, self.ERROR_LOG_NAMES):
-            error_log_paths.update(self.target.fs.path(log_dir).glob(f"{log_name}*"))
+            self.error_paths.update(self.target.fs.path(log_dir).glob(f"*{log_name}*"))
+
+        seen = set()
 
         # Check default Apache configs for CustomLog or ErrorLog directives
         for config in self.DEFAULT_CONFIG_PATHS:
-            if (path := self.target.fs.path(config)).exists():
-                for line in path.open("rt"):
-                    line = line.strip()
+            if (path := self.target.fs.path(config)).exists() and path not in seen:
+                self._process_conf_file(path, seen)
 
-                    if not line or ("CustomLog" not in line and "ErrorLog" not in line):
+        # Check all .conf files inside the server root
+        if self.server_root:
+            for path in self.server_root.rglob("*.conf"):
+                if path not in seen:
+                    self._process_conf_file(path, seen)
+
+    def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
+        """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
+        and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
+        """
+        seen = set() if seen is None else seen
+
+        if path in seen:
+            self.target.log.warning("Detected recursion in Apache configuration, file already parsed: %s", path)
+            return
+
+        seen.add(path)
+
+        for line in path.open("rt"):
+            if not (line := line.strip()):
+                continue
+
+            if "ServerRoot" in line:
+                if not (match := RE_CONFIG_ROOT.match(line)):
+                    self.target.log.warning("Unable to parse Apache 'ServerRoot' configuration in %s: %r", path, line)
+                    continue
+                location = match.groupdict().get("location")
+                self.server_root = self.target.fs.path(location)
+
+            elif "CustomLog" in line or "ErrorLog" in line:
+                self._process_conf_line(path, line)
+
+            elif "Include" in line:
+                if not (match := RE_CONFIG_INCLUDE.match(line)):
+                    self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
+                    continue
+
+                location = match.groupdict().get("location")
+
+                if "*" in location:
+                    root, rest = location.split("*", 1)
+                    if root.startswith("/"):
+                        root = self.target.fs.path(root)
+                    elif not root.startswith("/") and self.server_root:
+                        root = self.server_root.joinpath(root)
+                    elif not self.server_root:
+                        self.target.log.warning("Unable to resolve relative Include in %s: %r", path, line)
                         continue
 
-                    if "ErrorLog" in line:
-                        set_to_update = error_log_paths
-                        pattern_to_use = RE_CONFIG_ERRORLOG_DIRECTIVE
-                    else:
-                        set_to_update = access_log_paths
-                        pattern_to_use = RE_CONFIG_CUSTOM_LOG_DIRECTIVE
+                    for found_conf in root.glob(f"*{rest}"):
+                        self._process_conf_file(found_conf, seen)
 
-                    match = pattern_to_use.match(line)
-                    if not match:
-                        self.target.log.warning("Unexpected Apache log configuration: %s (%s)", line, path)
-                        continue
+                elif self.server_root and (include_path := self.server_root.joinpath(location)).exists():
+                    self._process_conf_file(include_path, seen)
 
-                    directive = match.groupdict()
-                    custom_log = self.target.fs.path(directive["location"])
-                    set_to_update.update(path for path in custom_log.parent.glob(f"{custom_log.name}*"))
+                elif (include_path := self.target.fs.path(location)).exists():
+                    self._process_conf_file(include_path, seen)
 
-        return sorted(access_log_paths), sorted(error_log_paths)
+                else:
+                    self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
 
-    @plugin.export(record=WebserverAccessLogRecord)
+    def _process_conf_line(self, path: Path, line: str) -> None:
+        """Parse and resolve the given ``CustomLog`` or ``ErrorLog`` directive found in a Apache ``.conf`` file."""
+        if "ErrorLog" in line:
+            pattern = RE_CONFIG_ERRORLOG_DIRECTIVE
+            set_to_update = self.error_paths
+        else:
+            pattern = RE_CONFIG_CUSTOM_LOG_DIRECTIVE
+            set_to_update = self.access_paths
+
+        if not (match := pattern.match(line)):
+            self.target.log.warning("Unexpected Apache 'ErrorLog' or 'CustomLog' configuration in %s: %r", path, line)
+            return
+
+        location = match.groupdict().get("location")
+        custom_log = self.target.fs.path(location)
+
+        if env_var_match := RE_ENV_VAR_IN_STRING.match(location):
+            env_var = env_var_match.groupdict()["env_var"]
+            if (apache_log_dir := self.env_vars.get(env_var)) is None:
+                self.target.log.warning("%s does not exist, cannot resolve '%s' in %s", env_var, custom_log, path)
+                return
+
+            custom_log = self.target.fs.path(location.replace(f"${{{env_var}}}", apache_log_dir.replace("$SUFFIX", "")))
+
+        set_to_update.update(path for path in custom_log.parent.glob(f"*{custom_log.name}*"))
+
+    @cached_property
+    def env_vars(self) -> dict[str, str]:
+        variables = {}
+        for envvar_file in self.DEFAULT_ENVVAR_PATHS:
+            if (file := self.target.fs.path(envvar_file)).exists():
+                for line in file.read_text().splitlines():
+                    key, _, value = line.strip().partition("=")
+                    if key:
+                        variables[key.replace("export ", "")] = value.strip("\"'")
+        return variables
+
+    @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
         """Return contents of Apache access log files in unified ``WebserverAccessLogRecord`` format."""
-        for line, path in self._iterate_log_lines(self.access_log_paths):
+        for line, path in self._iterate_log_lines(self.access_paths):
             try:
                 logformat = self.infer_access_log_format(line)
                 if not logformat:
@@ -285,10 +399,10 @@ class ApachePlugin(WebserverPlugin):
                 self.target.log.warning("An error occured parsing Apache log file %s: %s", path, str(e))
                 self.target.log.debug("", exc_info=e)
 
-    @plugin.export(record=WebserverErrorLogRecord)
+    @export(record=WebserverErrorLogRecord)
     def error(self) -> Iterator[WebserverErrorLogRecord]:
         """Return contents of Apache error log files in unified ``WebserverErrorLogRecord`` format."""
-        for line, path in self._iterate_log_lines(self.error_log_paths):
+        for line, path in self._iterate_log_lines(self.error_paths):
             try:
                 match = LOG_FORMAT_ERROR_COMMON.pattern.match(line)
                 if not match:
@@ -343,7 +457,7 @@ class ApachePlugin(WebserverPlugin):
                 self.target.log.warning("Apache log file configured but could not be found (dead symlink?): %s", path)
 
     @staticmethod
-    def infer_access_log_format(line: str) -> Optional[LogFormat]:
+    def infer_access_log_format(line: str) -> LogFormat | None:
         """Attempt to infer what standard LogFormat is used. Returns None if no known format can be inferred.
 
         Three default log type examples from Apache (note that the ipv4 could also be ipv6)
