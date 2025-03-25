@@ -13,6 +13,7 @@ from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverErrorLogRecord,
+    WebserverHostRecord,
     WebserverPlugin,
 )
 from dissect.target.target import Target
@@ -142,6 +143,8 @@ RE_ERROR_COMMON_PATTERN = r"""
 
 RE_ENV_VAR_IN_STRING = re.compile(r"\$\{(?P<env_var>[^\"\s$]+)\}", re.VERBOSE)
 
+RE_VIRTUALHOST = re.compile(r"^\<VirtualHost (?P<addr>[^\s:]+)(?:\:(?P<port>\d+))?")
+
 LOG_FORMAT_ACCESS_COMMON = LogFormat(
     "common",
     re.compile(
@@ -224,18 +227,19 @@ class ApachePlugin(WebserverPlugin):
         self.server_root = None
         self.access_paths = set()
         self.error_paths = set()
+        self.virtual_hosts = set()
         self.find_logs()
 
     def check_compatible(self) -> None:
-        if not self.access_paths and not self.error_paths:
-            raise UnsupportedPluginError("No Apache log files found")
+        if not self.access_paths and not self.error_paths and not self.virtual_hosts:
+            raise UnsupportedPluginError("No Apache log files or virtual hosts found")
 
         if self.target.os == OperatingSystem.CITRIX:
             raise UnsupportedPluginError("Use the 'apps.webserver.citrix' apache plugin instead")
 
     def find_logs(self) -> None:
         """Discover any present Apache log paths on the target system.
-        Populates ``self.access_paths`` and ``self.error_paths``.
+        Populates ``self.access_paths``, ``self.error_paths`` and ``self.virtual_hosts``.
 
         References:
             - https://httpd.apache.org/docs/2.4/logs.html
@@ -318,6 +322,10 @@ class ApachePlugin(WebserverPlugin):
 
                 else:
                     self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
+
+            # While we're at it, see if we can find any VirtualHosts
+            elif "<VirtualHost" in line:
+                self.virtual_hosts.add(path)
 
     def _process_conf_line(self, path: Path, line: str) -> None:
         """Parse and resolve the given ``CustomLog`` or ``ErrorLog`` directive found in a Apache ``.conf`` file."""
@@ -442,6 +450,41 @@ class ApachePlugin(WebserverPlugin):
             except Exception as e:
                 self.target.log.warning("An error occured parsing Apache log file %s: %s", path, str(e))
                 self.target.log.debug("", exc_info=e)
+
+    def hosts(self) -> Iterator[WebserverHostRecord]:
+        """Return found VirtualHost directives in the Apache configuration.
+
+        Resources:
+            - https://httpd.apache.org/docs/2.4/mod/core.html#virtualhost
+        """
+
+        for path in self.virtual_hosts:
+            # A configuration file can contain multiple VirtualHost directives.
+            current_vhost = {}
+            for line in path.open("rt").readlines():
+                if "<VirtualHost" in line:
+                    # Currently only supports a single addr:port combination.
+                    if match := RE_VIRTUALHOST.match(line.lstrip()):
+                        current_vhost = match.groupdict()
+                    else:
+                        self.target.log.warning("Unable to parse VirtualHost directive %r in %s", line, path)
+                        current_vhost = {}
+
+                elif "</VirtualHost" in line:
+                    yield WebserverHostRecord(
+                        ts=path.lstat().st_mtime,
+                        server_name=current_vhost.get("ServerName") or current_vhost.get("addr"),
+                        server_port=current_vhost.get("port"),
+                        root_path=current_vhost.get("DocumentRoot"),
+                        access_log_config=current_vhost.get("CustomLog", "").rpartition(" ")[0],
+                        error_log_config=current_vhost.get("ErrorLog"),
+                        source=path,
+                        _target=self.target,
+                    )
+
+                else:
+                    key, _, value = line.strip().partition(" ")
+                    current_vhost[key] = value
 
     def _iterate_log_lines(self, paths: list[Path]) -> Iterator[tuple[str, Path]]:
         """Iterate through a list of paths and yield tuples of loglines and the path of the file where they're from."""
