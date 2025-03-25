@@ -8,10 +8,17 @@ from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystem import Filesystem
+from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+from dissect.target.helpers.nfs.client.nfs import NfsError
+from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
 from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
+from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -227,7 +234,20 @@ class UnixPlugin(OSPlugin):
     def _add_mounts(self) -> None:
         fstab = self.target.fs.path("/etc/fstab")
 
-        for dev_id, volume_name, mount_point, _, options in parse_fstab(fstab, self.target.log):
+        for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
+            # Mount nfs, but only when target has been mapped by the `LocalLoader`
+            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
+                if "enable-nfs" in self.target.path_query:
+                    self._add_nfs(dev_id, volume_name, mount_point)
+                else:
+                    log.warning(
+                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                        dev_id,
+                        volume_name,
+                        mount_point,
+                    )
+                continue
+
             opts = parse_options_string(options)
             subvol = opts.get("subvol", None)
             subvolid = opts.get("subvolid", None)
@@ -265,6 +285,36 @@ class UnixPlugin(OSPlugin):
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
+
+    def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        # Try all users to see if we can access the share
+        def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
+            for user in self.users():
+                if user.uid is None or user.gid is None:
+                    continue
+                auth = auth_unix("machine", user.uid, user.gid, [])
+                nfs_client.rebind_auth(auth)
+                try:
+                    self.target.log.debug("Trying to read NFS share with uid %d and gid %d", user.uid, user.gid)
+                    # Use a readdir to check if we have access.
+                    # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
+                    nfs_client.readdir(filehandle)
+                    return  # We have access
+                except NfsError as e:
+                    if e.nfsstat != NfsStat.ERR_ACCES:
+                        self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
+                        nfs_client.close()
+                        raise e
+
+            raise FilesystemError("No user has access to NFS share")
+
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
+            nfs = NfsFilesystem.connect(address, exported_dir, auth_setter, LocalPortPolicy.PRIVILEGED)
+            self.target.fs.mount(mount_point, nfs)
+        except Exception as e:
+            self.target.log.warning("Failed to mount NFS share %s:%s at %s", address, exported_dir, mount_point)
+            self.target.log.debug("", exc_info=e)
 
     def _add_devices(self) -> None:
         """Add some virtual block devices to the target.
@@ -395,6 +445,12 @@ def parse_fstab(
             dev_id = dev.split("=")[1]
         elif dev.startswith("LABEL="):
             volume_name = dev.split("=")[1]
+        elif fs_type == "nfs":
+            # Put the nfs server address in dev_id and the root path in volume_name
+            dev_id, sep, volume_name = dev.partition(":")
+            if sep != ":":
+                log.warning("Invalid NFS mount: %s", dev)
+                continue
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue
