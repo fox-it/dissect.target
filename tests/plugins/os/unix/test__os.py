@@ -119,8 +119,8 @@ def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
-    expected_hostname: str,
-    expected_domain: str,
+    expected_hostname: str | None,
+    expected_domain: str | None,
     file_content: str,
 ) -> None:
     fs_unix.map_file_fh(path, BytesIO(file_content))
