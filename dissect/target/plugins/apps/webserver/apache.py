@@ -461,7 +461,7 @@ class ApachePlugin(WebserverPlugin):
         for path in self.virtual_hosts:
             # A configuration file can contain multiple VirtualHost directives.
             current_vhost = {}
-            for line in path.open("rt").readlines():
+            for line in path.open("rt"):
                 if "<VirtualHost" in line:
                     # Currently only supports a single addr:port combination.
                     if match := RE_VIRTUALHOST.match(line.lstrip()):
