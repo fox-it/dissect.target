@@ -33,7 +33,7 @@ RE_CONFIG_ROOT = re.compile(
         "?(?P<location>[^"\s]+)"
         $
     """,
-    re.VERBOSE,
+    re.VERBOSE | re.IGNORECASE,
 )
 
 # e.g. Include conf.modules.d/*.conf and IncludeOptional conf.d/*.conf
@@ -45,7 +45,7 @@ RE_CONFIG_INCLUDE = re.compile(
         ?(?P<location>[^"\s]+)
         $
     """,
-    re.VERBOSE,
+    re.VERBOSE | re.IGNORECASE,
 )
 
 
@@ -60,7 +60,7 @@ RE_CONFIG_CUSTOM_LOG_DIRECTIVE = re.compile(
         (?P<logformat>[^$]+)            # Format to use (can be either a format string or a nickname).
         $
     """,
-    re.VERBOSE,
+    re.VERBOSE | re.IGNORECASE,
 )
 
 # e.g ErrorLog "/var/log/httpd/error_log"
@@ -72,7 +72,7 @@ RE_CONFIG_ERRORLOG_DIRECTIVE = re.compile(
         "?(?P<location>[^"\s]+)"?       # Location to log to, optionally wrapped in double quotes.
         $
     """,
-    re.VERBOSE,
+    re.VERBOSE | re.IGNORECASE,
 )
 
 RE_REMOTE_PATTERN = r"""
@@ -143,7 +143,7 @@ RE_ERROR_COMMON_PATTERN = r"""
 
 RE_ENV_VAR_IN_STRING = re.compile(r"\$\{(?P<env_var>[^\"\s$]+)\}", re.VERBOSE)
 
-RE_VIRTUALHOST = re.compile(r"^\<VirtualHost (?P<addr>[^\s:]+)(?:\:(?P<port>\d+))?")
+RE_VIRTUALHOST = re.compile(r"^\<VirtualHost (?P<addr>[^\s:]+)(?:\:(?P<port>\d+))?", re.IGNORECASE)
 
 LOG_FORMAT_ACCESS_COMMON = LogFormat(
     "common",
@@ -217,10 +217,12 @@ class ApachePlugin(WebserverPlugin):
     DEFAULT_CONFIG_PATHS = [
         "/etc/apache2/apache2.conf",
         "/usr/local/etc/apache22/httpd.conf",
+        "/usr/local/apache2/httpd.conf",
         "/etc/httpd/conf/httpd.conf",
         "/etc/httpd.conf",
     ]
     DEFAULT_ENVVAR_PATHS = ["/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf"]
+    DEFAULT_SERVER_ROOTS = ["/etc/apache2", "/usr/local/apache2", "/etc/httpd", "/home/httpd", "/home/apache2"]
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -271,6 +273,11 @@ class ApachePlugin(WebserverPlugin):
     def _process_conf_file(self, path: Path, seen: set[Path] | None = None) -> None:
         """Process an Apache ``.conf`` file for ``ServerRoot``, ``CustomLog``, ``Include``
         and ``OptionalInclude`` directives. Populates ``self.access_paths`` and ``self.error_paths``.
+
+        Apache / Httpd directives are case-insensitive which is why we convert lines to lowercase for pattern matching.
+
+        Resources:
+            - https://httpd.apache.org/docs/2.4/en/configuring.html#syntax
         """
         seen = set() if seen is None else seen
 
@@ -284,17 +291,19 @@ class ApachePlugin(WebserverPlugin):
             if not (line := line.strip()):
                 continue
 
-            if "ServerRoot" in line:
+            line_lower = line.lower()
+
+            if "serverroot" in line_lower:
                 if not (match := RE_CONFIG_ROOT.match(line)):
                     self.target.log.warning("Unable to parse Apache 'ServerRoot' configuration in %s: %r", path, line)
                     continue
                 location = match.groupdict().get("location")
                 self.server_root = self.target.fs.path(location)
 
-            elif "CustomLog" in line or "ErrorLog" in line:
+            elif "customlog" in line_lower or "errorlog" in line_lower:
                 self._process_conf_line(path, line)
 
-            elif "Include" in line:
+            elif "include" in line_lower:
                 if not (match := RE_CONFIG_INCLUDE.match(line)):
                     self.target.log.warning("Unable to parse Apache 'Include' configuration in %s: %r", path, line)
                     continue
@@ -324,12 +333,12 @@ class ApachePlugin(WebserverPlugin):
                     self.target.log.warning("Unable to resolve Apache Include in %s: %r", path, line)
 
             # While we're at it, see if we can find any VirtualHosts
-            elif "<VirtualHost" in line:
+            elif "<virtualhost" in line_lower:
                 self.virtual_hosts.add(path)
 
     def _process_conf_line(self, path: Path, line: str) -> None:
         """Parse and resolve the given ``CustomLog`` or ``ErrorLog`` directive found in a Apache ``.conf`` file."""
-        if "ErrorLog" in line:
+        if "errorlog" in line.lower():
             pattern = RE_CONFIG_ERRORLOG_DIRECTIVE
             set_to_update = self.error_paths
         else:
@@ -462,7 +471,8 @@ class ApachePlugin(WebserverPlugin):
             # A configuration file can contain multiple VirtualHost directives.
             current_vhost = {}
             for line in path.open("rt"):
-                if "<VirtualHost" in line:
+                line_lower = line.lower()
+                if "<virtualhost" in line_lower:
                     # Currently only supports a single addr:port combination.
                     if match := RE_VIRTUALHOST.match(line.lstrip()):
                         current_vhost = match.groupdict()
@@ -470,21 +480,21 @@ class ApachePlugin(WebserverPlugin):
                         self.target.log.warning("Unable to parse VirtualHost directive %r in %s", line, path)
                         current_vhost = {}
 
-                elif "</VirtualHost" in line:
+                elif "</virtualhost" in line_lower:
                     yield WebserverHostRecord(
                         ts=path.lstat().st_mtime,
-                        server_name=current_vhost.get("ServerName") or current_vhost.get("addr"),
+                        server_name=current_vhost.get("servername") or current_vhost.get("addr"),
                         server_port=current_vhost.get("port"),
-                        root_path=current_vhost.get("DocumentRoot"),
-                        access_log_config=current_vhost.get("CustomLog", "").rpartition(" ")[0],
-                        error_log_config=current_vhost.get("ErrorLog"),
+                        root_path=current_vhost.get("documentroot"),
+                        access_log_config=current_vhost.get("customlog", "").rpartition(" ")[0],
+                        error_log_config=current_vhost.get("errorlog"),
                         source=path,
                         _target=self.target,
                     )
 
                 else:
                     key, _, value = line.strip().partition(" ")
-                    current_vhost[key] = value
+                    current_vhost[key.lower()] = value
 
     def _iterate_log_lines(self, paths: list[Path]) -> Iterator[tuple[str, Path]]:
         """Iterate through a list of paths and yield tuples of loglines and the path of the file where they're from."""

@@ -274,8 +274,8 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     <VirtualHost *:80>
         ServerName example.com
         DocumentRoot /var/www/html
-        ErrorLog /path/to/virtualhost/log/error.log
-        CustomLog /path/to/virtualhost/log/access.log custom
+        errorlog /path/to/virtualhost/log/error.log
+        customlog /path/to/virtualhost/log/access.log custom
     </VirtualHost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-enabled/example.conf", BytesIO(textwrap.dedent(site_conf).encode()))
@@ -373,9 +373,9 @@ def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -
         ErrorLog ${APACHE_LOG_DIR}/error.log
         CustomLog ${APACHE_LOG_DIR}/access.log combined
     </VirtualHost>
-    <VirtualHost 127.0.0.1:80>
-        DocumentRoot /path/to/other/html
-    </VirtualHost>
+    <Virtualhost 127.0.0.1:80>
+        documentroot /path/to/other/html
+    </Virtualhost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
 
