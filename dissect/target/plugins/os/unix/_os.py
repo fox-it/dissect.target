@@ -174,6 +174,11 @@ class UnixPlugin(OSPlugin):
             _, _, hostname = line.rstrip().partition("=")
         return hostname
 
+    def _parse_etc_hosts(self, path: Path) -> str | None:
+        for line in path.open("rt"):
+            if line.startswith(("127.0.0.1 ", "::1 ")) and "localhost" not in line:
+                return line.split(" ")[1]
+
     def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
         """Returns a dict containing the hostname and domain name portion of the path(s) specified.
 
@@ -181,7 +186,13 @@ class UnixPlugin(OSPlugin):
             paths (list): list of paths
         """
         redhat_legacy_path = "/etc/sysconfig/network"
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/proc/sys/kernel/hostname", redhat_legacy_path]
+        paths = paths or [
+            "/etc/hostname",
+            "/etc/HOSTNAME",
+            "/proc/sys/kernel/hostname",
+            redhat_legacy_path,
+            "/etc/hosts",  # fallback if no other hostnames are found
+        ]
         hostname_dict = {"hostname": None, "domain": None}
 
         for path in paths:
@@ -192,6 +203,8 @@ class UnixPlugin(OSPlugin):
 
             if path.as_posix() == redhat_legacy_path:
                 hostname_string = self._parse_rh_legacy(path)
+            elif path.as_posix() == "/etc/hosts":
+                hostname_string = self._parse_etc_hosts(path)
             else:
                 hostname_string = path.open("rt").read().rstrip()
 
