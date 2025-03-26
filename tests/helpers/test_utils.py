@@ -58,6 +58,8 @@ def test_helpers_fsutil_year_rollover_helper() -> None:
     mocked_stat = fsutil.stat_result([stat.S_IFREG, 1337, id(vfs), 0, 0, 0, len(content), 0, 3384460800, 0])
     with patch.object(path, "stat", return_value=mocked_stat):
         result = list(utils.year_rollover_helper(path, re_ts, ts_fmt))
+        assert len(result) == 10
+
         year_line = [(ts.year, line) for ts, line in result]
 
         assert result[0][0].tzinfo == datetime.timezone.utc
@@ -78,3 +80,26 @@ def test_helpers_fsutil_year_rollover_helper() -> None:
 
         assert year_line[0] == (2022, "Jan  1 13:21:34 Line 10")
         assert year_line[-1] == (2018, "Dec 31 03:14:15 Line 1")
+
+
+def test_helpers_fsutil_year_rollover_helper_leap_day() -> None:
+    """test if we correctly handle leap days such as 2024-02-29."""
+
+    content = """
+    Feb 28 11:00:00 Line 1
+    Feb 29 12:00:00 Line 2
+    Mar  1 13:00:00 Line 3
+    """
+    fs = VirtualFilesystem()
+    fs.map_file_fh("file", io.BytesIO(textwrap.dedent(content).encode()))
+    path = fs.path("file")
+
+    re_ts = r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})"
+    ts_fmt = "%b %d %H:%M:%S"
+    mocked_stat = fsutil.stat_result(
+        [stat.S_IFREG, 1337, id(fs), 0, 0, 0, len(content), 0, 1709294400, 0]
+    )  # mtime is set to 2024-03-01.
+
+    with patch.object(path, "stat", return_value=mocked_stat):
+        result = list(utils.year_rollover_helper(path, re_ts, ts_fmt))
+        assert len(result) == 3
