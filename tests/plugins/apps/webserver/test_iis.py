@@ -8,11 +8,11 @@ from unittest.mock import mock_open, patch
 import pytest
 
 from dissect.target.plugins.apps.webserver import iis
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_iis_plugin_iis_format(target_win_tzinfo: Target, fs_win: VirtualFilesystem) -> None:
@@ -220,7 +220,7 @@ def test_iis_access_iis_format_noconfig(
 def test_plugins_apps_webservers_iis_single_file_mode() -> None:
     data_path = absolute_path("_data/plugins/apps/webserver/iis/iis-logs-iis/W3SVC1/*.log")
 
-    target = Target.minimal([data_path])
+    target = Target.minimal([str(data_path)])
     records = list(target.iis.logs())
 
     assert len(records) == 10

@@ -10,13 +10,13 @@ import pytest
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.os.unix.log.auth import AuthPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dissect.target.filesystem import VirtualFilesystem
-    from dissect.target.target import Target
 
 
 def test_auth_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -336,7 +336,7 @@ def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesy
 def test_auth_plugin_single_file_mode() -> None:
     data_path = absolute_path("_data/plugins/os/unix/log/auth/auth.log")
 
-    target = Target.minimal([data_path])
+    target = Target.minimal([str(data_path)])
     results = list(target.authlog())
 
     assert len(results) == 10

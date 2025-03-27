@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from glob import glob
 import logging
 import os
 import traceback
 from collections import defaultdict
+from glob import glob
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar, Union
 
@@ -127,11 +127,11 @@ class Target:
         self.minimal = minimal  # Flag indicating that the target is minimal
 
     @classmethod
-    def minimal(cls, search_pattern: Iterator[str]):
+    def minimal(cls, search_pattern: Iterator[str]) -> Self:
         """Create a minimal target with a virtual root filesystem.
 
-        The filesystem will be populated with files found by the search patterns.
-        This is useful for ad-hoc runs of plugins on individual log files.
+        The filesystem is populated with files found from the search patterns.
+        This is useful when running plugins on individual log files.
         """
         target = Target(minimal=True)
 

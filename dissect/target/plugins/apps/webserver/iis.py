@@ -79,6 +79,7 @@ class IISLogsPlugin(WebserverPlugin):
         self._create_extended_descriptor = lru_cache(4096)(self._create_extended_descriptor)
 
     def check_compatible(self) -> None:
+        # Check for minimal here because NamespacePlugin overrides Plugin.check_compatible :/
         if not self.target.minimal and not self.log_dirs:
             raise UnsupportedPluginError("No IIS log files found")
 

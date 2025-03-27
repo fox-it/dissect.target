@@ -301,8 +301,8 @@ class AuthPlugin(Plugin):
         super().__init__(target)
         self._auth_log_builder = AuthLogRecordBuilder(target)
 
-    def check_compatible(self) -> None:
-        if not any(self.get_files()):
+    def _check_compatible(self) -> None:
+        if not any(self._get_files()):
             raise UnsupportedPluginError("No auth log files found")
 
     def _get_files(self) -> Iterable[Path]:
