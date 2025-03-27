@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import urllib
+import warnings
 from pathlib import Path
 from typing import Union
-import warnings
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
