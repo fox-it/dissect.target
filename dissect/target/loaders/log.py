@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import urllib
+import warnings
 from pathlib import Path
 from typing import Union
 
@@ -27,6 +28,7 @@ class LogLoader(Loader):
     }
 
     def __init__(self, path: Union[Path, str], parsed_path=None):
+        warnings.warn("The LogLoader is deprecated in favor of single files (--single_file)", DeprecationWarning)
         super().__init__(path)
         self.options = {}
         if parsed_path:
