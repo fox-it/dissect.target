@@ -78,6 +78,9 @@ class ESXiPlugin(UnixPlugin):
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
 
+        # Mount NFS shares after parsing the config store
+        self._mount_nfs_shares()
+
     def _cfg(self, path: str) -> str | None:
         if not self._config:
             self.target.log.warning("No ESXi config!")
@@ -196,6 +199,24 @@ class ESXiPlugin(UnixPlugin):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
+
+    def _mount_nfs_shares(self) -> None:
+        # Mount NFS shares
+        nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        if not nfs_shares:
+            self.target.log.info("No NFS shares found in datastore")
+            return
+
+        for key, nfs_share in nfs_shares.items():
+            user_value: dict[str, Any] = nfs_share.get("user_value", {})
+            nfs_ip = user_value.get("hostname", "")
+            volume_name = user_value.get("volume_name", "")
+            remote_share = user_value.get("remote_share", "")
+            if not nfs_ip or not volume_name or not remote_share:
+                self.target.log.warning("Invalid NFS share configuration with key: %s", key)
+                continue
+            mount_point = f"/vmfs/volumes/{volume_name}"
+            self._add_nfs(nfs_ip, remote_share, mount_point)
 
 
 def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
