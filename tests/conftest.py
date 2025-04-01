@@ -17,7 +17,7 @@ from dissect.target.plugin import OSPlugin
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
@@ -313,7 +313,7 @@ def target_suse(tmp_path: pathlib.Path, fs_suse: Filesystem) -> Iterator[Target]
 
 @pytest.fixture
 def target_osx(tmp_path: pathlib.Path, fs_osx: Filesystem) -> Iterator[Target]:
-    mock_target = make_os_target(tmp_path, MacPlugin, root_fs=fs_osx)
+    mock_target = make_os_target(tmp_path, MacOSPlugin, root_fs=fs_osx)
 
     version = absolute_path("_data/plugins/os/unix/bsd/osx/_os/SystemVersion.plist")
     fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)

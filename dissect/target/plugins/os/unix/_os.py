@@ -45,6 +45,10 @@ ARCH_MAP = {
 
 
 class UnixPlugin(OSPlugin):
+    """"""
+
+    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
@@ -66,8 +70,6 @@ class UnixPlugin(OSPlugin):
     def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
         target.fs.mount("/", sysvol)
         return cls(target)
-
-    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
 
     @export(record=UnixUserRecord)
     @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")

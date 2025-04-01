@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Union, get_args
 from flow.record.fieldtypes.net import IPAddress, IPNetwork
 
 from dissect.target.helpers.record import (
-    MacInterfaceRecord,
+    MacOSInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from dissect.target.target import Target
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
 
 
 class NetworkPlugin(Plugin):

@@ -8,12 +8,14 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
-from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.plugins.os.unix.bsd.ios._os import detect_macho_arch
+from dissect.target.plugins.os.unix.bsd.darwin._os import (
+    DarwinPlugin,
+    detect_macho_arch,
+)
 from dissect.target.target import Target
 
 
-class MacPlugin(BsdPlugin):
+class MacOSPlugin(DarwinPlugin):
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
     SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"
@@ -27,7 +29,7 @@ class MacPlugin(BsdPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> MacPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> MacOSPlugin:
         target.fs.mount("/", sysvol)
         return cls(target)
 
@@ -80,7 +82,7 @@ class MacPlugin(BsdPlugin):
 
     @export(property=True)
     def os(self) -> str:
-        return OperatingSystem.OSX.value
+        return OperatingSystem.MACOS.value
 
     @export(property=True)
     def architecture(self) -> str | None:
