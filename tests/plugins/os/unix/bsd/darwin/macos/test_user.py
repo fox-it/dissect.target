@@ -1,6 +1,6 @@
 from flow.record.fieldtypes import datetime
 
-from dissect.target.plugins.os.unix.bsd.osx.user import UserPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.user import UserPlugin
 
 
 def test_unix_bsd_osx_user(target_osx_users):

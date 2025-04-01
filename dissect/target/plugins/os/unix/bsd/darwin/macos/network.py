@@ -4,12 +4,12 @@ import plistlib
 from functools import cache, lru_cache
 from typing import Iterator
 
-from dissect.target.helpers.record import MacInterfaceRecord
+from dissect.target.helpers.record import MacOSInterfaceRecord
 from dissect.target.plugins.os.default.network import NetworkPlugin
 from dissect.target.target import Target
 
 
-class MacNetworkPlugin(NetworkPlugin):
+class MacOSNetworkPlugin(NetworkPlugin):
     """macOS network interface plugin."""
 
     def __init__(self, target: Target):
@@ -26,7 +26,7 @@ class MacNetworkPlugin(NetworkPlugin):
         if (preferences := self.target.fs.path("/Library/Preferences/SystemConfiguration/preferences.plist")).exists():
             return plistlib.load(preferences.open())
 
-    def _interfaces(self) -> Iterator[MacInterfaceRecord]:
+    def _interfaces(self) -> Iterator[MacOSInterfaceRecord]:
         plistnetwork = self._plistnetwork()
         current_set = plistnetwork.get("CurrentSet")
         sets = plistnetwork.get("Sets", {})
@@ -72,7 +72,7 @@ class MacNetworkPlugin(NetworkPlugin):
                 if subnetmask:
                     network = self.calculate_network(ips, subnetmask)
 
-                yield MacInterfaceRecord(
+                yield MacOSInterfaceRecord(
                     name=name,
                     type=_type,
                     enabled=not interface.get("__INACTIVE__", False),

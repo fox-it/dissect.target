@@ -1,11 +1,11 @@
 from flow.record.fieldtypes import posix_path
 
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from tests._utils import absolute_path
 
 
 def test_unix_bsd_osx_os(target_osx_users, fs_osx):
-    target_osx_users.add_plugin(MacPlugin)
+    target_osx_users.add_plugin(MacOSPlugin)
 
     interface = absolute_path("_data/plugins/os/unix/bsd/osx/_os/en0.plist")
     fs_osx.map_file("/private/var/db/dhcpclient/leases/en0.plist", interface)

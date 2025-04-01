@@ -5,7 +5,7 @@ import logging
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import (
     LinuxNetworkManager,
     parse_unix_dhcp_leases,
@@ -51,7 +51,7 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
         for fs in target.filesystems:
             # We explicitly exclude filesystems that look more like a macOS or Windows sysvol.
-            if MacPlugin.detect(target) or WindowsPlugin.detect(target):
+            if MacOSPlugin.detect(target) or WindowsPlugin.detect(target):
                 continue
 
             # Dirs /var and /etc make this a Unix-like system (see UnixPlugin.detect),

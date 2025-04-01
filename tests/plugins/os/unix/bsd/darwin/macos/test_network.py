@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 
-from dissect.target.plugins.os.unix.bsd.osx.network import MacNetworkPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos.network import MacOSNetworkPlugin
 from dissect.target.target import Target
 
 
@@ -156,11 +156,11 @@ def test_macos_network(
 ) -> None:
     plistnetwork = request.getfixturevalue(netinfo_param)
     with mock.patch(
-        "dissect.target.plugins.os.unix.bsd.osx.network.MacNetworkPlugin._plistlease", return_value=lease
+        "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistlease", return_value=lease
     ), mock.patch(
-        "dissect.target.plugins.os.unix.bsd.osx.network.MacNetworkPlugin._plistnetwork", return_value=plistnetwork
+        "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistnetwork", return_value=plistnetwork
     ):
-        network = MacNetworkPlugin(target_osx)
+        network = MacOSNetworkPlugin(target_osx)
 
     interfaces = list(network.interfaces())
     assert len(interfaces) == count

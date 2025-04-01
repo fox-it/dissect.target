@@ -182,7 +182,7 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
     ],
 )
 
-MacInterfaceRecord = TargetRecordDescriptor(
+MacOSInterfaceRecord = TargetRecordDescriptor(
     "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
