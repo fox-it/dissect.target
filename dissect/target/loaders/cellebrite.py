@@ -70,7 +70,7 @@ class CellebriteLoader(Loader):
         self.ufd = []
         self.ffs = None
 
-        # Parse xml to find ``.ufd`` path
+        # Parse xml to find .ufd path
         if path.suffix == ".ufdx":
             try:
                 tree = ET.fromstring(path.read_text())
@@ -82,11 +82,12 @@ class CellebriteLoader(Loader):
                     extractions=[],
                 )
 
+                base_path = path.resolve().parent
                 for extraction in tree.findall("Extractions/Extraction"):
                     self.ufdx.extractions.append(
                         Extraction(
                             type=extraction.get("TransferType"),
-                            path=path.resolve().parent.joinpath(extraction.get("Path").replace("\\", "/")),
+                            path=base_path.joinpath(extraction.get("Path").replace("\\", "/")),
                         )
                     )
 
