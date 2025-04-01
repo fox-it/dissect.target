@@ -311,6 +311,12 @@ class WindowsPlugin(OSPlugin):
                     home = profile_image_path.value
                     name = home.split("\\")[-1]
 
+                # Windows XP uses %variables% in home paths
+                if home.startswith(r"%SystemDrive%"):
+                    home = home.replace("%SystemDrive%", "sysvol")
+                elif home.startswith(r"%systemroot%"):
+                    home = home.replace(r"%systemroot%", "sysvol\\Windows")
+
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
