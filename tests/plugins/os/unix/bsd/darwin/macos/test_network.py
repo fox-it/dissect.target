@@ -158,7 +158,8 @@ def test_macos_network(
     with mock.patch(
         "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistlease", return_value=lease
     ), mock.patch(
-        "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistnetwork", return_value=plistnetwork
+        "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistnetwork",
+        return_value=plistnetwork,
     ):
         network = MacOSNetworkPlugin(target_osx)
 

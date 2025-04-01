@@ -67,6 +67,7 @@ class IOSPlugin(BsdPlugin):
     def architecture(self) -> str | None:
         return detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], suffix="ios", fs=self.target.fs)
 
+
 @dataclass
 class Config:
     SYSTEM: dict

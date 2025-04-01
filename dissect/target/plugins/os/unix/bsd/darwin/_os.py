@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 from dissect.target.target import Target
