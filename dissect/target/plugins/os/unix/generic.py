@@ -57,12 +57,12 @@ class GenericPlugin(Plugin):
             return ts.from_unix(root_stat.st_ctime)
 
 
-def calculate_last_activity(folder: Path) -> Optional[datetime]:
-    if not folder.exists():
+def calculate_last_activity(folder: Path, recursive: bool = False) -> Optional[datetime]:
+    if not folder.exists() or not folder.is_dir():
         return
 
     last_seen = 0
-    for file in folder.iterdir():
+    for file in folder.rglob("*") if recursive else folder.iterdir():
         if not file.exists():
             continue
         if file.stat().st_mtime > last_seen:

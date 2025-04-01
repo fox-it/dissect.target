@@ -212,3 +212,8 @@ WindowsApplicationRecord = TargetRecordDescriptor(
     "windows/application",
     COMMON_APPLICATION_FIELDS,
 )
+
+IOSApplicationRecord = TargetRecordDescriptor(
+    "ios/application",
+    COMMON_APPLICATION_FIELDS,
+)

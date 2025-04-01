@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import plistlib
-from typing import Iterator, Optional
+from typing import Iterator
 
 from flow.record.fieldtypes import posix_path
 
@@ -9,6 +9,7 @@ from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
+from dissect.target.plugins.os.unix.bsd.ios._os import detect_macho_arch
 from dissect.target.target import Target
 
 
@@ -18,9 +19,9 @@ class MacPlugin(BsdPlugin):
     SYSTEM = "/Library/Preferences/SystemConfiguration/preferences.plist"
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if fs.exists("/Library") and fs.exists("/Applications"):
+            if fs.exists("/Library") and fs.exists("/Applications") and not fs.exists("/private/var/mobile"):
                 return fs
 
         return None
@@ -31,7 +32,7 @@ class MacPlugin(BsdPlugin):
         return cls(target)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         try:
             preferences = plistlib.load(self.target.fs.path(self.SYSTEM).open())
             return preferences["System"]["System"]["ComputerName"]
@@ -40,11 +41,11 @@ class MacPlugin(BsdPlugin):
             pass
 
     @export(property=True)
-    def ips(self) -> Optional[list[str]]:
+    def ips(self) -> list[str] | None:
         return list(set(map(str, self.target.network.ips())))
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         try:
             systemVersion = plistlib.load(self.target.fs.path(self.VERSION).open())
             productName = systemVersion["ProductName"]
@@ -82,7 +83,15 @@ class MacPlugin(BsdPlugin):
         return OperatingSystem.OSX.value
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
-        # OS-X uses Mach-O binary format. We should implement something similar
-        # to the Unix architecture() function but for Mach-O libraries.
-        pass
+    def architecture(self) -> str | None:
+        return detect_macho_arch(
+            paths=[
+                "/bin/bash",
+                "/bin/sh",
+                "/bin/cp",
+                "/bin/ls",
+                "/bin/ps",
+            ],
+            suffix="macos",
+            fs=self.target.fs,
+        )
