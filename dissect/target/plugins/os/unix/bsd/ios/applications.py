@@ -13,7 +13,7 @@ class IOSApplicationsPlugin(Plugin):
 
     PATH = "/private/var/containers/Bundle/Application"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if self.target.os != OperatingSystem.IOS or not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("Target is not iOS or no Bundle Application folder found")
 

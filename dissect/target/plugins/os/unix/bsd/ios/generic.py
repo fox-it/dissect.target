@@ -25,6 +25,5 @@ class GenericPlugin(Plugin):
         # prng.seed seems to be created when iOS is first installed and not touched afterwards,
         # this is an educated guess without any further research.
         for path in ["/private/var/db/prng.seed"]:
-            file = self.target.fs.path(path)
-            if file.exists():
+            if (file := self.target.fs.path(path)).exists():
                 return ts.from_unix(file.lstat().st_mtime)

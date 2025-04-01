@@ -4,7 +4,7 @@ from dissect.target.plugins.os.unix.locale import timezone_from_path
 
 
 class LocalePlugin(Plugin):
-    """iOS locale plugin."""
+    """Locale plugin for iOS targets."""
 
     def check_compatible(self) -> None:
         if not self.target.os == OperatingSystem.IOS:

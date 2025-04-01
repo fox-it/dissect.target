@@ -38,7 +38,7 @@ class IOSPlugin(BsdPlugin):
         )
 
     @classmethod
-    def detect(cls, target: Target) -> VirtualFilesystem | None:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             if fs.exists("/private/var/preferences"):
                 return fs
@@ -76,19 +76,19 @@ class IOSPlugin(BsdPlugin):
         return detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], suffix="ios", fs=self.target.fs)
 
 
-def detect_macho_arch(paths: list[str | Path], suffix: str, fs: VirtualFilesystem | None = None) -> str | None:
+def detect_macho_arch(paths: list[str | Path], suffix: str, fs: Filesystem | None = None) -> str | None:
     """Detect the architecture of the system by reading the Mach-O headers of the provided binaries.
 
     We could use the mach-o magic headers (feedface, feedfacf, cafebabe), but the mach-o cpu type
     also contains bitness.
 
     Args:
-        paths: list of strings or Path objects.
-        suffix: string to append to returned architecture, e.g. providing ``suffix`` returns ``arm64-suffix``.
+        paths: List of strings or ``Path`` objects.
+        suffix: String to append to returned architecture, e.g. providing ``suffix`` returns ``arm64-suffix``.
         fs: Optional filesystem to search the provided paths in. Required if ``paths`` is a list of strings.
 
     Returns:
-        Detected architecture or None.
+        Detected architecture or ``None``.
 
     Resources:
         - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
@@ -103,10 +103,10 @@ def detect_macho_arch(paths: list[str | Path], suffix: str, fs: VirtualFilesyste
             continue
 
         try:
-            fh = path.open("rb")
-            fh.seek(4)
-            arch = ARCH_MAP.get(fh.read(4))  # mach-o cpu type
-            return f"{arch}-{suffix}"
+            with path.open("rb") as fh:
+                fh.seek(4)
+                arch = ARCH_MAP.get(fh.read(4))  # mach-o cpu type
+                return f"{arch}-{suffix}"
         except Exception:
             pass
 
