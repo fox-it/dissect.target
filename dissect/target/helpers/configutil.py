@@ -9,6 +9,7 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from pathlib import Path
 from types import TracebackType
 from typing import (
     Any,
@@ -890,7 +891,9 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 }
 
 
-def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, *args, **kwargs) -> ConfigurationParser:
+def parse(
+    path: Union[FilesystemEntry, TargetPath, Path], hint: Optional[str] = None, *args, **kwargs
+) -> ConfigurationParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
@@ -909,7 +912,7 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
     if isinstance(path, TargetPath):
         entry = path.get()
 
-    if not entry.is_file(follow_symlinks=True):
+    if not isinstance(entry, Path) and not entry.is_file(follow_symlinks=True):
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
@@ -918,14 +921,14 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
 
 
 def parse_config(
-    entry: FilesystemEntry,
+    entry: FilesystemEntry | Path,
     hint: Optional[str] = None,
     options: Optional[ParserOptions] = None,
 ) -> ConfigurationParser:
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-    with entry.open() as fh:
+    with entry.open("rb") if isinstance(entry, Path) else entry.open() as fh:
         if not isinstance(parser, Bin):
             open_file = io.TextIOWrapper(fh, encoding="utf-8")
         else:
