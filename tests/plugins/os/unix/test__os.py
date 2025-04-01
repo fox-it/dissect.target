@@ -125,10 +125,10 @@ def test_parse_hostname_string(
 ) -> None:
     fs_unix.map_file_fh(path, BytesIO(file_content))
 
-    hostname_dict = target_unix._os._parse_hostname_string()
+    hostname, domain = target_unix._os._parse_hostname_string()
 
-    assert hostname_dict["hostname"] == expected_hostname
-    assert hostname_dict["domain"] == expected_domain
+    assert hostname == expected_hostname
+    assert domain == expected_domain
 
 
 def test_users(target_unix_users: Target) -> None:

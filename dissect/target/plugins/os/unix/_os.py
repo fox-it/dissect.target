@@ -42,7 +42,7 @@ class UnixPlugin(OSPlugin):
         super().__init__(target)
         self._add_mounts()
         self._add_devices()
-        self._hostname_dict = self._parse_hostname_string()
+        self._hostname, self._domain = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
 
@@ -149,14 +149,13 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        hosts_string = self._hosts_dict.get("hostname", "localhost")
-        return self._hostname_dict.get("hostname", hosts_string)
+        return self._hostname or self._hosts_dict.get("hostname", "localhost")
 
     @export(property=True)
     def domain(self) -> str | None:
-        domain = self._hostname_dict.get("domain", "localhost")
+        domain = self._domain or "localhost"
         if domain == "localhost":
-            domain = self._hosts_dict["hostname", "localhost"]
+            domain = self._hosts_dict.get("hostname", "localhost")
             if domain == self.hostname:
                 return domain  # domain likely not defined, so localhost is the domain.
         return domain
@@ -167,14 +166,14 @@ class UnixPlugin(OSPlugin):
 
     def _parse_hostname_string(
         self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None
-    ) -> dict[str, str] | None:
-        """Returns a dict containing the hostname and domain name portion of the path(s) specified.
+    ) -> tuple[str | None, str | None]:
+        """Returns a tuple containing respectively the hostname and domain name portion of the path(s) specified.
 
         Args:
             paths (list): list of tuples with paths and callables to parse the path or None
 
         Returns:
-            Dictionary with ``hostname`` and ``domain`` keys.
+            Tuple with ``hostname`` and ``domain`` strings.
         """
         hostname = None
         domain = None
@@ -201,7 +200,8 @@ class UnixPlugin(OSPlugin):
 
             break  # break whenever a valid hostname is found
 
-        return {"hostname": hostname if hostname else None, "domain": domain if domain else None}
+        # can be an empty string due to splitting of hostname and domain
+        return hostname if hostname else None, domain if domain else None
 
     def _parse_rh_legacy(self, path: Path) -> str | None:
         hostname = None

@@ -9,7 +9,7 @@ from dissect.target.target import Target
 class OpenBsdPlugin(BsdPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
-        self._hostname_dict = self._parse_hostname_string([("/etc/myname", None)])
+        self._hostname, self._domain = self._parse_hostname_string([("/etc/myname", None)])
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
@@ -30,4 +30,8 @@ class OpenBsdPlugin(BsdPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        return self._hostname_dict.get("hostname", None)
+        return self._hostname
+
+    @export(property=True)
+    def domain(self) -> str | None:
+        return self._domain
