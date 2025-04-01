@@ -67,6 +67,8 @@ class UnixPlugin(OSPlugin):
         target.fs.mount("/", sysvol)
         return cls(target)
 
+    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
+
     @export(record=UnixUserRecord)
     @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")
     def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
@@ -76,12 +78,10 @@ class UnixPlugin(OSPlugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
-        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
-
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in PASSWD_FILES:
+        for passwd_file in self.PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt", errors="surrogateescape"):
                     line = line.strip()
