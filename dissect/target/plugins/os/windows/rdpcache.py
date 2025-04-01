@@ -44,8 +44,7 @@ bitmap_def = """
 typedef LONG FXPT2DOT30;
 
 // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-ciexyz
-struct CIEXYZ
-{
+struct CIEXYZ {
     FXPT2DOT30  ciexyzX;
     FXPT2DOT30  ciexyzY;
     FXPT2DOT30  ciexyzZ;
@@ -133,8 +132,9 @@ class BitmapTile:
 
 
 def parse_color_data(data: bytes, reverse_rows: bool = False, row_width: int = 64) -> bytes:
-    """
-    Parse bitmap color data. Optionally can reverse the row order of the bitmap data, which is useful when parsing a
+    """Parse bitmap color data. 
+    
+    Optionally can reverse the row order of the bitmap data, which is useful when parsing a
     bitmap that is top-down when you want it to be bottom-up (like in .bin files). Assumes 32 bits-per-pixel.
     """
     color_data = b""
@@ -217,7 +217,7 @@ def wrap_square_colors_in_border(colors: bytes, side_length: int, border_pixel: 
 def assemble_tiles_into_collage(tiles: list[BitmapTile], border_around_tile: int = 0) -> BitmapTile:
     """Assemble a list of tiles into one tile containing all color data."""
     tiles_in_row = 64
-    rows = [list()]
+    rows = [[]]
     current_row = 0
     if border_around_tile > 0:
         tile_length = 64 + (border_around_tile * 2)
@@ -233,7 +233,7 @@ def assemble_tiles_into_collage(tiles: list[BitmapTile], border_around_tile: int
 
         if len(rows[current_row]) == tiles_in_row:
             current_row += 1
-            rows.append(list())
+            rows.append([])
 
         if border_around_tile > 0:
             tile_color_data = wrap_square_colors_in_border(tile_color_data, 64, BORDER_PIXEL, border_around_tile)
@@ -266,8 +266,9 @@ def assemble_tiles_into_collage(tiles: list[BitmapTile], border_around_tile: int
 
 
 def extract_bin(fh: BinaryIO) -> Iterator[BitmapTile]:
-    """
-    Extract bitmap tiles from a Cache000[1-4].bin bitmap cache file. These files are found on modern Windows versions.
+    """Extract bitmap tiles from a Cache000[1-4].bin bitmap cache file. 
+    
+    These files are found on modern Windows versions.
     """
     fh.seek(0)
     bin_header = c_bitmap_cache.bin_header(fh)
@@ -340,7 +341,7 @@ class RdpCachePlugin(Plugin):
     CACHE_PATH = "AppData/Local/Microsoft/Terminal Server Client/Cache/"
     GLOBS = ["Cache*.bin", "bcache2*.bmc"]
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._caches: list[tuple[UserDetails, TargetPath]] = []
 
@@ -358,7 +359,7 @@ class RdpCachePlugin(Plugin):
 
     def _recover_tiles_from_cache(self, path: TargetPath) -> Iterator[BitmapTile]:
         """Given a target path, select the correct extraction method and yield bitmap tiles."""
-        fh = path.open()
+        fh = path.open("rb")
         if fh.read(len(BIN_MAGIC)) == BIN_MAGIC:
             yield from extract_bin(fh)
         else:
@@ -377,36 +378,35 @@ class RdpCachePlugin(Plugin):
                 _target=self.target,
             )
 
-    @arg("--output", "-o", dest="output_dir", type=Path, required=True, help="Path to recover bitmap files to.")
+    @arg("--output", "-o", dest="output_dir", type=Path, required=True, help="path to recover bitmap files to")
     @arg(
         "--grid",
         "-g",
         dest="as_grid",
         action="store_true",
-        help="Assemble all recovered tiles of a cache into a single grid image with borders around each tile",
+        help="assemble all recovered tiles of a cache into a single grid image with borders around each tile",
     )
     @arg(
         "--collage",
         "-c",
         dest="as_collage",
         action="store_true",
-        help="Assemble all recovered tiles of a cache into one image",
+        help="assemble all recovered tiles of a cache into one image",
     )
     @arg(
         "--no-tiles",
         "-n",
         dest="no_individual_tiles",
         action="store_true",
-        help="Do not save each recovered tile as a seperate bitmap",
+        help="do not save each recovered tile as a separate bitmap",
     )
     @arg(
         "--remnants",
         "-r",
-        dest="remnants",
         choices=["only", "include", "exclude"],
         default="exclude",
         type="str",
-        help="Include old leftover colordata in between tiles as seperate, 'remnant' tiles",
+        help="include old leftover colordata in between tiles as separate, 'remnant' tiles",
     )
     @export(output="none")
     def recover(
@@ -472,9 +472,8 @@ class RdpCachePlugin(Plugin):
             for assemble_name, border_around_tile in assemble_settings:
                 for tile_type_name, tiles in valid_tile_sets:
                     file = output_dir.joinpath(f"{prefix}{tile_type_name}{assemble_name}.bmp")
-                    with open(file, "wb") as out_fh:
-                        try:
-                            out_fh.write(tile_to_bitmap(assemble_tiles_into_collage(tiles, border_around_tile)))
-                        except Exception as e:
-                            self.target.log.error("Unable to write bitmap to file %s: %s", file, e)
-                            self.target.log.debug("", exc_info=e)
+                    try:
+                        file.write_bytes(tile_to_bitmap(assemble_tiles_into_collage(tiles, border_around_tile)))
+                    except Exception as e:
+                        self.target.log.error("Unable to write bitmap to file %s: %s", file, e)
+                        self.target.log.debug("", exc_info=e)
