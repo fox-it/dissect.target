@@ -155,10 +155,10 @@ def test_macos_network(
     plistnetwork = request.getfixturevalue(netinfo_param)
     with (
         mock.patch(
-            "dissect.target.plugins.os.unix.bsd.osx.network.MacOSInterfaceRecord._plistlease", return_value=lease
+            "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistlease", return_value=lease
         ),
         mock.patch(
-            "dissect.target.plugins.os.unix.bsd.osx.network.MacOSInterfaceRecord._plistnetwork",
+            "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistnetwork",
             return_value=plistnetwork,
         ),
     ):
