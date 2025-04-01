@@ -54,7 +54,7 @@ class MSNPlugin(ChatPlugin):
 
     @export(record=[ChatMessageRecord, ChatAttachmentRecord])
     def history(self) -> Iterator[ChatMessageRecord | ChatAttachmentRecord]:
-        """Yield MSN chat history messages
+        """Yield MSN chat history messages.
 
         Chat history artifacts can be found in:
             - ``$HOME/My Documents/My Received Files/MsnMsgr.txt``
@@ -108,7 +108,7 @@ class MSNPlugin(ChatPlugin):
 
 
 def convert_email(string: str) -> int:
-    """Convert MSN email address to 10 digit Passport ID"""
+    """Convert MSN email address to 10 digit Passport ID."""
     num = 0
     for char in string.lower():
         num = num * 101 + ord(char)
