@@ -63,7 +63,7 @@ class CellebriteLoader(Loader):
         - https://corp.digitalcorpora.org/corpora/mobile
     """
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path: Path, **kwargs):
         super().__init__(path)
 
         self.ufdx = None
@@ -132,7 +132,7 @@ class CellebriteLoader(Loader):
             for dump in ufd.dumps:
                 # Keychain dumps are inside the same FFS zip file, so we let the CellebriteFilesystem handle mounting
                 # that so we prevent an extra file handle being opened.
-                if dump.type not in ["FileDump"]:
+                if dump.type != "FileDump":
                     log.warning("Ignoring Cellebrite dump %s of type %s", dump.path.name, dump.type)
                     continue
 
@@ -157,7 +157,6 @@ class CellebriteFilesystem(LayerFilesystem):
 
         if path.suffix == ".zip":
             fs = ZipFilesystem(path.open("rb"), base=base)
-
         else:
             raise ValueError(f"Unsupported Cellebrite dump type {path.name}")
 
