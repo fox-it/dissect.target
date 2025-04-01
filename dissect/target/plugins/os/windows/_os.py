@@ -312,10 +312,8 @@ class WindowsPlugin(OSPlugin):
                     name = home.split("\\")[-1]
 
                 # Windows XP uses %variables% in home paths
-                if home.startswith(r"%SystemDrive%"):
-                    home = home.replace("%SystemDrive%", "sysvol")
-                elif home.startswith(r"%systemroot%"):
-                    home = home.replace(r"%systemroot%", "sysvol\\Windows")
+                if "%" in home:
+                    home = self.target.resolve(home)
 
                 yield WindowsUserRecord(
                     sid=subkey.name,
