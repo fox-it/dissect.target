@@ -149,7 +149,14 @@ def year_rollover_helper(
             # We have to append the current_year to strptime instead of adding it using replace later.
             # This prevents DeprecationWarnings on cpython >= 3.13 and Exceptions on cpython >= 3.15.
             # See https://github.com/python/cpython/issues/70647 and https://github.com/python/cpython/pull/117107.
-            compare_ts = datetime.strptime(f"{timestamp.group(0)};1900", f"{ts_format};%Y")
+            # Use 1904 instead of 1900 to include leap days (29 Feb).
+            try:
+                compare_ts = datetime.strptime(f"{timestamp.group(0)};1904", f"{ts_format};%Y")
+            except ValueError as e:
+                log.warning("Unable to create comparison timestamp for %r in line %r: %s", timestamp.group(0), line, e)
+                log.debug("", exc_info=e)
+                continue
+
             if last_seen_month and compare_ts.month > last_seen_month:
                 current_year -= 1
             last_seen_month = compare_ts.month
@@ -157,7 +164,14 @@ def year_rollover_helper(
             try:
                 relative_ts = datetime.strptime(f"{timestamp.group(0)};{current_year}", f"{ts_format};%Y")
             except ValueError as e:
-                log.warning("Timestamp '%s' does not match format '%s', skipping line.", timestamp.group(0), ts_format)
+                log.warning(
+                    "Timestamp '%s;%s' does not match format '%s;%%Y', skipping line %r: %s",
+                    timestamp.group(0),
+                    current_year,
+                    ts_format,
+                    line,
+                    e,
+                )
                 log.debug("", exc_info=e)
                 continue
 
