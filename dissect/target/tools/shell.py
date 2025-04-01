@@ -719,6 +719,12 @@ class TargetCli(TargetCmd):
         print_target_info(self.target)
         return False
 
+    def do_reload(self, line: str) -> bool:
+        """reload the target"""
+        self.target = self.target.reload()
+        self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
+        return False
+
     @arg("path", nargs="?")
     @arg("-l", action="store_true")
     @arg("-a", "--all", action="store_true")  # ignored but included for proper argument parsing
