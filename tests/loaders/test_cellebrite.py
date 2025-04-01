@@ -1,9 +1,7 @@
-
 from pathlib import Path
 
 from dissect.target.loaders.cellebrite import CellebriteFilesystem, CellebriteLoader
 from dissect.target.target import Target
-
 from tests._utils import absolute_path
 
 
