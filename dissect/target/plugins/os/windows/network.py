@@ -318,9 +318,9 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     # skip this network interface.
                     if not conf or not any(
                         [
-                            conf["dns"],
-                            conf["gateway"],
                             conf["cidr"],
+                            conf["gateway"],
+                            conf["dns"],
                             conf["search_domain"],
                         ]
                     ):
@@ -362,20 +362,20 @@ class WindowsNetworkPlugin(NetworkPlugin):
         except RegistryKeyNotFoundError:
             return []
 
-        if not len(keys):
+        if not keys:
             return []
 
         for key in keys:
             # Extract DHCP configuration from the registry
-            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
-            dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
             dhcp_config["cidr"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
+            dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
+            dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
             dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
 
             # Extract static configuration from the registry
-            static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
-            static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
             static_config["cidr"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
+            static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
+            static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
 
         dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1

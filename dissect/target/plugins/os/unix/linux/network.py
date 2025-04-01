@@ -81,7 +81,7 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
         dhcp_ipv6: bool = False
         vlan: set[int] = field(default_factory=set)
 
-        def to_record(self) -> UnixInterfaceRecord:
+        def to_record(self, target: Target) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
                 name=self.name,
                 type=self.type,
@@ -90,12 +90,13 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
                 gateway=list(self.gateways),
                 dns=list(self.dns),
                 mac=to_list(self.mac_address),
+                source=self.source,
                 dhcp_ipv4=self.dhcp_ipv4,
                 dhcp_ipv6=self.dhcp_ipv6,
                 last_connected=self.last_connected,
                 vlan=list(self.vlan),
                 configurator="NetworkManager",
-                source=self.source,
+                _target=target,
             )
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
@@ -138,7 +139,7 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
             vlan_ids_from_uuid = vlan_id_by_interface.get(connection.uuid, set())
             connection.vlan.update(vlan_ids_from_uuid)
 
-            yield connection.to_record()
+            yield connection.to_record(self._target)
 
     def _parse_route(self, route: str) -> NetAddress | None:
         """Parse a route and return gateway IP address."""
@@ -296,6 +297,7 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                     dhcp_ipv6=dhcp_ipv6,
                     vlan=list(vlan_ids),
                     configurator="systemd-networkd",
+                    _target=self._target,
                 )
             except Exception as e:
                 self._target.log.warning("Error parsing network config file %s", config_file)
