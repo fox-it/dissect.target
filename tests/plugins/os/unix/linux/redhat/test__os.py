@@ -15,7 +15,7 @@ from dissect.target.target import Target
         ("/etc/centos-release"),
         ("/etc/fedora-release"),
         ("/etc/sysconfig/network-scripts"),
-    ]
+    ],
 )
 def test_unix_linux_redhat_os_detection(target_bare: Target, file_name: str) -> None:
     """test if we detect RedHat OS correctly."""

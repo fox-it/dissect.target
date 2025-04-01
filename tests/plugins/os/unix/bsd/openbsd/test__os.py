@@ -1,4 +1,5 @@
 from io import BytesIO
+
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.openbsd._os import OpenBsdPlugin

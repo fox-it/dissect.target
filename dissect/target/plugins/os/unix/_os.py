@@ -165,7 +165,9 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
-    def _parse_hostname_string(self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None) -> dict[str, str] | None:
+    def _parse_hostname_string(
+        self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None
+    ) -> dict[str, str] | None:
         """Returns a dict containing the hostname and domain name portion of the path(s) specified.
 
         Args:
