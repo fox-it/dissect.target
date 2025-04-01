@@ -160,12 +160,17 @@ class CellebriteFilesystem(LayerFilesystem):
         else:
             raise ValueError(f"Unsupported Cellebrite dump type {path.name}")
 
+        # We add the full file system from ``/filesystem1`` as a layer to the root ``/`` and
+        # mount found extras and extraction metadata, such as keychain dumps to folders in ``/$fs$/fs0``,
+        # to keep this information accessible for device specific plugins.
         for fs_dir, dest in [
             ("/filesystem1", "/"),
             ("/extra", "/$fs$/fs0/extra"),
             ("/metadata1", "/$fs$/fs0/metadata"),
         ]:
             if fs.path(fs_dir).exists():
+                # Mounts the ZipFilesystem at the provided fs_dir base. This way we can
+                # (ab)use a single zip file handle for multiple filesystem layers.
                 self.append_layer().mount(dest, fs, base=fs_dir)
 
     def __repr__(self) -> str:
