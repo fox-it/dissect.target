@@ -274,8 +274,8 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
     <VirtualHost *:80>
         ServerName example.com
         DocumentRoot /var/www/html
-        ErrorLog /path/to/virtualhost/log/error.log
-        CustomLog /path/to/virtualhost/log/access.log custom
+        errorlog /path/to/virtualhost/log/error.log
+        customlog /path/to/virtualhost/log/access.log custom
     </VirtualHost>
     """
     fs_unix.map_file_fh("/etc/apache2/sites-enabled/example.conf", BytesIO(textwrap.dedent(site_conf).encode()))
@@ -359,3 +359,41 @@ def test_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem) 
     assert log_with_source.pid == 7
     assert log_with_source.message == "authorization result of <RequireAny>: granted"
     assert log_with_source.error_source == "mod_authz_core.c(820)"
+
+
+def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if we can find and parse virtual host configurations correctly."""
+
+    fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
+
+    site = r"""
+    <VirtualHost *:443>
+        ServerName example.com
+        DocumentRoot /var/www/html
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+    </VirtualHost>
+    <Virtualhost 127.0.0.1:80>
+        documentroot /path/to/other/html
+    </Virtualhost>
+    """
+    fs_unix.map_file_fh("/etc/apache2/sites-available/example.conf", BytesIO(textwrap.dedent(site).encode()))
+
+    target_unix.add_plugin(ApachePlugin)
+
+    records = list(target_unix.apache.hosts())
+    assert len(records) == 2
+
+    assert records[0].ts
+    assert records[0].server_name == "example.com"
+    assert records[0].server_port == 443
+    assert records[0].root_path == "/var/www/html"
+    assert records[0].access_log_config == r"${APACHE_LOG_DIR}/access.log"
+    assert records[0].error_log_config == r"${APACHE_LOG_DIR}/error.log"
+    assert records[0].source == "/etc/apache2/sites-available/example.conf"
+
+    assert records[1].ts
+    assert records[1].server_name == "127.0.0.1"
+    assert records[1].server_port == 80
+    assert records[1].root_path == "/path/to/other/html"
+    assert records[1].source == "/etc/apache2/sites-available/example.conf"
