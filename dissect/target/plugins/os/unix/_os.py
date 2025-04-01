@@ -173,7 +173,7 @@ class UnixPlugin(OSPlugin):
             paths (list): list of tuples with paths and callables to parse the path or None
 
         Returns:
-            Tuple with ``hostname`` and ``domain`` strings.
+            Tuple with hostname and domain strings.
         """
         hostname = None
         domain = None
@@ -200,8 +200,8 @@ class UnixPlugin(OSPlugin):
 
             break  # break whenever a valid hostname is found
 
-        # can be an empty string due to splitting of hostname and domain
-        return hostname if hostname else None, domain if domain else None
+        # Can be an empty string due to splitting of hostname and domain
+        return hostname or None, domain or None
 
     def _parse_rh_legacy(self, path: Path) -> str | None:
         hostname = None
