@@ -461,7 +461,7 @@ class ApachePlugin(WebserverPlugin):
                 self.target.log.debug("", exc_info=e)
 
     def hosts(self) -> Iterator[WebserverHostRecord]:
-        """Return found VirtualHost directives in the Apache configuration.
+        """Return found ``VirtualHost`` directives in the Apache configuration.
 
         Resources:
             - https://httpd.apache.org/docs/2.4/mod/core.html#virtualhost
