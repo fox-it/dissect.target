@@ -136,7 +136,7 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
             {
                 "service": "sshd",
                 "pid": 12345,
-                "remote_ips": ["12.34.56.78", "90.12.34.56"],
+                "remote_ips": ["90.12.34.56", "12.34.56.78"],
             },
             id="sshd: reverse dns ip addr",
         ),
@@ -293,10 +293,15 @@ def test_auth_plugin_additional_fields(
     fs_unix.map_file("var/log/auth.log", data_path)
 
     target_unix.add_plugin(AuthPlugin)
-    record = list(target_unix.authlog())[0]
+
+    result = list(target_unix.authlog())
+    assert len(result) == 1
 
     for key, value in results.items():
-        assert getattr(record, key) == value
+        if isinstance(value, list):
+            value = sorted(value)
+
+        assert getattr(result[0], key) == value
 
 
 def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
