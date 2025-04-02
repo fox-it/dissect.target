@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import plistlib
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Any, Iterator
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.helpers.record import IOSUserRecord
@@ -82,12 +82,14 @@ class IOSPlugin(DarwinPlugin):
 
 @dataclass
 class Config:
-    SYSTEM: dict
-    GLOBAL: dict
-    VERSION: dict
+    SYSTEM: dict[str, Any]
+    GLOBAL: dict[str, Any]
+    VERSION: dict[str, Any]
 
     def __post_init__(self):
         for field in self.__dataclass_fields__.keys():
             path = getattr(self, field)
             if path.is_file():
                 setattr(self, field, plistlib.load(path.open("rb")))
+            else:
+                setattr(self, field, {})
