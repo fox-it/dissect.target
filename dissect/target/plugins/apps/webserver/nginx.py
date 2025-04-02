@@ -77,7 +77,7 @@ RE_INCLUDE_DIRECTIVE = re.compile(r"[\s#]*include\s+(?P<path>[^\s\;]+)")
 
 
 class NginxPlugin(WebserverPlugin):
-    """Nginx webserver plugin."""
+    """NGINX webserver plugin."""
 
     __namespace__ = "nginx"
 
@@ -124,21 +124,18 @@ class NginxPlugin(WebserverPlugin):
             if "*" in config_file:
                 base, _, glob = config_file.partition("*")
                 for f in self.target.fs.path(base).rglob(f"*{glob}"):
-                    if f not in seen:
-                        self.parse_config(f)
-                        seen.add(f)
+                    self.parse_config(f)
 
-            elif (config_file := self.target.fs.path(config_file)).exists() and config_file not in seen:
+            elif (config_file := self.target.fs.path(config_file)).exists():
                 self.parse_config(config_file)
-                seen.add(config_file)
 
     def parse_config(self, path: Path, seen: set[Path] | None = None) -> None:
-        """Parse the given nginx ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
+        """Parse the given NGINX ``.conf`` file for ``access_log``, ``error_log`` and ``include`` directives."""
 
         seen = set() if seen is None else seen
 
         if path in seen:
-            self.target.log.warning("Detected recursion in Nginx configuration, file already parsed: %s", path)
+            self.target.log.warning("Detected recursion in NGINX configuration, file already parsed: %s", path)
             return
 
         seen.add(path)
@@ -147,23 +144,23 @@ class NginxPlugin(WebserverPlugin):
             self.target.log.warning("File %s does not exist on target", path)
             return
 
-        for line in path.open("rt").readlines():
+        for line in path.open("rt"):
             if not (line := line.strip()):
                 continue
 
             if "access_log " in line:
                 if access_log := RE_ACCESS_LOG_DIRECTIVE.search(line):
                     access_log = self.target.fs.path(access_log["path"])
-                    self.access_paths.update(p for p in access_log.parent.glob(f"{access_log.name}*"))
+                    self.access_paths.update(access_log.parent.glob(f"{access_log.name}*")
                 else:
                     self.target.log.warning("Unable to parse nginx access_log line %r in %s", line, path)
 
             elif "error_log " in line:
                 if error_log := RE_ERROR_LOG_DIRECTIVE.search(line):
                     error_log = self.target.fs.path(error_log["path"])
-                    self.error_paths.update(p for p in error_log.parent.glob(f"{error_log.name}*"))
+                    self.error_paths.update(error_log.parent.glob(f"{error_log.name}*")
                 else:
-                    self.target.log.warning("Unable to parse nginx error_log line %r in %s", line, path)
+                    self.target.log.warning("Unable to parse NGINX error_log line %r in %s", line, path)
 
             elif "server {" in line:
                 self.host_paths.add(path)
@@ -182,14 +179,14 @@ class NginxPlugin(WebserverPlugin):
                         if include_path.is_absolute():
                             self.parse_config(include_path)
                         else:
-                            include_path = self.target.fs.path(f"{path.parent}/{include_path}")
+                            include_path = self.target.fs.path(path.parent).joinpath(include_path)
                             self.parse_config(include_path)
                 else:
-                    self.target.log.warning("Unable to parse nginx include line %r in %s", line, path)
+                    self.target.log.warning("Unable to parse NGINX include line %r in %s", line, path)
 
     @export(record=WebserverAccessLogRecord)
     def access(self) -> Iterator[WebserverAccessLogRecord]:
-        """Return contents of NGINX access log files in unified WebserverAccessLogRecord format.
+        """Return contents of NGINX access log files in unified ``WebserverAccessLogRecord`` format.
 
         References:
             - https://docs.nginx.com/nginx/admin-guide/monitoring/logging/#access_log
@@ -243,7 +240,7 @@ class NginxPlugin(WebserverPlugin):
                 )
 
     def error(self) -> Iterator[WebserverErrorLogRecord]:
-        """Return contents of NGINX error log files in unified WebserverErrorLogRecord format.
+        """Return contents of NGINX error log files in unified ``WebserverErrorLogRecord`` format.
 
         Resources:
             - https://nginx.org/en/docs/ngx_core_module.html#error_log
@@ -281,7 +278,7 @@ class NginxPlugin(WebserverPlugin):
                 )
 
     def hosts(self) -> Iterator[WebserverHostRecord]:
-        """Return found server directives in the Nginx configuration.
+        """Return found server directives in the NGINX configuration.
 
         Resources:
             - https://nginx.org/en/docs/http/ngx_http_core_module.html#server
@@ -302,7 +299,7 @@ class NginxPlugin(WebserverPlugin):
         for host_path in self.host_paths:
             current_server = {}
             seen_server_directive = False
-            for line in host_path.open("rt").readlines():
+            for line in host_path.open("rt"):
                 if "server {" in line:
                     if current_server:
                         yield from yield_record(current_server)
@@ -318,15 +315,15 @@ class NginxPlugin(WebserverPlugin):
 
 
 def parse_json_line(line: str) -> dict[str, str] | None:
-    """Attempt to parse a default Nginx JSON log line.
+    """Attempt to parse a default NGINX JSON log line.
 
-    We assume the custom ``log_format`` uses the following default nginx field names::
+    We assume the custom ``log_format`` uses the following default NGINX field names::
 
         time_local, time, remote_addr, remote_ip, remote_user, request_method, request,
         response, status, body_bytes_sent, request_time, http_referrer, referrer,
         http_user_agent, agent
 
-    Unfortunately Nginx has no official default naming convention for JSON access logs,
+    Unfortunately NGINX has no official default naming convention for JSON access logs,
     users can configure the JSON ``log_format`` as they see fit.
 
     Resources:
@@ -351,4 +348,4 @@ def parse_json_line(line: str) -> dict[str, str] | None:
         }
 
     except JSONDecodeError as e:
-        raise ValueError(f"Could not parse nginx log line {repr(line)}: {e}") from e
+        raise ValueError(f"Could not parse NGINX log line {line!r}: {e}") from e
