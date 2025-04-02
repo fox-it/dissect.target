@@ -14,6 +14,7 @@ def test_ios_detect(target_bare: Target, fs_ios: VirtualFilesystem) -> None:
     target_bare.filesystems.add(fs_ios)
     target_bare.apply()
     assert IOSPlugin.detect(target_bare)
+    assert target_bare._os_plugin is IOSPlugin
 
 
 def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
