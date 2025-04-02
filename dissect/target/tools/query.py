@@ -275,7 +275,7 @@ def main() -> None:
             if args.dry_run:
                 print(f"Dry run on: {target}")
 
-            record_entries: list[Generator] = []
+            record_entries: list[Iterator[Record]] = []
             basic_entries = []
             yield_entries = []
 
