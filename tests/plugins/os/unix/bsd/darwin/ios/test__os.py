@@ -9,8 +9,15 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
+def test_ios_detect(target_bare: Target, fs_ios: VirtualFilesystem) -> None:
+    """Test if we correctly detect an iOS target."""
+    target_bare.filesystems.add(fs_ios)
+    target_bare.apply()
+    assert IOSPlugin.detect(target_bare)
+
+
 def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
-    """Test if we correctly detect an iOS target.
+    """Test if the iOS plugin works on an iOS target.
 
     Data based on example iOS image from Digital Corpora.
 
