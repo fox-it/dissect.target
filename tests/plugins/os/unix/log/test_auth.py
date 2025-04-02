@@ -298,10 +298,12 @@ def test_auth_plugin_additional_fields(
     assert len(result) == 1
 
     for key, value in results.items():
+        plugin_result = getattr(result[0], key)
         if isinstance(value, list):
-            value = sorted(value)
+            value = sorted(map(str, value))
+            plugin_result = sorted(map(str, plugin_result))
 
-        assert getattr(result[0], key) == value
+        assert plugin_result == value
 
 
 def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
