@@ -156,7 +156,7 @@ class DPAPIPlugin(InternalPlugin):
 
         Returns:
             Decrypted bytes.
-        """
+        """  # noqa: E501
         return self.decrypt_user_blob(data, sid=self.SYSTEM_SID, **kwargs)
 
     def decrypt_user_blob(self, data: bytes, username: str | None = None, sid: str | None = None, **kwargs) -> bytes:
@@ -173,7 +173,7 @@ class DPAPIPlugin(InternalPlugin):
 
         Returns:
             Decrypted bytes.
-        """
+        """  # noqa: E501
 
         if not sid and not username:
             raise ValueError("Either sid or username argument is required")
@@ -209,7 +209,7 @@ class DPAPIPlugin(InternalPlugin):
 
         Returns:
             Decrypted bytes.
-        """
+        """  # noqa: E501
         try:
             blob = DPAPIBlob(data)
         except EOFError as e:
