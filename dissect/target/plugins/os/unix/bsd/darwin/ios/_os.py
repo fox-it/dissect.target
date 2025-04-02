@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import plistlib
 from dataclasses import dataclass
 from typing import Any, Iterator
@@ -32,7 +33,7 @@ class IOSPlugin(DarwinPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
 
-        self._config = Config(
+        self._config = Config.load(
             target.fs.path(self.SYSTEM),
             target.fs.path(self.GLOBAL),
             target.fs.path(self.VERSION),
@@ -86,10 +87,12 @@ class Config:
     GLOBAL: dict[str, Any]
     VERSION: dict[str, Any]
 
-    def __post_init__(self):
-        for field in self.__dataclass_fields__.keys():
-            path = getattr(self, field)
+    @classmethod
+    def load(cls, *args: list[Path]) -> Config:
+        plists = []
+        for path in args:
             if path.is_file():
-                setattr(self, field, plistlib.load(path.open("rb")))
+                plists.append(plistlib.load(path.open("rb")))
             else:
-                setattr(self, field, {})
+                plists.append({})
+        return cls(*plists)
