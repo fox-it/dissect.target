@@ -149,7 +149,7 @@ class DPAPIPlugin(InternalPlugin):
 
         Args:
             data: Bytes of DPAPI system blob to decrypt.
-            **kwargs: Arbitrary named arguments to pass to ``DPAPIBlob.decrypt`` function.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
 
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
@@ -166,7 +166,7 @@ class DPAPIPlugin(InternalPlugin):
             data: Bytes of DPAPI blob to decrypt.
             username: Username of the owner of the DPAPI blob.
             sid: SID of the owner of the DPAPI blob.
-            **kwargs: Arbitrary named arguments to pass to DPAPIBlob.decrypt function.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
 
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
@@ -202,7 +202,7 @@ class DPAPIPlugin(InternalPlugin):
 
         Args:
             data: Bytes of DPAPI blob to decrypt.
-            **kwargs: Arbitrary named arguments to pass to ``DPAPIBlob.decrypt`` function.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
 
         Raises:
             ValueError: When conditions to decrypt are not met or if decrypting failed.
