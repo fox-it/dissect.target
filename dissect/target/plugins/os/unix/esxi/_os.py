@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import logging
 import lzma
 import struct
 import subprocess
@@ -13,6 +14,11 @@ from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
+
+from dissect.target.filesystems.nfs import NfsFilesystem
+from dissect.target.helpers.sunrpc import client
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy
+from dissect.target.loaders.local import LocalLoader
 
 try:
     from dissect.hypervisor.util.envelope import (
@@ -46,6 +52,8 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("path", "path"),
     ],
 )
+
+log = logging.getLogger(__name__)
 
 
 class ESXiPlugin(UnixPlugin):
@@ -202,6 +210,10 @@ class ESXiPlugin(UnixPlugin):
 
     def _mount_nfs_shares(self) -> None:
         # Mount NFS shares
+        if not self._configstore:
+            self.target.log.warning("No configstore found")
+            return
+
         nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
         if not nfs_shares:
             self.target.log.info("No NFS shares found in datastore")
@@ -217,6 +229,29 @@ class ESXiPlugin(UnixPlugin):
                 continue
             mount_point = f"/vmfs/volumes/{volume_name}"
             self._add_nfs(nfs_ip, remote_share, mount_point)
+
+    def _add_nfs(self, nfs_ip: str, remote_share: str, mount_point: str) -> None:
+        """Mount NFS share to the target."""
+        if not isinstance(self.target._loader, LocalLoader):
+            return
+
+        if "enable-nfs" not in self.target.path_query:
+            log.warning(
+                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                nfs_ip,
+                remote_share,
+                mount_point,
+            )
+            return
+
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s", remote_share, mount_point)
+            credentials = client.auth_unix("machine", 0, 0, [])
+            nfs = NfsFilesystem.connect(nfs_ip, remote_share, credentials, LocalPortPolicy.PRIVILEGED)
+            self.target.fs.mount(mount_point, nfs)
+        except Exception as e:
+            self.target.log.warning("Failed to mount NFS share %s:%s at %s", nfs_ip, remote_share, mount_point)
+            self.target.log.debug("", exc_info=e)
 
 
 def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
