@@ -151,7 +151,6 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, cls.TCP_KEEPIDLE)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
