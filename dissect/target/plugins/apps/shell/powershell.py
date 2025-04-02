@@ -56,7 +56,7 @@ class PowerShellHistoryPlugin(Plugin):
         for user, _path in self._history:
             file_mtime = _path.stat().st_mtime
 
-            for line_number, line in enumerate(_path.open("r")):
+            for i, line in enumerate(_path.open("r")):
                 line = line.strip()
                 if not line:
                     continue
@@ -64,7 +64,7 @@ class PowerShellHistoryPlugin(Plugin):
                 yield ConsoleHostHistoryRecord(
                     mtime=file_mtime,
                     command=line,
-                    order=line_number,
+                    order=i,
                     source=_path,
                     _target=self.target,
                     _user=user,
