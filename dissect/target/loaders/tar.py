@@ -47,12 +47,10 @@ TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
 WINDOWS_MEMBERS = (
-    "Windows/System32",
-    "/Windows/System32",
-    "Winnt",
-    "/Winnt",
-    "WINNT",
-    "/WINNT",
+    "windows/system32",
+    "/windows/system32",
+    "winnt",
+    "/winnt",
 )
 
 
@@ -145,7 +143,7 @@ class GenericTarSubLoader(TarSubLoader):
             if member.name == ".":
                 continue
 
-            if member.name.startswith(WINDOWS_MEMBERS):
+            if member.name.lower().startswith(WINDOWS_MEMBERS):
                 windows_found = True
                 if "/" in volumes:
                     # Root filesystem was already added
