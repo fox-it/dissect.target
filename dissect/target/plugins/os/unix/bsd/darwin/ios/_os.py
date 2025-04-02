@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import plistlib
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
