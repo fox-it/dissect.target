@@ -62,7 +62,8 @@ class OperatingSystem(StrEnum):
     FORTIOS = "fortios"
     IOS = "ios"
     LINUX = "linux"
-    OSX = "osx"
+    MACOS = "macos"
+    OSX = "osx"  # legacy
     PROXMOX = "proxmox"
     UNIX = "unix"
     VYOS = "vyos"

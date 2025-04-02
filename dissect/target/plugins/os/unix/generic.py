@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 from statistics import median
-from typing import Optional
 
 from dissect.util import ts
 
@@ -15,13 +16,13 @@ class GenericPlugin(Plugin):
         pass
 
     @export(property=True)
-    def activity(self) -> Optional[datetime]:
+    def activity(self) -> datetime | None:
         """Return last seen activity based on filesystem timestamps."""
         var_log = self.target.fs.path("/var/log")
         return calculate_last_activity(var_log)
 
     @export(property=True)
-    def install_date(self) -> Optional[datetime]:
+    def install_date(self) -> datetime | None:
         """Return the likely install date of the operating system."""
 
         # Although this purports to be a generic function for Unix targets,
@@ -57,12 +58,12 @@ class GenericPlugin(Plugin):
             return ts.from_unix(root_stat.st_ctime)
 
 
-def calculate_last_activity(folder: Path) -> Optional[datetime]:
-    if not folder.exists():
+def calculate_last_activity(folder: Path, recursive: bool = False) -> datetime | None:
+    if not folder.exists() or not folder.is_dir():
         return
 
     last_seen = 0
-    for file in folder.iterdir():
+    for file in folder.rglob("*") if recursive else folder.iterdir():
         if not file.exists():
             continue
         if file.stat().st_mtime > last_seen:

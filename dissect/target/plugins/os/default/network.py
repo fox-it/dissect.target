@@ -6,14 +6,14 @@ from flow.record.fieldtypes.net import IPAddress, IPNetwork
 from flow.record.fieldtypes.net.ipv4 import Address, addr_long, addr_str, mask_to_bits
 
 from dissect.target.helpers.record import (
-    MacInterfaceRecord,
+    MacOSInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
 from dissect.target.plugin import Plugin, export, internal
 from dissect.target.target import Target
 
-InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacInterfaceRecord]
+InterfaceRecord = Union[UnixInterfaceRecord, WindowsInterfaceRecord, MacOSInterfaceRecord]
 
 
 class NetworkPlugin(Plugin):

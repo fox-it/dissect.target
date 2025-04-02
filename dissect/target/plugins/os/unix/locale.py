@@ -19,7 +19,7 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 )
 
 
-def timezone_from_path(path: Path) -> str:
+def timezone_from_path(path: Path | str) -> str:
     """Return timezone name for the given zoneinfo path.
 
     .. code-block::
@@ -28,6 +28,9 @@ def timezone_from_path(path: Path) -> str:
         /usr/share/zoneinfo/UTC              -> UTC
         Etc/UTC                              -> UTC
     """
+    if not isinstance(path, Path):
+        path = Path(path)
+
     return "/".join([p for p in path.parts[-2:] if p.lower() not in ["zoneinfo", "etc"]])
 
 

@@ -3,9 +3,17 @@ from typing import Iterator
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import UnixApplicationRecord
+from dissect.target.helpers.record import (
+    COMMON_APPLICATION_FIELDS,
+    TargetRecordDescriptor,
+)
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
+
+UnixApplicationRecord = TargetRecordDescriptor(
+    "unix/application",
+    COMMON_APPLICATION_FIELDS,
+)
 
 
 class UnixApplicationsPlugin(Plugin):
