@@ -2,11 +2,21 @@ from __future__ import annotations
 
 import plistlib
 from dataclasses import dataclass
+from typing import Iterator
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
+from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, export
-from dissect.target.plugins.os.unix.bsd.darwin._os import DarwinPlugin, detect_macho_arch
+from dissect.target.plugins.os.unix.bsd.darwin._os import (
+    DarwinPlugin,
+    detect_macho_arch,
+)
 from dissect.target.target import Target
+
+IOSUserRecord = TargetRecordDescriptor(
+    "ios/user",
+    COMMON_UNIX_FIELDS,
+)
 
 
 class IOSPlugin(DarwinPlugin):
@@ -36,7 +46,7 @@ class IOSPlugin(DarwinPlugin):
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if fs.exists("/private/var/preferences") or fs.exists("/private/var/mobile"):
+            if fs.exists("/private/var/preferences") and fs.exists("/private/var/mobile"):
                 return fs
 
     @classmethod
@@ -59,6 +69,11 @@ class IOSPlugin(DarwinPlugin):
     @export(property=True)
     def version(self) -> str:
         return f'{self._config.VERSION["ProductName"]} {self._config.VERSION["ProductVersion"]} ({self._config.VERSION["ProductBuildVersion"]})'  # noqa: E501
+
+    @export(record=IOSUserRecord)
+    def users(self) -> Iterator[IOSUserRecord]:
+        for user in super().users():
+            yield IOSUserRecord(**user._asdict())
 
     @export(property=True)
     def os(self) -> str:
