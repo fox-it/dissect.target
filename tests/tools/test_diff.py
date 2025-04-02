@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import textwrap
 from io import BytesIO, StringIO
-from pathlib import Path
 from typing import Iterator
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.target import Target
 from dissect.target.tools import fsutils
 from dissect.target.tools.diff import (
@@ -21,34 +18,12 @@ from dissect.target.tools.diff import (
 )
 from dissect.target.tools.diff import main as target_diff
 from tests._utils import absolute_path
-from tests.conftest import make_os_target
+from tests.conftest import TargetUnixFactory
 
 PASSWD_CONTENTS = """
             root:x:0:0:root:/root:/bin/bash
             user:x:1000:1000:user:/home/user:/bin/bash
             """
-
-
-class TargetUnixFactory:
-    def __init__(self, tmp_path: Path):
-        self.tmp_path = tmp_path
-
-    def new(self, hostname: str) -> tuple[Target, VirtualFilesystem]:
-        """Initialize a virtual unix target."""
-        fs = VirtualFilesystem()
-
-        fs.makedirs("var")
-        fs.makedirs("etc")
-        fs.map_file_fh("/etc/hostname", BytesIO(hostname.encode()))
-
-        return make_os_target(self.tmp_path, UnixPlugin, root_fs=fs), fs
-
-
-@pytest.fixture
-def target_unix_factory(tmp_path: Path) -> TargetUnixFactory:
-    """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
-    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
-    return TargetUnixFactory(tmp_path)
 
 
 @pytest.fixture
