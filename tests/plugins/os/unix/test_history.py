@@ -40,19 +40,19 @@ def test_commandhistory_with_timestamps(target_unix_users, fs_unix):
 
     assert results[0].ts == dt("2022-03-29T23:58:59Z")
     assert results[0].command == 'echo "this is a test"'
-    assert results[0].order == 1
+    assert results[0].order == 0
     assert results[0].shell == "bash"
     assert results[0].source.as_posix() == "/root/.bash_history"
 
     assert results[1].ts is None
     assert results[1].command == 'echo "O no. A line without timestamp"'
-    assert results[1].order == 2
+    assert results[1].order == 1
     assert results[1].shell == "bash"
     assert results[1].source.as_posix() == "/root/.bash_history"
 
     assert results[2].ts == dt("2022-07-23T12:14:28Z")
     assert results[2].command == "exit"
-    assert results[2].order == 4
+    assert results[2].order == 2
     assert results[2].shell == "bash"
     assert results[2].source.as_posix() == "/root/.bash_history"
 
@@ -117,7 +117,7 @@ def test_commandhistory_zsh_history(target_unix_users, fs_unix):
 
     assert not results[1].ts
     assert results[1].command == 'echo "Whoops no timestamps"'
-    assert results[1].order == 2
+    assert results[1].order == 1
     assert results[1].shell == "zsh"
     assert results[1].source.as_posix() == "/root/.zsh_history"
 
@@ -225,7 +225,7 @@ def test_commandhistory_database_history(target_unix_users, fs_unix, db_type, db
     for i, line in enumerate(history_lines):
         assert results[i].ts is None
         assert results[i].command == line
-        assert results[i].order == i + 1
+        assert results[i].order == i
         assert results[i].shell == db_type
         assert results[i].source.as_posix() == f"/root/{db_file}"
 

@@ -83,12 +83,12 @@ def test_netscaler_cli_history(target_citrix: Target, fs_bsd: VirtualFilesystem)
 
     assert not results[0].ts
     assert results[0].command == "help"
-    assert results[0].order == 1
+    assert results[0].order == 0
     assert results[0].shell == "citrix-netscaler-cli"
     assert results[0].source.as_posix() == "/var/nstmp/user/.nscli_history"
 
     assert not results[1].ts
     assert results[1].command == "shell"
-    assert results[1].order == 2
+    assert results[1].order == 1
     assert results[1].shell == "citrix-netscaler-cli"
     assert results[1].source.as_posix() == "/var/nstmp/user/.nscli_history"

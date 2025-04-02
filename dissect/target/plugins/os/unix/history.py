@@ -96,7 +96,8 @@ class CommandHistoryPlugin(Plugin):
         """
         next_cmd_ts = None
 
-        for i, line in enumerate(file.open("rt", errors="replace")):
+        i = -1
+        for line in file.open("rt", errors="replace"):
             ts = None
             line = line.strip()
 
@@ -111,6 +112,7 @@ class CommandHistoryPlugin(Plugin):
                 ts = next_cmd_ts
                 next_cmd_ts = None
 
+            i += 1
             yield CommandHistoryRecord(
                 ts=ts,
                 command=line,
@@ -135,7 +137,8 @@ class CommandHistoryPlugin(Plugin):
         Resources:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
-        for i, line in enumerate(file.open("rt", errors="replace")):
+        i = -1
+        for line in file.open("rt", errors="replace"):
             line = line.strip()
 
             if not line or line == ": :;":
@@ -148,6 +151,7 @@ class CommandHistoryPlugin(Plugin):
                 ts = None
                 command = line
 
+            i += 1
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,

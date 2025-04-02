@@ -53,19 +53,21 @@ class PowerShellHistoryPlugin(Plugin):
             - https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline?view=powershell-7.3#command-history
         """  # noqa E501
 
-        for user, _path in self._history:
-            file_mtime = _path.stat().st_mtime
+        for user, path in self._history:
+            file_mtime = path.stat().st_mtime
 
-            for i, line in enumerate(_path.open("r")):
+            i = -1
+            for line in path.open("r"):
                 line = line.strip()
                 if not line:
                     continue
+                i += 1
 
                 yield ConsoleHostHistoryRecord(
                     mtime=file_mtime,
                     command=line,
                     order=i,
-                    source=_path,
+                    source=path,
                     _target=self.target,
                     _user=user,
                 )

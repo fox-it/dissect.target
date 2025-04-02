@@ -85,9 +85,9 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
 
     def parse_netscaler_bash_history(self, path: TargetPath) -> Iterator[CommandHistoryRecord]:
         """Parse bash.log* contents."""
-        for i, (ts, line) in enumerate(
-            year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S ")
-        ):
+
+        i = -1
+        for ts, line in year_rollover_helper(path, RE_CITRIX_NETSCALER_BASH_HISTORY_DATE, "%b %d %H:%M:%S "):
             line = line.strip()
             if not line:
                 continue
@@ -96,6 +96,7 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
             if not match:
                 continue
 
+            i += 1
             group = match.groupdict()
             command = group.get("command")
             user = self._find_user_by_name(group.get("username"))
@@ -118,13 +119,15 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         The only difference compared to generic bash history files is that the first line will start with
         ``_HiStOrY_V2_``, which we will skip.
         """
-        for i, line in enumerate(history_file.open("rt")):
+        i = -1
+        for line in history_file.open("rt"):
             if not (line := line.strip()):
                 continue
 
-            if i == 0 and line == "_HiStOrY_V2_":
+            if i == -1 and line == "_HiStOrY_V2_":
                 continue
 
+            i += 1
             yield CommandHistoryRecord(
                 ts=None,
                 command=line,
