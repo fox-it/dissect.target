@@ -14,7 +14,6 @@ from dissect.target.plugins.os.unix.bsd.darwin._os import (
 )
 from dissect.target.target import Target
 
-
 MacOSUserRecord = UnixUserRecord
 MacOSUserRecord.name = "macos/user"
 
@@ -90,7 +89,7 @@ class MacOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        if (arch := detect_macho_arch(
+        if arch := detect_macho_arch(
             paths=[
                 "/bin/bash",
                 "/bin/sh",
@@ -99,5 +98,5 @@ class MacOSPlugin(DarwinPlugin):
                 "/bin/ps",
             ],
             fs=self.target.fs,
-        )):
+        ):
             return f"{arch}-macos"

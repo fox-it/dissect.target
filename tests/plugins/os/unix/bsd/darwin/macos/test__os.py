@@ -1,8 +1,8 @@
-from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.target import Target
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 

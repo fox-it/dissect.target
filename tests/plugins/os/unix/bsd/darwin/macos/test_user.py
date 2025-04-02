@@ -1,7 +1,7 @@
-from dissect.target.target import Target
 from flow.record.fieldtypes import datetime
 
 from dissect.target.plugins.os.unix.bsd.darwin.macos.user import UserPlugin
+from dissect.target.target import Target
 
 
 def test_unix_bsd_darwin_macos_user(target_macos_users: Target) -> None:

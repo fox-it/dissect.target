@@ -67,7 +67,7 @@ class IOSPlugin(BsdPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        if (arch := detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs)):
+        if arch := detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs):
             return f"{arch}-ios"
 
 
