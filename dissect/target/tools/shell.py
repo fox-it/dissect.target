@@ -21,9 +21,9 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, BinaryIO, Callable, Iterator, TextIO
 
+from dissect.cstruct import hexdump
 from flow.record import RecordOutput
 
-from dissect.cstruct import hexdump
 from dissect.target.exceptions import (
     PluginError,
     RegistryError,
