@@ -280,14 +280,11 @@ class AuthLogRecordBuilder:
             if isinstance(value, int):
                 record_type = "varint"
 
-            elif isinstance(value, list):
-                if key in ["remote_ips", "host_ips"]:
-                    record_type = "net.ipaddress[]"
-                else:
-                    record_type = "string[]"
-
-            elif key in ["remote_ip", "host_ip"]:
+            elif key.startswith(("remote_ip", "host_ip")):
                 record_type = "net.ipaddress"
+
+            if isinstance(value, list):
+                record_type += "[]"
 
             record_fields.append((record_type, key))
             record_values[key] = value
