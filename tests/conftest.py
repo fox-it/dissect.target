@@ -17,6 +17,7 @@ from dissect.target.plugin import OSPlugin
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
@@ -209,6 +210,14 @@ def fs_macos() -> Iterator[VirtualFilesystem]:
 
 
 @pytest.fixture
+def fs_ios() -> Iterator[VirtualFilesystem]:
+    fs = VirtualFilesystem()
+    fs.makedirs("/private/var/preferences")
+    fs.makedirs("/private/var/mobile")
+    yield fs
+
+
+@pytest.fixture
 def fs_bsd() -> Iterator[VirtualFilesystem]:
     fs = VirtualFilesystem()
     fs.map_file("/bin/freebsd-version", absolute_path("_data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
@@ -321,6 +330,12 @@ def target_macos(tmp_path: pathlib.Path, fs_macos: Filesystem) -> Iterator[Targe
     system = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/preferences.plist")
     fs_macos.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
 
+    yield mock_target
+
+
+@pytest.fixture
+def target_ios(tmp_path: pathlib.Path, fs_ios: Filesystem) -> Iterator[Target]:
+    mock_target = make_os_target(tmp_path, IOSPlugin, root_fs=fs_ios)
     yield mock_target
 
 

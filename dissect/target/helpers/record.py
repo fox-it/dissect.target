@@ -124,18 +124,20 @@ WindowsUserRecord = TargetRecordDescriptor(
     ],
 )
 
+COMMON_UNIX_FIELDS = [
+    ("string", "name"),
+    ("string", "passwd"),
+    ("varint", "uid"),
+    ("varint", "gid"),
+    ("string", "gecos"),
+    ("path", "home"),
+    ("string", "shell"),
+    ("string", "source"),
+]
+
 UnixUserRecord = TargetRecordDescriptor(
     "unix/user",
-    [
-        ("string", "name"),
-        ("string", "passwd"),
-        ("varint", "uid"),
-        ("varint", "gid"),
-        ("string", "gecos"),
-        ("path", "home"),
-        ("string", "shell"),
-        ("string", "source"),
-    ],
+    COMMON_UNIX_FIELDS,
 )
 
 EmptyRecord = RecordDescriptor(

@@ -6,7 +6,7 @@ from typing import Iterator
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import Filesystem
-from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
@@ -14,8 +14,10 @@ from dissect.target.plugins.os.unix.bsd.darwin._os import (
 )
 from dissect.target.target import Target
 
-MacOSUserRecord = UnixUserRecord
-MacOSUserRecord.name = "macos/user"
+MacOSUserRecord = TargetRecordDescriptor(
+    "macos/user",
+    COMMON_UNIX_FIELDS,
+)
 
 
 class MacOSPlugin(DarwinPlugin):
