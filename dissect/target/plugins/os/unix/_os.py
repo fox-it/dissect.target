@@ -47,6 +47,7 @@ ARCH_MAP = {
 class UnixPlugin(OSPlugin):
     """UNIX plugin."""
 
+    # Files to parse for user details
     PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
 
     def __init__(self, target: Target):
