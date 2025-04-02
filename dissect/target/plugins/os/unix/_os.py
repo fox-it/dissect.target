@@ -38,7 +38,7 @@ ARCH_MAP = {
 
 
 class UnixPlugin(OSPlugin):
-    """"""
+    """UNIX plugin."""
 
     PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
 

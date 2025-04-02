@@ -7,7 +7,7 @@ from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 
 AccountPolicyRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
-    "osx/account_policy",
+    "macos/account_policy",
     [
         ("string", "generateduid"),
         ("datetime", "creation_time"),
@@ -20,7 +20,7 @@ AccountPolicyRecord = create_extended_descriptor([UserRecordDescriptorExtension]
 
 
 class UserPlugin(Plugin):
-    """MacOS / OSX user plugin."""
+    """macOS user plugin."""
 
     # TODO: Parse additional user data like: HeimdalSRPKey, KerberosKeys, ShadowHashData, LinkedIdentity,
     # inputSources, smartCardSecureTokenData, smartCardSecureTokenUUID, unlockOptions, smb_sid

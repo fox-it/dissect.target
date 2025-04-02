@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import plistlib
 from dataclasses import dataclass
 
@@ -46,7 +48,7 @@ class IOSPlugin(BsdPlugin):
     @export(property=True)
     def hostname(self) -> str | None:
         try:
-            # ComputerName can contain invalid utf characters
+            # ComputerName can contain invalid utf characters, so we use HostName instead.
             return self._config.SYSTEM["System"]["System"]["HostName"]
         except KeyError:
             pass
@@ -65,7 +67,8 @@ class IOSPlugin(BsdPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        return detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], suffix="ios", fs=self.target.fs)
+        if (arch := detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs)):
+            return f"{arch}-ios"
 
 
 @dataclass

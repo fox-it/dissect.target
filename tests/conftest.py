@@ -201,7 +201,7 @@ def fs_linux_proc_sockets(fs_linux_proc: VirtualFilesystem) -> Iterator[VirtualF
 
 
 @pytest.fixture
-def fs_osx() -> Iterator[VirtualFilesystem]:
+def fs_macos() -> Iterator[VirtualFilesystem]:
     fs = VirtualFilesystem()
     fs.makedirs("Applications")
     fs.makedirs("Library")
@@ -312,14 +312,14 @@ def target_suse(tmp_path: pathlib.Path, fs_suse: Filesystem) -> Iterator[Target]
 
 
 @pytest.fixture
-def target_osx(tmp_path: pathlib.Path, fs_osx: Filesystem) -> Iterator[Target]:
-    mock_target = make_os_target(tmp_path, MacOSPlugin, root_fs=fs_osx)
+def target_macos(tmp_path: pathlib.Path, fs_macos: Filesystem) -> Iterator[Target]:
+    mock_target = make_os_target(tmp_path, MacOSPlugin, root_fs=fs_macos)
 
-    version = absolute_path("_data/plugins/os/unix/bsd/osx/_os/SystemVersion.plist")
-    fs_osx.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
+    version = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/SystemVersion.plist")
+    fs_macos.map_file("/System/Library/CoreServices/SystemVersion.plist", version)
 
-    system = absolute_path("_data/plugins/os/unix/bsd/osx/_os/preferences.plist")
-    fs_osx.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
+    system = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/preferences.plist")
+    fs_macos.map_file("/Library/Preferences/SystemConfiguration/preferences.plist", system)
 
     yield mock_target
 
@@ -462,16 +462,16 @@ def target_linux_users(target_linux: Target, fs_linux: VirtualFilesystem) -> Ite
 
 
 @pytest.fixture
-def target_osx_users(target_osx: Target, fs_osx: VirtualFilesystem) -> Iterator[Target]:
-    dissect = absolute_path("_data/plugins/os/unix/bsd/osx/_os/dissect.plist")
-    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
+def target_macos_users(target_macos: Target, fs_macos: VirtualFilesystem) -> Iterator[Target]:
+    dissect = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/dissect.plist")
+    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_dissect.plist", dissect)
 
-    test = absolute_path("_data/plugins/os/unix/bsd/osx/_os/test.plist")
-    fs_osx.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
+    test = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/test.plist")
+    fs_macos.map_file("/var/db/dslocal/nodes/Default/users/_test.plist", test)
 
-    fs_osx.makedirs("/Users/dissect")
+    fs_macos.makedirs("/Users/dissect")
 
-    yield target_osx
+    yield target_macos
 
 
 @pytest.fixture

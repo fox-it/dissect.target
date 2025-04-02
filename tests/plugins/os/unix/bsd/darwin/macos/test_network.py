@@ -152,7 +152,7 @@ def dhcp(fake_plist: dict) -> Iterator[dict]:
     ],
 )
 def test_macos_network(
-    target_osx: Target, lease: dict, netinfo_param: str, expected: dict, count: int, request: pytest.FixtureRequest
+    target_macos: Target, lease: dict, netinfo_param: str, expected: dict, count: int, request: pytest.FixtureRequest
 ) -> None:
     plistnetwork = request.getfixturevalue(netinfo_param)
     with mock.patch(
@@ -161,7 +161,7 @@ def test_macos_network(
         "dissect.target.plugins.os.unix.bsd.darwin.macos.network.MacOSNetworkPlugin._plistnetwork",
         return_value=plistnetwork,
     ):
-        network = MacOSNetworkPlugin(target_osx)
+        network = MacOSNetworkPlugin(target_macos)
 
     interfaces = list(network.interfaces())
     assert len(interfaces) == count
