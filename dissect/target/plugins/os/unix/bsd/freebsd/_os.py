@@ -14,16 +14,14 @@ class FreeBsdPlugin(BsdPlugin):
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         FREEBSD_PATHS = {
-            "/net",
             "/.sujournal",
             "/entropy",
             "/bin/freebsd-version",
         }
 
         for fs in target.filesystems:
-            for path in FREEBSD_PATHS:
-                if fs.exists(path):
-                    return fs
+            if fs.exists("/net") and any(fs.exists(path) for path in FREEBSD_PATHS):
+                return fs
 
     @export(property=True)
     def version(self) -> str | None:

@@ -13,16 +13,15 @@ class OpenBsdPlugin(BsdPlugin):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
-        BSD_PATHS = {
+        OPENBSD_PATHS = {
             "/bsd",
             "/bsd.rd",
             "/bsd.mp",
         }
 
         for fs in target.filesystems:
-            for path in BSD_PATHS:
-                if fs.exists(path):
-                    return fs
+            if any(fs.exists(path) for path in OPENBSD_PATHS):
+                return fs
 
     @export(property=True)
     def version(self) -> str | None:

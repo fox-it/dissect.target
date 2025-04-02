@@ -91,7 +91,7 @@ class LocalePlugin(Plugin):
                 for line in path.open("rt"):
                     if "LANG=" in line:
                         lang_str = line.partition("=")[-1].strip().strip('"')
-                        if lang_str == "C.UTF-8":
+                        if lang_str == "C.UTF-8":  # Skip if no locales are installed.
                             continue
                         found_languages.add(normalize_language(lang_str))
 

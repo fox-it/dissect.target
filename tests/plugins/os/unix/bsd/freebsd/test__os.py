@@ -9,6 +9,7 @@ def test_bsd_freebsd_os_detection(target_bare: Target) -> None:
     """test if we detect FreeBSD correctly."""
 
     fs = VirtualFilesystem()
+    fs.makedirs("/net")
     fs.map_file("/bin/freebsd-version", absolute_path("_data/plugins/os/unix/bsd/freebsd/freebsd-freebsd-version"))
 
     target_bare.filesystems.add(fs)
