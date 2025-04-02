@@ -5,8 +5,16 @@ from typing import Iterator
 from dissect.util.plist import NSKeyedArchiver
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import IOSApplicationRecord
+from dissect.target.helpers.record import (
+    COMMON_APPLICATION_FIELDS,
+    TargetRecordDescriptor,
+)
 from dissect.target.plugin import OperatingSystem, Plugin, export
+
+IOSApplicationRecord = TargetRecordDescriptor(
+    "ios/application",
+    COMMON_APPLICATION_FIELDS,
+)
 
 
 class IOSApplicationsPlugin(Plugin):

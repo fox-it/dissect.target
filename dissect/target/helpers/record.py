@@ -140,6 +140,16 @@ UnixUserRecord = TargetRecordDescriptor(
     COMMON_UNIX_FIELDS,
 )
 
+MacOSUserRecord = TargetRecordDescriptor(
+    "macos/user",
+    COMMON_UNIX_FIELDS,
+)
+
+IOSUserRecord = TargetRecordDescriptor(
+    "ios/user",
+    COMMON_UNIX_FIELDS,
+)
+
 EmptyRecord = RecordDescriptor(
     "empty",
     [],
@@ -202,18 +212,3 @@ COMMON_APPLICATION_FIELDS = [
     ("string", "type"),
     ("path", "path"),
 ]
-
-UnixApplicationRecord = TargetRecordDescriptor(
-    "unix/application",
-    COMMON_APPLICATION_FIELDS,
-)
-
-WindowsApplicationRecord = TargetRecordDescriptor(
-    "windows/application",
-    COMMON_APPLICATION_FIELDS,
-)
-
-IOSApplicationRecord = TargetRecordDescriptor(
-    "ios/application",
-    COMMON_APPLICATION_FIELDS,
-)

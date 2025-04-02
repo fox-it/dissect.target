@@ -5,18 +5,13 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
-from dissect.target.helpers.record import COMMON_UNIX_FIELDS, TargetRecordDescriptor
+from dissect.target.helpers.record import IOSUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
     detect_macho_arch,
 )
 from dissect.target.target import Target
-
-IOSUserRecord = TargetRecordDescriptor(
-    "ios/user",
-    COMMON_UNIX_FIELDS,
-)
 
 
 class IOSPlugin(DarwinPlugin):
