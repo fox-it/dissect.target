@@ -9,7 +9,7 @@ from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_unix_bsd_darwin_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
+def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
     """Test if we correctly detect an iOS target.
 
     Data based on example iOS image from Digital Corpora.
