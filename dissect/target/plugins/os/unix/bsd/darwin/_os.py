@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from dissect.target.filesystem import Filesystem
@@ -14,13 +16,19 @@ ARCH_MAP = {
 
 
 class DarwinPlugin(BsdPlugin):
-    """"""
+    """Darwin plugin."""
 
     def __init__(self, target: Target):
         super().__init__(target)
 
+    @classmethod
+    def detect(cls, target: Target) -> Filesystem | None:
+        for fs in target.filesystems:
+            if (fs.exists("/Library") and fs.exists("/Applications")) or fs.exists("/private/var/mobile"):
+                return fs
 
-def detect_macho_arch(paths: list[str | Path], suffix: str, fs: Filesystem | None = None) -> str | None:
+
+def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> str | None:
     """Detect the architecture of the system by reading the Mach-O headers of the provided binaries.
 
     We could use the mach-o magic headers (feedface, feedfacf, cafebabe), but the mach-o cpu type
@@ -28,11 +36,10 @@ def detect_macho_arch(paths: list[str | Path], suffix: str, fs: Filesystem | Non
 
     Args:
         paths: List of strings or ``Path`` objects.
-        suffix: String to append to returned architecture, e.g. providing ``suffix`` returns ``arm64-suffix``.
         fs: Optional filesystem to search the provided paths in. Required if ``paths`` is a list of strings.
 
     Returns:
-        Detected architecture or ``None``.
+        Detected architecture (e.g. ``arm64``) or ``None``.
 
     Resources:
         - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
@@ -49,7 +56,6 @@ def detect_macho_arch(paths: list[str | Path], suffix: str, fs: Filesystem | Non
         try:
             with path.open("rb") as fh:
                 fh.seek(4)
-                arch = ARCH_MAP.get(fh.read(4))  # mach-o cpu type
-                return f"{arch}-{suffix}"
+                return ARCH_MAP.get(fh.read(4))  # mach-o cpu type
         except Exception:
             pass

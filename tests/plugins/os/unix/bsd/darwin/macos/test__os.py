@@ -1,19 +1,23 @@
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.target import Target
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from tests._utils import absolute_path
 
 
-def test_unix_bsd_osx_os(target_osx_users, fs_osx):
-    target_osx_users.add_plugin(MacOSPlugin)
+def test_unix_bsd_darwin_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
+    """test if we detect a macOS target correctly."""
 
-    interface = absolute_path("_data/plugins/os/unix/bsd/osx/_os/en0.plist")
-    fs_osx.map_file("/private/var/db/dhcpclient/leases/en0.plist", interface)
+    target_macos_users.add_plugin(MacOSPlugin)
 
-    hostname = target_osx_users.hostname
-    version = target_osx_users.version
-    users = list(target_osx_users.users())
-    ips = target_osx_users.ips
+    interface = absolute_path("_data/plugins/os/unix/bsd/darwin/macos/_os/en0.plist")
+    fs_macos.map_file("/private/var/db/dhcpclient/leases/en0.plist", interface)
+
+    hostname = target_macos_users.hostname
+    version = target_macos_users.version
+    users = list(target_macos_users.users())
+    ips = target_macos_users.ips
     ips.sort()
 
     dissect_user = users[0]
@@ -25,6 +29,7 @@ def test_unix_bsd_osx_os(target_osx_users, fs_osx):
     assert len(users) == 2
     assert len(ips) == 2
 
+    assert dissect_user._desc.name == "macos/user"
     assert dissect_user.name == "_dissect"
     assert dissect_user.passwd == "*"
     assert dissect_user.home == posix_path("/Users/dissect")

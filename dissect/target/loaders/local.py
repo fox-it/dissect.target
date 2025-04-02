@@ -60,7 +60,7 @@ class LocalLoader(Loader):
                 map_solaris_drives(target)
             elif os_name == "vmkernel":
                 map_esxi_drives(target)
-            elif os_name in ["darwin", "osx"]:
+            elif os_name in ["darwin", "osx", "macos"]:
                 # There is currently no way to access raw disk devices in OS-X,
                 # so we always do a simple DirectoryFilesystem fallback.
                 target.filesystems.add(DirectoryFilesystem(Path("/")))

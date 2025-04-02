@@ -15,6 +15,10 @@ from dissect.target.plugins.os.unix.bsd.darwin._os import (
 from dissect.target.target import Target
 
 
+MacOSUserRecord = UnixUserRecord
+MacOSUserRecord.name = "macos/user"
+
+
 class MacOSPlugin(DarwinPlugin):
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
     GLOBAL = "/Library/Preferences/.GlobalPreferences.plist"
@@ -57,8 +61,8 @@ class MacOSPlugin(DarwinPlugin):
         except FileNotFoundError:
             pass
 
-    @export(record=UnixUserRecord)
-    def users(self) -> Iterator[UnixUserRecord]:
+    @export(record=MacOSUserRecord)
+    def users(self) -> Iterator[MacOSUserRecord]:
         try:
             for path in self.target.fs.path("/var/db/dslocal/nodes/Default/users/").glob("*.plist"):
                 user = plistlib.load(path.open())
@@ -67,7 +71,7 @@ class MacOSPlugin(DarwinPlugin):
                 # but a user account can also have multiply home directories e.g. the root account.
                 # https://developer.apple.com/documentation/foundation/filemanager/1642853-homedirectory/
                 for home_dir in user.get("home", [None]):
-                    yield UnixUserRecord(
+                    yield MacOSUserRecord(
                         name=user.get("name", [None])[0],
                         passwd=user.get("passwd", [None])[0],
                         uid=user.get("uid", [None])[0],
@@ -86,7 +90,7 @@ class MacOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        return detect_macho_arch(
+        if (arch := detect_macho_arch(
             paths=[
                 "/bin/bash",
                 "/bin/sh",
@@ -94,6 +98,6 @@ class MacOSPlugin(DarwinPlugin):
                 "/bin/ls",
                 "/bin/ps",
             ],
-            suffix="macos",
             fs=self.target.fs,
-        )
+        )):
+            return f"{arch}-macos"
