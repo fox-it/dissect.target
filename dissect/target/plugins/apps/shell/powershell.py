@@ -9,8 +9,8 @@ ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExten
     "powershell/history",
     [
         ("datetime", "mtime"),
-        ("string", "command"),
         ("varint", "order"),
+        ("string", "command"),
         ("path", "source"),
     ],
 )
@@ -56,12 +56,11 @@ class PowerShellHistoryPlugin(Plugin):
         for user, path in self._history:
             file_mtime = path.stat().st_mtime
 
-            i = -1
+            i = 0
             for line in path.open("r"):
                 line = line.strip()
                 if not line:
                     continue
-                i += 1
 
                 yield ConsoleHostHistoryRecord(
                     mtime=file_mtime,
@@ -71,3 +70,5 @@ class PowerShellHistoryPlugin(Plugin):
                     _target=self.target,
                     _user=user,
                 )
+
+                i += 1
