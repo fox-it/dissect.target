@@ -5,12 +5,11 @@ from dataclasses import dataclass
 
 from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.plugin import OperatingSystem, export
-from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.plugins.os.unix.bsd.darwin._os import detect_macho_arch
+from dissect.target.plugins.os.unix.bsd.darwin._os import DarwinPlugin, detect_macho_arch
 from dissect.target.target import Target
 
 
-class IOSPlugin(BsdPlugin):
+class IOSPlugin(DarwinPlugin):
     """Apple iOS plugin.
 
     Resources:
@@ -37,7 +36,7 @@ class IOSPlugin(BsdPlugin):
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            if fs.exists("/private/var/preferences"):
+            if fs.exists("/private/var/preferences") or fs.exists("/private/var/mobile"):
                 return fs
 
     @classmethod
