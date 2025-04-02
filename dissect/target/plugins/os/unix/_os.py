@@ -305,7 +305,12 @@ class UnixPlugin(OSPlugin):
 
         # Try all users to see if we can access the share
         def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
-            for user in self.users():
+            users = list(self.users())
+            if not users:
+                self.target.log.debug("No users found, trying root")
+                users = [UnixUserRecord(uid=0, gid=0)]
+
+            for user in users:
                 if user.uid is None or user.gid is None:
                     continue
                 auth = auth_unix("machine", user.uid, user.gid, [])
@@ -324,6 +329,7 @@ class UnixPlugin(OSPlugin):
                     # We have access
                     return
 
+            self.target.log.debug("No user has access to NFS share")
             raise FilesystemError("No user has access to NFS share")
 
         try:
