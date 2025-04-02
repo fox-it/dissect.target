@@ -96,7 +96,7 @@ class CommandHistoryPlugin(Plugin):
         """
         next_cmd_ts = None
 
-        for line_number, line in enumerate(file.open("rt", errors="replace")):
+        for i, line in enumerate(file.open("rt", errors="replace")):
             ts = None
             line = line.strip()
 
@@ -114,7 +114,7 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=line,
-                order=line_number,
+                order=i,
                 shell=shell,
                 source=file,
                 _target=self.target,
@@ -135,7 +135,7 @@ class CommandHistoryPlugin(Plugin):
         Resources:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
-        for line_number, line in enumerate(file.open("rt", errors="replace")):
+        for i, line in enumerate(file.open("rt", errors="replace")):
             line = line.strip()
 
             if not line or line == ": :;":
@@ -151,7 +151,7 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,
-                order=line_number,
+                order=i,
                 shell="zsh",
                 source=file,
                 _target=self.target,
@@ -185,11 +185,11 @@ class CommandHistoryPlugin(Plugin):
         with history_file.open("r") as h_file:
             history_data = h_file.read()
 
-        for command_no, (command, ts) in enumerate(RE_FISH.findall(history_data)):
+        for i, (command, ts) in enumerate(RE_FISH.findall(history_data)):
             yield CommandHistoryRecord(
                 ts=from_unix(int(ts)),
                 command=command,
-                order=command_no,
+                order=i,
                 shell="fish",
                 source=history_file,
                 _target=self.target,

@@ -118,17 +118,17 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
         The only difference compared to generic bash history files is that the first line will start with
         ``_HiStOrY_V2_``, which we will skip.
         """
-        for idx, line in enumerate(history_file.open("rt")):
+        for i, line in enumerate(history_file.open("rt")):
             if not (line := line.strip()):
                 continue
 
-            if idx == 0 and line == "_HiStOrY_V2_":
+            if i == 0 and line == "_HiStOrY_V2_":
                 continue
 
             yield CommandHistoryRecord(
                 ts=None,
                 command=line,
-                order=idx,
+                order=i,
                 shell="citrix-netscaler-cli",
                 source=history_file,
                 _target=self.target,
