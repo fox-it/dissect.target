@@ -183,7 +183,7 @@ class MRUPlugin(Plugin):
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU`` registry key
         - renamed to ``LastVisitedPidlMRU`` since Windows Vista - contains information about the executable used by
-        an application to open the files that are documented at the OpenSaveMRU registry key. Also, each value
+        an application to open the files that are documented at the ``OpenSaveMRU`` registry key. Also, each value
         tracks the directory location for the last file that was accessed by that application.
 
         References:
