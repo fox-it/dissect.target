@@ -95,7 +95,10 @@ class LSAPlugin(Plugin):
         result = {}
         for subkey in self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets").subkeys():
             for val in ["CurrVal", "OldVal"]:
-                enc_data = subkey.subkey(val).value("(Default)").value
+                try:
+                    enc_data = subkey.subkey(val).value("(Default)").value
+                except RegistryKeyNotFoundError:
+                    continue
 
                 # Windows Vista or newer
                 if float(self.target.ntversion) >= 6.0:
