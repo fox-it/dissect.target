@@ -1168,10 +1168,10 @@ class VirtualFilesystem(Filesystem):
 
         return directory
 
-    def map_fs(self, vfspath: str, fs: Filesystem) -> None:
+    def map_fs(self, vfspath: str, fs: Filesystem, base: str = "/") -> None:
         """Mount a dissect filesystem to a directory in the VFS"""
         directory = self.makedirs(vfspath)
-        directory.top = fs.get("/")
+        directory.top = fs.get(base)
 
     mount = map_fs
 
