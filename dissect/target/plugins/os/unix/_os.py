@@ -219,7 +219,7 @@ class UnixPlugin(OSPlugin):
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
-        hosts_string = {"ip": None, "hostname": None}
+        hosts_string = {}
 
         for path in paths:
             for fs in self.target.filesystems:

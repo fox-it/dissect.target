@@ -99,6 +99,35 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
+    ("hostname_content", "hosts_content", "expected_hostname", "expected_domain"),
+    [
+        (b"", b"", "localhost", "localhost"),
+        (b"", b"127.0.0.1 mydomain", "localhost", "mydomain"),
+        (b"", b"127.0.0.1 localhost", "localhost", "localhost"),
+        (b"myhost", b"", "myhost", "localhost"),
+        (b"myhost.mydomain", b"", "myhost", "mydomain"),
+        (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mydomain", b"127.0.0.1 localhost", "myhost", "mydomain"),
+        (b"myhost.localhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+    ],
+)
+def test_parse_domain(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    hostname_content: bytes,
+    hosts_content: bytes,
+    expected_domain: str,
+    expected_hostname: str,
+) -> None:
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(hostname_content))
+    fs_unix.map_file_fh("/etc/hosts", BytesIO(hosts_content))
+    target_unix.add_plugin(UnixPlugin)
+
+    assert target_unix.hostname == expected_hostname
+    assert target_unix.domain == expected_domain
+
+
+@pytest.mark.parametrize(
     ("path", "expected_hostname", "expected_domain", "file_content"),
     [
         ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
