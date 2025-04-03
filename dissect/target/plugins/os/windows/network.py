@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from enum import IntEnum
 from functools import lru_cache
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 
@@ -12,9 +12,13 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
 )
 from dissect.target.helpers.record import WindowsInterfaceRecord
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugins.os.default.network import NetworkPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 
 class IfTypes(IntEnum):
@@ -238,6 +242,20 @@ def _get_config_value(key: RegistryKey, name: str, sep: str | None = None) -> se
     return {value}
 
 
+def _construct_interface(key: RegistryKey, ip_key: str, subnet_key: str) -> set[str]:
+    interface = ""
+    if ip := _get_config_value(key, ip_key):
+        interface = next(iter(ip))
+
+    if subnet := _get_config_value(key, subnet_key):
+        interface = f"{interface}/{next(iter(subnet))}"
+
+    if not interface:
+        return set()
+
+    return {interface}
+
+
 class WindowsNetworkPlugin(NetworkPlugin):
     """Windows network interface plugin."""
 
@@ -300,10 +318,9 @@ class WindowsNetworkPlugin(NetworkPlugin):
                     # skip this network interface.
                     if not conf or not any(
                         [
-                            conf["dns"],
-                            conf["ip"],
+                            conf["cidr"],
                             conf["gateway"],
-                            conf["subnetmask"],
+                            conf["dns"],
                             conf["search_domain"],
                         ]
                     ):
@@ -322,21 +339,17 @@ class WindowsNetworkPlugin(NetworkPlugin):
         """Extract network device configuration from the given interface_id for all ControlSets on the system."""
 
         dhcp_config = {
+            "cidr": set(),
             "gateway": set(),
-            "ip": set(),
             "dns": set(),
-            "subnetmask": set(),
             "search_domain": set(),
-            "network": set(),
         }
 
         static_config = {
-            "ip": set(),
-            "dns": set(),
-            "subnetmask": set(),
-            "search_domain": set(),
+            "cidr": set(),
             "gateway": set(),
-            "network": set(),
+            "dns": set(),
+            "search_domain": set(),
         }
 
         # Get the registry keys for the given interface id
@@ -349,36 +362,27 @@ class WindowsNetworkPlugin(NetworkPlugin):
         except RegistryKeyNotFoundError:
             return []
 
-        if not len(keys):
+        if not keys:
             return []
 
         for key in keys:
             # Extract DHCP configuration from the registry
+            dhcp_config["cidr"].update(_construct_interface(key, "DhcpIPAddress", "DhcpSubnetMask"))
             dhcp_config["gateway"].update(_get_config_value(key, "DhcpDefaultGateway"))
-            dhcp_config["ip"].update(_get_config_value(key, "DhcpIPAddress"))
-            dhcp_config["subnetmask"].update(_get_config_value(key, "DhcpSubnetMask"))
-            dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
             dhcp_config["dns"].update(_get_config_value(key, "DhcpNameServer", " ,"))
+            dhcp_config["search_domain"].update(_get_config_value(key, "DhcpDomain"))
 
             # Extract static configuration from the registry
+            static_config["cidr"].update(_construct_interface(key, "IPAddress", "SubnetMask"))
             static_config["gateway"].update(_get_config_value(key, "DefaultGateway"))
             static_config["dns"].update(_get_config_value(key, "NameServer", " ,"))
             static_config["search_domain"].update(_get_config_value(key, "Domain"))
-            static_config["ip"].update(_get_config_value(key, "IPAddress"))
-            static_config["subnetmask"].update(_get_config_value(key, "SubnetMask"))
 
-        if len(dhcp_config) > 0:
-            dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1
-            dhcp_config["dhcp"] = True
+        dhcp_config["enabled"] = _try_value(key, "EnableDHCP") == 1
+        dhcp_config["dhcp"] = True
 
-        if len(static_config) > 0:
-            static_config["enabled"] = None
-            static_config["dhcp"] = False
-
-        # Iterate over combined ip/subnet lists
-        for config in (dhcp_config, static_config):
-            if (ips := config.get("ip")) and (masks := config.get("subnetmask")):
-                config["network"].update(set(self.calculate_network(ips, masks)))
+        static_config["enabled"] = None
+        static_config["dhcp"] = False
 
         # Return both configurations
         return [dhcp_config, static_config]
