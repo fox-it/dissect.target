@@ -18,7 +18,7 @@ from dissect.target.loader import Loader, SubLoader
 ContainerImageTarSubLoader: TarSubLoader = import_lazy(
     "dissect.target.loaders.containerimage"
 ).ContainerImageTarSubLoader
-GenericTarSubLoader: TarSubLoader = import_lazy("dissect.target.loaders.tar").GenericTarSubLoader
+_GenericTarSubLoader: TarSubLoader = import_lazy("dissect.target.loaders.tar").GenericTarSubLoader
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class TarLoader(Loader):
 
     __subloaders__ = [
         ContainerImageTarSubLoader,
-        GenericTarSubLoader,  # should be last
+        _GenericTarSubLoader,  # should be last
     ]
 
     def __init__(self, path: Path | str, **kwargs):
