@@ -301,3 +301,29 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "alias": False,
         "path": "os.windows.credential.sam.sam",
     }
+
+    # plugin with arguments
+    docker_plugin = get_plugin(output, "docker.logs")
+    assert docker_plugin == {
+        "name": "docker.logs",
+        "output": "record",
+        "description": "Returns log files (stdout/stderr) from Docker containers.",
+        "arguments": [
+            {
+                "name": "--raw-messages",
+                "type": "bool",
+                "help": "preserve ANSI escape sequences and trailing newlines from log messages",
+                "default": False,
+                "required": False,
+            },
+            {
+                "name": "--remove-backspaces",
+                "type": "bool",
+                "help": "alter messages by removing ASCII backspaces and the corresponding characters",
+                "default": False,
+                "required": False,
+            },
+        ],
+        "path": "apps.container.docker.logs",
+        "alias": False,
+    }
