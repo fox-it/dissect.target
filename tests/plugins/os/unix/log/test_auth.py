@@ -132,6 +132,15 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
             id="sshd: failed password",
         ),
         pytest.param(
+            "Jun 4 22:14:15 ubuntu-1 sshd[12345]: reverse mapping checking getaddrinfo for some-hostname-with-digits-012.34.56.78.example.com [90.12.34.56] failed - POSSIBLE BREAK-IN ATTEMPT!",  # noqa: E501
+            {
+                "service": "sshd",
+                "pid": 12345,
+                "remote_ips": ["90.12.34.56", "12.34.56.78"],
+            },
+            id="sshd: reverse dns ip addr",
+        ),
+        pytest.param(
             "Mar 27 13:08:09 ubuntu-1 sshd[1361]: Accepted publickey for test_user "
             "from 8.8.8.8 port 12345 ssh2: RSA SHA256:123456789asdfghjklertzuio",
             {
@@ -284,10 +293,17 @@ def test_auth_plugin_additional_fields(
     fs_unix.map_file("var/log/auth.log", data_path)
 
     target_unix.add_plugin(AuthPlugin)
-    record = list(target_unix.authlog())[0]
+
+    result = list(target_unix.authlog())
+    assert len(result) == 1
 
     for key, value in results.items():
-        assert getattr(record, key) == value
+        plugin_result = getattr(result[0], key)
+        if isinstance(value, list):
+            value = sorted(map(str, value))
+            plugin_result = sorted(map(str, plugin_result))
+
+        assert plugin_result == value
 
 
 def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
