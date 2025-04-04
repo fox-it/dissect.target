@@ -5,6 +5,7 @@ import os
 import traceback
 import urllib
 from collections import defaultdict
+from glob import glob
 from pathlib import Path
 from typing import Any, Callable, Generic, Iterator, Optional, TypeVar, Union
 
@@ -64,7 +65,7 @@ class Target:
         path: The path of a target.
     """
 
-    def __init__(self, path: Union[str, Path] = None):
+    def __init__(self, path: Union[str, Path] = None, minimal=False):
         # WIP, part of the introduction of URI-style paths.
         # Since pathlib.Path does not support URIs, bigger refactoring
         # is needed in order to fully utilise URI's scheme / path / query
@@ -117,6 +118,27 @@ class Target:
         self.filesystems = FilesystemCollection(self)
 
         self.fs = filesystem.RootFilesystem(self)
+        self.minimal = minimal  # Flag indicating that the target is minimal
+
+    @classmethod
+    def minimal(cls, search_pattern: Iterator[str]):
+        """Create a minimal target with a virtual root filesystem.
+
+        The filesystem is populated with files found from the search patterns.
+        This is useful when running plugins on individual log files.
+        """
+        target = Target(minimal=True)
+
+        vfs = filesystem.VirtualFilesystem()
+        for path_str in search_pattern:
+            for found_file in glob(path_str, recursive=True):
+                abs_path = Path(found_file).resolve()
+                vfs.map_file(str(abs_path), str(abs_path))
+
+        target._os_plugin = DefaultPlugin
+        target._os = target.add_plugin(DefaultPlugin.create(target, vfs))
+
+        return target
 
     def __repr__(self) -> str:
         return f"<Target {self.path}>"
