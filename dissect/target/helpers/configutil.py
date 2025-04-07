@@ -9,6 +9,7 @@ from collections import deque
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from pathlib import Path
 from types import TracebackType
 from typing import (
     Any,
@@ -18,9 +19,7 @@ from typing import (
     Iterator,
     KeysView,
     Literal,
-    Optional,
     TextIO,
-    Union,
 )
 
 from defusedxml import ElementTree
@@ -107,7 +106,7 @@ class ConfigurationParser:
 
     def __init__(
         self,
-        collapse: Union[bool, Iterable[str]] = False,
+        collapse: bool | Iterable[str] = False,
         collapse_inverse: bool = False,
         separator: tuple[str] = ("=",),
         comment_prefixes: tuple[str] = (";", "#"),
@@ -120,7 +119,7 @@ class ConfigurationParser:
         self.comment_prefixes = comment_prefixes
         self.parsed_data = {}
 
-    def __getitem__(self, item: Any) -> Union[dict, str]:
+    def __getitem__(self, item: Any) -> dict | str:
         return self.parsed_data[item]
 
     def __contains__(self, item: str) -> bool:
@@ -157,7 +156,7 @@ class ConfigurationParser:
         """
         raise NotImplementedError()
 
-    def get(self, item: str, default: Optional[Any] = None) -> Any:
+    def get(self, item: str, default: Any | None = None) -> Any:
         return self.parsed_data.get(item, default)
 
     def read_file(self, fh: TextIO | io.BytesIO) -> None:
@@ -388,7 +387,7 @@ class ListUnwrapper:
     """Provides utility functions to unwrap dictionary objects out of lists."""
 
     @staticmethod
-    def unwrap(data: Union[dict, list]) -> Union[dict, list]:
+    def unwrap(data: dict | list) -> dict | list:
         """Transforms a list with dictionaries to a dictionary.
 
         The order of the list is preserved. If no dictionary is found, the list remains untouched:
@@ -409,7 +408,7 @@ class ListUnwrapper:
         return ListUnwrapper._unwrap_dict(orig)
 
     @staticmethod
-    def _unwrap_dict(data: Union[dict, list]) -> Union[dict, list]:
+    def _unwrap_dict(data: dict | list) -> dict | list:
         """Looks for dictionaries and unwraps its values."""
 
         if not isinstance(data, dict):
@@ -425,7 +424,7 @@ class ListUnwrapper:
         return root
 
     @staticmethod
-    def _unwrap_dict_list(data: Union[dict, list]) -> Union[dict, list]:
+    def _unwrap_dict_list(data: dict | list) -> dict | list:
         """Unwraps a list containing dictionaries."""
         if not isinstance(data, list) or not any(isinstance(obj, dict) for obj in data):
             return data
@@ -559,9 +558,9 @@ class ScopeManager:
 
     def __exit__(
         self,
-        type: Optional[type[BaseException]],
-        value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        type: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         self.clean()
 
@@ -636,7 +635,7 @@ class Indentation(Default):
         manager: ScopeManager,
         line: str,
         key: str,
-        next_line: Optional[str] = None,
+        next_line: str | None = None,
     ) -> bool:
         """A function to check whether to create a new scope, or go back to a previous one.
 
@@ -722,7 +721,7 @@ class SystemD(Indentation):
         manager: ScopeManager,
         line: str,
         key: str,
-        next_line: Optional[str] = None,
+        next_line: str | None = None,
     ) -> bool:
         scope_char = ("[", "]")
         changed = False
@@ -785,22 +784,22 @@ class SystemD(Indentation):
 
 @dataclass(frozen=True)
 class ParserOptions:
-    collapse: Optional[Union[bool, set]] = None
-    collapse_inverse: Optional[bool] = None
-    separator: Optional[tuple[str]] = None
-    comment_prefixes: Optional[tuple[str]] = None
+    collapse: bool | set | None = None
+    collapse_inverse: bool | None = None
+    separator: tuple[str] | None = None
+    comment_prefixes: tuple[str] | None = None
 
 
 @dataclass(frozen=True)
 class ParserConfig:
     parser: type[ConfigurationParser] = Default
-    collapse: Optional[Union[bool, set]] = None
-    collapse_inverse: Optional[bool] = None
-    separator: Optional[tuple[str]] = None
-    comment_prefixes: Optional[tuple[str]] = None
-    fields: Optional[tuple[str]] = None
+    collapse: bool | set | None = None
+    collapse_inverse: bool | None = None
+    separator: tuple[str] | None = None
+    comment_prefixes: tuple[str] | None = None
+    fields: tuple[str] | None = None
 
-    def create_parser(self, options: Optional[ParserOptions] = None) -> ConfigurationParser:
+    def create_parser(self, options: ParserOptions | None = None) -> ConfigurationParser:
         kwargs = {}
 
         for field_name in ["collapse", "collapse_inverse", "separator", "comment_prefixes", "fields"]:
@@ -890,7 +889,7 @@ KNOWN_FILES: dict[str, type[ConfigurationParser]] = {
 }
 
 
-def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, *args, **kwargs) -> ConfigurationParser:
+def parse(path: FilesystemEntry | TargetPath | Path, hint: str | None = None, *args, **kwargs) -> ConfigurationParser:
     """Parses the content of an ``path`` or ``entry`` to a dictionary.
 
     Args:
@@ -909,7 +908,7 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
     if isinstance(path, TargetPath):
         entry = path.get()
 
-    if not entry.is_file(follow_symlinks=True):
+    if not isinstance(entry, Path) and not entry.is_file(follow_symlinks=True):
         raise FileNotFoundError(f"Could not parse {path} as a dictionary.")
 
     options = ParserOptions(*args, **kwargs)
@@ -918,14 +917,14 @@ def parse(path: Union[FilesystemEntry, TargetPath], hint: Optional[str] = None, 
 
 
 def parse_config(
-    entry: FilesystemEntry,
-    hint: Optional[str] = None,
-    options: Optional[ParserOptions] = None,
+    entry: FilesystemEntry | Path,
+    hint: str | None = None,
+    options: ParserOptions | None = None,
 ) -> ConfigurationParser:
     parser_type = _select_parser(entry, hint)
 
     parser = parser_type.create_parser(options)
-    with entry.open() as fh:
+    with entry.open("rb") if isinstance(entry, Path) else entry.open() as fh:
         if not isinstance(parser, Bin):
             open_file = io.TextIOWrapper(fh, encoding="utf-8")
         else:
@@ -935,7 +934,7 @@ def parse_config(
     return parser
 
 
-def _select_parser(entry: FilesystemEntry, hint: Optional[str] = None) -> ParserConfig:
+def _select_parser(entry: FilesystemEntry, hint: str | None = None) -> ParserConfig:
     if hint and (parser_type := CONFIG_MAP.get(hint)):
         return parser_type
 
