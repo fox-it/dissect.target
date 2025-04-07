@@ -12,6 +12,7 @@ from typing import Any, Iterator
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
+from dissect.target.helpers.regex.ipaddress import extract_ips
 from dissect.target.helpers.utils import year_rollover_helper
 from dissect.target.plugin import Plugin, alias, export
 from dissect.target.plugins.os.unix.log.helpers import (
@@ -23,15 +24,6 @@ from dissect.target.plugins.os.unix.log.helpers import (
 
 log = logging.getLogger(__name__)
 
-
-# Generic regular expressions
-RE_IPV4_ADDRESS = re.compile(
-    r"""
-    ((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}   # First three octets
-    (25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)          # Last octet
-    """,
-    re.VERBOSE,
-)
 RE_USER = re.compile(r"for ([^\s]+)")
 
 
@@ -78,9 +70,14 @@ class SshdService(BaseService):
     def parse(cls, message: str) -> dict[str, str | int]:
         """Parse message from sshd"""
         additional_fields = {}
-        if ip_address := RE_IPV4_ADDRESS.search(message):
+        if ip_address := extract_ips(message):
             field_name = "host_ip" if "listening" in message else "remote_ip"
-            additional_fields[field_name] = ip_address.group(0)
+
+            if len(ip_address) > 1:
+                field_name += "s"
+
+            additional_fields[field_name] = ip_address[0] if len(ip_address) == 1 else ip_address
+
         if port := cls.RE_SSHD_PORTREGEX.search(message):
             additional_fields["port"] = int(port.group(1))
         if user := cls.RE_USER.search(message):
@@ -279,8 +276,15 @@ class AuthLogRecordBuilder:
 
         for key, value in self._parse_additional_fields(record_values["service"], line).items():
             record_type = "string"
+
             if isinstance(value, int):
                 record_type = "varint"
+
+            elif key.startswith(("remote_ip", "host_ip")):
+                record_type = "net.ipaddress"
+
+            if isinstance(value, list):
+                record_type += "[]"
 
             record_fields.append((record_type, key))
             record_values[key] = value
