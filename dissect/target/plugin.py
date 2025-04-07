@@ -16,7 +16,7 @@ import traceback
 from dataclasses import dataclass, field
 from itertools import zip_longest
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator
 
 try:
     from typing import TypeAlias  # novermin
@@ -72,7 +72,15 @@ class OperatingSystem(StrEnum):
 @dataclass(frozen=True, eq=True)
 class PluginDescriptor:
     # COMPAT: Replace with slots=True when we drop Python 3.9
-    __slots__ = ("module", "qualname", "namespace", "path", "findable", "functions", "exports")
+    __slots__ = (
+        "module",
+        "qualname",
+        "namespace",
+        "path",
+        "findable",
+        "functions",
+        "exports",
+    )
 
     module: str
     qualname: str
@@ -446,10 +454,25 @@ class Plugin:
         file exists.
         Otherwise it should raise an ``UnsupportedPluginError``.
 
+        Default implementation delegates to `_check_compatible`
+        if the target mode is not minimal.
+
         Raises:
             UnsupportedPluginError: If the plugin could not be loaded.
         """
-        raise NotImplementedError
+
+        if not self.target.minimal:
+            self._check_compatible()
+        # No plugin needs a compatibility check in minimal mode yet.
+        # Delegate to self._check_compatible_minimal if needed.
+
+    def _check_compatible(self) -> None:
+        """Perform a compatibility check on an ordinary target.
+
+        To be implemented by subclasses
+        """
+
+        pass
 
     def __call__(self, *args, **kwargs) -> Iterator[Record | Any]:
         """Return the records of all exported methods.
@@ -471,7 +494,29 @@ class Plugin:
             try:
                 yield from method()
             except Exception:
-                self.target.log.error("Error while executing `%s.%s`", self.__namespace__, method_name, exc_info=True)
+                self.target.log.error(
+                    "Error while executing `%s.%s`",
+                    self.__namespace__,
+                    method_name,
+                    exc_info=True,
+                )
+
+    def get_files(self, *args, **kwargs) -> Iterable[Path]:
+        if self.target.minimal:
+            yield from self._get_minimal_files(*args, **kwargs)
+        else:
+            yield from self._get_files(*args, **kwargs)
+
+    def _get_minimal_files(self, *args, **kwargs) -> Iterable[Path]:
+        entries = self.target.fs.path().rglob("*")
+        return filter(lambda entry: entry.is_file(), entries)
+
+    def _get_files(self, *args, **kwargs) -> Iterable[Path]:
+        """Return all files of interest to the plugin.
+
+        To be implemented by the plugin subclass.
+        """
+        pass
 
 
 def register(plugincls: type[Plugin]) -> None:
@@ -735,7 +780,10 @@ def functions(osfilter: type[OSPlugin] | None = None, *, index: str = "__regular
 
 
 def lookup(
-    function_name: str, osfilter: type[OSPlugin] | None = None, *, index: str = "__regular__"
+    function_name: str,
+    osfilter: type[OSPlugin] | None = None,
+    *,
+    index: str = "__regular__",
 ) -> Iterator[FunctionDescriptor]:
     """Lookup a function descriptor by function name.
 
@@ -948,7 +996,9 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
 
 
 def _filter_compatible(
-    descriptors: list[FunctionDescriptor], target: Target, ignore_load_errors: bool = False
+    descriptors: list[FunctionDescriptor],
+    target: Target,
+    ignore_load_errors: bool = False,
 ) -> Iterator[FunctionDescriptor]:
     """Filter a list of function descriptors based on compatibility with a target."""
     compatible = set()

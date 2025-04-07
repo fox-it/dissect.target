@@ -6,6 +6,7 @@ from dissect.target.exceptions import RegistryKeyNotFoundError
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log import evt
 from dissect.target.plugins.scrape import scrape
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
@@ -76,7 +77,7 @@ def test_evt_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registr
     assert len({str(rec.ts) for rec in records}) == 5
 
 
-def test_evt_scraping(target_win):
+def test_evt_scraping(target_win: Target) -> None:
     target_win.add_plugin(scrape.ScrapePlugin)
 
     plugin = evt.EvtPlugin(target_win)
@@ -89,3 +90,12 @@ def test_evt_scraping(target_win):
         scraped_records = list(plugin.scraped_evt())
 
     assert len(scraped_records) == 5
+
+
+def test_evt_single_file_mode(target_default: Target) -> None:
+    data_path = absolute_path("_data/plugins/os/windows/log/evt/TestLog.evt")
+
+    target = Target.minimal([data_path])
+    records = list(target.evt())
+
+    assert len(records) == 5
