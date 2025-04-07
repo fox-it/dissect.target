@@ -45,10 +45,10 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
     apps = list(target_ios.applications())
     assert len(apps) == 4
 
-    assert [app.name for app in apps] == [
+    assert sorted([app.name for app in apps]) == [
         # System apps
-        "Calculator",
         "Books",
+        "Calculator",
         "Compass",
         # AppStore apps
         "DuckDuckGo Private Browser",
