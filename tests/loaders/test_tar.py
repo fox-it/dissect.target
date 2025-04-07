@@ -1,9 +1,13 @@
+import pathlib
+import tarfile
+
 import pytest
 
 from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
+from tests.filesystems.test_tar import _mkdir
 
 
 def test_tar_loader_compressed_tar_file(target_win: Target) -> None:
@@ -76,6 +80,32 @@ def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str,
     assert sorted(target_default.fs.mounts.keys()) == [expected_drive_letter]
 
 
+def test_tar_loader_windows_case_sensitivity(target_default: Target, tmp_path: pathlib.Path) -> None:
+    """test if we correctly map a tar with Windows folder structure as a case-insensitive filesystem."""
+
+    tar_path = tmp_path.joinpath("target.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tf:
+        _mkdir(tf, "Windows")
+        _mkdir(tf, "Windows/System32")
+
+    loader = TarLoader(tar_path)
+    loader.map(target_default)
+
+    # Make sure the case sensitiveness is changed to False and make sure we detect the target as Windows.
+    assert not target_default.filesystems[0].case_sensitive
+    assert WindowsPlugin.detect(target_default)
+
+    # We also test the inverse, make sure a random Linux target is not marked as case-insensitive.
+    tar_path = tmp_path.joinpath("second_target.tar.gz")
+    with tarfile.open(tar_path, "w:gz") as tf:
+        _mkdir(tf, "etc")
+        _mkdir(tf, "var")
+        _mkdir(tf, "opt")
+    loader = TarLoader(tar_path)
+    loader.map(target_default)
+    assert target_default.filesystems[1].case_sensitive
+
+
 def test_tar_anonymous_filesystems(target_default: Target) -> None:
     tar_file = absolute_path("_data/loaders/tar/test-anon-filesystems.tar")
 
@@ -89,3 +119,37 @@ def test_tar_anonymous_filesystems(target_default: Target) -> None:
     assert "/" in target_default.fs.mounts.keys()
     assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
     assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"
+
+
+@pytest.mark.parametrize(
+    ("should_detect", "filename", "buffer"),
+    [
+        # regular tar file
+        (True, "file.tar", ""),
+        (True, "file", "00" * 257 + "7573746172202000"),
+        # gzip tar file
+        (True, "file.tar.gz", ""),
+        (True, "file.tgz", ""),
+        (True, "file", "1f8b0800000000000000"),
+        # bzip2 tar file
+        (True, "file.tar.bz2", ""),
+        (True, "file.tar.bz", ""),
+        (True, "file.tbz", ""),
+        (True, "file.tbz2", ""),
+        (True, "file", "425a6839314159265359"),
+        # xz tar file
+        (True, "file.tar.xz", ""),
+        (True, "file.txz", ""),
+        (True, "file", "fd377a585a000004e6d6"),
+        # some things it should not detect
+        (False, "file", "00010203"),
+        (False, "file.zip", "504b0304"),
+    ],
+)
+def test_tar_detect(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
+    """test if we detect the given buffer as a (compressed) tar file or not."""
+    tmp_tar = tmp_path.joinpath(filename)
+    tmp_tar.touch()
+    with tmp_tar.open("wb") as fh:
+        fh.write(bytes.fromhex(buffer))
+    assert TarLoader.detect(tmp_tar) == should_detect
