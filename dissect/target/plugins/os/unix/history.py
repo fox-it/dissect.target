@@ -27,7 +27,7 @@ RE_FISH = re.compile(r"- cmd: (?P<command>.+?)\s+when: (?P<ts>\d+)")
 
 
 class CommandHistoryPlugin(Plugin):
-    """Unix command history plugin."""
+    """UNIX command history plugin."""
 
     COMMAND_HISTORY_RELATIVE_PATHS = (
         ("bash", ".bash_history"),
@@ -63,11 +63,10 @@ class CommandHistoryPlugin(Plugin):
     @alias("bashhistory")
     @export(record=CommandHistoryRecord)
     def commandhistory(self) -> Iterator[CommandHistoryRecord]:
-        """Return shell history for all users.
+        """Return shell history for all UNIX users.
 
-        When using a shell, history of the used commands is kept on the system.
-        It is kept in a hidden file named ".$SHELL_history" and may expose
-        commands that were used by an adversary.
+        When using a shell, history of the used commands can be kept on the system. These are usually written to
+        a hidden file named ``.$SHELL_history`` and may expose commands that were used by an adversary.
         """
 
         for shell, history_path, user in self._history_files:

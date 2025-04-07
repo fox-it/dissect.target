@@ -72,9 +72,10 @@ class CitrixCommandHistoryPlugin(CommandHistoryPlugin):
 
     @export(record=CommandHistoryRecord)
     def commandhistory(self) -> Iterator[CommandHistoryRecord]:
-        """Return shell history for all users.
+        """Return shell history for all Citrix users.
 
-        When using a shell, history of the used commands is kept on the system.
+        Some entries are returned in reverse chronological order and can contain negative command order integers due
+        to the way Citrix stores bash history commands.
         """
 
         for shell, history_path, user in self._history_files:
