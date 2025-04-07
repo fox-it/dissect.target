@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from json import JSONDecodeError
 from pathlib import Path
 from typing import Iterator
 
@@ -347,5 +346,5 @@ def parse_json_line(line: str) -> dict[str, str] | None:
             "bytes_sent": json_log.get("body_bytes_sent") or json_log.get("bytes"),
         }
 
-    except JSONDecodeError as e:
+    except json.JSONDecodeError as e:
         raise ValueError(f"Could not parse NGINX log line {line!r}: {e}") from e
