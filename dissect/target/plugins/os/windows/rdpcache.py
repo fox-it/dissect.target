@@ -404,7 +404,7 @@ class RdpCachePlugin(Plugin):
         "-r",
         choices=["only", "include", "exclude"],
         default="exclude",
-        type="str",
+        type=str,
         help="include old leftover colordata in between tiles as separate, 'remnant' tiles",
     )
     @export(output="none")
