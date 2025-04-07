@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import re
 from enum import Enum, auto
-from typing import Optional, Tuple
 from uuid import UUID
 
 from dissect.ntfs.exceptions import FileNotFoundError
 from dissect.ntfs.mft import MftRecord
-
 from dissect.target import Target
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 
@@ -56,7 +56,7 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
         return ""
 
 
-def get_volume_identifier(fs: NtfsFilesystem) -> str:
+def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
     """Return the filesystem guid if available"""
     try:
         return f"{UUID(bytes_le=fs.volume.guid)}"
@@ -67,7 +67,7 @@ def get_volume_identifier(fs: NtfsFilesystem) -> str:
         return None
 
 
-def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> Tuple[Optional[str], Optional[str]]:
+def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> tuple[str | None, str | None]:
     owner, group = None, None
     try:
         stdinfo = entry.attributes.STANDARD_INFORMATION[0]
@@ -79,8 +79,8 @@ def get_owner_and_group(entry: MftRecord, fs: NtfsFilesystem) -> Tuple[Optional[
     return owner, group
 
 
-def get_record_size(record: MftRecord, name: str = "") -> Optional[int]:
-    """Gets the size for a specific record"""
+def get_record_size(record: MftRecord, name: str = "") -> int | None:
+    """Gets the size for a specific record."""
     try:
         return record.size(name)
     except (FileNotFoundError, KeyError):
