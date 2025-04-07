@@ -149,7 +149,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
                 # Convert milliseconds to microseconds
                 if "." in time:
                     hms, _, ms = time.rpartition(".")
-                    time = f"{hms}.{ms:06}"
+                    time = f"{hms}.{ms:0<6}"
                 else:
                     time += ".000000"
 
@@ -192,7 +192,7 @@ def parse_start(line: str) -> datetime | None:
         if dt["timezone"]:
             name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
             amount = int(amount.replace(":", ""))
-            dt["timezone"] = f"{name}{operator}{amount:04d}"
+            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
 
         start_date = datetime.strptime(
             f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
