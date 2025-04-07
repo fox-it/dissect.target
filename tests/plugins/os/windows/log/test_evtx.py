@@ -1,15 +1,19 @@
 import shutil
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log import evt, evtx
 from dissect.target.plugins.scrape import scrape
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
+def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: str) -> None:
     # Mock eventlog registry key in a specific control set,
     # CurrentControlSet used in preconfigured value is a soft link
     registry_hive = target_win.registry._root
@@ -39,7 +43,14 @@ def mock_registry_log_location(target_win, reg_key_name, mock_log_path):
         (True, True, True),
     ],
 )
-def test_evtx_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_registry, duplicate):
+def test_evtx_plugin(
+    target_win: Target,
+    fs_win: VirtualFilesystem,
+    tmp_path: Path,
+    is_in_directory: bool,
+    is_in_registry: bool,
+    duplicate: bool,
+) -> None:
     with pytest.raises(UnsupportedPluginError):
         target_win.add_plugin(evtx.EvtxPlugin)
 
@@ -89,7 +100,7 @@ def test_evtx_plugin(target_win, fs_win, tmp_path, is_in_directory, is_in_regist
     assert len({str(rec.EventID) for rec in records}) == 5
 
 
-def test_evtx_scraping(target_win):
+def test_evtx_scraping(target_win: Target) -> None:
     target_win.add_plugin(scrape.ScrapePlugin)
 
     plugin = evtx.EvtxPlugin(target_win)
@@ -100,3 +111,49 @@ def test_evtx_scraping(target_win):
         scraped_records = list(plugin.scraped_evtx())
 
     assert len(scraped_records) == 5
+
+
+def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    """test if we normalize certain evtx fields correctly."""
+
+    # Example Security.evtx originates from Windows 10 22H2 Pro build 19045.2006,
+    # events exported after clean virtual machine post-install.
+    security_evtx = absolute_path("_data/plugins/os/windows/log/evtx/Security.evtx")
+    fs_win.map_file("Windows\\System32\\winevt\\Logs\\Security.evtx", security_evtx)
+
+    target_win.add_plugin(evtx.EvtxPlugin)
+
+    records = sorted(list(target_win.evtx()), key=lambda r: r.ts)
+
+    # Verified amount of events in Event Viewer
+    assert len(records) == 759
+
+    assert records[0].ts == datetime(2025, 3, 4, 10, 27, 58, 245262, tzinfo=timezone.utc)
+    assert records[0].Provider_Name == "Microsoft-Windows-Security-Auditing"
+    assert records[0].EventID == 4616
+    assert records[0].Channel == "Security"
+    assert records[0].Computer == "DESKTOP-L7A1DDP"
+    assert records[0].Correlation_ActivityID is None
+    assert records[0].SubjectUserSid == "S-1-5-18"
+    assert records[0].source == "sysvol\\windows\\system32\\winevt\\logs\\Security.evtx"
+
+    assert records[69].ts == datetime(2025, 3, 4, 10, 28, 2, 905350, tzinfo=timezone.utc)
+    assert records[69].PrivilegeList is None
+    assert records[69].SidHistory is None
+
+    # Should contain None instead of string "-"
+    assert {getattr(r, "IpAddress", None) for r in records} == {None, "127.0.0.1"}
+
+
+@pytest.mark.parametrize(
+    ("key", "keys", "expected_key"),
+    [
+        ("source", {"source", "_target"}, "source_2_duplicate"),
+        ("source", {"source", "source_2_duplicate", "_target"}, "source_3_duplicate"),
+        ("source", {"source", "source_2", "_target"}, "source_2_duplicate"),
+    ],
+)
+def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
+    """test if ``unique_keys`` correctly deduplicates key values."""
+
+    assert evtx.unique_key(key, keys) == expected_key
