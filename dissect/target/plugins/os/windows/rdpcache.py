@@ -12,6 +12,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, arg, export
 from dissect.target.plugins.general.users import UserDetails
+from dissect.target.target import Target
 
 bitmap_cache_def = """
 // https://www.cert.ssi.gouv.fr/actualite/CERTFR-2016-ACT-017/
@@ -132,8 +133,8 @@ class BitmapTile:
 
 
 def parse_color_data(data: bytes, reverse_rows: bool = False, row_width: int = 64) -> bytes:
-    """Parse bitmap color data. 
-    
+    """Parse bitmap color data.
+
     Optionally can reverse the row order of the bitmap data, which is useful when parsing a
     bitmap that is top-down when you want it to be bottom-up (like in .bin files). Assumes 32 bits-per-pixel.
     """
@@ -217,13 +218,13 @@ def wrap_square_colors_in_border(colors: bytes, side_length: int, border_pixel: 
 def assemble_tiles_into_collage(tiles: list[BitmapTile], border_around_tile: int = 0) -> BitmapTile:
     """Assemble a list of tiles into one tile containing all color data."""
     tiles_in_row = 64
-    rows = [[]]
+    rows: list[list[bytes]] = [[]]
     current_row = 0
-    if border_around_tile > 0:
-        tile_length = 64 + (border_around_tile * 2)
 
-    else:
-        tile_length = 64
+    if not isinstance(border_around_tile, int) or border_around_tile < 0:
+        raise ValueError("Argument border_around_tile should be zero or a positive integer.")
+
+    tile_length = 64 + (border_around_tile * 2)
 
     padding_tile = EMPTY_PIXEL * tile_length * tile_length
 
@@ -246,28 +247,26 @@ def assemble_tiles_into_collage(tiles: list[BitmapTile], border_around_tile: int
     while len(rows[current_row]) < tiles_in_row:
         rows[current_row].append(padding_tile)
 
-    final_image = b""
+    final_image: list[bytes] = []
     for row in rows:
         # We can't dump every tile's color data one after another, as bitmaps go row-by-row. We 'slice' each horizontal
         # line from each tile, concat them to one another into one line of the final collage, and add that line to the
         # final image
-        vertical_image_line = b""
         for i in range(tile_length):
             for tile_color_data in row:
                 tile_data_size = tile_length * 4  # 4 bytes per pixel
                 offset = i * tile_data_size
                 line_from_tile = tile_color_data[offset : offset + tile_data_size]
-                vertical_image_line += line_from_tile
-        final_image += vertical_image_line
+                final_image.append(line_from_tile)
 
     collage_width = tiles_in_row * tile_length
     collage_height = tile_length * len(rows)
-    return BitmapTile(collage_width, collage_height, final_image)
+    return BitmapTile(collage_width, collage_height, b"".join(final_image))
 
 
 def extract_bin(fh: BinaryIO) -> Iterator[BitmapTile]:
-    """Extract bitmap tiles from a Cache000[1-4].bin bitmap cache file. 
-    
+    """Extract bitmap tiles from a Cache000[1-4].bin bitmap cache file.
+
     These files are found on modern Windows versions.
     """
     fh.seek(0)
