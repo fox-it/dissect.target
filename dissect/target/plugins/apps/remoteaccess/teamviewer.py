@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
@@ -13,7 +14,33 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
 )
 from dissect.target.plugins.general.users import UserDetails
 
-START_PATTERN = re.compile(r"^(\d{2}|\d{4})/")
+RE_LOG = re.compile(
+    r"""
+        ^
+        (?P<date>(\d{2,4}\/)?\d{2}\/\d{2})                  # YYYY/MM/DD or YY/MM/DD or MM/DD
+        \s
+        (?P<time>\d{2}\:\d{2}\:\d{2}(?:[\.\:]\d{3})?)       # HH:MM:SS or HH:MM:SS.FFF or HH:MM:SS:FFF
+        \s+
+        (?P<message>.+)
+        $
+    """,
+    re.VERBOSE,
+)
+RE_START = re.compile(
+    r"""
+        ^Start\:
+        \s+
+        (?P<date>\S+)
+        \s
+        (?P<time>\S+)
+        (
+            \s
+            \((?P<timezone>\S+)\)                           # UTC+2:00
+        )?
+        $
+    """,
+    re.VERBOSE,
+)
 
 
 class TeamViewerPlugin(RemoteAccessPlugin):
@@ -45,22 +72,22 @@ class TeamViewerPlugin(RemoteAccessPlugin):
     def __init__(self, target):
         super().__init__(target)
 
-        self.logfiles: list[list[TargetPath, UserDetails]] = []
+        self.logfiles: set[tuple[str, UserDetails | None]] = set()
 
         # Find system service log files.
         for log_glob in self.SYSTEM_GLOBS:
             for logfile in self.target.fs.glob(log_glob):
-                self.logfiles.append([logfile, None])
+                self.logfiles.add((logfile, None))
 
         # Find user log files.
         for user_details in self.target.user_details.all_with_home():
             for log_glob in self.USER_GLOBS:
                 for logfile in user_details.home_path.glob(log_glob):
-                    self.logfiles.append([logfile, user_details])
+                    self.logfiles.add((logfile, user_details))
 
     def check_compatible(self) -> None:
         if not len(self.logfiles):
-            raise UnsupportedPluginError("No Teamviewer logs found")
+            raise UnsupportedPluginError("No Teamviewer logs found on target")
 
     @export(record=RemoteAccessLogRecord)
     def logs(self) -> Iterator[RemoteAccessLogRecord]:
@@ -68,59 +95,107 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
         """
+
+        try:
+            target_tz = self.target.datetime.tzinfo
+
+        except Exception as e:
+            self.target.log.warning("Unable to determine target timezone, assuming UTC if no timezone is found in logs")
+            self.target.log.debug("", exc_info=e)
+            target_tz = timezone.utc
+
         for logfile, user_details in self.logfiles:
             logfile = self.target.fs.path(logfile)
 
             start_date = None
-            with logfile.open("rt") as file:
-                while True:
+            for line in logfile.open("rt", errors="replace"):
+                if not (line := line.strip()) or line.startswith("# "):
+                    continue
+
+                if line.startswith("Start:"):
                     try:
-                        line = file.readline()
-                    except UnicodeDecodeError:
+                        start_date = parse_start(line)
+                    except Exception as e:
+                        self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
+                        self.target.log.debug("", exc_info=e)
+
+                    continue
+
+                if not (match := RE_LOG.search(line)):
+                    self.target.log.warning("Skipping TeamViewer log line %r in %s", line, logfile)
+                    continue
+
+                log = match.groupdict()
+                date = log["date"]
+                time = log["time"]
+
+                # Older TeamViewer versions first mention the start time and then leave out the year,
+                # so we have to correct for the missing year in date.
+                if date.count("/") == 1:
+                    if not start_date:
+                        self.target.log.warning("Missing year in log line, skipping line %r in %s", line, logfile)
                         continue
+                    date = f"{start_date.year}/{log['date']}"
 
-                    # End of file, quit while loop
-                    if not line:
-                        break
+                # Correct for year if short notation for 2000 is used
+                if date.count("/") == 2 and len(date.split("/")[0]) == 2:
+                    date = "20" + date
 
-                    line = line.strip()
+                # Correct for ``:`` separator of milliseconds
+                if time.count(":") == 3:
+                    hms, _, ms = time.rpartition(":")
+                    time = f"{hms}.{ms}"
 
-                    # Skip empty lines
-                    if not line:
-                        continue
-                    # Older logs first mention the start time and then leave out the year
-                    if line.startswith("Start:"):
-                        start_date = datetime.strptime(line.split()[1], "%Y/%m/%d")
+                # Convert milliseconds to microseconds
+                if "." in time:
+                    hms, _, ms = time.rpartition(".")
+                    time = f"{hms}.{ms:0<6}"
+                else:
+                    time += ".000000"
 
-                    # Sometimes there are weird, mult-line/pretty print log messages.
-                    # We only parse the start line which starts with year (%Y/) or month (%m/)
-                    if not re.match(START_PATTERN, line):
-                        continue
-
-                    ts_day, ts_time, message = line.split(" ", 2)
-                    ts_time = ts_time.split(".")[0]
-
-                    # Correct for use of : as millisecond separator
-                    if ts_time.count(":") > 2:
-                        ts_time = ":".join(ts_time.split(":")[:3])
-                    # Correct for missing year in date
-                    if ts_day.count("/") == 1:
-                        if not start_date:
-                            self.target.log.debug("Missing year in log line, skipping line.")
-                            continue
-                        ts_day = f"{start_date.year}/{ts_day}"
-                    # Correct for year if short notation for 2000 is used
-                    if ts_day.count("/") == 2 and len(ts_day.split("/")[0]) == 2:
-                        ts_day = "20" + ts_day
-
-                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S").replace(
-                        tzinfo=timezone.utc
+                try:
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
+                        tzinfo=start_date.tzinfo if start_date else target_tz
                     )
+                except Exception as e:
+                    self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
+                    self.target.log.debug("", exc_info=e)
+                    timestamp = 0
 
-                    yield self.RemoteAccessLogRecord(
-                        ts=timestamp,
-                        message=message,
-                        source=logfile,
-                        _target=self.target,
-                        _user=user_details.user if user_details else None,
-                    )
+                yield self.RemoteAccessLogRecord(
+                    ts=timestamp,
+                    message=log.get("message"),
+                    source=logfile,
+                    _target=self.target,
+                    _user=user_details.user if user_details else None,
+                )
+
+
+def parse_start(line: str) -> datetime | None:
+    """TeamViewer ``Start`` messages can be formatted in different ways
+    and might contain the timezone offset of all timestamps.
+
+    .. code-block::
+
+        Start: 2021/11/11 12:34:56
+        Start: 2024/12/31 01:02:03.123 (UTC+2:00)
+    """
+
+    if match := RE_START.search(line):
+        dt = match.groupdict()
+
+        # Drop milliseconds
+        if "." in dt["time"]:
+            dt["time"] = dt["time"].rsplit(".")[0]
+
+        # Format timezone, e.g. "UTC+2:00" to "UTC+0200"
+        if dt["timezone"]:
+            name, operator, amount = re.split(r"(\+|\-)", dt["timezone"])
+            amount = int(amount.replace(":", ""))
+            dt["timezone"] = f"{name}{operator}{amount:0>4d}"
+
+        start_date = datetime.strptime(
+            f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
+            "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
+        )
+        return start_date
