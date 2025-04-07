@@ -98,7 +98,7 @@ class EvtxPlugin(WindowsEventlogsMixin, plugin.Plugin):
         except MalformedElfChnkException:
             pass
 
-    def _build_record(self, evtx_record: dict, source: Path) -> Record:
+    def _build_record(self, evtx_record: dict, source: Path | None) -> Record:
         # predictable order of fields in the list is important, since we'll
         # be constructing a record descriptor from it.
         evtx_record_fields = sorted(evtx_record.items())
