@@ -30,13 +30,14 @@ def test_ios_os(target_ios: Target, fs_ios: VirtualFilesystem) -> None:
     target_ios.add_plugin(IOSPlugin)
     target_ios.add_plugin(LocalePlugin)
     target_ios.add_plugin(IOSApplicationsPlugin)
+    target_ios.apply()
 
     assert target_ios.os == OperatingSystem.IOS
     assert target_ios.version == "iPhone OS 17.3 (21D50)"
     assert target_ios.architecture == "arm64-ios"
     assert target_ios.hostname == "This-Iss-iPhone"
     assert target_ios.timezone == "America/New_York"
-    # assert target_ios.language == ["en_US"]  # unable to test this in pytest for some reason
+    assert target_ios.language == ["en_US"]
 
     users = list(target_ios.users())
     assert len(users) == 43

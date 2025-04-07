@@ -1,4 +1,5 @@
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.localeutil import normalize_language
 from dissect.target.plugin import OperatingSystem, Plugin, export
 from dissect.target.plugins.os.unix.locale import timezone_from_path
 
@@ -19,4 +20,4 @@ class LocalePlugin(Plugin):
     @export(property=True)
     def language(self) -> list[str]:
         """Return the configured language(s) of the iOS system."""
-        return self.target._os._config.GLOBAL["AppleLanguages"]
+        return list(map(normalize_language, self.target._os._config.GLOBAL["AppleLanguages"]))
