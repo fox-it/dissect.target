@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
 from typing import Iterator
@@ -106,81 +108,70 @@ class TeamViewerPlugin(RemoteAccessPlugin):
             logfile = self.target.fs.path(logfile)
 
             start_date = None
-            with logfile.open("rt") as fh:
-                while True:
+            for line in logfile.open("rt", errors="replace"):
+                if not (line := line.strip()) or line.startswith("# "):
+                    continue
+
+                if line.startswith("Start:"):
                     try:
-                        line = fh.readline()
-                    except UnicodeDecodeError as e:
-                        self.target.log.warning("Unable to parse log line in %s: %s", logfile, e)
-                        self.target.log.debug("", exc_info=e)
-                        continue
-
-                    if not line:
-                        break
-
-                    if not (line := line.strip()) or line.startswith("# "):
-                        continue
-
-                    if line.startswith("Start:"):
-                        try:
-                            start_date = parse_start(line)
-                        except Exception as e:
-                            self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
-                            self.target.log.debug("", exc_info=e)
-
-                        continue
-
-                    if not (match := RE_LOG.search(line)):
-                        self.target.log.warning("Skipping TeamViewer log line %r in %s", line, logfile)
-                        continue
-
-                    log = match.groupdict()
-                    date = log["date"]
-                    time = log["time"]
-
-                    # Older TeamViewer versions first mention the start time and then leave out the year,
-                    # so we have to correct for the missing year in date.
-                    if date.count("/") == 1:
-                        if not start_date:
-                            self.target.log.warning("Missing year in log line, skipping line %r in %s", line, logfile)
-                            continue
-                        date = f"{start_date.year}/{log['date']}"
-
-                    # Correct for year if short notation for 2000 is used
-                    if date.count("/") == 2 and len(date.split("/")[0]) == 2:
-                        date = "20" + date
-
-                    # Correct for ``:`` separator of milliseconds
-                    if time.count(":") == 3:
-                        hms, _, ms = time.rpartition(":")
-                        time = f"{hms}.{ms}"
-
-                    # Convert milliseconds to microseconds
-                    if "." in time:
-                        hms, _, ms = time.rpartition(".")
-                        time = f"{hms}.{ms:06}"
-                    else:
-                        time += ".000000"
-
-                    try:
-                        timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
-                            tzinfo=start_date.tzinfo if start_date else target_tz
-                        )
+                        start_date = parse_start(line)
                     except Exception as e:
-                        self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
+                        self.target.log.warning("Failed to parse Start message %r in %s", line, logfile)
                         self.target.log.debug("", exc_info=e)
-                        timestamp = 0
 
-                    yield self.RemoteAccessLogRecord(
-                        ts=timestamp,
-                        message=log.get("message"),
-                        source=logfile,
-                        _target=self.target,
-                        _user=user_details.user if user_details else None,
+                    continue
+
+                if not (match := RE_LOG.search(line)):
+                    self.target.log.warning("Skipping TeamViewer log line %r in %s", line, logfile)
+                    continue
+
+                log = match.groupdict()
+                date = log["date"]
+                time = log["time"]
+
+                # Older TeamViewer versions first mention the start time and then leave out the year,
+                # so we have to correct for the missing year in date.
+                if date.count("/") == 1:
+                    if not start_date:
+                        self.target.log.warning("Missing year in log line, skipping line %r in %s", line, logfile)
+                        continue
+                    date = f"{start_date.year}/{log['date']}"
+
+                # Correct for year if short notation for 2000 is used
+                if date.count("/") == 2 and len(date.split("/")[0]) == 2:
+                    date = "20" + date
+
+                # Correct for ``:`` separator of milliseconds
+                if time.count(":") == 3:
+                    hms, _, ms = time.rpartition(":")
+                    time = f"{hms}.{ms}"
+
+                # Convert milliseconds to microseconds
+                if "." in time:
+                    hms, _, ms = time.rpartition(".")
+                    time = f"{hms}.{ms:06}"
+                else:
+                    time += ".000000"
+
+                try:
+                    timestamp = datetime.strptime(f"{date} {time}", "%Y/%m/%d %H:%M:%S.%f").replace(
+                        tzinfo=start_date.tzinfo if start_date else target_tz
                     )
+                except Exception as e:
+                    self.target.log.warning("Unable to parse timestamp %r in file %s", line, logfile)
+                    self.target.log.debug("", exc_info=e)
+                    timestamp = 0
+
+                yield self.RemoteAccessLogRecord(
+                    ts=timestamp,
+                    message=log.get("message"),
+                    source=logfile,
+                    _target=self.target,
+                    _user=user_details.user if user_details else None,
+                )
 
 
-def parse_start(line: str, tz_fallback: timezone = timezone.utc) -> datetime | None:
+def parse_start(line: str) -> datetime | None:
     """TeamViewer ``Start`` messages can be formatted in different ways
     and might contain the timezone offset of all timestamps.
 
