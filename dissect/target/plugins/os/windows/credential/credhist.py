@@ -133,6 +133,7 @@ class CredHistFile:
                     raw=entry,
                 )
         except EOFError:
+            # An empty CREDHIST file will be 24 bytes long and has dwNextLinkSize set to 0.
             pass
 
     def decrypt(self, password_hash: bytes) -> None:
@@ -178,6 +179,7 @@ class CredHistPlugin(Plugin):
     @export(record=CredHistRecord)
     def credhist(self) -> Iterator[CredHistRecord]:
         """Yield and decrypt all Windows CREDHIST entries on the target."""
+
         passwords = keychain_passwords()
 
         if not passwords:
