@@ -56,8 +56,8 @@ full = [
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
-    "dissect.fve>=4.2,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
-    "dissect.jffs>=1.5.dev,<2",     # TODO: update on release 
+    "dissect.fve>=4.2.dev,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",  # TODO: update on release
+    "dissect.jffs>=1.5.dev,<2",  # TODO: update on release
     "dissect.ole>=3,<4",
     "dissect.shellitem>=3,<4",
     "dissect.squashfs>=1,<2",
