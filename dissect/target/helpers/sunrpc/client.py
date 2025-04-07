@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import socket
+import sys
 from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
@@ -153,10 +154,12 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, cls.TCP_KEEPIDLE)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, cls.TCP_KEEPCNT)
+        if not sys.platform.startswith("darwin"):
+            # MacOS does not support TCP_KEEPIDLE, and TCP_KEEPALIVE is only available in Python 3.10
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, cls.TCP_KEEPIDLE)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, cls.TCP_KEEPINTVL)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, cls.TCP_KEEPCNT)
 
         local_port_int = local_port.value if isinstance(local_port, LocalPortPolicy) else local_port
         if local_port_int == LocalPortPolicy.PRIVILEGED:
