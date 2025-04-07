@@ -306,9 +306,10 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_man(self, line: str) -> bool:
         """alias for help"""
-        return self.do_help(line)
+        self.do_help(line)
+        return False
 
-    def complete_man(self, *args) -> list[str]:
+    def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
@@ -403,15 +404,15 @@ class TargetCmd(ExtendedCmd):
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
+        self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
+            else:
+                self.target.log.warning("{cwd} and {base} were not set inside PS1, using the default prompt")
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
-
-        else:
-            self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
 
         super().__init__(self.target.props.get("cyber"))
 

@@ -144,12 +144,36 @@ class DPAPIPlugin(InternalPlugin):
         """Cached map of username to SID."""
         return {user.name: user.sid for user in self.target.users()}
 
-    def decrypt_system_blob(self, data: bytes) -> bytes:
-        """Decrypt the given bytes using the SYSTEM master key."""
-        return self.decrypt_user_blob(data, sid=self.SYSTEM_SID)
+    def decrypt_system_blob(self, data: bytes, **kwargs) -> bytes:
+        """Decrypt the given bytes using the SYSTEM master key.
 
-    def decrypt_user_blob(self, data: bytes, username: str | None = None, sid: str | None = None) -> bytes:
-        """Decrypt the given bytes using the master key of the given SID or username."""
+        Args:
+            data: Bytes of DPAPI system blob to decrypt.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
+
+        Raises:
+            ValueError: When conditions to decrypt are not met or if decrypting failed.
+
+        Returns:
+            Decrypted bytes.
+        """  # noqa: E501
+        return self.decrypt_user_blob(data, sid=self.SYSTEM_SID, **kwargs)
+
+    def decrypt_user_blob(self, data: bytes, username: str | None = None, sid: str | None = None, **kwargs) -> bytes:
+        """Decrypt the given bytes using the master key of the given SID or username.
+
+        Args:
+            data: Bytes of DPAPI blob to decrypt.
+            username: Username of the owner of the DPAPI blob.
+            sid: SID of the owner of the DPAPI blob.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
+
+        Raises:
+            ValueError: When conditions to decrypt are not met or if decrypting failed.
+
+        Returns:
+            Decrypted bytes.
+        """  # noqa: E501
 
         if not sid and not username:
             raise ValueError("Either sid or username argument is required")
@@ -168,13 +192,24 @@ class DPAPIPlugin(InternalPlugin):
         if not (mk := self.master_keys.get(sid, {}).get(blob.guid)):
             raise ValueError(f"Blob is encrypted using master key {blob.guid} that we do not have for SID {sid}")
 
-        if not blob.decrypt(mk.key):
+        if not blob.decrypt(mk.key, **kwargs):
             raise ValueError(f"Failed to decrypt blob for SID {sid}")
 
         return blob.clear_text
 
-    def decrypt_blob(self, data: bytes) -> bytes:
-        """Attempt to decrypt the given bytes using any of the available master keys."""
+    def decrypt_blob(self, data: bytes, **kwargs) -> bytes:
+        """Attempt to decrypt the given bytes using any of the available master keys.
+
+        Args:
+            data: Bytes of DPAPI blob to decrypt.
+            **kwargs: Arbitrary named arguments to pass to :meth:`DPAPIBlob.decrypt <dissect.target.plugins.os.windows.dpapi.blob.Blob.decrypt>` function.
+
+        Raises:
+            ValueError: When conditions to decrypt are not met or if decrypting failed.
+
+        Returns:
+            Decrypted bytes.
+        """  # noqa: E501
         try:
             blob = DPAPIBlob(data)
         except EOFError as e:
@@ -182,7 +217,7 @@ class DPAPIPlugin(InternalPlugin):
 
         for user in self.master_keys:
             for mk in self.master_keys[user].values():
-                if blob.decrypt(mk.key):
+                if blob.decrypt(mk.key, **kwargs):
                     return blob.clear_text
 
         raise ValueError("Failed to decrypt blob using any available master key")
