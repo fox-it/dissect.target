@@ -148,8 +148,9 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
 @pytest.mark.parametrize(
     ("key", "keys", "expected_key"),
     [
-        ("source", {"source", "_target"}, "source_2"),
-        ("source", {"source", "source_2", "_target"}, "source_3"),
+        ("source", {"source", "_target"}, "source_2_duplicate"),
+        ("source", {"source", "source_2_duplicate", "_target"}, "source_3_duplicate"),
+        ("source", {"source", "source_2", "_target"}, "source_2_duplicate"),
     ],
 )
 def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
