@@ -33,6 +33,7 @@ class LSAPlugin(Plugin):
         - https://learn.microsoft.com/en-us/windows/win32/secauthn/lsa-authentication
         - https://moyix.blogspot.com/2008/02/decrypting-lsa-secrets.html (Windows XP)
         - https://github.com/fortra/impacket/blob/master/impacket/examples/secretsdump.py
+        - ReVaulting decryption and opportunities SANS Summit Prague 2015
     """
 
     __namespace__ = "lsa"
@@ -83,23 +84,31 @@ class LSAPlugin(Plugin):
 
     @cached_property
     def _secrets(self) -> dict[str, bytes] | None:
-        """Return dict of Windows system decrypted LSA secrets."""
+        """Return dict of Windows system decrypted LSA secrets.
+
+        Includes current values (``CurrVal``) and the previous value (``OldVal``).
+        Key names are suffixed with ``_OldVal`` if an old value is found in the registry.
+        """
         if not self.target.ntversion:
             raise ValueError("Unable to determine Windows NT version")
 
         result = {}
         for subkey in self.target.registry.key(self.SECURITY_POLICY_KEY).subkey("Secrets").subkeys():
-            enc_data = subkey.subkey("CurrVal").value("(Default)").value
+            for val in ["CurrVal", "OldVal"]:
+                try:
+                    enc_data = subkey.subkey(val).value("(Default)").value
+                except RegistryKeyNotFoundError:
+                    continue
 
-            # Windows Vista or newer
-            if float(self.target.ntversion) >= 6.0:
-                secret = _decrypt_aes(enc_data, self.lsakey)
+                # Windows Vista or newer
+                if float(self.target.ntversion) >= 6.0:
+                    secret = _decrypt_aes(enc_data, self.lsakey)
 
-            # Windows XP
-            else:
-                secret = _decrypt_des(enc_data, self.lsakey)
+                # Windows XP
+                else:
+                    secret = _decrypt_des(enc_data, self.lsakey)
 
-            result[subkey.name] = secret
+                result[f"{subkey.name}{'_OldVal' if val == 'OldVal' else ''}"] = secret
 
         return result
 
