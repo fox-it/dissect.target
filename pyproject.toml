@@ -56,7 +56,7 @@ full = [
     "dissect.extfs>=3,<4",
     "dissect.fat>=3,<4",
     "dissect.ffs>=3,<4",
-    "dissect.fve>=4,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.fve>=4.2,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "dissect.jffs>=1.5.dev,<2",     # TODO: update on release 
     "dissect.ole>=3,<4",
     "dissect.shellitem>=3,<4",
@@ -93,7 +93,7 @@ dev = [
     "dissect.extfs[dev]>=3.0.dev,<4.0.dev",
     "dissect.fat[dev]>=3.0.dev,<4.0.dev",
     "dissect.ffs[dev]>=3.0.dev,<4.0.dev",
-    "dissect.fve[dev]>=4.0.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.fve[dev]>=4.2.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
     "dissect.hypervisor[dev]>=3.0.dev,<4.0.dev",
     "dissect.jffs[dev]>=1.5.dev,<2.0.dev",
     "dissect.ntfs[dev]>=3.4.dev,<4.0.dev",
