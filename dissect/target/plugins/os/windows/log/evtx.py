@@ -190,7 +190,7 @@ def unique_key(key: str, dictionary: dict[str, Any], count: int | None = None) -
     is desired.
     """
     count = count or 2
-    new_key = f"{key}_{count}"
+    new_key = f"{key}_{count}_duplicate"
 
     if new_key in dictionary:
         return unique_key(key, dictionary, count + 1)
