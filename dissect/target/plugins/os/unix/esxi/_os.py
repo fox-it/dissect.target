@@ -18,7 +18,6 @@ from dissect.sql import sqlite3
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.sunrpc import client
 from dissect.target.helpers.sunrpc.client import LocalPortPolicy
-from dissect.target.loaders.local import LocalLoader
 
 try:
     from dissect.hypervisor.util.envelope import (
@@ -220,6 +219,7 @@ class ESXiPlugin(UnixPlugin):
             return
 
         for key, nfs_share in nfs_shares.items():
+            # Parse the NFS share configuration
             user_value: dict[str, Any] = nfs_share.get("user_value", {})
             nfs_ip = user_value.get("hostname", "")
             volume_name = user_value.get("volume_name", "")
@@ -232,23 +232,24 @@ class ESXiPlugin(UnixPlugin):
 
     def _add_nfs(self, nfs_ip: str, remote_share: str, mount_point: str) -> None:
         """Mount NFS share to the target."""
-        if not isinstance(self.target._loader, LocalLoader):
-            return
 
-        if "enable-nfs" not in self.target.path_query:
-            log.warning(
-                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-                nfs_ip,
-                remote_share,
-                mount_point,
-            )
+        if not self._check_nfs_enabled(nfs_ip, remote_share, mount_point):
             return
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", remote_share, mount_point)
+
+            # On ESXi, there is typically only a single root user.
+            # Besides, UnixPlugin::users does not work (see issue https://github.com/fox-it/dissect.target/issues/1093).
+            # Moreover, socket rebinding is not implemented on ESXi.
+            # Therefore, we try logging only as root. This implies that he NFS share has `no_root_squash` enabled.
+            # According to the docs, ESxi mounts NFS shares using root privileges (https://www.vmware.com/docs/vmw-best-practices-running-nfs-vmware-vsphere)  # noqa: E501
             credentials = client.auth_unix("machine", 0, 0, [])
             nfs = NfsFilesystem.connect(nfs_ip, remote_share, credentials, LocalPortPolicy.PRIVILEGED)
             self.target.fs.mount(mount_point, nfs)
+            # Actually, on disk the mount point is a symlink to /vmfs/volumes/<uuid>.
+            # This UUID is not stored in the config store, but derived from the NFS share ip and path.
+            # Unfortunately, the details of the UUID generation are unknown.
         except Exception as e:
             self.target.log.warning("Failed to mount NFS share %s:%s at %s", nfs_ip, remote_share, mount_point)
             self.target.log.debug("", exc_info=e)

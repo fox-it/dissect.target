@@ -290,9 +290,9 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
-    def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+    def _check_nfs_enabled(self, address: str, exported_dir: str, mount_point: str) -> bool:
         if not isinstance(self.target._loader, LocalLoader):
-            return
+            return False
 
         if "enable-nfs" not in self.target.path_query:
             log.warning(
@@ -301,6 +301,12 @@ class UnixPlugin(OSPlugin):
                 exported_dir,
                 mount_point,
             )
+            return False
+
+        return True
+
+    def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if not self._check_nfs_enabled(address, exported_dir, mount_point):
             return
 
         # Try all users to see if we can access the share
