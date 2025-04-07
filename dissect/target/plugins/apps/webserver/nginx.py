@@ -117,8 +117,6 @@ class NginxPlugin(WebserverPlugin):
             for log_name in self.ERROR_LOG_NAMES:
                 self.error_paths.update(log_dir.glob(f"{log_name}*"))
 
-        seen = set()
-
         # Check for custom paths in NGINX install config
         for config_file in self.DEFAULT_CONFIG_PATHS:
             if "*" in config_file:
@@ -151,14 +149,14 @@ class NginxPlugin(WebserverPlugin):
             if "access_log " in line:
                 if access_log := RE_ACCESS_LOG_DIRECTIVE.search(line):
                     access_log = self.target.fs.path(access_log["path"])
-                    self.access_paths.update(access_log.parent.glob(f"{access_log.name}*")
+                    self.access_paths.update(access_log.parent.glob(f"{access_log.name}*"))
                 else:
                     self.target.log.warning("Unable to parse nginx access_log line %r in %s", line, path)
 
             elif "error_log " in line:
                 if error_log := RE_ERROR_LOG_DIRECTIVE.search(line):
                     error_log = self.target.fs.path(error_log["path"])
-                    self.error_paths.update(error_log.parent.glob(f"{error_log.name}*")
+                    self.error_paths.update(error_log.parent.glob(f"{error_log.name}*"))
                 else:
                     self.target.log.warning("Unable to parse NGINX error_log line %r in %s", line, path)
 
