@@ -125,4 +125,4 @@ class SophosPlugin(Plugin):
                             _target=self.target,
                         )
                     except Exception as error:
-                        self.target.log.warning(f"Error: {error} on log line: {line}.")
+                        self.target.log.warning("Error: %s on log line: %s", error, line)
