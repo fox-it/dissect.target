@@ -84,7 +84,7 @@ class SophosPlugin(Plugin):
                         _target=self.target,
                     )
             except Exception as error:
-                self.target.log.error(f"Error occurred during reading alerts: %s", error)
+                self.target.log.error("Error occurred during reading alerts: %s", error)
 
     @export(record=SophosLogRecord)
     def sophoshomelogs(self) -> Iterator[SophosLogRecord]:
@@ -125,4 +125,4 @@ class SophosPlugin(Plugin):
                             _target=self.target,
                         )
                     except Exception as error:
-                        self.target.log.warning("Error: %s on log line: %s", error, line)
+                        self.target.log.warning("Error: {error} on log line: {line}.")
