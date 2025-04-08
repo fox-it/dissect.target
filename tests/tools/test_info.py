@@ -26,7 +26,7 @@ def test_target_info(
                 "volumes": [],
                 "children": [],
                 "hostname": "ubuntu",
-                "domain": None,
+                "domain": "localhost",
                 "ips": ["1.2.3.4"],
                 "os_family": "linux",
                 "os_version": "Ubuntu 22.04.4 LTS (Jammy Jellyfish)",
@@ -40,7 +40,7 @@ def test_target_info(
         elif output_type == "record":
             assert (
                 stdout
-                == "<target/info hostname='ubuntu' domain=None last_activity=None install_date=2024-07-02 12:00:56+00:00 ips=[net.ipaddress('1.2.3.4')] os_family='linux' os_version='Ubuntu 22.04.4 LTS (Jammy Jellyfish)' architecture=None language=[] timezone='Europe/Amsterdam' disks=[] volumes=[] children=[]>\n"  # noqa: E501
+                == "<target/info hostname='ubuntu' domain='localhost' last_activity=None install_date=2024-07-02 12:00:56+00:00 ips=[net.ipaddress('1.2.3.4')] os_family='linux' os_version='Ubuntu 22.04.4 LTS (Jammy Jellyfish)' architecture=None language=[] timezone='Europe/Amsterdam' disks=[] volumes=[] children=[]>\n"  # noqa: E501
             )
 
         else:

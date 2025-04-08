@@ -102,13 +102,16 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
     ("hostname_content", "hosts_content", "expected_hostname", "expected_domain"),
     [
         (b"", b"", "localhost", "localhost"),
-        (b"", b"127.0.0.1 mydomain", "localhost", "mydomain"),
+        (b"", b"127.0.0.1 mydomain", "mydomain", "mydomain"),
         (b"", b"127.0.0.1 localhost", "localhost", "localhost"),
         (b"myhost", b"", "myhost", "localhost"),
         (b"myhost.mydomain", b"", "myhost", "mydomain"),
         (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
         (b"myhost.mydomain", b"127.0.0.1 localhost", "myhost", "mydomain"),
         (b"myhost.localhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mycoolerdomain", b"127.0.0.1 mydomain", "myhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 mydomain", "localhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 localhost", "localhost", "mycoolerdomain"),
     ],
 )
 def test_parse_domain(

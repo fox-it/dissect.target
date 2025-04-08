@@ -86,7 +86,7 @@ def dhcp(fake_plist: dict) -> Iterator[dict]:
             "fake_plist",
             [
                 (0, "hostname", ["dummys Mac"]),
-                (0, "domain", ["None"]),
+                (0, "domain", ["localhost"]),
                 (0, "name", ["en0"]),
                 (0, "type", ["Ethernet"]),
                 (0, "ip", ["192.122.13.34"]),
