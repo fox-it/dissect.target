@@ -15,11 +15,6 @@ from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
 
-ContainerImageTarSubLoader: TarSubLoader = import_lazy(
-    "dissect.target.loaders.containerimage"
-).ContainerImageTarSubLoader
-GenericTarSubLoader: TarSubLoader = import_lazy("dissect.target.loaders.tar").GenericTarSubLoader
-
 log = logging.getLogger(__name__)
 
 TAR_EXT_COMP = (
@@ -38,7 +33,7 @@ TAR_MAGIC_COMP = (
     # gzip
     b"\x1f\x8b",
     # bzip2
-    b"\x42\x5A\x68",
+    b"\x42\x5a\x68",
     # xz
     b"\xfd\x37\x7a\x58\x5a\x00",
 )
@@ -46,59 +41,12 @@ TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
-
-class TarLoader(Loader):
-    """Load tar files."""
-
-    __subloaders__ = [
-        ContainerImageTarSubLoader,
-        GenericTarSubLoader,  # should be last
-    ]
-
-    def __init__(self, path: Path | str, **kwargs):
-        super().__init__(path)
-
-        if isinstance(path, str):
-            path = Path(path)
-
-        if is_compressed(path):
-            log.warning(
-                f"Tar file {path!r} is compressed, which will affect performance. "
-                "Consider uncompressing the archive before passing the tar file to Dissect."
-            )
-
-        self.fh = path.open("rb")
-        self.tar = tf.open(mode="r:*", fileobj=self.fh)
-        self.subloader = None
-
-    @staticmethod
-    def detect(path: Path) -> bool:
-        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
-
-    def map(self, target: target.Target) -> None:
-        for candidate in self.__subloaders__:
-            if candidate.detect(self.tar):
-                self.subloader = candidate(self.tar)
-                self.subloader.map(target)
-                break
-
-
-def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
-    if not path.is_file():
-        return False
-
-    with path.open("rb") as fh:
-        headers = [fh.read(6)]
-        fh.seek(257)
-        headers.append(fh.read(8))
-        for header in headers:
-            if header.startswith(magics):
-                return True
-    return False
-
-
-def is_compressed(path: Path) -> bool:
-    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
+WINDOWS_MEMBERS = (
+    "windows/system32",
+    "/windows/system32",
+    "winnt",
+    "/winnt",
+)
 
 
 class TarSubLoader(SubLoader[tf.TarFile]):
@@ -130,15 +78,22 @@ class GenericTarSubLoader(TarSubLoader):
 
     def map(self, target: target.Target) -> None:
         volumes = {}
+        windows_found = False
 
         for member in self.tar.getmembers():
             if member.name == ".":
                 continue
 
+            if member.name.lower().startswith(WINDOWS_MEMBERS):
+                windows_found = True
+                if "/" in volumes:
+                    # Root filesystem was already added
+                    volumes["/"].case_sensitive = False
+
             if not member.name.startswith(("/fs/", "fs/", "/sysvol/", "sysvol/")):
                 # Not an acquire tar
                 if "/" not in volumes:
-                    vol = filesystem.VirtualFilesystem(case_sensitive=True)
+                    vol = filesystem.VirtualFilesystem(case_sensitive=not windows_found)
                     vol.tar = self.tar
                     volumes["/"] = vol
                     target.filesystems.add(vol)
@@ -197,3 +152,57 @@ class GenericTarSubLoader(TarSubLoader):
             )
 
             target.fs.mount(vol_name, vol)
+
+
+class TarLoader(Loader):
+    """Load tar files."""
+
+    __subloaders__ = [
+        import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
+        GenericTarSubLoader,  # should be last
+    ]
+
+    def __init__(self, path: Path | str, **kwargs):
+        super().__init__(path)
+
+        if isinstance(path, str):
+            path = Path(path)
+
+        if is_compressed(path):
+            log.warning(
+                f"Tar file {path!r} is compressed, which will affect performance. "
+                "Consider uncompressing the archive before passing the tar file to Dissect."
+            )
+
+        self.fh = path.open("rb")
+        self.tar = tf.open(mode="r:*", fileobj=self.fh)
+        self.subloader = None
+
+    @staticmethod
+    def detect(path: Path) -> bool:
+        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
+
+    def map(self, target: target.Target) -> None:
+        for candidate in self.__subloaders__:
+            if candidate.detect(self.tar):
+                self.subloader = candidate(self.tar)
+                self.subloader.map(target)
+                break
+
+
+def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
+    if not path.is_file():
+        return False
+
+    with path.open("rb") as fh:
+        headers = [fh.read(6)]
+        fh.seek(257)
+        headers.append(fh.read(8))
+        for header in headers:
+            if header.startswith(magics):
+                return True
+    return False
+
+
+def is_compressed(path: Path) -> bool:
+    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)
