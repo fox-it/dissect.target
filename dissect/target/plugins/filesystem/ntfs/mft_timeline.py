@@ -35,4 +35,3 @@ class MftTimelinePlugin(Plugin):
             "The `mft_timeline` function is deprecated in favor of `mft.timeline` and will be removed in dissect.target 3.24",
         )
         return MftPlugin(self.target).timeline(ignore_dos)
-

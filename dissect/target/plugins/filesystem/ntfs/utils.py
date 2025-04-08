@@ -6,6 +6,7 @@ from uuid import UUID
 
 from dissect.ntfs.exceptions import FileNotFoundError
 from dissect.ntfs.mft import MftRecord
+
 from dissect.target import Target
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 

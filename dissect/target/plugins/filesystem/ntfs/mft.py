@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Callable
 
-from flow.record import Record
-from flow.record.fieldtypes import windows_path
-
 from dissect.ntfs.attr import Attribute, FileName, StandardInformation
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
 from dissect.ntfs.mft import MftRecord
+from flow.record import Record
+from flow.record.fieldtypes import windows_path
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin, arg, export

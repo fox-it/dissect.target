@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
-
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
+
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
