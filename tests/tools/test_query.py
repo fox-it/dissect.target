@@ -301,3 +301,18 @@ def test_target_query_list_json(capsys: pytest.CaptureFixture, monkeypatch: pyte
         "alias": False,
         "path": "os.windows.credential.sam.sam",
     }
+
+
+def test_target_query_record_stream_write_exception_handling(
+    capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """test if we correctly print the function name of the iterator that failed to iterate."""
+
+    with monkeypatch.context() as m:
+        m.setattr("sys.argv", ["target-query", "-f", "users,walkfs", "tests/_data/loaders/tar/test-archive.tar.gz"])
+
+        with patch("dissect.target.tools.query.record_output", return_value=None):
+            target_query()
+            _, err = capsys.readouterr()
+
+    assert "Exception occurred while processing output of WalkFSPlugin.walkfs:" in err
