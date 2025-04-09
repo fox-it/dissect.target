@@ -153,12 +153,10 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def domain(self) -> str | None:
-        domain = self._domain or "localhost"
-        if domain == "localhost":
-            domain = self._hosts_dict.get("hostname", "localhost")
-            if domain == self.hostname:
-                return domain  # domain likely not defined, so localhost is the domain.
-        return domain
+        if self._domain is None or self._domain == "localhost":
+            # fall back to /etc/hosts file
+            return self._hosts_dict.get("hostname")
+        return self._domain
 
     @export(property=True)
     def os(self) -> str:
@@ -227,7 +225,7 @@ class UnixPlugin(OSPlugin):
                     for line in fs.path(path).open("rt").readlines():
                         if not (line := line.split()):
                             continue
-                        if line[0].startswith(("127.0.", "::1")) and line[1].lower() != "localhost":
+                        if line[0].startswith(("127.0.", "::1")):
                             hosts_string = {"ip": line[0], "hostname": line[1]}
         return hosts_string
 
