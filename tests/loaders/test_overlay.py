@@ -1,21 +1,34 @@
 from __future__ import annotations
 
+from io import BytesIO
 from typing import TYPE_CHECKING
 
-from dissect.target.loaders.overlay import Overlay2Loader
+from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.loaders.overlay import OverlayLoader
+from tests.plugins.apps.container.test_podman import target_unix_podman  # noqa: F401
 
 if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_overlay_loader_docker(target_linux_docker: Target) -> None:
-    for container in target_linux_docker.fs.path("/var/lib/docker/image/overlay2/layerdb/mounts/").iterdir():
-        assert Overlay2Loader.detect(container)
-        loader = Overlay2Loader(container)
-        loader.map(target_linux_docker)
+def test_overlay_loader_oci_podman(target_bare: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we correctly detect and map a Podman OCI container."""
 
-    assert len(target_linux_docker.filesystems) == 4
+    base = "/home/user/.local/share/containers/storage/overlay/f351129587e2bb1da9ba4f03dcd22e1c838cd4f20dcc70e6da72381d2905b913"  # noqa: E501
+    fs_unix.makedirs(base)
+    fs_unix.makedirs(f"{base}/diff")
+    fs_unix.makedirs(f"{base}/work")
+    fs_unix.map_file_fh(f"{base}/link", BytesIO(b""))
+    fs_unix.map_file_fh(f"{base}/lower", BytesIO(b""))
 
-    container_fs = target_linux_docker.filesystems[1]
-    assert len(container_fs.layers) == 4
-    assert len(list(container_fs.path("/").iterdir())) == 18
+    fs_unix.map_file_fh(f"{base}/diff/test.txt", BytesIO(b"example"))
+
+    assert OverlayLoader.detect(fs_unix.path(base))
+
+    loader = OverlayLoader(fs_unix.path(base))
+    loader.map(target_bare)
+    target_bare.apply()
+
+    assert len(target_bare.filesystems) == 1
+
+    assert list(map(str, target_bare.fs.path("/").iterdir())) == ["/test.txt"]
