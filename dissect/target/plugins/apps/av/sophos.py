@@ -84,7 +84,7 @@ class SophosPlugin(Plugin):
                         _target=self.target,
                     )
             except Exception as error:
-                self.target.log.error("Error occurred during reading alerts: %s", error)
+                self.target.log.error("Error occurred during reading alerts: %r.", error)
 
     @export(record=SophosLogRecord)
     def sophoshomelogs(self) -> Iterator[SophosLogRecord]:
@@ -103,6 +103,7 @@ class SophosPlugin(Plugin):
             for line in self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le"):
                 if line.find(self.MARKER_INFECTION) > -1:
                     try:
+                        raise Exception
                         ts, json_data = line.split(" ", maxsplit=2)
                         details = json.loads(json_data)
 
@@ -125,4 +126,4 @@ class SophosPlugin(Plugin):
                             _target=self.target,
                         )
                     except Exception as error:
-                        self.target.log.warning(f"Error: {error} on log line: {line}.")
+                        self.target.log.warning("Error: %r on log line: %s.", error, line)
