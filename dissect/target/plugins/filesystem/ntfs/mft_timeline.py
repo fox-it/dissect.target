@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from dissect.target.plugin import Plugin, arg, export
@@ -30,8 +31,9 @@ class MftTimelinePlugin(Plugin):
 
         References:
             - https://docs.microsoft.com/en-us/windows/win32/fileio/master-file-table
-        """
-        self.target.log.warning(
-            "The `mft_timeline` function is deprecated in favor of `mft.timeline` and will be removed in dissect.target 3.24",
+        """  # noqa: E501
+        warnings.warn(
+            "The `mft_timeline` function is deprecated in favor of `mft.timeline` and will be removed in dissect.target 3.24",  # noqa: E501
+            FutureWarning,
         )
         return MftPlugin(self.target).timeline(ignore_dos)

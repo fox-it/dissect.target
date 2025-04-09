@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator, Optional
@@ -12,7 +11,6 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
-warnings.simplefilter(action="ignore", category=FutureWarning)
 log = logging.getLogger(__name__)
 
 SchedLgURecord = TargetRecordDescriptor(

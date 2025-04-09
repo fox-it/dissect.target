@@ -1,10 +1,9 @@
 import datetime
-import warnings
 from typing import Iterator, Optional
 
-from dissect.cstruct import cstruct
 from flow.record import GroupedRecord
 
+from dissect.cstruct import cstruct
 from dissect.target.exceptions import InvalidTaskError
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -18,8 +17,6 @@ from dissect.target.plugins.os.windows.tasks.records import (
     WeeklyTriggerRecord,
 )
 from dissect.target.target import Target
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 atjob_def = """
 struct PRIORITY {
