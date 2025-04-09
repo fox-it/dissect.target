@@ -450,7 +450,7 @@ class Target:
     def reload(self) -> Target:
         """Reload the current target.
 
-        Using the loaded with which the target was originally loaded,
+        Using the loader with which the target was originally loaded,
         reload the path of the current target.
         This is useful when the target is live.
 
