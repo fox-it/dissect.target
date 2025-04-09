@@ -296,7 +296,7 @@ def test_target_diff_shell(capsys: pytest.CaptureFixture, monkeypatch: pytest.Mo
         m.setattr("sys.stdin", StringIO("ls changes"))
         target_diff()
         out, err = capsys.readouterr()
-        out = out.replace("(diff) src_target.localhost/dst_target.localhost:/$", "").strip()
+        out = out.replace("(diff) src_target/dst_target:/$", "").strip()
 
         expected = [
             "changed (modified)",

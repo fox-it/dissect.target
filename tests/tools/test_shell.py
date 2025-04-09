@@ -318,7 +318,7 @@ def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Captu
     target_path = absolute_path("_data/tools/info/image.tar")
     dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
     ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
-    assert dir_out == "ubuntu.localhost:/$ " + ls_out + "ubuntu.localhost:/$ \n"
+    assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
 
 
 def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
@@ -329,39 +329,39 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
     list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls xxl='ls -la'\nlist")
     sys.stdout.flush()
     ls_out, _ = run_target_shell(monkeypatch, capsys, target_path, "ls")
-    assert list_out == "ubuntu.localhost:/$ " + ls_out
+    assert list_out == "ubuntu:/$ " + ls_out
 
     # list aliases
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
-    assert out == "ubuntu.localhost:/$ alias list=ls\nalias xxl=ls -la\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias list=ls\nalias xxl=ls -la\nubuntu:/$ \n"
 
     # list single aliases
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list")
-    assert out == "ubuntu.localhost:/$ alias list=ls\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
 
     # unalias
     sys.stdout.flush()
     run_target_shell(monkeypatch, capsys, target_path, "unalias xxl")
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
-    assert out == "ubuntu.localhost:/$ alias list=ls\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias list=ls\nubuntu:/$ \n"
 
     # unalias multiple and non-existant
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "unalias list abc")
-    assert out == "ubuntu.localhost:/$ alias abc not found\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias abc not found\nubuntu:/$ \n"
 
     # alias multiple broken - b will be empty
     sys.stdout.flush()
     run_target_shell(monkeypatch, capsys, target_path, "alias a=1 b=")
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias")
-    assert out == "ubuntu.localhost:/$ alias a=1\nalias b=\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias a=1\nalias b=\nubuntu:/$ \n"
 
     # alias set/get mixed
     sys.stdout.flush()
     out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias b=1 a")
-    assert out == "ubuntu.localhost:/$ alias a=1\nubuntu.localhost:/$ \n"
+    assert out == "ubuntu:/$ alias a=1\nubuntu:/$ \n"
 
     # alias with other symbols not allowed due to parser difference
     sys.stdout.flush()
@@ -406,7 +406,7 @@ def test_shell_prompt_tab_autocomplete() -> None:
     child.setwinsize(100, 100)
 
     # note that the expect pattern will be re.compiled so we need to escape regex special characters
-    child.expect(re.escape("ubuntu.localhost:/$ "), timeout=20)
+    child.expect(re.escape("ubuntu:/$ "), timeout=20)
     # this should auto complete to `ls /home/user`
     child.sendline("ls /home/u\t")
     # expect the prompt to be printed again
@@ -415,7 +415,7 @@ def test_shell_prompt_tab_autocomplete() -> None:
     child.send("\n")
     # we expect the files in /home/user to be printed
     child.expect(re.escape(".bash_history\r\n.zsh_history\r\n"), timeout=5)
-    child.expect(re.escape("ubuntu.localhost:/$ "), timeout=5)
+    child.expect(re.escape("ubuntu:/$ "), timeout=5)
 
     # send partial ls /etc/ command
     child.send("ls /etc/")
@@ -432,6 +432,6 @@ def test_shell_prompt_tab_autocomplete() -> None:
     child.expect("shadow\r\ntimezone\r\n", timeout=5)
 
     # exit the shell
-    child.expect(re.escape("ubuntu.localhost:/$ "), timeout=5)
+    child.expect(re.escape("ubuntu:/$ "), timeout=5)
     child.sendline("exit")
     child.expect(pexpect.EOF, timeout=5)
