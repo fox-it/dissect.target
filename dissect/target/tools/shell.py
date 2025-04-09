@@ -594,8 +594,8 @@ class TargetCli(TargetCmd):
 
         TargetCmd.__init__(self, target)
         self._clicache = {}
-        self.cwd = None
-        self.chdir("/")
+        # Force to root, using `chdir` causes `None` to propagate throughout the class methods.
+        self.cwd = self.target.fs.path("/")
 
     @property
     def prompt(self) -> str:
@@ -683,8 +683,8 @@ class TargetCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         """Change directory to the given path."""
-        if path := self.check_dir(path):
-            self.cwd = path
+        if dir := self.check_dir(path):
+            self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
         """change directory"""
@@ -722,7 +722,8 @@ class TargetCli(TargetCmd):
     def do_reload(self, line: str) -> bool:
         """reload the target"""
         self.target = self.target.reload()
-        self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
+        if self.cwd:
+            self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
         return False
 
     @arg("path", nargs="?")
