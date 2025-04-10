@@ -84,15 +84,18 @@ class LocalePlugin(Plugin):
             "/etc/sysconfig/i18n",
         ]
 
-        found_languages = []
+        found_languages = set()
 
         for locale_path in locale_paths:
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        found_languages.append(normalize_language(line.replace("LANG=", "").strip().strip('"')))
+                        lang_str = line.partition("=")[-1].strip().strip('"')
+                        if lang_str == "C.UTF-8":  # Skip if no locales are installed.
+                            continue
+                        found_languages.add(normalize_language(lang_str))
 
-        return found_languages
+        return list(found_languages)
 
     @export(record=UnixKeyboardRecord)
     def keyboard(self) -> Iterator[UnixKeyboardRecord]:

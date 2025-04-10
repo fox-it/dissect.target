@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -100,6 +102,38 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
+    ("hostname_content", "hosts_content", "expected_hostname", "expected_domain"),
+    [
+        (b"", b"", "localhost", None),
+        (b"", b"127.0.0.1 mydomain", "mydomain", "mydomain"),
+        (b"", b"127.0.0.1 localhost", "localhost", "localhost"),
+        (b"myhost", b"", "myhost", None),
+        (b"myhost.mydomain", b"", "myhost", "mydomain"),
+        (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mydomain", b"127.0.0.1 localhost", "myhost", "mydomain"),
+        (b"myhost.localhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mycoolerdomain", b"127.0.0.1 mydomain", "myhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 mydomain", "localhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 localhost", "localhost", "mycoolerdomain"),
+    ],
+)
+def test_parse_domain(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    hostname_content: bytes,
+    hosts_content: bytes,
+    expected_domain: str,
+    expected_hostname: str,
+) -> None:
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(hostname_content))
+    fs_unix.map_file_fh("/etc/hosts", BytesIO(hosts_content))
+    target_unix.add_plugin(UnixPlugin)
+
+    assert target_unix.hostname == expected_hostname
+    assert target_unix.domain == expected_domain
+
+
+@pytest.mark.parametrize(
     ("path", "expected_hostname", "expected_domain", "file_content"),
     [
         ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
@@ -122,16 +156,16 @@ def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
-    expected_hostname: str,
-    expected_domain: str,
+    expected_hostname: str | None,
+    expected_domain: str | None,
     file_content: str,
 ) -> None:
     fs_unix.map_file_fh(path, BytesIO(file_content))
 
-    hostname_dict = target_unix._os._parse_hostname_string()
+    hostname, domain = target_unix._os._parse_hostname_string()
 
-    assert hostname_dict["hostname"] == expected_hostname
-    assert hostname_dict["domain"] == expected_domain
+    assert hostname == expected_hostname
+    assert domain == expected_domain
 
 
 def test_users(target_unix_users: Target) -> None:

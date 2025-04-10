@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from flow.record.fieldtypes import posix_path
 
@@ -49,7 +49,7 @@ class UnixPlugin(OSPlugin):
         super().__init__(target)
         self._add_mounts()
         self._add_devices()
-        self._hostname_dict = self._parse_hostname_string()
+        self._hostname, self._domain = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
 
@@ -156,21 +156,57 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        hosts_string = self._hosts_dict.get("hostname", "localhost")
-        return self._hostname_dict.get("hostname", hosts_string)
+        return self._hostname or self._hosts_dict.get("hostname", "localhost")
 
     @export(property=True)
     def domain(self) -> str | None:
-        domain = self._hostname_dict.get("domain", "localhost")
-        if domain == "localhost":
-            domain = self._hosts_dict["hostname", "localhost"]
-            if domain == self.hostname:
-                return domain  # domain likely not defined, so localhost is the domain.
-        return domain
+        if self._domain is None or self._domain == "localhost":
+            # fall back to /etc/hosts file
+            return self._hosts_dict.get("hostname")
+        return self._domain
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.UNIX.value
+
+    def _parse_hostname_string(
+        self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None
+    ) -> tuple[str | None, str | None]:
+        """Returns a tuple containing respectively the hostname and domain name portion of the path(s) specified.
+
+        Args:
+            paths (list): list of tuples with paths and callables to parse the path or None
+
+        Returns:
+            Tuple with hostname and domain strings.
+        """
+        hostname = None
+        domain = None
+
+        paths = paths or [
+            ("/etc/hostname", None),
+            ("/etc/HOSTNAME", None),
+            ("/proc/sys/kernel/hostname", None),
+            ("/etc/sysconfig/network", self._parse_rh_legacy),
+            ("/etc/hosts", self._parse_etc_hosts),  # fallback if no other hostnames are found
+        ]
+
+        for path, callable in paths:
+            if not (path := self.target.fs.path(path)).exists():
+                continue
+
+            if callable:
+                hostname = callable(path)
+            else:
+                hostname = path.open("rt").read().rstrip()
+
+            if hostname and "." in hostname:
+                hostname, domain = hostname.split(".", maxsplit=1)
+
+            break  # break whenever a valid hostname is found
+
+        # Can be an empty string due to splitting of hostname and domain
+        return hostname or None, domain or None
 
     def _parse_rh_legacy(self, path: Path) -> str | None:
         hostname = None
@@ -181,53 +217,22 @@ class UnixPlugin(OSPlugin):
             _, _, hostname = line.rstrip().partition("=")
         return hostname
 
-    def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
-        """Returns a dict containing the hostname and domain name portion of the path(s) specified.
-
-        Args:
-            paths (list): list of paths
-        """
-        redhat_legacy_path = "/etc/sysconfig/network"
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/proc/sys/kernel/hostname", redhat_legacy_path]
-        hostname_dict = {"hostname": None, "domain": None}
-
-        for path in paths:
-            path = self.target.fs.path(path)
-
-            if not path.exists():
-                continue
-
-            if path.as_posix() == redhat_legacy_path:
-                hostname_string = self._parse_rh_legacy(path)
-            else:
-                hostname_string = path.open("rt").read().rstrip()
-
-            if hostname_string and "." in hostname_string:
-                hostname_string = hostname_string.split(".", maxsplit=1)
-                hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-            elif hostname_string != "":
-                hostname_dict = {"hostname": hostname_string, "domain": None}
-            else:
-                hostname_dict = {"hostname": None, "domain": None}
-            break  # break whenever a valid hostname is found
-
-        return hostname_dict
+    def _parse_etc_hosts(self, path: Path) -> str | None:
+        for line in path.open("rt"):
+            if line.startswith(("127.0.0.1 ", "::1 ")) and "localhost" not in line:
+                return line.split(" ")[1]
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
-        hosts_string = {"ip": None, "hostname": None}
+        hosts_string = {}
 
         for path in paths:
             for fs in self.target.filesystems:
                 if fs.exists(path):
                     for line in fs.path(path).open("rt").readlines():
-                        line = line.split()
-                        if not line:
+                        if not (line := line.split()):
                             continue
-
-                        if (line[0].startswith("127.0.") or line[0].startswith("::1")) and line[
-                            1
-                        ].lower() != "localhost":
+                        if line[0].startswith(("127.0.", "::1")):
                             hosts_string = {"ip": line[0], "hostname": line[1]}
         return hosts_string
 
