@@ -309,7 +309,7 @@ class MRUPlugin(Plugin):
 
 
 def parse_mru_key(
-    target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor
+    target: Target, key: RegistryKey, record: TargetRecordDescriptor
 ) -> Iterator[UserRegistryRecordDescriptor]:
     user = target.registry.get_user(key)
 
