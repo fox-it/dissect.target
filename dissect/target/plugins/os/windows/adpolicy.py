@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from struct import unpack
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 from dissect.cstruct import cstruct
@@ -18,6 +20,12 @@ from dissect.regf.c_regf import (
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 policy_def = """
 struct registry_policy_header {
@@ -50,7 +58,7 @@ class ADPolicyPlugin(Plugin):
         - https://docs.microsoft.com/en-us/previous-versions/windows/desktop/policy/registry-policy-file-format
     """
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.paths = "windows/sysvol/domain/policies/", "windows/system32/GroupPolicy/DataStore/"
         self.dirs = []
@@ -63,7 +71,7 @@ class ADPolicyPlugin(Plugin):
         if len([d for d in self.dirs if d.exists()]) <= 0:
             raise UnsupportedPluginError("No AD policy directories found")
 
-    def _xmltasks(self, policy_dir):
+    def _xmltasks(self, policy_dir: Path) -> Iterator[ADPolicyRecord]:
         for task_file in policy_dir.rglob("ScheduledTasks.xml"):
             try:
                 task_file_stat = task_file.stat()
@@ -87,8 +95,8 @@ class ADPolicyPlugin(Plugin):
                         path=task_file,
                         _target=self.target,
                     )
-            except Exception as error:
-                self.target.log.warning("Unable to read XML policy file: %s", error)
+            except Exception as e:  # noqa: PERF203
+                self.target.log.warning("Unable to read XML policy file: %s", e)
 
     @export(record=ADPolicyRecord)
     def adpolicy(self) -> Iterator[ADPolicyRecord]:
@@ -159,18 +167,19 @@ class ADPolicyPlugin(Plugin):
                     )
 
 
-def _decode_policy_reg_data(policy_reg_type, policy_reg_data):
+def _decode_policy_reg_data(policy_reg_type: int, policy_reg_data: bytes) -> bytes | str | int | None:
     if policy_reg_data is None or policy_reg_type == REG_NONE:
         return policy_reg_data
-    elif policy_reg_type in (REG_EXPAND_SZ, REG_SZ, REG_MULTI_SZ, REG_LINK):
+    if policy_reg_type in (REG_EXPAND_SZ, REG_SZ, REG_MULTI_SZ, REG_LINK):
         # REG_SZ, REG_MULTI_SZ, and REG_EXPAND_SZ types get a null terminating character added. We remove that here.
         # ref: https://docs.microsoft.com/en-us/windows/win32/sysinfo/registry-value-types
         return policy_reg_data.decode("utf-16-le").rstrip("\x00")
-    elif policy_reg_type == REG_DWORD:
+    if policy_reg_type == REG_DWORD:
         return unpack("i", policy_reg_data)[0]
-    elif policy_reg_type == REG_DWORD_BIG_ENDIAN:
+    if policy_reg_type == REG_DWORD_BIG_ENDIAN:
         return unpack(">i", policy_reg_data)[0]
-    elif policy_reg_type == REG_QWORD:
+    if policy_reg_type == REG_QWORD:
         return unpack("q", policy_reg_data)[0]
-    elif policy_reg_type == REG_BINARY:
+    if policy_reg_type == REG_BINARY:
         return policy_reg_data
+    return None

@@ -1,7 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
-def test_users_plugin(target_win_users, fs_win, tmp_path):
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+def test_users_plugin(target_win_users: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
     users = list(target_win_users.users())
     assert len(users) == 2
 
@@ -26,17 +36,17 @@ def test_users_plugin(target_win_users, fs_win, tmp_path):
     assert len(users_with_home) == 1  # only John has a home dir
 
 
-def test_users_plugin_find_no_params(target_unix_users):
-    with pytest.raises(ValueError):
+def test_users_plugin_find_no_params(target_unix_users: Target) -> None:
+    with pytest.raises(ValueError, match="Either sid or uid or username is expected"):
         target_unix_users.user_details.find()
 
 
-def test_users_plugin_find_no_usser(target_unix_users):
+def test_users_plugin_find_no_usser(target_unix_users: Target) -> None:
     user_details = target_unix_users.user_details.find(uid=13)
     assert user_details is None
 
 
-def test_users_plugin_find_uid0(target_unix_users):
+def test_users_plugin_find_uid0(target_unix_users: Target) -> None:
     user_details = target_unix_users.user_details.find(uid=0)
     assert user_details is not None
     assert user_details.user.uid == 0

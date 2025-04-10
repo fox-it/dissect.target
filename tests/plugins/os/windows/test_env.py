@@ -1,5 +1,7 @@
-from collections import OrderedDict, namedtuple
-from typing import Iterator
+from __future__ import annotations
+
+from collections import OrderedDict
+from typing import TYPE_CHECKING, NamedTuple
 from unittest import mock
 
 import pytest
@@ -9,13 +11,26 @@ from dissect.target.plugins.os.windows.env import (
     EnvVarDetails,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
+
 PATHEXTS = [".ext_1", ".ext_2"]
 
-MockUser = namedtuple("user", ["name", "home", "sid"])(
+
+class _MockUser(NamedTuple):
+    name: str
+    home: str
+    sid: str
+
+
+MockUser = _MockUser(
     "test-user",
     "test-user-home",
     "test-user-sid",
 )
+
 
 TEST_VARIABLES = [
     EnvVarDetails(
@@ -69,9 +84,11 @@ TEST_USER_ENV_VARS = (
 def env_plugin() -> Iterator[EnvironmentVariablePlugin]:
     mock_target = mock.Mock()
 
-    def registry_value_side_effect(key, value):
-        Value = namedtuple("Value", "value")
-        return Value(key)
+    class _MockValue(NamedTuple):
+        value: str
+
+    def registry_value_side_effect(key: RegistryKey, value: str) -> _MockValue:
+        return _MockValue(key)
 
     mock_registry_value = mock.Mock(side_effect=registry_value_side_effect)
     mock_target.registry.value = mock_registry_value
@@ -129,14 +146,13 @@ def test__get_env_vars(env_plugin: EnvironmentVariablePlugin) -> None:
 
 
 def test__get_system_env_vars(env_plugin: EnvironmentVariablePlugin) -> None:
-    with mock.patch.object(env_plugin, "_get_env_vars"):
-        with mock.patch.object(env_plugin, "_expand_env_vars"):
-            env_plugin._get_system_env_vars()
-            env_plugin._get_env_vars.assert_called_with(env_plugin.VARIABLES)
-            env_plugin._expand_env_vars.assert_called_with(env_plugin._get_env_vars.return_value)
+    with mock.patch.object(env_plugin, "_get_env_vars"), mock.patch.object(env_plugin, "_expand_env_vars"):
+        env_plugin._get_system_env_vars()
+        env_plugin._get_env_vars.assert_called_with(env_plugin.VARIABLES)
+        env_plugin._expand_env_vars.assert_called_with(env_plugin._get_env_vars.return_value)
 
 
-@pytest.mark.parametrize("user, results", TEST_USER_ENV_VARS)
+@pytest.mark.parametrize(("user", "results"), TEST_USER_ENV_VARS)
 def test__get_user_env_vars(
     env_plugin: EnvironmentVariablePlugin, user: MockUser, results: tuple[tuple[str, str]]
 ) -> None:
@@ -149,23 +165,22 @@ def test__get_user_env_vars(
         assert env_vars[variable] == value
 
 
-@pytest.mark.parametrize("user, _", TEST_USER_ENV_VARS)
-def test_expand_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, _) -> None:
+@pytest.mark.parametrize(("user", "results"), TEST_USER_ENV_VARS)
+def test_expand_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, results: tuple[tuple[str, str]]) -> None:
     path = "mock"
 
-    with mock.patch.object(env_plugin, "_get_user_env_vars"):
-        with mock.patch.object(env_plugin, "_expand_env"):
-            user_sid = None
-            if user:
-                user_sid = user.sid
-            expanded_path = env_plugin.expand_env(path, user_sid)
-            env_plugin._get_user_env_vars.assert_called_with(user_sid)
-            env_plugin._expand_env.assert_called_with(path, env_plugin._get_user_env_vars.return_value)
-            assert expanded_path == env_plugin._expand_env.return_value
+    with mock.patch.object(env_plugin, "_get_user_env_vars"), mock.patch.object(env_plugin, "_expand_env"):
+        user_sid = None
+        if user:
+            user_sid = user.sid
+        expanded_path = env_plugin.expand_env(path, user_sid)
+        env_plugin._get_user_env_vars.assert_called_with(user_sid)
+        env_plugin._expand_env.assert_called_with(path, env_plugin._get_user_env_vars.return_value)
+        assert expanded_path == env_plugin._expand_env.return_value
 
 
-@pytest.mark.parametrize("user, _", TEST_USER_ENV_VARS)
-def test_user_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, _) -> None:
+@pytest.mark.parametrize(("user", "results"), TEST_USER_ENV_VARS)
+def test_user_env(env_plugin: EnvironmentVariablePlugin, user: MockUser, results: tuple[tuple[str, str]]) -> None:
     with mock.patch.object(env_plugin, "_get_user_env_vars"):
         user_sid = None
         if user:
@@ -183,24 +198,26 @@ def test_env(env_plugin: EnvironmentVariablePlugin) -> None:
 
 
 def test_environment_variables(env_plugin: EnvironmentVariablePlugin) -> None:
-    with mock.patch.object(env_plugin, "_get_system_env_vars", side_effect=lambda: {"sys-name": "sys-value"}):
-        with mock.patch.object(env_plugin, "_get_user_env_vars", side_effect=lambda _: {"usr-name": "usr-value"}):
-            records = list(env_plugin.environment_variables())
-            # unwind the generator, so all functions are called
-            [_ for _ in records]
-            env_plugin._get_system_env_vars.assert_called()
-            env_plugin._get_user_env_vars.assert_called_once_with(MockUser.sid)
-            assert records[0].name == "sys-name"
-            assert records[0].value == "sys-value"
-            assert records[0].username is None
-            assert records[1].name == "usr-name"
-            assert records[1].value == "usr-value"
-            assert records[1].username == "test-user"
+    with (
+        mock.patch.object(env_plugin, "_get_system_env_vars", side_effect=lambda: {"sys-name": "sys-value"}),
+        mock.patch.object(env_plugin, "_get_user_env_vars", side_effect=lambda _: {"usr-name": "usr-value"}),
+    ):
+        records = list(env_plugin.environment_variables())
+        # unwind the generator, so all functions are called
+        list(records)
+        env_plugin._get_system_env_vars.assert_called()
+        env_plugin._get_user_env_vars.assert_called_once_with(MockUser.sid)
+        assert records[0].name == "sys-name"
+        assert records[0].value == "sys-value"
+        assert records[0].username is None
+        assert records[1].name == "usr-name"
+        assert records[1].value == "usr-value"
+        assert records[1].username == "test-user"
 
 
 def test__get_pathext(env_plugin: EnvironmentVariablePlugin) -> None:
     pathexts = env_plugin.pathext
-    pathexts = sorted(tuple(pathexts))
+    pathexts = sorted(pathexts)
     assert pathexts == PATHEXTS
 
 

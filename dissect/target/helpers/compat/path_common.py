@@ -4,9 +4,11 @@ import io
 import posixpath
 import stat
 import sys
-from typing import IO, TYPE_CHECKING, Iterator, Literal
+from typing import IO, TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import TargetPath
 
@@ -21,7 +23,7 @@ try:
     from pathlib import _PathParents
 
     class _DissectPathParents(_PathParents):
-        __slots__ = ("_fs", "_flavour")
+        __slots__ = ("_flavour", "_fs")
 
         def __init__(self, path: TargetPath):
             super().__init__(path)
@@ -83,7 +85,7 @@ class _DissectScandirIterator:
     def __next__(self, *args) -> FilesystemEntry:
         return next(self._iterator, *args)
 
-    def close(self):
+    def close(self) -> None:
         # close() is not defined in the various filesystem implementations. The
         # python ScandirIterator does define the interface however.
         pass
@@ -157,9 +159,8 @@ def _joinrealpath(fs: Filesystem, path: str, rest: str, strict: bool, seen: dict
             if strict:
                 # Raise OSError(errno.ELOOP)
                 raise SymlinkRecursionError(newpath)
-            else:
-                # Return already resolved part + rest of the path unchanged.
-                return posixpath.join(newpath, rest), False
+            # Return already resolved part + rest of the path unchanged.
+            return posixpath.join(newpath, rest), False
         seen[newpath] = None  # not resolved symlink
         path, ok = _joinrealpath(fs, path, normalize(fs.readlink(newpath)), strict, seen)
         if not ok:
@@ -186,7 +187,7 @@ def io_open(
     """
     modes = set(mode)
     if modes - set("rbt") or len(mode) > len(modes):
-        raise ValueError("invalid mode: %r" % mode)
+        raise ValueError(f"invalid mode: {mode!r}")
 
     reading = "r" in modes
     binary = "b" in modes
@@ -216,10 +217,10 @@ def io_open(
     result = raw
 
     line_buffering = False
-    if buffering == 1 or buffering < 0 and raw.isatty():
+    if buffering == 1 or (buffering < 0 and raw.isatty()):
         buffering = -1
         line_buffering = True
-    if buffering < 0 or text and buffering == 0:
+    if buffering < 0 or (text and buffering == 0):
         buffering = io.DEFAULT_BUFFER_SIZE
     if buffering == 0:
         if binary:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume import lvm
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +48,7 @@ class LvmVolumeSystem(LogicalVolumeSystem):
         for pvs in devices.values():
             try:
                 yield cls(pvs, disk=[pv.fh for pv in pvs])
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod

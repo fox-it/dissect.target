@@ -3,8 +3,10 @@ from __future__ import annotations
 import csv
 import logging
 from enum import Enum
-from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -78,7 +80,7 @@ def register_keychain_file(keychain_path: Path) -> None:
 
         provider,key_type,identifier,value
 
-    Values in columns `key_type` and `value` are required, `provider` and `identifier` are optional.
+    Values in columns ``key_type`` and ``value`` are required, ``provider`` and ``identifier`` are optional.
     Example of the CSV-serialised data:
 
         bitlocker,recovery_key,,312268-409816-583517-486695-627121-599511-664389-145640

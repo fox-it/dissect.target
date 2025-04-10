@@ -1,11 +1,9 @@
 from __future__ import annotations
 
+import datetime
 import re
-from datetime import datetime, timezone, tzinfo
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -17,6 +15,12 @@ from dissect.target.plugins.os.unix.log.helpers import (
     is_iso_fmt,
     iso_readlines,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 MessagesRecord = TargetRecordDescriptor(
     "linux/log/messages",
@@ -69,19 +73,18 @@ class MessagesPlugin(Plugin):
             - https://www.geeksforgeeks.org/file-timestamps-mtime-ctime-and-atime-in-linux/
             - https://cloudinit.readthedocs.io/en/latest/development/logging.html#logging-command-output
         """
-
-        tzinfo = self.target.datetime.tzinfo
+        target_tz = self.target.datetime.tzinfo
 
         for log_file in self.log_files:
             if "cloud-init" in log_file.name:
-                yield from self._parse_cloud_init_log(log_file, tzinfo)
+                yield from self._parse_cloud_init_log(log_file, target_tz)
                 continue
 
             if is_iso_fmt(log_file):
                 iterable = iso_readlines(log_file)
 
             else:
-                iterable = year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo)
+                iterable = year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, target_tz)
 
             for ts, line in iterable:
                 match = RE_LINE.search(line)
@@ -97,7 +100,9 @@ class MessagesPlugin(Plugin):
                     _target=self.target,
                 )
 
-    def _parse_cloud_init_log(self, log_file: Path, tzinfo: tzinfo | None = timezone.utc) -> Iterator[MessagesRecord]:
+    def _parse_cloud_init_log(
+        self, log_file: Path, tzinfo: datetime.tzinfo | None = datetime.timezone.utc
+    ) -> Iterator[MessagesRecord]:
         """Parse a cloud-init.log file.
 
         Lines are structured in the following format:
@@ -130,15 +135,15 @@ class MessagesPlugin(Plugin):
                 # https://github.com/canonical/cloud-init/blob/main/cloudinit/log/loggers.py#DEFAULT_LOG_FORMAT
                 # https://docs.python.org/3/library/logging.html#asctime
                 raw_ts, _, milliseconds = values["ts"].rpartition(",")
-                raw_ts += "," + str((int(milliseconds) * 1000)).zfill(6)
+                raw_ts += "," + str(int(milliseconds) * 1000).zfill(6)
 
                 try:
-                    ts = datetime.strptime(raw_ts, ts_fmt).replace(tzinfo=tzinfo)
+                    ts = datetime.datetime.strptime(raw_ts, ts_fmt).replace(tzinfo=tzinfo)
 
                 except ValueError as e:
                     self.target.log.warning("Timestamp '%s' does not match format '%s'", raw_ts, ts_fmt)
                     self.target.log.debug("", exc_info=e)
-                    ts = datetime(1970, 1, 1, 0, 0, 0, 0)
+                    ts = datetime.datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime.timezone.utc)
 
                 yield MessagesRecord(
                     ts=ts,

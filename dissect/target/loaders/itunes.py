@@ -4,8 +4,7 @@ import hashlib
 import plistlib
 import struct
 from io import BytesIO
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from dissect.sql import sqlite3
 from dissect.util.plist import NSKeyedArchiver
@@ -16,6 +15,9 @@ from dissect.target.helpers import fsutil, keychain
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
     from dissect.target.target import Target
 
 try:
@@ -66,7 +68,7 @@ class ITunesLoader(Loader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
 
         self.backup = ITunesBackup(self.path)
 
@@ -76,7 +78,7 @@ class ITunesLoader(Loader):
                     if key.identifier == self.backup.identifier:
                         self.backup.open(key.value)
                         break
-                    elif not key.identifier:
+                    if not key.identifier:
                         try:
                             self.backup.open(key.value)
                             break
@@ -118,7 +120,7 @@ class ITunesBackup:
     def identifier(self) -> str:
         return self.info["Unique Identifier"]
 
-    def open(self, password: Optional[str] = None, kek: Optional[bytes] = None) -> None:
+    def open(self, password: str | None = None, kek: bytes | None = None) -> None:
         """Open the backup.
 
         Opens the Manifest.db file. Requires a password if the backup is encrypted.
@@ -196,14 +198,14 @@ class FileInfo:
         return self.metadata["Size"]
 
     @property
-    def encryption_key(self) -> Optional[str]:
+    def encryption_key(self) -> str | None:
         return self.metadata.get("EncryptionKey")
 
     def get(self) -> Path:
         """Return a Path object to the underlying file."""
         return self.backup.root / self.file_id[:2] / self.file_id
 
-    def create_cipher(self):
+    def create_cipher(self) -> Any:
         """Return a new AES cipher for this file."""
         if not self.backup.encrypted:
             raise TypeError("File is not encrypted")
@@ -250,7 +252,7 @@ class ClassKey:
         wrap_type: int,
         key_type: int,
         wrapped_key: bytes,
-        public_key: Optional[bytes] = None,
+        public_key: bytes | None = None,
     ):
         self.uuid = uuid
         self.protection_class = protection_class
@@ -262,7 +264,7 @@ class ClassKey:
         self.key = None
 
     @classmethod
-    def from_bag_dict(cls, data: dict[str, Union[bytes, int]]) -> ClassKey:
+    def from_bag_dict(cls, data: dict[str, bytes | int]) -> ClassKey:
         return cls(
             data.get("UUID"),
             data.get("CLAS"),
@@ -385,7 +387,7 @@ def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc") -> A
             raise ValueError(f"Invalid key size: {key_size}")
 
         return _pystandalone.cipher(f"aes-{key_size * 8}-{mode}", key, iv)
-    elif HAS_CRYPTO:
+    if HAS_CRYPTO:
         mode_map = {
             "cbc": (AES.MODE_CBC, True),
             "ecb": (AES.MODE_ECB, False),
@@ -393,5 +395,4 @@ def _create_cipher(key: bytes, iv: bytes = b"\x00" * 16, mode: str = "cbc") -> A
         mode_id, has_iv = mode_map[mode]
         kwargs = {"iv": iv} if has_iv else {}
         return AES.new(key, mode_id, **kwargs)
-    else:
-        raise RuntimeError("No crypto module available")
+    raise RuntimeError("No crypto module available")

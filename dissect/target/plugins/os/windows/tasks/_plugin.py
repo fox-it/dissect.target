@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from flow.record import GroupedRecord
 
-from dissect.target import Target
 from dissect.target.exceptions import InvalidTaskError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.tasks.job import AtTask
 from dissect.target.plugins.os.windows.tasks.xml import ScheduledTasks
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 TaskRecord = TargetRecordDescriptor(
     "filesystem/windows/task",
@@ -78,16 +82,16 @@ class TasksPlugin(Plugin):
         target: The target system.
     """
 
-    PATHS = {
+    PATHS = (
         "sysvol/windows/system32/tasks",
         "sysvol/windows/system32/tasks_migrated",
         "sysvol/windows/syswow64/tasks",
         "sysvol/windows/tasks",  # at.exe job file location
-    }
-    GLOB_PATHS = [
+    )
+    GLOB_PATHS = (
         "sysvol/windows/system32/GroupPolicy/DataStore/*/Machine/Preferences/ScheduledTasks/*",
         "sysvol/ProgramData/Microsoft/*/Preferences/ScheduledTasks/*",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -125,6 +129,8 @@ class TasksPlugin(Plugin):
         Yields:
             The scheduled tasks found on the target.
         """
+        target_tz = self.target.datetime.tzinfo
+
         for task_file in self.task_files:
             if not task_file.suffix or task_file.suffix == ".xml":
                 try:
@@ -134,11 +140,11 @@ class TasksPlugin(Plugin):
                     self.target.log.debug("", exc_info=e)
                     continue
             else:
-                task_objects = [AtTask(task_file, self.target)]
+                task_objects = [AtTask(task_file, target_tz)]
 
             for task_object in task_objects:
                 record_kwargs = {}
-                for attr in TaskRecord.fields.keys():
+                for attr in TaskRecord.fields:
                     record_kwargs[attr] = getattr(task_object, attr, None)
 
                 record = TaskRecord(**record_kwargs, _target=self.target)

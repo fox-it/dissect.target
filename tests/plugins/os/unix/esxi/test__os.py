@@ -1,11 +1,11 @@
 from unittest.mock import patch
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.esxi._os import (
     _create_local_fs,
     _decrypt_crypto_util,
 )
+from dissect.target.target import Target
 
 
 def test__create_tar_fs_no_envelope(target_linux: Target, fs_unix: VirtualFilesystem) -> None:

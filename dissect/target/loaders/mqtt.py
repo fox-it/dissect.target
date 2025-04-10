@@ -9,14 +9,14 @@ import re
 import ssl
 import sys
 import time
-import urllib
+import urllib.parse
 from dataclasses import dataclass
 from functools import lru_cache
 from getpass import getpass
 from pathlib import Path
 from struct import pack, unpack_from
 from threading import Thread
-from typing import Any, Callable, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, TypeVar
 
 import paho.mqtt.client as mqtt
 from dissect.util.stream import AlignedStream
@@ -25,19 +25,25 @@ from dissect.target.containers.raw import RawContainer
 from dissect.target.exceptions import LoaderError
 from dissect.target.loader import Loader
 from dissect.target.plugin import arg
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 DISK_INDEX_OFFSET = 9
 
+R = TypeVar("R")
 
-def suppress(func: Callable) -> Callable:
-    def suppressed(*args, **kwargs):
+
+def suppress(func: Callable[..., R]) -> Callable[..., R | None]:
+    def suppressed(*args, **kwargs) -> Any:
         try:
             return func(*args, **kwargs)
         except Exception:
-            return
+            return None
 
     return suppressed
 
@@ -59,13 +65,13 @@ class SeekMessage:
     data: bytes = b""
 
 
-class MQTTTransferRatePerSecond:
+class MqttTransferRatePerSecond:
     def __init__(self, window_size: int = 10):
         self.window_size = window_size
         self.timestamps = []
         self.bytes = []
 
-    def record(self, timestamp: float, byte_count: int) -> MQTTTransferRatePerSecond:
+    def record(self, timestamp: float, byte_count: int) -> MqttTransferRatePerSecond:
         while self.timestamps and (timestamp - self.timestamps[0] > self.window_size):
             self.timestamps.pop(0)
             self.bytes.pop(0)
@@ -87,19 +93,18 @@ class MQTTTransferRatePerSecond:
         return total_bytes / elapsed_time
 
 
-class MQTTStream(AlignedStream):
-    def __init__(self, stream: MQTTConnection, disk_id: int, size: Optional[int] = None):
+class MqttStream(AlignedStream):
+    def __init__(self, stream: MqttConnection, disk_id: int, size: int | None = None):
         self.stream = stream
         self.disk_id = disk_id
         super().__init__(size)
 
     def _read(self, offset: int, length: int, optimization_strategy: int = 0) -> bytes:
-        data = self.stream.read(self.disk_id, offset, length, optimization_strategy)
-        return data
+        return self.stream.read(self.disk_id, offset, length, optimization_strategy)
 
 
-class MQTTDiagnosticLine:
-    def __init__(self, connection: MQTTConnection, total_peers: int):
+class MqttDiagnosticLine:
+    def __init__(self, connection: MqttConnection, total_peers: int):
         self.connection = connection
         self.total_peers = total_peers
         self._columns, self._rows = os.get_terminal_size(0)
@@ -148,7 +153,7 @@ class MQTTDiagnosticLine:
         logo = "TARGETD"
 
         start = time.time()
-        transfer_rate = MQTTTransferRatePerSecond(window_size=7)
+        transfer_rate = MqttTransferRatePerSecond(window_size=7)
 
         while True:
             time.sleep(0.05)
@@ -193,7 +198,7 @@ class MQTTDiagnosticLine:
         t.start()
 
 
-class MQTTConnection:
+class MqttConnection:
     broker = None
     host = None
     prev = -1
@@ -215,7 +220,7 @@ class MQTTConnection:
             time.sleep(1)
         return self.broker.peers(self.host)
 
-    def info(self) -> list[MQTTStream]:
+    def info(self) -> list[MqttStream]:
         disks = []
         self.broker.info(self.host)
 
@@ -224,7 +229,7 @@ class MQTTConnection:
             message = self.broker.disk(self.host)
 
         for idx, disk in enumerate(message.disks):
-            disks.append(MQTTStream(self, idx, disk.total_size))
+            disks.append(MqttStream(self, idx, disk.total_size))
 
         return disks
 
@@ -276,9 +281,9 @@ class Broker:
     username = None
     password = None
 
-    diskinfo = {}
-    index = {}
-    topo = {}
+    diskinfo: ClassVar[dict] = {}
+    index: ClassVar[dict] = {}
+    topo: ClassVar[dict] = {}
     factor = 1
 
     def __init__(
@@ -292,7 +297,7 @@ class Broker:
         self.case = case
         self.username = username
         self.password = password
-        self.command = kwargs.get("command", None)
+        self.command = kwargs.get("command")
 
     def clear_cache(self) -> None:
         self.index = {}
@@ -329,7 +334,7 @@ class Broker:
         for i in range(self.factor):
             sublength = int(read_length / self.factor)
             start = i * sublength
-            key = f"{hostname}-{disk_id}-{seek_address+start}-{sublength}"
+            key = f"{hostname}-{disk_id}-{seek_address + start}-{sublength}"
             if key in self.index:
                 continue
 
@@ -351,7 +356,7 @@ class Broker:
         try:
             decoded_payload = payload.decode("utf-8")
         except UnicodeDecodeError as e:
-            log.error(f"Failed to decode payload for hostname {hostname}: {e}")
+            log.exception("Failed to decode payload for hostname %s: %s", hostname, e)  # noqa: TRY401
             return
 
         print(decoded_payload)
@@ -425,8 +430,7 @@ class Broker:
 
 
 def strictly_positive(value: str) -> int:
-    """
-    Validates that the provided value is a strictly positive integer.
+    """Validates that the provided value is a strictly positive integer.
 
     This function is intended to be used as a type for argparse arguments.
 
@@ -441,16 +445,16 @@ def strictly_positive(value: str) -> int:
     """
     try:
         strictly_positive_value = int(value)
-        if strictly_positive_value < 1:
-            raise argparse.ArgumentTypeError("Value must be larger than or equal to 1.")
-        return strictly_positive_value
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid integer value specified: '{value}'")
 
+    if strictly_positive_value < 1:
+        raise argparse.ArgumentTypeError("Value must be larger than or equal to 1.")
+    return strictly_positive_value
+
 
 def port(value: str) -> int:
-    """
-    Convert a string value to an integer representing a valid port number.
+    """Convert a string value to an integer representing a valid port number.
 
     This function is intended to be used as a type for argparse arguments.
 
@@ -464,16 +468,16 @@ def port(value: str) -> int:
 
     try:
         port = int(value)
-        if port < 1 or port > 65535:
-            raise argparse.ArgumentTypeError("Port number must be between 1 and 65535.")
-        return port
     except ValueError:
         raise argparse.ArgumentTypeError(f"Invalid port number specified: '{value}'")
 
+    if port < 1 or port > 65535:
+        raise argparse.ArgumentTypeError("Port number must be between 1 and 65535.")
+    return port
+
 
 def case(value: str) -> str:
-    """
-    Validates that the given value is a valid case name consisting of
+    """Validates that the given value is a valid case name consisting of
     alphanumeric characters and underscores only.
 
     This function is intended to be used as a type for argparse arguments.
@@ -516,46 +520,47 @@ def case(value: str) -> str:
 @arg("--mqtt-diag", action="store_true", dest="diag", help="show MQTT diagnostic information")
 @arg("--mqtt-username", dest="username", default="mqtt-loader", help="Username for connection")
 @arg("--mqtt-password", action="store_true", dest="password", help="Ask for password before connecting")
-class MQTTLoader(Loader):
+class MqttLoader(Loader):
     """Load remote targets through a broker."""
 
     connection = None
     broker = None
-    peers = []
+    peers: ClassVar[list] = []
 
-    def __init__(self, path: Union[Path, str], **kwargs):
-        super().__init__(path)
-        cls = MQTTLoader
+    def __init__(self, path: Path, **kwargs):
+        super().__init__(path, **kwargs, resolve=False)
+        cls = MqttLoader
         self.broker = cls.broker
-        self.connection = MQTTConnection(self.broker, path)
+        self.connection = MqttConnection(self.broker, path)
 
     @staticmethod
     def detect(path: Path) -> bool:
         return False
 
-    def find_all(path: Path, **kwargs) -> Iterator[str]:
-        cls = MQTTLoader
+    @staticmethod
+    def find_all(path: Path, parsed_path: urllib.parse.ParseResult | None = None) -> Iterator[str]:
+        cls = MqttLoader
         num_peers = 1
 
-        if cls.broker is None:
-            if (uri := kwargs.get("parsed_path")) is None:
-                raise LoaderError("No URI connection details have been passed.")
+        if parsed_path is None:
+            raise LoaderError("No URI connection details have been passed.")
 
-            options = dict(urllib.parse.parse_qsl(uri.query, keep_blank_values=True))
+        if cls.broker is None:
+            options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True))
             if options.get("password"):
                 options["password"] = getpass()
             cls.broker = Broker(**options)
             cls.broker.connect()
             num_peers = int(options.get("peers", 1))
-            cls.connection = MQTTConnection(cls.broker, path)
-            if options.get("diag", None):
+            cls.connection = MqttConnection(cls.broker, path)
+            if options.get("diag"):
                 cls.broker.monitor = True
-                MQTTDiagnosticLine(cls.connection, num_peers).start()
+                MqttDiagnosticLine(cls.connection, num_peers).start()
         else:
-            cls.connection = MQTTConnection(cls.broker, path)
+            cls.connection = MqttConnection(cls.broker, path)
 
         cls.peers = cls.connection.topo(num_peers)
-        yield from cls.peers
+        yield from (f"mqtt://{peer}?{parsed_path.query}" for peer in cls.peers)
 
     def map(self, target: Target) -> None:
         for disk in self.connection.info():

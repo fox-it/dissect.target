@@ -1,23 +1,25 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import print_function
+from __future__ import annotations
 
 import argparse
 import itertools
 import logging
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import (
     RegistryError,
     RegistryKeyNotFoundError,
     TargetError,
 )
-from dissect.target.helpers.regutil import RegistryKey
+from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
 )
+
+if TYPE_CHECKING:
+    from dissect.target.helpers.regutil import RegistryKey
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -25,7 +27,7 @@ logging.raiseExceptions = False
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -60,19 +62,21 @@ def main():
                             print(key.value(args.value))
                         else:
                             recursor(key, args.depth, 0, args.length)
-                    except RegistryError:
+                    except RegistryError:  # noqa: PERF203
                         log.exception("Failed to find registry value")
 
             except (RegistryKeyNotFoundError, StopIteration):
-                target.log.error("Key %r does not exist", args.key)
+                target.log.error("Key %r does not exist", args.key)  # noqa: TRY400
 
             except Exception as e:
-                target.log.error("Failed to iterate key: %s", e)
+                target.log.error("Failed to iterate key: %s", e)  # noqa: TRY400
                 target.log.debug("", exc_info=e)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
+
+    return 0
 
 
 def recursor(key: RegistryKey, depth: int, indent: int, max_length: int = 100) -> None:
@@ -88,7 +92,7 @@ def recursor(key: RegistryKey, depth: int, indent: int, max_length: int = 100) -
             if len(value) > max_length:
                 value = value[:max_length] + "..."
             print(" " * indent + f"  - {r.name!r} {value}")
-        except NotImplementedError:
+        except NotImplementedError:  # noqa: PERF203
             continue
 
     if depth == 0:

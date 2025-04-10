@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 from dissect.target.helpers.docs import INDENT_STEP, get_docstring
@@ -25,7 +27,7 @@ class LoaderListPlugin(Plugin):
             try:
                 docstring = get_docstring(loader, "No documentation.").splitlines()[0].strip()
                 loaders_info[key] = docstring
-            except ImportError:
+            except ImportError:  # noqa: PERF203
                 continue
 
         loaders = sorted(loaders_info.items())

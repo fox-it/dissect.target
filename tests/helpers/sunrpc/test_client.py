@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -22,15 +23,18 @@ from dissect.target.helpers.nfs.nfs3 import (
 )
 from dissect.target.helpers.sunrpc.client import Client, auth_unix
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 @pytest.fixture
-def mock_socket():
+def mock_socket() -> Iterator[MagicMock]:
     with patch("socket.socket") as mock_socket:
         yield mock_socket
 
 
 @pytest.fixture
-def rpc_client():
+def rpc_client() -> MagicMock:
     return MagicMock(spec=Client)
 
 
@@ -149,7 +153,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
                     ctime=NfsTime(seconds=1737126247, nseconds=294873337),
                 ),
                 handle=FileHandle(
-                    opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x19\x84\xee\x02\xc1\x8a\x8c\\"  # noqa: E501
+                    opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x19\x84\xee\x02\xc1\x8a\x8c\\"
                 ),
             ),
             EntryPlus(
@@ -195,7 +199,7 @@ def test_readdir(mock_socket: MagicMock) -> None:
                     ctime=NfsTime(seconds=1737126558, nseconds=731831818),
                 ),
                 handle=FileHandle(
-                    opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x07\x84\xee\x02\x9524*"  # noqa: E501
+                    opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x07\x84\xee\x02\x9524*"
                 ),
             ),
             EntryPlus(fileid=49020930, name="..", cookie=9223372036854775807, attributes=None, handle=None),
@@ -230,7 +234,7 @@ def test_lookup(mock_socket: MagicMock) -> None:
     # Verify that the result of the call equals the result
     assert result == LookupResult(
         object=FileHandle(
-            opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb41\x12\xf2\x02\x8f\x9958"  # noqa: E501
+            opaque=b"\x01\x00\x07\x01\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb41\x12\xf2\x02\x8f\x9958"
         ),
         obj_attributes=FileAttributes(
             type=FileType.DIR,
@@ -323,7 +327,7 @@ def test_readlink(mock_socket: MagicMock) -> None:
     auth.credentials.stamp = 1668888506
     nfs_client = NfsClient.connect("localhost", 2049, auth, 666)
     file_handle = FileHandle(
-        opaque=b"\x01\x00\x07\x02\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x0f{\xee\x02\xefoz\xef\xda&\xee\x02'/\x00\x91"  # noqa: E501
+        opaque=b"\x01\x00\x07\x02\xda&\xee\x02\x00\x00\x00\x00\xb5g\x131&\xf1I\xed\xb8R\rx\\h8\xb4\x0f{\xee\x02\xefoz\xef\xda&\xee\x02'/\x00\x91"
     )
     result = nfs_client.readlink(file_handle)
 
@@ -362,7 +366,7 @@ def test_readfile(rpc_client: MagicMock) -> None:
     # Compare the received file with the generated one
     assert received_data == random_data
     assert rpc_client.call.call_count == len(chunks)
-    for i, chunk in enumerate(chunks):
+    for i, _ in enumerate(chunks):
         offset = i * NfsClient.READ_CHUNK_SIZE
         rpc_client.call.assert_any_call(
             ReadFileProc, ReadParams(file_handle, offset, NfsClient.READ_CHUNK_SIZE), ANY, ANY

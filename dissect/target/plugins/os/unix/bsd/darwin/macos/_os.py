@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import plistlib
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import posix_path
 
@@ -13,6 +13,12 @@ from dissect.target.plugins.os.unix.bsd.darwin._os import (
     detect_macho_arch,
 )
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class MacOSPlugin(DarwinPlugin):
@@ -50,12 +56,13 @@ class MacOSPlugin(DarwinPlugin):
     def version(self) -> str | None:
         try:
             systemVersion = plistlib.load(self.target.fs.path(self.VERSION).open())
+        except FileNotFoundError:
+            pass
+        else:
             productName = systemVersion["ProductName"]
             productUserVisibleVersion = systemVersion["ProductUserVisibleVersion"]
             productBuildVersion = systemVersion["ProductBuildVersion"]
             return f"{productName} {productUserVisibleVersion} ({productBuildVersion})"
-        except FileNotFoundError:
-            pass
 
     @export(record=MacOSUserRecord)
     def users(self) -> Iterator[MacOSUserRecord]:
@@ -97,3 +104,4 @@ class MacOSPlugin(DarwinPlugin):
             fs=self.target.fs,
         ):
             return f"{arch}-macos"
+        return None

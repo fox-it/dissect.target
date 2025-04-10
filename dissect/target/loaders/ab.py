@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import hashlib
 import io
 import posixpath
 import shutil
 import struct
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 try:
     from Crypto.Cipher import AES
@@ -21,7 +23,9 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 DIRECTORY_MAPPING = {
     "a": "/data/app/{id}",
@@ -42,7 +46,7 @@ class AndroidBackupLoader(Loader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
         self.ab = AndroidBackup(path.open("rb"))
 
         if self.ab.encrypted:
@@ -54,7 +58,7 @@ class AndroidBackupLoader(Loader):
                     except ValueError:
                         continue
             else:
-                raise LoaderError(f"Missing password for encrypted Android Backup: {self.path}")
+                raise LoaderError(f"Missing password for encrypted Android Backup: {path}")
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -79,8 +83,8 @@ class AndroidBackupLoader(Loader):
                 word = "compressed and encrypted"
 
             target.log.warning(
-                f"Backup file is {word}, consider unwrapping with "
-                "`python -m dissect.target.loaders.ab <path/to/backup.ab>`"
+                "Backup file is %s, consider unwrapping with `python -m dissect.target.loaders.ab <path/to/backup.ab>`",
+                word,
             )
 
         vfs = VirtualFilesystem(case_sensitive=False)

@@ -1,10 +1,16 @@
-from dissect.target import Target
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.filesystems.overlay import Overlay2Filesystem
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_overlay_filesystem_docker_container(target_linux_docker: Target) -> None:
     mount_path = target_linux_docker.fs.path(
-        "/var/lib/docker/image/overlay2/layerdb/mounts/f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"  # noqa: E501
+        "/var/lib/docker/image/overlay2/layerdb/mounts/f988f88e221d97930a665712cf16ab520f7e2c5af395660c145df93aebedf071"
     )
     fs = Overlay2Filesystem(mount_path)
 

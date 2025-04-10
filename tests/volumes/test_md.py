@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gzip
 
 from dissect.target.containers.raw import RawContainer

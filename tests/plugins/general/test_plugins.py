@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 
 from dissect.target import plugin
@@ -9,14 +11,14 @@ from dissect.target.plugins.general.plugins import (
 
 
 def test_plugin_description() -> None:
-    description = [x for x in _generate_plugin_tree_overview(PluginListPlugin, False)]
+    description = list(_generate_plugin_tree_overview(PluginListPlugin, False))
     assert description == ["plugins - Print all available plugins. (output: no output)"]
 
 
 def test_plugin_description_compacting() -> None:
     module = {"hello": {"world": PluginListPlugin}}
 
-    description = [x for x in _generate_plugin_tree_overview(module, False)]
+    description = list(_generate_plugin_tree_overview(module, False))
     assert description == [
         "hello:",
         "  world:",
@@ -27,7 +29,7 @@ def test_plugin_description_compacting() -> None:
 def test_plugin_description_in_dict_multiple() -> None:
     module = {"hello": {"world": {"data": PluginListPlugin, "data2": PluginListPlugin}}}
 
-    description = [x for x in _generate_plugin_tree_overview(module, False)]
+    description = list(_generate_plugin_tree_overview(module, False))
     assert description == [
         "hello:",
         "  world:",

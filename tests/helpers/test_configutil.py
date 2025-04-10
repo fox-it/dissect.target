@@ -3,7 +3,7 @@ from __future__ import annotations
 import textwrap
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -23,19 +23,19 @@ from dissect.target.helpers.configutil import (
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from dissect.target import Target
     from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def parse_data(parser_type: type[ConfigurationParser], data_to_read: str, *args, **kwargs) -> dict:
-    """Initializes parser_type as a parser which parses ``data_to_read``"""
+    """Initializes parser_type as a parser which parses ``data_to_read``."""
     parser = parser_type(*args, **kwargs)
     parser.read_file(StringIO(data_to_read))
     return parser.parsed_data
 
 
 @pytest.mark.parametrize(
-    "parser_string, key, value",
+    ("parser_string", "key", "value"),
     [
         ("hello world", "hello", "world"),
         ("hello world\t# new info", "hello", "world"),
@@ -47,7 +47,7 @@ def test_unknown_parser(parser_string: str, key: str, value: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "parser_string, separator, expected_output",
+    ("parser_string", "separator", "expected_output"),
     [
         ("hello=world", "=", {"hello": "world"}),
         ("hello = world", "=", {"hello": "world"}),
@@ -62,7 +62,7 @@ def test_custom_separators(parser_string: str, separator: tuple, expected_output
 
 
 @pytest.mark.parametrize(
-    "comment_string, comment_prefixes",
+    ("comment_string", "comment_prefixes"),
     [
         ("; some information", (";", "#")),
         ("# Some other info", (";", "#")),
@@ -79,7 +79,7 @@ def test_custom_comments(comment_string: str, comment_prefixes: tuple[str, ...])
 
 
 @pytest.mark.parametrize(
-    "indented_string, expected_output",
+    ("indented_string", "expected_output"),
     [
         (
             """
@@ -181,7 +181,7 @@ def test_change_scope() -> None:
 
 
 @pytest.mark.parametrize(
-    "string_data, expected_output",
+    ("string_data", "expected_output"),
     [
         ("[Unit]\n[System]\n", {"Unit": {}, "System": {}}),
         ("[Unit]\nkey=value;\n[System]", {"Unit": {"key": "value;"}, "System": {}}),
@@ -243,7 +243,7 @@ def test_systemd_basic_syntax() -> None:
 
 
 @pytest.mark.parametrize(
-    "data_string, expected_data",
+    ("data_string", "expected_data"),
     [
         (r'{"data" : "value"}', {"data": "value"}),
         (r'[{"data" : "value"}]', {"list_item0": {"data": "value"}}),
@@ -264,7 +264,7 @@ def test_systemd_basic_syntax() -> None:
         ),
     ],
 )
-def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None:
+def test_json_syntax(data_string: str, expected_data: dict | list) -> None:
     parser = Json()
     parser.parse_file(StringIO(data_string))
 
@@ -272,7 +272,7 @@ def test_json_syntax(data_string: str, expected_data: Union[dict, list]) -> None
 
 
 @pytest.mark.parametrize(
-    "data, expected_data",
+    ("data", "expected_data"),
     [
         (b"\x00\x01\x02", {"binary": b"\x00\x01\x02", "size": "3"}),
     ],
@@ -284,7 +284,7 @@ def test_bin_parser(data: bytes, expected_data: dict) -> None:
 
 
 @pytest.mark.parametrize(
-    "fields, separator, comment, data_string, expected_data",
+    ("fields", "separator", "comment", "data_string", "expected_data"),
     [
         (["a", "b"], (r"\s+",), ("#",), "1 2", {"0": {"a": "1", "b": "2"}}),  # SSV
         (["a", "b"], (r"\s+",), ("#",), "1 2\n3 4", {"0": {"a": "1", "b": "2"}, "1": {"a": "3", "b": "4"}}),  # SSV-2
@@ -296,7 +296,9 @@ def test_bin_parser(data: bytes, expected_data: dict) -> None:
         (["a", "b"], (r"\s+",), ("#",), "x", {"0": {"line": "x"}}),  # unparsed
     ],
 )
-def test_csv_syntax(fields, separator, comment, data_string: str, expected_data: dict) -> None:
+def test_csv_syntax(
+    fields: list[str], separator: tuple[str, ...], comment: tuple[str, ...], data_string: str, expected_data: dict
+) -> None:
     parser = CSVish(fields=fields, separator=separator, comment_prefixes=comment)
     parser.parse_file(StringIO(data_string))
     assert parser.parsed_data == expected_data
@@ -321,7 +323,7 @@ def test_parse(target_linux: Target, fs_linux: VirtualFilesystem, tmp_path: Path
 
 
 @pytest.mark.parametrize(
-    "input,expected_output",
+    ("input", "expected_output"),
     [
         ("", {}),
         ("foo=bar\n", {"foo": "bar"}),

@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import json
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.sql import sqlite3
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 HitmanAlertRecord = TargetRecordDescriptor(
     "application/av/sophos/hitman/log",
@@ -38,9 +44,9 @@ class SophosPlugin(Plugin):
     LOG_SOPHOS_HITMAN = "sysvol/ProgramData/HitmanPro.Alert/excalibur.db"
     MARKER_INFECTION = '{"command":"clean-threat'
 
-    LOGS = [LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN]
+    LOGS = (LOG_SOPHOS_HOME, LOG_SOPHOS_HITMAN)
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 
@@ -74,7 +80,7 @@ class SophosPlugin(Plugin):
             try:
                 fh = self.target.fs.path(self.LOG_SOPHOS_HITMAN).open("rb")
                 db = sqlite3.SQLite3(fh)
-                alerts = list(filter(lambda t: t.name == "Alerts", db.tables()))[0]
+                alerts = next(filter(lambda t: t.name == "Alerts", db.tables()))
                 for alert in alerts.rows():
                     yield HitmanAlertRecord(
                         ts=wintimestamp(alert.Timestamp),  # already utc
@@ -83,8 +89,9 @@ class SophosPlugin(Plugin):
                         details=alert.Details,
                         _target=self.target,
                     )
-            except Exception as error:
-                self.target.log.error("Error occurred during reading alerts: %r.", error)
+            except Exception as e:
+                self.target.log.error("Error occurred during reading alerts: %r", e)  # noqa: TRY400
+                self.target.log.debug("", exc_info=e)
 
     @export(record=SophosLogRecord)
     def sophoshomelogs(self) -> Iterator[SophosLogRecord]:
@@ -124,5 +131,6 @@ class SophosPlugin(Plugin):
                             path=self.target.fs.path(path_to_infected_file),
                             _target=self.target,
                         )
-                    except Exception as error:
-                        self.target.log.warning("Error: %r on log line: %s.", error, line)
+                    except Exception as e:
+                        self.target.log.warning("Error: %r on log line: %s", e, line)
+                        self.target.log.debug("", exc_info=e)

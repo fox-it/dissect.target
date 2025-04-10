@@ -4,8 +4,7 @@ import itertools
 import re
 from datetime import datetime
 from functools import cached_property
-from pathlib import Path
-from typing import Iterator, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
@@ -16,7 +15,12 @@ from dissect.target.plugins.apps.webserver.webserver import (
     WebserverHostRecord,
     WebserverPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class LogFormat(NamedTuple):
@@ -204,25 +208,25 @@ class ApachePlugin(WebserverPlugin):
 
     __namespace__ = "apache"
 
-    DEFAULT_LOG_DIRS = [
+    DEFAULT_LOG_DIRS = (
         "/var/log/apache2",
         "/var/log/apache",
         "/var/log/httpd",
         "/var/log",
         "sysvol/xampp/apache/logs",
         "/opt/lampp/logs",
-    ]
-    ACCESS_LOG_NAMES = ["access.log", "access_log", "httpd-access.log"]
-    ERROR_LOG_NAMES = ["error.log"]
-    DEFAULT_CONFIG_PATHS = [
+    )
+    ACCESS_LOG_NAMES = ("access.log", "access_log", "httpd-access.log")
+    ERROR_LOG_NAMES = ("error.log",)
+    DEFAULT_CONFIG_PATHS = (
         "/etc/apache2/apache2.conf",
         "/usr/local/etc/apache22/httpd.conf",
         "/usr/local/apache2/httpd.conf",
         "/etc/httpd/conf/httpd.conf",
         "/etc/httpd.conf",
-    ]
-    DEFAULT_ENVVAR_PATHS = ["/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf"]
-    DEFAULT_SERVER_ROOTS = ["/etc/apache2", "/usr/local/apache2", "/etc/httpd", "/home/httpd", "/home/apache2"]
+    )
+    DEFAULT_ENVVAR_PATHS = ("/etc/apache2/envvars", "/etc/sysconfig/httpd", "/etc/rc.conf")
+    DEFAULT_SERVER_ROOTS = ("/etc/apache2", "/usr/local/apache2", "/etc/httpd", "/home/httpd", "/home/apache2")
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -323,10 +327,9 @@ class ApachePlugin(WebserverPlugin):
                     for found_conf in root.glob(f"*{rest}"):
                         self._process_conf_file(found_conf, seen)
 
-                elif self.server_root and (include_path := self.server_root.joinpath(location)).exists():
-                    self._process_conf_file(include_path, seen)
-
-                elif (include_path := self.target.fs.path(location)).exists():
+                elif (self.server_root and (include_path := self.server_root.joinpath(location)).exists()) or (
+                    include_path := self.target.fs.path(location)
+                ).exists():
                     self._process_conf_file(include_path, seen)
 
                 else:
@@ -441,7 +444,7 @@ class ApachePlugin(WebserverPlugin):
                     error_source, error_code = error_code, error_source
 
                 # Unlike with access logs, ErrorLogFormat doesn't log the offset to UTC but insteads logs in local time.
-                ts = self.target.datetime.local(datetime.strptime(log["ts"], "%a %b %d %H:%M:%S.%f %Y"))
+                ts = self.target.datetime.local(datetime.strptime(log["ts"], "%a %b %d %H:%M:%S.%f %Y"))  # noqa: DTZ007
 
                 yield WebserverErrorLogRecord(
                     ts=ts,
@@ -537,10 +540,10 @@ class ApachePlugin(WebserverPlugin):
         if ":" in first_part and "." in first_part:
             # does not start with IP, hence it must be a vhost typed log
             return LOG_FORMAT_ACCESS_VHOST_COMBINED
-        elif line[-1] == '"':
+        if line[-1] == '"':
             # ends with a quotation mark but does not contain a response time, meaning there is only a user agent
             return LOG_FORMAT_ACCESS_COMBINED
-        elif line[-1].isdigit():
+        if line[-1].isdigit():
             return LOG_FORMAT_ACCESS_COMMON
 
         return None

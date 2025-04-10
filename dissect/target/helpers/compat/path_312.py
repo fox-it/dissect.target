@@ -25,7 +25,7 @@ from __future__ import annotations
 import posixpath
 import sys
 from pathlib import Path, PurePath
-from typing import IO, TYPE_CHECKING, Iterator
+from typing import IO, TYPE_CHECKING, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -33,6 +33,8 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
 
@@ -42,7 +44,7 @@ class _DissectFlavour:
     altsep = ""
     case_sensitive = False
 
-    __variant_instances = {}
+    __variant_instances: ClassVar[dict[tuple[bool, str], _DissectFlavour]] = {}
 
     def __new__(cls, case_sensitive: bool = False, alt_separator: str = ""):
         idx = (case_sensitive, alt_separator)
@@ -107,7 +109,7 @@ class PureDissectPath(PurePath):
         if not isinstance(fs, filesystem.Filesystem):
             raise TypeError(
                 "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)" % (fs, *pathsegments)
+                "got {!r} (this might be a bug, please report)".format(fs, *pathsegments)
             )
 
         alt_separator = fs.alt_separator
@@ -167,8 +169,7 @@ class TargetPath(Path, PureDissectPath):
         """
         if follow_symlinks:
             return self.get().stat()
-        else:
-            return self.get().lstat()
+        return self.get().lstat()
 
     def open(
         self,

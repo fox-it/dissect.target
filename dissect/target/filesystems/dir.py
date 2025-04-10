@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import os
-from pathlib import Path
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -11,6 +12,10 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
 
 class DirectoryFilesystem(Filesystem):
@@ -120,7 +125,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         # We want to get the "truest" form of the symlink
         # If we use the readlink() of pathlib.Path directly, it gets thrown into the path parsing of pathlib
@@ -128,8 +133,7 @@ class DirectoryFilesystemEntry(FilesystemEntry):
         # and use os.readlink for host paths
         if isinstance(self.entry, fsutil.TargetPath):
             return self.entry.get().readlink()
-        else:
-            return os.readlink(self.entry)
+        return os.readlink(self.entry)  # noqa: PTH115
 
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
         return self._resolve(follow_symlinks=follow_symlinks).entry.lstat()

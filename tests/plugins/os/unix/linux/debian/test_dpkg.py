@@ -1,11 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix.linux.debian.dpkg import (
     STATUS_FILE_NAME,
     DpkgPlugin,
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_dpkg_plugin_status(target_unix, fs_unix):
+
+def test_dpkg_plugin_status(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     status_file = absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg-status")
 
     fs_unix.map_file(STATUS_FILE_NAME, status_file)
@@ -19,7 +27,7 @@ def test_dpkg_plugin_status(target_unix, fs_unix):
     assert {r.arch for r in results} == {"amd64", "all"}
 
 
-def test_dpkg_plugin_log_plain(target_unix, fs_unix):
+def test_dpkg_plugin_log_plain(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     log_file = absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg.log")
     fs_unix.map_file("/var/log/dpkg.log", log_file)
 
@@ -35,7 +43,7 @@ def test_dpkg_plugin_log_plain(target_unix, fs_unix):
     assert {r.arch for r in results} == {"amd64", "all"}
 
 
-def test_dpkg_plugin_log_gz(target_unix, fs_unix):
+def test_dpkg_plugin_log_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     log_file_gz = absolute_path("_data/plugins/os/unix/linux/debian/dpkg/dpkg.log.2.gz")
     fs_unix.map_file("/var/log/dpkg.log.2.gz", log_file_gz)
 

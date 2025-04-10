@@ -20,7 +20,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path, PurePath, _Accessor, _PosixFlavour
-from typing import IO, TYPE_CHECKING, Any, BinaryIO, Callable, Iterator
+from typing import IO, TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import (
@@ -32,6 +32,8 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.compat.path_common import _DissectScandirIterator
     from dissect.target.helpers.fsutil import stat_result
@@ -40,11 +42,11 @@ if TYPE_CHECKING:
 class _DissectFlavour(_PosixFlavour):
     is_supported = True
 
-    __variant_instances = {}
+    __variant_instances: ClassVar[dict[tuple[bool, str], _DissectFlavour]] = {}
 
     def __new__(cls, case_sensitive: bool = False, alt_separator: str = ""):
         idx = (case_sensitive, alt_separator)
-        instance = cls.__variant_instances.get(idx, None)
+        instance = cls.__variant_instances.get(idx)
         if instance is None:
             instance = _PosixFlavour.__new__(cls)
             cls.__variant_instances[idx] = instance
@@ -65,12 +67,12 @@ class _DissectFlavour(_PosixFlavour):
     def compile_pattern(self, pattern: str) -> Callable[..., Any]:
         return re.compile(fnmatch.translate(pattern), 0 if self.case_sensitive else re.IGNORECASE).fullmatch
 
-    def resolve(self, path: str, strict: bool = False) -> str:
+    def resolve(self, path: TargetPath, strict: bool = False) -> str:
         sep = self.sep
         accessor = path._accessor
         seen = {}
 
-        def _resolve(fs, path, rest):
+        def _resolve(fs: filesystem.Filesystem, path: str, rest: str) -> str:
             if rest.startswith(sep):
                 path = ""
 
@@ -82,10 +84,7 @@ class _DissectFlavour(_PosixFlavour):
                     # parent dir
                     path, _, _ = path.rpartition(sep)
                     continue
-                if path.endswith(sep):
-                    newpath = path + name
-                else:
-                    newpath = path + sep + name
+                newpath = path + name if path.endswith(sep) else path + sep + name
                 if newpath in seen:
                     # Already seen this path
                     path = seen[newpath]
@@ -124,8 +123,7 @@ class _DissectAccessor(_Accessor):
     def stat(path: TargetPath, *, follow_symlinks: bool = True) -> stat_result:
         if follow_symlinks:
             return path.get().stat()
-        else:
-            return path.get().lstat()
+        return path.get().lstat()
 
     @staticmethod
     def lstat(path: TargetPath) -> stat_result:
@@ -181,7 +179,7 @@ class _DissectAccessor(_Accessor):
 
     @staticmethod
     def utime(
-        path: TargetPath, times: tuple[float, float], *, ns: tuple[int, int] = None, follow_symlinks: bool = True
+        path: TargetPath, times: tuple[float, float], *, ns: tuple[int, int] | None = None, follow_symlinks: bool = True
     ) -> None:
         raise NotImplementedError("TargetPath.utime() is unsupported")
 
@@ -218,7 +216,7 @@ class PureDissectPath(PurePath):
         if not isinstance(fs, filesystem.Filesystem):
             raise TypeError(
                 "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)" % args
+                f"got {args!r} (this might be a bug, please report)"
             )
 
         alt_separator = fs.alt_separator
@@ -267,7 +265,7 @@ class PureDissectPath(PurePath):
 
     def __rtruediv__(self, key: str) -> TargetPath:
         try:
-            return self._from_parts([self._fs, key] + self._parts)
+            return self._from_parts([self._fs, key, *self._parts])
         except TypeError:
             return NotImplemented
 
@@ -330,7 +328,7 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def walk(
-        self, top_down: bool = True, on_error: Callable[[Exception], None] = None, follow_symlinks: bool = False
+        self, top_down: bool = True, on_error: Callable[[Exception], None] | None = None, follow_symlinks: bool = False
     ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
         """Walk the directory tree from this directory, similar to os.walk()."""
         paths = [self]
@@ -348,9 +346,9 @@ class TargetPath(Path, PureDissectPath):
             # directories are still left to visit. That logic is copied here.
             try:
                 scandir_it = self._accessor.scandir(path)
-            except OSError as error:
+            except OSError as e:
                 if on_error is not None:
-                    on_error(error)
+                    on_error(e)
                 continue
 
             with scandir_it:
@@ -447,8 +445,7 @@ class TargetPath(Path, PureDissectPath):
         Return the path to which the symbolic link points.
         """
         path = self._accessor.readlink(self)
-        obj = self._from_parts((self._fs, path), init=False)
-        return obj
+        return self._from_parts((self._fs, path), init=False)
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:

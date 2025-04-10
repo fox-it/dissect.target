@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
 )
 from dissect.target.helpers.configutil import parse_config
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture
@@ -35,7 +39,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
 
 
 @pytest.mark.parametrize(
-    "test_file, expected_output",
+    ("test_file", "expected_output"),
     [
         (
             "_data/helpers/configutil/hosts",
@@ -136,7 +140,7 @@ def test_parse_file_input(target_unix: Target, mapped_file: str, expected_output
     check_dictionary(expected_output, entry.parser_items)
 
 
-def check_dictionary(expected_dict: dict, data_dict: dict):
+def check_dictionary(expected_dict: dict, data_dict: dict) -> None:
     for key, value in expected_dict.items():
         if info_value := data_dict.get(key):
             check_value(value, info_value)
@@ -159,7 +163,7 @@ def test_unix_registry(target_unix: Target, etc_directory: VirtualFilesystem) ->
     config_path = list(config_fs.get("/").iterdir())
 
     assert config_path == ["new"]
-    assert sorted(list(config_fs.get("/new").iterdir())) == ["config", "path"]
+    assert sorted(config_fs.get("/new").iterdir()) == ["config", "path"]
     assert isinstance(config_fs.get("/new/path/config"), ConfigurationEntry)
 
 
@@ -168,7 +172,7 @@ def test_config_entry() -> None:
         def __enter__(self):
             return self.binary_data
 
-        def __exit__(self, _, __, ___):
+        def __exit__(self, *args):
             return
 
     mocked_open = MockableRead(binary_data=BytesIO(b"default=test\n[Unit]\nhelp=me\n"))

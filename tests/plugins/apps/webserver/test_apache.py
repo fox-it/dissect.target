@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.apache import (
     LOG_FORMAT_ACCESS_COMBINED,
     LOG_FORMAT_ACCESS_COMMON,
     LOG_FORMAT_ACCESS_VHOST_COMBINED,
     ApachePlugin,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_infer_access_log_format_combined() -> None:
@@ -175,7 +180,7 @@ def test_custom_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     target_unix.add_plugin(ApachePlugin)
 
-    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
+    assert sorted(map(str, target_unix.apache.access_paths)) == [
         "/very/custom/log/location/access.log",
         "/very/custom/log/location/access.log.1",
         "/very/custom/log/location/access.log.2",
@@ -200,19 +205,19 @@ def test_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesystem) 
 
     target_unix.add_plugin(ApachePlugin)
 
-    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
+    assert sorted(map(str, target_unix.apache.access_paths)) == [
         "/custom/log/location/new.log",
         "/custom/log/location/old.log",
     ]
 
-    assert sorted(list(map(str, target_unix.apache.error_paths))) == [
+    assert sorted(map(str, target_unix.apache.error_paths)) == [
         "/custom/log/location/new_error.log",
         "/custom/log/location/old_error.log",
     ]
 
 
 def test_config_vhosts_httpd(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we detect httpd CustomLog and ErrorLog directives using IncludeOptional configuration."""
+    """Test if we detect httpd CustomLog and ErrorLog directives using IncludeOptional configuration."""
     config = """
     ServerRoot "/etc/httpd"
     IncludeOptional conf/vhosts/*/*.conf
@@ -237,18 +242,18 @@ def test_config_vhosts_httpd(target_unix: Target, fs_unix: VirtualFilesystem) ->
 
     target_unix.add_plugin(ApachePlugin)
 
-    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
+    assert sorted(map(str, target_unix.apache.access_paths)) == [
         "/custom/log/location/vhost_1.log",
         "/custom/log/location/vhost_2.log",
     ]
-    assert sorted(list(map(str, target_unix.apache.error_paths))) == [
+    assert sorted(map(str, target_unix.apache.error_paths)) == [
         "/custom/log/location/vhost_1.error",
         "/custom/log/location/vhost_2.error",
     ]
 
 
 def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we detect apache2 CustomLog and ErrorLog directives using IncludeOptional configuration."""
+    """Test if we detect apache2 CustomLog and ErrorLog directives using IncludeOptional configuration."""
     config = r"""
     ServerRoot "/etc/apache2"
     ErrorLog ${APACHE_LOG_DIR}/error.log
@@ -296,7 +301,7 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
 
     target_unix.add_plugin(ApachePlugin)
 
-    assert sorted(list(map(str, target_unix.apache.access_paths))) == [
+    assert sorted(map(str, target_unix.apache.access_paths)) == [
         "/path/to/apache/logs/example_access.log.1.gz",
         "/path/to/disabled/access.log.2",
         "/path/to/virtualhost/log/access.log.1",
@@ -304,7 +309,7 @@ def test_config_vhosts_apache2(target_unix: Target, fs_unix: VirtualFilesystem) 
         "/var/log/apache2/some-other-vhost-old-log.access.log",
     ]
 
-    assert sorted(list(map(str, target_unix.apache.error_paths))) == [
+    assert sorted(map(str, target_unix.apache.error_paths)) == [
         "/path/to/apache/logs/error.log",
         "/path/to/virtualhost/log/error.log.1",
         "/var/log/apache2/error.log",
@@ -362,7 +367,7 @@ def test_all_error_log_formats(target_unix: Target, fs_unix: VirtualFilesystem) 
 
 
 def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we can find and parse virtual host configurations correctly."""
+    """Test if we can find and parse virtual host configurations correctly."""
 
     fs_unix.map_file_fh("/etc/apache2/apache2.conf", BytesIO(b'ServerRoot "/etc/apache2"\n'))
 

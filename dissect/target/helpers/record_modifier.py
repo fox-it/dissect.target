@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import logging
 from functools import partial
-from typing import Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Callable
 
 from flow.record import GroupedRecord, Record, RecordDescriptor, fieldtypes
 
-from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError, FilesystemError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.hashutil import common
 from dissect.target.helpers.utils import StrEnum
+from dissect.target.target import Target
 
-__all__ = ("get_modifier_function", "Modifier", "ModifierFunc")
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+
+__all__ = ("Modifier", "ModifierFunc", "get_modifier_function")
 
 RECORD_NAME = "filesystem/file/digest"
 NAME_SUFFIXES = ["_resolved", "_digest"]
@@ -27,8 +33,8 @@ class Modifier(StrEnum):
 def _create_modified_record(
     record_name: str, field_name: str, field_info: Iterable[tuple[str, str, TargetPath]]
 ) -> Record:
-    record_kwargs = dict()
-    record_def = list()
+    record_kwargs = {}
+    record_def = []
     for type, name_suffix, data in field_info:
         extended_field_name = f"{field_name}{name_suffix}"
         record_kwargs.update({extended_field_name: data})
@@ -54,7 +60,8 @@ def _hash_path_records(field_name: str, resolved_path: TargetPath) -> Record:
     Raises:
         FileNotFoundError: Raised if the provided ``resolved_path`` does not exist or is not a file on the target.
 
-    Returns: Modified record with digests of path field types.
+    Returns:
+        Modified record with digests of path field types.
     """
 
     if not resolved_path.exists() or not resolved_path.is_file():
@@ -95,7 +102,7 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
     for field_name, resolved_path in _resolve_path_types(target, record):
         try:
             _record = modifier_function(field_name, resolved_path)
-        except FilesystemError as e:
+        except FilesystemError as e:  # noqa: PERF203
             level = logging.INFO if isinstance(e, FileNotFoundError) else logging.WARNING
             target.log.log(
                 level,
@@ -112,10 +119,10 @@ def modify_record(target: Target, record: Record, modifier_function: ModifierFun
     if not additional_records:
         return record
 
-    return GroupedRecord(record._desc.name, [record] + additional_records)
+    return GroupedRecord(record._desc.name, [record, *additional_records])
 
 
-def _noop(_target: Target, record: Record):
+def _noop(_target: Target, record: Record) -> Record:
     return record
 
 

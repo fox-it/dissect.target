@@ -1,4 +1,7 @@
-from typing import Callable, Generator, Iterator, Union
+from __future__ import annotations
+
+from collections.abc import Generator, Iterator
+from typing import Callable
 
 from flow.record import GroupedRecord
 
@@ -23,14 +26,14 @@ class OSInfoPlugin(plugin.Plugin):
             raise UnsupportedPluginError("No operating system detected on target")
 
     @plugin.export(record=OSInfoRecord)
-    def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
+    def osinfo(self) -> Iterator[OSInfoRecord | GroupedRecord]:
         """Yield grouped records with target OS info."""
         for os_func in self.target._os.__functions__:
             value = getattr(self.target._os, os_func)
             record = OSInfoRecord(name=os_func, value=None, _target=self.target)
             if isinstance(value, Callable) and isinstance(subrecords := value(), Generator):
                 try:
-                    yield GroupedRecord("generic/osinfo/grouped", [record] + list(subrecords))
+                    yield GroupedRecord("generic/osinfo/grouped", [record, *list(subrecords)])
                 except Exception:
                     # Ignore exceptions triggered by functions
                     # that cannot be executed in this context

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import logging
 import re
-import urllib
+import urllib.parse
 from os import PathLike
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
-from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -74,24 +74,21 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
             path = fs.get(path)
             if path.stat().st_size > 0:
                 return path.open()
-            else:
-                log.warning("File is empty and will be skipped: %s", path)
-        except FileNotFoundError:
+            log.warning("File is empty and will be skipped: %s", path)
+        except FileNotFoundError:  # noqa: PERF203
             pass
+    return None
 
 
 def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult | None]:
-    """
-    Extracts a ParseResult from a path if it has
-    a scheme and adjusts the path if necessary.
+    """Extracts a ``ParseResult`` from a path if it has a scheme and adjusts the path if necessary.
 
     Args:
-        path: String or Path describing the path of a target.
+        path: String or ``Path`` describing the path of a target.
 
     Returns:
-        - a Path or None
-        - ParseResult or None
-
+        - a ``Path`` or ``None``
+        - ``ParseResult`` or ``None``
     """
 
     if path is None:
@@ -103,5 +100,4 @@ def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult 
     parsed_path = urllib.parse.urlparse(path)
     if parsed_path.scheme == "" or re.match("^[A-Za-z]$", parsed_path.scheme):
         return Path(path), None
-    else:
-        return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path
+    return Path(parsed_path.netloc + parsed_path.path).expanduser(), parsed_path

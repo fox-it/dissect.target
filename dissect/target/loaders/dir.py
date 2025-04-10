@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import zipfile
 from collections import defaultdict
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem
@@ -13,7 +12,9 @@ from dissect.target.loader import Loader
 from dissect.target.plugin import OperatingSystem
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 PREFIXES = ["", "fs"]
 
@@ -26,14 +27,15 @@ class DirLoader(Loader):
         return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        self.path /= find_entry_path(self.path)
-        find_and_map_dirs(target, self.path)
+        path = self.path.joinpath(find_entry_path(self.path))
+        find_and_map_dirs(target, path)
 
 
 def find_entry_path(path: Path) -> str | None:
     for prefix in PREFIXES:
         if find_dirs(path / prefix)[0] is not None:
             return prefix
+    return None
 
 
 def map_dirs(

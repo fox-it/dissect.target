@@ -1,10 +1,17 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 recent_files_def = """
     struct header {
@@ -33,7 +40,7 @@ RecentFileCacheRecord = TargetRecordDescriptor(
 class RecentFileCachePlugin(Plugin):
     """Plugin that parses the RecentFileCache.bcf file."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._recentfiles = self.target.fs.path("sysvol/windows/appcompat/programs/RecentFileCache.bcf")
 
@@ -65,5 +72,5 @@ class RecentFileCachePlugin(Plugin):
                     path=self.target.fs.path(entry.path),
                     _target=self.target,
                 )
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break

@@ -1,18 +1,22 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser.edge import EdgePlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 # NOTE: Missing cookie tests for Edge.
 
 
 @pytest.fixture
-def target_edge_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_edge_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\",
         absolute_path("_data/plugins/apps/browser/edge/"),
@@ -24,20 +28,20 @@ def target_edge_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iter
 
     target_win_users.add_plugin(EdgePlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.fixture
-def target_edge_unix(target_unix_users, fs_unix):
+def target_edge_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     fs_unix.map_dir("/root/.config/microsoft-edge/Default/", absolute_path("_data/plugins/apps/browser/edge/"))
     fs_unix.map_dir("/root/.config/microsoft-edge/Profile 1/", absolute_path("_data/plugins/apps/browser/edge/"))
     target_unix_users.add_plugin(EdgePlugin)
 
-    yield target_unix_users
+    return target_unix_users
 
 
 @pytest.fixture
-def target_edge_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_edge_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Microsoft\\Edge\\User Data\\Snapshots\\116.0.5038.150\\Default",
         absolute_path("_data/plugins/apps/browser/edge/"),
@@ -49,7 +53,7 @@ def target_edge_win_snapshot(target_win_users: Target, fs_win: VirtualFilesystem
 
     target_win_users.add_plugin(EdgePlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.mark.parametrize(
@@ -61,7 +65,7 @@ def test_edge_history(target_platform: Target, request: pytest.FixtureRequest) -
     records = list(target_platform.edge.history())
 
     assert len(records) == 90
-    assert set(["edge"]) == set(record.browser for record in records)
+    assert {"edge"} == {record.browser for record in records}
 
     assert records[-1].url == "https://github.com/fox-it/dissect"
     assert records[-1].id == "45"
@@ -78,7 +82,7 @@ def test_edge_downloads(target_platform: Target, request: pytest.FixtureRequest)
     records = list(target_platform.edge.downloads())
 
     assert len(records) == 4
-    assert set(["edge"]) == set(record.browser for record in records)
+    assert {"edge"} == {record.browser for record in records}
 
     assert records[0].id == 1
     assert records[0].ts_start == dt("2023-02-24T11:52:36.631304+00:00")
@@ -95,7 +99,7 @@ def test_edge_extensions(target_platform: Target, request: pytest.FixtureRequest
     records = list(target_platform.edge.extensions())
 
     assert len(records) == 78
-    assert set(["edge"]) == set(record.browser for record in records)
+    assert {"edge"} == {record.browser for record in records}
 
     assert records[0].ts_install == dt("2023-04-18T08:39:57.968208+00:00")
     assert records[0].ts_update == dt("2023-04-18T08:39:57.968208+00:00")
@@ -187,7 +191,7 @@ def test_edge_windows_snapshots(target_win_users: Target, fs_win: VirtualFilesys
 
     # Loop over the different types of records and verify we have the same amount of records in each profile directory.
     for records in records_list:
-        assert set(["edge"]) == set(record.browser for record in records)
+        assert {"edge"} == {record.browser for record in records}
 
         for base_dir in base_dirs:
             base_path_records = [r for r in records if str(r.source.parent).endswith(base_dir)]

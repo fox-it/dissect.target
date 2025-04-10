@@ -1,35 +1,30 @@
 import pathlib
-from typing import Iterator
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.target import Target
 from tests.conftest import make_os_target
 
 
 @pytest.fixture
-def target_linux_proc_sys(tmp_path: pathlib.Path) -> Iterator[Target]:
+def target_linux_proc_sys(tmp_path: pathlib.Path) -> Target:
     root_fs = VirtualFilesystem()
     root_fs.makedirs("/proc/sys")
     root_fs.makedirs("/sys/module")
-    target_linux_proc_sys = make_os_target(tmp_path, LinuxPlugin, root_fs)
-
-    yield target_linux_proc_sys
+    return make_os_target(tmp_path, LinuxPlugin, root_fs)
 
 
 @pytest.fixture
-def target_linux_windows_folder(tmp_path: pathlib.Path) -> Iterator[Target]:
+def target_linux_windows_folder(tmp_path: pathlib.Path) -> Target:
     root_fs = VirtualFilesystem()
     root_fs.makedirs("/windows")
     root_fs.makedirs("/var")
     root_fs.makedirs("/etc")
     root_fs.makedirs("/opt")
 
-    target_linux_proc_sys = make_os_target(tmp_path, LinuxPlugin, root_fs)
-
-    yield target_linux_proc_sys
+    return make_os_target(tmp_path, LinuxPlugin, root_fs)
 
 
 def test_linux_os(target_linux: Target) -> None:

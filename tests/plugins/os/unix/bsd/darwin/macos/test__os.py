@@ -1,14 +1,20 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import posix_path
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_unix_bsd_darwin_macos_os(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
-    """test if we detect a macOS target correctly."""
+    """Test if we detect a macOS target correctly."""
 
     target_macos_users.add_plugin(MacOSPlugin)
 

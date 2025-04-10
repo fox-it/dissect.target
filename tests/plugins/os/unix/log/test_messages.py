@@ -1,18 +1,22 @@
+from __future__ import annotations
+
 import gzip
 import tarfile
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
+from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
 
 
 def test_unix_log_messages_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -73,7 +77,7 @@ def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     fs = TarFilesystem(bio)
     target.filesystems.add(fs)
     target.fs.mount("/", fs)
-    target._os_plugin = DefaultPlugin
+    target._os_plugin = UnixPlugin
     target.apply()
     target.add_plugin(MessagesPlugin)
 
@@ -115,7 +119,7 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target
 
 
 def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we correctly parse plaintext and compressed cloud-init log files."""
+    """Test if we correctly parse plaintext and compressed cloud-init log files."""
 
     messages = """
     2005-08-09 11:55:21,000 - foo.py[DEBUG]: This is a cloud-init message!
@@ -128,7 +132,7 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
     fs_unix.map_file_fh("/var/log/installer/cloud-init.log.1.gz", BytesIO(gzip.compress(msg_bytes)))
     target_unix.add_plugin(MessagesPlugin)
 
-    results = sorted(list(target_unix.messages()), key=lambda r: r.source)
+    results = sorted(target_unix.messages(), key=lambda r: r.source)
     assert len(results) == 4
 
     assert results[0].ts == datetime(2005, 8, 9, 11, 55, 21, 0, tzinfo=ZoneInfo("Europe/Amsterdam"))
@@ -142,13 +146,13 @@ def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesyste
     assert results[-1].pid is None
     assert (
         results[-1].message
-        == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."  # noqa: E501
+        == "Cloud-init v. 1.2.3-4ubuntu5 running 'init-local' at Tue, 9 Aug 2005 11:55:21 +0000. Up 13.37 seconds."
     )
     assert results[-1].source == "/var/log/installer/cloud-init.log.1.gz"
 
 
 def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we correctly detect and parse ISO 8601 formatted syslog logs."""
+    """Test if we correctly detect and parse ISO 8601 formatted syslog logs."""
 
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
     messages = """
@@ -161,7 +165,7 @@ def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualF
 
     target_unix.add_plugin(UnixPlugin)
     target_unix.add_plugin(MessagesPlugin)
-    results = sorted(list(target_unix.syslog()), key=lambda r: r.ts)
+    results = sorted(target_unix.syslog(), key=lambda r: r.ts)
 
     assert len(results) == 4
 
@@ -174,7 +178,7 @@ def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualF
 
 
 def test_linux_messages_kernel_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we can parse kernel ring buffer messages."""
+    """Test if we can parse kernel ring buffer messages."""
 
     messages = """
     Dec 31 13:37:01 hostname kernel: [1337.1337] some example message
@@ -187,7 +191,7 @@ def test_linux_messages_kernel_logs(target_unix: Target, fs_unix: VirtualFilesys
     target_unix.add_plugin(UnixPlugin)
     target_unix.add_plugin(MessagesPlugin)
 
-    results = sorted(list(target_unix.syslog()), key=lambda r: r.ts)
+    results = sorted(target_unix.syslog(), key=lambda r: r.ts)
     assert len(results) == 4
 
     assert results[0].service == "kernel"

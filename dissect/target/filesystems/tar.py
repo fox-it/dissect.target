@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import stat
 import tarfile as tf
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import BufferedStream
 
@@ -21,6 +21,9 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +48,7 @@ class TarFilesystem(Filesystem):
             self.tar = tarfile
         else:
             fh.seek(0)
-            self.tar = tf.open(mode="r", fileobj=fh, tarinfo=tarinfo)
+            self.tar = tf.open(mode="r", fileobj=fh, tarinfo=tarinfo)  # noqa: SIM115
 
         self.base = base or ""
 
@@ -70,7 +73,7 @@ class TarFilesystem(Filesystem):
         fh.seek(257)
         return fh.read(8) in (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
-    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry | None = None) -> FilesystemEntry:
         """Returns a TarFilesystemEntry object corresponding to the given path."""
         return self._fs.get(path, relentry=relentry)
 
@@ -87,7 +90,7 @@ class TarFilesystemEntry(VirtualFile):
                 f.size = f.raw.size
             return BufferedStream(f, size=f.size)
         except Exception:
-            raise FileNotFoundError()
+            raise FileNotFoundError
 
     def iterdir(self) -> Iterator[str]:
         if self.is_dir():
@@ -120,7 +123,7 @@ class TarFilesystemEntry(VirtualFile):
     def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
         return self.entry.linkname
 
     def readlink_ext(self) -> FilesystemEntry:

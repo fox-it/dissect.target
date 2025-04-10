@@ -1,14 +1,14 @@
+from __future__ import annotations
+
 import datetime
 import json
 import operator
 from io import BytesIO
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import path
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.container.docker import (
     DockerPlugin,
     convert_timestamp,
@@ -18,12 +18,16 @@ from dissect.target.plugins.apps.container.docker import (
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 @pytest.fixture
-def target_linux_docker_logs(target_linux: Target, fs_linux: VirtualFilesystem) -> Iterator[Target]:
+def target_linux_docker_logs(target_linux: Target, fs_linux: VirtualFilesystem) -> Target:
     docker_containers = absolute_path("_data/plugins/apps/container/docker/logs")
     fs_linux.map_dir("/var/lib/docker/containers", docker_containers)
-    yield target_linux
+    return target_linux
 
 
 def test_docker_plugin_data_roots(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -139,7 +143,7 @@ def test_backspace_interpretation() -> None:
 
 
 def test_regression_running_container_parsing(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we correctly discover and reconstruct exposed container ports and commands on a running container"""
+    """Test if we correctly discover and reconstruct exposed container ports and commands on a running container."""
 
     id = "deadbeef"
     config = {

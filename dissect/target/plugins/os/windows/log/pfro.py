@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import datetime
 import re
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 PfroRecord = TargetRecordDescriptor(
     "filesystem/windows/pfro",
@@ -17,11 +24,9 @@ PfroRecord = TargetRecordDescriptor(
 
 
 class PfroPlugin(Plugin):
-    """
-    PFRO plugin.
-    """
+    """PFRO plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.logfile = self.target.fs.path("sysvol/windows/PFRO.log")
 
@@ -50,7 +55,9 @@ class PfroPlugin(Plugin):
             ts (datetime): The parsed timestamp.
             path (uri): The parsed path.
             operation (string): The parsed operation.
-        """  # noqa: E501
+        """
+        target_tz = self.target.datetime.tzinfo
+
         try:
             for line in self.logfile.open("rt", encoding="utf-16-le"):
                 if len(line) <= 1:
@@ -65,13 +72,10 @@ class PfroPlugin(Plugin):
                     date = re.split(".+[A-Za-z]", date)[1]
                 file_path = idx[1].split("|")[0][16:-2]
                 operation = idx[1].split("|")
-                if len(operation) >= 2:
-                    operation = operation[1].split(" ")[0]
-                else:
-                    operation = None
+                operation = operation[1].split(" ")[0] if len(operation) >= 2 else None
 
                 yield PfroRecord(
-                    ts=datetime.datetime.strptime(date, "%m/%d/%Y %H:%M:%S"),
+                    ts=datetime.datetime.strptime(date, "%m/%d/%Y %H:%M:%S").replace(tzinfo=target_tz),
                     path=self.target.fs.path(file_path),
                     operation=operation,
                     _target=self.target,

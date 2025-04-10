@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 import textwrap
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 from dissect.util.ts import from_unix
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.history import CommandHistoryPlugin
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_commandhistory_with_timestamps(target_unix_users, fs_unix):
+
+def test_commandhistory_with_timestamps(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     commandhistory_data = """\
     #1648598339
     echo "this is a test"
@@ -63,7 +68,7 @@ def test_commandhistory_with_timestamps(target_unix_users, fs_unix):
     assert results[3].source.as_posix() == "/home/user/.bash_history"
 
 
-def test_commandhistory_without_timestamps(target_unix_users, fs_unix):
+def test_commandhistory_without_timestamps(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     commandhistory_data = """\
     echo "Test if basic commandhistory works" > /dev/null
     exit
@@ -92,7 +97,7 @@ def test_commandhistory_without_timestamps(target_unix_users, fs_unix):
     assert results[1].source.as_posix() == "/root/.zsh_history"
 
 
-def test_commandhistory_zsh_history(target_unix_users, fs_unix):
+def test_commandhistory_zsh_history(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     commandhistory_data = """\
     : 1673860722:0;sudo apt install sl
     : :;
@@ -122,7 +127,7 @@ def test_commandhistory_zsh_history(target_unix_users, fs_unix):
     assert results[1].source.as_posix() == "/root/.zsh_history"
 
 
-def test_commandhistory_fish_history(target_unix_users, fs_unix):
+def test_commandhistory_fish_history(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     commandhistory_data = """
     - cmd: ls
       when: 1688642435
@@ -164,7 +169,7 @@ def test_commandhistory_fish_history(target_unix_users, fs_unix):
 
 
 @pytest.mark.parametrize(
-    "db_type, db_file, db_history",
+    ("db_type", "db_file", "db_history"),
     [
         (
             "mongodb",
@@ -208,7 +213,9 @@ def test_commandhistory_fish_history(target_unix_users, fs_unix):
         ),
     ],
 )
-def test_commandhistory_database_history(target_unix_users, fs_unix, db_type, db_file, db_history):
+def test_commandhistory_database_history(
+    target_unix_users: Target, fs_unix: VirtualFilesystem, db_type: str, db_file: str, db_history: str
+) -> None:
     history_content = textwrap.dedent(db_history)
     history_lines = history_content.strip().split("\n")
     fs_unix.map_file_fh(

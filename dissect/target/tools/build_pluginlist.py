@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, print_function
+from __future__ import annotations
 
 import argparse
 import logging
@@ -8,7 +8,7 @@ import textwrap
 from dissect.target import plugin
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
     args = parser.parse_args()
@@ -38,6 +38,8 @@ def main() -> None:
     PLUGINS = {}
     """
     print(textwrap.dedent(template).format(pluginlist))
+
+    return 0
 
 
 if __name__ == "__main__":

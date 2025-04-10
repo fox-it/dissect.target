@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import datetime
 import enum
@@ -6,17 +8,22 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, TextIO
+from typing import TYPE_CHECKING, Any, Callable, TextIO
 
 import structlog
 
-from dissect.target import Target
 from dissect.target.tools.dump.utils import (
     Compression,
     Serialization,
     get_current_utc_time,
     parse_datetime_iso,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
+    from dissect.target.tools.dump.run import RecordStreamElement
 
 log = structlog.get_logger(__name__)
 
@@ -51,8 +58,8 @@ class DumpState:
     sinks: list[Sink] = dataclasses.field(default_factory=list)
 
     # Volatile properties
-    output_dir: Optional[Path] = None
-    pending_updates_count: Optional[int] = 0
+    output_dir: Path | None = None
+    pending_updates_count: int | None = 0
 
     @property
     def record_count(self) -> int:
@@ -75,29 +82,26 @@ class DumpState:
             raise ValueError("Output directory is unknown for the state")
         return self.output_dir / sink.path
 
-    def get_sink(self, path: Path) -> Optional[Sink]:
+    def get_sink(self, path: Path) -> Sink | None:
         for sink in self.sinks:
             if sink.path == path:
                 return sink
+        return None
 
     def serialize(self) -> str:
-        """Serialize state instance into a JSON formatted string"""
+        """Serialize state instance into a JSON formatted string."""
         state_dict = dataclasses.asdict(self)
         state_dict.pop("output_dir")
         state_dict.pop("pending_updates_count")
-        serialized = json.dumps(
+        return json.dumps(
             state_dict,
             default=serialize_obj,
             indent=4,
             sort_keys=True,
         )
-        return serialized
 
     def persist(self, fh: TextIO) -> None:
-        """
-        Write serialized state instance into profided `fh` byte stream,
-        overwriting it from the beginning
-        """
+        """Write serialized state instance into profided ``fh`` byte stream, overwriting it from the beginning."""
         fh.seek(0)
         fh.write(self.serialize())
         fh.flush()
@@ -105,19 +109,16 @@ class DumpState:
         log.debug("State flushed")
 
     def mark_as_finished(self, target: Target, func: str) -> None:
-        """
-        Mark sinks that match provided `target` and `func` pair as not dirty.
-        """
+        """Mark sinks that match provided ``target`` and ``func`` pair as not dirty."""
         matching_sinks = [
             sink for sink in self.sinks if str(sink.target_path) == str(target.path) and sink.func == func
         ]
         for sink in matching_sinks:
             sink.is_dirty = False
 
-    def create_sink(self, sink_path: Path, stream_element) -> Sink:
-        """
-        Create a sink instance for provided `sink_path` and `stream_element`
-        (from which `target` and `func` properties are used).
+    def create_sink(self, sink_path: Path, stream_element: RecordStreamElement) -> Sink:
+        """Create a sink instance for provided ``sink_path`` and ``stream_element``
+        (from which ``target`` and ``func`` properties are used).
         """
         sink = Sink(
             path=sink_path,
@@ -127,10 +128,8 @@ class DumpState:
         self.sinks.append(sink)
         return sink
 
-    def update(self, stream_element, fp_position: int) -> None:
-        """
-        Update a sink instance for provided `stream_element`.
-        """
+    def update(self, stream_element: RecordStreamElement, fp_position: int) -> None:
+        """Update a sink instance for provided ``stream_element``."""
         sink = self.get_sink(stream_element.sink_path)
 
         sink.record_count += 1
@@ -141,8 +140,8 @@ class DumpState:
         log.debug("State updated", records=self.record_count, sinks=len(self.sinks), path=self.path)
 
     @classmethod
-    def from_dict(cls, state_dict: dict) -> "DumpState":
-        """Deserialize state instance from provided dict"""
+    def from_dict(cls, state_dict: dict) -> DumpState:
+        """Deserialize state instance from provided dictionary."""
         return DumpState(
             target_paths=state_dict["target_paths"],
             functions=state_dict["functions"],
@@ -164,25 +163,25 @@ class DumpState:
         )
 
     @classmethod
-    def from_path(cls, output_dir: Path) -> Optional["DumpState"]:
-        """Deserialize state instance from a file in the provided output directory path"""
+    def from_path(cls, output_dir: Path) -> DumpState | None:
+        """Deserialize state instance from a file in the provided output directory path."""
         state_path = DumpState.get_state_path(output_dir)
         if not state_path.exists():
-            return
+            return None
 
         with state_path.open(mode="r") as fh:
             try:
                 state_dict = json.load(fh)
             except ValueError as e:
                 log.warning("Can not load state from path", path=state_path, exc=e)
-                return
+                return None
 
         state = DumpState.from_dict(state_dict)
         state.output_dir = output_dir
         return state
 
     def get_invalid_sinks(self) -> list[Sink]:
-        """Return sinks that have a mismatch between recorded size and a real file size"""
+        """Return sinks that have a mismatch between recorded size and a real file size."""
         invalid_sinks = []
         for sink in self.sinks:
             # sink file does not exist
@@ -198,16 +197,13 @@ class DumpState:
         return invalid_sinks
 
     def drop_invalid_sinks(self) -> None:
-        """
-        Remove sinks that have a mismatch between recorded size and
-        a real file size from the list of sinks.
-        """
+        """Remove sinks that have a mismatch between recorded size and a real file size from the list of sinks."""
         for invalid_sink in self.get_invalid_sinks():
             self.sinks.remove(invalid_sink)
             log.debug("Ignoring invalid sink", sink=invalid_sink.path)
 
     def drop_dirty_sinks(self) -> None:
-        """Drop sinks that are marked as "dirty" in the current state from the list of sinks"""
+        """Drop sinks that are marked as "dirty" in the current state from the list of sinks."""
         dirty_sinks = [s for s in self.sinks if s.is_dirty]
         for dirty_sink in dirty_sinks:
             self.sinks.remove(dirty_sink)
@@ -222,7 +218,7 @@ def create_state(
     serialization: Serialization,
     compression: Compression = None,
 ) -> DumpState:
-    """Create a `DumpState` instance with provided properties"""
+    """Create a ``DumpState`` instance with provided properties."""
     current_time = get_current_utc_time()
     return DumpState(
         target_paths=target_paths,
@@ -237,7 +233,7 @@ def create_state(
 
 @contextmanager
 def persisted_state(state: DumpState) -> Iterator[Callable]:
-    """Return a context manager for persisting `DumpState` instance"""
+    """Return a context manager for persisting ``DumpState`` instance."""
 
     def save_state(fh: TextIO) -> None:
         state.persist(fh)
@@ -256,15 +252,12 @@ def persisted_state(state: DumpState) -> Iterator[Callable]:
             save_state(fh)
 
 
-def load_state(output_dir: Path) -> Optional[DumpState]:
-    """
-    Load persisted `DumpState` instance from provided `output_dir` path
-    and perform sink validation.
-    """
+def load_state(output_dir: Path) -> DumpState | None:
+    """Load persisted ``DumpState`` instance from provided ``output_dir`` path and perform sink validation."""
     state = DumpState.from_path(output_dir)
 
     if not state:
-        return
+        return None
 
     # Dropping sinks that are marked as finished (clean) but the file
     # size on the disk is different from the one stored in the state object.
@@ -280,11 +273,11 @@ def load_state(output_dir: Path) -> Optional[DumpState]:
 
 
 def serialize_obj(obj: Any) -> str:
-    """JSON serializer for object types not serializable by `json` lib"""
+    """JSON serializer for object types not serializable by ``json`` library."""
     if isinstance(obj, datetime.datetime):
         return obj.isoformat()
     if isinstance(obj, Path):
         return str(obj)
     if isinstance(obj, enum.Enum):
         return obj.value
-    raise TypeError("Type %s not serializable" % type(obj))
+    raise TypeError(f"Type {type(obj)} not serializable")

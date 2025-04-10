@@ -1,17 +1,22 @@
+from __future__ import annotations
+
 import io
 import re
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import pytest
-
-from dissect.target import Target
 from dissect.target.containers.raw import RawContainer
 from dissect.target.tools.qfind import main as target_qfind
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.target import Target
 
 re_ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
-def test_yara(target_bare: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+def test_qfind(target_bare: Target, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
     buf = (
         (b"\x00" * 1024 * 64)
         + (b"ABCD" + b"\x00" * ((1024 * 4) - 4))

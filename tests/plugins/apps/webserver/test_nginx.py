@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.nginx import NginxPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_nginx_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -132,12 +137,12 @@ def test_nginx_config_commented_logs(target_unix: Target, fs_unix: VirtualFilesy
     assert len(target_unix.nginx.access_paths) == 2
     assert len(target_unix.nginx.error_paths) == 2
 
-    assert sorted(list(map(str, target_unix.nginx.access_paths))) == ["/foo/bar/new.log", "/foo/bar/old.log"]
-    assert sorted(list(map(str, target_unix.nginx.error_paths))) == ["/foo/bar/error/new.log", "/foo/bar/error/old.log"]
+    assert sorted(map(str, target_unix.nginx.access_paths)) == ["/foo/bar/new.log", "/foo/bar/old.log"]
+    assert sorted(map(str, target_unix.nginx.error_paths)) == ["/foo/bar/error/new.log", "/foo/bar/error/old.log"]
 
 
 def test_nginx_error_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we detect and parse nginx error logs correctly."""
+    """Test if we detect and parse nginx error logs correctly."""
 
     errors = """
     2025/01/31 13:37:01 [alert] 12345#12345: this is a message
@@ -158,7 +163,7 @@ def test_nginx_error_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> No
 
 
 def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we parse config files and their include directives correctly."""
+    """Test if we parse config files and their include directives correctly."""
 
     base_conf = """
     user www www;
@@ -203,21 +208,21 @@ def test_nginx_parse_config(target_unix: Target, fs_unix: VirtualFilesystem) -> 
 
     target_unix.add_plugin(NginxPlugin)
 
-    assert sorted(list(map(str, target_unix.nginx.access_paths))) == [
+    assert sorted(map(str, target_unix.nginx.access_paths)) == [
         "/eighty/access.log.1",
         "/some/access.log",
     ]
-    assert sorted(list(map(str, target_unix.nginx.error_paths))) == [
+    assert sorted(map(str, target_unix.nginx.error_paths)) == [
         "/eighty/error.log.1",
         "/some/error.log",
     ]
 
-    assert sorted(list(map(str, target_unix.nginx.host_paths))) == [
+    assert sorted(map(str, target_unix.nginx.host_paths)) == [
         "/etc/nginx/nginx.conf",
         "/more/confs/one.conf",
     ]
 
-    records = sorted(list(target_unix.nginx.hosts()), key=lambda r: r.source)
+    records = sorted(target_unix.nginx.hosts(), key=lambda r: r.source)
 
     assert len(records) == 2
 

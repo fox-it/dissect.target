@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from flow.record.fieldtypes import windows_path
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 def current_version_key() -> str:
     hive_name, path = WindowsPlugin.CURRENT_VERSION_KEY.split("\\", maxsplit=1)
     hive_name = RegistryPlugin.SHORTNAMES.get(hive_name, hive_name)
-    key_name = "\\".join([hive_name, path])
-
-    return key_name
+    return f"{hive_name}\\{path}"
 
 
 CURRENT_VERSION_KEY = current_version_key()
@@ -32,23 +32,23 @@ def version_target(target_win: Target) -> Target:
 
 
 @pytest.fixture
-def win_plugin(version_target: Target):
+def win_plugin(version_target: Target) -> WindowsPlugin:
     return WindowsPlugin(version_target)
 
 
 @pytest.fixture
-def target_win_linux_folders(target_win: Filesystem, fs_linux_sys: Filesystem) -> Iterator[Target]:
+def target_win_linux_folders(target_win: Filesystem, fs_linux_sys: Filesystem) -> Target:
     target_win.fs.mount("/", fs_linux_sys)
-    yield target_win
+    return target_win
 
 
-def map_version_value(target: Target, name: str | None, value: Any):
+def map_version_value(target: Target, name: str | None, value: Any) -> None:
     if name is not None:
         hive = target.registry._root
         hive.map_value(CURRENT_VERSION_KEY, name, VirtualValue(hive, name, value))
 
 
-def assert_value(result: Any, value: Any):
+def assert_value(result: Any, value: Any) -> None:
     if value is None:
         assert result is value
     else:
@@ -56,7 +56,7 @@ def assert_value(result: Any, value: Any):
 
 
 @pytest.mark.parametrize(
-    "name, value",
+    ("name", "value"),
     [
         (None, None),
         ("CurrentVersion", "Some Stringy Version"),
@@ -67,7 +67,7 @@ def test_windowsplugin__legacy_curre_ntversion(
     win_plugin: WindowsPlugin,
     name: str | None,
     value: Any,
-):
+) -> None:
     map_version_value(version_target, name, value)
     result = win_plugin._legacy_current_version()
 
@@ -75,7 +75,7 @@ def test_windowsplugin__legacy_curre_ntversion(
 
 
 @pytest.mark.parametrize(
-    "name, value",
+    ("name", "value"),
     [
         (None, None),
         ("CurrentMajorVersionNumber", 10),
@@ -86,7 +86,7 @@ def test_windowsplugin__major_version(
     win_plugin: WindowsPlugin,
     name: str | None,
     value: Any,
-):
+) -> None:
     map_version_value(version_target, name, value)
     result = win_plugin._major_version()
 
@@ -94,7 +94,7 @@ def test_windowsplugin__major_version(
 
 
 @pytest.mark.parametrize(
-    "name, value",
+    ("name", "value"),
     [
         (None, None),
         ("CurrentMinorVersionNumber", 0),
@@ -105,7 +105,7 @@ def test_windowsplugin__minor_version(
     win_plugin: WindowsPlugin,
     name: str | None,
     value: Any,
-):
+) -> None:
     map_version_value(version_target, name, value)
     result = win_plugin._minor_version()
 
@@ -113,7 +113,7 @@ def test_windowsplugin__minor_version(
 
 
 @pytest.mark.parametrize(
-    "keys, value",
+    ("keys", "value"),
     [
         ([], None),
         ([("CurrentVersion", "x.y")], "x.y"),
@@ -141,7 +141,7 @@ def test_windowsplugin__nt_version(
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
     value: str | None,
-):
+) -> None:
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)
     result = win_plugin._nt_version()
@@ -150,7 +150,7 @@ def test_windowsplugin__nt_version(
 
 
 @pytest.mark.parametrize(
-    "keys, value",
+    ("keys", "value"),
     [
         ([], None),
         (
@@ -240,7 +240,7 @@ def test_windowsplugin_version(
     win_plugin: WindowsPlugin,
     keys: list[tuple[str, Any]],
     value: str | None,
-):
+) -> None:
     for key_name, key_value in keys:
         map_version_value(version_target, key_name, key_value)
     result = win_plugin.version
@@ -279,7 +279,7 @@ def test_windows_user(target_win_users: Target) -> None:
 def test_windows_hostname(
     registry_value: bytes, expected_hostname: str, target_win_users: Target, hive_hklm: VirtualHive
 ) -> None:
-    """test if we can parse windows hostnames correctly."""
+    """Test if we can parse windows hostnames correctly."""
 
     key_name = "SYSTEM\\ControlSet001\\Control\\ComputerName\\ComputerName"
     key = VirtualKey(hive_hklm, key_name)

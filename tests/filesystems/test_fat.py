@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest.mock import Mock, create_autospec
 
 import pytest
@@ -11,14 +13,14 @@ from dissect.target.filesystems.fat import (
 
 
 @pytest.mark.parametrize(
-    "raised_exception, expected_exception",
+    ("raised_exception", "expected_exception"),
     [
         (fat_exc.FileNotFoundError, FileNotFoundError),
         (fat_exc.Error, FileNotFoundError),
         (fat_exc.NotADirectoryError, NotADirectoryError),
     ],
 )
-def test_get_entry(raised_exception, expected_exception):
+def test_get_entry(raised_exception: Exception, expected_exception: Exception) -> None:
     """Test whether the raised exception generates the expected exception."""
     mocked_fs = create_autospec(FatFilesystem)
     mocked_fs.fatfs = Mock()

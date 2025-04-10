@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import tarfile as tf
-from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import (
@@ -14,6 +13,10 @@ from dissect.target.filesystems.tar import (
 from dissect.target.helpers import fsutil, loaderutil
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.loader import Loader, SubLoader
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -157,25 +160,23 @@ class GenericTarSubLoader(TarSubLoader):
 class TarLoader(Loader):
     """Load tar files."""
 
-    __subloaders__ = [
+    __subloaders__ = (
         import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
         GenericTarSubLoader,  # should be last
-    ]
+    )
 
-    def __init__(self, path: Path | str, **kwargs):
-        super().__init__(path)
-
-        if isinstance(path, str):
-            path = Path(path)
+    def __init__(self, path: Path, **kwargs):
+        super().__init__(path, **kwargs)
 
         if is_compressed(path):
             log.warning(
-                f"Tar file {path!r} is compressed, which will affect performance. "
-                "Consider uncompressing the archive before passing the tar file to Dissect."
+                "Tar file %r is compressed, which will affect performance. "
+                "Consider uncompressing the archive before passing the tar file to Dissect.",
+                path,
             )
 
         self.fh = path.open("rb")
-        self.tar = tf.open(mode="r:*", fileobj=self.fh)
+        self.tar = tf.open(mode="r:*", fileobj=self.fh)  # noqa: SIM115
         self.subloader = None
 
     @staticmethod

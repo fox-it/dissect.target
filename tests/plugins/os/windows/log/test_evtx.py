@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import shutil
 from datetime import datetime, timezone
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.log import evt, evtx
 from dissect.target.plugins.scrape import scrape
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_path: str) -> None:
@@ -35,7 +41,7 @@ def mock_registry_log_location(target_win: Target, reg_key_name: str, mock_log_p
 
 
 @pytest.mark.parametrize(
-    "is_in_directory, is_in_registry, duplicate",
+    ("is_in_directory", "is_in_registry", "duplicate"),
     [
         (True, False, False),
         (False, True, False),
@@ -106,15 +112,15 @@ def test_evtx_scraping(target_win: Target) -> None:
     plugin = evtx.EvtxPlugin(target_win)
     evtx_log_file = absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx")
 
-    with open(evtx_log_file, "rb") as f:
-        target_win.disks.add(f)
+    with evtx_log_file.open("rb") as fh:
+        target_win.disks.add(fh)
         scraped_records = list(plugin.scraped_evtx())
 
     assert len(scraped_records) == 5
 
 
 def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    """test if we normalize certain evtx fields correctly."""
+    """Test if we normalize certain evtx fields correctly."""
 
     # Example Security.evtx originates from Windows 10 22H2 Pro build 19045.2006,
     # events exported after clean virtual machine post-install.
@@ -123,7 +129,7 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
 
     target_win.add_plugin(evtx.EvtxPlugin)
 
-    records = sorted(list(target_win.evtx()), key=lambda r: r.ts)
+    records = sorted(target_win.evtx(), key=lambda r: r.ts)
 
     # Verified amount of events in Event Viewer
     assert len(records) == 759
@@ -154,6 +160,6 @@ def test_evtx_normalize_values(target_win: Target, fs_win: VirtualFilesystem) ->
     ],
 )
 def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> None:
-    """test if ``unique_keys`` correctly deduplicates key values."""
+    """Test if ``unique_keys`` correctly deduplicates key values."""
 
     assert evtx.unique_key(key, keys) == expected_key

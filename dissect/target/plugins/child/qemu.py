@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class QemuChildTargetPlugin(ChildTargetPlugin):

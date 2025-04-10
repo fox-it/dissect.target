@@ -5,12 +5,15 @@ import re
 import urllib.parse
 from datetime import datetime, timezone, tzinfo
 from enum import Enum
-from pathlib import Path
-from typing import BinaryIO, Callable, Iterator, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, BinaryIO, TypeVar
 
 from dissect.util.ts import from_unix
 
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -47,18 +50,10 @@ def to_list(value: T | list[T] | None) -> list[T]:
 
 
 class StrEnum(str, Enum):
-    """Sortable and serializible string-based enum"""
+    """Sortable and serializible string-based enum."""
 
 
-def list_to_frozen_set(function: Callable) -> Callable:
-    def wrapper(*args):
-        args = [frozenset(x) if isinstance(x, list) else x for x in args]
-        return function(*args)
-
-    return wrapper
-
-
-def parse_path_uri(path: Path) -> tuple[Optional[str], Optional[str], Optional[str]]:
+def parse_path_uri(path: Path) -> tuple[str | None, str | None, str | None]:
     if path is None:
         return None, None, None
     parsed_path = urllib.parse.urlparse(str(path))
@@ -66,7 +61,7 @@ def parse_path_uri(path: Path) -> tuple[Optional[str], Optional[str], Optional[s
     return parsed_path.scheme, parsed_path.path, parsed_query
 
 
-def parse_options_string(options: str) -> dict[str, Union[str, bool]]:
+def parse_options_string(options: str) -> dict[str, str | bool]:
     result = {}
     for opt in options.split(","):
         if "=" in opt:
@@ -110,7 +105,7 @@ STRIP_RE = re.compile(r"^[\s\x00]*|[\s\x00]*$")
 
 
 def year_rollover_helper(
-    path: Path, re_ts: Union[str, re.Pattern], ts_format: str, tzinfo: tzinfo = timezone.utc
+    path: Path, re_ts: str | re.Pattern, ts_format: str, tzinfo: tzinfo = timezone.utc
 ) -> Iterator[tuple[datetime, str]]:
     """Helper function for determining the correct timestamps for log files without year notation.
 
@@ -151,7 +146,7 @@ def year_rollover_helper(
             # See https://github.com/python/cpython/issues/70647 and https://github.com/python/cpython/pull/117107.
             # Use 1904 instead of 1900 to include leap days (29 Feb).
             try:
-                compare_ts = datetime.strptime(f"{timestamp.group(0)};1904", f"{ts_format};%Y")
+                compare_ts = datetime.strptime(f"{timestamp.group(0)};1904", f"{ts_format};%Y").replace(tzinfo=tzinfo)
             except ValueError as e:
                 log.warning("Unable to create comparison timestamp for %r in line %r: %s", timestamp.group(0), line, e)
                 log.debug("", exc_info=e)
@@ -162,7 +157,9 @@ def year_rollover_helper(
             last_seen_month = compare_ts.month
 
             try:
-                relative_ts = datetime.strptime(f"{timestamp.group(0)};{current_year}", f"{ts_format};%Y")
+                relative_ts = datetime.strptime(f"{timestamp.group(0)};{current_year}", f"{ts_format};%Y").replace(
+                    tzinfo=tzinfo
+                )
             except ValueError as e:
                 log.warning(
                     "Timestamp '%s;%s' does not match format '%s;%%Y', skipping line %r: %s",
@@ -175,4 +172,4 @@ def year_rollover_helper(
                 log.debug("", exc_info=e)
                 continue
 
-            yield relative_ts.replace(tzinfo=tzinfo), line
+            yield relative_ts, line

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
@@ -9,6 +11,9 @@ from dissect.target.plugins.os.unix.packagemanager import (
     PackageManagerLogRecord,
     PackageManagerPlugin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class ZypperPlugin(PackageManagerPlugin):
@@ -20,8 +25,7 @@ class ZypperPlugin(PackageManagerPlugin):
     LOG_FILES_GLOB = "history*"
 
     def check_compatible(self) -> None:
-        log_files = list(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB))
-        if not len(log_files):
+        if not next(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB), None):
             raise UnsupportedPluginError("No zypper files found")
 
     @export(record=PackageManagerLogRecord)
@@ -46,8 +50,8 @@ class ZypperPlugin(PackageManagerPlugin):
             2022-12-16 12:57:50|remove |unzip|6.00-41.1|x86_64|root@ec9fa6d67dda|
             2022-12-16 12:58:49|command|root@ec9fa6d67dda|'zypper' 'install' 'unzip'|
         """  # noqa E501
+        target_tz = self.target.datetime.tzinfo
 
-        tzinfo = self.target.datetime.tzinfo
         for path in self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB):
             for line in open_decompress(path, "rt"):
                 line = line.strip()
@@ -57,7 +61,7 @@ class ZypperPlugin(PackageManagerPlugin):
                     continue
 
                 ts, operation, *remainder = line.split("|")
-                ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo)
+                ts = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=target_tz)
                 operation = OperationTypes.infer(operation)
 
                 record = PackageManagerLogRecord(

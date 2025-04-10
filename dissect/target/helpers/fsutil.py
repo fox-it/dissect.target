@@ -11,7 +11,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator, Sequence, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO
 
 try:
     import lzma
@@ -34,7 +34,6 @@ try:
 except ImportError:
     HAS_ZSTD = False
 
-import dissect.target.filesystem as filesystem
 from dissect.target.exceptions import FileNotFoundError, SymlinkRecursionError
 from dissect.target.helpers.polypath import (
     abspath,
@@ -53,6 +52,11 @@ from dissect.target.helpers.polypath import (
     splitroot,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+
+    import dissect.target.filesystem as filesystem
+
 if sys.version_info >= (3, 13):
     from dissect.target.helpers.compat.path_313 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 12):
@@ -61,7 +65,7 @@ elif sys.version_info >= (3, 11):
     from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 10):
     from dissect.target.helpers.compat.path_310 import PureDissectPath, TargetPath
-elif sys.version_info >= (3, 9):
+elif sys.version_info >= (3, 9):  # noqa: UP036
     from dissect.target.helpers.compat.path_39 import PureDissectPath, TargetPath
 else:
     raise RuntimeError("dissect.target requires at least Python 3.9")
@@ -73,6 +77,8 @@ re_glob_magic = re.compile(r"[*?[]")
 re_glob_index = re.compile(r"(?<=\/)[^\/]*[*?[]")
 
 __all__ = [
+    "PureDissectPath",
+    "TargetPath",
     "abspath",
     "basename",
     "commonpath",
@@ -88,7 +94,7 @@ __all__ = [
     "normalize",
     "normpath",
     "open_decompress",
-    "PureDissectPath",
+    "recurse",
     "relpath",
     "resolve_link",
     "reverse_read",
@@ -98,10 +104,8 @@ __all__ = [
     "splitext",
     "splitroot",
     "stat_result",
-    "TargetPath",
-    "walk_ext",
     "walk",
-    "recurse",
+    "walk_ext",
 ]
 
 
@@ -112,7 +116,7 @@ def generate_addr(path: str | Path, alt_separator: str = "") -> int:
     return int(hashlib.sha256(path.encode()).hexdigest()[:8], 16)
 
 
-class stat_result:  # noqa
+class stat_result:
     """Custom stat_result object, designed to mimick os.stat_result.
 
     The real stat_result is a CPython internal StructSeq, which kind of behaves like a namedtuple on steroids.
@@ -121,7 +125,7 @@ class stat_result:  # noqa
     For consistency this class is also called stat_result.
     """
 
-    __slots__ = {
+    __slots__ = {  # noqa: RUF023
         # Regular fields
         "st_mode": "protection bits",
         "st_ino": "inode",
@@ -217,16 +221,16 @@ class stat_result:  # noqa
             self._st_ctime,
         )
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, stat_result):
             other = other._s
 
         return self._s == other
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: object) -> bool:
         return not self == other
 
-    def __getitem__(self, item) -> int:
+    def __getitem__(self, item: int) -> int:
         return self._s[item]
 
     def __iter__(self) -> Iterator[int]:
@@ -238,26 +242,33 @@ class stat_result:  # noqa
         )
         return f"dissect.target.stat_result({values})"
 
-    def _parse_time(self, ts: int | float) -> tuple[int, float, int]:
+    def _parse_time(self, ts: float) -> tuple[int, float, int]:
         ts_int = int(ts)
         ts_ns = int(ts * 1e9)
 
         return ts_int, ts_ns * 1e-9, ts_ns
 
     @classmethod
-    def copy(cls, other) -> stat_result:
+    def copy(cls, other: stat_result) -> stat_result:
         # First copy the basic 10 fields
         st = cls(list(other))
         # Then iterate and copy any other
         for attr in list(cls.__slots__.keys())[10 : cls._field_count]:
             try:
                 setattr(st, attr, getattr(other, attr))
-            except AttributeError:
+            except AttributeError:  # noqa: PERF203
                 pass
         return st
 
 
-def walk(path_entry, topdown=True, onerror=None, followlinks=False):
+def walk(
+    path_entry: filesystem.FilesystemEntry,
+    topdown: bool = True,
+    onerror: Callable[[Exception], None] | None = None,
+    followlinks: bool = False,
+) -> Iterator[
+    tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
+]:
     for path_list, dirs, files in walk_ext(path_entry, topdown, onerror, followlinks):
         dir_names = [d.name for d in dirs]
         file_names = [f.name for f in files]
@@ -269,7 +280,14 @@ def walk(path_entry, topdown=True, onerror=None, followlinks=False):
             dirs[:] = [d for d in dirs if d.name in dir_names]
 
 
-def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
+def walk_ext(
+    path_entry: filesystem.FilesystemEntry,
+    topdown: bool = True,
+    onerror: Callable[[Exception], None] | None = None,
+    followlinks: bool = False,
+) -> Iterator[
+    tuple[list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry], list[filesystem.FilesystemEntry]]
+]:
     dirs = []
     files = []
 
@@ -291,7 +309,7 @@ def walk_ext(path_entry, topdown=True, onerror=None, followlinks=False):
     for direntry in dirs:
         if followlinks or not direntry.is_symlink():
             for xpath, xdirs, xfiles in walk_ext(direntry, topdown, onerror, followlinks):
-                yield [path_entry] + xpath, xdirs, xfiles
+                yield [path_entry, *xpath], xdirs, xfiles
 
     if not topdown:
         yield [path_entry], dirs, files
@@ -357,9 +375,7 @@ def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fil
             pass
         else:
             # Patterns ending with a slash, so without a base_name, should match only directories.
-            if base_name:
-                yield entry
-            elif entry.is_dir():
+            if base_name or entry.is_dir():
                 yield entry
         return
 
@@ -372,21 +388,14 @@ def glob_ext(direntry: filesystem.FilesystemEntry, pattern: str) -> Iterator[fil
     # If the pattern has more than one path part and these parts (dir_name) contain globs, we
     # recursively go over all the path parts and match them (glob_ext).
     # If these path parts have no globs, we get the path directly by name (glob_ext0).
-    if has_glob_magic(dir_name):
-        glob_in_dir = glob_ext
-    else:
-        glob_in_dir = glob_ext0
+    glob_in_dir = glob_ext if has_glob_magic(dir_name) else glob_ext0
 
     # If the pattern's last path part (base_name) has globs, we fnmatch it against the entries in
     # direntry (glob_ext1), otherwise we get the part directly by name (glob_ext0).
-    if has_glob_magic(base_name):
-        glob_in_base = glob_ext1
-    else:
-        glob_in_base = glob_ext0
+    glob_in_base = glob_ext1 if has_glob_magic(base_name) else glob_ext0
 
-    for direntry in glob_in_dir(direntry, dir_name):
-        for entry in glob_in_base(direntry, base_name):
-            yield entry
+    for entry in glob_in_dir(direntry, dir_name):
+        yield from glob_in_base(entry, base_name)
 
 
 # These 2 helper functions non-recursively glob inside a literal directory.
@@ -440,7 +449,7 @@ def glob_ext0(direntry: filesystem.FilesystemEntry, path: str) -> Iterator[files
             pass
 
 
-def has_glob_magic(s) -> bool:
+def has_glob_magic(s: str) -> bool:
     return re_glob_magic.search(s) is not None
 
 
@@ -617,7 +626,7 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
         while (fh.tell() & ((1 << 64) - 1)) < prev_offset:
             try:
                 lines.append(fh.readline())
-            except UnicodeDecodeError:
+            except UnicodeDecodeError:  # noqa: PERF203
                 offset += 1
                 fh.seek(offset)
 

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.target import container
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 RE_VOLUME_ID = re.compile(r"(?:file=)?([^:]+):([^,]+)")
 
@@ -21,11 +25,6 @@ class ProxmoxLoader(Loader):
     volume directly from the same directory as the configuration file, or from ``/dev/pve/`` (default LVM config).
     If the volume is not found, it will log a warning.
     """
-
-    def __init__(self, path: Path, **kwargs):
-        path = path.resolve()
-        super().__init__(path)
-        self.base_dir = path.parent
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -46,23 +45,26 @@ class ProxmoxLoader(Loader):
                 key, value = line.split(":", 1)
                 value = value.strip()
 
-                if key.startswith(("scsi", "sata", "ide", "virtio")) and key[-1].isdigit():
-                    # https://pve.proxmox.com/wiki/Storage
-                    if match := RE_VOLUME_ID.match(value):
-                        storage_id, volume_id = match.groups()
+                # https://pve.proxmox.com/wiki/Storage
+                if (
+                    key.startswith(("scsi", "sata", "ide", "virtio"))
+                    and key[-1].isdigit()
+                    and (match := RE_VOLUME_ID.match(value))
+                ):
+                    storage_id, volume_id = match.groups()
 
-                        # TODO: parse the storage information from /etc/pve/storage.cfg
-                        # For now, let's try a few assumptions
-                        disk_path = None
-                        if (path := self.base_dir.joinpath(volume_id)).exists():
-                            disk_path = path
-                        elif (path := self.base_dir.joinpath("/dev/pve/").joinpath(volume_id)).exists():
-                            disk_path = path
+                    # TODO: parse the storage information from /etc/pve/storage.cfg
+                    # For now, let's try a few assumptions
+                    disk_path = None
+                    if (path := self.base_path.joinpath(volume_id)).exists() or (
+                        path := self.base_path.joinpath("/dev/pve/").joinpath(volume_id)
+                    ).exists():
+                        disk_path = path
 
-                        if disk_path:
-                            try:
-                                target.disks.add(container.open(disk_path))
-                            except Exception:
-                                target.log.exception("Failed to open disk: %s", disk_path)
-                        else:
-                            target.log.warning("Unable to find disk: %s:%s", storage_id, volume_id)
+                    if disk_path:
+                        try:
+                            target.disks.add(container.open(disk_path))
+                        except Exception:
+                            target.log.exception("Failed to open disk: %s", disk_path)
+                    else:
+                        target.log.warning("Unable to find disk: %s:%s", storage_id, volume_id)

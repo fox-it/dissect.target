@@ -4,7 +4,7 @@ import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import BufferedStream
 
@@ -22,6 +22,9 @@ from dissect.target.filesystem import (
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -139,7 +142,7 @@ class ZipFilesystemEntry(VirtualDirectory):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
         return self.fs.zip.open(self.entry).read().decode()
 
     def readlink_ext(self) -> FilesystemEntry:

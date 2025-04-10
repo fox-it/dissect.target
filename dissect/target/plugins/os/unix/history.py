@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import re
-from typing import Iterator, List, Tuple
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import UnixUserRecord, create_extended_descriptor
 from dissect.target.plugin import Plugin, alias, export, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/history",
@@ -50,7 +57,7 @@ class CommandHistoryPlugin(Plugin):
         if not len(self._history_files):
             raise UnsupportedPluginError("No command history found")
 
-    def _find_history_files(self) -> List[Tuple[str, TargetPath, UnixUserRecord]]:
+    def _find_history_files(self) -> list[tuple[str, TargetPath, UnixUserRecord]]:
         """Find existing history files."""
         history_files = []
         for user_details in self.target.user_details.all_with_home():
@@ -80,10 +87,11 @@ class CommandHistoryPlugin(Plugin):
                 yield from self.parse_generic_history(history_path, user, shell)
 
     @internal
-    def parse_generic_history(self, file, user: UnixUserRecord, shell: str) -> Iterator[CommandHistoryRecord]:
-        """Parse bash_history contents.
+    def parse_generic_history(self, file: Path, user: UnixUserRecord, shell: str) -> Iterator[CommandHistoryRecord]:
+        """Parse ``bash_history`` contents.
 
-        Regular .bash_history files contain one plain command per line. Extended ``.bash_history`` files look like this:
+        Regular ``.bash_history`` files contain one plain command per line.
+        Extended ``.bash_history`` files look like this:
 
         .. code-block::
 
@@ -124,8 +132,8 @@ class CommandHistoryPlugin(Plugin):
             i += 1
 
     @internal
-    def parse_zsh_history(self, file, user: UnixUserRecord) -> Iterator[CommandHistoryRecord]:
-        """Parse zsh_history contents.
+    def parse_zsh_history(self, file: Path, user: UnixUserRecord) -> Iterator[CommandHistoryRecord]:
+        """Parse ``zsh_history`` contents.
 
         Regular ``.zsh_history`` lines are just the plain commands. Extended ``.zsh_history`` files look like this:
 
@@ -180,7 +188,7 @@ class CommandHistoryPlugin(Plugin):
             - cmd: echo "test: test"
             when: 1688986629
 
-        Note that the last `- cmd: echo "test: test"` is not valid YAML,
+        Note that the last ``- cmd: echo "test: test"`` is not valid YAML,
         which is why we cannot safely use the Python yaml module.
 
         Resources:

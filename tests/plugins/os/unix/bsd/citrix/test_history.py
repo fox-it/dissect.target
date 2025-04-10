@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import datetime
 import gzip
 import textwrap
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.bsd.citrix.history import CitrixCommandHistoryPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_netscaler_bash_history_absolute_path_glob(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 
@@ -9,6 +9,11 @@ from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPlugi
 from dissect.target.helpers import regutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 AMCACHE_FILE_KEYS = {
     "0": "product_name",
@@ -200,15 +205,15 @@ AppLaunchAppcompatRecord = TargetRecordDescriptor(
 class AmcachePluginOldMixin:
     __namespace__ = "amcache"
 
-    def _replace_indices_with_fields(self, mapping, record):
+    def _replace_indices_with_fields(self, mapping: dict[str, str], record: regutil.RegistryKey) -> dict[str, str]:
         record_data = {v.name: v.value for v in record.values()}
         result = {}
-        for key in record_data:
-            field = mapping[key] if key in mapping else key
-            result[field] = record_data[key]
+        for key, value in record_data.items():
+            field = mapping.get(key, key)
+            result[field] = value
         return result
 
-    def parse_file(self):
+    def parse_file(self) -> Iterator[FileAppcompatRecord]:
         key = "Root\\File"
 
         for entry in self.read_key_subkeys(key):
@@ -234,7 +239,7 @@ class AmcachePluginOldMixin:
                     _target=self.target,
                 )
 
-    def parse_programs(self):
+    def parse_programs(self) -> Iterator[ProgramsAppcompatRecord]:
         key = "Root\\Programs"
 
         for entry in self.read_key_subkeys(key):
@@ -327,12 +332,11 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         - https://binaryforay.blogspot.com/2015/04/appcompatcache-changes-in-windows-10.html
         - https://cyber.gouv.fr/sites/default/files/2019/01/anssi-coriin_2019-analysis_amcache.pdf
         - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
-
     """
 
     __namespace__ = "amcache"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.amcache = regutil.HiveCollection()
         self.amcache_applaunch = False
@@ -348,21 +352,18 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         if not len(self.amcache) > 0 and not self.amcache_applaunch:
             raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 
-    def read_key_subkeys(self, key):
+    def read_key_subkeys(self, key: str) -> Iterator[regutil.RegistryKey]:
         try:
-            for entry in self.amcache.key(key).subkeys():
-                yield entry
+            yield from self.amcache.key(key).subkeys()
         except RegistryKeyNotFoundError:
             self.target.log.warning('Could not find registry key "%s"', key)
 
-    def parse_inventory_application(self):
+    def parse_inventory_application(self) -> Iterator[ApplicationAppcompatRecord]:
         """Parse Root\\InventoryApplication registry key subkeys.
 
         References:
             - https://docs.microsoft.com/en-us/windows/privacy/required-windows-diagnostic-data-events-and-fields-2004#microsoftwindowsinventorycoreinventoryapplicationadd
-
-        """  # noqa
-
+        """
         key = "Root\\InventoryApplication"
 
         for entry in self.read_key_subkeys(key):
@@ -425,13 +426,12 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 _target=self.target,
             )
 
-    def parse_inventory_application_file(self):
+    def parse_inventory_application_file(self) -> Iterator[ApplicationFileAppcompatRecord]:
         """Parse Root\\InventoryApplicationFile registry key subkeys.
 
         References:
             - https://docs.microsoft.com/en-us/windows/privacy/required-windows-diagnostic-data-events-and-fields-2004#microsoftwindowsinventorycoreinventoryapplicationadd
-
-        """  # noqa
+        """
         key = "Root\\InventoryApplicationFile"
 
         for entry in self.read_key_subkeys(key):
@@ -460,7 +460,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
             #     "Version": "7.2105.4012.0"
             # }
 
-            sha1_digest = entry_data.get("FileId", None)
+            sha1_digest = entry_data.get("FileId")
             # The FileId, if it exists, is always prefixed with 4 zeroes (0000)
             # and sometimes the FileId is an empty string.
             sha1_digest = sha1_digest[-40:] if sha1_digest else None
@@ -486,7 +486,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 _target=self.target,
             )
 
-    def parse_inventory_driver_binary(self):
+    def parse_inventory_driver_binary(self) -> Iterator[BinaryAppcompatRecord]:
         key = "Root\\InventoryDriverBinary"
 
         for entry in self.read_key_subkeys(key):
@@ -511,7 +511,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 _target=self.target,
             )
 
-    def parse_inventory_application_shortcut(self):
+    def parse_inventory_application_shortcut(self) -> Iterator[ShortcutAppcompatRecord]:
         key = "Root\\InventoryApplicationShortcut"
 
         for entry in self.read_key_subkeys(key):
@@ -521,7 +521,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
                 _target=self.target,
             )
 
-    def parse_inventory_device_container(self):
+    def parse_inventory_device_container(self) -> Iterator[ContainerAppcompatRecord]:
         # https://binaryforay.blogspot.com/2017/10/amcache-still-rules-everything-around.html
         key = "Root\\InventoryDeviceContainer"
 
@@ -646,9 +646,11 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
 def parse_win_datetime(value: str) -> datetime | None:
     if value:
-        return datetime.strptime(value, "%m/%d/%Y %H:%M:%S")
+        return datetime.strptime(value, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
+    return None
 
 
 def parse_win_timestamp(value: str) -> datetime | None:
     if value:
         return wintimestamp(value)
+    return None

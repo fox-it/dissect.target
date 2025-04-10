@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 import textwrap
 from datetime import datetime, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.shell.wget import WgetPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_wget_hsts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if .wget-hsts files are parsed as expected"""
+    """Test if .wget-hsts files are parsed as expected."""
     fs_unix.map_file_fh("/etc/hostname", BytesIO(b"example.domain"))
 
     fs_unix.map_file_fh(
@@ -32,7 +37,7 @@ def test_wget_hsts(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Non
     target_unix_users.add_plugin(UnixPlugin)
     target_unix_users.add_plugin(WgetPlugin)
 
-    results = sorted(list(target_unix_users.wget.hsts()), key=lambda r: r.host)
+    results = sorted(target_unix_users.wget.hsts(), key=lambda r: r.host)
 
     assert len(results) == 4
     assert [r.host for r in results] == [

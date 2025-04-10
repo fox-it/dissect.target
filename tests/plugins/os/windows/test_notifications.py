@@ -1,15 +1,20 @@
+from __future__ import annotations
+
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from flow.record.fieldtypes import datetime
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.plugins.os.windows.notifications import (
     NOTIFICATIONS_DIR,
     NotificationsPlugin,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 USER_DIR = "Users\\John"
 

@@ -1,17 +1,22 @@
+from __future__ import annotations
+
 import random
-from typing import Sequence, Tuple
+from typing import TYPE_CHECKING
 
 from flow.record import RecordDescriptor
-from flow.record.base import parse_def
+from flow.record.base import Record, parse_def
 
 from dissect.target.helpers.descriptor_extensions import (
     RecordDescriptorExtensionBase,
     TargetRecordDescriptorExtension,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 
 class ExtendableRecordDescriptor(RecordDescriptor):
-    def __init__(self, name: str, fields: Sequence[Tuple[str, str]] = None):
+    def __init__(self, name: str, fields: Sequence[tuple[str, str]] | None = None):
         """A RecordDescriptor with default fields for dissect targets
         automatically added.
         """
@@ -45,20 +50,19 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         elif fields is None:
             name, fields = parse_def(name)
 
-        default_field_names = set(field_name for _, field_name in prepend_default_fields + append_default_fields)
+        default_field_names = {field_name for _, field_name in prepend_default_fields + append_default_fields}
         extended_fields.extend(prepend_default_fields)
 
         for field_type, field_name in fields:
             if field_name in default_field_names:
                 raise TypeError(f"Default field '{field_name}' is not allowed to be explicitly declared")
-            else:
-                extended_fields.append((field_type, field_name))
+            extended_fields.append((field_type, field_name))
 
         extended_fields.extend(append_default_fields)
 
         super().__init__(name, fields=extended_fields)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> Record:
         """Generate a record.
 
         Default fields are prefilled if the _target keyword argument is
@@ -78,7 +82,9 @@ class ExtendableRecordDescriptor(RecordDescriptor):
         return super().__call__(*args, **kwargs)
 
 
-def create_extended_descriptor(extensions: Sequence[RecordDescriptorExtensionBase], descriptor_class_name: str = None):
+def create_extended_descriptor(
+    extensions: Sequence[RecordDescriptorExtensionBase], descriptor_class_name: str | None = None
+) -> type[ExtendableRecordDescriptor]:
     class_name = descriptor_class_name or f"CustomExtendedRecordDescriptor{int(random.random() * 100000)}"
     # ExtendableRecordDescriptor must come first, since `ExtendableRecordDescriptor.__init__()` constructor
     # must be executed for extensions to work
@@ -88,7 +94,7 @@ def create_extended_descriptor(extensions: Sequence[RecordDescriptorExtensionBas
 TargetRecordDescriptor = create_extended_descriptor([])
 
 
-def DynamicDescriptor(types):  # noqa
+def DynamicDescriptor(types: Sequence[str]) -> RecordDescriptor:
     """Returns a RecordDescriptor with the provided types.
 
     Plugins that yield records are required to provide their RecordDescriptor

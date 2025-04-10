@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 
@@ -20,7 +22,7 @@ class ExchangePlugin(Plugin):
                     setup_key = subkey.subkey("Setup")
                     install_path = setup_key.value("MsiInstallPath").value
                     paths.append(install_path)
-                except RegistryError:
+                except RegistryError:  # noqa: PERF203
                     pass
 
         return paths

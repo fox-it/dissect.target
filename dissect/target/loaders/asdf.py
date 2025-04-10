@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dissect.evidence import AsdfSnapshot
@@ -11,7 +10,9 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class AsdfLoader(Loader):
@@ -20,13 +21,11 @@ class AsdfLoader(Loader):
     METADATA_PREFIX = "$asdf$"
 
     def __init__(self, path: Path, **kwargs):
-        path = path.resolve()
-
-        super().__init__(path)
+        super().__init__(path, **kwargs)
         self.asdf = AsdfSnapshot(path.open("rb"))
 
     @staticmethod
-    def detect(path) -> bool:
+    def detect(path: Path) -> bool:
         return path.suffix.lower() == ".asdf"
 
     def map(self, target: Target) -> None:

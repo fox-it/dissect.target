@@ -1,8 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.windows import ual
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_ual_plugin(target_win, fs_win):
+
+def test_ual_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     ual_dir = absolute_path("_data/plugins/os/windows/ual")
 
     fs_win.map_dir("Windows/System32/LogFiles/Sum", ual_dir)

@@ -4,15 +4,18 @@ import base64
 import textwrap
 from enum import Enum, auto
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.ssh.openssh import (
     OpenSSHPlugin,
     calculate_fingerprints,
 )
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture(
@@ -22,7 +25,7 @@ from dissect.target.plugins.apps.ssh.openssh import (
     ],
     ids=["target_unix", "target_windows"],
 )
-def target_and_filesystem(request) -> tuple[Target, VirtualFilesystem]:
+def target_and_filesystem(request: pytest.FixtureRequest) -> tuple[Target, VirtualFilesystem]:
     target = request.getfixturevalue(request.param[0])
     filesystem = request.getfixturevalue(request.param[1])
     return target, filesystem

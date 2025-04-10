@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Iterator
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -12,7 +12,13 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
     RemoteAccessPlugin,
 )
-from dissect.target.plugins.general.users import UserDetails
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
+
 
 RE_LOG = re.compile(
     r"""
@@ -54,22 +60,22 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
     __namespace__ = "teamviewer"
 
-    SYSTEM_GLOBS = [
+    SYSTEM_GLOBS = (
         "sysvol/Program Files/TeamViewer/*.log",
         "sysvol/Program Files (x86)/TeamViewer/*.log",
         "/var/log/teamviewer*/*.log",
-    ]
+    )
 
-    USER_GLOBS = [
+    USER_GLOBS = (
         "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
         "Library/Logs/TeamViewer/teamviewer*_logfile*.log",
-    ]
+    )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
     )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self.logfiles: set[tuple[str, UserDetails | None]] = set()
@@ -95,14 +101,7 @@ class TeamViewerPlugin(RemoteAccessPlugin):
 
         TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
         """
-
-        try:
-            target_tz = self.target.datetime.tzinfo
-
-        except Exception as e:
-            self.target.log.warning("Unable to determine target timezone, assuming UTC if no timezone is found in logs")
-            self.target.log.debug("", exc_info=e)
-            target_tz = timezone.utc
+        target_tz = self.target.datetime.tzinfo
 
         for logfile, user_details in self.logfiles:
             logfile = self.target.fs.path(logfile)
@@ -194,8 +193,8 @@ def parse_start(line: str) -> datetime | None:
             amount = int(amount.replace(":", ""))
             dt["timezone"] = f"{name}{operator}{amount:0>4d}"
 
-        start_date = datetime.strptime(
+        return datetime.strptime(  # noqa: DTZ007
             f"{dt['date']} {dt['time']}" + (f" {dt['timezone']}" if dt["timezone"] else ""),
             "%Y/%m/%d %H:%M:%S" + (" %Z%z" if dt["timezone"] else ""),
         )
-        return start_date
+    return None

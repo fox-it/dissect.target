@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import io
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, call, patch
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.plugins.scrape.scrape import ScrapePlugin
-from dissect.target.target import Target
 from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_create_streams(target_bare: Target) -> None:

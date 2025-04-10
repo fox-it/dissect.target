@@ -6,14 +6,15 @@ from typing import TYPE_CHECKING, BinaryIO, Callable
 
 from dissect.util.stream import MappingStream
 
-from dissect.target.container import Container
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.scrape import Needle, find_needles, scrape_chunks
 from dissect.target.plugin import Plugin, internal
 from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.target.container import Container
+    from dissect.target.helpers.record import TargetRecordDescriptor
 
 
 class ScrapePlugin(Plugin):
@@ -130,7 +131,9 @@ class ScrapePlugin(Plugin):
                 needles,
                 lock_seek=lock_seek,
                 block_size=block_size,
-                progress=(lambda current: progress(disk, current, stream.size)) if progress else None,
+                progress=(lambda current, disk=disk, stream=stream: progress(disk, current, stream.size))
+                if progress
+                else None,
             ):
                 yield disk, stream, needle, offset
 

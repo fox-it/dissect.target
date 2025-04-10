@@ -18,6 +18,7 @@ class LocalePlugin(Plugin):
         """Return the configured localtime of the iOS system."""
         if (localtime := self.target.fs.path("/private/var/db/timezone/localtime")).exists():
             return timezone_from_path(localtime.read_text().strip())
+        return None
 
     @export(property=True)
     def language(self) -> list[str]:

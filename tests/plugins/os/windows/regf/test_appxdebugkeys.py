@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -41,7 +43,7 @@ DEBUG_INFO = "C:\\windows\\system32\\cmd.exe"
 
 
 @pytest.fixture
-def target_win_appx(target_win_users: Target, hive_hku: RegistryHive):
+def target_win_appx(target_win_users: Target, hive_hku: RegistryHive) -> Target:
     packaged_appx_key = VirtualKey(hive_hku, PACKAGED_APPX_KEY_NAME)
     packaged_appx_key.add_value(PACKAGED_APPX_VALUE_NAME, DEBUG_INFO)
     hive_hku.map_key(PACKAGED_APPX_KEY_NAME, packaged_appx_key)

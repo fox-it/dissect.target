@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
-from typing import BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.hypervisor import hdd
 
 from dissect.target.container import Container
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class HddContainer(Container):
@@ -19,11 +23,11 @@ class HddContainer(Container):
         super().__init__(fh, self.stream.size, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return False
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return path.suffix.lower() == ".hdd"
 
     def read(self, length: int) -> bytes:

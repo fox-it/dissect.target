@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from typing import BinaryIO, Iterable, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import from_unix
@@ -11,6 +10,10 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
 
 # Resources: https://linux.die.net/man/5/locate.db
 mlocate_def = """
@@ -72,7 +75,7 @@ c_mlocate = cstruct(endian=">").load(mlocate_def)
 
 
 class MLocateFile:
-    """mlocate file parser
+    """Parser for mlocate files.
 
     Resources:
         - https://manpages.debian.org/testing/mlocate/mlocate.db.5.en.html
@@ -94,7 +97,7 @@ class MLocateFile:
 
             yield dbe_type, entry
 
-    def __iter__(self) -> Iterable[MLocateFile]:
+    def __iter__(self) -> Iterator[MLocateFile]:
         while True:
             try:
                 directory_entry = c_mlocate.directory_entry(self.fh)
@@ -110,7 +113,7 @@ class MLocateFile:
                         path=file_path,
                         dbe_type=dbe_type,
                     )
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 return
 
 

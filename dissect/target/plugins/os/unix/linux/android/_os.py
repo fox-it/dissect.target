@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.helpers import configutil
 from dissect.target.helpers.record import EmptyRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class AndroidPlugin(LinuxPlugin):
@@ -22,9 +26,8 @@ class AndroidPlugin(LinuxPlugin):
         for build_prop in self.build_prop_paths:
             try:
                 self.props.update(configutil.parse(build_prop, separator=("=",), comment_prefixes=("#",)).parsed_data)
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 self.target.log.warning("Unable to parse Android build.prop file %s: %s", build_prop, e)
-                pass
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
@@ -38,6 +41,7 @@ class AndroidPlugin(LinuxPlugin):
         for fs in target.filesystems:
             if all(fs.exists(p) for p in ANDROID_PATHS) and any(find_build_props(fs)):
                 return fs
+        return None
 
     @classmethod
     def create(cls, target: Target, sysvol: Filesystem) -> AndroidPlugin:

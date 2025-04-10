@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import sys
-from typing import Iterator
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture
@@ -35,7 +40,7 @@ def mock_device(mock_cbc_sdk: MagicMock) -> MagicMock:
 
     mock_cbc_sdk.rest_api.CBCloudAPI.return_value.select.return_value.all.return_value = [mock_device]
 
-    yield mock_device
+    return mock_device
 
 
 @pytest.fixture
@@ -43,7 +48,7 @@ def mock_session(mock_device: MagicMock) -> MagicMock:
     mock_session = MagicMock()
     mock_device.lr_session.return_value = mock_session
 
-    yield mock_session
+    return mock_session
 
 
 def test_cb_loader(mock_session: MagicMock) -> None:
@@ -51,21 +56,22 @@ def test_cb_loader(mock_session: MagicMock) -> None:
     from dissect.target.loader import open as loader_open
     from dissect.target.loaders.cb import CbLoader, CbRegistry
 
-    loader = loader_open("cb://workstation@instance")
-    assert isinstance(loader, CbLoader)
-    assert loader.session is mock_session
+    with patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"cb": CbLoader}):
+        loader = loader_open("cb://workstation@instance")
+        assert isinstance(loader, CbLoader)
+        assert loader.session is mock_session
 
-    mock_session.session_data = {"drives": ["C:\\"]}
+        mock_session.session_data = {"drives": ["C:\\"]}
 
-    t = Target()
-    loader.map(t)
+        t = Target()
+        loader.map(t)
 
-    assert len(t.filesystems) == 1
-    assert isinstance(t.fs.mounts["c:\\"], CbFilesystem)
-    assert t.fs.mounts["c:\\"].prefix == "c:\\"
+        assert len(t.filesystems) == 1
+        assert isinstance(t.fs.mounts["c:\\"], CbFilesystem)
+        assert t.fs.mounts["c:\\"].prefix == "c:\\"
 
-    assert len(t._plugins) == 1
-    assert isinstance(t._plugins[0], CbRegistry)
+        assert len(t._plugins) == 1
+        assert isinstance(t._plugins[0], CbRegistry)
 
 
 def test_cb_registry(target_bare: Target, mock_session: MagicMock) -> None:

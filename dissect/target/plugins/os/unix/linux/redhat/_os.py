@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from dissect.target.filesystem import Filesystem
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class RedHatPlugin(LinuxPlugin):
@@ -24,3 +28,4 @@ class RedHatPlugin(LinuxPlugin):
             for path in REDHAT_PATHS:
                 if fs.exists(path):
                     return fs
+        return None

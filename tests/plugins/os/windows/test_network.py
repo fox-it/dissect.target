@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -9,8 +10,10 @@ import pytest
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.network import WindowsNetworkPlugin
-from dissect.target.target import Target
 from tests.conftest import change_controlset
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @dataclass
@@ -347,7 +350,7 @@ def test_network_dhcp_and_static(
     property(MagicMock(return_value=["ControlSet001", "ControlSet002", "ControlSet003"])),
 )
 def test_regression_duplicate_ips(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877."""
 
     change_controlset(hive_hklm, 3)
 

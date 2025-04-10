@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import argparse
 import logging
 
-from dissect.target import Target
 from dissect.target.exceptions import TargetError
 from dissect.target.plugins.filesystem.yara import HAS_YARA, YaraPlugin
+from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -17,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="target-yara",
@@ -39,11 +40,11 @@ def main():
 
     if not HAS_YARA:
         log.error("yara-python is not installed: pip install yara-python")
-        parser.exit(1)
+        return 1
 
     if not args.targets:
         log.error("No targets provided")
-        parser.exit(1)
+        return 1
 
     try:
         for target in Target.open_all(args.targets, args.children):
@@ -52,9 +53,11 @@ def main():
                 rs.write(record)
 
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":

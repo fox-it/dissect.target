@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from uuid import UUID
 
 
@@ -31,7 +32,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
         for devs in devices.values():
             try:
                 yield cls(devs, disk=[dev.fh for dev in devs])
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod

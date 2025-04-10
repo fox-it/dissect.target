@@ -19,7 +19,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, BinaryIO, Callable, Iterator, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, ClassVar, TextIO
 
 from dissect.cstruct import hexdump
 from flow.record import RecordOutput
@@ -31,7 +31,6 @@ from dissect.target.exceptions import (
     RegistryValueNotFoundError,
     TargetError,
 )
-from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
 from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
@@ -53,6 +52,11 @@ from dissect.target.tools.utils import (
     generate_argparse_for_bound_method,
     process_generic_arguments,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.filesystem import FilesystemEntry
 
 log = logging.getLogger(__name__)
 logging.lastResort = None
@@ -146,8 +150,9 @@ class ExtendedCmd(cmd.Cmd):
     """
 
     CMD_PREFIX = "cmd_"
-    _runtime_aliases = {}
     DEFAULT_RUNCOMMANDS_FILE = None
+
+    _runtime_aliases: ClassVar[dict[str, str]] = {}
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
@@ -261,7 +266,6 @@ class ExtendedCmd(cmd.Cmd):
             - https://stackoverflow.com/a/16479030
             - https://github.com/python/cpython/blob/3.12/Lib/cmd.py#L10
         """
-        pass
 
     def _exec(self, func: Callable[[list[str], TextIO], bool], command_args_str: str, no_cyber: bool = False) -> bool:
         """Command execution helper that chains initial command and piped subprocesses (if any) together."""
@@ -345,7 +349,6 @@ class ExtendedCmd(cmd.Cmd):
                     print(f"alias {alias_name}={self._runtime_aliases[alias_name]}")
                 else:
                     print(f"alias {alias_name} not found")
-                pass
 
         return False
 
@@ -482,13 +485,14 @@ class TargetCmd(ExtendedCmd):
             else:
                 print(value, file=stdout)
 
-        for func in funcs:
+        # What in the variable hoisting is this
+        for func in funcs:  # noqa: B007
             try:
                 self._exec(_exec_, command_args_str)
-            except PluginError as err:
+            except PluginError:  # noqa: PERF203
                 if self.debug:
-                    raise err
-                self.target.log.error(err)
+                    raise
+                self.target.log.exception("Plugin error")
 
         # Keep the shell open
         return False
@@ -635,25 +639,25 @@ class TargetCli(TargetCmd):
             try:
                 for path in self.target.fs.path("/").glob(glob_path):
                     yield path
-            except ValueError as err:
+            except ValueError as e:
                 # The generator returned by glob() will raise a
                 # ValueError if the '**' glob is not used as an entire path
                 # component
-                print(err)
+                print(e)
 
     def check_file(self, path: str) -> fsutil.TargetPath | None:
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file")
-            return
+            return None
 
         if path.is_dir():
             print(f"{path}: Is a directory")
-            return
+            return None
 
         if not path.is_file():
             print(f"{path}: Not a file")
-            return
+            return None
 
         return path
 
@@ -661,15 +665,15 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such directory")
-            return
+            return None
 
         if path.is_file():
             print(f"{path}: Is a file")
-            return
+            return None
 
         if not path.is_dir():
             print(f"{path}: Not a directory")
-            return
+            return None
 
         return path
 
@@ -677,7 +681,7 @@ class TargetCli(TargetCmd):
         path = self.resolve_path(path)
         if not path.exists():
             print(f"{path}: No such file or directory")
-            return
+            return None
 
         return path
 
@@ -758,7 +762,7 @@ class TargetCli(TargetCmd):
     def cmd_ll(self, args: argparse.Namespace, stdout: TextIO) -> bool:
         """alias for ls -la"""
         args = extend_args(args, self.cmd_ls)
-        args.l = True  # noqa: E741
+        args.l = True
         args.a = True
         return self.cmd_ls(args, stdout)
 
@@ -852,7 +856,7 @@ class TargetCli(TargetCmd):
                     if child_attr := child.get().attr():
                         print_xattr(child, child_attr, stdout)
                         print()
-                except Exception:
+                except Exception:  # noqa: PERF203
                     pass
 
         return False
@@ -896,7 +900,7 @@ class TargetCli(TargetCmd):
 
         def get_diverging_path(path: pathlib.Path, reference_path: pathlib.Path) -> pathlib.Path:
             """Get the part of path where it diverges from reference_path."""
-            diverging_path = pathlib.Path("")
+            diverging_path = pathlib.Path()
 
             for diff_idx, path_part in enumerate(reference_path.parts):
                 if path_part != path.parts[diff_idx]:
@@ -953,7 +957,7 @@ class TargetCli(TargetCmd):
                 if not dst_path.exists() and not dst_path.parent.is_dir():
                     print(f"{dst_path.parent}: destination directory does not exist")
                     return
-                elif dst_path.exists():
+                if dst_path.exists():
                     if dst_path.is_dir():
                         if create_dst_subdir:
                             dst_path = dst_path.joinpath(create_dst_subdir)
@@ -1031,7 +1035,7 @@ class TargetCli(TargetCmd):
             fh = path.open()
             shutil.copyfileobj(fh, stdout)
             stdout.flush()
-        print("")
+        print()
         return False
 
     @arg("path")
@@ -1213,7 +1217,7 @@ class UnixConfigTreeCli(TargetCli):
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.target.fs.alt_separator)
         return self.config_tree.path(path)
 
-    def resolve_key(self, path) -> FilesystemEntry:
+    def resolve_key(self, path: str) -> FilesystemEntry:
         return self.config_tree.path(path).get()
 
     def resolve_glob_path(self, path: fsutil.TargetPath) -> Iterator[fsutil.TargetPath]:
@@ -1226,11 +1230,11 @@ class UnixConfigTreeCli(TargetCli):
             try:
                 for path in self.config_tree.path("/").glob(glob_path):
                     yield path
-            except ValueError as err:
+            except ValueError as e:
                 # The generator returned by glob() will raise a
                 # ValueError if the '**' glob is not used as an entire path
                 # component
-                print(err)
+                print(e)
 
 
 class RegistryCli(TargetCmd):
@@ -1268,10 +1272,7 @@ class RegistryCli(TargetCmd):
         if isinstance(path, regutil.RegistryKey):
             return path
 
-        if path and not path.startswith("\\"):
-            path = "\\".join([self.cwd, path])
-        else:
-            path = path or self.cwd
+        path = f"{self.cwd}\\{path}" if path and not path.startswith("\\") else path or self.cwd
         path = path.replace("\\\\", "\\")
         return self.registry.key(path.strip("\\"))
 
@@ -1293,7 +1294,7 @@ class RegistryCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         if not path.startswith("\\"):
-            path = "\\".join([self.cwd, path])
+            path = f"{self.cwd}\\{path}"
 
         if self.check_key(path):
             self.cwd = "\\" + path.strip("\\")
@@ -1304,12 +1305,10 @@ class RegistryCli(TargetCmd):
         except RegistryError:
             return []
 
-        r = []
-        for s in key.subkeys():
-            r.append((s, fmt_ls_colors("di", s.name) if color else s.name))
-
-        for v in key.values():
-            r.append((v, fmt_ls_colors("fi", v.name) if color else v.name))
+        r = [
+            *((s, fmt_ls_colors("di", s.name) if color else s.name) for s in key.subkeys()),
+            *((v, fmt_ls_colors("fi", v.name) if color else v.name) for v in key.values()),
+        ]
 
         r.sort(key=lambda e: e[0].name)
         return r
@@ -1407,8 +1406,7 @@ def _target_name(target: Target) -> str:
 
 @contextmanager
 def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Iterator[tuple[TextIO, BinaryIO]]:
-    """
-    Generator context manager that chains piped subprocessess and
+    """Generator context manager that chains piped subprocessess and
     returns a tuple (chain input stream, chain output stream).
 
     On context exit the generator will close the input stream and wait for
@@ -1460,8 +1458,7 @@ def build_pipe(pipe_parts: list[str], pipe_stdout: int = subprocess.PIPE) -> Ite
 
 @contextmanager
 def build_pipe_stdout(pipe_parts: list[str]) -> Iterator[TextIO]:
-    """
-    Generator context manager that chains piped subprocessess, with a chain's
+    """Generator context manager that chains piped subprocessess, with a chain's
     outgoing stream configured to be parent's stdout.
 
     Generator returns a chain's input stream from `build_pipe` generator.
@@ -1522,7 +1519,7 @@ def create_cli(targets: list[Target], cli_cls: type[TargetCmd]) -> cmd.Cmd | Non
     if len(targets) == 1:
         target = targets[0]
         if not cli_cls.check_compatible(target):
-            return
+            return None
 
         cli = cli_cls(target)
     else:
@@ -1540,12 +1537,7 @@ def run_cli(cli: cmd.Cmd) -> None:
     while True:
         try:
             cli.cmdloop()
-
-            # Print an empty newline on exit
-            print()
-            return
-
-        except KeyboardInterrupt:
+        except KeyboardInterrupt:  # noqa: PERF203
             # Run postloop so the interrupted command is added to the history file
             cli.postloop()
 
@@ -1554,17 +1546,21 @@ def run_cli(cli: cmd.Cmd) -> None:
 
         except Exception as e:
             if cli.debug:
-                log.exception(e)
+                log.exception("Unhandled error")
             else:
                 log.info(e)
                 print(f"*** Unhandled error: {e}")
                 print("If you wish to see the full debug trace, enable debug mode.")
 
             cli.postloop()
+        else:
+            # Print an empty newline on exit
+            print()
+            return
 
 
 @catch_sigpipe
-def main() -> None:
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -1589,20 +1585,18 @@ def main() -> None:
         major, minor, patch = tuple(map(int, platform.python_version_tuple()))
         if major <= 3 and minor <= 10 and patch < 14:
             print(
-                "\n".join(
-                    [
-                        "Note for users of PyPy < 3.10.14:",
-                        "Autocomplete might not work due to an outdated version of pyrepl/readline.py",
-                        "To fix this, please update your version of PyPy.",
-                    ]
-                )
+                "Note for users of PyPy < 3.10.14:\n"
+                "Autocomplete might not work due to an outdated version of pyrepl/readline.py\n"
+                "To fix this, please update your version of PyPy."
             )
 
     try:
         open_shell(args.targets, args.python, args.registry, args.commands)
     except TargetError as e:
-        log.error(e)
+        log.exception("Error opening shell")
         log.debug("", exc_info=e)
+
+    return 0
 
 
 if __name__ == "__main__":

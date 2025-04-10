@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import bisect
 import io
 from pathlib import Path
-from typing import BinaryIO, List, Union
+from typing import BinaryIO
 
 from dissect.target.container import Container
 
 
-def find_files(path: Path) -> List[Path]:
+def find_files(path: Path) -> list[Path]:
     path = path.resolve()
     return sorted([f for f in path.parent.glob(path.stem + ".*") if f.suffix[1:].isdigit()])
 
@@ -14,7 +16,7 @@ def find_files(path: Path) -> List[Path]:
 class SplitContainer(Container):
     __type__ = "split"
 
-    def __init__(self, fh: Union[list, BinaryIO, Path], *args, **kwargs):
+    def __init__(self, fh: list | BinaryIO | Path, *args, **kwargs):
         self._fhs = []
         self.offsets = [0]
         offset = 0
@@ -34,11 +36,11 @@ class SplitContainer(Container):
         super().__init__(fh, offset, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return isinstance(original, list) and len(original) > 1
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return (path.suffix[1:].isdigit() and len(find_files(path)) > 1) or (
             isinstance(original, list) and len(original) > 1
         )

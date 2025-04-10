@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import stat
 from functools import cached_property
-from typing import BinaryIO, Callable, Iterator, TypeVar
+from typing import TYPE_CHECKING, BinaryIO, Callable, TypeVar
 
 from dissect.util.stream import AlignedStream
 
@@ -19,9 +19,11 @@ from dissect.target.helpers.nfs.nfs3 import (
     NfsProgram,
     NfsVersion,
 )
-from dissect.target.helpers.sunrpc.client import AuthScheme
+from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy, auth_null
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
-from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_null
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ConCredentials = TypeVar("ConCredentials")
 ConVerifier = TypeVar("ConVerifier")
@@ -39,7 +41,9 @@ class AuthFlavorNotSupported(Exception):
         self.provided = provided_flavor
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__} Auth flavor {self.provided} not supported. Supported flavors: {self.supported}"  # noqa: E501
+        return (
+            f"{self.__class__.__name__} Auth flavor {self.provided} not supported. Supported flavors: {self.supported}"
+        )
 
 
 class NfsFilesystem(Filesystem):
@@ -141,7 +145,6 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
-        """Get a new filesystem entry relative to this entry"""
         return self.fs.get(path, relentry=self)
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
@@ -220,12 +223,11 @@ class NfsFilesystemEntry(FilesystemEntry):
     def _mode_file_type(self, type: FileType) -> int:
         if type == FileType.DIR:
             return stat.S_IFDIR
-        elif type == FileType.REG:
+        if type == FileType.REG:
             return stat.S_IFREG
-        elif type == FileType.LNK:
+        if type == FileType.LNK:
             return stat.S_IFLNK
-        else:
-            return 0o000000
+        return 0o000000
 
 
 class NfsStream(AlignedStream):
@@ -234,6 +236,6 @@ class NfsStream(AlignedStream):
         self._client = client
         self._file_handle = file_handle
 
-    def _read(self, offset, size: int) -> bytes:
+    def _read(self, offset: int, size: int) -> bytes:
         data = self._client.readfile(self._file_handle, offset, size)
         return b"".join(data)

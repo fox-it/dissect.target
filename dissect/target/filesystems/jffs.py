@@ -1,4 +1,6 @@
-from typing import BinaryIO, Iterator, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.jffs import jffs2
 from dissect.jffs.c_jffs2 import c_jffs2
@@ -12,6 +14,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class JFFSFilesystem(Filesystem):
@@ -31,7 +36,7 @@ class JFFSFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return JFFSFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[jffs2.INode] = None) -> jffs2.INode:
+    def _get_node(self, path: str, node: jffs2.INode | None = None) -> jffs2.INode:
         try:
             return self.jffs2.get(path, node)
         except jffs2.FileNotFoundError as e:
@@ -93,7 +98,7 @@ class JFFSFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 

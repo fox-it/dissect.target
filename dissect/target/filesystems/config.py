@@ -3,13 +3,17 @@ from __future__ import annotations
 import io
 import textwrap
 from logging import getLogger
-from typing import Any, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 
-from dissect.target import Target
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry, VirtualFilesystem
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import ConfigurationParser, parse
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 log = getLogger(__name__)
 
@@ -26,16 +30,16 @@ class ConfigurationFilesystem(VirtualFilesystem):
         >>> fs = ConfigurationFilesystem(target, "/etc")
         >>> entry = fs.get("xattr.conf")
         <ConfigurationEntry path=/etc/xattr.conf value=<dissect.target.helpers.configutil.Default object at 0x115683280>
-        >>> entry.listdir() # listed entries are the keys in the configuration file
+        >>> entry.listdir()  # listed entries are the keys in the configuration file
         [...
         'system.posix_acl_access',
         'system.posix_acl_default',
         'trusted.SGI_ACL_DEFAULT',
         'trusted.SGI_ACL_FILE',
         ...]
-        >>> entry.get("system.posix_acl_access") # returns the value of the key
+        >>> entry.get("system.posix_acl_access")  # returns the value of the key
         <ConfigurationEntry path=/etc/xattr.conf/system.posix_acl_access value=permissions>
-        >>> entry.get("system.posix_acl_access").open().read() # returns the raw value of the key
+        >>> entry.get("system.posix_acl_access").open().read()  # returns the raw value of the key
         b'permissions\\n'
 
     """
@@ -69,14 +73,14 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         parts = path.split("/")
 
-        for idx, part in enumerate(parts, start=1):
+        for idx, part in enumerate(parts, start=1):  # noqa: B007
             # Resolve link
             if entry.is_symlink():
                 entry = entry.readlink_ext()
 
             if part == ".":
                 continue
-            elif part == "..":
+            if part == "..":
                 entry = entry.up or self.root
                 continue
 
@@ -89,7 +93,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
 
         return parts[idx:], entry
 
-    def get(self, path: str, relentry: Optional[FilesystemEntry] = None, *args, **kwargs) -> ConfigurationEntry:
+    def get(self, path: str, relentry: FilesystemEntry | None = None, *args, **kwargs) -> ConfigurationEntry:
         """Retrieve a :class:`ConfigurationEntry` relative to the root or ``relentry``.
 
         Raises:
@@ -113,8 +117,7 @@ class ConfigurationFilesystem(VirtualFilesystem):
     def _convert_entry(self, file_entry: FilesystemEntry, *args, **kwargs) -> ConfigurationEntry:
         """Creates a :class:`ConfigurationEntry` from a ``file_entry``.
 
-        If an error occurs during the parsing of the file contents,
-        the original ``file_entry`` is returned.
+        If an error occurs during the parsing of the file contents, the original ``file_entry`` is returned.
         """
         entry = file_entry
         config_parser = None
@@ -142,7 +145,7 @@ class ConfigurationEntry(FilesystemEntry):
         >>> fs = ConfigurationFilesystem(target, "/etc")
         >>> entry = fs.get("xattr.conf")
         <ConfigurationEntry path=/etc/xattr.conf value=<dissect.target.helpers.configutil.Default object at 0x115683280>
-        >>> entry.listdir() # listed entries are the keys in the configuration file
+        >>> entry.listdir()  # listed entries are the keys in the configuration file
         [...
         'system.posix_acl_access',
         'system.posix_acl_default',
@@ -155,9 +158,9 @@ class ConfigurationEntry(FilesystemEntry):
             "system.posix_acl_access" : "...",
             ...
         }
-        >>> entry.get("system.posix_acl_access") # returns the value of the key
+        >>> entry.get("system.posix_acl_access")  # returns the value of the key
         <ConfigurationEntry path=/etc/xattr.conf/system.posix_acl_access value=permissions>
-        >>> entry.get("system.posix_acl_access").open().read() # returns the raw value of the key
+        >>> entry.get("system.posix_acl_access").open().read()  # returns the raw value of the key
         b'permissions\\n'
     """
 
@@ -182,7 +185,7 @@ class ConfigurationEntry(FilesystemEntry):
 
         return f"<{self.__class__.__name__} {output}"
 
-    def get(self, key, default: Any | None = None) -> ConfigurationEntry | Any | None:
+    def get(self, key: str, default: Any | None = None) -> ConfigurationEntry | Any | None:
         """Gets the dictionary key that belongs to this entry using ``key``.
         Behaves like ``dictionary.get()``.
 
@@ -195,7 +198,7 @@ class ConfigurationEntry(FilesystemEntry):
         """
         # Check for path in config entry
         if not key:
-            raise TypeError("key should be defined")
+            raise ValueError("key should be defined")
 
         path = fsutil.join(self.path, key, alt_separator=self.fs.alt_separator)
 
@@ -265,7 +268,7 @@ class ConfigurationEntry(FilesystemEntry):
     def scandir(self) -> Iterator[ConfigurationEntry]:
         """Return the items inside :attr:`parser_items` as ``ConfigurationEntries``."""
         if self.is_file():
-            raise NotADirectoryError()
+            raise NotADirectoryError
 
         if self.parser_items is None and self.entry.is_dir():
             for entry in self.entry.scandir():

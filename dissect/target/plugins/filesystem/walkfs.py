@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -6,7 +8,11 @@ from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.filesystem import FilesystemEntry, LayerFilesystemEntry
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 FilesystemRecord = TargetRecordDescriptor(
     "filesystem/entry",
@@ -52,7 +58,7 @@ class WalkFSPlugin(Plugin):
             try:
                 yield generate_record(self.target, entry)
 
-            except FileNotFoundError as e:
+            except FileNotFoundError as e:  # noqa: PERF203
                 self.target.log.warning("File not found: %s", entry)
                 self.target.log.debug("", exc_info=e)
             except Exception as e:

@@ -1,12 +1,12 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 from asn1crypto.algos import EncryptionAlgorithmId
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import keychain
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.plugins.apps.browser.firefox import (
@@ -18,9 +18,13 @@ from dissect.target.plugins.apps.browser.firefox import (
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 @pytest.fixture
-def target_firefox_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_firefox_win(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_dir(
         "Users\\John\\AppData\\Local\\Mozilla\\Firefox\\Profiles\\g1rbw8y7.default-release\\",
         absolute_path("_data/plugins/apps/browser/firefox/"),
@@ -28,11 +32,11 @@ def target_firefox_win(target_win_users: Target, fs_win: VirtualFilesystem) -> I
 
     target_win_users.add_plugin(FirefoxPlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 @pytest.fixture
-def target_firefox_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Iterator[Target]:
+def target_firefox_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -> Target:
     fs_unix.map_dir(
         "/root/.mozilla/firefox/g1rbw8y7.default-release/", absolute_path("_data/plugins/apps/browser/firefox/")
     )
@@ -43,11 +47,11 @@ def target_firefox_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -
 
     target_unix_users.add_plugin(FirefoxPlugin)
 
-    yield target_unix_users
+    return target_unix_users
 
 
 @pytest.fixture
-def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem) -> Iterator[Target]:
+def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem) -> Target:
     fs_android.map_dir(
         "/data/data/org.mozilla.vrbrowser",
         absolute_path("_data/plugins/apps/browser/firefox/android/org.mozilla.vrbrowser"),
@@ -55,7 +59,7 @@ def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem)
 
     target_android.add_plugin(FirefoxPlugin)
 
-    yield target_android
+    return target_android
 
 
 @pytest.mark.parametrize(
@@ -67,7 +71,7 @@ def test_firefox_history(target_platform: Target, request: pytest.FixtureRequest
     records = list(target_platform.firefox.history())
 
     assert len(records) == 24
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].url == "https://www.mozilla.org/privacy/firefox/"
     assert records[0].id == "1"
@@ -85,7 +89,7 @@ def test_firefox_downloads(target_platform: Target, request: pytest.FixtureReque
     records = list(target_platform.firefox.downloads())
 
     assert len(records) == 3
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].id == 1
     assert records[0].ts_start == dt("2021-12-01T10:57:01.175000+00:00")
@@ -108,10 +112,10 @@ def test_firefox_cookies(target_platform: Target, request: pytest.FixtureRequest
     records = list(target_platform.firefox.cookies())
 
     assert len(records) == 4
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].ts_created == dt("2023-07-13 09:53:47.460676+00:00")
-    assert sorted([*map(lambda c: c.name, records)]) == [
+    assert sorted([*(c.name for c in records)]) == [
         "_lr_env_src_ats",
         "_lr_retry_request",
         "_uc_referrer",
@@ -128,7 +132,7 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
 
     records = list(target_platform.firefox.extensions())
 
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
     assert len(records) == 2
     assert records[0].id == "uBlock0@raymondhill.net"
     assert records[0].ts_install == dt("2024-04-23 07:07:21.516000+00:00")
@@ -199,7 +203,7 @@ def test_firefox_oculus_history(target_firefox_oculus: Target) -> None:
     records = list(target_firefox_oculus.firefox.history())
 
     assert len(records) == 191
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].url == "https://webxr.today/"
     assert records[0].id == "1"
@@ -211,10 +215,10 @@ def test_firefox_oculus_cookies(target_firefox_oculus: Target) -> None:
     records = list(target_firefox_oculus.firefox.cookies())
 
     assert len(records) == 33
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].ts_created == dt("2023-07-06 07:50:55.352988+00:00")
-    assert sorted([*map(lambda c: c.name, records)]) == [
+    assert sorted([*(c.name for c in records)]) == [
         "AEC",
         "AWSALBTGCORS",
         "CONSENT",
@@ -254,7 +258,7 @@ def test_firefox_oculus_cookies(target_firefox_oculus: Target) -> None:
 def test_firefox_oculus_extensions(target_firefox_oculus: Target) -> None:
     records = list(target_firefox_oculus.firefox.extensions())
 
-    assert set(["firefox"]) == set(record.browser for record in records)
+    assert {"firefox"} == {record.browser for record in records}
     assert len(records) == 5
     assert records[0].id == "default-theme@mozilla.org"
     assert records[0].ts_install == dt("2021-11-04 13:29:29.988000+00:00")
@@ -316,7 +320,7 @@ def test_decrypt_is_succesful(path_key4: TargetPath, logins: dict[str, str], dec
 
 @patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", side_effect=ValueError(""))
 def test_decrypt_bad_master_key(path_key4: TargetPath, logins: dict[str, str]) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Failed to decrypt password using keyfile:"):
         decrypt(logins.get("username"), logins.get("password"), path_key4)
 
 
@@ -337,14 +341,15 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
     path_key4_primary_password: TargetPath,
     logins_with_primary_password: dict[str, str],
 ) -> None:
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(
+        ValueError, match="Failed to decrypt password using keyfile: /key4.db, password: BAD_PRIMARY_PASSWORD"
+    ):
         decrypt(
             logins_with_primary_password.get("username"),
             logins_with_primary_password.get("password"),
             path_key4_primary_password,
             "BAD_PRIMARY_PASSWORD",
         )
-        assert e.msg == "Failed to decrypt password using keyfile /key4.db and password 'BAD_PRIMARY_PASSWORD'"
 
 
 def test_retrieve_master_key_is_succesful(path_key4: TargetPath) -> None:
@@ -356,9 +361,8 @@ def test_retrieve_master_key_is_succesful(path_key4: TargetPath) -> None:
 
 @patch("dissect.target.plugins.apps.browser.firefox.query_master_key", return_value=(b"aaaa", "BAD_CKA_VALUE"))
 def test_retrieve_master_key_bad_cka_value(mock_target: Target, path_key4: TargetPath) -> None:
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match="Password master key CKA_ID 'BAD_CKA_VALUE' is not equal to expected value"):
         retrieve_master_key(b"", path_key4)
-        assert "Password master key CKA_ID 'BAD_CKA_VALUE' is not equal to expected value" in e.msg
 
 
 def test_query_master_key(path_key4: TargetPath) -> None:

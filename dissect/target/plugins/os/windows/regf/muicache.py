@@ -1,4 +1,6 @@
-from typing import Generator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
@@ -6,8 +8,12 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
 
 MuiCacheRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, UserRecordDescriptorExtension])(
     "windows/registry/muicache",
@@ -23,17 +29,17 @@ MuiCacheRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, 
 class MuiCachePlugin(Plugin):
     """Plugin that iterates various MUIcache locations."""
 
-    KEYS = [
+    KEYS = (
         "HKCU\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\MuiCache",  # NT >= 6.0
         "HKCU\\Software\\Classes\\Local Settings\\MuiCache",  # NT >= 6.0
         "HKCU\\Software\\Microsoft\\Windows\\ShellNoRoam\\MUICache",  # NT < 6.0
-    ]
+    )
 
     FIELD_NAMES = ("FriendlyAppName", "ApplicationCompany")
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEYS))):
-            return UnsupportedPluginError("No MuiCache registry keys found")
+        if not next(self.target.registry.keys(self.KEYS), None):
+            raise UnsupportedPluginError("No MuiCache registry keys found")
 
     @export(record=MuiCacheRecord)
     def muicache(self) -> MuiCacheRecord:
@@ -67,7 +73,7 @@ class MuiCachePlugin(Plugin):
                 else:
                     yield from self._get_records(key)
 
-    def _get_records(self, key: RegistryKey) -> Generator[MuiCacheRecord, None, None]:
+    def _get_records(self, key: RegistryKey) -> Iterator[MuiCacheRecord]:
         for index, entry in enumerate(key.values()):
             user = self.target.registry.get_user(key)
             try:

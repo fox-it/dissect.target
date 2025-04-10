@@ -3,14 +3,13 @@ from __future__ import annotations
 import io
 import logging
 from struct import error as StructError
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 from dissect.ole import OLE
 from dissect.ole.exceptions import Error as OleError
 from dissect.shellitem.lnk import Lnk
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
@@ -18,6 +17,11 @@ from dissect.target.helpers.shell_application_ids import APPLICATION_IDENTIFIERS
 from dissect.target.helpers.utils import findall
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.lnk import LnkRecord, parse_lnk_file
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -106,7 +110,7 @@ class AutomaticDestinationFile(JumpListFile):
             for item in dir.open():
                 try:
                     yield Lnk(io.BytesIO(item))
-                except StructError:
+                except StructError:  # noqa: PERF203
                     continue
                 except Exception as e:
                     log.warning("Failed to parse LNK file from directory %s", dir_name)
@@ -118,7 +122,7 @@ class CustomDestinationFile(JumpListFile):
     """Parse Jump List CustomDestination file."""
 
     MAGIC_FOOTER = 0xBABFFBAB
-    VERSIONS = [2]
+    VERSIONS = (2,)
 
     def __init__(self, fh: BinaryIO, file_name: str):
         super().__init__(fh, file_name)
@@ -143,7 +147,7 @@ class CustomDestinationFile(JumpListFile):
         if self.version not in self.VERSIONS:
             raise NotImplementedError(f"The CustomDestination file has an unsupported version: {self.version}")
 
-        if not self.MAGIC_FOOTER == self.magic:
+        if self.magic != self.MAGIC_FOOTER:
             raise ValueError(f"The CustomDestination file has an invalid magic footer: {self.magic}")
 
     def __iter__(self) -> Iterator[Lnk]:
@@ -154,7 +158,7 @@ class CustomDestinationFile(JumpListFile):
             try:
                 lnk = Lnk(io.BytesIO(buf[offset + len(LNK_GUID) :]))
                 yield lnk
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break
             except Exception as e:
                 log.warning("Failed to parse LNK file from a CustomDestination file")

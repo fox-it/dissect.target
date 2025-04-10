@@ -1,18 +1,24 @@
+from __future__ import annotations
+
 from io import BytesIO
-from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.exceptions import FileNotFoundError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.config import (
     ConfigurationEntry,
     ConfigurationFilesystem,
 )
 from dissect.target.plugins.general.config import ConfigurationTreePlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture
@@ -57,7 +63,7 @@ def test_config_tree_plugin(config_tree: ConfigurationTreePlugin, fs_unix: Virtu
 def test_collapse_types(
     config_tree: ConfigurationTreePlugin, fs_unix: VirtualFilesystem, collapse_type: type[Iterable]
 ) -> None:
-    """Using specifically the SequenceType due to using lru_cache in the plugin"""
+    """Using specifically the SequenceType due to using lru_cache in the plugin."""
 
     fs_unix.map_file_fh("/etc/new/path/config", BytesIO(b"key=value"))
 
@@ -65,7 +71,7 @@ def test_collapse_types(
 
 
 @pytest.mark.parametrize(
-    "hint, data_bytes",
+    ("hint", "data_bytes"),
     [
         ("ini", b"[DEFAULT]\nkey=value"),
         ("xml", b"<a>currently_just_text</a>"),

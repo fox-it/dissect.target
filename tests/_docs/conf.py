@@ -1,3 +1,5 @@
+project = "dissect.target"
+
 extensions = [
     "autoapi.extension",
     "sphinx.ext.autodoc",

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
     from hashlib._hashlib import HASH
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 BUFFER_SIZE = 32768
 
 
-def _hash(fh: BinaryIO, ctx: Union[HASH, list[HASH]]) -> tuple[str]:
+def _hash(fh: BinaryIO, ctx: HASH | list[HASH]) -> tuple[str]:
     if not isinstance(ctx, list):
         ctx = [ctx]
 
@@ -38,10 +38,7 @@ def common(fh: BinaryIO) -> tuple[str]:
     return _hash(fh, [hashlib.md5, hashlib.sha1, hashlib.sha256])
 
 
-def custom(fh: BinaryIO, algos: list[Union[str, HASH]]) -> tuple[str]:
-    if isinstance(algos[0], str):
-        ctx = [getattr(hashlib, h) for h in algos]
-    else:
-        ctx = algos
+def custom(fh: BinaryIO, algos: list[str | HASH]) -> tuple[str]:
+    ctx = [getattr(hashlib, h) for h in algos] if isinstance(algos[0], str) else algos
 
     return _hash(fh, ctx)

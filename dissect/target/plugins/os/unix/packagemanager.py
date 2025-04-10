@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Final
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin
@@ -27,7 +28,7 @@ class OperationTypes(Enum):
     Remove = "remove"
     Other = "other"
 
-    __MAPPING__: dict = {
+    __MAPPING__: Final[dict[str, list[str]]] = {
         Install: ["install", "installed", "reinstall"],
         Update: ["update", "updated", "upgrade"],
         Downgrade: ["downgrade"],

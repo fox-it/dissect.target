@@ -1,12 +1,23 @@
+from __future__ import annotations
+
 import base64
 import functools
 import inspect
 import os
 from itertools import tee
+from pathlib import Path
 from types import GeneratorType
+from typing import TYPE_CHECKING, Any, Callable
 
 from flow.record import RecordReader, RecordWriter
 from flow.record.base import HAS_ZSTD
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from flow.record.adapter.stream import StreamReader, StreamWriter
+
+    from dissect.target.target import Target
 
 Tee = type(tee([], 1)[0])
 
@@ -16,49 +27,49 @@ REWRITE_CACHE = os.getenv("REWRITE_CACHE", "0") == "1"
 
 
 class LineWriter:
-    def __init__(self, path):
-        self.fh = open(path, "w")
+    def __init__(self, path: Path):
+        self.fh = path.open("w")
 
-    def write(self, line):
+    def write(self, line: str) -> None:
         self.fh.write(line + "\n")
 
-    def close(self):
+    def close(self) -> None:
         self.fh.close()
 
 
 class LineReader:
-    def __init__(self, path):
+    def __init__(self, path: Path):
         self.path = path
 
-    def __iter__(self):
-        with open(self.path, "r") as fh:
+    def __iter__(self) -> Iterator[str]:
+        with self.path.open() as fh:
             for line in fh:
                 yield line.strip()
 
 
 class CacheWriter:
-    def __init__(self, path, temp, reader, writer):
+    def __init__(self, path: Path, temp: Path, reader: Iterator[Any], writer: StreamWriter | LineWriter):
         self.path = path
         self.temp = temp
         self.reader = reader
         self.writer = writer
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Any]:
         for obj in self.reader:
             self.writer.write(obj)
             yield obj
         self.close()
 
-    def close(self):
+    def close(self) -> None:
         self.writer.close()
         try:
-            os.rename(self.temp, self.path)
+            self.temp.rename(self.path)
         except OSError:
             pass
 
 
 class Cache:
-    def __init__(self, func, no_cache=False, cls=None):
+    def __init__(self, func: Callable, no_cache: bool = False, cls: type | None = None):
         self.func = func
         self.no_cache = no_cache
 
@@ -69,19 +80,21 @@ class Cache:
         self.fname = f"{module}{qualname}"
         self.wrapper = None
 
-    def open_reader(self, path, output):
+    def open_reader(self, path: Path, output: str) -> StreamReader | LineReader | None:
         if output == "record":
-            return RecordReader(path)
-        elif output == "yield":
+            return RecordReader(str(path))
+        if output == "yield":
             return LineReader(path)
+        return None
 
-    def open_writer(self, path, output):
+    def open_writer(self, path: Path, output: str) -> StreamWriter | LineWriter | None:
         if output == "record":
-            return RecordWriter(path)
-        elif output == "yield":
+            return RecordWriter(str(path))
+        if output == "yield":
             return LineWriter(path)
+        return None
 
-    def cache_path(self, target, key):
+    def cache_path(self, target: Target, key: tuple) -> Path | None:
         cache_dir = getattr(target._config, "CACHE_DIR", None) if target._config else None
         if not cache_dir:
             return None
@@ -89,10 +102,10 @@ class Cache:
         path_key = base64.b64encode(repr(key).encode()).decode("utf8")
         ext = "zstd" if HAS_ZSTD else "rec"
         fname = f"{self.fname}.{path_key}.{ext}"
-        return os.path.join(cache_dir, os.path.basename(target.path), fname)
+        return Path(cache_dir).joinpath(Path(target.path).name, fname)
 
-    def call(self, *args, **kwargs):
-        target = args[0].target
+    def call(self, *args, **kwargs) -> Any:
+        target: Target = args[0].target
 
         output = getattr(self.wrapper, "__output__", None)
         if output not in ("record", "yield", "none"):
@@ -109,7 +122,7 @@ class Cache:
 
             return func_cache[key]
 
-        key = (args[1:], list(sorted(kwargs.items())))
+        key = (args[1:], sorted(kwargs.items()))
         cache_file = self.cache_path(target, key)
 
         # The default policy is READ cache if available else WRITE it (reading
@@ -128,7 +141,7 @@ class Cache:
         write_file_cache = True
 
         if cache_file:
-            if not os.path.exists(cache_file):
+            if not cache_file.exists():
                 read_file_cache = False
         else:
             read_file_cache = False
@@ -145,14 +158,15 @@ class Cache:
         if read_file_cache:
             target.log.debug("Reading from cache file: %s", cache_file)
             if os.access(cache_file, os.R_OK, effective_ids=bool(os.supports_effective_ids)):
-                if os.stat(cache_file).st_size != 0:
+                if cache_file.stat().st_size != 0:
                     try:
                         reader = self.open_reader(cache_file, output)
-                        target.log.info("Using cache for function: %s", self.fname)
-                        return reader
                     except Exception as e:
                         target.log.warning("Cache will NOT be used. Error opening cache file: %s", cache_file)
                         target.log.debug("", exc_info=e)
+                    else:
+                        target.log.info("Using cache for function: %s", self.fname)
+                        return reader
                 else:
                     target.log.warning("Cache will NOT be used. File is empty: %s", cache_file)
             else:
@@ -161,56 +175,50 @@ class Cache:
             dir_mode = getattr(target._config, "CACHE_DIR_MODE", 0o777) if target._config else 0o777
             file_mode = getattr(target._config, "CACHE_FILE_MODE", 0o666) if target._config else 0o666
 
-            temp_dir = os.path.dirname(cache_file)
-            temp_name = f"_{os.path.basename(cache_file)}"
-            temp_path = os.path.join(temp_dir, temp_name)
+            temp_dir = cache_file.parent
+            temp_path = cache_file.with_name(f"_{cache_file.name}")
 
-            if not os.path.exists(temp_dir):
+            if not temp_dir.exists():
                 try:
-                    os.makedirs(temp_dir, mode=dir_mode)
-                except Exception as err:
+                    temp_dir.mkdir(mode=dir_mode, parents=True)
+                except Exception as e:
                     target.log.warning(
-                        "Cache will NOT be written. Unable to create cache directory: %s (%s)",
-                        temp_dir,
-                        err,
+                        "Cache will NOT be written. Unable to create cache directory: %s (%s)", temp_dir, e
                     )
 
             if os.access(temp_dir, os.W_OK | os.R_OK | os.X_OK, effective_ids=bool(os.supports_effective_ids)):
-                if os.path.exists(temp_path):
+                if temp_path.exists():
                     try:
-                        os.remove(temp_path)
-                    except Exception as err:
+                        temp_path.unlink()
+                    except Exception as e:
                         target.log.warning(
                             "Cache will NOT be written. Unable to remove pre-existing cache temp file: %s (%s)",
                             temp_path,
-                            err,
+                            e,
                         )
 
-                if not os.path.exists(temp_path):
+                if not temp_path.exists():
                     try:
                         writer = self.open_writer(temp_path, output)
                         try:
                             # Set permissions
-                            os.chmod(temp_path, file_mode)
-                        except OSError as err:
+                            temp_path.chmod(file_mode)
+                        except OSError as e:
                             target.log.debug(
                                 "Setting permissions on temp cache file failed, "
                                 "continuing with existing permissions: %s (%s)",
                                 temp_path,
-                                err,
+                                e,
                             )
                         target.log.debug("Caching to file: %s", temp_path)
                         return CacheWriter(cache_file, temp_path, self.func(*args, **kwargs), writer)
-                    except Exception as err:
-                        target.log.exception(
-                            "Cache will NOT be written. Failed to cache to file: %s (%s)",
-                            cache_file,
-                            err,
-                        )
+                    except Exception as e:
+                        target.log.error("Cache will NOT be written. Failed to cache to file: %s (%s)", cache_file, e)  # noqa: TRY400
+                        target.log.debug("", exc_info=e)
                         try:
-                            os.remove(temp_path)
-                        except Exception as err:
-                            target.log.warning("Unable to remove cache temp file: %s (%s)", temp_path, err)
+                            temp_path.unlink()
+                        except Exception as e:
+                            target.log.warning("Unable to remove cache temp file: %s (%s)", temp_path, e)
             else:
                 target.log.warning(
                     "Cache will NOT be written. No permissions to write cache file in directory: %s",
@@ -220,11 +228,11 @@ class Cache:
         return self.func(*args, **kwargs)
 
 
-def wrap(func, no_cache=False, cls=None):
+def wrap(func: Callable, no_cache: bool = False, cls: type | None = None) -> Callable:
     cache = Cache(func, no_cache=no_cache, cls=cls)
 
     @functools.wraps(func)
-    def cache_wrapper(*args, **kwargs):
+    def cache_wrapper(*args, **kwargs) -> Any:
         if cache.no_cache:
             return cache.func(*args, **kwargs)
         return cache.call(*args, **kwargs)

@@ -1,8 +1,15 @@
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.windows.regf.muicache import MuiCachePlugin
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
-def test_muicache_plugin(target_win_users, hive_hku):
+
+def test_muicache_plugin(target_win_users: Target, hive_hku: VirtualHive) -> None:
     # NT >= 6.0
     muicache_shell_key = VirtualKey(
         hive_hku,

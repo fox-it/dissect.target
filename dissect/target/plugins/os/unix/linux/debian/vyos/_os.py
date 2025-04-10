@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from operator import itemgetter
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class VyosPlugin(LinuxPlugin):
@@ -29,7 +31,7 @@ class VyosPlugin(LinuxPlugin):
         super().__init__(target)
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             boot_dir = fs.path("/boot")
 
@@ -46,7 +48,7 @@ class VyosPlugin(LinuxPlugin):
         return None
 
     @export(property=True)
-    def ips(self) -> Optional[list[str]]:
+    def ips(self) -> list[str] | None:
         return None
 
     @export(property=True)
