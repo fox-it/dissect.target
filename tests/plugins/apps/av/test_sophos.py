@@ -24,8 +24,21 @@ def test_sophos_hitman_plugin_log(target_win: Target, fs_win: VirtualFilesystem)
     assert log.details.find("LOVE-LETTER-FOR-YOU.TXT.vbs") > -1
 
 
-def test_sophos_home_plugin_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    log_file = absolute_path("_data/plugins/apps/av/sophos/Clean.log")
+def test_sophos_home_plugin_log_3_9_4_1(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    log_file = absolute_path("_data/plugins/apps/av/sophos/Clean-3.9.4.1.log")
+    fs_win.map_file("ProgramData/Sophos/Clean/Logs/Clean.log", log_file)
+    target_win.add_plugin(SophosPlugin)
+    logs = list(target_win.sophos.sophoshomelogs())
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.ts == dt("2023-06-14T10:46:56.235Z")
+    assert isinstance(log, type(SophosLogRecord()))
+    assert log.description == "EICAR-AV-Test"
+    assert str(log.path) == "C:\\eicar_com.zip"
+
+
+def test_sophos_home_plugin_log_3_10_3(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    log_file = absolute_path("_data/plugins/apps/av/sophos/Clean-3.10.3.log")
     fs_win.map_file("ProgramData/Sophos/Clean/Logs/Clean.log", log_file)
     target_win.add_plugin(SophosPlugin)
     logs = list(target_win.sophos.sophoshomelogs())
