@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import logging
 import lzma
 import struct
 import subprocess
@@ -14,7 +15,10 @@ from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
 
+from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.sunrpc import client
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 
 try:
     from dissect.hypervisor.util.envelope import (
@@ -41,6 +45,8 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("path", "path"),
     ],
 )
+
+log = logging.getLogger(__name__)
 
 
 class ESXiPlugin(UnixPlugin):
@@ -72,6 +78,9 @@ class ESXiPlugin(UnixPlugin):
         configstore = target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
+
+        # Mount NFS shares after parsing the config store
+        self._mount_nfs_shares()
 
     def _cfg(self, path: str) -> str | None:
         if not self._config:
@@ -189,6 +198,53 @@ class ESXiPlugin(UnixPlugin):
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.ESXI.value
+
+    def _mount_nfs_shares(self) -> None:
+        # Mount NFS shares
+        if not self._configstore:
+            self.target.log.warning("No configstore found")
+            return
+
+        nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        if not nfs_shares:
+            self.target.log.info("No NFS shares found in datastore")
+            return
+
+        for key, nfs_share in nfs_shares.items():
+            # Parse the NFS share configuration
+            user_value: dict[str, Any] = nfs_share.get("user_value", {})
+            nfs_ip = user_value.get("hostname", "")
+            volume_name = user_value.get("volume_name", "")
+            remote_share = user_value.get("remote_share", "")
+            if not nfs_ip or not volume_name or not remote_share:
+                self.target.log.warning("Invalid NFS share configuration with key: %s", key)
+                continue
+            mount_point = f"/vmfs/volumes/{volume_name}"
+            self._add_nfs(nfs_ip, remote_share, mount_point)
+
+    def _add_nfs(self, nfs_ip: str, remote_share: str, mount_point: str) -> None:
+        """Mount NFS share to the target."""
+
+        if not self._check_nfs_enabled(nfs_ip, remote_share, mount_point):
+            return
+
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s", remote_share, mount_point)
+
+            # On ESXi, there is typically only a single root user.
+            # Besides, UnixPlugin::users does not work (see issue https://github.com/fox-it/dissect.target/issues/1093).
+            # Moreover, socket rebinding is not implemented on ESXi.
+            # Therefore, we try logging only as root. This implies that he NFS share has `no_root_squash` enabled.
+            # According to the docs, ESxi mounts NFS shares using root privileges (https://www.vmware.com/docs/vmw-best-practices-running-nfs-vmware-vsphere)  # noqa: E501
+            credentials = client.auth_unix("machine", 0, 0, [])
+            nfs = NfsFilesystem.connect(nfs_ip, remote_share, credentials, LocalPortPolicy.PRIVILEGED)
+            self.target.fs.mount(mount_point, nfs)
+            # Actually, on disk the mount point is a symlink to /vmfs/volumes/<uuid>.
+            # This UUID is not stored in the config store, but derived from the NFS share ip and path.
+            # Unfortunately, the details of the UUID generation are unknown.
+        except Exception as e:
+            self.target.log.warning("Failed to mount NFS share %s:%s at %s", nfs_ip, remote_share, mount_point)
+            self.target.log.debug("", exc_info=e)
 
 
 def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:

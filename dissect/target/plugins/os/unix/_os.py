@@ -244,16 +244,8 @@ class UnixPlugin(OSPlugin):
 
         for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
             # Mount nfs, but only when target has been mapped by the `LocalLoader`
-            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
-                if "enable-nfs" in self.target.path_query:
-                    self._add_nfs(dev_id, volume_name, mount_point)
-                else:
-                    log.warning(
-                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-                        dev_id,
-                        volume_name,
-                        mount_point,
-                    )
+            if fs_type == "nfs":
+                self._add_nfs(dev_id, volume_name, mount_point)
                 continue
 
             opts = parse_options_string(options)
@@ -294,10 +286,33 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
+    def _check_nfs_enabled(self, address: str, exported_dir: str, mount_point: str) -> bool:
+        if not isinstance(self.target._loader, LocalLoader):
+            return False
+
+        if "enable-nfs" not in self.target.path_query:
+            log.warning(
+                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                address,
+                exported_dir,
+                mount_point,
+            )
+            return False
+
+        return True
+
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if not self._check_nfs_enabled(address, exported_dir, mount_point):
+            return
+
         # Try all users to see if we can access the share
         def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
-            for user in self.users():
+            users = list(self.users())
+            if not users:
+                self.target.log.debug("No users found, trying root")
+                users = [UnixUserRecord(uid=0, gid=0)]
+
+            for user in users:
                 if user.uid is None or user.gid is None:
                     continue
                 auth = auth_unix("machine", user.uid, user.gid, [])
@@ -314,6 +329,7 @@ class UnixPlugin(OSPlugin):
                         nfs_client.close()
                         raise e
 
+            self.target.log.debug("No user has access to NFS share")
             raise FilesystemError("No user has access to NFS share")
 
         try:
