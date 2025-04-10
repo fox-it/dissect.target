@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import warnings
 from typing import Iterator, Optional
 from xml.etree.ElementTree import Element
 
@@ -21,8 +20,6 @@ from dissect.target.plugins.os.windows.tasks.records import (
     TimeTriggerRecord,
     TriggerRecord,
 )
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 class ScheduledTasks:
