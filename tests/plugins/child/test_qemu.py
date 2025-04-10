@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.child.qemu import QemuChildTargetPlugin
 from tests.conftest import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_compatible(target_linux: Target, fs_linux: VirtualFilesystem) -> None:

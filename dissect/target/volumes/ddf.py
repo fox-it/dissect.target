@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import io
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.volume.ddf.ddf import DDF, DEFAULT_SECTOR_SIZE, DDFPhysicalDisk
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class DdfVolumeSystem(LogicalVolumeSystem):
@@ -29,7 +32,7 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         for devs in sets.values():
             try:
                 yield cls(devs)
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod

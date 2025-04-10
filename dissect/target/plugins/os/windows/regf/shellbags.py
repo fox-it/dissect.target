@@ -3,8 +3,8 @@ from __future__ import annotations
 import io
 import logging
 import uuid
-from datetime import datetime
-from typing import Any, Iterator
+from datetime import timezone
+from typing import TYPE_CHECKING, Any, Final
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import dostimestamp
@@ -17,9 +17,14 @@ from dissect.target.helpers.descriptor_extensions import (
     UserRecordDescriptorExtension,
 )
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -257,7 +262,7 @@ DELEGATE_ITEM_IDENTIFIER = b"\x74\x1a\x59\x5e\x96\xdf\xd3\x48\x8d\x67\x17\x33\xb
 class SHITEM:
     STRUCT = None
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         self.buf = buf
         self.fh = io.BytesIO(buf)
         self.item = self.STRUCT(self.fh) if self.STRUCT is not None else None
@@ -310,20 +315,19 @@ class UNKNOWN(SHITEM):
 class UNKNOWN0(SHITEM):
     STRUCT = c_bag.SHITEM_UNKNOWN0
 
-    def __init__(self, fh):
-        super().__init__(fh)
+    def __init__(self, buf: bytes):
+        super().__init__(buf)
         self.guid = None
 
         if self.item.size == 0x20:
-            self.guid = uuid.UUID(bytes_le=fh.read(16))
+            self.guid = uuid.UUID(bytes_le=self.fh.read(16))
 
     @property
     def name(self) -> str:
         if self.guid:
             GUID_name = shell_folder_ids.DESCRIPTIONS.get(str(self.guid))
             return GUID_name or f"<UNKNOWN0: {{{self.guid}}}>"
-        else:
-            return f"<UNKNOWN0 0x{self.size:x}>"
+        return f"<UNKNOWN0 0x{self.size:x}>"
 
 
 class UNKNOWN1(SHITEM):
@@ -337,8 +341,8 @@ class UNKNOWN1(SHITEM):
 class ROOT_FOLDER(SHITEM):
     STRUCT = c_bag.SHITEM_ROOT_FOLDER
 
-    def __init__(self, fh):
-        super().__init__(fh)
+    def __init__(self, buf: bytes):
+        super().__init__(buf)
         self.guid = uuid.UUID(bytes_le=self.item.guid)
         self.extension = None
 
@@ -354,7 +358,7 @@ class ROOT_FOLDER(SHITEM):
 class VOLUME(SHITEM):
     STRUCT = c_bag.SHITEM_VOLUME
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.volume_name = None
         self.identifier = None
@@ -378,7 +382,7 @@ class VOLUME(SHITEM):
 class FILE_ENTRY(SHITEM):
     STRUCT = c_bag.SHITEM_FILE_ENTRY
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
 
         has_swn1 = False
@@ -417,14 +421,14 @@ class FILE_ENTRY(SHITEM):
     def modification_time(self) -> datetime | None:
         ts = self.item.modification_time
         if ts > 0:
-            return dostimestamp(ts, swap=True)
+            return dostimestamp(ts, swap=True).replace(tzinfo=timezone.utc)
         return None
 
 
 class NETWORK(SHITEM):
     STRUCT = c_bag.SHITEM_NETWORK
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.description = None
         self.comments = None
@@ -451,7 +455,7 @@ class COMPRESSED_FOLDER(SHITEM):
 class URI(SHITEM):
     STRUCT = c_bag.SHITEM_URI
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.uri = None
         if self.item.data_size < self.size - 6:
@@ -469,7 +473,7 @@ class URI(SHITEM):
 class CONTROL_PANEL(SHITEM):
     STRUCT = c_bag.SHITEM_CONTROL_PANEL
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.guid = uuid.UUID(bytes_le=self.item.guid)
 
@@ -481,7 +485,7 @@ class CONTROL_PANEL(SHITEM):
 
 class CONTROL_PANEL_CATEGORY(SHITEM):
     STRUCT = c_bag.SHITEM_CONTROL_PANEL_CATEGORY
-    CATEGORIES = {
+    CATEGORIES: Final[dict[int, str]] = {
         0: "All Control Panel Items",
         1: "Appearance and Personalization",
         2: "Hardware and Sound",
@@ -515,7 +519,7 @@ class CDBURN(SHITEM):
 class GAME_FOLDER(SHITEM):
     STRUCT = c_bag.SHITEM_GAME_FOLDER
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.guid = uuid.UUID(bytes_le=self.item.identifier)
 
@@ -559,7 +563,7 @@ class MTP_VOLUME(SHITEM):
 class USERS_PROPERTY_VIEW(SHITEM):
     STRUCT = c_bag.SHITEM_USERS_PROPERTY_VIEW
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.guid = None
         self.identifier = self.item.data_signature
@@ -577,7 +581,7 @@ class USERS_PROPERTY_VIEW(SHITEM):
 class UNKNOWN_0x74(SHITEM):
     STRUCT = c_bag.SHITEM_UNKNOWN_0x74
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.subitem = None
         if self.item.subitem_size >= 16:
@@ -590,14 +594,18 @@ class UNKNOWN_0x74(SHITEM):
     @property
     def modification_time(self) -> datetime | None:
         if self.subitem.modification_time > 0:
-            return dostimestamp(self.subitem.modification_time, swap=True) if self.subitem else None
+            return (
+                dostimestamp(self.subitem.modification_time, swap=True).replace(tzinfo=timezone.utc)
+                if self.subitem
+                else None
+            )
         return None
 
 
 class DELEGATE(SHITEM):
     STRUCT = c_bag.SHITEM_DELEGATE
 
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         self.delegate_identifier = uuid.UUID(bytes_le=self.item.delegate_identifier)
         self.shell_identifier = uuid.UUID(bytes_le=self.item.shell_identifier)
@@ -609,7 +617,7 @@ class DELEGATE(SHITEM):
 
 
 class EXTENSION_BLOCK:
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         self.buf = buf
         self.fh = io.BytesIO(buf)
         self.header = c_bag.EXTENSION_BLOCK_HEADER(self.fh)
@@ -635,7 +643,7 @@ class EXTENSION_BLOCK:
 
 
 class EXTENSION_BLOCK_BEEF0004(EXTENSION_BLOCK):
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         fh = self.fh
         version = self.version
@@ -669,7 +677,7 @@ class EXTENSION_BLOCK_BEEF0004(EXTENSION_BLOCK):
 
 
 class EXTENSION_BLOCK_BEEF0005(EXTENSION_BLOCK):
-    def __init__(self, buf):
+    def __init__(self, buf: bytes):
         super().__init__(buf)
         c_bag.char[16](self.fh)  # GUID?
         self.shell_items = self.fh.read(self.data_size - 18)
@@ -691,7 +699,7 @@ ShellBagRecord = create_extended_descriptor([RegistryRecordDescriptorExtension, 
 class ShellBagsPlugin(Plugin):
     """Windows Shellbags plugin."""
 
-    KEYS = [
+    KEYS = (
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\Shell",
         "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\ShellNoRoam",
         "HKEY_CURRENT_USER\\Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\Shell",
@@ -699,7 +707,7 @@ class ShellBagsPlugin(Plugin):
         "HKEY_CURRENT_USER\\Software\\Classes\\Wow6432Node\\Local Settings\\Software\\Microsoft\\Windows\\Shell",
         "HKEY_CURRENT_USER\\Software\\Classes\\Wow6432Node\\Local Settings\\Software\\Microsoft\\Windows\\ShellNoRoam",
         "HKEY_CURRENT_USER\\Local Settings\\Software\\Microsoft\\Windows\\Shell\\BagMRU",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -725,11 +733,11 @@ class ShellBagsPlugin(Plugin):
             try:
                 yield from self._walk_bags(regkey.subkey("BagMRU"), None)
 
-            except RegistryKeyNotFoundError:
+            except RegistryKeyNotFoundError:  # noqa: PERF203
                 continue
 
             except Exception as e:
-                self.target.log.error("Exception while parsing shellbags")
+                self.target.log.error("Exception while parsing shellbags")  # noqa: TRY400
                 self.target.log.debug("", exc_info=e)
                 continue
 
@@ -745,7 +753,7 @@ class ShellBagsPlugin(Plugin):
             path = None
 
             for item in parse_shell_item_list(value):
-                path = "\\".join(path_prefix + [item.name])
+                path = "\\".join([*path_prefix, item.name])
                 yield ShellBagRecord(
                     ts_mtime=item.modification_time,
                     ts_atime=item.access_time,
@@ -800,9 +808,8 @@ def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
             elif signature == 0x46534643:
                 entry = UNKNOWN_0x74
 
-        if size >= 38 and not entry:
-            if item_buf[size - 32 : size] == DELEGATE_ITEM_IDENTIFIER:
-                entry = DELEGATE
+        if size >= 38 and not entry and item_buf[size - 32 : size] == DELEGATE_ITEM_IDENTIFIER:
+            entry = DELEGATE
 
         if size >= 3 and not entry:
             class_type = item_buf[2]
@@ -878,49 +885,32 @@ def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
 
                 if extension_signature >> 16 != 0xBEEF:
                     log.debug("Got unsupported extension signature 0x%08x from item %r", extension_signature, entry)
-                    pass  # Unsupported
+                    # Unsupported
 
-                elif extension_signature == 0xBEEF0000:
+                elif extension_signature == 0xBEEF0000 or extension_signature == 0xBEEF0001:
                     pass
 
-                elif extension_signature == 0xBEEF0001:
-                    pass
-
-                elif extension_signature == 0xBEEF0003:
-                    ext = EXTENSION_BLOCK_BEEF0004
-
-                elif extension_signature == 0xBEEF0004:
+                elif extension_signature == 0xBEEF0003 or extension_signature == 0xBEEF0004:
                     ext = EXTENSION_BLOCK_BEEF0004
 
                 elif extension_signature == 0xBEEF0005:
                     ext = EXTENSION_BLOCK_BEEF0005
 
-                elif extension_signature == 0xBEEF0006:
-                    pass
-
-                elif extension_signature == 0xBEEF000A:
-                    pass
-
-                elif extension_signature == 0xBEEF0013:
-                    pass
-
-                elif extension_signature == 0xBEEF0014:
-                    pass
-
-                elif extension_signature == 0xBEEF0019:
-                    pass
-
-                elif extension_signature == 0xBEEF0025:
-                    pass
-
-                elif extension_signature == 0xBEEF0026:
+                elif (
+                    extension_signature == 0xBEEF0006
+                    or extension_signature == 0xBEEF000A
+                    or extension_signature == 0xBEEF0013
+                    or extension_signature == 0xBEEF0014
+                    or extension_signature == 0xBEEF0019
+                    or extension_signature == 0xBEEF0025
+                    or extension_signature == 0xBEEF0026
+                ):
                     pass
 
                 else:
                     log.debug(
                         "Got unsupported beef extension signature 0x%08x from item %r", extension_signature, entry
                     )
-                    pass
 
                 if ext is None:
                     ext = EXTENSION_BLOCK

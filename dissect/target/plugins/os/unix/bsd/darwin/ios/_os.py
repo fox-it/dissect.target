@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import plistlib
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.helpers.record import IOSUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd.darwin._os import (
     DarwinPlugin,
     detect_macho_arch,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.filesystem import Filesystem, VirtualFilesystem
+    from dissect.target.target import Target
 
 
 class IOSPlugin(DarwinPlugin):
@@ -21,14 +25,14 @@ class IOSPlugin(DarwinPlugin):
     Resources:
         - https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
         - https://corp.digitalcorpora.org/corpora/mobile/iOS17/
-    """  # noqa: E501
+    """
 
     SYSTEM = "/private/var/preferences/SystemConfiguration/preferences.plist"
     GLOBAL = "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist"
     VERSION = "/System/Library/CoreServices/SystemVersion.plist"
 
     # /private/etc/master.passwd is a copy of /private/etc/passwd
-    PASSWD_FILES = ["/private/etc/passwd"]
+    PASSWD_FILES = ("/private/etc/passwd",)
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -44,6 +48,7 @@ class IOSPlugin(DarwinPlugin):
         for fs in target.filesystems:
             if fs.exists("/private/var/preferences") and fs.exists("/private/var/mobile"):
                 return fs
+        return None
 
     @classmethod
     def create(cls, target: Target, sysvol: VirtualFilesystem) -> None:
@@ -64,7 +69,7 @@ class IOSPlugin(DarwinPlugin):
 
     @export(property=True)
     def version(self) -> str:
-        return f'{self._config.VERSION["ProductName"]} {self._config.VERSION["ProductVersion"]} ({self._config.VERSION["ProductBuildVersion"]})'  # noqa: E501
+        return f"{self._config.VERSION['ProductName']} {self._config.VERSION['ProductVersion']} ({self._config.VERSION['ProductBuildVersion']})"  # noqa: E501
 
     @export(record=IOSUserRecord)
     def users(self) -> Iterator[IOSUserRecord]:
@@ -79,6 +84,7 @@ class IOSPlugin(DarwinPlugin):
     def architecture(self) -> str | None:
         if arch := detect_macho_arch(["/bin/df", "/bin/ps", "/sbin/fsck", "/sbin/mount"], fs=self.target.fs):
             return f"{arch}-ios"
+        return None
 
 
 @dataclass

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 from enum import IntEnum
 from io import BytesIO
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 CapabilityRecord = TargetRecordDescriptor(
     "filesystem/unix/capability",
@@ -155,7 +160,7 @@ def parse_attr(attr: bytes) -> tuple[list[str], list[str], bool, int]:
         data_len = (2 + 2 * VFS_CAP_U32_2) * 4
 
     else:
-        raise ValueError("Unexpected capability revision '%s'" % cap_revision)
+        raise ValueError(f"Unexpected capability revision '{cap_revision}'")
 
     if data_len != (actual_len := len(attr)):
         raise ValueError("Unexpected capability length (%s vs %s)", data_len, actual_len)

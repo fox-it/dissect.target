@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import re
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 RE_CONFIG_IP = re.compile(r"-IPAddress (?P<ip>[^ ]+) ")
 RE_CONFIG_HOSTNAME = re.compile(r"set ns hostName (?P<hostname>[^\n]+)\n")
@@ -48,7 +52,7 @@ class CitrixPlugin(BsdPlugin):
         self._ips = list(ips)
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         ramdisk = None
         for fs in target.filesystems:
             # /netscaler can be present on both the ramdisk and the harddisk. Therefore we also check for the /log
@@ -87,11 +91,11 @@ class CitrixPlugin(BsdPlugin):
         return cls(target)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         return self._hostname or super().hostname
 
     @export(property=True)
-    def version(self) -> Optional[str]:
+    def version(self) -> str | None:
         version = "Unknown"
         version_path = self.target.fs.path("/flash/.version")
         if version_path.is_file():
@@ -105,7 +109,7 @@ class CitrixPlugin(BsdPlugin):
                 version = f"{version} ({kernel_version})" if version else kernel_version
 
         if not version:
-            self.target.log.warn("Could not determine kernel version")
+            self.target.log.warning("Could not determine kernel version")
 
         return version
 

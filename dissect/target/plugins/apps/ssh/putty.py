@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import logging
 from base64 import b64decode
-from datetime import datetime
-from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import TYPE_CHECKING
 
 try:
     from Crypto.PublicKey import ECC, RSA
@@ -17,14 +17,21 @@ from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPlugi
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import create_extended_descriptor
-from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.ssh.ssh import (
     KnownHostRecord,
     SSHPlugin,
     calculate_fingerprints,
 )
-from dissect.target.plugins.general.users import UserDetails
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+    from pathlib import Path
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -60,24 +67,27 @@ class PuTTYPlugin(SSHPlugin):
 
     __namespace__ = "putty"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self.regf_installs, self.path_installs = self._detect_putty()
 
     def _detect_putty(
         self,
-    ) -> tuple[list[set[RegistryKey, Optional[UserDetails]]], list[set[TargetPath, Optional[UserDetails]]]]:
+    ) -> tuple[list[set[RegistryKey, UserDetails | None]], list[set[TargetPath, UserDetails | None]]]:
         regf_installs, path_installs = [], []
 
         if self.target.has_function("registry"):
-            for key in self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY"):
-                user_details = self.target.registry.get_user_details(key)
-                regf_installs.append((key, user_details))
+            regf_installs = [
+                (key, self.target.registry.get_user_details(key))
+                for key in self.target.registry.keys("HKCU\\Software\\SimonTatham\\PuTTY")
+            ]
 
-        for user_details in self.target.user_details.all_with_home():
-            if (putty_path := user_details.home_path.joinpath(".putty")).exists():
-                path_installs.append((putty_path, user_details))
+        path_installs = [
+            (putty_path, user_details)
+            for user_details in self.target.user_details.all_with_home()
+            if (putty_path := user_details.home_path.joinpath(".putty")).exists()
+        ]
 
         return regf_installs, path_installs
 
@@ -124,7 +134,7 @@ class PuTTYPlugin(SSHPlugin):
             )
 
     def _path_known_hosts(self, putty_path: TargetPath, user_details: UserDetails) -> Iterator[KnownHostRecord]:
-        """Parse PuTTY traces in ``.putty`` folders"""
+        """Parse PuTTY traces in ``.putty`` folders."""
         ssh_host_keys_path = putty_path.joinpath("sshhostkeys")
 
         if ssh_host_keys_path.exists():
@@ -184,7 +194,7 @@ class PuTTYPlugin(SSHPlugin):
                     )
 
     def _build_session_record(
-        self, ts: float, name: Union[float, datetime], source: Path, cfg: dict, user_details: UserDetails
+        self, ts: float, name: float | datetime, source: Path, cfg: dict, user_details: UserDetails
     ) -> PuTTYSessionRecord:
         host, user = parse_host_user(cfg.get("HostName"), cfg.get("UserName"))
 
@@ -236,7 +246,7 @@ def construct_public_key(key_type: str, iv: str) -> tuple[str, tuple[str, str, s
         return iv
 
     if not isinstance(key_type, str) or not isinstance(iv, str):
-        raise ValueError("Invalid key_type or iv")
+        raise TypeError("Invalid key_type or iv")
 
     key = None
 

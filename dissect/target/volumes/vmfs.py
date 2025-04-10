@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.vmfs import lvm
 from dissect.vmfs.c_vmfs import c_vmfs
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -33,7 +36,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         for pvs in lvm_extents.values():
             try:
                 yield cls(pvs)
-            except Exception:
+            except Exception:  # noqa: PERF203
                 continue
 
     @staticmethod

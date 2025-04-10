@@ -1,14 +1,23 @@
+from __future__ import annotations
+
 from functools import lru_cache
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, BinaryIO, Final
 
 from dissect.etl.etl import ETL, Event
+from flow.record.base import Record
 
-from dissect.target import Target
 from dissect.target.exceptions import FilesystemError, UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.datetime import parse_tzi
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from flow.record import Record
+
+    from dissect.target.target import Target
 
 
 class EtlRecordBuilder:
@@ -17,8 +26,8 @@ class EtlRecordBuilder:
     def __init__(self):
         self._create_event_descriptor = lru_cache(4096)(self._create_event_descriptor)
 
-    def _build_record(self, etl_event: Event, etl_path: Path, target: Target):
-        """Builds an ETL event record"""
+    def _build_record(self, etl_event: Event, etl_path: Path, target: Target) -> Record:
+        """Builds an ETL event record."""
 
         record_values = {}
         record_fields = [
@@ -55,14 +64,14 @@ class EtlRecordBuilder:
         desc = self._create_event_descriptor(tuple(record_fields))
         return desc(**record_values)
 
-    def _create_event_descriptor(self, record_fields):
+    def _create_event_descriptor(self, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
         return TargetRecordDescriptor(self.RECORD_NAME, record_fields)
 
-    def read_etl_records(self, etl_file_stream, etl_path, target):
-        etl_file = ETL(etl_file_stream)
+    def read_etl_records(self, fh: BinaryIO, path: Path, target: Target) -> Iterator[Record]:
+        etl_file = ETL(fh)
         for buffer in etl_file.buffers():
             for event_records in buffer:
-                yield self._build_record(event_records.event, etl_path, target)
+                yield self._build_record(event_records.event, path, target)
 
 
 class EtlPlugin(Plugin):
@@ -70,7 +79,7 @@ class EtlPlugin(Plugin):
 
     __namespace__ = "etl"
 
-    PATHS = {
+    PATHS: Final[dict[str, list[str]]] = {
         "boot": [
             "sysvol/windows/system32/wdi/logfiles/bootckcl.etl",
             "sysvol/windows/system32/wdi/logfiles/bootperfdiaglogger.etl",
@@ -81,7 +90,7 @@ class EtlPlugin(Plugin):
         ],
     }
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._etl_record_builder = EtlRecordBuilder()
 
@@ -91,7 +100,7 @@ class EtlPlugin(Plugin):
         if not any(plugin_target_folders):
             raise UnsupportedPluginError("No ETL paths found")
 
-    def read_etl_files(self, etl_paths: list[str]):
+    def read_etl_files(self, etl_paths: list[str]) -> Iterator[Record]:
         """Read ETL files using an EtlReader."""
         for etl_path in etl_paths:
             entry = self.target.fs.path(etl_path)
@@ -132,7 +141,7 @@ class EtlPlugin(Plugin):
             Provider_Name (string): The Provider_Name field of the event.
             EventType (string): The type of the event defined by the manifest file.
         """
-        for etl_plugin in self.PATHS.keys():
+        for etl_plugin in self.PATHS:
             yield from getattr(self, etl_plugin)()
 
     @export(record=DynamicDescriptor(["datetime"]))

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import io
 import stat
@@ -83,7 +85,7 @@ def test_helpers_fsutil_year_rollover_helper() -> None:
 
 
 def test_helpers_fsutil_year_rollover_helper_leap_day() -> None:
-    """test if we correctly handle leap days such as 2024-02-29."""
+    """Test if we correctly handle leap days such as 2024-02-29."""
 
     content = """
     Feb 28 11:00:00 Line 1

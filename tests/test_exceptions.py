@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.target import exceptions
 
 
 @pytest.mark.parametrize(
-    "exc, std",
+    ("exc", "std"),
     [
         (exceptions.FileNotFoundError, FileNotFoundError),
         (exceptions.IsADirectoryError, IsADirectoryError),

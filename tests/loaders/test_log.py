@@ -1,16 +1,21 @@
+from __future__ import annotations
+
 import io
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import pytest
 from flow.record.fieldtypes import path as flow_path
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.log import LogLoader
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
+
 
 @pytest.mark.parametrize(
-    "path, uri, input_file, expected_mapping",
+    ("path", "uri", "input_file", "expected_mapping"),
     [
         ("/dir/*.evt*", None, "/dir/test.evtx", "/sysvol/windows/system32/winevt/logs/test.evtx"),
         ("/dir/*.evt*", None, "/dir/test.evt", "/sysvol/windows/system32/config/test.evt"),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import stat
 from io import BytesIO
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.sql import sqlite3
 from dissect.util.stream import BufferedStream
@@ -16,7 +16,9 @@ from dissect.target.filesystem import (
 from dissect.target.helpers import fsutil
 from dissect.target.plugins.os.unix._os import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 class ProxmoxPlugin(DebianPlugin):
@@ -48,6 +50,7 @@ class ProxmoxPlugin(DebianPlugin):
             if pkg.name == "proxmox-ve":
                 distro_name = self._os_release.get("PRETTY_NAME", "")
                 return f"{pkg.name} {pkg.version} ({distro_name})"
+        return None
 
     @export(property=True)
     def os(self) -> str:

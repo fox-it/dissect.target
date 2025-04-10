@@ -14,7 +14,7 @@ from dissect.target.plugin import Plugin, arg, export
 class ICatPlugin(Plugin):
     """Plugin to output the contents of a file based on its MFT segment or inode number."""
 
-    FS_SUPPORTED = ["ntfs", "xfs", "ext", "virtual"]
+    FS_SUPPORTED = ("ntfs", "xfs", "ext", "virtual")
 
     def check_compatible(self) -> None:
         filesystems = self.target.filesystems

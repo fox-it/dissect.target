@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
@@ -31,25 +31,27 @@ def test_persist_execution_report() -> None:
         },
         "item2": "bar",
     }
-    timestamp = datetime(2000, 1, 1)
+    timestamp = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
     test_output = "TEST OUTPUT"
 
-    with patch("pathlib.Path.write_text") as mocked_write_text:
-        with patch("json.dumps", return_value=test_output) as mocked_json_dumps:
-            full_path = persist_execution_report(output_path, report_data, timestamp)
+    with (
+        patch("pathlib.Path.write_text") as mocked_write_text,
+        patch("json.dumps", return_value=test_output) as mocked_json_dumps,
+    ):
+        full_path = persist_execution_report(output_path, report_data, timestamp)
 
-            assert full_path.parent == output_path
-            assert full_path.suffix == ".json"
-            assert "2000-01-01-000000" in full_path.name
+        assert full_path.parent == output_path
+        assert full_path.suffix == ".json"
+        assert "2000-01-01-000000" in full_path.name
 
-            mocked_json_dumps.assert_called_once_with(report_data, sort_keys=True, indent=4)
+        mocked_json_dumps.assert_called_once_with(report_data, sort_keys=True, indent=4)
 
-            mocked_write_text.assert_called_once_with(test_output)
+        mocked_write_text.assert_called_once_with(test_output)
 
 
 @pytest.mark.parametrize(
-    "targets, loader_name, rest, uris",
+    ("targets", "loader_name", "rest", "uris"),
     [
         (["/path/to/somewhere"], "loader", ["--loader-option", "1"], ["loader:///path/to/somewhere?option=1"]),
         (["/path/to/somewhere"], "loader", ["--loader-option", "2"], ["loader:///path/to/somewhere?option=2"]),
@@ -123,7 +125,7 @@ def test_process_generic_arguments() -> None:
 
 
 @pytest.mark.parametrize(
-    "pattern, expected_function",
+    ("pattern", "expected_function"),
     [
         ("passwords", "dissect.target.plugins.os.unix.shadow"),
         ("firefox.passwords", "Unsupported function `firefox.passwords`"),
@@ -143,7 +145,7 @@ def test_plugin_name_confusion_regression(target_unix_users: Target, pattern: st
     assert expected_function in str(exc_info.value)
 
 
-def test_plugin_mutual_exclusive_arguments():
+def test_plugin_mutual_exclusive_arguments() -> None:
     fargs = [
         (("--aa",), {"group": "aa"}),
         (("--bb",), {"group": "aa"}),
@@ -151,7 +153,7 @@ def test_plugin_mutual_exclusive_arguments():
         (("--dd",), {"group": "bb"}),
     ]
     method = test_plugin_mutual_exclusive_arguments
-    setattr(method, "__args__", fargs)
+    method.__args__ = fargs
     with patch("inspect.isfunction", return_value=True):
         parser = generate_argparse_for_unbound_method(method)
     assert len(parser._mutually_exclusive_groups) == 2

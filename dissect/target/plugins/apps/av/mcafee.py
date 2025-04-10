@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import ipaddress
 import re
 from collections import defaultdict
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.sql import SQLite3
 from dissect.util.ts import from_unix
@@ -10,6 +11,10 @@ from dissect.util.ts import from_unix
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
 McAfeeMscLogRecord = TargetRecordDescriptor(
     "application/av/mcafee/msc/log",
@@ -35,7 +40,7 @@ McAfeeMscFirewallRecord = TargetRecordDescriptor(
     ],
 )
 
-re_cdata = re.compile(r"<!\[CDATA\[(.*?)\]\]>", flags=re.M)
+re_cdata = re.compile(r"<!\[CDATA\[(.*?)\]\]>", flags=re.MULTILINE)
 re_strip_tags = re.compile(r"<[^!][^>]*>")
 
 
@@ -44,11 +49,11 @@ class McAfeePlugin(Plugin):
 
     __namespace__ = "mcafee"
 
-    DIRS = [
+    DIRS = (
         "sysvol/ProgramData/McAfee/MSC/Logs",  # Windows
         "/opt/McAfee/ens/log/tp",  # Linux/Mac according to docs
         "/opt/McAfee/ens/log/esp",  # Linux/Mac according to docs
-    ]
+    )
     LOG_FILE_PATTERN = "*.log"
     TEMPLATE_ID_INFECTION = 102
     MARKER_INFECTION = "%INFECTION_INFO%"

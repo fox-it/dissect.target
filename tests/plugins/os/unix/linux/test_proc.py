@@ -1,12 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.proc import ProcPlugin, ProcProcess
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
-def test_process(target_linux_users: Target, fs_linux_proc: VirtualFilesystem):
+def test_process(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
 
     process = target_linux_users.proc.process(1)
@@ -24,14 +30,14 @@ def test_process(target_linux_users: Target, fs_linux_proc: VirtualFilesystem):
     assert environ[0].contents == "1"
 
 
-def test_process_not_found(target_linux_users: Target, fs_linux_proc: VirtualFilesystem):
+def test_process_not_found(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
     with pytest.raises(ProcessLookupError) as exc:
         target_linux_users.proc.process(404)
     assert str(exc.value) == f"Process with PID 404 could not be found on target: {target_linux_users}"
 
 
-def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem):
+def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem) -> None:
     target_linux_users.add_plugin(ProcPlugin)
 
     for process in target_linux_users.proc.processes():
@@ -46,6 +52,6 @@ def test_processes(target_linux_users: Target, fs_linux_proc: VirtualFilesystem)
             assert env.contents == "1"
 
 
-def test_proc_plugin_incompatible(target_linux_users: Target, fs_linux: VirtualFilesystem):
+def test_proc_plugin_incompatible(target_linux_users: Target, fs_linux: VirtualFilesystem) -> None:
     with pytest.raises(UnsupportedPluginError, match="No /proc directory found"):
         target_linux_users.add_plugin(ProcPlugin)

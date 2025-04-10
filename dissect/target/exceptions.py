@@ -8,7 +8,7 @@ from typing import Callable
 
 
 class Error(Exception):
-    """Generic dissect.target error"""
+    """Generic dissect.target error."""
 
     def __init__(self, message: str | None = None, extra: list[Exception] | None = None):
         if extra:

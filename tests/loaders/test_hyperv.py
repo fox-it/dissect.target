@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
@@ -7,9 +10,12 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.loaders.hyperv import HyperVLoader
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
+
 
 @pytest.mark.parametrize(
-    "descriptor_dir, disk_dir",
+    ("descriptor_dir", "disk_dir"),
     [
         # Disk next to descriptor file
         ("c:", "c:"),
@@ -21,7 +27,7 @@ from tests._utils import absolute_path
         ("c:\\Virtual Machines", "c:\\Disks"),
     ],
 )
-def test_hyperv_loader_xml(descriptor_dir, disk_dir, target_bare):
+def test_hyperv_loader_xml(descriptor_dir: str, disk_dir: str, target_bare: Target) -> None:
     gen1_xml_filename = "B90AC31B-C6F8-479F-9B91-07B894A6A3F6.xml"
     gen2_xml_filename = "D351C151-DAC7-4042-B434-B72D522C1E4A.xml"
     gen1_vmcx_filename = "EC04F346-DB96-4700-AF5B-77B3C56C38BD.vmcx"

@@ -20,7 +20,7 @@ from __future__ import annotations
 import fnmatch
 import re
 from pathlib import Path, PurePath, _Accessor, _PosixFlavour
-from typing import IO, TYPE_CHECKING, Any, Callable, Iterator
+from typing import IO, TYPE_CHECKING, Any, Callable, ClassVar
 
 from dissect.target import filesystem
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
@@ -28,6 +28,8 @@ from dissect.target.helpers import polypath
 from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
 
@@ -35,7 +37,7 @@ if TYPE_CHECKING:
 class _DissectFlavour(_PosixFlavour):
     is_supported = True
 
-    __variant_instances = {}
+    __variant_instances: ClassVar[dict[tuple[bool, str], _DissectFlavour]] = {}
 
     def __new__(cls, case_sensitive: bool = False, alt_separator: str = ""):
         idx = (case_sensitive, alt_separator)
@@ -66,8 +68,7 @@ class _DissectAccessor(_Accessor):
     def stat(path: TargetPath, *, follow_symlinks: bool = True) -> stat_result:
         if follow_symlinks:
             return path.get().stat()
-        else:
-            return path.get().lstat()
+        return path.get().lstat()
 
     @staticmethod
     def open(
@@ -178,7 +179,7 @@ class PureDissectPath(PurePath):
         if not isinstance(fs, filesystem.Filesystem):
             raise TypeError(
                 "invalid PureDissectPath initialization: missing filesystem, "
-                "got %r (this might be a bug, please report)" % args
+                f"got {args!r} (this might be a bug, please report)"
             )
 
         alt_separator = fs.alt_separator
@@ -227,7 +228,7 @@ class PureDissectPath(PurePath):
 
     def __rtruediv__(self, key: str) -> TargetPath:
         try:
-            return self._from_parts([self._fs, key] + self._parts)
+            return self._from_parts([self._fs, key, *self._parts])
         except TypeError:
             return NotImplemented
 
@@ -288,7 +289,7 @@ class TargetPath(Path, PureDissectPath):
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def walk(
-        self, top_down: bool = True, on_error: Callable[[Exception], None] = None, follow_symlinks: bool = False
+        self, top_down: bool = True, on_error: Callable[[Exception], None] | None = None, follow_symlinks: bool = False
     ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
         """Walk the directory tree from this directory, similar to os.walk()."""
         paths = [self]
@@ -306,9 +307,9 @@ class TargetPath(Path, PureDissectPath):
             # directories are still left to visit. That logic is copied here.
             try:
                 scandir_it = self._accessor.scandir(path)
-            except OSError as error:
+            except OSError as e:
                 if on_error is not None:
-                    on_error(error)
+                    on_error(e)
                 continue
 
             with scandir_it:
@@ -406,8 +407,7 @@ class TargetPath(Path, PureDissectPath):
         Return the path to which the symbolic link points.
         """
         path = self._accessor.readlink(self)
-        obj = self._from_parts((self._fs, path))
-        return obj
+        return self._from_parts((self._fs, path))
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:

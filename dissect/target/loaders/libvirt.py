@@ -1,20 +1,21 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 
 from dissect.target import container
 from dissect.target.helpers import fsutil
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class LibvirtLoader(Loader):
     """Load libvirt xml configuration files."""
-
-    def __init__(self, path: Path, **kwargs):
-        path = path.resolve()
-        self.base_dir = path.parent
-        super().__init__(path)
 
     @staticmethod
     def detect(path: Path) -> bool:
@@ -35,6 +36,6 @@ class LibvirtLoader(Loader):
                 continue
 
             for part in [fsutil.basename(file), file]:
-                if (path := self.base_dir.joinpath(part)).exists():
+                if (path := self.base_path.joinpath(part)).exists():
                     target.disks.add(container.open(path))
                     break

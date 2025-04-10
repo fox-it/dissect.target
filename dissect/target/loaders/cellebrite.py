@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
-from uuid import UUID
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as ET
 
@@ -11,7 +10,12 @@ from dissect.target.filesystem import LayerFilesystem
 from dissect.target.filesystems.zip import ZipFilesystem
 from dissect.target.helpers import configutil
 from dissect.target.loader import Loader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from uuid import UUID
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -66,7 +70,7 @@ class CellebriteLoader(Loader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
 
         self.ufdx = None
         self.ufd = []
@@ -84,20 +88,19 @@ class CellebriteLoader(Loader):
                     extractions=[],
                 )
 
-                base_path = path.resolve().parent
                 for extraction in tree.findall("Extractions/Extraction"):
                     self.ufdx.extractions.append(
                         Extraction(
                             type=extraction.get("TransferType"),
-                            path=base_path.joinpath(extraction.get("Path").replace("\\", "/")),
+                            path=self.base_path.joinpath(extraction.get("Path").replace("\\", "/")),
                         )
                     )
 
             except ET.ParseError as e:
-                raise ValueError(f"Invalid XML in {path}: {str(e)}")
+                raise ValueError(f"Invalid XML in {path}: {e}")
 
         elif path.suffix == ".ufd":
-            self.ufdx = Ufdx(extractions=[Extraction(type=None, path=path.resolve())])
+            self.ufdx = Ufdx(extractions=[Extraction(type=None, path=self.absolute_path)])
 
         else:
             raise ValueError(f"Unknown suffix {path.suffix} for {path}")

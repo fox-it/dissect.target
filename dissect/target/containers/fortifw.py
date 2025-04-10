@@ -5,13 +5,15 @@ import io
 import logging
 import zlib
 from itertools import cycle, islice
-from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import AlignedStream, RangeStream, RelativeStream
 
 from dissect.target.container import Container
 from dissect.target.tools.utils import catch_sigpipe
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 

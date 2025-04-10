@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import binascii
 from io import BytesIO
+from typing import TYPE_CHECKING, Any, Callable
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -18,13 +21,19 @@ from dissect.target.plugins.os.windows.regf.shimcache import (
     c_shim,
 )
 
+if TYPE_CHECKING:
+    import datetime
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
+
 TEST_ARGUMENTS = {
     SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER: {"path_len": 1},
     SHIMCACHE_WIN_TYPE.VERSION_WIN81: {"ts": 0, "pkg_len": 0, "pkg": "", "path_len": 0},
 }
 
 
-def create_header_bytes(magic: int, position=0, length=0x100):
+def create_header_bytes(magic: int, position: int = 0, length: int = 0x100) -> BytesIO:
     if position > length - 4:
         raise ValueError("total header bytes would be larger than length.")
 
@@ -34,19 +43,18 @@ def create_header_bytes(magic: int, position=0, length=0x100):
 
 
 @pytest.fixture
-def mocked_shimcache():
+def mocked_shimcache() -> ShimCache:
     with patch.object(ShimCache, "identify"):
-        shimcache = ShimCache(fh=BytesIO(b""), ntversion="", noheader=False)
-    return shimcache
+        return ShimCache(fh=BytesIO(b""), ntversion="", noheader=False)
 
 
 @pytest.fixture(params=[True, False])
-def crc_check(request):
+def crc_check(request: pytest.FixtureRequest) -> bool:
     return request.param
 
 
 @pytest.fixture
-def mocked_nt61_file(version, pathname):
+def mocked_nt61_file(version: int, pathname: str) -> tuple[dict, Mock]:
     winnt_variations = TYPE_VARIATIONS.get(version)
 
     nt_header = winnt_variations.get("header")
@@ -65,7 +73,7 @@ def mocked_nt61_file(version, pathname):
 
 
 @pytest.fixture
-def created_header_win8plus(crc_check, version):
+def created_header_win8plus(crc_check: bool, version: int) -> tuple[dict, Mock]:
     variations = TYPE_VARIATIONS.get(version)
     entry_header, data_header = variations.get("headers")
 
@@ -86,12 +94,12 @@ def created_header_win8plus(crc_check, version):
 
 
 @pytest.fixture(params=[0, 1])
-def offset(request):
+def offset(request: pytest.FixtureRequest) -> int:
     return request.param
 
 
 @pytest.fixture
-def mocked_nt52_file(offset, pathname):
+def mocked_nt52_file(offset: int, pathname: str) -> tuple[dict, Mock]:
     winnt_variations = TYPE_VARIATIONS.get(SHIMCACHE_WIN_TYPE.VERSION_NT52)
 
     nt_header = winnt_variations.get("header")
@@ -113,18 +121,18 @@ def mocked_nt52_file(offset, pathname):
 
 
 @pytest.mark.parametrize("shimcache_error", [NotImplementedError, EOFError])
-def test_shimcache_plugin_initialize(target_win, shimcache_error):
+def test_shimcache_plugin_initialize(target_win: Target, shimcache_error: type[Exception]) -> None:
     shimcache = ShimcachePlugin(target_win)
     mocked_registry_keys = Mock()
     target_win.registry.keys = Mock(return_value=[mocked_registry_keys])
     mocked_registry_keys.value.return_value.value = b"hello_world"
 
     with patch(ShimCache.__module__, side_effect=[shimcache_error]):
-        assert [] == list(shimcache.shimcache())
+        assert list(shimcache.shimcache()) == []
 
 
 @pytest.mark.parametrize(
-    "file_data, ntversion, expected_value",
+    ("file_data", "ntversion", "expected_value"),
     [
         (create_header_bytes(MAGIC_NT52), "6.3", SHIMCACHE_WIN_TYPE.VERSION_NT52),
         (create_header_bytes(MAGIC_NT61), "6.3", SHIMCACHE_WIN_TYPE.VERSION_NT61),
@@ -134,14 +142,14 @@ def test_shimcache_plugin_initialize(target_win, shimcache_error):
         (create_header_bytes(MAGIC_WIN10, 0x34, 0x38), "6.3", SHIMCACHE_WIN_TYPE.VERSION_WIN10_CREATORS),
     ],
 )
-def test_shimcache_identify(mocked_shimcache, file_data, ntversion, expected_value):
+def test_shimcache_identify(mocked_shimcache: ShimCache, file_data: bytes, ntversion: str, expected_value: int) -> None:
     mocked_shimcache.fh = file_data
     mocked_shimcache.ntversion = ntversion
     assert mocked_shimcache.identify() == expected_value
 
 
 @pytest.mark.parametrize(
-    "file_data, ntversion, no_header, expected_value",
+    ("file_data", "ntversion", "no_header", "expected_value"),
     [
         (create_header_bytes(0), "6.3", False, SHIMCACHE_WIN_TYPE.VERSION_WIN81),
         (create_header_bytes(0), "6.3", True, SHIMCACHE_WIN_TYPE.VERSION_WIN81_NO_HEADER),
@@ -152,7 +160,13 @@ def test_shimcache_identify(mocked_shimcache, file_data, ntversion, expected_val
         (create_header_bytes(0, 0x34, 0x38), None, False, NotImplementedError),
     ],
 )
-def test_identify_special_conditions(mocked_shimcache, file_data, ntversion, no_header, expected_value):
+def test_identify_special_conditions(
+    mocked_shimcache: ShimCache,
+    file_data: bytes,
+    ntversion: str | None,
+    no_header: bool,
+    expected_value: int | type[Exception],
+) -> None:
     mocked_shimcache.fh = file_data
     mocked_shimcache.ntversion = ntversion
     mocked_shimcache.noheader = no_header
@@ -165,7 +179,7 @@ def test_identify_special_conditions(mocked_shimcache, file_data, ntversion, no_
 
 
 @pytest.mark.parametrize(
-    "version, expected_method",
+    ("version", "expected_method"),
     [
         (SHIMCACHE_WIN_TYPE.VERSION_WIN10_CREATORS, ShimCache.iter_win_8_plus),
         (SHIMCACHE_WIN_TYPE.VERSION_WIN10, ShimCache.iter_win_8_plus),
@@ -174,7 +188,7 @@ def test_identify_special_conditions(mocked_shimcache, file_data, ntversion, no_
         (SHIMCACHE_WIN_TYPE.VERSION_NT52, ShimCache.iter_nt),
     ],
 )
-def test_shim_cache_iterator_mocked(mocked_shimcache, version, expected_method):
+def test_shim_cache_iterator_mocked(mocked_shimcache: ShimCache, version: int, expected_method: Callable) -> None:
     mocked_shimcache.version = version
     mocked_shimcache.ntversion = "6.3"
 
@@ -182,14 +196,14 @@ def test_shim_cache_iterator_mocked(mocked_shimcache, version, expected_method):
         assert iter(mocked_shimcache) == iterator_method.return_value
 
 
-def test_shim_cache_iterator_unimplemented(mocked_shimcache):
+def test_shim_cache_iterator_unimplemented(mocked_shimcache: ShimCache) -> None:
     mocked_shimcache.version = -1
     with pytest.raises(NotImplementedError):
         iter(mocked_shimcache)
 
 
 @pytest.mark.parametrize(
-    "version, timestamp",
+    ("version", "timestamp"),
     [
         (SHIMCACHE_WIN_TYPE.VERSION_WIN10, wintimestamp(0)),
         (SHIMCACHE_WIN_TYPE.VERSION_WIN10_CREATORS, wintimestamp(0)),
@@ -197,12 +211,14 @@ def test_shim_cache_iterator_unimplemented(mocked_shimcache):
         (SHIMCACHE_WIN_TYPE.VERSION_WIN81, wintimestamp(0)),
     ],
 )
-def test_shim_iter_win8_plus(mocked_shimcache, created_header_win8plus, timestamp):
+def test_shim_iter_win8_plus(
+    mocked_shimcache: ShimCache, created_header_win8plus: tuple[dict, Mock], timestamp: datetime.datetime
+) -> None:
     win_10_variations, mocked_file = created_header_win8plus
 
     mocked_shimcache.fh = mocked_file.return_value
 
-    output = list(mocked_shimcache.iter_win_8_plus(**win_10_variations))[0]
+    output = next(iter(mocked_shimcache.iter_win_8_plus(**win_10_variations)))
     if isinstance(output, tuple):
         assert output == (timestamp, "")
     else:
@@ -210,7 +226,7 @@ def test_shim_iter_win8_plus(mocked_shimcache, created_header_win8plus, timestam
 
 
 @pytest.mark.parametrize(
-    "version, pathname, expected_output",
+    ("version", "pathname", "expected_output"),
     [
         (
             SHIMCACHE_WIN_TYPE.VERSION_NT61,
@@ -220,7 +236,9 @@ def test_shim_iter_win8_plus(mocked_shimcache, created_header_win8plus, timestam
         (SHIMCACHE_WIN_TYPE.VERSION_NT61, b"hello_world", []),
     ],
 )
-def test_shim_iter_nt61(mocked_shimcache, mocked_nt61_file, expected_output):
+def test_shim_iter_nt61(
+    mocked_shimcache: ShimCache, mocked_nt61_file: tuple[dict, Mock], expected_output: list
+) -> None:
     winnt_variations, open_file = mocked_nt61_file
     mocked_shimcache.fh = open_file
 
@@ -228,7 +246,7 @@ def test_shim_iter_nt61(mocked_shimcache, mocked_nt61_file, expected_output):
 
 
 @pytest.mark.parametrize(
-    "pathname, expected_output",
+    ("pathname", "expected_output"),
     [
         (
             b"h\x00e\x00l\x00l\x00o\x00_\x00w\x00o\x00r\x00l\x00d\x00",
@@ -237,18 +255,20 @@ def test_shim_iter_nt61(mocked_shimcache, mocked_nt61_file, expected_output):
         (b"hello_world", []),
     ],
 )
-def test_shim_iter_nt52(mocked_shimcache, mocked_nt52_file, expected_output):
+def test_shim_iter_nt52(
+    mocked_shimcache: ShimCache, mocked_nt52_file: tuple[dict, Mock], expected_output: list
+) -> None:
     winnt_variations, open_file = mocked_nt52_file
     mocked_shimcache.fh = open_file
 
     assert list(mocked_shimcache.iter_nt(**winnt_variations)) == expected_output
 
 
-def list_generator(input_list: list):
+def list_generator(input_list: Iterator[Any]) -> Iterator[Any]:
     yield from input_list
 
 
-def test_gracefull_shutdown_crc(mocked_shimcache, target_win):
+def test_gracefull_shutdown_crc(target_win: Target, mocked_shimcache: ShimCache) -> None:
     plugin = ShimcachePlugin(target_win)
     mocked_shimcache.version = SHIMCACHE_WIN_TYPE.VERSION_WIN10
 

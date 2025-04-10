@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 MssqlErrorlogRecord = TargetRecordDescriptor(
     "microsoft/sql/errorlog",

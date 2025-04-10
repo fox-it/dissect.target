@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from dissect.target.helpers import config
 
 
-def test_load_config():
+def test_load_config() -> None:
     # FS layout:
     #
     # temp_dir1

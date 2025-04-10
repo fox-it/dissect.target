@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
@@ -12,7 +13,13 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
     RemoteAccessPlugin,
 )
-from dissect.target.plugins.general.users import UserDetails
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 
 class AnydeskPlugin(RemoteAccessPlugin):
@@ -21,7 +28,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
     __namespace__ = "anydesk"
 
     # Anydesk logs when installed as a service
-    SERVICE_GLOBS = [
+    SERVICE_GLOBS = (
         # Standard client >= Windows 7
         "sysvol/ProgramData/AnyDesk/*.trace",
         # Custom client >= Windows 7
@@ -31,22 +38,22 @@ class AnydeskPlugin(RemoteAccessPlugin):
         "sysvol/Documents and Settings/Public/AnyDesk/ad_*/*.trace",
         # Standard/Custom client Linux/MacOS
         "var/log/anydesk*/*.trace",
-    ]
+    )
 
     # Anydesk Filetransfer logs when installed as a service
-    FILETRANSFER_SERVICE_LOGS = [
+    FILETRANSFER_SERVICE_LOGS = (
         # File transfer service log
         "sysvol/ProgramData/AnyDesk/file_transfer_trace.txt",
-    ]
+    )
 
     # User specific Anydesk filetransfer log
-    FILETRANSFER_USER_LOGS = [
+    FILETRANSFER_USER_LOGS = (
         # File transfer log
         "AppData/Roaming/AnyDesk/file_transfer_trace.txt",
-    ]
+    )
 
     # User specific Anydesk logs
-    USER_GLOBS = [
+    USER_GLOBS = (
         # Standard client Windows
         "AppData/Roaming/AnyDesk/*.trace",
         # Custom client Windows
@@ -57,7 +64,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
         ".anydesk/*.trace",
         # Custom client Linux/MacOS
         ".anydesk_ad_*/*.trace",
-    ]
+    )
 
     RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
         "remoteaccess/anydesk/log", GENERIC_LOG_RECORD_FIELDS
@@ -67,7 +74,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
         "remoteaccess/anydesk/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
     )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self.trace_files: set[tuple[TargetPath, UserDetails | None]] = set()

@@ -5,7 +5,10 @@ import importlib.machinery
 import importlib.util
 import logging
 from pathlib import Path
-from types import ModuleType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +18,7 @@ CONFIG_NAME = ".targetcfg.py"
 def load(paths: list[Path | str] | Path | str | None) -> ModuleType:
     """Attempt to load one configuration from the provided path(s)."""
 
-    if isinstance(paths, Path) or isinstance(paths, str):
+    if isinstance(paths, (Path, str)):
         paths = [paths]
 
     config_spec = importlib.machinery.ModuleSpec("config", None)
@@ -65,7 +68,7 @@ def _find_config_file(paths: list[Path | str] | None) -> Path | None:
     """
 
     if not paths:
-        return
+        return None
 
     config_file = None
 

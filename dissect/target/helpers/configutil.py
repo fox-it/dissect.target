@@ -6,18 +6,15 @@ import logging
 import re
 import sys
 from collections import deque
+from collections.abc import ItemsView, Iterable, Iterator, KeysView
 from configparser import ConfigParser, MissingSectionHeaderError
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
-from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
-    ItemsView,
-    Iterable,
-    Iterator,
-    KeysView,
     Literal,
     TextIO,
 )
@@ -25,8 +22,12 @@ from typing import (
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import ConfigurationParsingError, FileNotFoundError
-from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import TargetPath
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from dissect.target.filesystem import FilesystemEntry
 
 try:
     from ruamel.yaml import YAML
@@ -70,25 +71,25 @@ def _update_dictionary(current: dict[str, Any], key: str, value: Any) -> None:
 class PeekableIterator:
     # https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#peekable
 
-    def __init__(self, iterable):
+    def __init__(self, iterable: Iterable[str]):
         self._iterator = iter(iterable)
         self._cache = deque()
 
-    def __iter__(self):
+    def __iter__(self) -> PeekableIterator:
         return self
 
-    def __next__(self):
+    def __next__(self) -> str:
         if self._cache:
             return self._cache.popleft()
 
         return next(self._iterator)
 
-    def peek(self):
+    def peek(self) -> str | None:
         if not self._cache:
             try:
                 self._cache.append(next(self._iterator))
             except StopIteration:
-                return
+                return None
         return self._cache[0]
 
 
@@ -154,7 +155,7 @@ class ConfigurationParser:
         Args:
             fh: The text to parse.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get(self, item: str, default: Any | None = None) -> Any:
         return self.parsed_data.get(item, default)
@@ -205,11 +206,11 @@ class Default(ConfigurationParser):
         <empty_space><comment>  -> skip
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.SEPARATOR = re.compile(rf"\s*[{''.join(self.separator)}]\s*")
         self.COMMENTS = re.compile(rf"\s*[{''.join(self.comment_prefixes)}]")
-        self.skip_lines = self.comment_prefixes + ("\n",)
+        self.skip_lines = (*self.comment_prefixes, "\n")
 
     def line_reader(self, fh: TextIO, strip_comments: bool = True) -> Iterator[str]:
         for line in fh:
@@ -229,7 +230,7 @@ class Default(ConfigurationParser):
             if line.startswith((" ", "\t")):
                 # This part was indented so it is a continuation of the previous key
                 prev_value = information_dict.get(prev_key)
-                information_dict[prev_key] = " ".join([prev_value, line.strip()])
+                information_dict[prev_key] = f"{prev_value} {line.strip()}"
                 continue
 
             prev_key, *value = self.SEPARATOR.split(line, 1)
@@ -241,9 +242,9 @@ class Default(ConfigurationParser):
 
 
 class CSVish(Default):
-    """Parses CSV-ish config files (does not confirm to CSV standard!)"""
+    """Parses CSV-ish config files (does not confirm to CSV standard!)."""
 
-    def __init__(self, *args, fields: tuple[str], **kwargs) -> None:
+    def __init__(self, *args, fields: tuple[str, ...], **kwargs):
         self.fields = fields
         self.num_fields = len(self.fields)
         self.maxsplit = self.num_fields - 1
@@ -256,11 +257,8 @@ class CSVish(Default):
             line = raw_line.strip()
             columns = re.split(self.SEPARATOR, line, maxsplit=self.maxsplit)
 
-            if len(columns) < self.num_fields:
-                # keep unparsed lines separate (often env vars)
-                data = {"line": line}
-            else:
-                data = dict(zip(self.fields, columns))
+            # keep unparsed lines separate (often env vars)
+            data = {"line": line} if len(columns) < self.num_fields else dict(zip(self.fields, columns))
 
             information_dict[str(i)] = data
 
@@ -268,9 +266,9 @@ class CSVish(Default):
 
 
 class Ini(ConfigurationParser):
-    """Parses an ini file according using the built-in python ConfigParser"""
+    """Parses an ini file according using the built-in Python ``ConfigParser``."""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.parsed_data = ConfigParser(
@@ -282,17 +280,16 @@ class Ini(ConfigurationParser):
         )
         self.parsed_data.optionxform = str
 
-    def parse_file(self, fh: io.TextIO) -> None:
+    def parse_file(self, fh: TextIO) -> None:
         offset = fh.tell()
         try:
-            self.parsed_data.read_file(fh)
-            return
+            return self.parsed_data.read_file(fh)
         except MissingSectionHeaderError:
             pass
 
         fh.seek(offset)
         open_file = io.StringIO("[DEFAULT]\n" + fh.read())
-        self.parsed_data.read_file(open_file)
+        return self.parsed_data.read_file(open_file)
 
 
 class Txt(ConfigurationParser):
@@ -304,7 +301,7 @@ class Txt(ConfigurationParser):
 
 
 class Bin(ConfigurationParser):
-    """Read the file into ``binary`` and show the number of bytes read"""
+    """Read the file into ``binary`` and show the number of bytes read."""
 
     def parse_file(self, fh: io.BytesIO) -> None:
         self.parsed_data = {"binary": fh.read(), "size": str(fh.tell())}
@@ -341,15 +338,13 @@ class Xml(ConfigurationParser):
 
         # content goes into the text folder
         # we don't use special prefixes ($) because XML docs may use them anyway (even though they are forbidden)
-        if tree.text:
-            if text := tree.text.strip(" \n\r"):
-                result["text"] = text
+        if tree.text and (text := tree.text.strip(" \n\r")):
+            result["text"] = text
 
         # if you need to store meta-data, you can extend add more entries here... CDATA, Comments, errors
-        result = {tree.tag: result} if root else result
-        return result
+        return {tree.tag: result} if root else result
 
-    def _fix(self, content: str, position: tuple(int, int)) -> str:
+    def _fix(self, content: str, position: tuple[int, int]) -> str:
         """Quick heuristic fix. If there is an invalid token, just remove it."""
         lineno, offset = position
         lines = content.split("\n")
@@ -372,9 +367,9 @@ class Xml(ConfigurationParser):
             try:
                 tree = self._tree(ElementTree.fromstring(document), root=True)
                 break
-            except ElementTree.ParseError as err:
+            except ElementTree.ParseError as e:
                 errors += 1
-                document = self._fix(document, err.position)
+                document = self._fix(document, e.position)
 
         if not tree:
             # Error limit reached. Thus we consider the document not parseable.
@@ -414,7 +409,7 @@ class ListUnwrapper:
         if not isinstance(data, dict):
             return data
 
-        root = dict()
+        root = {}
         for key, value in data.items():
             _value = ListUnwrapper._unwrap_dict_list(value)
             if isinstance(_value, dict):
@@ -439,7 +434,7 @@ class ListUnwrapper:
 class Json(ConfigurationParser):
     """Parses a JSON file."""
 
-    def parse_file(self, fh: TextIO):
+    def parse_file(self, fh: TextIO) -> None:
         parsed_data = json.load(fh)
         self.parsed_data = ListUnwrapper.unwrap(parsed_data)
 
@@ -479,13 +474,13 @@ class Env(ConfigurationParser):
 
     RE_KV = re.compile(r"^(?P<key>.+?)=(?P<value>(\".+?\")|(\'.+?\')|(.*?))?(?P<comment> \#.+?)?$")
 
-    def __init__(self, comments: bool = True, *args, **kwargs) -> None:
+    def __init__(self, comments: bool = True, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.comments = comments
         self.parsed_data: dict | tuple[dict, str | None] = {}
 
     def parse_file(self, fh: TextIO) -> None:
-        for line in fh.readlines():
+        for line in fh:
             # Blank lines are ignored.
             # Lines beginning with ``#`` are processed as comments and ignored.
             if not line or line[0] == "#" or "=" not in line:
@@ -547,13 +542,13 @@ class ScopeManager:
         _previous: The node before the current (changed) node.
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         self._parents = {}
         self._root = {}
         self._current = self._root
         self._previous = None
 
-    def __enter__(self) -> ScopeManager:
+    def __enter__(self) -> ScopeManager:  # noqa: PYI034
         return self
 
     def __exit__(
@@ -768,7 +763,7 @@ class SystemD(Indentation):
                     prev_values, prev_key = self._update_continued_values(
                         func=manager.update,
                         key=prev_key,
-                        values=prev_values + [continued_value],
+                        values=[*prev_values, continued_value],
                     )
                     continue
 
@@ -776,7 +771,9 @@ class SystemD(Indentation):
 
             self.parsed_data = manager._root
 
-    def _update_continued_values(self, func: Callable, key, values: list[str]) -> tuple[list, None]:
+    def _update_continued_values(
+        self, func: Callable[[str, str], None], key: str, values: list[str]
+    ) -> tuple[list, None]:
         value = " ".join(values)
         func(key, value)
         return [], None
@@ -925,10 +922,7 @@ def parse_config(
 
     parser = parser_type.create_parser(options)
     with entry.open("rb") if isinstance(entry, Path) else entry.open() as fh:
-        if not isinstance(parser, Bin):
-            open_file = io.TextIOWrapper(fh, encoding="utf-8")
-        else:
-            open_file = io.BytesIO(fh.read())
+        open_file = io.TextIOWrapper(fh, encoding="utf-8") if not isinstance(parser, Bin) else io.BytesIO(fh.read())
         parser.read_file(open_file)
 
     return parser

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -59,12 +61,12 @@ class CitrixWebserverPlugin(ApachePlugin):
 
         LogFormat "%{Citrix-ns-orig-srcip}i -> %{Citrix-ns-orig-destip}i %l %u %t [%P] \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\" \"Time: %D microsecs\"" combined_resptime_with_citrix_hdrs
         LogFormat "%a %l %u %t [%P] \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\" \"Time: %D microsecs\"" combined_resptime
-    """  # noqa: E501, W605
+    """  # noqa: E501
 
     __namespace__ = "citrix"
 
-    ACCESS_LOG_NAMES = ApachePlugin.ACCESS_LOG_NAMES + ["httpaccess.log", "httpaccess-vpn.log"]
-    ERROR_LOG_NAMES = ApachePlugin.ERROR_LOG_NAMES + ["httperror.log", "httperror-vpn.log"]
+    ACCESS_LOG_NAMES = (*ApachePlugin.ACCESS_LOG_NAMES, "httpaccess.log", "httpaccess-vpn.log")
+    ERROR_LOG_NAMES = (*ApachePlugin.ERROR_LOG_NAMES, "httperror.log", "httperror-vpn.log")
 
     def check_compatible(self) -> None:
         if not self.target.os == OperatingSystem.CITRIX:

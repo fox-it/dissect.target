@@ -2,17 +2,22 @@ from __future__ import annotations
 
 import ipaddress
 import struct
-from collections import namedtuple
-from typing import Iterator
+from typing import TYPE_CHECKING, NamedTuple
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath, open_decompress
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, alias, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 UTMP_FIELDS = [
     ("datetime", "ts"),
@@ -78,32 +83,29 @@ struct entry {
     int32_t ut_addr_v6[4];         // Internet address of remote host; IPv4 address uses just ut_addr_v6[0]
     char    __unused[20];
 };
-"""  # noqa: E501
+"""
 
 c_utmp = cstruct().load(utmp_def)
 
-UTMP_ENTRY = namedtuple(
-    "UTMPRecord",
-    [
-        "ts",
-        "ut_type",
-        "ut_user",
-        "ut_pid",
-        "ut_line",
-        "ut_id",
-        "ut_host",
-        "ut_addr",
-    ],
-)
+
+class UtmpRecord(NamedTuple):
+    ts: datetime
+    ut_type: str
+    ut_user: str
+    ut_pid: int
+    ut_line: str
+    ut_id: str
+    ut_host: str
+    ut_addr: ipaddress.IPv4Address | ipaddress.IPv6Address | None
 
 
 class UtmpFile:
-    """utmp maintains a full accounting of the current status of the system"""
+    """Parser for utmp files."""
 
-    def __init__(self, path: TargetPath):
+    def __init__(self, path: Path):
         self.fh = open_decompress(path, "rb")
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[UtmpRecord]:
         while True:
             try:
                 entry = c_utmp.entry(self.fh)
@@ -118,7 +120,7 @@ class UtmpFile:
                 # UTMP misuses the field ut_addr_v6 for IPv4 and IPv6 addresses, because of this the ut_host field
                 # is used to determine if the ut_addr_v6 is an IPv6 address where the last 12 bytes of trailing zeroes.
                 if entry.ut_addr_v6:
-                    if not entry.ut_addr_v6[1:] == [0, 0, 0]:
+                    if entry.ut_addr_v6[1:] != [0, 0, 0]:
                         # IPv6 address that uses > 4 bytes
                         ut_addr = ipaddress.ip_address(struct.pack("<4i", *entry.ut_addr_v6))
                     else:
@@ -136,7 +138,7 @@ class UtmpFile:
                             # ut_addr_v6 is parsed as IPv4 address. This could not lead to incorrect results.
                             ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
 
-                yield UTMP_ENTRY(
+                yield UtmpRecord(
                     ts=from_unix(entry.ut_tv.tv_sec),
                     ut_type=r_type,
                     ut_pid=entry.ut_pid,
@@ -147,7 +149,7 @@ class UtmpFile:
                     ut_addr=ut_addr,
                 )
 
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break
 
 
@@ -164,7 +166,7 @@ class UtmpPlugin(Plugin):
         if not any(self.btmp_paths + self.wtmp_paths + self.utmp_paths):
             raise UnsupportedPluginError("No wtmp and/or btmp log files found")
 
-    def _build_record(self, record: TargetRecordDescriptor, entry: UTMP_ENTRY) -> Iterator[BtmpRecord | WtmpRecord]:
+    def _build_record(self, record: TargetRecordDescriptor, entry: UtmpRecord) -> Iterator[BtmpRecord | WtmpRecord]:
         return record(
             ts=entry.ts,
             ut_type=entry.ut_type,

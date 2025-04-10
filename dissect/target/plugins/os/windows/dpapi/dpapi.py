@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import re
 from functools import cache, cached_property
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import InternalPlugin
 from dissect.target.plugins.os.windows.dpapi.blob import Blob as DPAPIBlob
 from dissect.target.plugins.os.windows.dpapi.master_key import CredSystem, MasterKeyFile
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class DPAPIPlugin(InternalPlugin):
@@ -93,13 +97,8 @@ class DPAPIPlugin(InternalPlugin):
                     self.target.log.warning("Unable to decrypt SYSTEM master key: LSA secret missing")
                     continue
 
-                # Windows XP
-                if float(self.target.ntversion) < 6.0:
-                    secret_offset = 8
-
-                # Windows Vista and newer
-                else:
-                    secret_offset = 16
+                # Windows XP or Windows Vista and newer
+                secret_offset = 8 if float(self.target.ntversion) < 6.0 else 16
 
                 dpapi_system = CredSystem(self.target.lsa._secrets["DPAPI_SYSTEM"][secret_offset:])
                 mkf.decrypt_with_key(dpapi_system.machine_key)

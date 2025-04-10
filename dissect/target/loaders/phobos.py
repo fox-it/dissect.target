@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util import stream
 
@@ -9,7 +8,10 @@ from dissect.target import filesystem
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 BLOCK_SIZE = 64 * 0x100000  # 64 MiB
 

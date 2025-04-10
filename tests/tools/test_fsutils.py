@@ -1,13 +1,18 @@
-import sys
-from unittest.mock import MagicMock
+from __future__ import annotations
 
-import pytest
+import sys
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers.fsutil import stat_result
-from dissect.target.target import Target
 from dissect.target.tools.fsutils import print_extensive_file_stat_listing
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.target import Target
 
 
 def test_target_cli_print_extensive_file_stat(target_win: Target, capsys: pytest.CaptureFixture) -> None:

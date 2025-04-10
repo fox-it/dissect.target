@@ -1,27 +1,31 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
-from typing import BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.hypervisor import vmdk
 
 from dissect.target.container import Container
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 class VmdkContainer(Container):
-    """VMWare hard disks"""
+    """VMware virtual hard disks."""
 
     __type__ = "vmdk"
 
-    def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
         self.vmdk = vmdk.VMDK(fh)
         super().__init__(fh, self.vmdk.size, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         return fh.read(4) in (b"KDMV", b"COWD", b"# Di")
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return path.suffix.lower().endswith(".vmdk")
 
     def read(self, length: int) -> bytes:

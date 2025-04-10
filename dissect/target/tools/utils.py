@@ -7,14 +7,12 @@ import json
 import os
 import sys
 import textwrap
-import urllib
-from datetime import datetime
+import urllib.parse
 from functools import wraps
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable
 
-from dissect.target import Target
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
 from dissect.target.loader import LOADERS_BY_SCHEME
@@ -26,6 +24,12 @@ from dissect.target.plugin import (
     load_modules_from_paths,
 )
 from dissect.target.tools.logging import configure_logging
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+
+    from dissect.target.target import Target
 
 
 def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
@@ -125,7 +129,7 @@ def generate_argparse_for_plugin_class(
     """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` class."""
 
     if not isinstance(plugin_cls, type) or not issubclass(plugin_cls, Plugin):
-        raise ValueError(f"`plugin_cls` must be a valid plugin class, not `{plugin_cls}`")
+        raise TypeError(f"`plugin_cls` must be a valid plugin class, not `{plugin_cls}`")
 
     method_name = plugin_cls.__namespace__
     desc = docs.get_plugin_overview(plugin_cls, with_plugin_desc=True, with_func_docstrings=True)
@@ -172,7 +176,7 @@ def generate_argparse_for_plugin(
     """Generate an ``argparse.ArgumentParser`` for a ``Plugin`` instance."""
 
     if not isinstance(plugin_instance, Plugin):
-        raise ValueError(f"`plugin_instance` must be a valid plugin instance, not `{plugin_instance}`")
+        raise TypeError(f"`plugin_instance` must be a valid plugin instance, not `{plugin_instance}`")
 
     if not hasattr(plugin_instance, "__namespace__"):
         raise ValueError(f"Plugin `{plugin_instance}` is not a namespace plugin and is not callable")
@@ -240,7 +244,7 @@ def catch_sigpipe(func: Callable) -> Callable:
     """Catches ``KeyboardInterrupt`` and ``BrokenPipeError`` (``OSError 22`` on Windows)."""
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs) -> int:
         try:
             return func(*args, **kwargs)
         except KeyboardInterrupt:
@@ -276,10 +280,7 @@ def args_to_uri(targets: list[str], loader_name: str, rest: list[str]) -> list[s
     for load_arg in getattr(loader, "__args__", []):
         parser.add_argument(*load_arg[0], **load_arg[1])
     args = vars(parser.parse_known_args(rest)[0])
-    uris = []
-    for target in targets:
-        uris.append(f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else ""))
-    return uris
+    return [f"{loader_name}://{target}" + (("?" + urllib.parse.urlencode(args)) if args else "") for target in targets]
 
 
 def find_and_filter_plugins(

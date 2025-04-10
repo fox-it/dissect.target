@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import Filesystem
 from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 # https://en.wikipedia.org/wiki/Mach-O
 ARCH_MAP = {
@@ -26,6 +30,7 @@ class DarwinPlugin(BsdPlugin):
         for fs in target.filesystems:
             if (fs.exists("/Library") and fs.exists("/Applications")) or fs.exists("/private/var/mobile"):
                 return fs
+        return None
 
 
 def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> str | None:
@@ -59,3 +64,5 @@ def detect_macho_arch(paths: list[str | Path], fs: Filesystem | None = None) -> 
                 return ARCH_MAP.get(fh.read(4))  # mach-o cpu type
         except Exception:
             pass
+
+    return None

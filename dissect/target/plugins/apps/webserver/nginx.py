@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
@@ -15,7 +14,12 @@ from dissect.target.plugins.apps.webserver.webserver import (
     WebserverHostRecord,
     WebserverPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 # Reference: https://nginx/org/en/docs/http/ngx_http_log_module.html#log_format
 RE_ACCESS_LOG = re.compile(
@@ -82,19 +86,19 @@ class NginxPlugin(WebserverPlugin):
 
     __namespace__ = "nginx"
 
-    DEFAULT_LOG_DIRS = [
+    DEFAULT_LOG_DIRS = (
         "/var/log/nginx",
         "/var/log",
-    ]
+    )
 
-    ACCESS_LOG_NAMES = ["access.log"]
-    ERROR_LOG_NAMES = ["error.log"]
+    ACCESS_LOG_NAMES = ("access.log",)
+    ERROR_LOG_NAMES = ("error.log",)
 
-    DEFAULT_CONFIG_PATHS = [
+    DEFAULT_CONFIG_PATHS = (
         "/etc/nginx/nginx.conf",
         "/etc/nginx/sites-available/*.conf",
         "/etc/nginx/sites-enabled/*.conf",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -245,6 +249,8 @@ class NginxPlugin(WebserverPlugin):
             - https://nginx.org/en/docs/ngx_core_module.html#error_log
             - https://github.com/nginx/nginx/blob/master/src/core/ngx_log.c
         """
+        target_tz = self.target.datetime.tzinfo
+
         for path in self.error_paths:
             path = path.resolve(strict=True)
             if not path.is_file():
@@ -262,7 +268,7 @@ class NginxPlugin(WebserverPlugin):
                 log = match.groupdict()
 
                 try:
-                    ts = datetime.strptime(log["ts"], "%Y/%m/%d %H:%M:%S")
+                    ts = datetime.strptime(log["ts"], "%Y/%m/%d %H:%M:%S").replace(tzinfo=target_tz)
                 except ValueError:
                     ts = None
 
@@ -316,7 +322,9 @@ class NginxPlugin(WebserverPlugin):
 def parse_json_line(line: str) -> dict[str, str] | None:
     """Attempt to parse a default NGINX JSON log line.
 
-    We assume the custom ``log_format`` uses the following default NGINX field names::
+    We assume the custom ``log_format`` uses the following default NGINX field names:
+
+    .. code-block:: text
 
         time_local, time, remote_addr, remote_ip, remote_user, request_method, request,
         response, status, body_bytes_sent, request_time, http_referrer, referrer,

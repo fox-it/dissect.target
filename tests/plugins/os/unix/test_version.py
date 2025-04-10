@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -6,9 +9,14 @@ from dissect.target.plugins.os.unix.bsd.freebsd._os import FreeBsdPlugin
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.plugin import OSPlugin
+    from dissect.target.target import Target
+
 
 @pytest.mark.parametrize(
-    "data_path, target_path, expected_version, os_plugin",
+    ("data_path", "target_path", "expected_version", "os_plugin"),
     [
         (
             "_data/plugins/os/unix/linux/debian/_os/debian-os-release",
@@ -60,7 +68,14 @@ from tests._utils import absolute_path
         ),
     ],
 )
-def test_unix_version_detection(fs_unix, target_unix, data_path, target_path, expected_version, os_plugin):
+def test_unix_version_detection(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    data_path: str,
+    target_path: str,
+    expected_version: str,
+    os_plugin: type[OSPlugin],
+) -> None:
     fs_unix.map_file(target_path, absolute_path(data_path))
     target_unix.add_plugin(os_plugin)
 
@@ -68,36 +83,32 @@ def test_unix_version_detection(fs_unix, target_unix, data_path, target_path, ex
 
 
 @pytest.mark.parametrize(
-    "content, target_path, os_plugin",
+    ("content", "target_path", "os_plugin"),
     [
         ("Fedora release 37 (Thirty Seven)", "/etc/fedora-release", LinuxPlugin),
         ("CentOS Linux release 8.4.2105", "/etc/centos-release", LinuxPlugin),
     ],
 )
-def test_unix_version_detection_short(fs_unix, target_unix, content, target_path, os_plugin):
+def test_unix_version_detection_short(
+    target_unix: Target, fs_unix: VirtualFilesystem, content: str, target_path: str, os_plugin: type[OSPlugin]
+) -> None:
     fs_unix.map_file_fh(target_path, BytesIO(content.encode()))
     target_unix.add_plugin(os_plugin)
 
     assert target_unix.version == content
 
 
-def test_unix_os_release_directory_regression(fs_unix, target_unix):
+def test_unix_os_release_directory_regression(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_file_fh(
         "/etc/upstream-release/lsb-release",
         BytesIO(
-            b"DISTRIB_ID=Ubuntu\n"
-            b"DISTRIB_RELEASE=16.04\n"
-            b"DISTRIB_CODENAME=xenial\n"
-            b'DISTRIB_DESCRIPTION="Ubuntu 16.04 LTS"'
+            b'DISTRIB_ID=Ubuntu\nDISTRIB_RELEASE=16.04\nDISTRIB_CODENAME=xenial\nDISTRIB_DESCRIPTION="Ubuntu 16.04 LTS"'
         ),
     )
     fs_unix.map_file_fh(
         "/etc/lsb-release",
         BytesIO(
-            b"DISTRIB_ID=LinuxMint\n"
-            b"DISTRIB_RELEASE=19\n"
-            b"DISTRIB_CODENAME=tara\n"
-            b'DISTRIB_DESCRIPTION="Linux Mint 19 Tara"'
+            b'DISTRIB_ID=LinuxMint\nDISTRIB_RELEASE=19\nDISTRIB_CODENAME=tara\nDISTRIB_DESCRIPTION="Linux Mint 19 Tara"'
         ),
     )
     target_unix.add_plugin(LinuxPlugin)

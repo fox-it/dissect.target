@@ -50,8 +50,7 @@ class CipherAlgorithm:
         pad1 = bytes(c ^ 0x36 for c in key)[: hash_algorithm.block_length]
         pad2 = bytes(c ^ 0x5C for c in key)[: hash_algorithm.block_length]
         key = hashlib.new(hash_algorithm.name, pad1).digest() + hashlib.new(hash_algorithm.name, pad2).digest()
-        key = self.fixup_key(key)
-        return key
+        return self.fixup_key(key)
 
     def fixup_key(self, key: bytes) -> bytes:
         return key
@@ -65,7 +64,7 @@ class CipherAlgorithm:
         return self.decrypt(data, key, iv)
 
     def decrypt(self, data: bytes, key: bytes, iv: bytes | None = None) -> bytes:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class _AES(CipherAlgorithm):
@@ -257,7 +256,7 @@ def crypt_session_key_type1(
         verify_blob: Optional encrypted blob used for integrity check.
 
     Returns:
-        decryption key
+        The decryption key.
     """
     if len(master_key) > 20:
         master_key = hashlib.sha1(master_key).digest()
@@ -314,8 +313,9 @@ def crypt_session_key_type2(
         strong_password: Optional password used for decryption or the blob itself.
         smart_card_secret: Optional MS Next Gen Crypto secret (e.g. from PIN code). Only for API compatibility.
         verify_blob: Optional encrypted blob used for integrity check.
+
     Returns:
-        decryption key
+        The decryption key.
     """
     if len(masterkey) > 20:
         masterkey = hashlib.sha1(masterkey).digest()

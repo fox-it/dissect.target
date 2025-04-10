@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from dissect.util import ts
 
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.unix.generic import calculate_last_activity
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 class GenericPlugin(Plugin):
@@ -29,3 +32,4 @@ class GenericPlugin(Plugin):
         for path in ["/private/var/db/prng.seed"]:
             if (file := self.target.fs.path(path)).exists():
                 return ts.from_unix(file.lstat().st_mtime)
+        return None

@@ -9,13 +9,12 @@ import sys
 from collections import ChainMap
 from io import BytesIO, StringIO
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import IO, TYPE_CHECKING, Callable, TextIO
 from unittest.mock import MagicMock, call, mock_open, patch
 
 import pytest
 
 from dissect.target.helpers.fsutil import TargetPath, normalize
-from dissect.target.target import Target
 from dissect.target.tools import fsutils
 from dissect.target.tools.shell import (
     TargetCli,
@@ -25,6 +24,11 @@ from dissect.target.tools.shell import (
 )
 from dissect.target.tools.shell import main as target_shell
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 try:
     import pexpect
@@ -67,13 +71,17 @@ def test_build_pipe_nonexisting_command() -> None:
     pipeparts = ["grep", "test1", "|", dummy_command]
     input_stream = "input data test1"
 
-    with pytest.raises(OSError):
-        with build_pipe_stdout(pipeparts) as pipe_stdin:
-            print(input_stream, file=pipe_stdin)
+    with (
+        pytest.raises(OSError, match="No such file or directory: 'non-existing-command'"),
+        build_pipe_stdout(pipeparts) as pipe_stdin,
+    ):
+        print(input_stream, file=pipe_stdin)
 
-    with pytest.raises(OSError):
-        with build_pipe(pipeparts) as (pipe_stdin, _):
-            print(input_stream, file=pipe_stdin)
+    with (
+        pytest.raises(OSError, match="No such file or directory: 'non-existing-command'"),
+        build_pipe(pipeparts) as (pipe_stdin, _),
+    ):
+        print(input_stream, file=pipe_stdin)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
@@ -128,7 +136,7 @@ def test_targetcli_autocomplete(target_bare: Target, monkeypatch: pytest.MonkeyP
     subfile_name = "subfile"
     subpath_mismatch = "mismatch"
 
-    def dummy_scandir(path: TargetPath):
+    def dummy_scandir(path: TargetPath) -> list[tuple[TargetPath | None, str]]:
         assert str(path) == base_path
         return [
             (mock_subfolder, subfolder_name),
@@ -153,7 +161,7 @@ def targetrc_file() -> Iterator[list[str]]:
 
     original_open = pathlib.Path.open
 
-    def custom_open(self: Path, *args, **kwargs):
+    def custom_open(self: Path, *args, **kwargs) -> IO:
         if self.name.endswith(".targetrc"):
             return mock_open(read_data=content)()
         return original_open(self, *args, **kwargs)
@@ -176,7 +184,7 @@ def test_targetcli_targetrc(target_bare: Target, targetrc_file: list[str]) -> No
 def test_pipe_symbol_parsing(capfd: pytest.CaptureFixture, target_bare: Target) -> None:
     cli = TargetCli(target_bare)
 
-    def mock_func(func_args, func_stdout):
+    def mock_func(func_args: list[str], func_stdout: TextIO) -> None:
         # if the operation of parsing out the first `|` was successful,
         # `mock_func` should receive an empty `func_args` list
         assert len(func_args) == 0
@@ -220,11 +228,11 @@ def test_target_cli_ls(target_win: Target, capsys: pytest.CaptureFixture, monkey
     cli.onecmd("ls")
 
     captured = capsys.readouterr()
-    assert captured.out == "\n".join(["c:", "sysvol"]) + "\n"
+    assert captured.out == "c:\nsysvol" + "\n"
 
 
 @pytest.mark.parametrize(
-    "folders, files, save, expected",
+    ("folders", "files", "save", "expected"),
     [
         ("/a/b/c|/d", "/a/1.txt|/a/b/2.txt|/d/3.txt", "/a", "a|a/1.txt|a/b|a/b/2.txt|a/b/c"),
         ("/a/b/c|/d", "/a/1.txt|/b/2.txt|/d/3.txt", "/d", "d|d/3.txt"),
@@ -257,7 +265,7 @@ def test_target_cli_save(
         relative_path = str(path.relative_to(output_dir))
         return normalize(relative_path, alt_separator=target_win.fs.alt_separator)
 
-    path_map = map(lambda path: _map_function(path), output_dir.rglob("*"))
+    path_map = (_map_function(path) for path in output_dir.rglob("*"))
     tree = "|".join(sorted(path_map))
 
     assert tree == expected
@@ -267,7 +275,7 @@ def run_target_shell(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
 ) -> tuple[bytes, bytes]:
     with monkeypatch.context() as m:
-        m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),
+        (m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),)
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
         target_shell()
@@ -275,7 +283,7 @@ def run_target_shell(
 
 
 @pytest.mark.parametrize(
-    "provided_input, expected_output",
+    ("provided_input", "expected_output"),
     [
         ("hello", "world.txt"),  # Latin
         ("ħēļľŏ", "ŵőřŀđ.txt"),  # Latin Extended-A
@@ -292,7 +300,10 @@ def test_target_cli_unicode_argparse(
     expected_output: str,
 ) -> None:
     out, err = run_target_shell(
-        monkeypatch, capsys, absolute_path("_data/tools/shell/unicode.tar"), f"ls unicode/charsets/{provided_input}"
+        monkeypatch,
+        capsys,
+        str(absolute_path("_data/tools/shell/unicode.tar")),
+        f"ls unicode/charsets/{provided_input}",
     )
     out = out.replace("unicode.tar:/$", "").strip()
     assert out == expected_output
@@ -300,8 +311,8 @@ def test_target_cli_unicode_argparse(
 
 
 def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
-    """test if alias commands call their parent attribute correctly."""
-    target_path = absolute_path("_data/tools/info/image.tar")
+    """Test if alias commands call their parent attribute correctly."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
 
     # 'dir' and 'ls' should return the same output
     dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
@@ -315,15 +326,15 @@ def test_shell_cmd_alias(monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
 
 
 def test_shell_cli_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
-    target_path = absolute_path("_data/tools/info/image.tar")
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
     dir_out, _ = run_target_shell(monkeypatch, capsys, target_path, "dir")
     ls_out, _ = run_target_shell(monkeypatch, capsys, [target_path, "-c", "dir"], "")
     assert dir_out == "ubuntu:/$ " + ls_out + "ubuntu:/$ \n"
 
 
 def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
-    """test if alias commands call their parent attribute correctly."""
-    target_path = absolute_path("_data/tools/info/image.tar")
+    """Test if alias commands call their parent attribute correctly."""
+    target_path = str(absolute_path("_data/tools/info/image.tar"))
 
     # 'list' and 'ls' should return the same output after runtime aliasing
     list_out, _ = run_target_shell(monkeypatch, capsys, target_path, "alias list=ls xxl='ls -la'\nlist")
@@ -372,7 +383,7 @@ def test_shell_cmd_alias_runtime(monkeypatch: pytest.MonkeyPatch, capsys: pytest
 def test_shell_hostname_escaping(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
 ) -> None:
-    """test if we properly escape hostnames in the base prompt."""
+    """Test if we properly escape hostnames in the base prompt."""
 
     tmp_path.joinpath("etc").mkdir()
     tmp_path.joinpath("var").mkdir()
@@ -400,7 +411,7 @@ def test_shell_prompt_tab_autocomplete() -> None:
     target_path = absolute_path("_data/tools/info/image.tar")
 
     # We set NO_COLOR=1 so that the output is not colored and easier to match
-    child = pexpect.spawn("target-shell", args=[target_path], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+    child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
 
     # increase window size to avoid line wrapping
     child.setwinsize(100, 100)
@@ -424,7 +435,7 @@ def test_shell_prompt_tab_autocomplete() -> None:
     child.send("\t\t")
 
     # expect the files in /etc/ to be printed
-    child.expect("hosts       localtime   network/    os-release  passwd      shadow      timezone\r\n", timeout=5)
+    child.expect(r"hosts\s+localtime\s+network/\s+os-release\s+passwd\s+shadow\s+timezone\s*\r\n", timeout=5)
 
     # send newline to just list everything in /etc/
     child.send("\n")

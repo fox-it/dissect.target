@@ -2,9 +2,9 @@ from io import BytesIO
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.android._os import AndroidPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
@@ -25,7 +25,7 @@ def test_android_os(target_android: Target) -> None:
     ],
 )
 def test_android_os_detect_props(target_bare: Target, build_prop_locations: list[tuple[str, str]]) -> None:
-    """test if we detect different build.prop locations correctly."""
+    """Test if we detect different build.prop locations correctly."""
 
     fs = VirtualFilesystem()
     fs.makedirs("/data")
@@ -46,7 +46,7 @@ def test_android_os_detect_props(target_bare: Target, build_prop_locations: list
     target_bare.add_plugin(AndroidPlugin)
 
     assert target_bare.os == "android"
-    assert sorted(list(map(str, target_bare._os.build_prop_paths))) == sorted([p for p, _ in build_prop_locations])
+    assert sorted(map(str, target_bare._os.build_prop_paths)) == sorted([p for p, _ in build_prop_locations])
     assert target_bare._os.props
     assert target_bare.hostname == "TMG28071935"
 
