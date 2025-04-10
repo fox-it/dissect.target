@@ -50,7 +50,11 @@ def cat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     stdout = sys.stdout
     if hasattr(stdout, "buffer"):
         stdout = stdout.buffer
-    shutil.copyfileobj(path.open(), stdout)
+
+    if path.is_symlink() and args.ignore_symlinks:
+        sys.stdout.write(f"{path} -> {path.readlink()}")
+    else:
+        shutil.copyfileobj(path.open(), stdout)
 
 
 def walk(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
@@ -60,7 +64,7 @@ def walk(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
 
 def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
     output = os.path.abspath(os.path.expanduser(args.output))
-    if path.is_file():
+    if path.is_file() or (path.is_symlink() and args.ignore_symlinks):
         _extract_path(path, os.path.join(output, path.name))
     elif path.is_dir():
         for extract_path in path.rglob("*"):
@@ -71,7 +75,7 @@ def cp(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
 
 
 def stat(t: Target, path: TargetPath, args: argparse.Namespace) -> None:
-    if not path or not path.exists():
+    if not (path.is_symlink() and args.ignore_symlinks):
         return
     print_stat(path, sys.stdout, args.dereference)
 
@@ -82,7 +86,7 @@ def _extract_path(path: TargetPath, output_path: str) -> None:
     out_dir = ""
     if path.is_dir():
         out_dir = output_path
-    elif path.is_file():
+    elif path.is_file() or path.is_symlink():
         out_dir = os.path.dirname(output_path)
 
     try:
@@ -92,6 +96,9 @@ def _extract_path(path: TargetPath, output_path: str) -> None:
         if path.is_file():
             with open(output_path, "wb") as fh:
                 shutil.copyfileobj(path.open(), fh)
+        elif path.is_symlink():
+            with open(output_path, "w") as fh:
+                fh.write(f"{path} -> {path.readlink()}")
 
     except Exception as e:
         print("[!] Failed: %s" % path)
@@ -107,6 +114,7 @@ def main() -> None:
         formatter_class=help_formatter,
     )
     parser.add_argument("target", type=pathlib.Path, help="Target to load", metavar="TARGET")
+    parser.add_argument("-i", "--ignore-symlinks", dest="ignore_symlinks", action="store_true", help="Don't follow symlinks when accessing files")
 
     baseparser = argparse.ArgumentParser(add_help=False)
     baseparser.add_argument("path", type=str, help="path to perform an action on", metavar="PATH")
@@ -159,7 +167,7 @@ def main() -> None:
 
     path = target.fs.path(args.path)
 
-    if not path.exists():
+    if not path.exists() and not (path.is_symlink() and args.ignore_symlinks):
         print("[!] Path doesn't exist")
         sys.exit(1)
 
