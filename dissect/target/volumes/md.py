@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import BinaryIO, Iterator, Union
 
-from dissect.volume.md.md import MD, Device, find_super_block
+from dissect.volume.md.md import MD, MDPhysicalDisk, find_super_block
 
 from dissect.target.volume import LogicalVolumeSystem, Volume
 
@@ -21,7 +21,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
             if not cls.detect_volume(vol):
                 continue
 
-            device = Device(vol)
+            device = MDPhysicalDisk(vol)
             devices[device.set_uuid].append(device)
 
         for devs in devices.values():

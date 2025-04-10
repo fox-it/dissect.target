@@ -1,10 +1,12 @@
 import os
 from functools import reduce
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 from unittest.mock import Mock, patch
 
 import pytest
+from docutils.core import publish_string
+from docutils.utils import SystemMessage
 from flow.record import Record
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -12,9 +14,13 @@ from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExt
 from dissect.target.helpers.record import EmptyRecord, create_extended_descriptor
 from dissect.target.plugin import (
     PLUGINS,
+    InternalNamespacePlugin,
+    InternalPlugin,
     NamespacePlugin,
     OSPlugin,
     Plugin,
+    PluginFunction,
+    alias,
     environment_variable_paths,
     export,
     find_plugin_functions,
@@ -22,6 +28,7 @@ from dissect.target.plugin import (
     plugins,
     save_plugin_import_failure,
 )
+from dissect.target.plugins.general.default import DefaultPlugin
 from dissect.target.target import Target
 
 
@@ -533,3 +540,112 @@ def test_os_plugin___init_subclass__(subclass: type[OSPlugin], replaced: bool) -
         assert (os_docstring == subclass_docstring) is replaced
         if not replaced:
             assert subclass_docstring == f"Test docstring {method_name}"
+
+
+class _TestInternalPlugin(InternalPlugin):
+    def test(self) -> None:
+        pass
+
+
+def test_internal_plugin() -> None:
+    assert "test" not in _TestInternalPlugin.__exports__
+    assert "test" in _TestInternalPlugin.__functions__
+
+
+class _TestInternalNamespacePlugin(InternalNamespacePlugin):
+    __namespace__ = "NS"
+
+    def test(self) -> None:
+        pass
+
+
+def test_internal_namespace_plugin() -> None:
+    assert "SUBPLUGINS" in dir(_TestInternalNamespacePlugin)
+    assert "test" not in _TestInternalNamespacePlugin.__exports__
+    assert "test" in _TestInternalNamespacePlugin.__functions__
+
+
+class ExampleFooPlugin(Plugin):
+    """Example Foo Plugin."""
+
+    def check_compatible(self) -> None:
+        return
+
+    @export
+    @alias("bar")
+    @alias(name="baz")
+    def foo(self) -> Iterator[str]:
+        """Yield foo!"""
+        yield "foo!"
+
+
+def test_plugin_alias(target_bare: Target) -> None:
+    """test ``@alias`` decorator behaviour"""
+    target_bare.add_plugin(ExampleFooPlugin)
+    assert target_bare.has_function("foo")
+    assert target_bare.foo.__aliases__ == ["baz", "bar"]
+    assert target_bare.has_function("bar")
+    assert target_bare.has_function("baz")
+    assert list(target_bare.foo()) == list(target_bare.bar()) == list(target_bare.baz())
+
+
+@pytest.mark.parametrize(
+    "func_path, func",
+    [(func.path, func) for func in find_plugin_functions(Target(), "*", compatibility=False, show_hidden=True)[0]],
+)
+def test_exported_plugin_format(func_path: str, func: PluginFunction) -> None:
+    """This test checks plugin style guide conformity for all exported plugins.
+
+    Resources:
+        - https://docs.dissect.tools/en/latest/contributing/style-guide.html
+    """
+
+    # Ignore DefaultPlugin and NamespacePlugin instances
+    if func.class_object.__base__ is NamespacePlugin or func.class_object is DefaultPlugin:
+        return
+
+    # Plugin method should specify what it returns
+    assert func.output_type in ["record", "yield", "default", "none"], f"Invalid output_type for function {func}"
+
+    py_func = getattr(func.class_object, func.method_name)
+    annotations = None
+
+    if hasattr(py_func, "__annotations__"):
+        annotations = py_func.__annotations__
+
+    elif isinstance(py_func, property):
+        annotations = py_func.fget.__annotations__
+
+    # Plugin method should have a return annotation
+    assert annotations and "return" in annotations.keys(), f"No return type annotation for function {func}"
+
+    # TODO: Check if the annotations make sense with the provided output_type
+
+    # Plugin method should have a docstring
+    method_doc_str = py_func.__doc__
+    assert isinstance(method_doc_str, str), f"No docstring for function {func}"
+    assert method_doc_str != "", f"Empty docstring for function {func}"
+
+    # The method docstring should compile to rst without warnings
+    assert_valid_rst(method_doc_str)
+
+    # Plugin class should have a docstring
+    class_doc_str = func.class_object.__doc__
+    assert isinstance(class_doc_str, str), f"No docstring for class {func.class_object.__name__}"
+    assert class_doc_str != "", f"Empty docstring for class {func.class_object.__name__}"
+
+    # The class docstring should compile to rst without warnings
+    assert_valid_rst(class_doc_str)
+
+
+def assert_valid_rst(src: str) -> None:
+    """Attempts to compile the given string to rst."""
+
+    try:
+        publish_string(src, settings_overrides={"halt_level": 2})
+
+    except SystemMessage as e:
+        # Limited context was provided to docutils, so some exceptions could incorrectly be raised.
+        # We can assume that if the rst is truly invalid this will also be caught by `tox -e build-docs`.
+        if "Unknown interpreted text role" not in str(e):
+            assert str(e) in src  # makes reading pytest error easier

@@ -89,15 +89,25 @@ class Overlay2Filesystem(LayerFilesystem):
 
         # append and mount every layer
         for dest, layer in layers:
-            if layer.is_file() and dest in ["/etc/hosts", "/etc/hostname", "/etc/resolv.conf"]:
-                layer_fs = VirtualFilesystem()
-                layer_fs.map_file_fh("/etc/" + layer.name, layer.open("rb"))
-                dest = dest.split("/")[0]
+            # we could have collected a layer reference that actually does not exist on the host
+            if not layer.exists():
+                log.warning(
+                    "Can not mount layer %s for container %s as it does not exist on the host", layer, path.name
+                )
+                continue
 
+            # mount points can be files
+            if layer.is_file():
+                layer_fs = VirtualFilesystem()
+                layer_fs.map_file_fh(dest, layer.open("rb"))
+
+            # regular overlay2 layers are directories
+            # mount points can be directories too
             else:
                 layer_fs = DirectoryFilesystem(layer)
 
-            self.append_layer().mount(dest, layer_fs)
+            log.info("Adding layer %s to destination %s", layer, dest)
+            self.append_layer().mount("/" if layer.is_file() else dest, layer_fs)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.base_path}>"

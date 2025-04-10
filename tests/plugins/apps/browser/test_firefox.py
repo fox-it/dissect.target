@@ -2,7 +2,6 @@ from typing import Iterator
 from unittest.mock import patch
 
 import pytest
-from _pytest.fixtures import fixture
 from asn1crypto.algos import EncryptionAlgorithmId
 from flow.record.fieldtypes import datetime as dt
 
@@ -45,6 +44,18 @@ def target_firefox_unix(target_unix_users: Target, fs_unix: VirtualFilesystem) -
     target_unix_users.add_plugin(FirefoxPlugin)
 
     yield target_unix_users
+
+
+@pytest.fixture
+def target_firefox_oculus(target_android: Target, fs_android: VirtualFilesystem) -> Iterator[Target]:
+    fs_android.map_dir(
+        "/data/data/org.mozilla.vrbrowser",
+        absolute_path("_data/plugins/apps/browser/firefox/android/org.mozilla.vrbrowser"),
+    )
+
+    target_android.add_plugin(FirefoxPlugin)
+
+    yield target_android
 
 
 @pytest.mark.parametrize(
@@ -99,6 +110,7 @@ def test_firefox_cookies(target_platform: Target, request: pytest.FixtureRequest
     assert len(records) == 4
     assert set(["firefox"]) == set(record.browser for record in records)
 
+    assert records[0].ts_created == dt("2023-07-13 09:53:47.460676+00:00")
     assert sorted([*map(lambda c: c.name, records)]) == [
         "_lr_env_src_ats",
         "_lr_retry_request",
@@ -119,8 +131,8 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
     assert set(["firefox"]) == set(record.browser for record in records)
     assert len(records) == 2
     assert records[0].id == "uBlock0@raymondhill.net"
-    assert records[0].ts_install == dt("2024-04-23 07:07:21+00:00")
-    assert records[0].ts_update == dt("2024-04-23 07:07:21+00:00")
+    assert records[0].ts_install == dt("2024-04-23 07:07:21.516000+00:00")
+    assert records[0].ts_update == dt("2024-04-23 07:07:21.516000+00:00")
     assert (
         records[0].ext_path == "C:\\Users\\Win11\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles"
         "\\9nxit8q0.default-release\\extensions\\uBlock0@raymondhill.net.xpi"
@@ -137,13 +149,14 @@ def test_firefox_extensions(target_platform: Target, request: pytest.FixtureRequ
         "webRequest",
         "webRequestBlocking",
     ]
+    assert records[1].permissions == []
 
 
 @pytest.mark.parametrize(
     "target_platform",
     ["target_firefox_win", "target_firefox_unix"],
 )
-def test_firefox_password_plugin(target_platform: Target, request: pytest.FixtureRequest) -> None:
+def test_firefox_passwords(target_platform: Target, request: pytest.FixtureRequest) -> None:
     target_platform = request.getfixturevalue(target_platform)
 
     records = list(target_platform.firefox.passwords())
@@ -155,9 +168,7 @@ def test_firefox_password_plugin(target_platform: Target, request: pytest.Fixtur
         assert record.decrypted_password == "password"
 
 
-def test_unix_firefox_password_plugin_with_primary_password(
-    target_unix_users: Target, fs_unix: VirtualFilesystem
-) -> None:
+def test_unix_firefox_passwords_with_primary_password(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.map_dir(
         "/root/.mozilla/firefox/g1rbw8y7.default-release/",
         absolute_path("_data/plugins/apps/browser/firefox/passwords/primary/"),
@@ -184,8 +195,76 @@ def test_unix_firefox_password_plugin_with_primary_password(
         assert record.decrypted_password == "password"
 
 
-@fixture
-def path_key4(fs_unix):
+def test_firefox_oculus_history(target_firefox_oculus: Target) -> None:
+    records = list(target_firefox_oculus.firefox.history())
+
+    assert len(records) == 191
+    assert set(["firefox"]) == set(record.browser for record in records)
+
+    assert records[0].url == "https://webxr.today/"
+    assert records[0].id == "1"
+    assert records[0].description == "47356570952011"
+    assert records[0].ts == dt("2021-11-04 13:29:30.780000+00:00")
+
+
+def test_firefox_oculus_cookies(target_firefox_oculus: Target) -> None:
+    records = list(target_firefox_oculus.firefox.cookies())
+
+    assert len(records) == 33
+    assert set(["firefox"]) == set(record.browser for record in records)
+
+    assert records[0].ts_created == dt("2023-07-06 07:50:55.352988+00:00")
+    assert sorted([*map(lambda c: c.name, records)]) == [
+        "AEC",
+        "AWSALBTGCORS",
+        "CONSENT",
+        "Features",
+        "Locale",
+        "NID",
+        "OptanonConsent",
+        "SNID",
+        "SOCS",
+        "Session-Id",
+        "Tag",
+        "Tag",
+        "Tag",
+        "Tag",
+        "VISITOR_INFO1_LIVE",
+        "_ga",
+        "_ga_18EC69JQ0P",
+        "_ga_2VC139B3XV",
+        "_gat_gtag_UA_36116321_2",
+        "_gid",
+        "_hjFirstSeen",
+        "count",
+        "is-proton-user",
+        "lst",
+        "lst",
+        "mp_abe3945ad0ddaadc3d987393d8d7c2ce_mixpanel",
+        "session_id",
+        "spid.6b32",
+        "spses.6b32",
+        "visid_incap_1329355",
+        "visid_incap_2188750",
+        "visid_incap_2295456",
+        "visid_incap_2809573",
+    ]
+
+
+def test_firefox_oculus_extensions(target_firefox_oculus: Target) -> None:
+    records = list(target_firefox_oculus.firefox.extensions())
+
+    assert set(["firefox"]) == set(record.browser for record in records)
+    assert len(records) == 5
+    assert records[0].id == "default-theme@mozilla.org"
+    assert records[0].ts_install == dt("2021-11-04 13:29:29.988000+00:00")
+    assert records[0].ts_update == dt("1970-01-01 00:00:00+00:00")
+    assert records[0].ext_path is None
+    assert records[0].permissions == []
+
+
+@pytest.fixture
+def path_key4(fs_unix: VirtualFilesystem) -> TargetPath:
     fs_unix.map_file(
         "/key4.db",
         absolute_path("_data/plugins/apps/browser/firefox/key4.db"),
@@ -196,8 +275,8 @@ def path_key4(fs_unix):
 PRIMARY_PASSWORD = "PrimaryPassword"
 
 
-@fixture
-def path_key4_primary_password(fs_unix):
+@pytest.fixture
+def path_key4_primary_password(fs_unix: VirtualFilesystem) -> TargetPath:
     fs_unix.map_file(
         "/key4.db",
         absolute_path("_data/plugins/apps/browser/firefox/passwords/primary/key4.db"),
@@ -205,45 +284,45 @@ def path_key4_primary_password(fs_unix):
     return TargetPath(fs_unix, "/key4.db")
 
 
-@fixture
-def logins():
+@pytest.fixture
+def logins() -> dict[str, str]:
     return {
         "username": "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECIFVMX6MyYxpBBC2j8K+bCEaE9/FmqE1wo2A",
         "password": "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECB2ZPCZBORUJBBDZ8dBZUVgECoiFD5vPvTbP",
     }
 
 
-@fixture
-def logins_with_primary_password():
+@pytest.fixture
+def logins_with_primary_password() -> dict[str, str]:
     return {
         "username": "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECPEZvPh6dhBkBBB3/O2puJy1NiBUo5gS8hZh",
         "password": "MDoEEPgAAAAAAAAAAAAAAAAAAAEwFAYIKoZIhvcNAwcECM00msnMxFyVBBByTarrnS+FSR5OHQhZfs8t",
     }
 
 
-@fixture
-def decrypted():
+@pytest.fixture
+def decrypted() -> dict[str, str]:
     return {
         "username": "username",
         "password": "password",
     }
 
 
-def test_decrypt_is_succesful(path_key4, logins, decrypted):
+def test_decrypt_is_succesful(path_key4: TargetPath, logins: dict[str, str], decrypted: dict[str, str]) -> None:
     dec_username, dec_password = decrypt(logins.get("username"), logins.get("password"), path_key4)
     assert dec_username == decrypted.get("username")
     assert dec_password == decrypted.get("password")
 
 
 @patch("dissect.target.plugins.apps.browser.firefox.retrieve_master_key", side_effect=ValueError(""))
-def test_decrypt_bad_master_key(mock_target, path_key4, logins):
+def test_decrypt_bad_master_key(path_key4: TargetPath, logins: dict[str, str]) -> None:
     with pytest.raises(ValueError):
         decrypt(logins.get("username"), logins.get("password"), path_key4)
 
 
 def test_decrypt_with_primary_password_is_succesful(
-    path_key4_primary_password, logins_with_primary_password, decrypted
-):
+    path_key4_primary_password: TargetPath, logins_with_primary_password: dict[str, str], decrypted: dict[str, str]
+) -> None:
     dec_username, dec_password = decrypt(
         logins_with_primary_password.get("username"),
         logins_with_primary_password.get("password"),
@@ -255,9 +334,9 @@ def test_decrypt_with_primary_password_is_succesful(
 
 
 def test_decrypt_with_bad_primary_password_is_unsuccesful(
-    path_key4_primary_password,
-    logins_with_primary_password,
-):
+    path_key4_primary_password: TargetPath,
+    logins_with_primary_password: dict[str, str],
+) -> None:
     with pytest.raises(ValueError) as e:
         decrypt(
             logins_with_primary_password.get("username"),
@@ -268,7 +347,7 @@ def test_decrypt_with_bad_primary_password_is_unsuccesful(
         assert e.msg == "Failed to decrypt password using keyfile /key4.db and password 'BAD_PRIMARY_PASSWORD'"
 
 
-def test_retrieve_master_key_is_succesful(path_key4):
+def test_retrieve_master_key_is_succesful(path_key4: TargetPath) -> None:
     key, algorithm = retrieve_master_key(b"", path_key4)
 
     assert EncryptionAlgorithmId.map(algorithm) == "pbes2"
@@ -276,13 +355,13 @@ def test_retrieve_master_key_is_succesful(path_key4):
 
 
 @patch("dissect.target.plugins.apps.browser.firefox.query_master_key", return_value=(b"aaaa", "BAD_CKA_VALUE"))
-def test_retrieve_master_key_bad_cka_value(mock_target, path_key4):
+def test_retrieve_master_key_bad_cka_value(mock_target: Target, path_key4: TargetPath) -> None:
     with pytest.raises(ValueError) as e:
         retrieve_master_key(b"", path_key4)
         assert "Password master key CKA_ID 'BAD_CKA_VALUE' is not equal to expected value" in e.msg
 
 
-def test_query_master_key(path_key4):
+def test_query_master_key(path_key4: TargetPath) -> None:
     master_key, master_key_cka = query_master_key(path_key4)
 
     assert isinstance(master_key, bytes)

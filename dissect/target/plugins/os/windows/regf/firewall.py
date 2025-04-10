@@ -1,4 +1,5 @@
 import re
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
@@ -19,13 +20,16 @@ class FirewallPlugin(Plugin):
             raise UnsupportedPluginError(f"Registry key {self.KEY} not found")
 
     @export(record=DynamicDescriptor(["uri"]))
-    def firewall(self):
+    def firewall(self) -> Iterator[DynamicDescriptor]:
         """Return firewall rules saved in the registry.
 
         For a Windows operating system, the Firewall rules are stored in the
         HKLM\\SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\FirewallRules registry key.
 
         Yields dynamic records with usually the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             key (string): The rule key name.

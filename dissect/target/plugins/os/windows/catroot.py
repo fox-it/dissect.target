@@ -5,6 +5,7 @@ from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.helpers.utils import findall
 from dissect.target.plugin import Plugin, export
 
 try:
@@ -34,17 +35,6 @@ CatrootRecord = TargetRecordDescriptor(
         ("path", "source"),
     ],
 )
-
-
-def findall(buf: bytes, needle: bytes) -> Iterator[int]:
-    offset = 0
-    while True:
-        offset = buf.find(needle, offset)
-        if offset == -1:
-            break
-
-        yield offset
-        offset += 1
 
 
 def _get_package_name(sequence: Sequence) -> str:
@@ -105,6 +95,9 @@ class CatrootPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
         Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             digest (digest): The parsed digest.
@@ -210,6 +203,9 @@ class CatrootPlugin(Plugin):
             - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files
 
         Yields CatrootRecords with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             digest (digest): The parsed digest.
@@ -221,15 +217,24 @@ class CatrootPlugin(Plugin):
             with ese_file.open("rb") as fh:
                 ese_db = EseDB(fh)
 
-                tables = [table.name for table in ese_db.tables()]
                 for hash_type, table_name in [("sha256", "HashCatNameTableSHA256"), ("sha1", "HashCatNameTableSHA1")]:
-                    if table_name not in tables:
+                    try:
+                        table = ese_db.table(table_name)
+                    except KeyError as e:
+                        self.target.log.warning("EseDB %s has no table %s", ese_file, table_name)
+                        self.target.log.debug("", exc_info=e)
                         continue
 
-                    for record in ese_db.table(table_name).records():
+                    for record in table.records():
                         file_digest = digest()
-                        setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
-                        catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+
+                        try:
+                            setattr(file_digest, hash_type, record.get("HashCatNameTable_HashCol").hex())
+                            catroot_names = record.get("HashCatNameTable_CatNameCol").decode().rstrip("|").split("|")
+                        except Exception as e:
+                            self.target.log.warning("Unable to parse catroot names for %s in %s", record, ese_file)
+                            self.target.log.debug("", exc_info=e)
+                            continue
 
                         for catroot_name in catroot_names:
                             yield CatrootRecord(

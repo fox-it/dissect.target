@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator
 
 from dissect.thumbcache import Error, Thumbcache
 from dissect.thumbcache.tools.extract_with_index import dump_entry_data_through_index
@@ -33,6 +35,8 @@ IconcacheRecord = TargetRecordDescriptor("windows/thumbcache/iconcache", GENERIC
 
 
 class ThumbcachePlugin(Plugin):
+    """Windows thumbcache plugin."""
+
     __namespace__ = "thumbcache"
 
     def get_cache_paths(self) -> Iterator[TargetPath]:
@@ -71,8 +75,8 @@ class ThumbcachePlugin(Plugin):
         self,
         record_type: TargetRecordDescriptor,
         prefix: str,
-        output_dir: Optional[Path],
-    ) -> Iterator[Union[ThumbcacheRecord, IconcacheRecord, IndexRecord]]:
+        output_dir: Path | None,
+    ) -> Iterator[ThumbcacheRecord | IconcacheRecord | IndexRecord]:
         for cache_path in self.get_cache_paths():
             try:
                 if output_dir:
@@ -91,10 +95,12 @@ class ThumbcachePlugin(Plugin):
 
     @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract thumbcache thumbnails to.")
     @export(record=[ThumbcacheRecord, IndexRecord])
-    def thumbcache(self, output_dir: Optional[Path] = None) -> Iterator[Union[ThumbcacheRecord, IndexRecord]]:
+    def thumbcache(self, output_dir: Path | None = None) -> Iterator[ThumbcacheRecord | IndexRecord]:
+        """Yield thumbcache thumbnails."""
         yield from self._parse_thumbcache(ThumbcacheRecord, "thumbcache", output_dir)
 
     @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract iconcache thumbnails to.")
     @export(record=[IconcacheRecord, IndexRecord])
-    def iconcache(self, output_dir: Optional[Path] = None) -> Iterator[Union[IconcacheRecord, IndexRecord]]:
+    def iconcache(self, output_dir: Path | None = None) -> Iterator[IconcacheRecord | IndexRecord]:
+        """Yield iconcache thumbnails."""
         yield from self._parse_thumbcache(IconcacheRecord, "iconcache", output_dir)

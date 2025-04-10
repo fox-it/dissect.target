@@ -102,9 +102,10 @@ def test_putty_plugin_saved_sessions_unix(target_unix_users: Target, fs_unix: Vi
 
     assert len(records) == 1
 
-    assert records[0].ts == datetime.utcfromtimestamp(
-        stat(absolute_path("_data/plugins/apps/ssh/putty/sessions/example-saved-session")).st_mtime
-    ).replace(tzinfo=timezone.utc)
+    assert records[0].ts == datetime.fromtimestamp(
+        stat(absolute_path("_data/plugins/apps/ssh/putty/sessions/example-saved-session")).st_mtime,
+        tz=timezone.utc,
+    )
     assert records[0].session_name == "example-saved-session"
     assert records[0].protocol == "ssh"
     assert records[0].host == "192.168.123.130"

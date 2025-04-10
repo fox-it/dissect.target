@@ -5,7 +5,7 @@ import argparse
 import logging
 import pathlib
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable
 
 from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
@@ -18,7 +18,6 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
-from dissect.target.loaders.targetd import ProxyLoader
 from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
 from dissect.target.report import ExecutionReport
 from dissect.target.tools.utils import (
@@ -170,33 +169,40 @@ def main():
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list:
-        collected_plugins = {}
+        collected_plugins = []
 
         if targets:
             for plugin_target in Target.open_all(targets, args.children):
-                if isinstance(plugin_target._loader, ProxyLoader):
-                    parser.error("can't list compatible plugins for remote targets.")
                 funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
                 for func in funcs:
-                    collected_plugins[func.path] = func.plugin_desc
+                    collected_plugins.append(func)
         else:
             funcs, _ = find_plugin_functions(Target(), args.list, compatibility=False, show_hidden=True)
             for func in funcs:
-                collected_plugins[func.path] = func.plugin_desc
+                collected_plugins.append(func)
 
-        # Display in a user friendly manner
         target = Target()
         fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
         fargs, rest = fparser.parse_known_args(rest)
 
+        # Display in a user friendly manner
         if collected_plugins:
-            target.plugins(list(collected_plugins.values()))
+            if args.json:
+                print('{"plugins": ', end="")
+            target.plugins(collected_plugins, as_json=args.json)
 
         # No real targets specified, show the available loaders
         if not targets:
             fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
             fargs, rest = fparser.parse_known_args(rest)
-            target.loaders(**vars(fargs))
+            del fargs.as_json
+            if args.json:
+                print(', "loaders": ', end="")
+            target.loaders(**vars(fargs), as_json=args.json)
+
+        if args.json:
+            print("}")
+
         parser.exit()
 
     if not targets:
@@ -390,7 +396,7 @@ def main():
         log.debug("", exc_info=e)
         parser.exit(1)
 
-    timestamp = datetime.utcnow()
+    timestamp = datetime.now(tz=timezone.utc)
 
     execution_report.set_plugin_stats(PLUGINS)
     log.debug("%s", execution_report.get_formatted_report())

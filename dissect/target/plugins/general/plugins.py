@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+import json
 import textwrap
-from typing import Dict, List, Type, Union
+from typing import Iterator, Type
 
 from dissect.target import plugin
 from dissect.target.helpers.docs import INDENT_STEP, get_plugin_overview
@@ -23,7 +26,8 @@ def categorize_plugins(plugins_selection: list[dict] = None) -> dict:
     return output_dict
 
 
-def get_exported_plugins():
+def get_exported_plugins() -> list:
+    """Returns list of exported plugins."""
     return [p for p in plugin.plugins() if len(p["exports"])]
 
 
@@ -50,10 +54,10 @@ def update_dict_recursive(source_dict: dict, updated_dict: dict) -> dict:
 
 
 def output_plugin_description_recursive(
-    structure_dict: Union[Dict, Plugin],
+    structure_dict: dict | Plugin,
     print_docs: bool,
-    indentation_step=0,
-) -> List[str]:
+    indentation_step: int = 0,
+) -> list[str]:
     """Create plugin overview with identations."""
 
     if isinstance(structure_dict, type) and issubclass(structure_dict, Plugin):
@@ -78,10 +82,10 @@ def get_plugin_description(
 
 
 def get_description_dict(
-    structure_dict: Dict,
+    structure_dict: dict,
     print_docs: bool,
     indentation_step: int,
-) -> List[str]:
+) -> list[str]:
     """Returns a list of indented descriptions."""
 
     output_descriptions = []
@@ -98,13 +102,24 @@ def get_description_dict(
 
 
 class PluginListPlugin(Plugin):
+    """Plugin list plugin (so meta)."""
+
     def check_compatible(self) -> None:
         pass
 
     @export(output="none", cache=False)
     @arg("--docs", dest="print_docs", action="store_true")
-    def plugins(self, plugins: list[dict] = None, print_docs: bool = False) -> None:
-        categorized_plugins = dict(sorted(categorize_plugins(plugins).items()))
+    # NOTE: We would prefer to re-use arguments across plugins from argparse in query.py, but that is not possible yet.
+    # For now we use --as-json, but in the future this should be changed to inherit --json from target-query.
+    # https://github.com/fox-it/dissect.target/pull/841
+    # https://github.com/fox-it/dissect.target/issues/889
+    @arg("--as-json", dest="as_json", action="store_true")
+    def plugins(self, plugins: list[Plugin] = None, print_docs: bool = False, as_json: bool = False) -> None:
+        """Print all available plugins."""
+
+        dict_plugins = list({p.path: p.plugin_desc for p in plugins}.values())
+        categorized_plugins = dict(sorted(categorize_plugins(dict_plugins).items()))
+
         plugin_descriptions = output_plugin_description_recursive(categorized_plugins, print_docs)
 
         plugins_list = textwrap.indent(
@@ -138,4 +153,32 @@ class PluginListPlugin(Plugin):
             "Failed to load:",
             failed_list,
         ]
-        print("\n".join(output_lines))
+
+        if as_json:
+            out = {"loaded": list(generate_plugins_json(plugins))}
+
+            if failed_plugins := plugin.failed():
+                out["failed"] = [
+                    {"module": p["module"], "stacktrace": "".join(p["stacktrace"])} for p in failed_plugins
+                ]
+
+            print(json.dumps(out), end="")
+
+        else:
+            print("\n".join(output_lines))
+
+
+def generate_plugins_json(plugins: list[Plugin]) -> Iterator[dict]:
+    """Generates JSON output of a list of :class:`Plugin`."""
+
+    for p in plugins:
+        func = getattr(p.class_object, p.method_name)
+        description = getattr(func, "__doc__", None)
+        summary = description.split("\n\n", 1)[0].strip() if description else None
+
+        yield {
+            "name": p.name,
+            "output": p.output_type,
+            "description": summary,
+            "path": p.path,
+        }

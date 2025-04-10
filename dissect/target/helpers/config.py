@@ -1,27 +1,35 @@
+from __future__ import annotations
+
 import ast
 import importlib.machinery
 import importlib.util
 import logging
 from pathlib import Path
 from types import ModuleType
-from typing import Optional, Union
 
 log = logging.getLogger(__name__)
 
 CONFIG_NAME = ".targetcfg.py"
 
 
-def load(path: Optional[Union[Path, str]]) -> ModuleType:
+def load(paths: list[Path | str] | Path | str | None) -> ModuleType:
+    """Attempt to load one configuration from the provided path(s)."""
+
+    if isinstance(paths, Path) or isinstance(paths, str):
+        paths = [paths]
+
     config_spec = importlib.machinery.ModuleSpec("config", None)
     config = importlib.util.module_from_spec(config_spec)
-    config_file = _find_config_file(path)
+    config_file = _find_config_file(paths)
+
     if config_file:
         config_values = _parse_ast(config_file.read_bytes())
         config.__dict__.update(config_values)
+
     return config
 
 
-def _parse_ast(code: str) -> dict[str, Union[str, int]]:
+def _parse_ast(code: str) -> dict[str, str | int]:
     # Only allow basic value assignments for backwards compatibility
     obj = {}
 
@@ -49,15 +57,19 @@ def _parse_ast(code: str) -> dict[str, Union[str, int]]:
     return obj
 
 
-def _find_config_file(path: Optional[Union[Path, str]]) -> Optional[Path]:
-    """Find a config file anywhere in the given path and return it.
+def _find_config_file(paths: list[Path | str] | None) -> Path | None:
+    """Find a config file anywhere in the given path(s) and return it.
 
     This algorithm allows parts of the path to not exist or the last part to be a filename.
     It also does not look in the root directory ('/') for config files.
     """
 
+    if not paths:
+        return
+
     config_file = None
-    if path:
+
+    for path in paths:
         path = Path(path)
         cur_path = path.absolute()
 
@@ -68,5 +80,8 @@ def _find_config_file(path: Optional[Union[Path, str]]) -> Optional[Path]:
             if cur_config.is_file():
                 config_file = cur_config
             cur_path = cur_path.parent
+
+        if config_file:
+            break
 
     return config_file

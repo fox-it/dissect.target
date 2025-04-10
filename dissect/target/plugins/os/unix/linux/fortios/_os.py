@@ -6,7 +6,7 @@ from base64 import b64decode
 from datetime import datetime
 from io import BytesIO
 from tarfile import ReadError
-from typing import BinaryIO, Iterator, Optional, TextIO, Union
+from typing import BinaryIO, Iterator, TextIO
 
 from dissect.util import cpio
 from dissect.util.compression import xz
@@ -73,10 +73,11 @@ class FortiOSPlugin(LinuxPlugin):
         return config
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
-            # Tested on FortiGate and FortiAnalyzer, other Fortinet devices may look different.
-            if fs.exists("/rootfs.gz") and (fs.exists("/.fgtsum") or fs.exists("/.fmg_sign") or fs.exists("/flatkc")):
+            # Tested on FortiGate, FortiAnalyzer and FortiManager.
+            # Other Fortinet devices may look different.
+            if fs.exists("/rootfs.gz") and (any(map(fs.exists, (".fgtsum", ".fmg_sign", "flatkc", "system.conf")))):
                 return fs
 
     @classmethod
@@ -212,7 +213,7 @@ class FortiOSPlugin(LinuxPlugin):
         return "FortiOS Unknown"
 
     @export(record=FortiOSUserRecord)
-    def users(self) -> Iterator[Union[FortiOSUserRecord, UnixUserRecord]]:
+    def users(self) -> Iterator[FortiOSUserRecord | UnixUserRecord]:
         """Return local users of the FortiOS system."""
 
         # Possible unix-like users
@@ -224,7 +225,7 @@ class FortiOSPlugin(LinuxPlugin):
                 yield FortiOSUserRecord(
                     name=username,
                     password=":".join(entry.get("password", [])),
-                    groups=[entry["accprofile"][0]],
+                    groups=list(entry.get("accprofile", [])),
                     home="/root",
                     _target=self.target,
                 )
@@ -233,69 +234,79 @@ class FortiOSPlugin(LinuxPlugin):
             self.target.log.debug("", exc_info=e)
 
         # FortiManager administrative users
-        try:
-            for username, entry in self._config["global-config"]["system"]["admin"]["user"].items():
-                yield FortiOSUserRecord(
-                    name=username,
-                    password=":".join(entry.get("password", [])),
-                    groups=[entry["profileid"][0]],
-                    home="/root",
-                    _target=self.target,
-                )
-        except KeyError as e:
-            self.target.log.warning("Exception while parsing FortiManager admin users")
-            self.target.log.debug("", exc_info=e)
+        if self._config.get("global-config", {}).get("system", {}).get("admin", {}).get("user"):
+            try:
+                for username, entry in self._config["global-config"]["system"]["admin"]["user"].items():
+                    yield FortiOSUserRecord(
+                        name=username,
+                        password=":".join(entry.get("password", [])),
+                        groups=list(entry.get("profileid", [])),
+                        home="/root",
+                        _target=self.target,
+                    )
+            except KeyError as e:
+                self.target.log.warning("Exception while parsing FortiManager admin users")
+                self.target.log.debug("", exc_info=e)
 
-        # Local users
-        try:
-            local_groups = local_groups_to_users(self._config["root-config"]["user"]["group"])
-            for username, entry in self._config["root-config"]["user"].get("local", {}).items():
-                try:
-                    password = decrypt_password(entry["passwd"][-1])
-                except (ValueError, RuntimeError):
-                    password = ":".join(entry.get("passwd", []))
+        if self._config.get("root-config", {}).get("user", {}).get("local"):
+            # Local users
+            try:
+                local_groups = local_groups_to_users(self._config["root-config"]["user"]["group"])
+            except KeyError as e:
+                self.target.log.warning("Unable to get local user groups in root config")
+                self.target.log.debug("", exc_info=e)
+                local_groups = {}
 
-                yield FortiOSUserRecord(
-                    name=username,
-                    password=password,
-                    groups=local_groups.get(username, []),
-                    home=None,
-                    _target=self.target,
-                )
-        except KeyError as e:
-            self.target.log.warning("Exception while parsing FortiOS local users")
-            self.target.log.debug("", exc_info=e)
+            try:
+                for username, entry in self._config["root-config"]["user"].get("local", {}).items():
+                    try:
+                        password = decrypt_password(entry["passwd"][-1])
+                    except (ValueError, RuntimeError):
+                        password = ":".join(entry.get("passwd", []))
 
-        # Temporary guest users
-        try:
-            for _, entry in self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).items():
-                try:
-                    password = decrypt_password(entry.get("password")[-1])
-                except (ValueError, RuntimeError):
-                    password = ":".join(entry.get("password"))
+                    yield FortiOSUserRecord(
+                        name=username,
+                        password=password,
+                        groups=local_groups.get(username, []),
+                        home=None,
+                        _target=self.target,
+                    )
+            except KeyError as e:
+                self.target.log.warning("Exception while parsing FortiOS local users")
+                self.target.log.debug("", exc_info=e)
 
-                yield FortiOSUserRecord(
-                    name=entry["user-id"][0],
-                    password=password,
-                    groups=["guestgroup"],
-                    home=None,
-                    _target=self.target,
-                )
-        except KeyError as e:
-            self.target.log.warning("Exception while parsing FortiOS temporary guest users")
-            self.target.log.debug("", exc_info=e)
+        if self._config.get("root-config", {}).get("user", {}).get("group", {}).get("guestgroup"):
+            # Temporary guest users
+            try:
+                for _, entry in (
+                    self._config["root-config"]["user"]["group"].get("guestgroup", {}).get("guest", {}).items()
+                ):
+                    try:
+                        password = decrypt_password(entry.get("password")[-1])
+                    except (ValueError, RuntimeError):
+                        password = ":".join(entry.get("password"))
+
+                    yield FortiOSUserRecord(
+                        name=entry["user-id"][0],
+                        password=password,
+                        groups=["guestgroup"],
+                        home=None,
+                        _target=self.target,
+                    )
+            except KeyError as e:
+                self.target.log.warning("Exception while parsing FortiOS temporary guest users")
+                self.target.log.debug("", exc_info=e)
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.FORTIOS.value
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         """Return architecture FortiOS runs on."""
-        paths = ["/lib/libav.so", "/bin/ctr"]
-        for path in paths:
-            if self.target.fs.path(path).exists():
-                return self._get_architecture(path=path)
+        for path in ["/lib/libav.so", "/bin/ctr", "/bin/grep"]:
+            if (bin := self.target.fs.path(path)).exists():
+                return self._get_architecture(path=bin)
 
 
 class ConfigNode(dict):
@@ -528,7 +539,7 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
     return BytesIO(result)
 
 
-def _kdf_7_4_x(key_data: Union[str, bytes]) -> tuple[bytes, bytes]:
+def _kdf_7_4_x(key_data: str | bytes) -> tuple[bytes, bytes]:
     """Derive 32 byte key and 16 byte IV from 32 byte seed.
 
     As the IV needs to be 16 bytes, we return the first 16 bytes of the sha256 hash.
@@ -542,7 +553,7 @@ def _kdf_7_4_x(key_data: Union[str, bytes]) -> tuple[bytes, bytes]:
     return key, iv
 
 
-def get_kernel_hash(sysvol: Filesystem) -> Optional[str]:
+def get_kernel_hash(sysvol: Filesystem) -> str | None:
     """Return the SHA256 hash of the (compressed) kernel."""
     kernel_files = ["flatkc", "vmlinuz", "vmlinux"]
     for k in kernel_files:

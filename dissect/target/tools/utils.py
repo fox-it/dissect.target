@@ -8,6 +8,7 @@ import textwrap
 import urllib
 from datetime import datetime
 from functools import wraps
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Type, Union
 
@@ -15,7 +16,6 @@ from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import docs, keychain
 from dissect.target.helpers.docs import get_docstring
-from dissect.target.helpers.targetd import CommandProxy
 from dissect.target.loader import LOADERS_BY_SCHEME
 from dissect.target.plugin import (
     OSPlugin,
@@ -32,6 +32,7 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
     args_parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
     args_parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
     args_parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
+    args_parser.add_argument("--version", action="store_true", help="print version")
     args_parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
     args_parser.add_argument(
         "--plugin-path",
@@ -44,6 +45,13 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
 
 def process_generic_arguments(args: argparse.Namespace) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
+
+    if args.version:
+        try:
+            print("dissect.target version " + version("dissect.target"))
+        except PackageNotFoundError:
+            print("unable to determine version")
+        sys.exit(0)
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -82,16 +90,32 @@ def generate_argparse_for_unbound_method(
         raise ValueError(f"Value `{method}` is not an unbound plugin method")
 
     desc = method.__doc__ or docs.get_func_description(method, with_docstrings=True)
+
+    if "\n" in desc:
+        desc = inspect.cleandoc(desc)
+
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
     fargs = getattr(method, "__args__", [])
+    groups = {}
+    default_group_options = {"required": False}
     for args, kwargs in fargs:
-        parser.add_argument(*args, **kwargs)
+        if "group" in kwargs:
+            group_name = kwargs.pop("group")
+            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
+            if group_name not in groups:
+                group = parser.add_mutually_exclusive_group(**options)
+                groups[group_name] = group
+            else:
+                group = groups[group_name]
+
+            group.add_argument(*args, **kwargs)
+        else:
+            parser.add_argument(*args, **kwargs)
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
-
     func_name = method.__name__
     usage_tmpl = usage_tmpl or "{prog} {usage}"
     parser.usage = usage_tmpl.format(prog=parser.prog, name=func_name, usage=usage[offset:])
@@ -206,15 +230,15 @@ def get_target_attribute(target: Target, func: PluginFunction) -> Union[Plugin, 
             target.add_plugin(plugin_class)
         except UnsupportedPluginError as e:
             raise UnsupportedPluginError(
-                f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}", cause=e
-            )
+                f"Unsupported function `{func.method_name}` for target with plugin {func.class_object}"
+            ) from e
 
     _, target_attr = plugin_factory(target, plugin_class, func.method_name, func.plugin_desc["namespace"])
     return target_attr
 
 
 def plugin_function_with_argparser(
-    target_attr: Union[Plugin, Callable]
+    target_attr: Union[Plugin, Callable],
 ) -> tuple[Optional[Iterator], Optional[argparse.ArgumentParser]]:
     """Resolves which plugin function to execute, and creates the argument parser for said plugin."""
     plugin_method = None
@@ -229,9 +253,6 @@ def plugin_function_with_argparser(
 
         plugin_method = plugin_obj.get_all_records
         parser = generate_argparse_for_plugin(plugin_obj)
-    elif isinstance(target_attr, CommandProxy):
-        plugin_method = target_attr.command()
-        parser = generate_argparse_for_bound_method(plugin_method)
     elif callable(target_attr):
         plugin_method = target_attr
         parser = generate_argparse_for_bound_method(target_attr)

@@ -26,15 +26,15 @@ classifiers = [
 ]
 dependencies = [
     "defusedxml",
-    "dissect.cstruct>=3.0.dev,<4.0.dev",
-    "dissect.eventlog>=3.0.dev,<4.0.dev",
-    "dissect.evidence>=3.0.dev,<4.0.dev",
-    "dissect.hypervisor>=3.0.dev,<4.0.dev",
-    "dissect.ntfs>=3.4.dev,<4.0.dev",
-    "dissect.regf>=3.3.dev,<4.0.dev",
-    "dissect.util>=3.0.dev,<4.0.dev",
-    "dissect.volume>=3.0.dev,<4.0.dev",
-    "flow.record~=3.14.0",
+    "dissect.cstruct>=4,<5",
+    "dissect.eventlog>=3,<4",
+    "dissect.evidence>=3,<4",
+    "dissect.hypervisor>=3,<4",
+    "dissect.ntfs>=3.4,<4",
+    "dissect.regf>=3.3,<4",
+    "dissect.util>=3,<4",
+    "dissect.volume>=2,<4",
+    "flow.record~=3.18.0",
     "structlog",
 ]
 dynamic = ["version"]
@@ -47,21 +47,24 @@ repository = "https://github.com/fox-it/dissect.target"
 [project.optional-dependencies]
 full = [
     "asn1crypto",
-    "dissect.btrfs>=1.0.dev,<2.0.dev",
-    "dissect.cim>=3.0.dev,<4.0.dev",
-    "dissect.clfs>=1.0.dev,<2.0.dev",
-    "dissect.esedb>=3.0.dev,<4.0.dev",
-    "dissect.etl>=3.0.dev,<4.0.dev",
-    "dissect.extfs>=3.0.dev,<4.0.dev",
-    "dissect.fat>=3.0.dev,<4.0.dev",
-    "dissect.ffs>=3.0.dev,<4.0.dev",
-    "dissect.jffs>=1.0.dev,<2.0.dev",
-    "dissect.shellitem>=3.0.dev,<4.0.dev",
-    "dissect.squashfs>=1.0.dev,<2.0.dev",
-    "dissect.sql>=3.0.dev,<4.0.dev",
-    "dissect.thumbcache>=1.0.dev,<2.0.dev",
-    "dissect.vmfs>=3.0.dev,<4.0.dev",
-    "dissect.xfs>=3.0.dev,<4.0.dev",
+    "dissect.archive>=1,<2",
+    "dissect.btrfs>=1,<2",
+    "dissect.cim>=3,<4",
+    "dissect.clfs>=1,<2",
+    "dissect.esedb>=3,<4",
+    "dissect.etl>=3,<4",
+    "dissect.extfs>=3,<4",
+    "dissect.fat>=3,<4",
+    "dissect.ffs>=3,<4",
+    "dissect.fve>=4,<5; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.jffs>=1,<2",
+    "dissect.ole>=3,<4",
+    "dissect.shellitem>=3,<4",
+    "dissect.squashfs>=1,<2",
+    "dissect.sql>=3,<4",
+    "dissect.thumbcache>=1,<2",
+    "dissect.vmfs>=3,<4",
+    "dissect.xfs>=3,<4",
     "ipython",
     "fusepy",
     "pycryptodome",
@@ -75,6 +78,34 @@ full = [
     # Until such time that this dependency can be installed through
     # flow.record, we define it as a dependency of dissect.target.
     "zstandard",
+]
+dev = [
+    "dissect.target[full,mqtt,yara]",
+    "dissect.archive[dev]>=1.0.dev,<2.0.dev",
+    "dissect.btrfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.cim[dev]>=3.0.dev,<4.0.dev",
+    "dissect.clfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.cstruct>=4.0.dev,<5.0.dev",
+    "dissect.esedb[dev]>=3.0.dev,<4.0.dev",
+    "dissect.etl[dev]>=3.0.dev,<4.0.dev",
+    "dissect.eventlog[dev]>=3.0.dev,<4.0.dev",
+    "dissect.evidence[dev]>=3.0.dev,<4.0.dev",
+    "dissect.extfs[dev]>=3.0.dev,<4.0.dev",
+    "dissect.fat[dev]>=3.0.dev,<4.0.dev",
+    "dissect.ffs[dev]>=3.0.dev,<4.0.dev",
+    "dissect.fve[dev]>=4.0.dev,<5.0.dev; platform_system != 'Windows' or platform_python_implementation != 'PyPy'",
+    "dissect.hypervisor[dev]>=3.0.dev,<4.0.dev",
+    "dissect.jffs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.ntfs[dev]>=3.4.dev,<4.0.dev",
+    "dissect.regf[dev]>=3.3.dev,<4.0.dev",
+    "dissect.shellitem[dev]>=3.0.dev,<4.0.dev",
+    "dissect.sql[dev]>=3.0.dev,<4.0.dev",
+    "dissect.squashfs[dev]>=1.0.dev,<2.0.dev",
+    "dissect.thumbcache[dev]>=1.0.dev,<2.0.dev",
+    "dissect.util>=3.0.dev,<4.0.dev",
+    "dissect.vmfs[dev]>=3.0.dev,<4.0.dev",
+    "dissect.volume[dev]>=3.0.dev,<4.0.dev",
+    "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -101,12 +132,14 @@ mqtt = [
 target-build-pluginlist = "dissect.target.tools.build_pluginlist:main"
 target-dump = "dissect.target.tools.dump.run:main"
 target-dd = "dissect.target.tools.dd:main"
+target-diff = "dissect.target.tools.diff:main"
 target-fs = "dissect.target.tools.fs:main"
 target-info = "dissect.target.tools.info:main"
 target-mount = "dissect.target.tools.mount:main"
 target-query = "dissect.target.tools.query:main"
 target-reg = "dissect.target.tools.reg:main"
 target-shell = "dissect.target.tools.shell:main"
+target-yara = "dissect.target.tools.yara:main"
 
 [tool.black]
 line-length = 120

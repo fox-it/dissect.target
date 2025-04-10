@@ -1,10 +1,11 @@
 from unittest.mock import Mock
 
-from dissect.target.filesystem import VirtualFile
+from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.plugins.filesystem.unix.capability import CapabilityPlugin
+from dissect.target.target import Target
 
 
-def test_capability_plugin(target_unix, fs_unix):
+def test_capability_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     # Some fictional capability values
     xattr1 = Mock()
     xattr1.name = "security.capability"
@@ -33,12 +34,12 @@ def test_capability_plugin(target_unix, fs_unix):
     vfile3.lattr.return_value = [xattr3]
     fs_unix.map_file_entry("/path/to/xattr3/file", vfile3)
 
-    target_unix.add_plugin(CapabilityPlugin)
+    target_unix.add_plugin(CapabilityPlugin, check_compatible=False)
 
     results = list(target_unix.capability_binaries())
     assert len(results) == 3
 
-    assert results[0].record.path == "/path/to/xattr1/file"
+    assert results[0].path == "/path/to/xattr1/file"
     assert results[0].permitted == [
         "CAP_NET_RAW",
         "CAP_SYS_PACCT",
@@ -61,9 +62,9 @@ def test_capability_plugin(target_unix, fs_unix):
         "CAP_MKNOD",
     ]
     assert results[0].effective
-    assert results[0].rootid is None
+    assert results[0].root_id is None
 
-    assert results[1].record.path == "/path/to/xattr2/file"
+    assert results[1].path == "/path/to/xattr2/file"
     assert results[1].permitted == [
         "CAP_NET_RAW",
         "CAP_SYS_PACCT",
@@ -96,10 +97,10 @@ def test_capability_plugin(target_unix, fs_unix):
         "CAP_CHECKPOINT_RESTORE",
     ]
     assert results[1].effective
-    assert results[1].rootid is None
+    assert results[1].root_id is None
 
-    assert results[2].record.path == "/path/to/xattr3/file"
+    assert results[2].path == "/path/to/xattr3/file"
     assert results[2].permitted == ["CAP_NET_RAW"]
     assert results[2].inheritable == []
     assert not results[2].effective
-    assert results[2].rootid == 1337
+    assert results[2].root_id == 1337

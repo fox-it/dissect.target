@@ -1,4 +1,5 @@
 import datetime
+import json
 import operator
 from io import BytesIO
 from typing import Iterator
@@ -14,6 +15,7 @@ from dissect.target.plugins.apps.container.docker import (
     find_installs,
     strip_log,
 )
+from dissect.target.plugins.os.unix._os import UnixPlugin
 from tests._utils import absolute_path
 
 
@@ -134,3 +136,67 @@ def test_backspace_interpretation() -> None:
         '~ # \x1b[6necho \'\x08\x1b[J"ths \x08\x1b[J\x08\x1b[Js \x08\x1b[J\x08\x1b[Jis is a secret!" > secret.txt\r\n'
     )
     assert strip_log(input, exc_backspace=True) == '~ # echo "this is a secret!" > secret.txt'
+
+
+def test_regression_running_container_parsing(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if we correctly discover and reconstruct exposed container ports and commands on a running container"""
+
+    id = "deadbeef"
+    config = {
+        "ID": id,
+        "Image": "sha256:blabla",
+        "Name": "/foo",
+        "Path": "/bin/some-binary",
+        "Driver": "overlay2",
+        "Args": [
+            "--some-argument 1",
+            "--another-argument 2",
+        ],
+        "State": {
+            "Running": True,
+            "Pid": 1337,
+            "StartedAt": "2024-12-31T13:37:00.123456789Z",
+        },
+        "Config": {
+            "Hostname": "foo",
+            "ExposedPorts": {
+                "1337/tcp": {},
+                "1337/udp": {},
+            },
+            "Image": "docker.io/debian",
+        },
+        "NetworkSettings": {
+            "Ports": {},
+        },
+        "MountPoints": {
+            "/dest/file.txt": {
+                "Source": "/somewhere/on/host/file.txt",
+                "Destination": "/dest/file.txt",
+            },
+        },
+    }
+
+    fs_unix.map_file_fh(f"/var/lib/docker/containers/{id}/config.v2.json", BytesIO(json.dumps(config).encode()))
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(b"hostname"))
+
+    target_unix.add_plugin(UnixPlugin)
+    target_unix.add_plugin(DockerPlugin)
+
+    results = list(target_unix.docker.containers())
+    assert len(results) == 1
+
+    assert results[0].hostname == "hostname"
+    assert results[0].container_id == id
+    assert results[0].image == "docker.io/debian"
+    assert results[0].image_id == "blabla"
+    assert results[0].command == "/bin/some-binary --some-argument 1 --another-argument 2"
+    assert results[0].created is None
+    assert results[0].running
+    assert results[0].pid == 1337
+    assert results[0].started == datetime.datetime(2024, 12, 31, 13, 37, 0, 123456, tzinfo=datetime.timezone.utc)
+    assert results[0].finished is None
+    assert results[0].ports == str({"1337/tcp": "0.0.0.0:1337", "1337/udp": "0.0.0.0:1337"})
+    assert results[0].names == "foo"
+    assert results[0].volumes == ["/somewhere/on/host/file.txt:/dest/file.txt"]
+    assert results[0].mount_path == "/var/lib/docker/image/overlay2/layerdb/mounts/deadbeef"
+    assert results[0].config_path == "/var/lib/docker/containers/deadbeef/config.v2.json"

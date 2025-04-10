@@ -22,6 +22,7 @@ class OSInfoPlugin(plugin.Plugin):
 
     @plugin.export(record=OSInfoRecord)
     def osinfo(self) -> Iterator[Union[OSInfoRecord, GroupedRecord]]:
+        """Yield grouped records with target OS info."""
         for os_func in self.target._os.__functions__:
             if os_func in ["is_compatible", "get_all_records"]:
                 continue

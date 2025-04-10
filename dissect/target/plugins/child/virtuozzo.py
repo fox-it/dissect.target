@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
@@ -9,13 +11,15 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
     Virtuozzo conatiners are by default registered in the folder ``vz/root/$VEID``,
     where VEID will be substituted with the actual container UUID.
 
-    /
-      etc/
-      var/
-      vz/
-          root/
-              <container-uuid>/
-              <container-uuid>/
+    .. code-block::
+
+        /
+        etc/
+        var/
+        vz/
+            root/
+                <container-uuid>/
+                <container-uuid>/
 
     References:
         - https://docs.virtuozzo.com/virtuozzo_hybrid_server_7_command_line_reference/managing-system/configuration-files.html
@@ -29,7 +33,7 @@ class VirtuozzoChildTargetPlugin(ChildTargetPlugin):
         if not self.target.fs.path(self.PATH).exists():
             raise UnsupportedPluginError("No Virtuozzo path found")
 
-    def list_children(self):
+    def list_children(self) -> Iterator[ChildTargetRecord]:
         for container in self.target.fs.path(self.PATH).iterdir():
             yield ChildTargetRecord(
                 type=self.__type__,

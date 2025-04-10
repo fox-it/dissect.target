@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
@@ -19,7 +19,7 @@ UNIX_ACCESSORS = ["file", "auto"]
 WINDOWS_ACCESSORS = ["mft", "ntfs", "lazy_ntfs", "ntfs_vss", "auto"]
 
 
-def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional[list[Path]]]:
+def find_fs_directories(path: Path) -> tuple[OperatingSystem | None, list[Path] | None]:
     fs_root = path.joinpath(FILESYSTEMS_ROOT)
 
     # Unix
@@ -57,7 +57,7 @@ def find_fs_directories(path: Path) -> tuple[Optional[OperatingSystem], Optional
     return None, None
 
 
-def extract_drive_letter(name: str) -> Optional[str]:
+def extract_drive_letter(name: str) -> str | None:
     # \\.\X: in URL encoding
     if len(name) == 14 and name.startswith("%5C%5C.%5C") and name.endswith("%3A"):
         return name[10].lower()
@@ -91,7 +91,7 @@ class VelociraptorLoader(DirLoader):
                 f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
                 "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
             )
-            self.root = zipfile.Path(path)
+            self.root = zipfile.Path(path.open("rb"))
         else:
             self.root = path
 
@@ -105,8 +105,8 @@ class VelociraptorLoader(DirLoader):
         #   results/
         #   uploads.json
         #   [...] other files related to the collection
-        if path.suffix == ".zip":  # novermin
-            path = zipfile.Path(path)
+        if path.exists() and path.suffix == ".zip":  # novermin
+            path = zipfile.Path(path.open("rb"))
 
         if path.joinpath(FILESYSTEMS_ROOT).exists() and path.joinpath("uploads.json").exists():
             _, dirs = find_fs_directories(path)

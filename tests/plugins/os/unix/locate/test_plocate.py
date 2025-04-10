@@ -10,8 +10,13 @@ def test_plocate(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
     records = list(target_unix.plocate.locate())
 
-    assert len(records) == 3481
+    assert len(records) == 3594
     assert isinstance(records[0], type(PLocateRecord()))
 
     assert records[0].path.as_posix() == "/.dockerenv"
     assert records[1].path.as_posix() == "/bin"
+
+    # regression for issue #696 (https://github.com/fox-it/dissect.target/issues/696)
+    # records[31] would be `/etc/cron.daily/etc/debconf.conf` without the fix
+    assert records[31].path.as_posix() == "/etc/cron.daily"
+    assert records[32].path.as_posix() == "/etc/debconf.conf"

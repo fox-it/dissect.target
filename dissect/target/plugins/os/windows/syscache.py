@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from dissect.ntfs import ntfs
 
 from dissect.target.exceptions import RegistryValueNotFoundError, UnsupportedPluginError
@@ -41,7 +43,7 @@ class SyscachePlugin(Plugin):
             raise UnsupportedPluginError("Could not load Syscache.hve")
 
     @export(record=SyscacheRecord)
-    def syscache(self):
+    def syscache(self) -> Iterator[SyscacheRecord]:
         """Parse the objects in the ObjectTable from the Syscache.hve file."""
 
         # Try to get the system volume
@@ -75,7 +77,8 @@ class SyscachePlugin(Plugin):
                 full_path = None
                 if mft:
                     try:
-                        full_path = self.target.fs.path("\\".join(["sysvol", mft.mft(file_segment).fullpath()]))
+                        if path := mft(file_segment).full_path():
+                            full_path = self.target.fs.path("\\".join(["sysvol", path]))
                     except ntfs.Error:
                         pass
 

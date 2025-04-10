@@ -8,7 +8,6 @@ from dissect.util.feature import Feature, feature_enabled
 
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 
-HAS_FUSE3 = False
 if feature_enabled(Feature.BETA):
     from fuse3 import FuseOSError, Operations
     from fuse3.c_fuse import fuse_config_p, fuse_conn_info_p
@@ -19,6 +18,8 @@ else:
 
     fuse_config_p = c_void_p
     fuse_conn_info_p = c_void_p
+
+    HAS_FUSE3 = False
 
 
 log = logging.getLogger(__name__)

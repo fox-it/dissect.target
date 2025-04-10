@@ -52,15 +52,13 @@ class WireGuardPlugin(Plugin):
 
     __namespace__ = "wireguard"
 
-    """
-    TODO: NetworkManager uses a different stanza format
-          "/etc/NetworkManager/system-connections/Wireguard*",
-    TODO: systemd uses a different stanza format
-          "/etc/systemd/network/wg*.netdev",
-          "/etc/systemd/network/*wg*.netdev",
-    TODO: other locations such as $HOME/.config/wireguard
-    TODO: parse native network manager formats from MacOS, Ubuntu and Windows.
-    """
+    # TODO: NetworkManager uses a different stanza format
+    #       "/etc/NetworkManager/system-connections/Wireguard*",
+    # TODO: systemd uses a different stanza format
+    #       "/etc/systemd/network/wg*.netdev",
+    #       "/etc/systemd/network/*wg*.netdev",
+    # TODO: other locations such as $HOME/.config/wireguard
+    # TODO: parse native network manager formats from MacOS, Ubuntu and Windows.
 
     CONFIG_GLOBS = [
         # Linux
@@ -160,6 +158,8 @@ def _parse_config(content: str) -> ConfigParser:
 
 
 class MultiDict(OrderedDict):
+    """OrderedDict implementation which allows multiple values for the keys ``Peer`` and ``Interface``."""
+
     def __init__(self, *args, **kwargs):
         self._unique = 0
         super().__init__(*args, **kwargs)

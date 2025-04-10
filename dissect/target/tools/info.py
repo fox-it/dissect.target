@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Union
 
@@ -12,6 +13,7 @@ from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
+    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     process_generic_arguments,
@@ -50,14 +52,14 @@ def main():
     )
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="Targets to display info from")
     parser.add_argument("--from-file", nargs="?", type=Path, help="file containing targets to load")
-    parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-r", "--record", action="store_true", help="print output as record")
     parser.add_argument("-j", "--json", action="store_true", help="output records as pretty json")
     parser.add_argument("-J", "--jsonlines", action="store_true", help="output records as one-line json")
+    parser.add_argument("-L", "--loader", action="store", default=None, help="select a specific loader (i.e. vmx, raw)")
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
 
     process_generic_arguments(args)
 
@@ -73,8 +75,10 @@ def main():
             targets = targets[:-1]
         args.targets = targets
 
+    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
+
     try:
-        for i, target in enumerate(Target.open_all(args.targets)):
+        for i, target in enumerate(Target.open_all(targets)):
             try:
                 if args.jsonlines:
                     print(json.dumps(get_target_info(target), default=str))
@@ -133,12 +137,15 @@ def print_target_info(target: Target) -> None:
             continue
 
         if isinstance(value, list):
-            value = ", ".join(value)
+            value = ", ".join(map(str, value))
+
+        if isinstance(value, datetime):
+            value = value.isoformat(timespec="microseconds")
 
         if name == "hostname":
             print()
 
-        print(f"{name.capitalize().replace('_', ' ')}" + (14 - len(name)) * " " + f" : {value}")
+        print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
 def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:

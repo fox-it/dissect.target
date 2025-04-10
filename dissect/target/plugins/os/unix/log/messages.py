@@ -1,18 +1,28 @@
+from __future__ import annotations
+
 import re
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 from typing import Iterator
 
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.utils import year_rollover_helper
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import Plugin, alias, export
+from dissect.target.plugins.os.unix.log.helpers import (
+    RE_LINE,
+    RE_TS,
+    is_iso_fmt,
+    iso_readlines,
+)
 
 MessagesRecord = TargetRecordDescriptor(
     "linux/log/messages",
     [
         ("datetime", "ts"),
-        ("string", "daemon"),
+        ("string", "service"),
         ("varint", "pid"),
         ("string", "message"),
         ("path", "source"),
@@ -20,14 +30,14 @@ MessagesRecord = TargetRecordDescriptor(
 )
 
 DEFAULT_TS_LOG_FORMAT = "%b %d %H:%M:%S"
-RE_TS = re.compile(r"(\w+\s{1,2}\d+\s\d{2}:\d{2}:\d{2})")
-RE_DAEMON = re.compile(r"^[^:]+:\d+:\d+[^\[\]:]+\s([^\[:]+)[\[|:]{1}")
-RE_PID = re.compile(r"\w\[(\d+)\]")
-RE_MSG = re.compile(r"[^:]+:\d+:\d+[^:]+:\s(.*)$")
-RE_CLOUD_INIT_LINE = re.compile(r"(?P<ts>.*) - (?P<daemon>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$")
+RE_CLOUD_INIT_LINE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<service>.*)\[(?P<log_level>\w+)\]\: (?P<message>.*)$"
+)
 
 
 class MessagesPlugin(Plugin):
+    """Unix messages log plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.log_files = set(self._find_log_files())
@@ -43,19 +53,12 @@ class MessagesPlugin(Plugin):
         if not self.log_files:
             raise UnsupportedPluginError("No log files found")
 
-    @export(record=MessagesRecord)
-    def syslog(self) -> Iterator[MessagesRecord]:
-        """Return contents of /var/log/messages*, /var/log/syslog* and cloud-init logs.
-
-        See ``messages`` for more information.
-        """
-        return self.messages()
-
+    @alias("syslog")
     @export(record=MessagesRecord)
     def messages(self) -> Iterator[MessagesRecord]:
         """Return contents of /var/log/messages*, /var/log/syslog* and cloud-init logs.
 
-        Note: due to year rollover detection, the contents of the files are returned in reverse.
+        Due to year rollover detection, the log contents could be returned in reversed or mixed chronological order.
 
         The messages log file holds information about a variety of events such as the system error messages, system
         startups and shutdowns, change in the network configuration, etc. Aims to store valuable, non-debug and
@@ -71,24 +74,31 @@ class MessagesPlugin(Plugin):
 
         for log_file in self.log_files:
             if "cloud-init" in log_file.name:
-                yield from self._parse_cloud_init_log(log_file)
+                yield from self._parse_cloud_init_log(log_file, tzinfo)
                 continue
 
-            for ts, line in year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo):
-                daemon = dict(enumerate(RE_DAEMON.findall(line))).get(0)
-                pid = dict(enumerate(RE_PID.findall(line))).get(0)
-                message = dict(enumerate(RE_MSG.findall(line))).get(0, line)
+            if is_iso_fmt(log_file):
+                iterable = iso_readlines(log_file)
+
+            else:
+                iterable = year_rollover_helper(log_file, RE_TS, DEFAULT_TS_LOG_FORMAT, tzinfo)
+
+            for ts, line in iterable:
+                match = RE_LINE.search(line)
+
+                if not match:
+                    self.target.log.warning("Unable to parse message line in %s", log_file)
+                    self.target.log.debug("Line %s", line)
+                    continue
 
                 yield MessagesRecord(
                     ts=ts,
-                    daemon=daemon,
-                    pid=pid,
-                    message=message,
+                    **match.groupdict(),
                     source=log_file,
                     _target=self.target,
                 )
 
-    def _parse_cloud_init_log(self, log_file: Path) -> Iterator[MessagesRecord]:
+    def _parse_cloud_init_log(self, log_file: Path, tzinfo: tzinfo | None = timezone.utc) -> Iterator[MessagesRecord]:
         """Parse a cloud-init.log file.
 
         Lines are structured in the following format:
@@ -101,18 +111,41 @@ class MessagesPlugin(Plugin):
 
         Returns: ``MessagesRecord``
         """
-        for line in log_file.open("rt").readlines():
-            if line := line.strip():
-                if match := RE_CLOUD_INIT_LINE.match(line):
-                    match = match.groupdict()
-                    yield MessagesRecord(
-                        ts=match["ts"].split(",")[0],
-                        daemon=match["daemon"],
-                        pid=None,
-                        message=match["message"],
-                        source=log_file,
-                        _target=self.target,
-                    )
-                else:
-                    self.target.log.warning("Could not match cloud-init log line")
+
+        ts_fmt = "%Y-%m-%d %H:%M:%S,%f"
+
+        with open_decompress(log_file, "rt") as fh:
+            for line in fh:
+                if not (line := line.strip()):
+                    continue
+
+                if not (match := RE_CLOUD_INIT_LINE.match(line)):
+                    self.target.log.warning("Could not match cloud-init log line in file: %s", log_file)
                     self.target.log.debug("No match for line '%s'", line)
+                    continue
+
+                values = match.groupdict()
+
+                # Actual format is ``YYYY-MM-DD HH:MM:SS,000`` (asctime with milliseconds) but python has no strptime
+                # operator for 3 digit milliseconds, so we convert and pad to six digit microseconds.
+                # https://github.com/canonical/cloud-init/blob/main/cloudinit/log/loggers.py#DEFAULT_LOG_FORMAT
+                # https://docs.python.org/3/library/logging.html#asctime
+                raw_ts, _, milliseconds = values["ts"].rpartition(",")
+                raw_ts += "," + str((int(milliseconds) * 1000)).zfill(6)
+
+                try:
+                    ts = datetime.strptime(raw_ts, ts_fmt).replace(tzinfo=tzinfo)
+
+                except ValueError as e:
+                    self.target.log.warning("Timestamp '%s' does not match format '%s'", raw_ts, ts_fmt)
+                    self.target.log.debug("", exc_info=e)
+                    ts = datetime(1970, 1, 1, 0, 0, 0, 0)
+
+                yield MessagesRecord(
+                    ts=ts,
+                    service=values["service"],
+                    pid=None,
+                    message=values["message"],
+                    source=log_file,
+                    _target=self.target,
+                )

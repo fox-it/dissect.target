@@ -21,6 +21,9 @@ class UtmLoader(Loader):
     def map(self, target: Target) -> None:
         data_dir = self.path.joinpath("Data")
         for drive in self.config.get("Drive", []):
+            if drive.get("ImageType") != "Disk":
+                continue
+
             path = data_dir.joinpath(drive["ImageName"])
             try:
                 target.disks.add(container.open(path))

@@ -1,4 +1,4 @@
-from dissect.hypervisor import vma
+from dissect.archive import vma
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.loader import Loader

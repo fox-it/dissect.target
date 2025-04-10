@@ -1,4 +1,6 @@
-from typing import Iterator, Optional
+from __future__ import annotations
+
+from typing import Iterator
 
 from dissect.shellitem.lnk import Lnk
 from dissect.util import ts
@@ -34,7 +36,92 @@ LnkRecord = TargetRecordDescriptor(
 )
 
 
+def parse_lnk_file(target: Target, lnk_file: Lnk, lnk_path: TargetPath) -> LnkRecord:
+    # we need to get the active codepage from the system to properly decode some values
+    codepage = target.codepage or "ascii"
+
+    lnk_net_name = lnk_device_name = None
+
+    if lnk_file.link_header:
+        lnk_name = lnk_file.stringdata.name_string.string if lnk_file.flag("has_name") else None
+
+        lnk_mtime = ts.from_unix(lnk_path.stat().st_mtime)
+        lnk_atime = ts.from_unix(lnk_path.stat().st_atime)
+        lnk_ctime = ts.from_unix(lnk_path.stat().st_ctime)
+
+        lnk_relativepath = (
+            target.fs.path(lnk_file.stringdata.relative_path.string) if lnk_file.flag("has_relative_path") else None
+        )
+        lnk_workdir = (
+            target.fs.path(lnk_file.stringdata.working_dir.string) if lnk_file.flag("has_working_dir") else None
+        )
+        lnk_iconlocation = (
+            target.fs.path(lnk_file.stringdata.icon_location.string) if lnk_file.flag("has_icon_location") else None
+        )
+        lnk_arguments = lnk_file.stringdata.command_line_arguments.string if lnk_file.flag("has_arguments") else None
+        local_base_path = (
+            lnk_file.linkinfo.local_base_path.decode(codepage)
+            if lnk_file.flag("has_link_info") and lnk_file.linkinfo.flag("volumeid_and_local_basepath")
+            else None
+        )
+        common_path_suffix = (
+            lnk_file.linkinfo.common_path_suffix.decode(codepage) if lnk_file.flag("has_link_info") else None
+        )
+
+        if local_base_path and common_path_suffix:
+            lnk_full_path = target.fs.path(local_base_path + common_path_suffix)
+        elif local_base_path and not common_path_suffix:
+            lnk_full_path = target.fs.path(local_base_path)
+        else:
+            lnk_full_path = None
+
+        if lnk_file.flag("has_link_info"):
+            if lnk_file.linkinfo.flag("common_network_relative_link_and_pathsuffix"):
+                lnk_net_name = (
+                    lnk_file.linkinfo.common_network_relative_link.net_name.decode()
+                    if lnk_file.linkinfo.common_network_relative_link.net_name
+                    else None
+                )
+                lnk_device_name = (
+                    lnk_file.linkinfo.common_network_relative_link.device_name.decode()
+                    if lnk_file.linkinfo.common_network_relative_link.device_name
+                    else None
+                )
+        try:
+            machine_id = lnk_file.extradata.TRACKER_PROPS.machine_id.decode(codepage).strip("\x00")
+        except AttributeError:
+            machine_id = None
+
+        target_mtime = ts.wintimestamp(lnk_file.link_header.write_time)
+        target_atime = ts.wintimestamp(lnk_file.link_header.access_time)
+        target_ctime = ts.wintimestamp(lnk_file.link_header.creation_time)
+
+        return LnkRecord(
+            lnk_path=lnk_path,
+            lnk_name=lnk_name,
+            lnk_mtime=lnk_mtime,
+            lnk_atime=lnk_atime,
+            lnk_ctime=lnk_ctime,
+            lnk_relativepath=lnk_relativepath,
+            lnk_workdir=lnk_workdir,
+            lnk_iconlocation=lnk_iconlocation,
+            lnk_arguments=lnk_arguments,
+            local_base_path=local_base_path,
+            common_path_suffix=common_path_suffix,
+            lnk_full_path=lnk_full_path,
+            lnk_net_name=lnk_net_name,
+            lnk_device_name=lnk_device_name,
+            machine_id=machine_id,
+            target_mtime=target_mtime,
+            target_atime=target_atime,
+            target_ctime=target_ctime,
+            _target=target,
+        )
+
+
 class LnkPlugin(Plugin):
+    """Windows lnk plugin."""
+
     def __init__(self, target: Target) -> None:
         super().__init__(target)
         self.folders = ["programdata", "users", "windows"]
@@ -45,12 +132,15 @@ class LnkPlugin(Plugin):
                 return None
         raise UnsupportedPluginError("No folders containing link files found")
 
-    @arg("--directory", "-d", dest="directory", default=None, help="Path to .lnk file in target")
+    @arg("--path", "-p", dest="path", default=None, help="Path to directory or .lnk file in target")
     @export(record=LnkRecord)
-    def lnk(self, directory: Optional[str] = None) -> Iterator[LnkRecord]:
+    def lnk(self, path: str | None = None) -> Iterator[LnkRecord]:
         """Parse all .lnk files in /ProgramData, /Users, and /Windows or from a specified path in record format.
 
         Yields a LnkRecord record with the following fields:
+
+        .. code-block:: text
+
             lnk_path (path): Path of the link (.lnk) file.
             lnk_name (string): Name of the link (.lnk) file.
             lnk_mtime (datetime): Modification time of the link (.lnk) file.
@@ -71,101 +161,25 @@ class LnkPlugin(Plugin):
             target_ctime (datetime): Creation time of the target (linked) file.
         """
 
-        # we need to get the active codepage from the system to properly decode some values
-        codepage = self.target.codepage or "ascii"
+        for entry in self.lnk_entries(path):
+            try:
+                lnk_file = Lnk(entry.open())
+                yield parse_lnk_file(self.target, lnk_file, entry)
+            except Exception as e:
+                self.target.log.warning("Failed to parse link file %s", lnk_file)
+                self.target.log.debug("", exc_info=e)
 
-        for entry in self.lnk_entries(directory):
-            lnk_file = Lnk(entry.open())
-            lnk_net_name = lnk_device_name = None
-
-            if lnk_file.link_header:
-                lnk_path = entry
-                lnk_name = lnk_file.stringdata.name_string.string if lnk_file.flag("has_name") else None
-
-                lnk_mtime = ts.from_unix(entry.stat().st_mtime)
-                lnk_atime = ts.from_unix(entry.stat().st_atime)
-                lnk_ctime = ts.from_unix(entry.stat().st_ctime)
-
-                lnk_relativepath = (
-                    self.target.fs.path(lnk_file.stringdata.relative_path.string)
-                    if lnk_file.flag("has_relative_path")
-                    else None
-                )
-                lnk_workdir = (
-                    self.target.fs.path(lnk_file.stringdata.working_dir.string)
-                    if lnk_file.flag("has_working_dir")
-                    else None
-                )
-                lnk_iconlocation = (
-                    self.target.fs.path(lnk_file.stringdata.icon_location.string)
-                    if lnk_file.flag("has_icon_location")
-                    else None
-                )
-                lnk_arguments = (
-                    lnk_file.stringdata.command_line_arguments.string if lnk_file.flag("has_arguments") else None
-                )
-                local_base_path = (
-                    lnk_file.linkinfo.local_base_path.decode(codepage)
-                    if lnk_file.flag("has_link_info") and lnk_file.linkinfo.flag("volumeid_and_local_basepath")
-                    else None
-                )
-                common_path_suffix = (
-                    lnk_file.linkinfo.common_path_suffix.decode(codepage) if lnk_file.flag("has_link_info") else None
-                )
-
-                if local_base_path and common_path_suffix:
-                    lnk_full_path = self.target.fs.path(local_base_path + common_path_suffix)
-                elif local_base_path and not common_path_suffix:
-                    lnk_full_path = self.target.fs.path(local_base_path)
-                else:
-                    lnk_full_path = None
-
-                if lnk_file.flag("has_link_info"):
-                    if lnk_file.linkinfo.flag("common_network_relative_link_and_pathsuffix"):
-                        lnk_net_name = (
-                            lnk_file.linkinfo.common_network_relative_link.net_name.decode()
-                            if lnk_file.linkinfo.common_network_relative_link.net_name
-                            else None
-                        )
-                        lnk_device_name = (
-                            lnk_file.linkinfo.common_network_relative_link.device_name.decode()
-                            if lnk_file.linkinfo.common_network_relative_link.device_name
-                            else None
-                        )
-                try:
-                    machine_id = lnk_file.extradata.TRACKER_PROPS.machine_id.decode(codepage).strip("\x00")
-                except AttributeError:
-                    machine_id = None
-
-                target_mtime = ts.wintimestamp(lnk_file.link_header.write_time)
-                target_atime = ts.wintimestamp(lnk_file.link_header.access_time)
-                target_ctime = ts.wintimestamp(lnk_file.link_header.creation_time)
-
-                yield LnkRecord(
-                    lnk_path=lnk_path,
-                    lnk_name=lnk_name,
-                    lnk_mtime=lnk_mtime,
-                    lnk_atime=lnk_atime,
-                    lnk_ctime=lnk_ctime,
-                    lnk_relativepath=lnk_relativepath,
-                    lnk_workdir=lnk_workdir,
-                    lnk_iconlocation=lnk_iconlocation,
-                    lnk_arguments=lnk_arguments,
-                    local_base_path=local_base_path,
-                    common_path_suffix=common_path_suffix,
-                    lnk_full_path=lnk_full_path,
-                    lnk_net_name=lnk_net_name,
-                    lnk_device_name=lnk_device_name,
-                    machine_id=machine_id,
-                    target_mtime=target_mtime,
-                    target_atime=target_atime,
-                    target_ctime=target_ctime,
-                    _target=self.target,
-                )
-
-    def lnk_entries(self, path: Optional[str] = None) -> Iterator[TargetPath]:
+    def lnk_entries(self, path: str | None = None) -> Iterator[TargetPath]:
         if path:
-            yield self.target.fs.path(path)
+            target_path = self.target.fs.path(path)
+            if not target_path.exists():
+                self.target.log.error("Provided path %s does not exist on target", target_path)
+                return
+
+            if target_path.is_file():
+                yield target_path
+            else:
+                yield from target_path.rglob("*.lnk")
         else:
             for folder in self.folders:
                 yield from self.target.fs.path("sysvol").joinpath(folder).rglob("*.lnk")

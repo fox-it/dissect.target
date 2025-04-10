@@ -13,12 +13,14 @@ DRIVE_LETTER_RE = re.compile(r"[a-zA-Z]:")
 
 
 class InformationType(Enum):
+    """Valid information types"""
+
     STANDARD_INFORMATION = auto()
     FILE_INFORMATION = auto()
     ALTERNATE_DATA_STREAM = auto()
 
 
-def get_drive_letter(target: Target, filesystem: NtfsFilesystem):
+def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
     """Retrieve the drive letter from the loaded mounts
 
     When the drive letter is not available for that filesystem it returns empty.

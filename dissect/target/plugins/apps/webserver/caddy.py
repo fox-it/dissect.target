@@ -22,6 +22,8 @@ LOG_REGEX = re.compile(
 
 
 class CaddyPlugin(WebserverPlugin):
+    """Caddy webserver plugin."""
+
     __namespace__ = "caddy"
 
     def __init__(self, target: Target):

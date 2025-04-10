@@ -13,6 +13,7 @@ def test_utmp_ipv6(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     target_linux.add_plugin(UtmpPlugin)
 
     results = list(target_linux.btmp())
+    assert len(results) == 6
 
     # IPv4 address
     results[0].ut_host == "127.0.0.1"
@@ -35,6 +36,7 @@ def test_wtmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
 
     results = list(target_linux.wtmp())
     assert len(results) == 70
+
     result = results[-1]
     assert result.ts == datetime(2021, 11, 12, 10, 12, 54, tzinfo=timezone.utc)
     assert result.ut_type == "USER_PROCESS"
@@ -54,6 +56,7 @@ def test_btmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
 
     results = list(target_linux.btmp())
     assert len(results) == 10
+
     result = results[-1]
     assert result.ts == datetime(2021, 11, 30, 23, 2, 9, tzinfo=timezone.utc)
     assert result.ut_type == "LOGIN_PROCESS"
@@ -63,3 +66,11 @@ def test_btmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
     assert result.ut_id == ""
     assert result.ut_host == "8.210.13.5"
     assert result.ut_addr == "8.210.13.5"
+
+
+def test_utmp_plugin(target_linux: Target, fs_linux: VirtualFilesystem) -> None:
+    """test if we correctly parse a /var/run/utmp file."""
+    fs_linux.map_file("var/run/utmp", absolute_path("_data/plugins/os/unix/log/wtmp/wtmp"))
+    target_linux.add_plugin(UtmpPlugin)
+    results = list(target_linux.utmp())
+    assert len(results) == 70

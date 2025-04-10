@@ -16,6 +16,8 @@ CmdlineRecord = TargetRecordDescriptor(
 
 
 class CmdlinePlugin(Plugin):
+    """Linux volatile proc commandline plugin."""
+
     def check_compatible(self) -> None:
         self.target.proc
 
@@ -29,6 +31,9 @@ class CmdlinePlugin(Plugin):
         Think of this output as the command line that the process wants you to see.
 
         Yields CmdlineRecord with the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The starttime of the process.

@@ -32,13 +32,13 @@ class SquashFSFilesystem(Filesystem):
         try:
             return self.squashfs.get(path, node)
         except exceptions.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except exceptions.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except exceptions.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except exceptions.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class SquashFSFilesystemEntry(FilesystemEntry):

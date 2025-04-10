@@ -1,60 +1,74 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
+from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
+from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
+    GENERIC_LOG_RECORD_FIELDS,
     RemoteAccessPlugin,
-    RemoteAccessRecord,
 )
+from dissect.target.plugins.general.users import UserDetails
 
 START_PATTERN = re.compile(r"^(\d{2}|\d{4})/")
 
 
-class TeamviewerPlugin(RemoteAccessPlugin):
-    """
-    Teamviewer plugin.
+class TeamViewerPlugin(RemoteAccessPlugin):
+    """TeamViewer client plugin.
+
+    Resources:
+        - https://teamviewer.com/en/global/support/knowledge-base/teamviewer-classic/contact-support/find-your-log-files
+        - https://www.systoolsgroup.com/forensics/teamviewer/
+        - https://benleeyr.wordpress.com/2020/05/19/teamviewer-forensics-tested-on-v15/
     """
 
     __namespace__ = "teamviewer"
 
-    # Teamviewer log when service (Windows)
-    GLOBS = [
+    SYSTEM_GLOBS = [
         "sysvol/Program Files/TeamViewer/*.log",
         "sysvol/Program Files (x86)/TeamViewer/*.log",
+        "/var/log/teamviewer*/*.log",
     ]
+
+    USER_GLOBS = [
+        "AppData/Roaming/TeamViewer/teamviewer*_logfile.log",
+        "Library/Logs/TeamViewer/teamviewer*_logfile*.log",
+    ]
+
+    RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "remoteaccess/teamviewer/log", GENERIC_LOG_RECORD_FIELDS
+    )
 
     def __init__(self, target):
         super().__init__(target)
 
-        self.logfiles = []
+        self.logfiles: list[list[TargetPath, UserDetails]] = []
 
-        # Check service globs
-        user = None
-        for log_glob in self.GLOBS:
+        # Find system service log files.
+        for log_glob in self.SYSTEM_GLOBS:
             for logfile in self.target.fs.glob(log_glob):
-                self.logfiles.append([logfile, user])
+                self.logfiles.append([logfile, None])
 
-        # Teamviewer logs when as user (Windows)
+        # Find user log files.
         for user_details in self.target.user_details.all_with_home():
-            for logfile in user_details.home_path.glob("appdata/roaming/teamviewer/teamviewer*_logfile.log"):
-                self.logfiles.append([logfile, user_details.user])
+            for log_glob in self.USER_GLOBS:
+                for logfile in user_details.home_path.glob(log_glob):
+                    self.logfiles.append([logfile, user_details])
 
     def check_compatible(self) -> None:
         if not len(self.logfiles):
             raise UnsupportedPluginError("No Teamviewer logs found")
 
-    @export(record=RemoteAccessRecord)
-    def logs(self):
-        """Return the content of the TeamViewer logs.
+    @export(record=RemoteAccessLogRecord)
+    def logs(self) -> Iterator[RemoteAccessLogRecord]:
+        """Yield TeamViewer client logs.
 
-        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a
-        system.
-
-        References:
-            - https://www.teamviewer.com/nl/
+        TeamViewer is a commercial remote desktop application. An adversary may use it to gain persistence on a system.
         """
-        for logfile, user in self.logfiles:
+        for logfile, user_details in self.logfiles:
             logfile = self.target.fs.path(logfile)
 
             start_date = None
@@ -83,7 +97,7 @@ class TeamviewerPlugin(RemoteAccessPlugin):
                     if not re.match(START_PATTERN, line):
                         continue
 
-                    ts_day, ts_time, description = line.split(" ", 2)
+                    ts_day, ts_time, message = line.split(" ", 2)
                     ts_time = ts_time.split(".")[0]
 
                     # Correct for use of : as millisecond separator
@@ -99,13 +113,14 @@ class TeamviewerPlugin(RemoteAccessPlugin):
                     if ts_day.count("/") == 2 and len(ts_day.split("/")[0]) == 2:
                         ts_day = "20" + ts_day
 
-                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S")
+                    timestamp = datetime.strptime(f"{ts_day} {ts_time}", "%Y/%m/%d %H:%M:%S").replace(
+                        tzinfo=timezone.utc
+                    )
 
-                    yield RemoteAccessRecord(
-                        tool="teamviewer",
+                    yield self.RemoteAccessLogRecord(
                         ts=timestamp,
-                        logfile=str(logfile),
-                        description=description,
+                        message=message,
+                        source=logfile,
                         _target=self.target,
-                        _user=user,
+                        _user=user_details.user if user_details else None,
                     )

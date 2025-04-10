@@ -1,17 +1,17 @@
-import gzip
+from __future__ import annotations
+
 import ipaddress
 import struct
 from collections import namedtuple
 from typing import Iterator
 
 from dissect.cstruct import cstruct
-from dissect.util.stream import BufferedStream
 from dissect.util.ts import from_unix
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.fsutil import TargetPath, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import OperatingSystem, Plugin, export
+from dissect.target.plugin import Plugin, alias, export
 from dissect.target.target import Target
 
 UTMP_FIELDS = [
@@ -27,26 +27,22 @@ UTMP_FIELDS = [
 
 BtmpRecord = TargetRecordDescriptor(
     "linux/log/btmp",
-    [
-        *UTMP_FIELDS,
-    ],
+    UTMP_FIELDS,
 )
 
 WtmpRecord = TargetRecordDescriptor(
     "linux/log/wtmp",
-    [
-        *UTMP_FIELDS,
-    ],
+    UTMP_FIELDS,
 )
 
-c_utmp = """
+utmp_def = """
 #define UT_LINESIZE     32
 #define UT_NAMESIZE     32
 #define UT_HOSTSIZE     256
 
 typedef uint32 pid_t;
 
-enum Type : char {
+enum Type : uint8_t {
     EMPTY           = 0x0,
     RUN_LVL         = 0x1,
     BOOT_TIME       = 0x2,
@@ -84,8 +80,7 @@ struct entry {
 };
 """  # noqa: E501
 
-utmp = cstruct()
-utmp.load(c_utmp)
+c_utmp = cstruct().load(utmp_def)
 
 UTMP_ENTRY = namedtuple(
     "UTMPRecord",
@@ -105,28 +100,17 @@ UTMP_ENTRY = namedtuple(
 class UtmpFile:
     """utmp maintains a full accounting of the current status of the system"""
 
-    def __init__(self, target: Target, path: TargetPath):
-        self.fh = target.fs.path(path).open()
-
-        if "gz" in path:
-            self.compressed = True
-        else:
-            self.compressed = False
+    def __init__(self, path: TargetPath):
+        self.fh = open_decompress(path, "rb")
 
     def __iter__(self):
-        if self.compressed:
-            gzip_entry = BufferedStream(gzip.open(self.fh, mode="rb"))
-            byte_stream = gzip_entry
-        else:
-            byte_stream = self.fh
-
         while True:
             try:
-                entry = utmp.entry(byte_stream)
+                entry = c_utmp.entry(self.fh)
 
                 r_type = ""
-                if entry.ut_type in utmp.Type.reverse:
-                    r_type = utmp.Type.reverse[entry.ut_type]
+                if entry.ut_type in c_utmp.Type:
+                    r_type = c_utmp.Type(entry.ut_type).name
 
                 ut_host = entry.ut_host.decode(errors="surrogateescape").strip("\x00")
                 ut_addr = None
@@ -152,7 +136,7 @@ class UtmpFile:
                             # ut_addr_v6 is parsed as IPv4 address. This could not lead to incorrect results.
                             ut_addr = ipaddress.ip_address(struct.pack("<i", entry.ut_addr_v6[0]))
 
-                utmp_entry = UTMP_ENTRY(
+                yield UTMP_ENTRY(
                     ts=from_unix(entry.ut_tv.tv_sec),
                     ut_type=r_type,
                     ut_pid=entry.ut_pid,
@@ -163,25 +147,37 @@ class UtmpFile:
                     ut_addr=ut_addr,
                 )
 
-                yield utmp_entry
             except EOFError:
                 break
 
 
 class UtmpPlugin(Plugin):
-    WTMP_GLOB = "/var/log/wtmp*"
-    BTMP_GLOB = "/var/log/btmp*"
+    """Unix utmp log plugin."""
+
+    def __init__(self, target: Target):
+        super().__init__(target)
+        self.btmp_paths = list(self.target.fs.path("/").glob("var/log/btmp*"))
+        self.wtmp_paths = list(self.target.fs.path("/").glob("var/log/wtmp*"))
+        self.utmp_paths = list(self.target.fs.path("/").glob("var/run/utmp*"))
 
     def check_compatible(self) -> None:
-        if not self.target.os == OperatingSystem.LINUX and not any(
-            [
-                list(self.target.fs.glob(self.BTMP_GLOB)),
-                list(self.target.fs.glob(self.WTMP_GLOB)),
-            ]
-        ):
-            raise UnsupportedPluginError("No WTMP or BTMP log files found")
+        if not any(self.btmp_paths + self.wtmp_paths + self.utmp_paths):
+            raise UnsupportedPluginError("No wtmp and/or btmp log files found")
 
-    @export(record=[BtmpRecord])
+    def _build_record(self, record: TargetRecordDescriptor, entry: UTMP_ENTRY) -> Iterator[BtmpRecord | WtmpRecord]:
+        return record(
+            ts=entry.ts,
+            ut_type=entry.ut_type,
+            ut_pid=entry.ut_pid,
+            ut_user=entry.ut_user,
+            ut_line=entry.ut_line,
+            ut_id=entry.ut_id,
+            ut_host=entry.ut_host,
+            ut_addr=entry.ut_addr,
+            _target=self.target,
+        )
+
+    @export(record=BtmpRecord)
     def btmp(self) -> Iterator[BtmpRecord]:
         """Return failed login attempts stored in the btmp file.
 
@@ -191,26 +187,18 @@ class UtmpPlugin(Plugin):
             - https://en.wikipedia.org/wiki/Utmp
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
-        btmp_paths = self.target.fs.glob(self.BTMP_GLOB)
-        for btmp_path in btmp_paths:
-            btmp = UtmpFile(self.target, btmp_path)
+        for path in self.btmp_paths:
+            if not path.is_file():
+                self.target.log.warning("Unable to parse btmp file: %s is not a file", path)
+                continue
 
-            for entry in btmp:
-                yield BtmpRecord(
-                    ts=entry.ts,
-                    ut_type=entry.ut_type,
-                    ut_pid=entry.ut_pid,
-                    ut_user=entry.ut_user,
-                    ut_line=entry.ut_line,
-                    ut_id=entry.ut_id,
-                    ut_host=entry.ut_host,
-                    ut_addr=entry.ut_addr,
-                    _target=self.target,
-                )
+            for entry in UtmpFile(path):
+                yield self._build_record(BtmpRecord, entry)
 
-    @export(record=[WtmpRecord])
+    @alias("utmp")
+    @export(record=WtmpRecord)
     def wtmp(self) -> Iterator[WtmpRecord]:
-        """Return the content of the wtmp log files.
+        """Yield contents of wtmp log files.
 
         The wtmp file contains the historical data of the utmp file. The utmp file contains information about users
         logins at which terminals, logouts, system events and current status of the system, system boot time
@@ -219,19 +207,11 @@ class UtmpPlugin(Plugin):
         References:
             - https://www.thegeekdiary.com/what-is-the-purpose-of-utmp-wtmp-and-btmp-files-in-linux/
         """
-        wtmp_paths = self.target.fs.glob(self.WTMP_GLOB)
-        for wtmp_path in wtmp_paths:
-            wtmp = UtmpFile(self.target, wtmp_path)
 
-            for entry in wtmp:
-                yield WtmpRecord(
-                    ts=entry.ts,
-                    ut_type=entry.ut_type,
-                    ut_pid=entry.ut_pid,
-                    ut_user=entry.ut_user,
-                    ut_line=entry.ut_line,
-                    ut_id=entry.ut_id,
-                    ut_host=entry.ut_host,
-                    ut_addr=entry.ut_addr,
-                    _target=self.target,
-                )
+        for path in self.wtmp_paths + self.utmp_paths:
+            if not path.is_file():
+                self.target.log.warning("Unable to parse wtmp file: %s is not a file", path)
+                continue
+
+            for entry in UtmpFile(path):
+                yield self._build_record(WtmpRecord, entry)

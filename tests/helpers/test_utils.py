@@ -8,11 +8,23 @@ from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers import fsutil, utils
 
 
-def test_slugify():
+def test_to_list_single_value() -> None:
+    assert utils.to_list(1) == [1]
+    assert utils.to_list("a") == ["a"]
+    assert utils.to_list(None) == [None]
+
+
+def test_to_list_list_value() -> None:
+    assert utils.to_list([1, 2, 3]) == [1, 2, 3]
+    assert utils.to_list(["a", "b", "c"]) == ["a", "b", "c"]
+    assert utils.to_list([]) == []
+
+
+def test_slugify() -> None:
     assert utils.slugify("foo/bar\\baz bla") == "foo_bar_baz_bla"
 
 
-def test_filesystem_readinto():
+def test_filesystem_readinto() -> None:
     data = b"hello_world"
     mocked_file = mock_open(read_data=b"hello_world")
 
@@ -22,7 +34,7 @@ def test_filesystem_readinto():
     assert len(buffer) == 512
 
 
-def test_helpers_fsutil_year_rollover_helper():
+def test_helpers_fsutil_year_rollover_helper() -> None:
     vfs = VirtualFilesystem()
 
     content = """

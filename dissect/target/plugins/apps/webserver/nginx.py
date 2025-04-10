@@ -18,6 +18,8 @@ LOG_REGEX = re.compile(
 
 
 class NginxPlugin(WebserverPlugin):
+    """Nginx webserver plugin."""
+
     __namespace__ = "nginx"
 
     def __init__(self, target: Target):

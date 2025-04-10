@@ -14,9 +14,11 @@ def test_wer_plugin(target_win, fs_win):
         "sig",
         "dynamic_sig",
         "dynamic_signatures_parameter1",
-        "ui1",
-        "spcial_charactr",
-        "невидимый",
+        "ui_x5b_1_x5d",
+        "sp_xc3a9_cial_charact_xc3a9_r",
+        "xd0bd_xd0b5_xd0b2_xd0b8_xd0b4_xd0b8_xd0bc_xd18b_xd0b9",
+        "x5f_start_with_an_",
+        "x33__start_with_a_3",
     ]
 
     records = list(target_win.wer())
@@ -29,12 +31,6 @@ def test_wer_plugin(target_win, fs_win):
     record = wer_record_map["wer_test.wer"]
     for test in tests:
         record_field = getattr(record, test, None)
-
-        # Check if expected line has been skipped
-        if record_field is None:
-            assert test == "невидимый"
-            continue
-
         assert record_field == f"test_{test}"
 
     assert record.ts == datetime.datetime(2022, 10, 4, 11, 0, 0, 0, tzinfo=datetime.timezone.utc)

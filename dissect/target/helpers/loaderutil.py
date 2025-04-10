@@ -5,7 +5,7 @@ import re
 import urllib
 from os import PathLike
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import FileNotFoundError
 from dissect.target.filesystem import Filesystem
@@ -42,12 +42,31 @@ def add_virtual_ntfs_filesystem(
     fh_sds = _try_open(fs, sds_path)
 
     if any([fh_boot, fh_mft]):
-        ntfs = NtfsFilesystem(boot=fh_boot, mft=fh_mft, usnjrnl=fh_usnjrnl, sds=fh_sds)
-        target.filesystems.add(ntfs)
-        fs.ntfs = ntfs.ntfs
+        ntfs = None
+
+        try:
+            ntfs = NtfsFilesystem(boot=fh_boot, mft=fh_mft, usnjrnl=fh_usnjrnl, sds=fh_sds)
+        except Exception as e:
+            if fh_boot:
+                log.warning("Failed to load NTFS filesystem from %s, retrying without $Boot file", fs)
+                log.debug("", exc_info=e)
+
+                try:
+                    # Try once more without the $Boot file
+                    ntfs = NtfsFilesystem(mft=fh_mft, usnjrnl=fh_usnjrnl, sds=fh_sds)
+                except Exception:
+                    log.warning("Failed to load NTFS filesystem from %s without $Boot file, skipping", fs)
+                    return
+
+        # Only add it if we have a valid NTFS with an MFT
+        if ntfs and ntfs.ntfs.mft:
+            target.filesystems.add(ntfs)
+            fs.ntfs = ntfs.ntfs
+        else:
+            log.warning("Opened NTFS filesystem from %s but could not find $MFT, skipping", fs)
 
 
-def _try_open(fs: Filesystem, path: str) -> BinaryIO:
+def _try_open(fs: Filesystem, path: str) -> BinaryIO | None:
     paths = [path] if not isinstance(path, list) else path
 
     for path in paths:
@@ -61,7 +80,7 @@ def _try_open(fs: Filesystem, path: str) -> BinaryIO:
             pass
 
 
-def extract_path_info(path: Union[str, Path]) -> tuple[Path, Optional[urllib.parse.ParseResult]]:
+def extract_path_info(path: str | Path) -> tuple[Path, urllib.parse.ParseResult | None]:
     """
     Extracts a ParseResult from a path if it has
     a scheme and adjusts the path if necessary.

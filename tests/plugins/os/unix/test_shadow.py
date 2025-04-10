@@ -1,8 +1,13 @@
+from io import BytesIO
+from pathlib import Path
+
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.shadow import ShadowPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_unix_shadow(target_unix_users, fs_unix):
+def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     shadow_file = absolute_path("_data/plugins/os/unix/shadow/shadow")
     fs_unix.map_file("/etc/shadow", shadow_file)
     target_unix_users.add_plugin(ShadowPlugin)
@@ -27,3 +32,20 @@ def test_unix_shadow(target_unix_users, fs_unix):
     assert results[0].inactivity_period == ""
     assert results[0].expiration_date == ""
     assert results[0].unused_field == ""
+
+
+def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if both the shadow file and shadow backup file are read and returns unique hash+user combinations"""
+    shadow_file = absolute_path("_data/plugins/os/unix/shadow/shadow")
+    fs_unix.map_file("/etc/shadow", shadow_file)
+
+    first_entry = Path(shadow_file).open("rb").read()
+    other_entry = first_entry.replace(b"test", b"other-user")
+    duplicate_entry = first_entry
+    fs_unix.map_file_fh("/etc/shadow-", BytesIO(first_entry + other_entry + duplicate_entry))
+
+    results = list(target_unix_users.passwords())
+    assert len(results) == 2
+    assert results[0].name == "test"
+    assert results[1].name == "other-user"
+    assert results[0].hash == results[1].hash

@@ -1,4 +1,5 @@
 import re
+from typing import Iterator
 
 from dissect.target.exceptions import (
     RegistryError,
@@ -62,8 +63,8 @@ class ServicesPlugin(Plugin):
             raise UnsupportedPluginError("No services found in the registry")
 
     @export(record=ServiceRecord)
-    def services(self):
-        """Return information about all installed services.
+    def services(self) -> Iterator[ServiceRecord]:
+        """Return information about all installed Windows services.
 
         The HKLM\\SYSTEM\\CurrentControlSet\\Services registry key contains information about the installed services and
         drivers on the system.
@@ -72,6 +73,9 @@ class ServicesPlugin(Plugin):
             - https://artifacts-kb.readthedocs.io/en/latest/sources/windows/ServicesAndDrivers.html
 
         Yields ServiceRecords with fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datatime): The last modified timestamp of the registry key.

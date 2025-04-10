@@ -25,6 +25,7 @@ class ChromePlugin(ChromiumMixin, BrowserPlugin):
     DIRS = [
         # Windows
         "AppData/Local/Google/Chrome/User Data/Default",
+        "AppData/Local/Google/Chrome/User Data/Snapshots/*/Default",
         "AppData/Local/Google/Chrome/continuousUpdates/User Data/Default",
         "Local Settings/Application Data/Google/Chrome/User Data/Default",
         # Linux

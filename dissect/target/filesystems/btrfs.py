@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import BinaryIO, Iterator, Optional, Union
 
 import dissect.btrfs as btrfs
@@ -78,13 +79,13 @@ class BtrfsSubvolumeFilesystem(Filesystem):
         try:
             return self.subvolume.get(path, node)
         except btrfs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except btrfs.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except btrfs.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except btrfs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class BtrfsFilesystemEntry(FilesystemEntry):
@@ -153,7 +154,7 @@ class BtrfsFilesystemEntry(FilesystemEntry):
         node = self.entry.inode
 
         # mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime
-        st_info = st_info = fsutil.stat_result(
+        st_info = fsutil.stat_result(
             [
                 entry.mode,
                 entry.inum,
@@ -176,5 +177,13 @@ class BtrfsFilesystemEntry(FilesystemEntry):
 
         # Btrfs has a birth time, called otime
         st_info.st_birthtime = entry.otime.timestamp()
+        st_info.st_birthtime_ns = entry.otime_ns
+
+        # Add block information of the filesystem
+        st_info.st_blksize = entry.btrfs.sector_size
+
+        st_info.st_blocks = 0
+        if not self.is_dir():
+            st_info.st_blocks = (st_info.st_blksize // 512) * math.ceil(st_info.st_size / st_info.st_blksize)
 
         return st_info

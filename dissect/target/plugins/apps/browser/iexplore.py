@@ -36,14 +36,18 @@ class WebCache:
             All ``ContainerId`` values for the requested container name.
         """
         try:
-            for container_record in self.db.table("Containers").records():
+            table = self.db.table("Containers")
+
+            for container_record in table.records():
                 if record_name := container_record.get("Name"):
                     record_name = record_name.rstrip("\00").lower()
                     if record_name == name.lower():
                         container_id = container_record.get("ContainerId")
                         yield self.db.table(f"Container_{container_id}")
-        except KeyError:
-            pass
+
+        except KeyError as e:
+            self.target.log.warning("Exception while parsing EseDB Containers table")
+            self.target.log.debug("", exc_info=e)
 
     def _iter_records(self, name: str) -> Iterator[record.Record]:
         """Yield records from a Webcache container.
@@ -131,6 +135,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser history records from Internet Explorer.
 
         Yields BrowserHistoryRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Visit timestamp.
             browser (string): The browser from which the records are generated from.
             id (string): Record ID.
@@ -183,6 +190,9 @@ class InternetExplorerPlugin(BrowserPlugin):
         """Return browser downloads records from Internet Explorer.
 
         Yields BrowserDownloadRecord with the following fields:
+
+        .. code-block:: text
+
             ts_start (datetime): Download start timestamp.
             ts_end (datetime): Download end timestamp.
             browser (string): The browser from which the records are generated from.

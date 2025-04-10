@@ -93,6 +93,8 @@ def format_info(
 
 
 class MftTimelinePlugin(Plugin):
+    """NTFS MFT timeline plugin."""
+
     def check_compatible(self) -> None:
         ntfs_filesystems = [fs for fs in self.target.filesystems if fs.__type__ == "ntfs"]
         if not len(ntfs_filesystems):
@@ -100,7 +102,7 @@ class MftTimelinePlugin(Plugin):
 
     @export(output="yield")
     @arg("--ignore-dos", action="store_true", help="ignore DOS file names")
-    def mft_timeline(self, ignore_dos: bool = False):
+    def mft_timeline(self, ignore_dos: bool = False) -> Iterator[str]:
         """Return the MFT records of all NTFS filesystems in a human readable format (unsorted).
 
         The Master File Table (MFT) contains metadata about every file and folder on a NFTS filesystem.

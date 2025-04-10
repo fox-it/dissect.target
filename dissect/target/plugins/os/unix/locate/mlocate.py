@@ -20,10 +20,10 @@ struct header_config {
     int32 conf_size;
     int8 version;                            /* file format version */
     int8 require_visibility;
-    int8 pad[2];                             /* 32-bit total alignment */
+    int8 pad0[2];                             /* 32-bit total alignment */
     char root_database;
     char config_block[conf_size];
-    int8 pad;
+    int8 pad1;
 };
 
 enum DBE_TYPE: uint8 {                       /* database entry type */
@@ -68,8 +68,7 @@ MLocateRecord = TargetRecordDescriptor(
     ],
 )
 
-c_mlocate = cstruct(endian=">")
-c_mlocate.load(mlocate_def)
+c_mlocate = cstruct(endian=">").load(mlocate_def)
 
 
 class MLocateFile:
@@ -116,6 +115,8 @@ class MLocateFile:
 
 
 class MLocatePlugin(BaseLocatePlugin):
+    """Unix mlocate plugin."""
+
     __namespace__ = "mlocate"
 
     path = "/var/lib/mlocate/mlocate.db"

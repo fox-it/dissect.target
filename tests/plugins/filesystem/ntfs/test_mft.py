@@ -1,13 +1,20 @@
 import re
+from random import randrange
 from unittest.mock import Mock
 
 import pytest
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
 
+from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
-from dissect.target.plugins.filesystem.ntfs.mft import MftPlugin
+from dissect.target.plugins.filesystem.ntfs.mft import (
+    FilesystemFilenameRecord,
+    FilesystemStdRecord,
+    MftPlugin,
+    macb_aggr,
+)
 from dissect.target.plugins.filesystem.ntfs.mft_timeline import MftTimelinePlugin
 from dissect.target.plugins.filesystem.ntfs.utils import (
     get_drive_letter,
@@ -168,6 +175,52 @@ def test_mft_plugin_entries(target_win, compact):
     load_mft_plugin(target_win)
     mft_data = list(target_win.mft(compact))
     assert len(mft_data) == check_output_amount(76, compact)
+
+
+def test_mft_plugin_macb(target_win: Target) -> None:
+    load_mft_plugin(target_win)
+    mft_data = list(target_win.mft(macb=True))
+    path = None
+    ts = None
+    macb = None
+    field = "MACB/MACB"
+    for record in mft_data:
+        assert record.macb != macb or record.ts != ts or record.path != path
+        for bit in [0, 1, 2, 3, 5, 6, 7]:
+            assert record.macb[bit : bit + 1] in (field[bit : bit + 1], ".")
+        path = record.path
+        macb = record.macb
+        ts = record.ts
+
+
+def test_mft_plugin_macb_ads(target_win: Target) -> None:
+    load_mft_plugin(target_win)
+    mft_data = list(target_win.mft(macb=True))
+    ads_entries = 0
+    for record in mft_data:
+        if record.ads:
+            ads_entries += 1
+            assert record.macb.endswith("/....")
+            assert not record.macb.startswith("..../")
+    assert ads_entries == 6
+
+
+def test_mft_plugin_macb_nodup() -> None:
+    # test whether you can never have duplicates
+
+    def make_ts(tss: set) -> int:
+        ts = randrange(1, 10)
+        tss.add(ts)
+        return ts
+
+    for _ in range(0, 100):
+        tss = set()
+        records = []
+        for ts_type in ["M", "A", "C", "B"]:
+            records.append(FilesystemStdRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=False))
+            records.append(FilesystemFilenameRecord(path="a.txt", ts=make_ts(tss), ts_type=ts_type, ads=True))
+        assert len(list(macb_aggr(records))) == len(tss)
 
 
 def test_mft_plugin_disk_label(target_win):

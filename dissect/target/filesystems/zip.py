@@ -4,16 +4,21 @@ import logging
 import stat
 import zipfile
 from datetime import datetime, timezone
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Iterator
 
 from dissect.util.stream import BufferedStream
 
-from dissect.target.exceptions import FileNotFoundError
+from dissect.target.exceptions import (
+    FileNotFoundError,
+    FilesystemError,
+    IsADirectoryError,
+    NotADirectoryError,
+    NotASymlinkError,
+)
 from dissect.target.filesystem import (
     Filesystem,
     FilesystemEntry,
     VirtualDirectory,
-    VirtualFile,
     VirtualFilesystem,
 )
 from dissect.target.helpers import fsutil
@@ -33,7 +38,7 @@ class ZipFilesystem(Filesystem):
     def __init__(
         self,
         fh: BinaryIO,
-        base: Optional[str] = None,
+        base: str | None = None,
         *args,
         **kwargs,
     ):
@@ -52,12 +57,7 @@ class ZipFilesystem(Filesystem):
                 continue
 
             rel_name = fsutil.normpath(mname[len(self.base) :], alt_separator=self.alt_separator)
-
-            # NOTE: Normally we would check here if the member is a symlink or not
-
-            entry_cls = ZipFilesystemDirectoryEntry if member.is_dir() else ZipFilesystemEntry
-            file_entry = entry_cls(self, rel_name, member)
-            self._fs.map_file_entry(rel_name, file_entry)
+            self._fs.map_file_entry(rel_name, ZipFilesystemEntry(self, rel_name, member))
 
     @staticmethod
     def _detect(fh: BinaryIO) -> bool:
@@ -69,60 +69,95 @@ class ZipFilesystem(Filesystem):
         return self._fs.get(path, relentry=relentry)
 
 
-class ZipFilesystemEntry(VirtualFile):
-    def open(self) -> BinaryIO:
-        """Returns file handle (file-like object)."""
-        try:
-            return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
-        except Exception:
-            raise FileNotFoundError()
+# Note: We subclass from VirtualDirectory because VirtualFilesystem is currently only compatible with VirtualDirectory
+# Subclass from VirtualDirectory so we get that compatibility for free, and override the rest to do our own thing
+class ZipFilesystemEntry(VirtualDirectory):
+    fs: ZipFilesystem
+    entry: zipfile.ZipInfo
 
-    def readlink(self) -> str:
-        """Read the link if this entry is a symlink. Returns a string."""
-        raise NotImplementedError()
-
-    def readlink_ext(self) -> FilesystemEntry:
-        """Read the link if this entry is a symlink. Returns a filesystem entry."""
-        raise NotImplementedError()
-
-    def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        """Return the stat information of this entry."""
-        return self.lstat()
-
-    def lstat(self) -> fsutil.stat_result:
-        """Return the stat information of the given path, without resolving links."""
-        # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
-        return fsutil.stat_result(
-            [
-                stat.S_IFREG | 0o777,
-                self.entry.header_offset,
-                id(self.fs),
-                1,
-                0,
-                0,
-                self.entry.file_size,
-                0,
-                datetime(*self.entry.date_time, tzinfo=timezone.utc).timestamp(),
-                0,
-            ]
-        )
-
-
-class ZipFilesystemDirectoryEntry(VirtualDirectory):
     def __init__(self, fs: ZipFilesystem, path: str, entry: zipfile.ZipInfo):
         super().__init__(fs, path)
         self.entry = entry
 
+    def open(self) -> BinaryIO:
+        if self.is_dir():
+            raise IsADirectoryError(self.path)
+
+        if self.is_symlink():
+            return self._resolve().open()
+
+        try:
+            return BufferedStream(self.fs.zip.open(self.entry), size=self.entry.file_size)
+        except Exception:
+            raise FileNotFoundError(self.path)
+
+    def iterdir(self) -> Iterator[str]:
+        if not self.is_dir():
+            raise NotADirectoryError(self.path)
+
+        entry = self._resolve()
+        if isinstance(entry, ZipFilesystemEntry):
+            yield from super(ZipFilesystemEntry, entry).iterdir()
+        else:
+            yield from entry.iterdir()
+
+    def scandir(self) -> Iterator[FilesystemEntry]:
+        if not self.is_dir():
+            raise NotADirectoryError(self.path)
+
+        entry = self._resolve()
+        if isinstance(entry, ZipFilesystemEntry):
+            yield from super(ZipFilesystemEntry, entry).scandir()
+        else:
+            yield from entry.scandir()
+
+    def is_dir(self, follow_symlinks: bool = True) -> bool:
+        try:
+            entry = self._resolve(follow_symlinks=follow_symlinks)
+        except FilesystemError:
+            return False
+
+        if isinstance(entry, ZipFilesystemEntry):
+            return entry.entry.is_dir()
+        return isinstance(entry, VirtualDirectory)
+
+    def is_file(self, follow_symlinks: bool = True) -> bool:
+        try:
+            entry = self._resolve(follow_symlinks=follow_symlinks)
+        except FilesystemError:
+            return False
+
+        if isinstance(entry, ZipFilesystemEntry):
+            return not entry.entry.is_dir()
+        return False
+
+    def is_symlink(self) -> bool:
+        return stat.S_ISLNK(self.entry.external_attr >> 16)
+
+    def readlink(self) -> str:
+        if not self.is_symlink():
+            raise NotASymlinkError()
+        return self.fs.zip.open(self.entry).read().decode()
+
+    def readlink_ext(self) -> FilesystemEntry:
+        return FilesystemEntry.readlink_ext(self)
+
     def stat(self, follow_symlinks: bool = True) -> fsutil.stat_result:
-        """Return the stat information of this entry."""
-        return self.lstat()
+        return self._resolve(follow_symlinks=follow_symlinks).lstat()
 
     def lstat(self) -> fsutil.stat_result:
         """Return the stat information of the given path, without resolving links."""
         # ['mode', 'addr', 'dev', 'nlink', 'uid', 'gid', 'size', 'atime', 'mtime', 'ctime']
+        mode = self.entry.external_attr >> 16
+
+        if self.entry.is_dir() and not stat.S_ISDIR(mode):
+            mode = stat.S_IFDIR | mode
+        elif not self.entry.is_dir() and not stat.S_ISREG(mode):
+            mode = stat.S_IFREG | mode
+
         return fsutil.stat_result(
             [
-                stat.S_IFDIR | 0o777,
+                mode,
                 self.entry.header_offset,
                 id(self.fs),
                 1,

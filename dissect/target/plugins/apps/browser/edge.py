@@ -28,6 +28,7 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
         ".var/app/com.microsoft.Edge/config/microsoft-edge/Default",
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",
+        "AppData/Local/Microsoft/Edge/User Data/Snapshots/*/Default",
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
     ]

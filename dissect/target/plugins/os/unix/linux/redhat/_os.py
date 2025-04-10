@@ -5,7 +5,7 @@ from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.target import Target
 
 
-class RedHat(LinuxPlugin):
+class RedHatPlugin(LinuxPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
 

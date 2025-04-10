@@ -8,6 +8,7 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import arg, find_plugin_functions
 from dissect.target.tools.utils import (
     args_to_uri,
+    generate_argparse_for_unbound_method,
     get_target_attribute,
     persist_execution_report,
 )
@@ -77,3 +78,17 @@ def test_plugin_name_confusion_regression(target_unix_users, pattern, expected_f
         get_target_attribute(target_unix_users, plugins[0])
 
     assert expected_function in str(exc_info.value)
+
+
+def test_plugin_mutual_exclusive_arguments():
+    fargs = [
+        (("--aa",), {"group": "aa"}),
+        (("--bb",), {"group": "aa"}),
+        (("--cc",), {"group": "bb"}),
+        (("--dd",), {"group": "bb"}),
+    ]
+    method = test_plugin_mutual_exclusive_arguments
+    setattr(method, "__args__", fargs)
+    with patch("inspect.isfunction", return_value=True):
+        parser = generate_argparse_for_unbound_method(method)
+    assert len(parser._mutually_exclusive_groups) == 2

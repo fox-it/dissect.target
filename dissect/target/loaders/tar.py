@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import logging
 import re
 import tarfile
 from pathlib import Path
-from typing import Union
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import (
@@ -21,8 +22,11 @@ ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 class TarLoader(Loader):
     """Load tar files."""
 
-    def __init__(self, path: Union[Path, str], **kwargs):
+    def __init__(self, path: Path | str, **kwargs):
         super().__init__(path)
+
+        if isinstance(path, str):
+            path = Path(path)
 
         if self.is_compressed(path):
             log.warning(
@@ -30,13 +34,13 @@ class TarLoader(Loader):
                 "Consider uncompressing the archive before passing the tar file to Dissect."
             )
 
-        self.tar = tarfile.open(path)
+        self.tar = tarfile.open(fileobj=path.open("rb"))
 
     @staticmethod
     def detect(path: Path) -> bool:
         return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
 
-    def is_compressed(self, path: Union[Path, str]) -> bool:
+    def is_compressed(self, path: Path | str) -> bool:
         return str(path).lower().endswith((".tar.gz", ".tgz"))
 
     def map(self, target: target.Target) -> None:

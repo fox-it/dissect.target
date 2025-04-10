@@ -39,13 +39,13 @@ class FfsFilesystem(Filesystem):
         try:
             return self.ffs.get(path, node)
         except ffs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except ffs.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except ffs.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except ffs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class FfsFilesystemEntry(FilesystemEntry):
@@ -126,6 +126,12 @@ class FfsFilesystemEntry(FilesystemEntry):
             ]
         )
 
+        # Note: stat on linux always returns the default block size of 4096
+        # We are returning the actual block size of the filesystem, as on BSD
+        st_info.st_blksize = self.fs.ffs.block_size
+        # Note: st_blocks * 512 can be lower than st_blksize because FFS employs fragments
+        st_info.st_blocks = self.entry.nblocks
+
         # Set the nanosecond resolution separately
         st_info.st_atime_ns = self.entry.atime_ns
         st_info.st_mtime_ns = self.entry.mtime_ns
@@ -134,5 +140,6 @@ class FfsFilesystemEntry(FilesystemEntry):
         # FFS2 has a birth time, FFS1 does not
         if btime := self.entry.btime:
             st_info.st_birthtime = btime.timestamp()
+            st_info.st_birthtime_ns = self.entry.btime_ns
 
         return st_info

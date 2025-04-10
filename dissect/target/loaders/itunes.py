@@ -163,8 +163,10 @@ class ITunesBackup:
 
     def files(self) -> Iterator[FileInfo]:
         """Iterate all the files in this backup."""
-        for row in self.manifest_db.table("Files").rows():
-            yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
+
+        if table := self.manifest_db.table("Files"):
+            for row in table.rows():
+                yield FileInfo(self, row.fileID, row.domain, row.relativePath, row.flags, row.file)
 
 
 class FileInfo:

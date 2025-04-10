@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from struct import unpack
-from typing import Iterator, Optional, Union
+from pathlib import Path
+from typing import Iterator
+
+from flow.record.fieldtypes import posix_path
 
 from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.fsutil import TargetPath
@@ -16,16 +18,36 @@ from dissect.target.target import Target
 log = logging.getLogger(__name__)
 
 
+# https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+ARCH_MAP = {
+    0x00: "unknown",
+    0x02: "sparc",
+    0x03: "x86",
+    0x08: "mips",
+    0x14: "powerpc32",
+    0x15: "powerpc64",
+    0x16: "s390",  # and s390x
+    0x28: "aarch32",  # armv7
+    0x2A: "superh",
+    0x32: "ia-64",
+    0x3E: "x86_64",
+    0xB7: "aarch64",  # armv8
+    0xF3: "riscv64",
+    0xF7: "bpf",
+}
+
+
 class UnixPlugin(OSPlugin):
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
+        self._add_devices()
         self._hostname_dict = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
 
     @classmethod
-    def detect(cls, target: Target) -> Optional[Filesystem]:
+    def detect(cls, target: Target) -> Filesystem | None:
         for fs in target.filesystems:
             if fs.exists("/var") and fs.exists("/etc"):
                 return fs
@@ -40,12 +62,18 @@ class UnixPlugin(OSPlugin):
     @export(record=UnixUserRecord)
     @arg("--sessions", action="store_true", help="Parse syslog for recent user sessions")
     def users(self, sessions: bool = False) -> Iterator[UnixUserRecord]:
-        """Recover users from /etc/passwd, /etc/master.passwd or /var/log/syslog session logins."""
+        """Yield unix user records from passwd files or syslog session logins.
+
+        Resources:
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
+        """
+
+        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
 
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in ["/etc/passwd", "/etc/master.passwd"]:
+        for passwd_file in PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt"):
                     line = line.strip()
@@ -53,14 +81,19 @@ class UnixPlugin(OSPlugin):
                         continue
 
                     pwent = dict(enumerate(line.split(":")))
-                    seen_users.add((pwent.get(0), pwent.get(5), pwent.get(6)))
+
+                    current_user = (pwent.get(0), pwent.get(5), pwent.get(6))
+                    if current_user in seen_users:
+                        continue
+
+                    seen_users.add(current_user)
                     yield UnixUserRecord(
                         name=pwent.get(0),
                         passwd=pwent.get(1),
                         uid=pwent.get(2),
                         gid=pwent.get(3),
                         gecos=pwent.get(4),
-                        home=self.target.fs.path(pwent.get(5)),
+                        home=posix_path(pwent.get(5)),
                         shell=pwent.get(6),
                         source=passwd_file,
                         _target=self.target,
@@ -104,23 +137,23 @@ class UnixPlugin(OSPlugin):
 
                 yield UnixUserRecord(
                     name=user["name"],
-                    home=user["home"],
+                    home=posix_path(user["home"]),
                     shell=user["shell"],
                     source="/var/log/syslog",
                     _target=self.target,
                 )
 
     @export(property=True)
-    def architecture(self) -> Optional[str]:
+    def architecture(self) -> str | None:
         return self._get_architecture(self.os)
 
     @export(property=True)
-    def hostname(self) -> Optional[str]:
+    def hostname(self) -> str | None:
         hosts_string = self._hosts_dict.get("hostname", "localhost")
         return self._hostname_dict.get("hostname", hosts_string)
 
     @export(property=True)
-    def domain(self) -> Optional[str]:
+    def domain(self) -> str | None:
         domain = self._hostname_dict.get("domain", "localhost")
         if domain == "localhost":
             domain = self._hosts_dict["hostname", "localhost"]
@@ -132,7 +165,7 @@ class UnixPlugin(OSPlugin):
     def os(self) -> str:
         return OperatingSystem.UNIX.value
 
-    def _parse_rh_legacy(self, path):
+    def _parse_rh_legacy(self, path: Path) -> str | None:
         hostname = None
         file_contents = path.open("rt").readlines()
         for line in file_contents:
@@ -141,7 +174,7 @@ class UnixPlugin(OSPlugin):
             _, _, hostname = line.rstrip().partition("=")
         return hostname
 
-    def _parse_hostname_string(self, paths: Optional[list[str]] = None) -> Optional[dict[str, str]]:
+    def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
         """
         Returns a dict containing the hostname and domain name portion of the path(s) specified
 
@@ -173,7 +206,7 @@ class UnixPlugin(OSPlugin):
             break  # break whenever a valid hostname is found
         return hostname_dict
 
-    def _parse_hosts_string(self, paths: Optional[list[str]] = None) -> dict[str, str]:
+    def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
         hosts_string = {"ip": None, "hostname": None}
 
@@ -202,11 +235,13 @@ class UnixPlugin(OSPlugin):
                 fs_id = None
                 fs_subvol = None
                 fs_subvolid = None
-                fs_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
                 fs_last_mount = None
+                fs_volume_name = None
+                vol_volume_name = fs.volume.name if fs.volume and not isinstance(fs.volume, list) else None
 
                 if fs.__type__ == "xfs":
                     fs_id = fs.xfs.uuid
+                    fs_volume_name = fs.xfs.name
                 elif fs.__type__ == "ext":
                     fs_id = fs.extfs.uuid
                     fs_last_mount = fs.extfs.last_mount
@@ -224,13 +259,25 @@ class UnixPlugin(OSPlugin):
 
                 if (
                     (fs_id and (fs_id == dev_id and (subvol == fs_subvol or subvolid == fs_subvolid)))
-                    or (fs_volume_name and (fs_volume_name == volume_name))
                     or (fs_last_mount and (fs_last_mount == mount_point))
+                    or (fs_volume_name and (fs_volume_name == volume_name))
+                    or (vol_volume_name and (vol_volume_name == volume_name))
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
-    def _parse_os_release(self, glob: Optional[str] = None) -> dict[str, str]:
+    def _add_devices(self) -> None:
+        """Add some virtual block devices to the target.
+
+        Currently only adds LVM devices.
+        """
+        vfs = self.target.fs.append_layer()
+
+        for volume in self.target.volumes:
+            if volume.vs and volume.vs.__type__ == "lvm":
+                vfs.map_file_fh(f"/dev/{volume.raw.vg.name}/{volume.raw.name}", volume)
+
+    def _parse_os_release(self, glob: str | None = None) -> dict[str, str]:
         """Parse files containing Unix version information.
 
         Not all these files are equal. Generally speaking these files are
@@ -272,43 +319,36 @@ class UnixPlugin(OSPlugin):
                                 continue
         return os_release
 
-    def _get_architecture(self, os: str = "unix", path: str = "/bin/ls") -> Optional[str]:
-        arch_strings = {
-            0x00: "Unknown",
-            0x02: "SPARC",
-            0x03: "x86",
-            0x08: "MIPS",
-            0x14: "PowerPC",
-            0x16: "S390",
-            0x28: "ARM",
-            0x2A: "SuperH",
-            0x32: "IA-64",
-            0x3E: "x86_64",
-            0xB7: "AArch64",
-            0xF3: "RISC-V",
-        }
+    def _get_architecture(self, os: str = "unix", path: Path | str = "/bin/ls") -> str | None:
+        """Determine architecture by reading an ELF header of a binary on the target.
 
-        for fs in self.target.filesystems:
-            if fs.exists(path):
-                fh = fs.open(path)
-                fh.seek(4)
-                # ELF - e_ident[EI_CLASS]
-                bits = unpack("B", fh.read(1))[0]
-                fh.seek(18)
-                # ELF - e_machine
-                arch = unpack("H", fh.read(2))[0]
-                arch = arch_strings.get(arch)
+        Resources:
+            - https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#ISA
+        """
 
-                if bits == 1:  # 32 bit system
-                    return f"{arch}_32-{os}"
-                else:
-                    return f"{arch}-{os}"
+        if not isinstance(path, TargetPath):
+            for fs in [self.target.fs, *self.target.filesystems]:
+                if (path := fs.path(path)).exists():
+                    break
+
+        if not path.exists():
+            return
+
+        fh = path.open("rb")
+        fh.seek(4)  # ELF - e_ident[EI_CLASS]
+        bits = fh.read(1)[0]
+
+        fh.seek(18)  # ELF - e_machine
+        e_machine = int.from_bytes(fh.read(2), "little")
+        arch = ARCH_MAP.get(e_machine, "unknown")
+
+        return f"{arch}_32-{os}" if bits == 1 and not arch[-2:] == "32" else f"{arch}-{os}"
 
 
 def parse_fstab(
     fstab: TargetPath,
     log: logging.Logger = log,
-) -> Iterator[tuple[Union[uuid.UUID, str], str, str, str, str]]:
+) -> Iterator[tuple[uuid.UUID | str, str, str, str, str]]:
     """Parse fstab file and return a generator that streams the details of entries,
     with unsupported FS types and block devices filtered away.
     """

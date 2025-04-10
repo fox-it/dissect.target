@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util import ts
@@ -88,7 +88,7 @@ struct entry {
 """
 
 c_local = cstruct(endian=">")
-c_local.addtype("varint", ProtobufVarint(c_local, "varint", size=None, signed=False, alignment=1))
+c_local.add_custom_type("varint", ProtobufVarint, size=None, alignment=1, signed=False)
 c_local.load(local_def, compiled=False)
 
 RE_DOCKER_NS = re.compile(r"\.(?P<nanoseconds>\d{7,})(?P<postfix>Z|\+\d{2}:\d{2})")
@@ -128,10 +128,15 @@ class DockerPlugin(Plugin):
         for data_root in self.installs:
             images_path = data_root.joinpath("image/overlay2/repositories.json")
 
-            if images_path.exists():
-                repositories = json.loads(images_path.read_text()).get("Repositories")
-            else:
+            if not images_path.exists():
                 self.target.log.debug("No docker images found, file %s does not exist.", images_path)
+                continue
+
+            try:
+                repositories = json.loads(images_path.read_text()).get("Repositories", {})
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.target.log.warning("Unable to parse JSON in: %s", images_path)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             for name, tags in repositories.items():
@@ -142,8 +147,12 @@ class DockerPlugin(Plugin):
                     created = None
 
                     if image_metadata_path.exists():
-                        image_metadata = json.loads(image_metadata_path.read_text())
-                        created = convert_timestamp(image_metadata.get("created"))
+                        try:
+                            image_metadata = json.loads(image_metadata_path.read_text())
+                            created = convert_timestamp(image_metadata.get("created"))
+                        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                            self.target.log.warning("Unable to parse JSON in: %s", image_metadata_path)
+                            self.target.log.debug("", exc_info=e)
 
                     yield DockerImageRecord(
                         name=name,
@@ -160,47 +169,51 @@ class DockerPlugin(Plugin):
 
         for data_root in self.installs:
             for config_path in data_root.joinpath("containers").glob("**/config.v2.json"):
-                config = json.loads(config_path.read_text())
+                try:
+                    config = json.loads(config_path.read_text())
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    self.target.log.warning("Unable to parse JSON in file: %s", config_path)
+                    self.target.log.debug("", exc_info=e)
+                    continue
+
                 container_id = config.get("ID")
 
                 # determine state
-                running = config.get("State").get("Running")
+                running = config.get("State", {}).get("Running")
                 if running:
-                    ports = config.get("NetworkSettings").get("Ports", {})
-                    pid = config.get("Pid")
-                else:
-                    ports = config.get("Config").get("ExposedPorts", {})
-                    pid = None
+                    ports = config.get("NetworkSettings", {}).get("Ports", {})
+
+                if not running or not ports:
+                    ports = config.get("Config", {}).get("ExposedPorts", {})
 
                 # parse volumes
                 volumes = []
-                if mount_points := config.get("MountPoints"):
-                    for mp in mount_points:
-                        mount_point = mount_points[mp]
+                if mount_points := config.get("MountPoints", {}):
+                    for mount_point in mount_points.values():
                         volumes.append(f"{mount_point.get('Source')}:{mount_point.get('Destination')}")
 
                 # determine mount point
                 mount_path = None
-                if config.get("Driver") == "overlay2":
+                if container_id and config.get("Driver") == "overlay2":
                     mount_path = data_root.joinpath("image/overlay2/layerdb/mounts", container_id)
                     if not mount_path.exists():
-                        self.target.log.warning("Overlay2 mount path for container %s does not exist!", container_id)
+                        self.target.log.warning("Overlay2 mount path does not exist for container: %s", container_id)
 
                 else:
-                    self.target.log.warning("Encountered unsupported container filesystem %s", config.get("Driver"))
+                    self.target.log.warning("Encountered unsupported container filesystem: %s", config.get("Driver"))
 
                 yield DockerContainerRecord(
                     container_id=container_id,
-                    image=config.get("Config").get("Image"),
-                    image_id=config.get("Image").split(":")[-1],
-                    command=config.get("Config").get("Cmd"),
+                    image=config.get("Config", {}).get("Image"),
+                    image_id=config.get("Image", "").split(":")[-1],
+                    command=f"{config.get('Path', '')} {' '.join(config.get('Args', []))}".strip(),
                     created=convert_timestamp(config.get("Created")),
                     running=running,
-                    pid=pid,
-                    started=convert_timestamp(config.get("State").get("StartedAt")),
-                    finished=convert_timestamp(config.get("State").get("FinishedAt")),
+                    pid=config.get("State", {}).get("Pid"),
+                    started=convert_timestamp(config.get("State", {}).get("StartedAt")),
+                    finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
                     ports=convert_ports(ports),
-                    names=config.get("Name").replace("/", "", 1),
+                    names=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     mount_path=mount_path,
                     config_path=config_path,
@@ -288,19 +301,19 @@ class DockerPlugin(Plugin):
         for line in open_decompress(path, "rt"):
             try:
                 entry = json.loads(line)
-            except json.JSONDecodeError as e:
-                self.target.log.warning("Could not decode JSON line in file %s", path)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                self.target.log.warning("Could not decode JSON line in file: %s", path)
                 self.target.log.debug("", exc_info=e)
                 continue
             yield entry
 
 
-def get_data_path(path: Path) -> Optional[str]:
+def get_data_path(path: Path) -> str | None:
     """Returns the configured Docker daemon data-root path."""
     try:
         config = json.loads(path.open("rt").read())
-    except json.JSONDecodeError as e:
-        log.warning("Could not read JSON file '%s'", path)
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        log.warning("Could not read JSON file: %s", path)
         log.debug(exc_info=e)
 
     return config.get("data-root")
@@ -341,7 +354,7 @@ def find_installs(target: Target) -> Iterator[Path]:
                     yield data_root_path
 
 
-def convert_timestamp(timestamp: str) -> str:
+def convert_timestamp(timestamp: str | None) -> str:
     """Docker sometimes uses (unpadded) 9 digit nanosecond precision
     in their timestamp logs, eg. "2022-12-19T13:37:00.123456789Z".
 
@@ -349,6 +362,9 @@ def convert_timestamp(timestamp: str) -> str:
     strip the last three digits from the timestamp to force
     compatbility with the 6 digit %f microsecond directive.
     """
+
+    if not timestamp:
+        return
 
     timestamp_nanoseconds_plus_postfix = timestamp[19:]
     match = RE_DOCKER_NS.match(timestamp_nanoseconds_plus_postfix)

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import fnmatch
 import re
 from pathlib import Path
-from typing import Any, BinaryIO, Generator, List, Optional
+from typing import Any, BinaryIO, Iterator
 
 from dissect.eventlog import evt
 from flow.record import Record
@@ -48,7 +50,7 @@ class WindowsEventlogsMixin:
     LOGS_DIR_PATH = None
 
     @plugin.internal
-    def get_logs(self, filename_glob="*") -> List[Path]:
+    def get_logs(self, filename_glob="*") -> list[Path]:
         file_paths = []
         file_paths.extend(self.get_logs_from_dir(self.LOGS_DIR_PATH, filename_glob=filename_glob))
 
@@ -66,7 +68,7 @@ class WindowsEventlogsMixin:
         return file_paths
 
     @plugin.internal
-    def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> List[Path]:
+    def get_logs_from_dir(self, logs_dir: str, filename_glob: str = "*") -> list[Path]:
         file_paths = []
         logs_dir = self.target.fs.path(logs_dir)
         if logs_dir.exists():
@@ -76,7 +78,7 @@ class WindowsEventlogsMixin:
         return file_paths
 
     @plugin.internal
-    def get_logs_from_registry(self, filename_glob: str = "*") -> List[Path]:
+    def get_logs_from_registry(self, filename_glob: str = "*") -> list[Path]:
         # compile glob into case-insensitive regex
         filename_regex = re.compile(fnmatch.translate(filename_glob), re.IGNORECASE)
 
@@ -112,6 +114,8 @@ class WindowsEventlogsMixin:
 
 
 class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
+    """Windows ``.evt`` event log plugin."""
+
     LOGS_DIR_PATH = "sysvol/windows/system32/config"
 
     NEEDLE = b"LfLe"
@@ -120,11 +124,14 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
     @plugin.arg("--logs-dir", help="logs directory to scan")
     @plugin.arg("--log-file-glob", default=EVT_GLOB, help="glob pattern to match a log file name")
     @plugin.export(record=EvtRecordDescriptor)
-    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: Optional[str] = None) -> Generator[Record, None, None]:
-        """Parse Windows Eventlog files (*.evt).
+    def evt(self, log_file_glob: str = EVT_GLOB, logs_dir: str | None = None) -> Iterator[EvtRecordDescriptor]:
+        """Parse Windows Eventlog files (``*.evt``).
 
         Yields dynamically created records based on the fields in the event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
@@ -171,7 +178,7 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         )
 
     @plugin.export(record=EvtRecordDescriptor)
-    def scraped_evt(self) -> Generator[Record, None, None]:
+    def scraped_evt(self) -> Iterator[EvtRecordDescriptor]:
         """Yields EVT log file records scraped from target disks"""
         yield from self.target.scrape.scrape_chunks_from_disks(
             needle=self.NEEDLE,
@@ -186,6 +193,6 @@ class EvtPlugin(WindowsEventlogsMixin, plugin.Plugin):
         fh.seek(offset - 4)
         return fh.read(chunk_size)
 
-    def _parse_chunk(self, _, chunk: bytes) -> Generator[Record, None, None]:
+    def _parse_chunk(self, _, chunk: bytes) -> Iterator[Record]:
         for record in evt.parse_chunk(chunk):
             yield self._build_record(record)

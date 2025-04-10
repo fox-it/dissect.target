@@ -1,4 +1,5 @@
 import struct
+from typing import Iterator
 
 from dissect.util.ts import wintimestamp
 
@@ -121,7 +122,7 @@ class MRUPlugin(Plugin):
             return UnsupportedPluginError("Target has no registry")
 
     @export(record=RunMRURecord)
-    def run(self):
+    def run(self) -> Iterator[RunMRURecord]:
         """Return the RunMRU data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU`` registry key contains information
@@ -136,7 +137,7 @@ class MRUPlugin(Plugin):
             yield from parse_mru_key(self.target, key, RunMRURecord)
 
     @export(record=RecentDocsRecord)
-    def recentdocs(self):
+    def recentdocs(self) -> Iterator[RecentDocsRecord]:
         """Return the RecentDocs data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs`` registry key contains
@@ -153,7 +154,7 @@ class MRUPlugin(Plugin):
             yield from parse_mru_ex_key(self.target, key, RecentDocsRecord)
 
     @export(record=OpenSaveMRURecord)
-    def opensave(self):
+    def opensave(self) -> Iterator[OpenSaveMRURecord]:
         """Return the OpenSaveMRU data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSaveMRU`` registry key
@@ -169,7 +170,7 @@ class MRUPlugin(Plugin):
             yield from parse_mru_key(self.target, key, OpenSaveMRURecord)
 
     @export(record=LastVisitedMRURecord)
-    def lastvisited(self):
+    def lastvisited(self) -> Iterator[LastVisitedMRURecord]:
         """Return the LastVisitedMRU data.
 
         The ``HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedMRU`` registry key
@@ -210,7 +211,7 @@ class MRUPlugin(Plugin):
                 )
 
     @export(record=ACMruRecord)
-    def acmru(self):
+    def acmru(self) -> Iterator[ACMruRecord]:
         """Return the ACMru (Windows Search) data.
 
         The following keys are being searched:
@@ -252,7 +253,7 @@ class MRUPlugin(Plugin):
             yield from parse_mru_ex_key(self.target, key, ACMruRecord)
 
     @export(record=MapNetworkDriveMRURecord)
-    def networkdrive(self):
+    def networkdrive(self) -> Iterator[MapNetworkDriveMRURecord]:
         """Return MRU of mapped network drives.
 
         The HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Map Network Drive MRU registry key contains
@@ -268,7 +269,7 @@ class MRUPlugin(Plugin):
             yield from parse_mru_key(self.target, key, MapNetworkDriveMRURecord)
 
     @export(record=TerminalServerMRURecord)
-    def mstsc(self):
+    def mstsc(self) -> Iterator[TerminalServerMRURecord]:
         """Return Terminal Server Client MRU data."""
 
         KEY = "HKCU\\Software\\Microsoft\\Terminal Server Client\\Default"
@@ -290,7 +291,7 @@ class MRUPlugin(Plugin):
                 )
 
     @export(record=MSOfficeMRURecord)
-    def msoffice(self):
+    def msoffice(self) -> Iterator[MSOfficeMRURecord]:
         """Return MS Office MRU keys."""
 
         KEY = "HKCU\\Software\\Microsoft\\Office"

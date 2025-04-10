@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterator
 
-from dissect.target import Target
-from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, export
+from dissect.target.plugin import NamespacePlugin
 
 PackageManagerLogRecord = TargetRecordDescriptor(
-    "unix/log/packagemanager",
+    "unix/packagemanager/log",
     [
         ("datetime", "ts"),
         ("string", "package_manager"),
@@ -22,6 +19,8 @@ PackageManagerLogRecord = TargetRecordDescriptor(
 
 
 class OperationTypes(Enum):
+    """Valid operation types."""
+
     Install = "install"
     Update = "update"
     Downgrade = "downgrade"
@@ -45,37 +44,5 @@ class OperationTypes(Enum):
         return OperationTypes.Other
 
 
-class PackageManagerPlugin(Plugin):
+class PackageManagerPlugin(NamespacePlugin):
     __namespace__ = "packagemanager"
-    __findable__ = False
-
-    TOOLS = [
-        "apt",
-        "yum",
-        "zypper",
-    ]
-
-    def __init__(self, target: Target):
-        super().__init__(target)
-        self._plugins = []
-        for entry in self.TOOLS:
-            try:
-                self._plugins.append(getattr(self.target, entry))
-            except Exception:
-                target.log.exception(f"Failed to load tool plugin: {entry}")
-
-    def check_compatible(self) -> None:
-        if not len(self._plugins):
-            raise UnsupportedPluginError("No compatible plugins found")
-
-    def _func(self, f: str) -> Iterator[PackageManagerLogRecord]:
-        for p in self._plugins:
-            try:
-                yield from getattr(p, f)()
-            except Exception:
-                self.target.log.exception("Failed to execute package manager plugin: %s.%s", p._name, f)
-
-    @export(record=PackageManagerLogRecord)
-    def logs(self) -> Iterator[PackageManagerLogRecord]:
-        """Returns logs from all available Unix package managers."""
-        yield from self._func("logs")

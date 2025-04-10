@@ -29,7 +29,7 @@ struct DomainKey {
     DWORD   accessCheckLen;
     char    guid[16];
     char    encryptedSecret[secretLen];
-    char    accessCheckLen[accessCheckLen];
+    char    accessCheck[accessCheckLen];
 };
 
 struct CredHist {
@@ -66,8 +66,7 @@ struct MasterKeyFileHeader {
     QWORD   qwDomainKeySize;
 };
 """
-c_master_key = cstruct()
-c_master_key.load(master_key_def)
+c_master_key = cstruct().load(master_key_def)
 
 
 class MasterKey:
@@ -96,6 +95,9 @@ class MasterKey:
 
     def decrypt_with_password(self, user_sid: str, pwd: str) -> bool:
         """Decrypts the master key with the given user's password and SID."""
+        if self.decrypted:
+            return True
+
         pwd = pwd.encode("utf-16-le")
 
         for algo in ["sha1", "md4"]:

@@ -25,43 +25,61 @@ UnixShadowRecord = TargetRecordDescriptor(
 
 
 class ShadowPlugin(Plugin):
+    """Unix shadow passwords plugin."""
+
     def check_compatible(self) -> None:
         if not self.target.fs.path("/etc/shadow").exists():
             raise UnsupportedPluginError("No shadow file found")
 
+    SHADOW_FILES = ["/etc/shadow", "/etc/shadow-"]
+
     @export(record=UnixShadowRecord)
     def passwords(self) -> Iterator[UnixShadowRecord]:
-        """Recover shadow records from /etc/shadow files."""
+        """Yield shadow records from /etc/shadow files.
 
-        if (path := self.target.fs.path("/etc/shadow")).exists():
-            for line in path.open("rt"):
-                line = line.strip()
-                if line == "" or line.startswith("#"):
-                    continue
+        Resources:
+            - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
+        """
 
-                shent = dict(enumerate(line.split(":")))
-                crypt = extract_crypt_details(shent)
+        seen_hashes = set()
 
-                # do not return a shadow record if we have no hash
-                if crypt.get("hash") is None or crypt.get("hash") == "":
-                    continue
+        for shadow_file in self.SHADOW_FILES:
+            if (path := self.target.fs.path(shadow_file)).exists():
+                for line in path.open("rt"):
+                    line = line.strip()
+                    if line == "" or line.startswith("#"):
+                        continue
 
-                yield UnixShadowRecord(
-                    name=shent.get(0),
-                    crypt=shent.get(1),
-                    algorithm=crypt.get("algo"),
-                    crypt_param=crypt.get("param"),
-                    salt=crypt.get("salt"),
-                    hash=crypt.get("hash"),
-                    last_change=shent.get(2),
-                    min_age=shent.get(3),
-                    max_age=shent.get(4),
-                    warning_period=shent.get(5),
-                    inactivity_period=shent.get(6),
-                    expiration_date=shent.get(7),
-                    unused_field=shent.get(8),
-                    _target=self.target,
-                )
+                    shent = dict(enumerate(line.split(":")))
+                    crypt = extract_crypt_details(shent)
+
+                    # do not return a shadow record if we have no hash
+                    if crypt.get("hash") is None or crypt.get("hash") == "":
+                        continue
+
+                    # prevent duplicate user hashes
+                    current_hash = (shent.get(0), crypt.get("hash"))
+                    if current_hash in seen_hashes:
+                        continue
+
+                    seen_hashes.add(current_hash)
+
+                    yield UnixShadowRecord(
+                        name=shent.get(0),
+                        crypt=shent.get(1),
+                        algorithm=crypt.get("algo"),
+                        crypt_param=crypt.get("param"),
+                        salt=crypt.get("salt"),
+                        hash=crypt.get("hash"),
+                        last_change=shent.get(2),
+                        min_age=shent.get(3),
+                        max_age=shent.get(4),
+                        warning_period=shent.get(5),
+                        inactivity_period=shent.get(6),
+                        expiration_date=shent.get(7),
+                        unused_field=shent.get(8),
+                        _target=self.target,
+                    )
 
 
 def extract_crypt_details(shent: dict) -> dict:

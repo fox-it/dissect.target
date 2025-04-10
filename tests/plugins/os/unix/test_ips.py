@@ -1,26 +1,46 @@
 import textwrap
 from io import BytesIO
+from unittest.mock import patch
 
 import pytest
 
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.helpers.network_managers import NetworkManager
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
+from dissect.target.plugins.os.unix.linux.network_managers import NetworkManager
+from dissect.target.tools.query import main as target_query
 from tests._utils import absolute_path
 
 
-def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
+@pytest.mark.parametrize(
+    "expected_ips, messages",
+    [
+        (
+            ["10.13.37.1"],
+            "Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'",  # noqa: E501
+        ),
+        (["10.13.37.2"], "Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0"),
+        (
+            ["10.13.37.3"],
+            "Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3",
+        ),
+        (
+            ["10.13.37.4"],
+            "Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.",
+        ),
+        (
+            ["2001:db8::"],
+            (
+                "Jun  6 13:37:06 test systemd-networkd[5]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff\n"  # noqa: E501
+                "May  5 13:37:05 test systemd-networkd[5]: eth0: DHCPv6 lease lost\n"
+            ),
+        ),
+    ],
+)
+def test_ips_dhcp(
+    target_unix_users: Target, fs_unix: VirtualFilesystem, expected_ips: list[str], messages: str
+) -> None:
     """Test DHCP lease messages from /var/log/syslog."""
-
-    messages = """
-    Jan  1 13:37:01 hostname NetworkManager[1]: <info>  [1600000000.0000] dhcp4 (eth0): option ip_address           => '10.13.37.1'
-    Feb  2 13:37:02 test systemd-networkd[2]: eth0: DHCPv4 address 10.13.37.2/24 via 10.13.37.0
-    Mar  3 13:37:03 localhost NetworkManager[3]: <info>  [1600000000.0003] dhcp4 (eth0):   address 10.13.37.3
-    Apr  4 13:37:04 localhost dhclient[4]: bound to 10.13.37.4 -- renewal in 1337 seconds.
-    May  5 13:37:05 test systemd-networkd[5]: eth0: DHCPv6 lease lost
-    Jun  6 13:37:06 test systemd-networkd[5]: eth0: DHCPv6 address 2001:db8::/64 via 2001:db8:ffff:ffff:ffff:ffff:ffff:ffff
-    """  # noqa E501
 
     fs_unix.map_file_fh(
         "/var/log/syslog",
@@ -30,8 +50,53 @@ def test_ips_dhcp(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None
     target_unix_users.add_plugin(LinuxPlugin)
     results = target_unix_users.ips
     results.reverse()
-    assert len(results) == 5
-    assert sorted(results) == ["10.13.37.1", "10.13.37.2", "10.13.37.3", "10.13.37.4", "2001:db8::"]
+    assert len(results) == len(expected_ips)
+    assert sorted(results) == expected_ips
+
+
+@pytest.mark.parametrize(
+    "flag, expected_out",
+    [
+        (None, "['10.13.37.2']"),
+        # ("--dhcp-all", "['10.13.37.2', '10.13.37.1']"),
+        # Temporarily disabled behaviour, for discussion see:
+        # https://github.com/fox-it/dissect.target/pull/687#discussion_r1698515269
+    ],
+)
+def test_ips_dhcp_arg(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    flag: str,
+    expected_out: str,
+    capsys: pytest.CaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test --dhcp-all flag behaviour"""
+
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
+
+    messages = """
+    Apr  1 13:37:01 localhost dhclient[4]: bound to 10.13.37.1 -- renewal in 1337 seconds.
+    Apr  2 13:37:02 localhost foo[1]: some other message.
+    Apr  3 13:37:03 localhost dhclient[4]: bound to 10.13.37.2 -- renewal in 1337 seconds.
+    """
+
+    fs_unix.map_file_fh(
+        "/var/log/syslog",
+        BytesIO(textwrap.dedent(messages).encode()),
+    )
+    target_unix.add_plugin(LinuxPlugin)
+
+    argv = ["target-query", "foo", "-f", "ips"]
+    if flag:
+        argv.append(flag)
+
+    with patch("dissect.target.Target.open_all", return_value=[target_unix]):
+        with monkeypatch.context() as m:
+            m.setattr("sys.argv", argv)
+            target_query()
+            out, _ = capsys.readouterr()
+            assert expected_out in out
 
 
 def test_ips_cloud_init(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -157,3 +222,27 @@ def test_clean_ips(input: str, expected_output: set) -> None:
     """Test the cleaning of dirty ip addresses."""
 
     assert NetworkManager.clean_ips({input}) == expected_output
+
+
+def test_regression_ips_unique_strings(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Regression test for https://github.com/fox-it/dissect.target/issues/877"""
+
+    config = """
+    network:
+        ethernets:
+            eth0:
+                addresses: ['1.2.3.4']
+    """
+    fs_unix.map_file_fh("/etc/netplan/01-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+    fs_unix.map_file_fh("/etc/netplan/02-netcfg.yaml", BytesIO(textwrap.dedent(config).encode()))
+
+    syslog = "Apr  4 13:37:04 localhost dhclient[4]: bound to 1.2.3.4 -- renewal in 1337 seconds."
+    fs_unix.map_file_fh("/var/log/syslog", BytesIO(textwrap.dedent(syslog).encode()))
+
+    target_unix.add_plugin(LinuxPlugin)
+
+    assert isinstance(target_unix.ips, list)
+    assert all([isinstance(ip, str) for ip in target_unix.ips])
+
+    assert len(target_unix.ips) == 1
+    assert target_unix.ips == ["1.2.3.4"]

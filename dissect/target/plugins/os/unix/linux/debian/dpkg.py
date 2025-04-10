@@ -1,6 +1,6 @@
 import gzip
 from datetime import datetime
-from typing import Dict, Generator, List, TextIO
+from typing import Dict, Generator, Iterator, List, TextIO
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -59,7 +59,7 @@ class DpkgPlugin(Plugin):
             raise UnsupportedPluginError("No DPKG files found")
 
     @export(record=DpkgPackageStatusRecord)
-    def status(self):
+    def status(self) -> Iterator[DpkgPackageStatusRecord]:
         """Yield records for packages in dpkg's status database"""
 
         status_file_path = self.target.fs.path(STATUS_FILE_NAME)
@@ -82,7 +82,7 @@ class DpkgPlugin(Plugin):
             yield DpkgPackageStatusRecord(_target=self.target, **record_fields)
 
     @export(record=DpkgPackageLogRecord)
-    def log(self):
+    def log(self) -> Iterator[DpkgPackageLogRecord]:
         """Yield records for actions logged in dpkg's logs"""
 
         for log_file in self.target.fs.glob(LOG_FILES_GLOB):

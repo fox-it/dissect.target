@@ -31,7 +31,7 @@ def mapped_file(test_file: str, fs_unix: VirtualFilesystem) -> VirtualFilesystem
     local_path = Path(absolute_path(test_file))
     file_name = f"/etc/{local_path.name}"
     fs_unix.map_file(file_name, local_path.absolute())
-    return local_path.name
+    return "/" + local_path.name
 
 
 @pytest.mark.parametrize(

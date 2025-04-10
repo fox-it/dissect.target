@@ -4,6 +4,7 @@ from typing import Iterator
 
 from defusedxml import ElementTree
 from dissect.util.ts import wintimestamp
+from flow.record.base import is_valid_field_name
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import Path
@@ -11,7 +12,9 @@ from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescrip
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
 
-camel_case_patterns = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"(\w)[.\s](\w)")]
+CAMEL_CASE_PATTERNS = [re.compile(r"(\S)([A-Z][a-z]+)"), re.compile(r"([a-z0-9])([A-Z])"), re.compile(r"(\w)[.\s](\w)")]
+RE_VALID_KEY_START_CHARS = re.compile(r"[a-zA-Z]")
+RE_VALID_KEY_CHARS = re.compile(r"[a-zA-Z0-9_]")
 
 
 def _create_record_descriptor(record_name: str, record_fields: list[tuple[str, str]]) -> TargetRecordDescriptor:
@@ -49,13 +52,25 @@ class WindowsErrorReportingPlugin(Plugin):
 
     def _sanitize_key(self, key: str) -> str:
         # Convert camel case to snake case
-        for pattern in camel_case_patterns:
+        for pattern in CAMEL_CASE_PATTERNS:
             key = pattern.sub(r"\1_\2", key)
 
-        # Keep only basic characters in key
-        key = re.sub(r"[^a-zA-Z0-9_]", "", key)
+        clean_key = ""
+        separator = "_"
+        prev_encoded = False
+        for idx, char in enumerate(key):
+            if prev_encoded:
+                clean_key += separator
+            clean_key += char
+            if not is_valid_field_name(clean_key):
+                clean_key = clean_key[:-1]
+                prefix = f"{separator}x" if (idx != 0 and not prev_encoded) else "x"
+                clean_key += prefix + char.encode("utf-8").hex()
+                prev_encoded = True
+            else:
+                prev_encoded = False
 
-        return key.lower()
+        return clean_key.lower()
 
     def _collect_wer_data(self, wer_file: Path) -> tuple[list[tuple[str, str]], dict[str, str]]:
         """Parse data from a .wer file."""
@@ -155,6 +170,9 @@ class WindowsErrorReportingPlugin(Plugin):
 
         Yields dynamically created records based on the fields in the files. A record at least contains the following
         fields:
+
+        .. code-block:: text
+
             ts (datetime): The moment in time when the error event took place.
             version (string): WER file version.
             event_type (string): WER file event type.

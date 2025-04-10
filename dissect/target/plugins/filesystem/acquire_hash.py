@@ -1,5 +1,6 @@
 import csv
 import gzip
+from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
@@ -27,7 +28,7 @@ class AcquireHashPlugin(Plugin):
             raise UnsupportedPluginError("No hash file found")
 
     @export(record=AcquireHashRecord)
-    def acquire_hashes(self):
+    def acquire_hashes(self) -> Iterator[AcquireHashRecord]:
         """Return file hashes collected by Acquire.
 
         An Acquire file container contains a file hashes csv when the hashes module was used. The content of this csv

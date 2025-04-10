@@ -1,6 +1,7 @@
-from typing import Union
+from __future__ import annotations
 
 import pytest
+from dissect.regf import c_regf
 
 from dissect.target.helpers.regutil import (
     HiveCollection,
@@ -8,6 +9,7 @@ from dissect.target.helpers.regutil import (
     RegFlex,
     RegistryHive,
     RegistryKeyNotFoundError,
+    RegistryValueType,
     VirtualHive,
     VirtualKey,
     glob_ext,
@@ -38,20 +40,49 @@ def test_regflex() -> None:
     key = hive.key("Test Values")
     assert len(key.values()) == 15
     assert key.value("String").value == "a"
+
+    assert key.value("String").type == RegistryValueType.SZ
     assert key.value("Long String").value == "a" * 1218
+    assert key.value("Long String").type == RegistryValueType.SZ
+
     assert key.value("Binary").value == b"\x00" * 8
+    assert key.value("Binary").type == RegistryValueType.BINARY
+
     assert key.value("Long Binary").value == b"\x00" * 240
+    assert key.value("Long Binary").type == RegistryValueType.BINARY
+
     assert key.value("Dword").value == 1
+    assert key.value("Dword").type == RegistryValueType.DWORD
+
     assert key.value("None").value == b"\x00\x01\x02\x04"
+    assert key.value("None").type == RegistryValueType.NONE
+
     assert key.value("Hex String").value == "abcd"
+    assert key.value("Hex String").type == RegistryValueType.SZ
+
     assert key.value("Expandable String").value == "a"
+    assert key.value("Expandable String").type == RegistryValueType.EXPAND_SZ
+
     assert key.value("Long Expandable String").value == "a" * 2584
+    assert key.value("Long Expandable String").type == RegistryValueType.EXPAND_SZ
+
     assert key.value("Hex Binary").value == b"\x00" * 8
+    assert key.value("Hex Binary").type == RegistryValueType.BINARY
+
     assert key.value("Hex Dword LE").value == 1
+    assert key.value("Hex Dword LE").type == RegistryValueType.DWORD
+
     assert key.value("Hex Dword BE").value == 1
+    assert key.value("Hex Dword BE").type == RegistryValueType.DWORD_BIG_ENDIAN
+
     assert key.value("Multi String").value == ["a", "b", "c", "d"]
+    assert key.value("Multi String").type == RegistryValueType.MULTI_SZ
+
     assert key.value("Long Multi String").value == ["a" * 1024, "b" * 1024, "c" * 1024, "d" * 1024]
+    assert key.value("Long Multi String").type == RegistryValueType.MULTI_SZ
+
     assert key.value("Qword").value == 1
+    assert key.value("Qword").type == RegistryValueType.QWORD
 
 
 @pytest.mark.parametrize(
@@ -142,7 +173,7 @@ def key_collection(hivecollection: HiveCollection) -> KeyCollection:
         ("some\\other\\bla\\", "bla"),
     ],
 )
-def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: Union[str, RegistryKeyNotFoundError]) -> None:
+def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: str | RegistryKeyNotFoundError) -> None:
     key = hive.key("\\")
 
     if key_name is RegistryKeyNotFoundError:
@@ -164,7 +195,7 @@ def test_registry_key_get(hive: RegistryHive, key_path: str, key_name: Union[str
 def test_key_collection_get(
     key_collection: KeyCollection,
     key_path: str,
-    key_name: Union[str, RegistryKeyNotFoundError],
+    key_name: str | RegistryKeyNotFoundError,
 ) -> None:
     if key_name is RegistryKeyNotFoundError:
         with pytest.raises(key_name):
@@ -309,3 +340,28 @@ def test_glob_ext(key_collection: KeyCollection, pattern: str, key_paths: list[s
         collection_paths.append(key_collection.path)
 
     assert sorted(collection_paths) == sorted(key_paths)
+
+
+@pytest.mark.parametrize(
+    "input, expected_name, expected_value",
+    [
+        (c_regf.REG_NONE, "NONE", 0),
+        (c_regf.REG_SZ, "SZ", 1),
+        (c_regf.REG_EXPAND_SZ, "EXPAND_SZ", 2),
+        (c_regf.REG_BINARY, "BINARY", 3),
+        (c_regf.REG_DWORD, "DWORD", 4),
+        (c_regf.REG_DWORD_BIG_ENDIAN, "DWORD_BIG_ENDIAN", 5),
+        (c_regf.REG_LINK, "LINK", 6),
+        (c_regf.REG_MULTI_SZ, "MULTI_SZ", 7),
+        (c_regf.REG_RESOURCE_LIST, "RESOURCE_LIST", 8),
+        (c_regf.REG_FULL_RESOURCE_DESCRIPTOR, "FULL_RESOURCE_DESCRIPTOR", 9),
+        (c_regf.REG_RESOURCE_REQUIREMENTS_LIST, "RESOURCE_REQUIREMENTS_LIST", 10),
+        (c_regf.REG_QWORD, "QWORD", 11),
+        (1337, None, 1337),
+    ],
+)
+def test_registry_value_type_enum(input: int, expected_name: str | None, expected_value: int) -> None:
+    """test if registry value types are not parsed strictly within the Enum"""
+    regf_value = RegistryValueType(input)
+    assert regf_value == expected_value
+    assert regf_value.name == expected_name

@@ -58,10 +58,10 @@ class SmbFilesystem(Filesystem):
         except SessionError as e:
             if e.error == STATUS_NOT_A_DIRECTORY:
                 # STATUS_NOT_A_DIRECTORY
-                raise NotADirectoryError(path, cause=e)
+                raise NotADirectoryError(path) from e
             else:
                 # 0xC000000F is STATUS_NO_SUCH_FILE, but everything else should raise a FileNotFoundError anyway
-                raise FileNotFoundError(path, cause=e)
+                raise FileNotFoundError(path) from e
 
         if len(result) != 1:
             raise FileNotFoundError(path)
@@ -106,7 +106,7 @@ class SmbFilesystemEntry(FilesystemEntry):
         try:
             return SmbStream(self.fs.conn, self.fs.share_name, self.path, self.entry.get_filesize())
         except SessionError as e:
-            raise FilesystemError(f"Failed to open file: {self.path}", cause=e)
+            raise FilesystemError(f"Failed to open file: {self.path}") from e
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
         try:

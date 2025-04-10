@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Iterator
 
 from dissect.etl.etl import ETL, Event
 
@@ -65,7 +66,7 @@ class EtlRecordBuilder:
 
 
 class EtlPlugin(Plugin):
-    """Plugin for fetching and parsing Windows ETL Files (*.etl)"""
+    """Plugin for parsing Windows ETL Files (``*.etl``)."""
 
     __namespace__ = "etl"
 
@@ -108,7 +109,7 @@ class EtlPlugin(Plugin):
             yield from etl_records
 
     @export(record=DynamicDescriptor(["datetime"]))
-    def etl(self):
+    def etl(self) -> Iterator[DynamicDescriptor]:
         """Return the contents of the ETL files generated at last boot and last shutdown.
 
         An event trace log (.etl) file, also known as a trace log, stores the trace messages generated during one or
@@ -122,6 +123,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
@@ -132,7 +136,7 @@ class EtlPlugin(Plugin):
             yield from getattr(self, etl_plugin)()
 
     @export(record=DynamicDescriptor(["datetime"]))
-    def shutdown(self):
+    def shutdown(self) -> Iterator[DynamicDescriptor]:
         """Return the contents of the ETL files created at last shutdown.
 
         The plugin reads the content from the ShutdownCKCL.etl file or the ShutdownPerfDiagLogger.etl file (depending
@@ -140,6 +144,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.
@@ -149,7 +156,7 @@ class EtlPlugin(Plugin):
         yield from self.read_etl_files(self.PATHS["shutdown"])
 
     @export(record=DynamicDescriptor(["datetime"]))
-    def boot(self):
+    def boot(self) -> Iterator[DynamicDescriptor]:
         """Return the contents of the ETL files created at last boot.
 
         The plugin reads the content from the BootCKCL.etl file or the BootPerfDiagLogger.etl file (depending
@@ -157,6 +164,9 @@ class EtlPlugin(Plugin):
 
         Yields dynamically created records based on the fields inside an ETL event.
         At least contains the following fields:
+
+        .. code-block:: text
+
             hostname (string): The target hostname.
             domain (string): The target domain.
             ts (datetime): The TimeCreated_SystemTime field of the event.

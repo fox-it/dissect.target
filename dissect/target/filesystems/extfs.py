@@ -33,13 +33,13 @@ class ExtFilesystem(Filesystem):
         try:
             return self.extfs.get(path, node)
         except extfs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except extfs.NotADirectoryError as e:
-            raise NotADirectoryError(path, cause=e)
+            raise NotADirectoryError(path) from e
         except extfs.NotASymlinkError as e:
-            raise NotASymlinkError(path, cause=e)
+            raise NotASymlinkError(path) from e
         except extfs.Error as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
 
 
 class ExtFilesystemEntry(FilesystemEntry):
@@ -128,11 +128,16 @@ class ExtFilesystemEntry(FilesystemEntry):
         # Set birthtime if available
         if self.entry.crtime:
             st_info.st_birthtime = self.entry.crtime.timestamp()
+            st_info.st_birthtime_ns = self.entry.crtime_ns
 
         # Set the nanosecond resolution separately
         st_info.st_atime_ns = self.entry.atime_ns
         st_info.st_mtime_ns = self.entry.mtime_ns
         st_info.st_ctime_ns = self.entry.ctime_ns
+
+        # Set blocks
+        st_info.st_blocks = self.entry.inode.i_blocks_lo
+        st_info.st_blksize = self.entry.extfs.block_size
 
         return st_info
 

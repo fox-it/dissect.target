@@ -99,14 +99,24 @@ def main():
     options = parse_options_string(args.options) if args.options else {}
 
     options["nothreads"] = True
-    options["allow_other"] = True
     options["ro"] = True
+    # Check if the allow other option is either not set (None) or set to True with -o allow_other=True
+    if (allow_other := options.get("allow_other")) is None or str(allow_other).lower() == "true":
+        options["allow_other"] = True
+        # If allow_other was not set, warn the user that it will be set by default
+        if allow_other is None:
+            log.warning("Using option 'allow_other' by default, please use '-o allow_other=False' to unset")
+    # Let the user be able to unset the allow_other option by supplying -o allow_other=False
+    elif str(allow_other).lower() == "false":
+        options["allow_other"] = False
 
-    print(f"Mounting to {args.mount} with options: {_format_options(options)}")
+    log.info("Mounting to %s with options: %s", args.mount, _format_options(options))
     try:
         FUSE(DissectMount(vfs), args.mount, **options)
-    except RuntimeError:
-        parser.exit("FUSE error")
+    except RuntimeError as e:
+        log.error("Mounting target %s failed", t)
+        log.debug("", exc_info=e)
+        parser.exit(1)
 
 
 def _format_options(options: dict[str, Union[str, bool]]) -> str:

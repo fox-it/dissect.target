@@ -30,6 +30,8 @@ SophosLogRecord = TargetRecordDescriptor(
 
 
 class SophosPlugin(Plugin):
+    """Sophos antivirus plugin."""
+
     __namespace__ = "sophos"
 
     LOG_SOPHOS_HOME = "sysvol/ProgramData/Sophos/Clean/Logs/Clean.log"
@@ -56,6 +58,9 @@ class SophosPlugin(Plugin):
         """Return alert log records from Sophos Hitman Pro/Alert.
 
         Yields HitmanAlertRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp.
             alert (string): Type of Alert.
             description (string): Short description of the alert.
@@ -85,6 +90,9 @@ class SophosPlugin(Plugin):
         """Return log history records from Sophos Home.
 
         Yields SophosLogRecord with the following fields:
+
+        .. code-block:: text
+
             ts (datetime): Timestamp.
             description (string): Short description of the alert.
             path (path): Path to the infected file (if available).

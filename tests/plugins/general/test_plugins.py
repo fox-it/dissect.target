@@ -29,7 +29,7 @@ def test_update_dict():
 
 def test_plugin_description():
     description = [x for x in output_plugin_description_recursive(PluginListPlugin, False)]
-    assert description == ["plugins - No documentation (output: no output)"]
+    assert description == ["plugins - Print all available plugins. (output: no output)"]
 
 
 def test_plugin_description_compacting():
@@ -39,7 +39,7 @@ def test_plugin_description_compacting():
     assert description == [
         "hello:",
         "  world:",
-        "    plugins - No documentation (output: no output)",
+        "    plugins - Print all available plugins. (output: no output)",
     ]
 
 
@@ -54,9 +54,9 @@ def test_plugin_description_in_dict_multiple():
         "hello:",
         "  world:",
         "    data:",
-        "      plugins - No documentation (output: no output)",
+        "      plugins - Print all available plugins. (output: no output)",
         "    data2:",
-        "      plugins - No documentation (output: no output)",
+        "      plugins - Print all available plugins. (output: no output)",
     ]
 
 
