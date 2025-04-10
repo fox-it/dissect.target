@@ -45,6 +45,8 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 /dev/disk/by-uuid/af0b9707-0945-499a-a37d-4da23d8dd245 /moredata auto default      0    2
 
 LABEL=foo                                 /foo         auto    default             0    2
+
+localhost:/home/user/nfstest              /mnt/nfs     nfs     ro                  0    0
 """  # noqa
 
 
@@ -72,6 +74,7 @@ def test_parse_fstab(tmp_path: Path) -> None:
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
         (None, "foo", "/foo", "auto", "default"),
+        ("localhost", "/home/user/nfstest", "/mnt/nfs", "nfs", "ro"),
     }
 
 

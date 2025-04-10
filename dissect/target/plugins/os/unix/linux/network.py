@@ -81,21 +81,22 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
         dhcp_ipv6: bool = False
         vlan: set[int] = field(default_factory=set)
 
-        def to_record(self) -> UnixInterfaceRecord:
+        def to_record(self, target: Target) -> UnixInterfaceRecord:
             return UnixInterfaceRecord(
-                source=self.source,
-                last_connected=self.last_connected,
                 name=self.name,
-                mac=to_list(self.mac_address),
                 type=self.type,
+                enabled=None,
+                cidr=self.ip_interfaces,
+                gateway=list(self.gateways),
+                dns=list(self.dns),
+                mac=to_list(self.mac_address),
+                source=self.source,
                 dhcp_ipv4=self.dhcp_ipv4,
                 dhcp_ipv6=self.dhcp_ipv6,
-                dns=list(self.dns),
-                ip=[interface.ip for interface in self.ip_interfaces],
-                network=[interface.network for interface in self.ip_interfaces],
-                gateway=list(self.gateways),
+                last_connected=self.last_connected,
                 vlan=list(self.vlan),
                 configurator="NetworkManager",
+                _target=target,
             )
 
     def interfaces(self) -> Iterator[UnixInterfaceRecord]:
@@ -138,7 +139,7 @@ class NetworkManagerConfigParser(LinuxNetworkConfigParser):
             vlan_ids_from_uuid = vlan_id_by_interface.get(connection.uuid, set())
             connection.vlan.update(vlan_ids_from_uuid)
 
-            yield connection.to_record()
+            yield connection.to_record(self._target)
 
     def _parse_route(self, route: str) -> NetAddress | None:
         """Parse a route and return gateway IP address."""
@@ -284,19 +285,19 @@ class SystemdNetworkConfigParser(LinuxNetworkConfigParser):
                 dhcp_ipv4, dhcp_ipv6 = self._parse_dhcp(network_section.get("DHCP"))
 
                 yield UnixInterfaceRecord(
-                    source=str(config_file),
+                    name=match_section.get("Name"),
                     type=match_section.get("Type"),
                     enabled=None,  # Unknown, dependent on run-time state
-                    dhcp_ipv4=dhcp_ipv4,
-                    dhcp_ipv6=dhcp_ipv6,
-                    name=match_section.get("Name"),
+                    cidr=ip_interfaces,
+                    gateway=list(gateways),
                     dns=list(dns),
                     mac=list(mac_addresses),
-                    ip=[interface.ip for interface in ip_interfaces],
-                    network=[interface.network for interface in ip_interfaces],
-                    gateway=list(gateways),
+                    source=str(config_file),
+                    dhcp_ipv4=dhcp_ipv4,
+                    dhcp_ipv6=dhcp_ipv6,
                     vlan=list(vlan_ids),
                     configurator="systemd-networkd",
+                    _target=self._target,
                 )
             except Exception as e:
                 self._target.log.warning("Error parsing network config file %s", config_file)
