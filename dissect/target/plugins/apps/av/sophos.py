@@ -103,7 +103,6 @@ class SophosPlugin(Plugin):
             for line in self.target.fs.path(self.LOG_SOPHOS_HOME).open("rt", 0, "utf-16le"):
                 if line.find(self.MARKER_INFECTION) > -1:
                     try:
-                        raise Exception
                         ts, json_data = line.split(" ", maxsplit=2)
                         details = json.loads(json_data)
 
