@@ -40,4 +40,4 @@ class VhdContainer(Container):
         return self.vhd.tell()
 
     def close(self) -> None:
-        pass
+        self.vhd.fh.close()
