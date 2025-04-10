@@ -9,7 +9,10 @@ from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import create_extended_descriptor
+from dissect.target.helpers.record import (
+    TargetRecordDescriptor,
+    create_extended_descriptor,
+)
 from dissect.target.helpers.regutil import RegistryKey
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
@@ -354,7 +357,7 @@ def parse_mru_key(
 
 def parse_mru_ex_key(
     target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor
-) -> Iterator[UserRegistryRecordDescriptor]:
+) -> Iterator[RecentDocsRecord | OpenSaveMRURecord | LastVisitedMRURecord | ACMruRecord]:
     user = target.registry.get_user(key)
 
     try:
