@@ -310,7 +310,7 @@ class MRUPlugin(Plugin):
 
 def parse_mru_key(
     target: Target, key: RegistryKey, record: TargetRecordDescriptor
-) -> Iterator[UserRegistryRecordDescriptor]:
+) -> Iterator[RunMRURecord | OpenSaveMRURecord | MapNetworkDriveMRURecord | LastVisitedMRURecord]:
     user = target.registry.get_user(key)
 
     try:
