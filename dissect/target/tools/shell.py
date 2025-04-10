@@ -306,9 +306,10 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_man(self, line: str) -> bool:
         """alias for help"""
-        return self.do_help(line)
+        self.do_help(line)
+        return False
 
-    def complete_man(self, *args) -> list[str]:
+    def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
@@ -403,15 +404,15 @@ class TargetCmd(ExtendedCmd):
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
+        self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
+            else:
+                self.target.log.warning("{cwd} and {base} were not set inside PS1, using the default prompt")
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
-
-        else:
-            self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
 
         super().__init__(self.target.props.get("cyber"))
 
@@ -593,8 +594,8 @@ class TargetCli(TargetCmd):
 
         TargetCmd.__init__(self, target)
         self._clicache = {}
-        self.cwd = None
-        self.chdir("/")
+        # Force to root, using `chdir` causes `None` to propagate throughout the class methods.
+        self.cwd = self.target.fs.path("/")
 
     @property
     def prompt(self) -> str:
@@ -682,8 +683,8 @@ class TargetCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         """Change directory to the given path."""
-        if path := self.check_dir(path):
-            self.cwd = path
+        if dir := self.check_dir(path):
+            self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
         """change directory"""
@@ -716,6 +717,13 @@ class TargetCli(TargetCmd):
     def do_info(self, line: str) -> bool:
         """print target information"""
         print_target_info(self.target)
+        return False
+
+    def do_reload(self, line: str) -> bool:
+        """reload the target"""
+        self.target = self.target.reload()
+        if self.cwd:
+            self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
         return False
 
     @arg("path", nargs="?")

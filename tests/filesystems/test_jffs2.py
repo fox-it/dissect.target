@@ -20,6 +20,7 @@ def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]
     inode = Mock(
         mode=0o100664,
         inum=4,
+        nlink=1,
         inode=raw_inode,
         atime=datetime(2024, 10, 1, 12, 0, 0),
         mtime=datetime(2024, 10, 2, 12, 0, 0),
@@ -39,6 +40,7 @@ def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemE
     inode = Mock(
         mode=0o40775,
         inum=2,
+        nlink=2,
         inode=raw_inode,
         atime=datetime(2024, 10, 1, 12, 0, 0),
         mtime=datetime(2024, 10, 2, 12, 0, 0),
@@ -63,7 +65,7 @@ def test_jffs2_stat(entry_fixture: str, expected_blocks: int, request: pytest.Fi
     assert stat.st_mode == entry.mode
     assert stat.st_ino == entry.inum
     assert stat.st_dev == id(jffs_entry.fs)
-    assert stat.st_nlink == 1
+    assert stat.st_nlink == entry.nlink
     assert stat.st_uid == entry.inode.uid
     assert stat.st_gid == entry.inode.gid
     assert stat.st_size == entry.inode.isize

@@ -1,5 +1,4 @@
 import datetime
-import warnings
 from typing import Iterator, Optional
 
 from dissect.cstruct import cstruct
@@ -18,8 +17,6 @@ from dissect.target.plugins.os.windows.tasks.records import (
     WeeklyTriggerRecord,
 )
 from dissect.target.target import Target
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 atjob_def = """
 struct PRIORITY {

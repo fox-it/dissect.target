@@ -4,14 +4,21 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Iterator
+from typing import Callable, Iterator
 
 from flow.record.fieldtypes import posix_path
 
+from dissect.target.exceptions import FilesystemError
 from dissect.target.filesystem import Filesystem
+from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
+from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
+from dissect.target.helpers.nfs.client.nfs import NfsError
+from dissect.target.helpers.nfs.nfs3 import FileHandle, NfsStat
 from dissect.target.helpers.record import UnixUserRecord
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
+from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
 from dissect.target.target import Target
 
@@ -38,11 +45,16 @@ ARCH_MAP = {
 
 
 class UnixPlugin(OSPlugin):
+    """UNIX plugin."""
+
+    # Files to parse for user details
+    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
         self._add_devices()
-        self._hostname_dict = self._parse_hostname_string()
+        self._hostname, self._domain = self._parse_hostname_string()
         self._hosts_dict = self._parse_hosts_string()
         self._os_release = self._parse_os_release()
 
@@ -69,12 +81,10 @@ class UnixPlugin(OSPlugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
-        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
-
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in PASSWD_FILES:
+        for passwd_file in self.PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt", errors="surrogateescape"):
                     line = line.strip()
@@ -149,21 +159,57 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def hostname(self) -> str | None:
-        hosts_string = self._hosts_dict.get("hostname", "localhost")
-        return self._hostname_dict.get("hostname", hosts_string)
+        return self._hostname or self._hosts_dict.get("hostname", "localhost")
 
     @export(property=True)
     def domain(self) -> str | None:
-        domain = self._hostname_dict.get("domain", "localhost")
-        if domain == "localhost":
-            domain = self._hosts_dict["hostname", "localhost"]
-            if domain == self.hostname:
-                return domain  # domain likely not defined, so localhost is the domain.
-        return domain
+        if self._domain is None or self._domain == "localhost":
+            # fall back to /etc/hosts file
+            return self._hosts_dict.get("hostname")
+        return self._domain
 
     @export(property=True)
     def os(self) -> str:
         return OperatingSystem.UNIX.value
+
+    def _parse_hostname_string(
+        self, paths: list[tuple[str, Callable[[Path], str] | None]] | None = None
+    ) -> tuple[str | None, str | None]:
+        """Returns a tuple containing respectively the hostname and domain name portion of the path(s) specified.
+
+        Args:
+            paths (list): list of tuples with paths and callables to parse the path or None
+
+        Returns:
+            Tuple with hostname and domain strings.
+        """
+        hostname = None
+        domain = None
+
+        paths = paths or [
+            ("/etc/hostname", None),
+            ("/etc/HOSTNAME", None),
+            ("/proc/sys/kernel/hostname", None),
+            ("/etc/sysconfig/network", self._parse_rh_legacy),
+            ("/etc/hosts", self._parse_etc_hosts),  # fallback if no other hostnames are found
+        ]
+
+        for path, callable in paths:
+            if not (path := self.target.fs.path(path)).exists():
+                continue
+
+            if callable:
+                hostname = callable(path)
+            else:
+                hostname = path.open("rt").read().rstrip()
+
+            if hostname and "." in hostname:
+                hostname, domain = hostname.split(".", maxsplit=1)
+
+            break  # break whenever a valid hostname is found
+
+        # Can be an empty string due to splitting of hostname and domain
+        return hostname or None, domain or None
 
     def _parse_rh_legacy(self, path: Path) -> str | None:
         hostname = None
@@ -174,60 +220,42 @@ class UnixPlugin(OSPlugin):
             _, _, hostname = line.rstrip().partition("=")
         return hostname
 
-    def _parse_hostname_string(self, paths: list[str] | None = None) -> dict[str, str] | None:
-        """Returns a dict containing the hostname and domain name portion of the path(s) specified.
-
-        Args:
-            paths (list): list of paths
-        """
-        redhat_legacy_path = "/etc/sysconfig/network"
-        paths = paths or ["/etc/hostname", "/etc/HOSTNAME", "/proc/sys/kernel/hostname", redhat_legacy_path]
-        hostname_dict = {"hostname": None, "domain": None}
-
-        for path in paths:
-            path = self.target.fs.path(path)
-
-            if not path.exists():
-                continue
-
-            if path.as_posix() == redhat_legacy_path:
-                hostname_string = self._parse_rh_legacy(path)
-            else:
-                hostname_string = path.open("rt").read().rstrip()
-
-            if hostname_string and "." in hostname_string:
-                hostname_string = hostname_string.split(".", maxsplit=1)
-                hostname_dict = {"hostname": hostname_string[0], "domain": hostname_string[1]}
-            elif hostname_string != "":
-                hostname_dict = {"hostname": hostname_string, "domain": None}
-            else:
-                hostname_dict = {"hostname": None, "domain": None}
-            break  # break whenever a valid hostname is found
-
-        return hostname_dict
+    def _parse_etc_hosts(self, path: Path) -> str | None:
+        for line in path.open("rt"):
+            if line.startswith(("127.0.0.1 ", "::1 ")) and "localhost" not in line:
+                return line.split(" ")[1]
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
-        hosts_string = {"ip": None, "hostname": None}
+        hosts_string = {}
 
         for path in paths:
             for fs in self.target.filesystems:
                 if fs.exists(path):
                     for line in fs.path(path).open("rt").readlines():
-                        line = line.split()
-                        if not line:
+                        if not (line := line.split()):
                             continue
-
-                        if (line[0].startswith("127.0.") or line[0].startswith("::1")) and line[
-                            1
-                        ].lower() != "localhost":
+                        if line[0].startswith(("127.0.", "::1")):
                             hosts_string = {"ip": line[0], "hostname": line[1]}
         return hosts_string
 
     def _add_mounts(self) -> None:
         fstab = self.target.fs.path("/etc/fstab")
 
-        for dev_id, volume_name, mount_point, _, options in parse_fstab(fstab, self.target.log):
+        for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
+            # Mount nfs, but only when target has been mapped by the `LocalLoader`
+            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
+                if "enable-nfs" in self.target.path_query:
+                    self._add_nfs(dev_id, volume_name, mount_point)
+                else:
+                    log.warning(
+                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                        dev_id,
+                        volume_name,
+                        mount_point,
+                    )
+                continue
+
             opts = parse_options_string(options)
             subvol = opts.get("subvol", None)
             subvolid = opts.get("subvolid", None)
@@ -265,6 +293,36 @@ class UnixPlugin(OSPlugin):
                 ):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
+
+    def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        # Try all users to see if we can access the share
+        def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
+            for user in self.users():
+                if user.uid is None or user.gid is None:
+                    continue
+                auth = auth_unix("machine", user.uid, user.gid, [])
+                nfs_client.rebind_auth(auth)
+                try:
+                    self.target.log.debug("Trying to read NFS share with uid %d and gid %d", user.uid, user.gid)
+                    # Use a readdir to check if we have access.
+                    # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
+                    nfs_client.readdir(filehandle)
+                    return  # We have access
+                except NfsError as e:
+                    if e.nfsstat != NfsStat.ERR_ACCES:
+                        self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
+                        nfs_client.close()
+                        raise e
+
+            raise FilesystemError("No user has access to NFS share")
+
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
+            nfs = NfsFilesystem.connect(address, exported_dir, auth_setter, LocalPortPolicy.PRIVILEGED)
+            self.target.fs.mount(mount_point, nfs)
+        except Exception as e:
+            self.target.log.warning("Failed to mount NFS share %s:%s at %s", address, exported_dir, mount_point)
+            self.target.log.debug("", exc_info=e)
 
     def _add_devices(self) -> None:
         """Add some virtual block devices to the target.
@@ -395,6 +453,12 @@ def parse_fstab(
             dev_id = dev.split("=")[1]
         elif dev.startswith("LABEL="):
             volume_name = dev.split("=")[1]
+        elif fs_type == "nfs":
+            # Put the nfs server address in dev_id and the root path in volume_name
+            dev_id, sep, volume_name = dev.partition(":")
+            if sep != ":":
+                log.warning("Invalid NFS mount: %s", dev)
+                continue
         else:
             log.warning("Unsupported mount device: %s %s", dev, mount_point)
             continue

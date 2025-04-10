@@ -6,10 +6,15 @@ from typing import Iterator, NamedTuple, Union
 from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import UnixUserRecord, WindowsUserRecord
+from dissect.target.helpers.record import (
+    IOSUserRecord,
+    MacOSUserRecord,
+    UnixUserRecord,
+    WindowsUserRecord,
+)
 from dissect.target.plugin import InternalPlugin
 
-UserRecord = Union[UnixUserRecord, WindowsUserRecord]
+UserRecord = Union[UnixUserRecord, WindowsUserRecord, MacOSUserRecord, IOSUserRecord]
 
 
 class UserDetails(NamedTuple):
