@@ -45,6 +45,11 @@ ARCH_MAP = {
 
 
 class UnixPlugin(OSPlugin):
+    """UNIX plugin."""
+
+    # Files to parse for user details
+    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
+
     def __init__(self, target: Target):
         super().__init__(target)
         self._add_mounts()
@@ -76,12 +81,10 @@ class UnixPlugin(OSPlugin):
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
         """
 
-        PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
-
         seen_users = set()
 
         # Yield users found in passwd files.
-        for passwd_file in PASSWD_FILES:
+        for passwd_file in self.PASSWD_FILES:
             if (path := self.target.fs.path(passwd_file)).exists():
                 for line in path.open("rt", errors="surrogateescape"):
                     line = line.strip()

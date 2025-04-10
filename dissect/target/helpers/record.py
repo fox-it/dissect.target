@@ -124,18 +124,30 @@ WindowsUserRecord = TargetRecordDescriptor(
     ],
 )
 
+COMMON_UNIX_FIELDS = [
+    ("string", "name"),
+    ("string", "passwd"),
+    ("varint", "uid"),
+    ("varint", "gid"),
+    ("string", "gecos"),
+    ("path", "home"),
+    ("string", "shell"),
+    ("string", "source"),
+]
+
 UnixUserRecord = TargetRecordDescriptor(
     "unix/user",
-    [
-        ("string", "name"),
-        ("string", "passwd"),
-        ("varint", "uid"),
-        ("varint", "gid"),
-        ("string", "gecos"),
-        ("path", "home"),
-        ("string", "shell"),
-        ("string", "source"),
-    ],
+    COMMON_UNIX_FIELDS,
+)
+
+MacOSUserRecord = TargetRecordDescriptor(
+    "macos/user",
+    COMMON_UNIX_FIELDS,
+)
+
+IOSUserRecord = TargetRecordDescriptor(
+    "ios/user",
+    COMMON_UNIX_FIELDS,
 )
 
 EmptyRecord = RecordDescriptor(
@@ -180,7 +192,7 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
     ],
 )
 
-MacInterfaceRecord = TargetRecordDescriptor(
+MacOSInterfaceRecord = TargetRecordDescriptor(
     "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
@@ -200,13 +212,3 @@ COMMON_APPLICATION_FIELDS = [
     ("string", "type"),
     ("path", "path"),
 ]
-
-UnixApplicationRecord = TargetRecordDescriptor(
-    "unix/application",
-    COMMON_APPLICATION_FIELDS,
-)
-
-WindowsApplicationRecord = TargetRecordDescriptor(
-    "windows/application",
-    COMMON_APPLICATION_FIELDS,
-)
