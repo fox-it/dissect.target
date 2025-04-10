@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import gzip
 import json
-import logging
 import lzma
 import struct
 import subprocess
@@ -32,6 +31,7 @@ except ImportError:
     HAS_ENVELOPE = False
 
 from dissect.target.filesystems import tar
+from dissect.target.helpers.esxi.hash import hash as esxi_hash
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, arg, export, internal
 from dissect.target.plugins.os.unix._os import UnixPlugin
@@ -51,8 +51,6 @@ VirtualMachineRecord = TargetRecordDescriptor(
         ("path", "path"),
     ],
 )
-
-log = logging.getLogger(__name__)
 
 
 class ESXiPlugin(UnixPlugin):
@@ -230,14 +228,16 @@ class ESXiPlugin(UnixPlugin):
             mount_point = f"/vmfs/volumes/{volume_name}"
             self._add_nfs(nfs_ip, remote_share, mount_point)
 
-    def _add_nfs(self, nfs_ip: str, remote_share: str, mount_point: str) -> None:
+    def _add_nfs(self, nfs_ip: str, remote_share: str, mount_alias: str) -> None:
         """Mount NFS share to the target."""
 
-        if not self._check_nfs_enabled(nfs_ip, remote_share, mount_point):
+        if not self._check_nfs_enabled(nfs_ip, remote_share, mount_alias):
             return
 
+        uuid = nfs_volume_uuid(nfs_ip, remote_share)
+        mount_point = f"/vmfs/volumes/{uuid}"
         try:
-            self.target.log.debug("Mounting NFS share %s at %s", remote_share, mount_point)
+            self.target.log.debug("Mounting NFS share %s at %s with alias %s", remote_share, mount_point, mount_alias)
 
             # On ESXi, there is typically only a single root user.
             # Besides, UnixPlugin::users does not work (see issue https://github.com/fox-it/dissect.target/issues/1093).
@@ -246,12 +246,16 @@ class ESXiPlugin(UnixPlugin):
             # According to the docs, ESxi mounts NFS shares using root privileges (https://www.vmware.com/docs/vmw-best-practices-running-nfs-vmware-vsphere)  # noqa: E501
             credentials = client.auth_unix("machine", 0, 0, [])
             nfs = NfsFilesystem.connect(nfs_ip, remote_share, credentials, LocalPortPolicy.PRIVILEGED)
+
             self.target.fs.mount(mount_point, nfs)
-            # Actually, on disk the mount point is a symlink to /vmfs/volumes/<uuid>.
-            # This UUID is not stored in the config store, but derived from the NFS share ip and path.
-            # Unfortunately, the details of the UUID generation are unknown.
+            self.target.fs.symlink(mount_point, mount_alias)
         except Exception as e:
-            self.target.log.warning("Failed to mount NFS share %s:%s at %s", nfs_ip, remote_share, mount_point)
+            self.target.log.warning(
+                "Failed to mount NFS share %s:%s at %s",
+                nfs_ip,
+                remote_share,
+                mount_alias,
+            )
             self.target.log.debug("", exc_info=e)
 
 
@@ -319,7 +323,15 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
     """
 
     result = subprocess.run(
-        ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
+        [
+            "crypto-util",
+            "envelope",
+            "extract",
+            "--aad",
+            "ESXConfiguration",
+            f"/{local_tgz_ve.as_posix()}",
+            "-",
+        ],
         capture_output=True,
     )
 
@@ -457,7 +469,8 @@ def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -
                     log_dir = "/scratch/log"
             except ConfigParserError as e:
                 target.log.warning(
-                    "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log", exc_info=e
+                    "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log",
+                    exc_info=e,
                 )
                 log_dir = "/scratch/log"
 
@@ -571,3 +584,16 @@ def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
             identifier["revision"] = row.Revision
 
     return store
+
+
+def nfs_volume_uuid(host: str, path: str) -> str:
+    """Generate a UUID for an NFS volume based on the host and path.
+
+    This is used to create a unique identifier for NFS volumes in ESXi.
+    """
+
+    h1 = esxi_hash(host.encode(), 42)  # 42 is starting value
+    h2 = esxi_hash(path.encode(), h1)
+
+    low, high = h2 & 0xFFFFFFFF, ((h2 >> 32) & 0xFFFFFFFF)
+    return f"{low:8x}-{high:8x}"
