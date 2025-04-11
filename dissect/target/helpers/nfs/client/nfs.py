@@ -42,6 +42,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from types import TracebackType
 
+    from typing_extensions import Self
+
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
 
@@ -69,7 +71,7 @@ class Client(AbstractContextManager):
     def __init__(self, rpc_client: SunRpcAbstractClient):
         self._rpc_client = rpc_client
 
-    def __enter__(self) -> Client:  # noqa: PYI034
+    def __enter__(self) -> Self:
         """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 

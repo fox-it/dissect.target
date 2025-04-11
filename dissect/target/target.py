@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     import urllib
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.helpers.record import ChildTargetRecord
 
 log = logging.getLogger(__name__)
@@ -263,7 +265,7 @@ class Target:
         return target_name
 
     @classmethod
-    def open(cls, path: str | Path) -> Target:
+    def open(cls, path: str | Path) -> Self:
         """Try to find a suitable loader for the given path and load a ``Target`` from it.
 
         Args:
@@ -285,7 +287,7 @@ class Target:
         return cls.open_raw(path)
 
     @classmethod
-    def open_raw(cls, path: str | Path) -> Target:
+    def open_raw(cls, path: str | Path) -> Self:
         """Open a Target with the given path using the :class:`~dissect.target.loaders.raw.RawLoader`.
 
         Args:
@@ -297,7 +299,7 @@ class Target:
         return cls._load(path, loader.RawLoader(path))
 
     @classmethod
-    def open_all(cls, paths: list[str | Path], include_children: bool = False) -> Iterator[Target]:
+    def open_all(cls, paths: list[str | Path], include_children: bool = False) -> Iterator[Self]:
         """Yield targets from a list of paths.
 
         If the path is a directory, iterate files one directory deep.
@@ -473,7 +475,7 @@ class Target:
         raise TargetError("Target has no path and/or loader")
 
     @classmethod
-    def _load(cls, path: str | Path, ldr: loader.Loader) -> Target:
+    def _load(cls, path: str | Path, ldr: loader.Loader) -> Self:
         """Internal function that attemps to load a path using a given loader.
 
         Args:

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import NamespacePlugin
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 PackageManagerLogRecord = TargetRecordDescriptor(
     "unix/packagemanager/log",
@@ -37,7 +40,7 @@ class OperationTypes(Enum):
     }
 
     @classmethod
-    def infer(cls, keyword: str) -> OperationTypes:
+    def infer(cls, keyword: str) -> Self:
         keyword = keyword.strip().lower()
         for key, values in cls.__MAPPING__.items():
             if keyword in values:

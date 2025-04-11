@@ -22,6 +22,8 @@ from dissect.target.tools.dump.utils import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.target import Target
     from dissect.target.tools.dump.run import RecordStreamElement
 
@@ -140,9 +142,9 @@ class DumpState:
         log.debug("State updated", records=self.record_count, sinks=len(self.sinks), path=self.path)
 
     @classmethod
-    def from_dict(cls, state_dict: dict) -> DumpState:
+    def from_dict(cls, state_dict: dict) -> Self:
         """Deserialize state instance from provided dictionary."""
-        return DumpState(
+        return cls(
             target_paths=state_dict["target_paths"],
             functions=state_dict["functions"],
             serialization=Serialization(state_dict["serialization"]),
@@ -163,9 +165,9 @@ class DumpState:
         )
 
     @classmethod
-    def from_path(cls, output_dir: Path) -> DumpState | None:
+    def from_path(cls, output_dir: Path) -> Self | None:
         """Deserialize state instance from a file in the provided output directory path."""
-        state_path = DumpState.get_state_path(output_dir)
+        state_path = cls.get_state_path(output_dir)
         if not state_path.exists():
             return None
 
@@ -176,7 +178,7 @@ class DumpState:
                 log.warning("Can not load state from path", path=state_path, exc=e)
                 return None
 
-        state = DumpState.from_dict(state_dict)
+        state = cls.from_dict(state_dict)
         state.output_dir = output_dir
         return state
 

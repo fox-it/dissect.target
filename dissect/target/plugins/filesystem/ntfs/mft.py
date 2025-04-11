@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from dissect.ntfs import MftRecord
     from dissect.ntfs.attr import Attribute, FileName, StandardInformation
     from flow.record import Record
+    from typing_extensions import Self
 
     from dissect.target.filesystems.ntfs import NtfsFilesystem
     from dissect.target.target import Target
@@ -530,7 +531,7 @@ class _Info:
     drive_letter: str | None = None
 
     @classmethod
-    def init(cls, target: Target, fs: NtfsFilesystem) -> _Info:
+    def init(cls, target: Target, fs: NtfsFilesystem) -> Self:
         # If this filesystem is a "fake" NTFS filesystem, used to enhance a
         # VirtualFilesystem, The driveletter (more accurate mount point)
         # returned will be that of the VirtualFilesystem. This makes sure

@@ -34,6 +34,8 @@ from dissect.target.plugins.os.unix._os import UnixPlugin
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, VirtualFilesystem
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.target import Target
@@ -101,7 +103,7 @@ class ESXiPlugin(UnixPlugin):
         return cfgs[0][0] if cfgs else None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> ESXiPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
         # Mount all the visor tars in individual filesystem layers

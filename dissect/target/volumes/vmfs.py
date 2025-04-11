@@ -12,6 +12,8 @@ from dissect.target.volume import LogicalVolumeSystem, Volume
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
 log = logging.getLogger(__name__)
 
 
@@ -23,7 +25,7 @@ class VmfsVolumeSystem(LogicalVolumeSystem):
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         lvm_extents = defaultdict(list)
 
         for vol in volumes:

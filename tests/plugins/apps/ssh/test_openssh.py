@@ -14,6 +14,8 @@ from dissect.target.plugins.apps.ssh.openssh import (
 )
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
@@ -45,7 +47,7 @@ class Alternatives:
     label: str
 
     @classmethod
-    def from_target(cls, target: Target) -> Alternatives:
+    def from_target(cls, target: Target) -> Self:
         alternative = cls()
         alternative.os_type = target._os.os
         alternative.separator = "/"

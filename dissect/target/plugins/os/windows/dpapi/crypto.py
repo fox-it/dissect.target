@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import TYPE_CHECKING
 
 try:
     from Crypto.Cipher import AES, ARC4, DES3
@@ -12,6 +13,9 @@ except ImportError:
 
 CIPHER_ALGORITHMS: dict[int | str, CipherAlgorithm] = {}
 HASH_ALGORITHMS: dict[int | str, HashAlgorithm] = {}
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 
 class CipherAlgorithm:
@@ -26,11 +30,11 @@ class CipherAlgorithm:
         CIPHER_ALGORITHMS[cls.name] = cls
 
     @classmethod
-    def from_id(cls, id: int) -> CipherAlgorithm:
+    def from_id(cls, id: int) -> Self:
         return CIPHER_ALGORITHMS[id]()
 
     @classmethod
-    def from_name(cls, name: str) -> CipherAlgorithm:
+    def from_name(cls, name: str) -> Self:
         return CIPHER_ALGORITHMS[name]()
 
     def derive_key(self, key: bytes, hash_algorithm: HashAlgorithm) -> bytes:
@@ -155,11 +159,11 @@ class HashAlgorithm:
         HASH_ALGORITHMS[cls.name] = cls
 
     @classmethod
-    def from_id(cls, id: int) -> HashAlgorithm:
+    def from_id(cls, id: int) -> Self:
         return HASH_ALGORITHMS[id]()
 
     @classmethod
-    def from_name(cls, name: str) -> HashAlgorithm | None:
+    def from_name(cls, name: str) -> Self:
         return HASH_ALGORITHMS[name]()
 
 

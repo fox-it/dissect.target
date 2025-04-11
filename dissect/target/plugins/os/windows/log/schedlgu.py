@@ -13,6 +13,8 @@ from dissect.target.plugin import Plugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -63,7 +65,7 @@ class SchedLgU:
         return line, None
 
     @classmethod
-    def from_line(cls, line: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> SchedLgU:
+    def from_line(cls, line: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> Self:
         """Parse a group of SchedLgU.txt lines."""
         event = cls()
         lines = line.splitlines()

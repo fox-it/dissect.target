@@ -29,7 +29,7 @@ class DefaultPlugin(OSPlugin):
         pass
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> DefaultPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         if sysvol:
             target.fs.mount("/", sysvol)
         return cls(target)

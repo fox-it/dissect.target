@@ -10,6 +10,8 @@ from dissect.target.plugins.os.unix.bsd._os import BsdPlugin
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
@@ -69,7 +71,7 @@ class CitrixPlugin(BsdPlugin):
         return ramdisk
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> CitrixPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         # A disk image of a Citrix Netscaler contains two partitions, that after boot are mounted to /var and /flash.
         # The rest of the filesystem is recreated at runtime into a 'ramdisk'. Currently, this plugin does not
         # yet support recreating the ramdisk from a 'clean' state. This might be possible in a future iteration but
