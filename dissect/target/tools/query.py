@@ -8,10 +8,10 @@ import logging
 import pathlib
 import sys
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Iterator
 
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
-from flow.record.base import AbstractWriter
+from flow.record import Record, RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record.adapter import AbstractWriter
 
 from dissect.target import Target, plugin
 from dissect.target.exceptions import (
@@ -21,15 +21,20 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
-from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_functions
+from dissect.target.plugin import (
+    PLUGINS,
+    FunctionDescriptor,
+    OSPlugin,
+    Plugin,
+    find_functions,
+)
 from dissect.target.plugins.general.plugins import (
     _get_default_functions,
     generate_functions_json,
     generate_functions_overview,
 )
-from dissect.target.report import ExecutionReport
+from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -134,14 +139,6 @@ def main() -> None:
         help="list (matching) available plugins and loaders",
     )
 
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
-    )
-
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
     parser.add_argument("-d", "--delimiter", default=" ", action="store", metavar="','")
     parser.add_argument("-j", "--json", action="store_true", help="output records as json")
@@ -172,15 +169,12 @@ def main() -> None:
 
     args, rest = parser.parse_known_args()
 
-    # If loader is specified then map to uri
-    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
         parser.print_help()
         parser.exit()
 
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -222,10 +216,10 @@ def main() -> None:
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
     if args.list is not None:
-        list_plugins(targets, args.list, args.children, args.json, rest)
+        list_plugins(args.targets, args.list, args.children, args.json, rest)
         parser.exit()
 
-    if not targets:
+    if not args.targets:
         parser.error("too few arguments")
 
     if not args.function:
@@ -276,17 +270,18 @@ def main() -> None:
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(targets, args.children):
+        for target in Target.open_all(args.targets, args.children):
             if args.child:
                 try:
                     target = target.open_child(args.child)
-                except Exception:
-                    target.log.exception("Exception while opening child '%s'", args.child)
+                except Exception as e:
+                    target.log.exception("Exception while opening child %r: %s", args.child, e)
+                    target.log.debug("", exc_info=e)
 
             if args.dry_run:
                 print(f"Dry run on: {target}")
 
-            record_entries = []
+            record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
 
@@ -322,10 +317,9 @@ def main() -> None:
                 except FatalError as fatal:
                     fatal.emit_last_message(target.log.error)
                     parser.exit(1)
-                except Exception:
-                    target.log.error(
-                        "Exception while executing function `%s` (`%s`)", func_def.name, func_def.path, exc_info=True
-                    )
+                except Exception as e:
+                    target.log.error("Exception while executing function %s (%s): %s", func_def.name, func_def.path, e)
+                    target.log.debug("", exc_info=e)
                     target.log.debug("Function info: %s", func_def)
                     continue
 
@@ -345,7 +339,7 @@ def main() -> None:
                     first_seen_output_type = output_type
 
                 if output_type == "record":
-                    record_entries.append(result)
+                    record_entries.append((func_def, result))
                 elif output_type == "yield":
                     yield_entries.append(result)
                 elif output_type == "none":
@@ -385,23 +379,31 @@ def main() -> None:
                 continue
 
             rs = record_output(args.strings, args.json)
-            for entry in record_entries:
+            for func_def, record_generator in record_entries:
                 try:
-                    for record_entries in entry:
-                        rs.write(modifier_func(target, record_entries))
+                    for record in record_generator:
+                        rs.write(modifier_func(target, record))
                         count += 1
                         if args.limit is not None and count >= args.limit:
                             break_out = True
                             break
+
                 except Exception as e:
-                    # Ignore errors if multiple functions
-                    if len(funcs) > 1:
-                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    # Ignore errors if multiple functions or multiple targets
+                    if len(record_entries) > 1 or len(args.targets) > 1:
+                        target.log.error(
+                            "Exception occurred while processing output of %s.%s: %s",
+                            func_def.qualname,
+                            func_def.name,
+                            e,
+                        )
+                        target.log.debug("", exc_info=e)
                     else:
                         raise e
 
                 if break_out:
                     break
+
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)

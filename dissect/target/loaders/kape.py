@@ -38,8 +38,11 @@ def is_valid_kape_dir(path: Path) -> bool:
 
 def is_valid_kape_vhdx(path: Path) -> bool:
     if path.suffix == ".vhdx":
-        for fs in open_vhdx(path):
-            return is_valid_kape_dir(fs.path())
+        try:
+            for fs in open_vhdx(path):
+                return is_valid_kape_dir(fs.path())
+        except Exception:
+            return False
 
     return False
 

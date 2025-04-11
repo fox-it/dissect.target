@@ -6,7 +6,7 @@ import pytest
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.filesystem import Filesystem
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
@@ -268,3 +268,22 @@ def test_windows_user(target_win_users: Target) -> None:
     assert users[1].sid == "S-1-5-21-3263113198-3007035898-945866154-1002"
     assert users[1].name == "John"
     assert users[1].home == windows_path("C:\\Users\\John")
+
+
+@pytest.mark.parametrize(
+    ("registry_value", "expected_hostname"),
+    [
+        (b"DESKTOP-EXAMPLE", "DESKTOP-EXAMPLE"),
+    ],
+)
+def test_windows_hostname(
+    registry_value: bytes, expected_hostname: str, target_win_users: Target, hive_hklm: VirtualHive
+) -> None:
+    """test if we can parse windows hostnames correctly."""
+
+    key_name = "SYSTEM\\ControlSet001\\Control\\ComputerName\\ComputerName"
+    key = VirtualKey(hive_hklm, key_name)
+    key.add_value("ComputerName", VirtualValue(hive_hklm, "ComputerName", registry_value.decode()))
+    hive_hklm.map_key(key_name, key)
+
+    assert target_win_users.hostname == expected_hostname

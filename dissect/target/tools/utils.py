@@ -28,13 +28,14 @@ from dissect.target.plugin import (
 from dissect.target.tools.logging import configure_logging
 
 
-def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
-    args_parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
-    args_parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
-    args_parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
-    args_parser.add_argument("--version", action="store_true", help="print version")
-    args_parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
-    args_parser.add_argument(
+def configure_generic_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("-K", "--keychain-file", type=Path, help="keychain file in CSV format")
+    parser.add_argument("-Kv", "--keychain-value", help="passphrase, recovery key or key file path value")
+    parser.add_argument("-L", "--loader", action="store", default=None, help="select a specific loader (i.e. vmx, raw)")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="increase output verbosity")
+    parser.add_argument("--version", action="store_true", help="print version")
+    parser.add_argument("-q", "--quiet", action="store_true", help="do not output logging information")
+    parser.add_argument(
         "--plugin-path",
         action="store",
         nargs="+",
@@ -43,7 +44,7 @@ def configure_generic_arguments(args_parser: argparse.ArgumentParser) -> None:
     )
 
 
-def process_generic_arguments(args: argparse.Namespace) -> None:
+def process_generic_arguments(args: argparse.Namespace, rest: list[str]) -> None:
     configure_logging(args.verbose, args.quiet, as_plain_text=True)
 
     if args.version:
@@ -52,6 +53,15 @@ def process_generic_arguments(args: argparse.Namespace) -> None:
         except PackageNotFoundError:
             print("unable to determine version")
         sys.exit(0)
+
+    targets = args.targets if hasattr(args, "targets") else [args.target] if hasattr(args, "target") else []
+    if targets and args.loader:
+        targets = args_to_uri(targets, args.loader, rest)
+
+    if hasattr(args, "targets"):
+        args.targets = targets
+    elif hasattr(args, "target"):
+        args.target = targets[0]
 
     if args.keychain_file:
         keychain.register_keychain_file(args.keychain_file)
@@ -67,7 +77,7 @@ def generate_argparse_for_bound_method(
     method: Callable,
     usage_tmpl: str | None = None,
 ) -> argparse.ArgumentParser:
-    """Generate an ``argparse.ArgumentParser`` for a bound ``Plugin` class method."""
+    """Generate an ``argparse.ArgumentParser`` for a bound ``Plugin`` class method."""
 
     # allow functools.partial wrapped method
     while hasattr(method, "func"):
@@ -284,3 +294,8 @@ def find_and_filter_plugins(
         executed_plugins.add(func_def.name)
 
         yield func_def
+
+
+def escape_str(value: str) -> str:
+    """Escape non-ASCII, unicode characters and bytes to a printable form."""
+    return repr(value)[1:-1]

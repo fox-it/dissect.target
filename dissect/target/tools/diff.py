@@ -28,6 +28,7 @@ from dissect.target.tools.query import record_output
 from dissect.target.tools.shell import (
     ExtendedCmd,
     TargetCli,
+    _target_name,
     arg_str_to_arg_list,
     build_pipe_stdout,
     fmt_ls_colors,
@@ -352,7 +353,7 @@ class TargetComparison:
 class DifferentialCli(ExtendedCmd):
     """CLI for browsing the differential between two or more targets."""
 
-    doc_header_prefix = "target-diff\n" "==========\n"
+    doc_header_prefix = "target-diff\n==========\n"
     doc_header_suffix = "\n\nDocumented commands (type help <topic>):"
     doc_header_multiple_targets = "Use 'list', 'prev' and 'next' to list and select targets to differentiate between."
 
@@ -390,10 +391,15 @@ class DifferentialCli(ExtendedCmd):
 
     @property
     def prompt(self) -> str:
-        if self.comparison.src_target.name != self.comparison.dst_target.name:
-            prompt_base = f"{self.comparison.src_target.name}/{self.comparison.dst_target.name}"
+        """Determine the prompt of the cli."""
+
+        src_name = _target_name(self.comparison.src_target)
+        dst_name = _target_name(self.comparison.dst_target)
+
+        if src_name != dst_name:
+            prompt_base = f"{src_name}/{dst_name}"
         else:
-            prompt_base = self.comparison.src_target.name
+            prompt_base = src_name
 
         if os.getenv("NO_COLOR"):
             suffix = f"{prompt_base}:{self.cwd}$ "
@@ -958,8 +964,8 @@ def main() -> None:
 
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     if len(args.targets) < 2:
         print("At least two targets are required for target-diff.")

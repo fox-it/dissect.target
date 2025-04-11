@@ -142,15 +142,13 @@ def main() -> None:
     )
     parser_cp.add_argument("-o", "--output", type=str, default=".", help="output directory")
     parser_cp.set_defaults(handler=cp)
-
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     if args.subcommand is None:
         parser.error("No subcommand specified")
-
-    process_generic_arguments(args)
 
     try:
         target = Target.open(args.target)

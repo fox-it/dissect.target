@@ -124,18 +124,30 @@ WindowsUserRecord = TargetRecordDescriptor(
     ],
 )
 
+COMMON_UNIX_FIELDS = [
+    ("string", "name"),
+    ("string", "passwd"),
+    ("varint", "uid"),
+    ("varint", "gid"),
+    ("string", "gecos"),
+    ("path", "home"),
+    ("string", "shell"),
+    ("string", "source"),
+]
+
 UnixUserRecord = TargetRecordDescriptor(
     "unix/user",
-    [
-        ("string", "name"),
-        ("string", "passwd"),
-        ("varint", "uid"),
-        ("varint", "gid"),
-        ("string", "gecos"),
-        ("path", "home"),
-        ("string", "shell"),
-        ("string", "source"),
-    ],
+    COMMON_UNIX_FIELDS,
+)
+
+MacOSUserRecord = TargetRecordDescriptor(
+    "macos/user",
+    COMMON_UNIX_FIELDS,
+)
+
+IOSUserRecord = TargetRecordDescriptor(
+    "ios/user",
+    COMMON_UNIX_FIELDS,
 )
 
 EmptyRecord = RecordDescriptor(
@@ -145,13 +157,12 @@ EmptyRecord = RecordDescriptor(
 
 COMMON_INTERFACE_ELEMENTS = [
     ("string", "name"),
-    ("string[]", "mac"),
     ("string", "type"),
     ("boolean", "enabled"),
-    ("net.ipaddress[]", "dns"),
-    ("net.ipaddress[]", "ip"),
+    ("net.ipinterface[]", "cidr"),
     ("net.ipaddress[]", "gateway"),
-    ("net.ipnetwork[]", "network"),
+    ("net.ipaddress[]", "dns"),
+    ("string[]", "mac"),
     ("string", "source"),
 ]
 
@@ -176,13 +187,12 @@ WindowsInterfaceRecord = TargetRecordDescriptor(
         ("stringlist", "search_domain"),
         ("datetime", "first_connected"),
         ("datetime", "last_connected"),
-        ("net.ipaddress[]", "subnetmask"),
         ("boolean", "dhcp"),
         ("varint", "vlan"),
     ],
 )
 
-MacInterfaceRecord = TargetRecordDescriptor(
+MacOSInterfaceRecord = TargetRecordDescriptor(
     "macos/network/interface",
     [
         *COMMON_INTERFACE_ELEMENTS,
@@ -202,13 +212,3 @@ COMMON_APPLICATION_FIELDS = [
     ("string", "type"),
     ("path", "path"),
 ]
-
-UnixApplicationRecord = TargetRecordDescriptor(
-    "unix/application",
-    COMMON_APPLICATION_FIELDS,
-)
-
-WindowsApplicationRecord = TargetRecordDescriptor(
-    "windows/application",
-    COMMON_APPLICATION_FIELDS,
-)

@@ -11,7 +11,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator, Optional, Sequence, TextIO, Union
+from typing import Any, BinaryIO, Iterator, Sequence, TextIO
 
 try:
     import lzma
@@ -42,6 +42,7 @@ from dissect.target.helpers.polypath import (
     commonpath,
     dirname,
     isabs,
+    isreserved,
     join,
     normalize,
     normpath,
@@ -52,7 +53,9 @@ from dissect.target.helpers.polypath import (
     splitroot,
 )
 
-if sys.version_info >= (3, 12):
+if sys.version_info >= (3, 13):
+    from dissect.target.helpers.compat.path_313 import PureDissectPath, TargetPath
+elif sys.version_info >= (3, 12):
     from dissect.target.helpers.compat.path_312 import PureDissectPath, TargetPath
 elif sys.version_info >= (3, 11):
     from dissect.target.helpers.compat.path_311 import PureDissectPath, TargetPath
@@ -80,6 +83,7 @@ __all__ = [
     "glob_split",
     "has_glob_magic",
     "isabs",
+    "isreserved",
     "join",
     "normalize",
     "normpath",
@@ -101,9 +105,9 @@ __all__ = [
 ]
 
 
-def generate_addr(path: Union[str, Path], alt_separator: str = "") -> int:
+def generate_addr(path: str | Path, alt_separator: str = "") -> int:
     if not alt_separator and isinstance(path, Path):
-        alt_separator = path._flavour.altsep
+        alt_separator = (getattr(path, "parser", None) or path._flavour).altsep
     path = normalize(str(path), alt_separator=alt_separator)
     return int(hashlib.sha256(path.encode()).hexdigest()[:8], 16)
 
@@ -234,7 +238,7 @@ class stat_result:  # noqa
         )
         return f"dissect.target.stat_result({values})"
 
-    def _parse_time(self, ts: Union[int, float]) -> tuple[int, float, int]:
+    def _parse_time(self, ts: int | float) -> tuple[int, float, int]:
         ts_int = int(ts)
         ts_ns = int(ts * 1e9)
 
@@ -312,7 +316,7 @@ def glob_split(pattern: str, alt_separator: str = "") -> tuple[str, str]:
 
     Args:
         pattern: A glob pattern to match names of filesystem entries against.
-        alt_separator: An optional alternative path separator in use by the filesystem being matched.
+        alt_separator: An alternative path separator in use by the filesystem being matched.
 
     Returns:
         A tuple of a string with path parts up to the first path part that has a glob pattern and a string of
@@ -489,14 +493,14 @@ def resolve_link(
 
 
 def open_decompress(
-    path: Optional[TargetPath] = None,
+    path: TargetPath | None = None,
     mode: str = "rb",
     *,
-    fileobj: Optional[BinaryIO] = None,
-    encoding: Optional[str] = "UTF-8",
-    errors: Optional[str] = "backslashreplace",
-    newline: Optional[str] = None,
-) -> Union[BinaryIO, TextIO]:
+    fileobj: BinaryIO | None = None,
+    encoding: str | None = "UTF-8",
+    errors: str | None = "backslashreplace",
+    newline: str | None = None,
+) -> BinaryIO | TextIO:
     """Open and decompress a file. Handles gz, bz2 and zstd files. Uncompressed files are opened as-is.
 
     When passing in an already opened ``fileobj``, the mode, encoding, errors and newline arguments are ignored.
@@ -630,9 +634,9 @@ def reverse_readlines(fh: TextIO, chunk_size: int = 1024 * 1024 * 8) -> Iterator
 
 
 def fs_attrs(
-    path: Union[os.PathLike, str, bytes],
+    path: os.PathLike | str | bytes,
     follow_symlinks: bool = True,
-) -> dict[Union[os.PathLike, str, bytes], bytes]:
+) -> dict[os.PathLike | str | bytes, bytes]:
     """Return the extended attributes for a given path on the local filesystem.
 
     This is currently only implemented for Linux using os.listxattr and related functions.

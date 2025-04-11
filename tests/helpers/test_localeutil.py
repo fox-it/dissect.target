@@ -1,3 +1,5 @@
+import pytest
+
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 
 
@@ -7,6 +9,16 @@ def test_helpers_localeutil_normalize_timezone():
     assert normalize_timezone("UTC") == "UTC"
 
 
-def test_helpers_localeutil_normalize_language():
-    assert normalize_language("en_US.UTF-8") == "en_US"
-    assert normalize_language("nl") == "nl_NL"
+@pytest.mark.parametrize(
+    ("language_input", "expected_output"),
+    [
+        ("en_US.UTF-8", "en_US"),
+        ("nl", "nl_NL"),
+        ("en", "en_US"),
+        ("en-US", "en_US"),
+    ],
+)
+def test_helpers_localeutil_normalize_language(language_input: str, expected_output: str) -> None:
+    """Test if we normalize languages to ISO-3166 correctly."""
+
+    assert normalize_language(language_input) == expected_output

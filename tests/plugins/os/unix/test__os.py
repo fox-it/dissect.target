@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import tempfile
 from io import BytesIO
 from pathlib import Path
@@ -43,6 +45,8 @@ UUID=F631-BECA                            /boot/efi    vfat    defaults,discard,
 /dev/disk/by-uuid/af0b9707-0945-499a-a37d-4da23d8dd245 /moredata auto default      0    2
 
 LABEL=foo                                 /foo         auto    default             0    2
+
+localhost:/home/user/nfstest              /mnt/nfs     nfs     ro                  0    0
 """  # noqa
 
 
@@ -70,6 +74,7 @@ def test_parse_fstab(tmp_path: Path) -> None:
         (None, "vg--main-lv--var", "/var", "auto", "default"),
         (None, "vg--main-lv--data", "/data", "auto", "default"),
         (None, "foo", "/foo", "auto", "default"),
+        ("localhost", "/home/user/nfstest", "/mnt/nfs", "nfs", "ro"),
     }
 
 
@@ -97,38 +102,70 @@ def test_mount_volume_name_regression(fs_unix: VirtualFilesystem) -> None:
 
 
 @pytest.mark.parametrize(
-    "path, expected_hostname, expected_domain, file_content",
+    ("hostname_content", "hosts_content", "expected_hostname", "expected_domain"),
     [
-        ("/etc/hostname", "myhost", "mydomain.com", "myhost.mydomain.com"),
-        ("/etc/HOSTNAME", "myhost", "mydomain.com", "myhost.mydomain.com"),
+        (b"", b"", "localhost", None),
+        (b"", b"127.0.0.1 mydomain", "mydomain", "mydomain"),
+        (b"", b"127.0.0.1 localhost", "localhost", "localhost"),
+        (b"myhost", b"", "myhost", None),
+        (b"myhost.mydomain", b"", "myhost", "mydomain"),
+        (b"myhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mydomain", b"127.0.0.1 localhost", "myhost", "mydomain"),
+        (b"myhost.localhost", b"127.0.0.1 mydomain", "myhost", "mydomain"),
+        (b"myhost.mycoolerdomain", b"127.0.0.1 mydomain", "myhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 mydomain", "localhost", "mycoolerdomain"),
+        (b"localhost.mycoolerdomain", b"127.0.0.1 localhost", "localhost", "mycoolerdomain"),
+    ],
+)
+def test_parse_domain(
+    target_unix: Target,
+    fs_unix: VirtualFilesystem,
+    hostname_content: bytes,
+    hosts_content: bytes,
+    expected_domain: str,
+    expected_hostname: str,
+) -> None:
+    fs_unix.map_file_fh("/etc/hostname", BytesIO(hostname_content))
+    fs_unix.map_file_fh("/etc/hosts", BytesIO(hosts_content))
+    target_unix.add_plugin(UnixPlugin)
+
+    assert target_unix.hostname == expected_hostname
+    assert target_unix.domain == expected_domain
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_hostname", "expected_domain", "file_content"),
+    [
+        ("/etc/hostname", "myhost", "mydomain.com", b"myhost.mydomain.com"),
+        ("/etc/HOSTNAME", "myhost", "mydomain.com", b"myhost.mydomain.com"),
         (
             "/etc/sysconfig/network",
             "myhost",
             "mydomain.com",
-            "NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
+            b"NETWORKING=NO\nHOSTNAME=myhost.mydomain.com\nGATEWAY=192.168.1.1",
         ),
-        ("/etc/hostname", "myhost", None, "myhost"),
-        ("/etc/sysconfig/network", "myhost", None, "NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
-        ("/not_a_valid_hostname_path", None, None, ""),
-        ("/etc/hostname", None, None, ""),
-        ("/etc/sysconfig/network", None, None, ""),
-        ("/proc/sys/kernel/hostname", "myhost", None, "myhost"),
+        ("/etc/hostname", "myhost", None, b"myhost"),
+        ("/etc/sysconfig/network", "myhost", None, b"NETWORKING=NO\nHOSTNAME=myhost\nGATEWAY=192.168.1.1"),
+        ("/not_a_valid_hostname_path", None, None, b""),
+        ("/etc/hostname", None, None, b""),
+        ("/etc/sysconfig/network", None, None, b""),
+        ("/proc/sys/kernel/hostname", "myhost", None, b"myhost"),
     ],
 )
 def test_parse_hostname_string(
     target_unix: Target,
     fs_unix: VirtualFilesystem,
     path: Path,
-    expected_hostname: str,
-    expected_domain: str,
+    expected_hostname: str | None,
+    expected_domain: str | None,
     file_content: str,
 ) -> None:
-    fs_unix.map_file_fh(path, BytesIO(file_content.encode("ascii")))
+    fs_unix.map_file_fh(path, BytesIO(file_content))
 
-    hostname_dict = target_unix._os._parse_hostname_string()
+    hostname, domain = target_unix._os._parse_hostname_string()
 
-    assert hostname_dict["hostname"] == expected_hostname
-    assert hostname_dict["domain"] == expected_domain
+    assert hostname == expected_hostname
+    assert domain == expected_domain
 
 
 def test_users(target_unix_users: Target) -> None:

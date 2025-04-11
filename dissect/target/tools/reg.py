@@ -37,11 +37,10 @@ def main():
     parser.add_argument("-kv", "--value", help="value to query")
     parser.add_argument("-d", "--depth", type=int, const=0, nargs="?", default=1, help="max depth of subkeys to print")
     parser.add_argument("-l", "--length", type=int, default=100, help="max length of key value to print")
-
     configure_generic_arguments(parser)
-    args = parser.parse_args()
 
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     try:
         for target in Target.open_all(args.targets):

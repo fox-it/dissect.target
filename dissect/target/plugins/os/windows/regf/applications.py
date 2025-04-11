@@ -2,9 +2,17 @@ from datetime import datetime
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.record import WindowsApplicationRecord
+from dissect.target.helpers.record import (
+    COMMON_APPLICATION_FIELDS,
+    TargetRecordDescriptor,
+)
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
+
+WindowsApplicationRecord = TargetRecordDescriptor(
+    "windows/application",
+    COMMON_APPLICATION_FIELDS,
+)
 
 
 class WindowsApplicationsPlugin(Plugin):

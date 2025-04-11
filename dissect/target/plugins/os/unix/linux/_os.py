@@ -5,7 +5,8 @@ import logging
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.ios._os import IOSPlugin
+from dissect.target.plugins.os.unix.bsd.darwin.macos._os import MacOSPlugin
 from dissect.target.plugins.os.unix.linux.network_managers import (
     LinuxNetworkManager,
     parse_unix_dhcp_leases,
@@ -18,6 +19,8 @@ log = logging.getLogger(__name__)
 
 
 class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
+    """Linux plugin."""
+
     def __init__(self, target: Target):
         super().__init__(target)
         self.network_manager = LinuxNetworkManager(target)
@@ -25,11 +28,42 @@ class LinuxPlugin(UnixPlugin, LinuxNetworkManager):
 
     @classmethod
     def detect(cls, target: Target) -> Filesystem | None:
+        """Detect a Linux-like filesystem.
+
+        These days there is little difference in the filesystem format used by Unix and Linux. Both implementations use
+        the Filesystem Hierarchy Standard (FHS). We can differentiate between Unix and Linux by checking for specific
+        Linux kernel-only files not present on actual Unix filesystems (e.g. BSD, Solaris, IBM AIX and HP-UX).
+
+        Resources:
+            - https://refspecs.linuxfoundation.org/fhs.shtml
+            - https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard
+        """
+
+        # NOTE: dirs like /opt, /mnt, /media, /tmp and /proc are not Linux-specific.
+        LINUX_PATHS = {
+            "/run",
+            "/sys",
+            "/etc/kernel",
+            "/etc/sysctl.conf",
+            "/var/log/kern.log",
+            "/boot/initrd.img",
+            "/boot/vmlinuz",
+            "/boot/vmlinux",
+            "/opt",  # Backwards compatibility for previous Linux detection.
+        }
+
         for fs in target.filesystems:
-            if (
-                (fs.exists("/var") and fs.exists("/etc") and fs.exists("/opt"))
-                or (fs.exists("/sys/module") or fs.exists("/proc/sys"))
-            ) and not (MacPlugin.detect(target) or WindowsPlugin.detect(target)):
+            # We explicitly exclude filesystems that look more like a macOS or Windows sysvol.
+            if MacOSPlugin.detect(target) or IOSPlugin.detect(target) or WindowsPlugin.detect(target):
+                continue
+
+            # Dirs /var and /etc make this a Unix-like system (see UnixPlugin.detect),
+            # while Linux-kernel specific files make it a Linux filesystem.
+            if fs.exists("/var") and fs.exists("/etc") and any(fs.exists(p) for p in LINUX_PATHS):
+                return fs
+
+            # This filesystem could be a volatile collection of a Linux system.
+            if fs.exists("/sys/module") or fs.exists("/proc/sys"):
                 return fs
 
     @export(property=True)

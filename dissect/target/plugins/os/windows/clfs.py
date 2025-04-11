@@ -4,7 +4,6 @@ from dissect.clfs import blf, container
 from dissect.clfs.exceptions import InvalidBLFError, InvalidRecordBlockError
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers import fsutil
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.target import Target
@@ -91,7 +90,6 @@ class ClfsPlugin(Plugin):
                             continue
 
                         container_path = blf_container.name.replace("%BLF%", str(blf_path.parent))
-                        container_path = fsutil.normalize(container_path, alt_separator=blf_path._flavour.altsep)
                         container_file = self.target.fs.path(container_path)
 
                         fh = container_file.open()

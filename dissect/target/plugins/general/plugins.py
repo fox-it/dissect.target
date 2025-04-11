@@ -58,17 +58,16 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
     failed = []
 
     for desc in functions or _get_default_functions():
-        plugincls = plugin.load(desc)
-        func = getattr(plugincls, desc.method_name)
-        docstring = func.__doc__.split("\n\n", 1)[0].strip() if func.__doc__ else None
+        docstring = desc.func.__doc__.split("\n\n", 1)[0].strip() if desc.func.__doc__ else None
         arguments = [
             {
                 "name": name[0],
                 "type": getattr(arg.get("type"), "__name__", None),
                 "help": arg.get("help"),
                 "default": arg.get("default"),
+                "required": arg.get("required", False),
             }
-            for name, arg in getattr(func, "__args__", [])
+            for name, arg in desc.args
         ]
 
         loaded.append(
@@ -78,6 +77,7 @@ def generate_functions_json(functions: list[plugin.FunctionDescriptor] | None = 
                 "description": docstring,
                 "arguments": arguments,
                 "path": desc.path,
+                "alias": desc.alias,
             }
         )
 
@@ -110,7 +110,7 @@ def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = No
             obj = obj.setdefault(part, {})
 
         if parts[-1] not in obj:
-            obj[parts[-1]] = plugin.load(desc)
+            obj[parts[-1]] = desc.cls
 
     return dict(sorted(result.items()))
 

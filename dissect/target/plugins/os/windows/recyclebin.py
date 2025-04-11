@@ -47,12 +47,14 @@ class RecyclebinPlugin(Plugin):
 
     def __init__(self, target: Target) -> None:
         super().__init__(target)
-
-    def check_compatible(self) -> None:
+        self.recyclebin_paths = []
         for fs_entry in self.target.fs.path("/").iterdir():
             if self._is_valid_recyclebin(fs_entry):
-                return
-        raise UnsupportedPluginError("No recycle bins found")
+                self.recyclebin_paths.append(fs_entry.joinpath("$recycle.bin"))
+
+    def check_compatible(self) -> None:
+        if not self.recyclebin_paths:
+            raise UnsupportedPluginError("No recycle bins found")
 
     def _is_valid_recyclebin(self, path: TargetPath) -> bool:
         """Checks wether it is a valid recycle bin path.
@@ -82,13 +84,7 @@ class RecyclebinPlugin(Plugin):
           source (uri): Location of $I meta file on disk
         """
 
-        recyclebin_paths = (
-            entry.joinpath("$recycle.bin")
-            for entry in self.target.fs.path("/").iterdir()
-            if self._is_valid_recyclebin(entry)
-        )
-
-        for recyclebin in recyclebin_paths:
+        for recyclebin in self.recyclebin_paths:
             yield from self.read_recycle_bin(recyclebin)
 
     def _is_recycle_file(self, path: TargetPath) -> bool:

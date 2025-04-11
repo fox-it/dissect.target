@@ -1,4 +1,6 @@
 import os
+import sys
+import textwrap
 from functools import reduce
 from pathlib import Path
 from typing import Iterator, Optional
@@ -23,16 +25,22 @@ from dissect.target.plugin import (
     PluginDescriptor,
     PluginDescriptorLookup,
     PluginRegistry,
+    _find_py_files,
     _generate_long_paths,
     _save_plugin_import_failure,
     alias,
     environment_variable_paths,
     export,
     find_functions,
+    find_functions_by_record_field_type,
+    functions,
     get_external_module_paths,
-    load,
+    load_modules_from_paths,
+    lookup,
     plugins,
 )
+from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
+from dissect.target.plugins.general.users import UsersPlugin
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.target import Target
 
@@ -77,6 +85,193 @@ def test_load_paths_with_env() -> None:
         assert get_external_module_paths([Path(""), Path("")]) == [Path("")]
 
 
+def test_load_environment_variable_empty_string() -> None:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
+        load_modules_from_paths([])
+        mocked_find_py_files.assert_not_called()
+
+
+def test_load_environment_variable_comma_seperated_string() -> None:
+    with patch("dissect.target.plugin._find_py_files") as mocked_find_py_files:
+        load_modules_from_paths([Path(""), Path("")])
+        mocked_find_py_files.assert_called_with(Path(""))
+
+
+def test_filter_file(tmp_path: Path) -> None:
+    file = tmp_path / "hello.py"
+    file.touch()
+
+    assert list(_find_py_files(file)) == [file]
+
+    test_file = tmp_path / "non_existent_file"
+    assert list(_find_py_files(test_file)) == []
+
+    test_file = tmp_path / "__init__.py"
+    test_file.touch()
+    assert list(_find_py_files(test_file)) == []
+
+
+@pytest.mark.parametrize(
+    ("filename", "empty_list"),
+    [
+        ("__init__.py", True),
+        ("__pycache__/help.pyc", True),
+        ("hello/test.py", False),
+    ],
+)
+def test_filter_directory(tmp_path: Path, filename: str, empty_list: bool) -> None:
+    file = tmp_path / filename
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.touch()
+
+    if empty_list:
+        assert list(_find_py_files(tmp_path)) == []
+    else:
+        assert file in list(_find_py_files(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_module"),
+    [
+        ("test.py", "test"),
+        ("hello_world/help.py", "hello_world.help"),
+        ("path/to/file.py", "path.to.file"),
+    ],
+)
+def test_filesystem_module_registration(tmp_path: Path, filename: str, expected_module: str) -> None:
+    path = tmp_path / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+
+    load_modules_from_paths([tmp_path])
+
+    assert expected_module in sys.modules.keys()
+
+
+def test_plugin_registration(tmp_path: Path) -> None:
+    code = """
+        from dissect.target.plugin import Plugin, export
+
+
+        class TestPlugin(Plugin):
+            __register__ = False
+
+            def check_compatible(self) -> None:
+                return None
+
+            @export(output="default")
+            def hello_world(self):
+                for x in self.target.fs.iterdir(""):
+                    print(f"hello {x}")
+    """
+    (tmp_path / "plugin.py").write_text(textwrap.dedent(code))
+
+    with patch("dissect.target.plugin.register") as mock_register:
+        load_modules_from_paths([tmp_path])
+
+        mock_register.assert_called_once()
+        assert mock_register.call_args[0][0].__name__ == "TestPlugin"
+
+    with patch("dissect.target.plugin.register") as mock_register:
+        load_modules_from_paths([tmp_path / "plugin.py"])
+
+        mock_register.assert_called_once()
+        assert mock_register.call_args[0][0].__name__ == "TestPlugin"
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_plugin_directory(mock_plugins: PluginRegistry, tmp_path: Path) -> None:
+    code = """
+        from dissect.target.plugin import Plugin, export
+
+        class MyPlugin(Plugin):
+            __namespace__ = {!r}
+
+            @export
+            def my_function(self):
+                return "My function"
+    """
+
+    (tmp_path / "myplugin").mkdir()
+    (tmp_path / "myplugin" / "__init__.py").write_text("")
+    (tmp_path / "myplugin" / "_plugin.py").write_text(textwrap.dedent(code.format(None)))
+
+    (tmp_path / "mypluginns").mkdir()
+    (tmp_path / "mypluginns" / "__init__.py").write_text("")
+    (tmp_path / "mypluginns" / "_plugin.py").write_text(textwrap.dedent(code.format("myns")))
+
+    load_modules_from_paths([tmp_path])
+
+    assert mock_plugins.__functions__.__regular__ == {
+        "my_function": {
+            "myplugin.MyPlugin": FunctionDescriptor(
+                name="my_function",
+                namespace=None,
+                path="myplugin.my_function",
+                exported=True,
+                internal=False,
+                findable=True,
+                alias=False,
+                output="default",
+                method_name="my_function",
+                module="myplugin._plugin",
+                qualname="MyPlugin",
+            )
+        },
+        "myns": {
+            "mypluginns.MyPlugin": FunctionDescriptor(
+                name="myns",
+                namespace="myns",
+                path="mypluginns",
+                exported=True,
+                internal=False,
+                findable=True,
+                alias=False,
+                output=None,
+                method_name="__call__",
+                module="mypluginns._plugin",
+                qualname="MyPlugin",
+            )
+        },
+        "myns.my_function": {
+            "mypluginns.MyPlugin": FunctionDescriptor(
+                name="myns.my_function",
+                namespace="myns",
+                path="mypluginns.my_function",
+                exported=True,
+                internal=False,
+                findable=True,
+                alias=False,
+                output="default",
+                method_name="my_function",
+                module="mypluginns._plugin",
+                qualname="MyPlugin",
+            )
+        },
+    }
+
+    assert mock_plugins.__plugins__.__regular__ == {
+        "myplugin.MyPlugin": PluginDescriptor(
+            module="myplugin._plugin",
+            qualname="MyPlugin",
+            namespace=None,
+            path="myplugin",
+            findable=True,
+            functions=["my_function"],
+            exports=["my_function"],
+        ),
+        "mypluginns.MyPlugin": PluginDescriptor(
+            module="mypluginns._plugin",
+            qualname="MyPlugin",
+            namespace="myns",
+            path="mypluginns",
+            findable=True,
+            functions=["my_function", "__call__"],
+            exports=["my_function", "__call__"],
+        ),
+    }
+
+
 class MockOSWarpPlugin(OSPlugin):
     __exports__ = ["f6"]  # OS exports f6
     __register__ = False
@@ -105,6 +300,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f3",
                         module="test.x13",
@@ -119,6 +315,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f3",
                         module="os",
@@ -133,6 +330,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=False,
+                        alias=False,
                         output="record",
                         method_name="f22",
                         module="test.x69",
@@ -149,6 +347,7 @@ class MockOSWarpPlugin(OSPlugin):
                         exported=True,
                         internal=False,
                         findable=True,
+                        alias=False,
                         output="record",
                         method_name="f6",
                         module="os.warp._os",
@@ -205,6 +404,19 @@ def test_find_functions_linux(target_linux: Target) -> None:
     assert len(found) == 1
     assert found[0].name == "services"
     assert found[0].path == "os.unix.linux.services.services"
+
+
+def test_find_functions_compatible_check(target_linux: Target) -> None:
+    """test if we correctly check for compatibility in ``find_functions`` and ``_filter_compatible``."""
+
+    found, _ = find_functions("*", target_linux, compatibility=True)
+    assert "os.unix.log.messages.syslog.syslog" not in [f"{f.path}.{f.name}" for f in found]
+
+    with patch("dissect.target.plugins.apps.browser.chrome.ChromePlugin.check_compatible", return_value=None):
+        found, _ = find_functions("*", target_linux, compatibility=True)
+        functions = [f.path for f in found]
+        assert "apps.browser.chrome.cookies" in functions
+        assert "apps.browser.chrome.history" in functions
 
 
 TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
@@ -336,6 +548,24 @@ def test_namespace_plugin(target_win: Target) -> None:
                 yield "faulty"
 
 
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_namespace_plugin_registration(mock_plugins: PluginRegistry) -> None:
+    class _TestNSPlugin(NamespacePlugin):
+        __namespace__ = "NS"
+
+    class _TestSubPlugin1(_TestNSPlugin):
+        __namespace__ = "t1"
+
+        @export(record=TestRecord)
+        def test(self):
+            ...
+
+    assert next(lookup("NS")).exported
+    assert next(lookup("NS.test")).exported
+    assert next(lookup("t1")).exported
+    assert next(lookup("t1.test")).exported
+
+
 def test_find_plugin_function_default(target_default: Target) -> None:
     found, _ = find_functions("services", target_default)
 
@@ -392,6 +622,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="mail",
                     module="apps.mail",
@@ -406,6 +637,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app1",
                     module="os.apps.app1",
@@ -420,6 +652,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app2",
                     module="os.apps.app2",
@@ -432,6 +665,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="app2",
                     module="os.fooos.apps.app2",
@@ -446,6 +680,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foo_app",
                     module="os.foos.apps.foo_app",
@@ -460,6 +695,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="bar_app",
                     module="os.foos.apps.bar_app",
@@ -474,6 +710,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foobar",
                     module="os.foos.foobar",
@@ -490,6 +727,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="generic_os",
                     module="os._os",
@@ -504,6 +742,7 @@ MOCK_PLUGINS = PluginRegistry(
                     exported=True,
                     internal=False,
                     findable=True,
+                    alias=False,
                     output="record",
                     method_name="foo_os",
                     module="os.fooos._os",
@@ -700,6 +939,93 @@ def test_plugins_default_plugin(target_default: Target) -> None:
     assert len(list(default_os_plugin_desc)) == 1
 
 
+def test_function_aliases(target_default: Target) -> None:
+    """test if alias functions are tagged as such correctly."""
+
+    # function that is an alias should have an alias property set to True
+    syslog_fd = find_functions("syslog", target_default)[0][0]
+    assert syslog_fd
+    assert syslog_fd.path == "os.unix.log.messages.syslog"
+    assert syslog_fd.exported
+    assert syslog_fd.alias
+
+    # function that is not an alias should have an alias property set to False
+    messages_fd = find_functions("messages", target_default)[0][0]
+    assert messages_fd
+    assert messages_fd.path == "os.unix.log.messages.messages"
+    assert not messages_fd.alias
+
+
+def test_function_required_arguments(target_default: Target) -> None:
+    """test if functions with required arguments are tagged as such correctly."""
+
+    # function without any arguments should have an args property with an empty list
+    syslog_fd = find_functions("syslog", target_default)[0][0]
+    assert syslog_fd
+    assert not syslog_fd.args
+
+    # function with an argument should have an args property filled
+    envfile_fd = find_functions("envfile", target_default)[0][0]
+    assert envfile_fd
+    assert envfile_fd.args == [
+        (
+            ("--env-path",),
+            {
+                "help": "path to scan environment files in",
+                "required": True,
+            },
+        ),
+        (
+            ("--extension",),
+            {
+                "default": "env",
+                "help": "extension of files to scan",
+            },
+        ),
+    ]
+
+
+def test_plugin_runtime_info() -> None:
+    plugin_desc = next(p for p in plugins() if p.path == "general.users")
+    assert plugin_desc.cls is UsersPlugin
+
+    func_desc = next(p for p in functions() if p.path == "apps.other.env.envfile")
+    assert func_desc.cls is EnvironmentFilePlugin
+    assert func_desc.func is EnvironmentFilePlugin.envfile
+    assert func_desc.record is EnvironmentFilePlugin.envfile.__record__
+    assert func_desc.args == EnvironmentFilePlugin.envfile.__args__
+
+
+def test_find_by_record_field_type(target_default: Target) -> None:
+    assert "filesystem.walkfs.walkfs" in [desc.path for desc in find_functions_by_record_field_type("path")]
+    assert "apps.other.env.envfile" in [
+        desc.path for desc in find_functions_by_record_field_type("path", target_default, compatibility=True)
+    ]
+
+    with patch(
+        "dissect.target.plugin.functions",
+        return_value=[
+            FunctionDescriptor(
+                name="test",
+                namespace=None,
+                path="test",
+                exported=True,
+                internal=False,
+                findable=True,
+                alias=False,
+                output="record",
+                method_name="test",
+                module="test",
+                qualname="Test",
+            )
+        ],
+    ):
+        with pytest.raises(PluginError, match="An exception occurred while trying to load a plugin: test"):
+            list(find_functions_by_record_field_type("path"))
+
+        assert list(find_functions_by_record_field_type("path", ignore_load_errors=True)) == []
+
+
 @pytest.mark.parametrize(
     "method_name",
     [
@@ -863,6 +1189,7 @@ def test_plugin_alias(target_bare: Target) -> None:
 @pytest.mark.parametrize(
     "descriptor",
     find_functions("*", Target(), compatibility=False, show_hidden=True)[0],
+    ids=lambda d: d.path,
 )
 def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     """This test checks plugin style guide conformity for all exported plugins.
@@ -870,23 +1197,20 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     Resources:
         - https://docs.dissect.tools/en/latest/contributing/style-guide.html
     """
-    plugincls = load(descriptor)
-
     # Ignore DefaultPlugin and NamespacePlugin instances
-    if plugincls.__base__ is NamespacePlugin or plugincls is DefaultPlugin:
+    if descriptor.cls.__base__ is NamespacePlugin or descriptor.cls is DefaultPlugin:
         return
 
     # Plugin method should specify what it returns
     assert descriptor.output in ["record", "yield", "default", "none"], f"Invalid output_type for function {descriptor}"
 
-    py_func = getattr(plugincls, descriptor.method_name)
     annotations = None
 
-    if hasattr(py_func, "__annotations__"):
-        annotations = py_func.__annotations__
+    if hasattr(descriptor.func, "__annotations__"):
+        annotations = descriptor.func.__annotations__
 
-    elif isinstance(py_func, property):
-        annotations = py_func.fget.__annotations__
+    elif isinstance(descriptor.func, property):
+        annotations = descriptor.func.fget.__annotations__
 
     # Plugin method should have a return annotation
     assert annotations and "return" in annotations.keys(), f"No return type annotation for function {descriptor}"
@@ -894,7 +1218,7 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     # TODO: Check if the annotations make sense with the provided output_type
 
     # Plugin method should have a docstring
-    method_doc_str = py_func.__doc__
+    method_doc_str = descriptor.func.__doc__
     assert isinstance(method_doc_str, str), f"No docstring for function {descriptor}"
     assert method_doc_str != "", f"Empty docstring for function {descriptor}"
 
@@ -902,9 +1226,9 @@ def test_exported_plugin_format(descriptor: FunctionDescriptor) -> None:
     assert_valid_rst(method_doc_str)
 
     # Plugin class should have a docstring
-    class_doc_str = plugincls.__doc__
-    assert isinstance(class_doc_str, str), f"No docstring for class {plugincls.__name__}"
-    assert class_doc_str != "", f"Empty docstring for class {plugincls.__name__}"
+    class_doc_str = descriptor.cls.__doc__
+    assert isinstance(class_doc_str, str), f"No docstring for class {descriptor.cls.__name__}"
+    assert class_doc_str != "", f"Empty docstring for class {descriptor.cls.__name__}"
 
     # The class docstring should compile to rst without warnings
     assert_valid_rst(class_doc_str)

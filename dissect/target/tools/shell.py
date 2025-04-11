@@ -33,6 +33,7 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import FilesystemEntry
 from dissect.target.helpers import cyber, fsutil, regutil
+from dissect.target.helpers.utils import StrEnum
 from dissect.target.plugin import FunctionDescriptor, alias, arg, clone_alias
 from dissect.target.target import Target
 from dissect.target.tools.fsutils import (
@@ -44,9 +45,9 @@ from dissect.target.tools.fsutils import (
 )
 from dissect.target.tools.info import print_target_info
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
+    escape_str,
     execute_function_on_target,
     find_and_filter_plugins,
     generate_argparse_for_bound_method,
@@ -76,6 +77,56 @@ except ImportError:
     readline = None
 
 
+def readline_escape(s: str | dict[str, str]) -> str | dict[str, str]:
+    """Escape a string or values in dictionary for readline prompt.
+
+    Used to embed terminal-specific escape sequences in prompts.
+
+    References:
+        - https://wiki.hackzine.org/development/misc/readline-color-prompt.html
+        - http://stackoverflow.com/a/9468954/148845
+        - RL_PROMPT_START_IGNORE = "\001"
+        - RL_PROMPT_END_IGNORE = "\002"
+    """
+    if isinstance(s, dict):
+        return {k: f"\001{v}\002" for k, v in s.items()}
+    return f"\001{s}\002"
+
+
+class AnsiColors(StrEnum):
+    """ANSI color escape sequences."""
+
+    # Base formatting
+    RESET = "\033[0m"
+
+    # Basic colors
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    # Bold colors
+    BOLD_RED = "\033[1;31m"
+    BOLD_GREEN = "\033[1;32m"
+    BOLD_YELLOW = "\033[1;33m"
+    BOLD_BLUE = "\033[1;34m"
+    BOLD_MAGENTA = "\033[1;35m"
+    BOLD_CYAN = "\033[1;36m"
+    BOLD_WHITE = "\033[1;37m"
+
+    @classmethod
+    def as_dict(cls) -> dict[str, str]:
+        """Return ANSI color escape sequences as a dictionary."""
+        return {item.name: item.value for item in cls}
+
+
+# ANSI color escape sequences for readline prompt
+ANSI_COLORS = readline_escape(AnsiColors.as_dict())
+
+
 class ExtendedCmd(cmd.Cmd):
     """Subclassed cmd.Cmd to provide some additional features.
 
@@ -100,7 +151,6 @@ class ExtendedCmd(cmd.Cmd):
 
     def __init__(self, cyber: bool = False):
         cmd.Cmd.__init__(self)
-        self.use_rawinput = False
         self.debug = False
         self.cyber = cyber
         self.identchars += "."
@@ -256,9 +306,10 @@ class ExtendedCmd(cmd.Cmd):
 
     def do_man(self, line: str) -> bool:
         """alias for help"""
-        return self.do_help(line)
+        self.do_help(line)
+        return False
 
-    def complete_man(self, *args) -> list[str]:
+    def complete_man(self, *args: list[str]) -> list[str]:
         return cmd.Cmd.complete_help(self, *args)
 
     def do_unalias(self, line: str) -> bool:
@@ -353,15 +404,15 @@ class TargetCmd(ExtendedCmd):
             self.histfile = pathlib.Path(getattr(target._config, "HISTFILE", self.DEFAULT_HISTFILE)).expanduser()
 
         # prompt format
+        self.prompt_ps1 = "{BOLD_GREEN}{base}{RESET}:{BOLD_BLUE}{cwd}{RESET}$ "
         if ps1 := getattr(target._config, "PS1", None):
             if "{cwd}" in ps1 and "{base}" in ps1:
                 self.prompt_ps1 = ps1
+            else:
+                self.target.log.warning("{cwd} and {base} were not set inside PS1, using the default prompt")
 
         elif getattr(target._config, "NO_COLOR", None) or os.getenv("NO_COLOR"):
             self.prompt_ps1 = "{base}:{cwd}$ "
-
-        else:
-            self.prompt_ps1 = "\x1b[1;32m{base}\x1b[0m:\x1b[1;34m{cwd}\x1b[0m$ "
 
         super().__init__(self.target.props.get("cyber"))
 
@@ -543,12 +594,12 @@ class TargetCli(TargetCmd):
 
         TargetCmd.__init__(self, target)
         self._clicache = {}
-        self.cwd = None
-        self.chdir("/")
+        # Force to root, using `chdir` causes `None` to propagate throughout the class methods.
+        self.cwd = self.target.fs.path("/")
 
     @property
     def prompt(self) -> str:
-        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = self.resolve_path(line[:begidx].rsplit(" ")[-1])
@@ -632,8 +683,8 @@ class TargetCli(TargetCmd):
 
     def chdir(self, path: str) -> None:
         """Change directory to the given path."""
-        if path := self.check_dir(path):
-            self.cwd = path
+        if dir := self.check_dir(path):
+            self.cwd = dir
 
     def do_cd(self, line: str) -> bool:
         """change directory"""
@@ -666,6 +717,13 @@ class TargetCli(TargetCmd):
     def do_info(self, line: str) -> bool:
         """print target information"""
         print_target_info(self.target)
+        return False
+
+    def do_reload(self, line: str) -> bool:
+        """reload the target"""
+        self.target = self.target.reload()
+        if self.cwd:
+            self.chdir(str(self.cwd))  # self.cwd has reference into the old target :/
         return False
 
     @arg("path", nargs="?")
@@ -1200,7 +1258,7 @@ class RegistryCli(TargetCmd):
 
     @property
     def prompt(self) -> str:
-        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd)
+        return "(registry) " + self.prompt_ps1.format(base=self.prompt_base, cwd=self.cwd, **ANSI_COLORS)
 
     def completedefault(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         path = line[:begidx].rsplit(" ")[-1]
@@ -1339,12 +1397,12 @@ def extend_args(args: argparse.Namespace, func: Callable) -> argparse.Namespace:
 
 
 def _target_name(target: Target) -> str:
-    """Return a target name for cmd.Cmd base prompts."""
+    """Return a printable FQDN target name for cmd.Cmd base prompts."""
 
     if target.has_function("domain") and target.domain:
-        return f"{target.name}.{target.domain}"
+        return escape_str(f"{target.name}.{target.domain}")
 
-    return target.name
+    return escape_str(target.name)
 
 
 @contextmanager
@@ -1516,18 +1574,11 @@ def main() -> None:
     parser.add_argument("targets", metavar="TARGETS", nargs="*", help="targets to load")
     parser.add_argument("-p", "--python", action="store_true", help="(I)Python shell")
     parser.add_argument("-r", "--registry", action="store_true", help="registry shell")
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
-    )
     parser.add_argument("-c", "--commands", action="store", nargs="*", help="commands to execute")
     configure_generic_arguments(parser)
+
     args, rest = parser.parse_known_args()
-    args.targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     # For the shell tool we want -q to log slightly more then just CRITICAL messages.
     if args.quiet:

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import re
-import tarfile
+import tarfile as tf
 from pathlib import Path
+from typing import Iterable
 
 from dissect.target import filesystem, target
 from dissect.target.filesystems.tar import (
@@ -11,49 +12,88 @@ from dissect.target.filesystems.tar import (
     TarFilesystemEntry,
 )
 from dissect.target.helpers import fsutil, loaderutil
-from dissect.target.loader import Loader
+from dissect.target.helpers.lazy import import_lazy
+from dissect.target.loader import Loader, SubLoader
 
 log = logging.getLogger(__name__)
 
+TAR_EXT_COMP = (
+    ".tar.gz",
+    ".tar.xz",
+    ".tar.bz",
+    ".tar.bz2",
+    ".tgz",
+    ".txz",
+    ".tbz",
+    ".tbz2",
+)
+TAR_EXT = (".tar",)
+
+TAR_MAGIC_COMP = (
+    # gzip
+    b"\x1f\x8b",
+    # bzip2
+    b"\x42\x5a\x68",
+    # xz
+    b"\xfd\x37\x7a\x58\x5a\x00",
+)
+TAR_MAGIC = (tf.GNU_MAGIC, tf.POSIX_MAGIC)
 
 ANON_FS_RE = re.compile(r"^fs[0-9]+$")
 
+WINDOWS_MEMBERS = (
+    "windows/system32",
+    "/windows/system32",
+    "winnt",
+    "/winnt",
+)
 
-class TarLoader(Loader):
-    """Load tar files."""
 
-    def __init__(self, path: Path | str, **kwargs):
-        super().__init__(path)
+class TarSubLoader(SubLoader[tf.TarFile]):
+    """Tar implementation of a :class:`SubLoader`."""
 
-        if isinstance(path, str):
-            path = Path(path)
-
-        if self.is_compressed(path):
-            log.warning(
-                f"Tar file {path!r} is compressed, which will affect performance. "
-                "Consider uncompressing the archive before passing the tar file to Dissect."
-            )
-
-        self.tar = tarfile.open(fileobj=path.open("rb"))
+    def __init__(self, tar: tf.TarFile, *args, **kwargs):
+        super().__init__(tar, *args, **kwargs)
+        self.tar = tar
 
     @staticmethod
-    def detect(path: Path) -> bool:
-        return path.name.lower().endswith((".tar", ".tar.gz", ".tgz"))
+    def detect(tarfile: tf.TarFile) -> bool:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError
 
-    def is_compressed(self, path: Path | str) -> bool:
-        return str(path).lower().endswith((".tar.gz", ".tgz"))
+    def map(self, target: target.Target) -> None:
+        """Only to be called internally by :class:`TarLoader`."""
+        raise NotImplementedError
+
+
+class GenericTarSubLoader(TarSubLoader):
+    """Generic tar sub loader.
+
+    Recognises acquire tar files and regular tar files. Attempts to map sysvol and c: volume names.
+    """
+
+    @staticmethod
+    def detect(tarfile: tf.TarFile) -> bool:
+        return True
 
     def map(self, target: target.Target) -> None:
         volumes = {}
+        windows_found = False
 
         for member in self.tar.getmembers():
             if member.name == ".":
                 continue
 
+            if member.name.lower().startswith(WINDOWS_MEMBERS):
+                windows_found = True
+                if "/" in volumes:
+                    # Root filesystem was already added
+                    volumes["/"].case_sensitive = False
+
             if not member.name.startswith(("/fs/", "fs/", "/sysvol/", "sysvol/")):
                 # Not an acquire tar
                 if "/" not in volumes:
-                    vol = filesystem.VirtualFilesystem(case_sensitive=True)
+                    vol = filesystem.VirtualFilesystem(case_sensitive=not windows_found)
                     vol.tar = self.tar
                     volumes["/"] = vol
                     target.filesystems.add(vol)
@@ -112,3 +152,57 @@ class TarLoader(Loader):
             )
 
             target.fs.mount(vol_name, vol)
+
+
+class TarLoader(Loader):
+    """Load tar files."""
+
+    __subloaders__ = [
+        import_lazy("dissect.target.loaders.containerimage").ContainerImageTarSubLoader,
+        GenericTarSubLoader,  # should be last
+    ]
+
+    def __init__(self, path: Path | str, **kwargs):
+        super().__init__(path)
+
+        if isinstance(path, str):
+            path = Path(path)
+
+        if is_compressed(path):
+            log.warning(
+                f"Tar file {path!r} is compressed, which will affect performance. "
+                "Consider uncompressing the archive before passing the tar file to Dissect."
+            )
+
+        self.fh = path.open("rb")
+        self.tar = tf.open(mode="r:*", fileobj=self.fh)
+        self.subloader = None
+
+    @staticmethod
+    def detect(path: Path) -> bool:
+        return path.name.lower().endswith(TAR_EXT + TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC + TAR_MAGIC_COMP)
+
+    def map(self, target: target.Target) -> None:
+        for candidate in self.__subloaders__:
+            if candidate.detect(self.tar):
+                self.subloader = candidate(self.tar)
+                self.subloader.map(target)
+                break
+
+
+def is_tar_magic(path: Path, magics: Iterable[bytes]) -> bool:
+    if not path.is_file():
+        return False
+
+    with path.open("rb") as fh:
+        headers = [fh.read(6)]
+        fh.seek(257)
+        headers.append(fh.read(8))
+        for header in headers:
+            if header.startswith(magics):
+                return True
+    return False
+
+
+def is_compressed(path: Path) -> bool:
+    return path.name.lower().endswith(TAR_EXT_COMP) or is_tar_magic(path, TAR_MAGIC_COMP)

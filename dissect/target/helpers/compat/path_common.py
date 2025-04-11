@@ -4,11 +4,11 @@ import io
 import posixpath
 import stat
 import sys
-from typing import IO, TYPE_CHECKING, Iterator, Literal, Optional
+from typing import IO, TYPE_CHECKING, Iterator, Literal
 
 if TYPE_CHECKING:
-    from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.filesystem import Filesystem, FilesystemEntry
+    from dissect.target.helpers.fsutil import TargetPath
 
 from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
 from dissect.target.helpers.polypath import abspath, normalize
@@ -173,9 +173,9 @@ def io_open(
     path: TargetPath,
     mode: str = "rb",
     buffering: int = 0,
-    encoding: Optional[str] = None,
-    errors: Optional[str] = None,
-    newline: Optional[str] = None,
+    encoding: str | None = None,
+    errors: str | None = None,
+    newline: str | None = None,
 ) -> IO:
     """Open file and return a stream.
 

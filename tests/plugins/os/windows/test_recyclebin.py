@@ -1,5 +1,7 @@
+import io
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Iterator
 from unittest.mock import Mock, mock_open, patch
 
 import pytest
@@ -7,10 +9,11 @@ import pytest
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.recyclebin import RecyclebinPlugin, c_recyclebin
+from dissect.target.target import Target
 
 
 @pytest.fixture
-def recycle_bin():
+def recycle_bin() -> Iterator[VirtualFilesystem]:
     recycle_bin = VirtualFilesystem()
 
     with TemporaryDirectory() as tmp_dir:
@@ -18,17 +21,17 @@ def recycle_bin():
         yield recycle_bin
 
 
-def test_recycle_bin_compatibility_failed(target_win):
+def test_recycle_bin_compatibility_failed(target_win: Target) -> None:
     with pytest.raises(UnsupportedPluginError):
         RecyclebinPlugin(target_win).check_compatible()
 
 
-def test_recycle_bin_compat_succeeded(target_win, recycle_bin):
+def test_recycle_bin_compat_succeeded(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     assert RecyclebinPlugin(target_win).check_compatible() is None
 
 
-def test_read_recycle_bin(target_win):
+def test_read_recycle_bin(target_win: Target) -> None:
     mocked_file = Mock()
 
     mocked_file.is_file.return_value = True
@@ -37,7 +40,7 @@ def test_read_recycle_bin(target_win):
         assert [mocked_bin_file.return_value] == list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file))
 
 
-def test_filtered_name(target_win):
+def test_filtered_name(target_win: Target) -> None:
     mocked_file = Mock()
     mocked_file.is_file.return_value = True
     mocked_file.is_dir.return_value = False
@@ -47,7 +50,7 @@ def test_filtered_name(target_win):
     assert [] == list(RecyclebinPlugin(target_win).read_recycle_bin(mocked_file))
 
 
-def test_read_recycle_bin_directory(target_win):
+def test_read_recycle_bin_directory(target_win: Target) -> None:
     mocked_dir = Mock()
     mocked_dir.is_file.return_value = False
     mocked_dir.is_dir.return_value = True
@@ -74,7 +77,7 @@ def test_read_recycle_bin_directory(target_win):
         (b"\x02" + b"\x00" * 7, "header_v2"),
     ],
 )
-def test_parse_header(target_win, version_number, expected_header):
+def test_parse_header(target_win: Target, version_number: bytes, expected_header: str) -> None:
     recycle_plugin = RecyclebinPlugin(target_win)
 
     header = recycle_plugin.select_header(version_number)
@@ -88,7 +91,7 @@ def test_parse_header(target_win, version_number, expected_header):
         "file/to/$recycle.bin/sid",
     ],
 )
-def test_read_bin_file_unknown(target_win, path):
+def test_read_bin_file_unknown(target_win: Target, path: str) -> None:
     recycle_plugin = RecyclebinPlugin(target_win)
 
     header_1 = c_recyclebin.header_v1(version=0, file_size=0x20, timestamp=0x20, filename="hello_world" + "\x00" * 249)
@@ -102,19 +105,20 @@ def test_read_bin_file_unknown(target_win, path):
     assert output.path == "hello_world"
 
 
-def test_recyclebin_plugin_file(target_win, recycle_bin):
-    recycle_bin.map_file("$ihello_world", None)
+def test_recyclebin_plugin_file(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
+    recycle_bin.map_file_fh("$ihello_world", io.BytesIO(b""))
 
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
+    target_win.fs.mount("D:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
     with patch.object(RecyclebinPlugin, "read_bin_file") as mocked_bin_file:
         recycle_bin_entries = list(target_win.recyclebin())
-        assert recycle_bin_entries == [mocked_bin_file.return_value]
+        assert recycle_bin_entries == [mocked_bin_file.return_value, mocked_bin_file.return_value]
 
 
-def test_recyclebin_plugin_wrong_prefix(target_win, recycle_bin):
-    recycle_bin.map_file("hello_world", None)
+def test_recyclebin_plugin_wrong_prefix(target_win: Target, recycle_bin: VirtualFilesystem) -> None:
+    recycle_bin.map_file_fh("hello_world", io.BytesIO(b""))
     target_win.fs.mount("C:\\$recycle.bin", recycle_bin)
     target_win.add_plugin(RecyclebinPlugin)
 
@@ -132,7 +136,7 @@ def test_recyclebin_plugin_wrong_prefix(target_win, recycle_bin):
         ("C:/$Recycle.bin/just_another_file", "unknown"),
     ],
 )
-def test_find_sid_from_path(target_win, path, expected_output):
+def test_find_sid_from_path(target_win: Target, path: str, expected_output: str) -> None:
     recycle_plugin = RecyclebinPlugin(target_win)
 
     assert recycle_plugin.find_sid(Path(path)) == expected_output

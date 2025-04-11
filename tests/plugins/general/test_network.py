@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from dissect.target.helpers.record import (
-    MacInterfaceRecord,
+    MacOSInterfaceRecord,
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
@@ -11,16 +11,16 @@ from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPl
 from dissect.target.target import Target
 
 
-@pytest.fixture(params=[MacInterfaceRecord, WindowsInterfaceRecord, UnixInterfaceRecord])
+@pytest.fixture(params=[MacOSInterfaceRecord, WindowsInterfaceRecord, UnixInterfaceRecord])
 def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
     return request.param(
         name="interface_name",
         type="physical",
         enabled=True,
-        mac=["DE:AD:BE:EF:00:00"],
-        ip=["10.42.42.10"],
+        cidr=["10.42.42.10/24"],
         gateway=["10.42.42.1"],
         dns=["8.8.8.8", "1.1.1.1"],
+        mac=["DE:AD:BE:EF:00:00"],
         source="some_file",
     )
 

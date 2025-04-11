@@ -87,8 +87,7 @@ class MessagesPlugin(Plugin):
                 match = RE_LINE.search(line)
 
                 if not match:
-                    self.target.log.warning("Unable to parse message line in %s", log_file)
-                    self.target.log.debug("Line %s", line)
+                    self.target.log.warning("Unable to parse message line in %s: %r", log_file, line)
                     continue
 
                 yield MessagesRecord(

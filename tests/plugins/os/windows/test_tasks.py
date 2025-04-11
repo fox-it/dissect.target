@@ -7,7 +7,7 @@ import pytest
 from flow.record import GroupedRecord
 
 from dissect.target.filesystem import Filesystem
-from dissect.target.plugins.os.windows.tasks import TaskRecord, TasksPlugin
+from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 

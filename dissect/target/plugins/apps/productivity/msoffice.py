@@ -118,6 +118,8 @@ class ClickOnceDeploymentManifestParser:
 
 
 class LoadBehavior(Enum):
+    """Values that specify the run time behavior of the VSTO add-in."""
+
     Manual = 1
     Autostart = 2
     OnDemand = 3

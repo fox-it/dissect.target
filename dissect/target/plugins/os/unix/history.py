@@ -14,6 +14,7 @@ CommandHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension
     "unix/history",
     [
         ("datetime", "ts"),
+        ("varint", "order"),
         ("string", "command"),
         ("string", "shell"),
         ("path", "source"),
@@ -26,7 +27,7 @@ RE_FISH = re.compile(r"- cmd: (?P<command>.+?)\s+when: (?P<ts>\d+)")
 
 
 class CommandHistoryPlugin(Plugin):
-    """Unix command history plugin."""
+    """UNIX command history plugin."""
 
     COMMAND_HISTORY_RELATIVE_PATHS = (
         ("bash", ".bash_history"),
@@ -62,11 +63,10 @@ class CommandHistoryPlugin(Plugin):
     @alias("bashhistory")
     @export(record=CommandHistoryRecord)
     def commandhistory(self) -> Iterator[CommandHistoryRecord]:
-        """Return shell history for all users.
+        """Return shell history for all UNIX users.
 
-        When using a shell, history of the used commands is kept on the system.
-        It is kept in a hidden file named ".$SHELL_history" and may expose
-        commands that were used by an adversary.
+        When using a shell, history of the used commands can be kept on the system. These are usually written to
+        a hidden file named ``.$SHELL_history`` and may expose commands that were used by an adversary.
         """
 
         for shell, history_path, user in self._history_files:
@@ -95,6 +95,7 @@ class CommandHistoryPlugin(Plugin):
         """
         next_cmd_ts = None
 
+        i = 0
         for line in file.open("rt", errors="replace"):
             ts = None
             line = line.strip()
@@ -113,11 +114,14 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=line,
+                order=i,
                 shell=shell,
                 source=file,
                 _target=self.target,
                 _user=user,
             )
+
+            i += 1
 
     @internal
     def parse_zsh_history(self, file, user: UnixUserRecord) -> Iterator[CommandHistoryRecord]:
@@ -133,6 +137,7 @@ class CommandHistoryPlugin(Plugin):
         Resources:
             - https://sourceforge.net/p/zsh/code/ci/master/tree/Src/hist.c
         """
+        i = 0
         for line in file.open("rt", errors="replace"):
             line = line.strip()
 
@@ -149,11 +154,14 @@ class CommandHistoryPlugin(Plugin):
             yield CommandHistoryRecord(
                 ts=ts,
                 command=command,
+                order=i,
                 shell="zsh",
                 source=file,
                 _target=self.target,
                 _user=user,
             )
+
+            i += 1
 
     @internal
     def parse_fish_history(self, history_file: TargetPath, user: UnixUserRecord) -> Iterator[CommandHistoryRecord]:
@@ -182,10 +190,11 @@ class CommandHistoryPlugin(Plugin):
         with history_file.open("r") as h_file:
             history_data = h_file.read()
 
-        for command, ts in RE_FISH.findall(history_data):
+        for i, (command, ts) in enumerate(RE_FISH.findall(history_data)):
             yield CommandHistoryRecord(
                 ts=from_unix(int(ts)),
                 command=command,
+                order=i,
                 shell="fish",
                 source=history_file,
                 _target=self.target,

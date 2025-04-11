@@ -169,7 +169,7 @@ class Container(io.IOBase):
 
         Override this if you need to clean-up anything.
         """
-        raise NotImplementedError()
+        pass
 
 
 def register(module: str, class_name: str, internal: bool = True):
