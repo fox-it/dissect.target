@@ -8,8 +8,19 @@ GENERIC_LOG_RECORD_FIELDS = [
     ("path", "source"),
 ]
 
+GENERIC_FILE_TRANSFER_RECORD_FIELDS = [
+    ("datetime", "ts"),
+    ("path", "filename"),
+    ("string", "message"),
+    ("path", "source"),
+]
+
 RemoteAccessLogRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "remoteaccess/log", GENERIC_LOG_RECORD_FIELDS
+)
+
+RemoteAccessFileTransferRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
+    "remoteaccess/filetransfer", GENERIC_FILE_TRANSFER_RECORD_FIELDS
 )
 
 
