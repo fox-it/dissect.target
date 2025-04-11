@@ -25,7 +25,7 @@ class ResolverPlugin(Plugin):
         pass
 
     @internal
-    def resolve(self, path: str, user: Optional[str] = None) -> str:
+    def resolve(self, path: str, user: Optional[str] = None) -> fsutil.TargetPath:
         """Resolve a partial path string to a file or directory present in the target.
 
         For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
