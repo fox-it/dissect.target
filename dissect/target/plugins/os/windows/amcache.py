@@ -193,11 +193,27 @@ ContainerAppcompatRecord = TargetRecordDescriptor(
     ],
 )
 
-AppLaunchAppcompatRecord = TargetRecordDescriptor(
-    "windows/appcompat/AppLaunch",
+PcaAppLaunchAppcompatRecord = TargetRecordDescriptor(
+    "windows/appcompat/pca/AppLaunch",
     [
         ("datetime", "ts"),
         ("path", "path"),
+        ("path", "source"),
+    ],
+)
+
+PcaGeneralAppcompatRecord = TargetRecordDescriptor(
+    "windows/appcompat/pca/General",
+    [
+        ("datetime", "ts"),
+        ("path", "path"),
+        ("varint", "type"),
+        ("string", "name"),
+        ("string", "copyright"),
+        ("string", "version"),
+        ("string", "program_id"),
+        ("string", "exit_code"),
+        ("path", "source"),
     ],
 )
 
@@ -345,11 +361,8 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         if fpath.exists():
             self.amcache.add(regutil.RegfHive(fpath))
 
-        if self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt").exists():
-            self.amcache_applaunch = True
-
     def check_compatible(self) -> None:
-        if not len(self.amcache) > 0 and not self.amcache_applaunch:
+        if not self.amcache and not next(self.target.fs.path("sysvol/windows/appcompat/pca").glob("Pca*.txt"), None):
             raise UnsupportedPluginError("Could not load amcache.hve or find AppLaunchDic")
 
     def read_key_subkeys(self, key: str) -> Iterator[regutil.RegistryKey]:
@@ -621,25 +634,63 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
         if self.amcache:
             yield from self.parse_inventory_device_container()
 
-    @export(record=AppLaunchAppcompatRecord)
-    def applaunches(self) -> Iterator[AppLaunchAppcompatRecord]:
-        """Return AppLaunchAppcompatRecord records from Amcache applaunch files (Windows 11 22H2 or later).
-
-        TODO: Research C:\\Windows\\appcompat\\pca\\PcaGeneralDb0.txt and
-              C:\\Windows\\appcompat\\pca\\PcaGeneralDb1.txt files.
+    @export(record=PcaAppLaunchAppcompatRecord)
+    def applaunches(self) -> Iterator[PcaAppLaunchAppcompatRecord]:
+        """Return PcaAppLaunchAppcompatRecord records from Amcache PCA AppLaunch files (Windows 11 22H2 or later).
 
         References:
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
         """
 
-        if (fh := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
-            for line in fh.open("rt"):
-                if line.startswith("#") or line.strip() == "":
+        if (path := self.target.fs.path("sysvol/windows/appcompat/pca/PcaAppLaunchDic.txt")).exists():
+            for line in path.open("rt"):
+                if not (line := line.strip()):
                     continue
-                parts = line.rstrip().split("|")
-                yield AppLaunchAppcompatRecord(
-                    ts=datetime.strptime(parts[-1], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
-                    path=self.target.fs.path(parts[0]),
+
+                parts = line.split("|")
+                if len(parts) != 2:
+                    self.target.log.warning("Invalid line in PcaAppLaunchDic.txt, ignoring: %s", line)
+                    continue
+
+                app_path, ts = parts
+
+                yield PcaAppLaunchAppcompatRecord(
+                    ts=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
+                    path=self.target.fs.path(app_path),
+                    source=path,
+                    _target=self.target,
+                )
+
+    @export(record=PcaGeneralAppcompatRecord)
+    def general(self) -> Iterator[PcaGeneralAppcompatRecord]:
+        """Return PcaGeneralAppcompatRecord records from Amcache PCA General files (Windows 11 22H2 or later).
+
+        References:
+            - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
+        """
+
+        for path in self.target.fs.path("sysvol/windows/appcompat/pca").glob("PcaGeneralDb*.txt"):
+            for line in path.open("rt", encoding="utf-16-le"):
+                if not (line := line.strip()):
+                    continue
+
+                parts = line.split("|")
+                if len(parts) != 8:
+                    self.target.log.warning("Invalid line in %s, ignoring: %s", path.name, line)
+                    continue
+
+                ts, type_, app_path, name, copyright, version, program_id, exit_code = parts
+
+                yield PcaGeneralAppcompatRecord(
+                    ts=datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc),
+                    path=self.target.resolve(app_path),
+                    type=int(type_),
+                    name=name,
+                    copyright=copyright,
+                    version=version,
+                    program_id=program_id,
+                    exit_code=exit_code,
+                    source=path,
                     _target=self.target,
                 )
 

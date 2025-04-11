@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path
@@ -67,7 +69,9 @@ def test_amcache_old_format(target_win: Target, fs_win: VirtualFilesystem) -> No
 
 
 def test_amcache_windows_11_applaunches(target_win: Target, fs_win: VirtualFilesystem) -> None:
-    applaunch_file = absolute_path("_data/plugins/os/windows/amcache/PcaAppLaunchDic.txt")
+    # Test file taken from https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaAppLaunchDic.txt
+    # Licensed under the MIT License, Copyright (c) 2022 DFIR Artifact Museum
+    applaunch_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaAppLaunchDic.txt")
     fs_win.map_file("windows/appcompat/pca/PcaAppLaunchDic.txt", applaunch_file)
 
     target_win.add_plugin(AmcachePlugin)
@@ -76,6 +80,37 @@ def test_amcache_windows_11_applaunches(target_win: Target, fs_win: VirtualFiles
     assert len(applaunches) == 55
     assert applaunches[0].ts == datetime.datetime(2022, 12, 17, 13, 27, 53, 96000, tzinfo=datetime.timezone.utc)
     assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
+
+
+def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    # Test files taken from https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaGeneralDb0.txt
+    # and https://github.com/AndrewRathbun/DFIRArtifactMuseum/blob/main/Windows/Amcache/Win11/RathbunVM/PcaGeneralDb1.txt
+    # Licensed under the MIT License, Copyright (c) 2022 DFIR Artifact Museum
+    db0_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaGeneralDb0.txt")
+    db1_file = absolute_path("_data/plugins/os/windows/amcache/pca/PcaGeneralDb1.txt")
+    fs_win.map_file("windows/appcompat/pca/PcaGeneralDb0.txt", db0_file)
+    fs_win.map_file("windows/appcompat/pca/PcaGeneralDb1.txt", db1_file)
+
+    # To rest path resolving
+    fs_win.map_file_fh("C:\\Program Files\\freefilesync\\bin\\freefilesync_x64.exe", BytesIO(b""))
+
+    target_win.add_plugin(AmcachePlugin)
+
+    with patch(
+        "dissect.target.plugins.os.windows.env.EnvironmentVariablePlugin._get_system_env_vars",
+        return_value={"%programfiles%": "C:\\Program Files"},
+    ):
+        records = list(target_win.amcache.general())
+
+        assert len(records) == 176
+        assert records[0].ts == datetime.datetime(2022, 5, 12, 19, 48, 9, 548000, tzinfo=datetime.timezone.utc)
+        assert records[0].path == "C:\\Program Files\\freefilesync\\freefilesync.exe"
+        assert records[0].type == 2
+        assert records[0].name == "freefilesync"
+        assert records[0].copyright == "freefilesync.org"
+        assert records[0].version == "11.20"
+        assert records[0].program_id == "000617915288ba535b4198ae58be4d9e2a4200000904"
+        assert records[0].exit_code == "Abnormal process exit with code 0x2"
 
 
 def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
