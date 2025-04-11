@@ -27,7 +27,7 @@ def test_citrix_os(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert target_citrix.os == "citrix-netscaler"
     hostname = target_citrix.hostname
     version = target_citrix.version
-    users = sorted(list(target_citrix.users()), key=lambda user: (user.name, str(user.home) if user.home else ""))
+    users = sorted(target_citrix.users(), key=lambda user: (user.name, str(user.home) if user.home else ""))
     ips = target_citrix.ips
     ips.sort()
 

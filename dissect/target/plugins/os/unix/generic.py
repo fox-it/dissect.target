@@ -3,10 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from statistics import median
+from typing import TYPE_CHECKING
 
 from dissect.util import ts
 
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
 
 
 class GenericPlugin(Plugin):
@@ -56,11 +61,12 @@ class GenericPlugin(Plugin):
         root_stat = self.target.fs.stat("/")
         if root_stat.st_ctime == root_stat.st_mtime:
             return ts.from_unix(root_stat.st_ctime)
+        return None
 
 
 def calculate_last_activity(folder: Path, recursive: bool = False) -> datetime | None:
     if not folder.exists() or not folder.is_dir():
-        return
+        return None
 
     last_seen = 0
     for file in folder.rglob("*") if recursive else folder.iterdir():
@@ -71,3 +77,4 @@ def calculate_last_activity(folder: Path, recursive: bool = False) -> datetime |
 
     if last_seen != 0:
         return ts.from_unix(last_seen)
+    return None

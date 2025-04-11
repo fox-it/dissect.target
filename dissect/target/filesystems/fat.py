@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import datetime
 import math
 import stat
-from typing import BinaryIO, Iterator, Optional, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fat import exceptions as fat_exc
 from dissect.fat import fat
@@ -10,12 +12,15 @@ from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 class FatFilesystem(Filesystem):
     __type__ = "fat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
-        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
+        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
         self.fatfs = fat.FATFS(fh)
         # FAT timestamps are in local time, so to prevent skewing them even more, we specify UTC by default.
         # However, it should be noted that they are not actual UTC timestamps!
@@ -27,17 +32,17 @@ class FatFilesystem(Filesystem):
         """Detect a FAT filesystem on a given file-like object."""
         try:
             fat.validate_bpb(fh.read(512))
-            return True
         except fat_exc.InvalidBPB:
             return False
+        else:
+            return True
 
     def get(self, path: str) -> FilesystemEntry:
-        """Returns a FatFilesystemEntry object corresponding to the given pathname"""
         return FatFilesystemEntry(self, path, self._get_entry(path))
 
     def _get_entry(
-        self, path: str, entry: Optional[Union[fat.RootDirectory, fat.DirectoryEntry]] = None
-    ) -> Union[fat.RootDirectory, fat.DirectoryEntry]:
+        self, path: str, entry: fat.RootDirectory | fat.DirectoryEntry | None = None
+    ) -> fat.RootDirectory | fat.DirectoryEntry:
         """Returns an internal FAT entry for a given path and optional relative entry."""
         try:
             return self.fatfs.get(path, dirent=entry)

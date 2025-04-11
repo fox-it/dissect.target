@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import itertools
+from typing import NoReturn
 
 import pytest
 
@@ -15,10 +18,10 @@ from dissect.target.helpers.record import (
 )
 
 RECORD_NAME = "test/record"
-RECORD_FIELDS = [
+RECORD_FIELDS = (
     ("string", "foo"),
     ("string", "bar"),
-]
+)
 
 BasicTestRecord = TargetRecordDescriptor(RECORD_NAME)
 TestRecord = TargetRecordDescriptor(RECORD_NAME, RECORD_FIELDS)
@@ -33,11 +36,11 @@ class MockTarget:
 
 class MockNoDomainTarget(MockTarget):
     @property
-    def domain(self):
+    def domain(self) -> NoReturn:
         raise PluginError("No plugin domain")
 
 
-def test_trd_init():
+def test_trd_init() -> None:
     default_field_names = [field_name for _, field_name in TargetRecordDescriptor._default_fields]
     record_field_names = list(BasicTestRecord.fields.keys())
 
@@ -55,7 +58,7 @@ def test_trd_init():
     assert descriptor_field_names == record_field_names
 
 
-def test_trd_init_with_defaults_fail():
+def test_trd_init_with_defaults_fail() -> None:
     for field_type, field_name in TargetRecordDescriptor._default_fields:
         with pytest.raises(TypeError, match=f"Default field '{field_name}'"):
             TargetRecordDescriptor(
@@ -64,7 +67,7 @@ def test_trd_init_with_defaults_fail():
             )
 
 
-def test_trd_call_with_kwargs():
+def test_trd_call_with_kwargs() -> None:
     record = TestRecord(
         foo="foo",
         bar="bar",
@@ -78,8 +81,8 @@ def test_trd_call_with_kwargs():
     assert record._source == "/some/path"
 
 
-def test_trd_call_with_args():
-    with pytest.raises(ValueError):
+def test_trd_call_with_args() -> None:
+    with pytest.raises(ValueError, match="Args are not allowed in ExtendableRecordDescriptor"):
         TestRecord(
             "foo",
             "bar",
@@ -87,8 +90,8 @@ def test_trd_call_with_args():
         )
 
 
-def test_trd_call_with_args_kwargs():
-    with pytest.raises(ValueError):
+def test_trd_call_with_args_kwargs() -> None:
+    with pytest.raises(ValueError, match="Args are not allowed in ExtendableRecordDescriptor"):
         TestRecord(
             "foo",
             bar="bar",
@@ -96,7 +99,7 @@ def test_trd_call_with_args_kwargs():
         )
 
 
-def test_trd_call_with_default_fields():
+def test_trd_call_with_default_fields() -> None:
     record = TestRecord(
         hostname="hostname-ignored",
         domain="domain-ignored",
@@ -112,7 +115,7 @@ def test_trd_call_with_default_fields():
     assert record._source == "/some/path"
 
 
-def test_trd_call_no_target():
+def test_trd_call_no_target() -> None:
     record = TestRecord(
         foo="foo",
         bar="bar",
@@ -125,7 +128,7 @@ def test_trd_call_no_target():
     assert record._source is None
 
 
-def test_trd_call_no_domain_target():
+def test_trd_call_no_domain_target() -> None:
     record = TestRecord(
         foo="foo",
         bar="bar",
@@ -139,7 +142,7 @@ def test_trd_call_no_domain_target():
     assert record._source == "/some/path"
 
 
-def test_ordered_record():
+def test_ordered_record() -> None:
     expected_ordered_fields = tuple(
         TargetRecordDescriptorExtension._default_fields + RECORD_FIELDS + UserRecordDescriptorExtension._default_fields
     )
@@ -150,7 +153,7 @@ def test_ordered_record():
 
 
 @pytest.fixture
-def mock_windows_user():
+def mock_windows_user() -> WindowsUserRecord:
     return WindowsUserRecord(
         sid="some-sid",
         name="some-name",
@@ -160,7 +163,7 @@ def mock_windows_user():
 
 
 @pytest.fixture
-def mock_unix_user():
+def mock_unix_user() -> UnixUserRecord:
     return UnixUserRecord(
         uid=1337,
         name="some-name",
@@ -169,7 +172,7 @@ def mock_unix_user():
     )
 
 
-def test_user_record_descriptor_extension(mock_windows_user, mock_unix_user):
+def test_user_record_descriptor_extension(mock_windows_user: WindowsUserRecord, mock_unix_user: UnixUserRecord) -> None:
     TestRecord = create_extended_descriptor([UserRecordDescriptorExtension])("test/record", [])
 
     test_record = TestRecord(_user=mock_windows_user)

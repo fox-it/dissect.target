@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from io import BytesIO
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.remoteaccess.teamviewer import TeamViewerPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_teamviewer_global_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
@@ -73,7 +78,7 @@ def test_teamviewer_special_date_parsing(target_win_users: Target, fs_win: Virtu
 
 
 def test_teamviewer_timezone(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    """test if we correctly set the timezone in teamviewer logs."""
+    """Test if we correctly set the timezone in teamviewer logs."""
 
     log = """
     Start:          2024/12/31 01:02:03.123 (UTC+2:00)
@@ -92,7 +97,7 @@ def test_teamviewer_timezone(target_win_users: Target, fs_win: VirtualFilesystem
 
     target_win_users.add_plugin(TeamViewerPlugin)
 
-    records = sorted(list(target_win_users.teamviewer.logs()), key=lambda r: r.ts)
+    records = sorted(target_win_users.teamviewer.logs(), key=lambda r: r.ts)
 
     assert len(records) == 8
 

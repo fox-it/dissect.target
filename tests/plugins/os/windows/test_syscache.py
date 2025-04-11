@@ -1,9 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugins.os.windows.syscache import SyscachePlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_syscache_plugin(target_win, fs_win):
+
+def test_syscache_plugin(target_win: Target, fs_win: VirtualFilesystem) -> None:
     syscache_file = absolute_path("_data/plugins/os/windows/syscache/Syscache.hve")
     fs_win.map_file("System Volume Information/Syscache.hve", syscache_file)
 
@@ -13,8 +21,8 @@ def test_syscache_plugin(target_win, fs_win):
     assert len(results) == 401
 
 
-def test_syscache_plugin_real_mft(target_win, fs_win):
-    filesystem = NtfsFilesystem(mft=open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb"))
+def test_syscache_plugin_real_mft(target_win: Target, fs_win: VirtualFilesystem) -> None:
+    filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw").open("rb"))
 
     # We need to change the type of the mocked filesystem, since syscache.py checks for explicit value
     target_win.fs.mounts["sysvol"].__type__ = "ntfs"

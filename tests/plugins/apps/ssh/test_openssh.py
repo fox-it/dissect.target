@@ -4,15 +4,20 @@ import base64
 import textwrap
 from enum import Enum, auto
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.ssh.openssh import (
     OpenSSHPlugin,
     calculate_fingerprints,
 )
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.fixture(
@@ -22,7 +27,7 @@ from dissect.target.plugins.apps.ssh.openssh import (
     ],
     ids=["target_unix", "target_windows"],
 )
-def target_and_filesystem(request) -> tuple[Target, VirtualFilesystem]:
+def target_and_filesystem(request: pytest.FixtureRequest) -> tuple[Target, VirtualFilesystem]:
     target = request.getfixturevalue(request.param[0])
     filesystem = request.getfixturevalue(request.param[1])
     return target, filesystem
@@ -42,7 +47,7 @@ class Alternatives:
     label: str
 
     @classmethod
-    def from_target(cls, target: Target) -> Alternatives:
+    def from_target(cls, target: Target) -> Self:
         alternative = cls()
         alternative.os_type = target._os.os
         alternative.separator = "/"

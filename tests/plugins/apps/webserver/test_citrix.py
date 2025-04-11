@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.webserver.apache import ApachePlugin
 from dissect.target.plugins.apps.webserver.citrix import (
     LOG_FORMAT_CITRIX_NETSCALER_ACCESS_COMBINED_RESPONSE_TIME,
@@ -12,8 +14,11 @@ from dissect.target.plugins.apps.webserver.citrix import (
     CitrixWebserverPlugin,
 )
 from dissect.target.plugins.apps.webserver.webserver import WebserverPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_infer_access_log_citrix_netscaler_combined_response_time() -> None:

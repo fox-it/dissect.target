@@ -1,10 +1,15 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers import keychain
 from dissect.target.plugin import export
 from dissect.target.plugins.os.windows.dpapi.keyprovider.keyprovider import (
     KeyProviderPlugin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class KeychainKeyProviderPlugin(KeyProviderPlugin):

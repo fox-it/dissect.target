@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import json
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.target.filesystem import LayerFilesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +47,7 @@ class Overlay2Filesystem(LayerFilesystem):
             cache_id = layer_ref.joinpath("cache-id").read_text()
             layers.append(("/", root.joinpath("overlay2", cache_id, "diff")))
 
-            if (parent_file := layer_ref.joinpath("parent")).exists():
-                parent_layer = parent_file.read_text()
-            else:
-                parent_layer = None
+            parent_layer = parent_file.read_text() if (parent_file := layer_ref.joinpath("parent")).exists() else None
 
         # add the container layers
         for container_layer_name in ["init-id", "mount-id"]:
@@ -62,7 +64,7 @@ class Overlay2Filesystem(LayerFilesystem):
                 return
 
             for mount in config.get("MountPoints").values():
-                if not mount["Type"] in ["volume", "bind"]:
+                if mount["Type"] not in ["volume", "bind"]:
                     log.warning("Encountered unsupported mount type %s in container %s", mount["Type"], path.name)
                     continue
 

@@ -6,7 +6,7 @@ from dissect.target.helpers.regex.ipaddress import extract_ips
 
 
 @pytest.mark.parametrize(
-    "input_ip, expected_output",
+    ("input_ip", "expected_output"),
     [
         # Correct ipv6 addresses
         ("1::", "1::"),

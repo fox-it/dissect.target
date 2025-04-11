@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import re
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -8,6 +9,12 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import basename, open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 AuditRecord = TargetRecordDescriptor(
     "linux/log/audit",
@@ -26,7 +33,7 @@ AUDIT_REGEX = re.compile(r"^type=(?P<audit_type>.*) msg=audit\((?P<ts>.*):(?P<au
 class AuditPlugin(Plugin):
     """Unix audit log plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.log_paths = self.get_log_paths()
 
@@ -65,7 +72,7 @@ class AuditPlugin(Plugin):
             - https://man7.org/linux/man-pages/man8/auditd.8.html
             - https://man7.org/linux/man-pages/man8/ausearch.8.html
             - https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/security_guide/sec-understanding_audit_log_files
-        """  # noqa: E501
+        """
 
         for path in self.log_paths:
             try:

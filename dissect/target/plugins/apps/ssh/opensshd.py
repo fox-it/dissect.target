@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Optional, Union
+from __future__ import annotations
 
-from dissect.target import Target
+from typing import TYPE_CHECKING, Any, Callable
+
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import DynamicDescriptor, TargetRecordDescriptor
 from dissect.target.plugin import export
@@ -8,7 +9,10 @@ from dissect.target.plugins.apps.ssh.openssh import find_sshd_directory
 from dissect.target.plugins.apps.ssh.ssh import SSHPlugin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.plugins.general.config import ConfigurationTreePlugin
+    from dissect.target.target import Target
 
 SSHD_BOOLEAN_VALUES = (
     "yes",
@@ -173,7 +177,7 @@ def _determine_type_and_value(key: str, value: str) -> tuple[str, Any]:
     return _type, _value
 
 
-def _convert_function(value: Union[str, list], unpack_function: Optional[Callable]) -> Union[list[Any], Any]:
+def _convert_function(value: str | list, unpack_function: Callable | None) -> list[Any] | Any:
     if isinstance(value, list):
         return [unpack_function(val) for val in value]
     return unpack_function(value)

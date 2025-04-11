@@ -1,13 +1,19 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, call, patch
 
 from dissect.target.loaders.ovf import OvfLoader
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 @patch("dissect.target.loaders.ovf.container")
 @patch("dissect.target.loaders.ovf.ovf.OVF")
-def test_ovf_loader(OVF: MagicMock, container: MagicMock, target_bare: Target, tmp_path: Path):
+def test_ovf_loader(OVF: MagicMock, container: MagicMock, target_bare: Target, tmp_path: Path) -> None:
     (tmp_path / "test.ovf").touch()
 
     OVF.return_value = OVF

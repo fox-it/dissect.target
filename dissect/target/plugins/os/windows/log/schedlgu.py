@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -31,35 +37,35 @@ SCHEDLGU_REGEX_PATTERN = re.compile(r"\".+\n.+\n\s{4}.+\n|\".+\n.+", re.MULTILIN
 
 @dataclass(order=True)
 class SchedLgU:
-    ts: datetime = None
-    job: str = None
-    status: str = None
-    command: str = None
-    exit_code: int = None
-    version: str = None
+    ts: datetime.datetime | None = None
+    job: str | None = None
+    status: str | None = None
+    command: str | None = None
+    exit_code: int | None = None
+    version: str | None = None
 
     @staticmethod
-    def _sanitize_ts(ts: str) -> datetime:
+    def _sanitize_ts(ts: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> datetime:
         # sometimes "at" exists before the timestamp
         ts = ts.strip("at ")
         try:
-            ts = datetime.strptime(ts, "%m/%d/%Y %I:%M:%S %p")
+            ts = datetime.datetime.strptime(ts, "%m/%d/%Y %I:%M:%S %p").replace(tzinfo=tzinfo)
         except ValueError:
-            ts = datetime.strptime(ts, "%d-%m-%Y %H:%M:%S")
+            ts = datetime.datetime.strptime(ts, "%d-%m-%Y %H:%M:%S").replace(tzinfo=tzinfo)
 
         return ts
 
     @staticmethod
-    def _parse_job(line: str) -> tuple[str, Optional[str]]:
+    def _parse_job(line: str) -> tuple[str, str | None]:
         matches = JOB_REGEX_PATTERN.match(line)
         if matches:
             return matches.groups()
 
-        log.warning("SchedLgU failed to parse job and command from line: '%s'. Returning line.", line)
+        log.warning("SchedLgU failed to parse job and command from line: %r, returning line", line)
         return line, None
 
     @classmethod
-    def from_line(cls, line: str) -> SchedLgU:
+    def from_line(cls, line: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> Self:
         """Parse a group of SchedLgU.txt lines."""
         event = cls()
         lines = line.splitlines()
@@ -95,7 +101,7 @@ class SchedLgU:
                 event.version = lines[1]
 
         if event.ts:
-            event.ts = cls._sanitize_ts(event.ts)
+            event.ts = cls._sanitize_ts(event.ts, tzinfo=tzinfo)
 
         return event
 
@@ -103,14 +109,14 @@ class SchedLgU:
 class SchedLgUPlugin(Plugin):
     """Plugin for parsing the Task Scheduler Service transaction log file (SchedLgU.txt)."""
 
-    PATHS = {
+    PATHS = (
         "sysvol/SchedLgU.txt",
         "sysvol/windows/SchedLgU.txt",
         "sysvol/windows/tasks/SchedLgU.txt",
         "sysvol/winnt/tasks/SchedLgU.txt",
-    }
+    )
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         self.target = target
         self.paths = [self.target.fs.path(path) for path in self.PATHS if self.target.fs.path(path).exists()]
 
@@ -138,12 +144,13 @@ class SchedLgUPlugin(Plugin):
             exit_code (int): The exit code of the event.
             version (str): The version of the Task Scheduler service.
         """
+        target_tz = self.target.datetime.tzinfo
 
         for path in self.paths:
             content = path.read_text(encoding="UTF-16", errors="surrogateescape")
 
             for match in re.findall(SCHEDLGU_REGEX_PATTERN, content):
-                event = SchedLgU.from_line(match)
+                event = SchedLgU.from_line(match, tzinfo=target_tz)
 
                 yield SchedLgURecord(
                     ts=event.ts,

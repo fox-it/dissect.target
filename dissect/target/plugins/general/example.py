@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
@@ -9,6 +11,9 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import Plugin, arg, export, internal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ExampleRecordRecord = TargetRecordDescriptor(
     "example/descriptor",
@@ -49,7 +54,7 @@ class ExamplePlugin(Plugin):
     The ``__init__`` takes the target as only argument. Perform additional
     initialization here if necessary::
 
-        def __init__(self, target):
+        def __init__(self, target: Target):
             super().__init__(target)
     """
 
@@ -67,7 +72,6 @@ class ExamplePlugin(Plugin):
         Raises:
             UnsupportedPluginError: If the plugin could not be loaded.
         """
-        pass
 
     @export(output="default")
     @arg("--flag", action="store_true", help="optional example flag")

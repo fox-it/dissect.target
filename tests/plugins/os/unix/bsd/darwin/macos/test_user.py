@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime
 
 from dissect.target.plugins.os.unix.bsd.darwin.macos.user import UserPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_unix_bsd_darwin_macos_user(target_macos_users: Target) -> None:

@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import io
-from pathlib import Path
-from typing import BinaryIO, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.hypervisor import vhd
 
 from dissect.target.container import Container
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 class VhdContainer(Container):
     __type__ = "vhd"
 
-    def __init__(self, fh: Union[BinaryIO, Path], *args, **kwargs):
+    def __init__(self, fh: BinaryIO | Path, *args, **kwargs):
         f = fh
         if not hasattr(fh, "read"):
             f = fh.open("rb")
@@ -19,7 +23,7 @@ class VhdContainer(Container):
         super().__init__(fh, self.vhd.size, *args, **kwargs)
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         try:
             fh.seek(-512, io.SEEK_END)
             return b"conectix" in fh.read(9)
@@ -27,7 +31,7 @@ class VhdContainer(Container):
             return False
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, BinaryIO]) -> bool:
+    def detect_path(path: Path, original: list | BinaryIO) -> bool:
         return path.suffix.lower() == ".vhd"
 
     def read(self, length: int) -> bytes:

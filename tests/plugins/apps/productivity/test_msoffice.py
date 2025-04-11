@@ -1,16 +1,21 @@
-import io
+from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+import io
+from typing import TYPE_CHECKING
+
 from dissect.target.helpers import fsutil
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.apps.productivity.msoffice import MSOffice
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_office_startup_default_machine(
     target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive
 ) -> None:
-    """Test if machine-scoped startup items are found in default locations"""
+    """Test if machine-scoped startup items are found in default locations."""
 
     office_install_path = "C:/Office"
     key_path = "Software\\Microsoft\\Office\\16.0\\Word\\InstallRoot"
@@ -46,7 +51,7 @@ def test_office_startup_default_user(target_win_users: Target, fs_win: VirtualFi
 
 
 def test_office_startup_options(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:
-    """Test if startup items are found in custom specified locations"""
+    """Test if startup items are found in custom specified locations."""
 
     startup_item_path = "C:/FUNWAREZ/innocent.dll"
     key_path = "Software\\Microsoft\\Office\\16.0\\Word\\Options"
@@ -66,7 +71,7 @@ def test_office_startup_options(target_win_users: Target, fs_win: VirtualFilesys
 
 
 def test_office_com_addin(target_win_users: Target, hive_hklm: VirtualHive) -> None:
-    """Test if COM add-ins are found"""
+    """Test if COM add-ins are found."""
 
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
@@ -91,7 +96,7 @@ def test_office_com_addin(target_win_users: Target, hive_hklm: VirtualHive) -> N
 
 
 def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, hive_hklm: VirtualHive) -> None:
-    """Test if vsto add-ins are found"""
+    """Test if vsto add-ins are found."""
 
     addin_prog_id = "ExcelAddin"
     addin_key_path = f"Software\\Microsoft\\Office\\Excel\\Addins\\{addin_prog_id}"
@@ -117,7 +122,7 @@ def test_office_vsto_addin(target_win_users: Target, fs_win: VirtualFilesystem, 
 
 
 def test_office_web_addin(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    """Test if web add-ins are found"""
+    """Test if web add-ins are found."""
 
     fs_win.map_dir("users/John/AppData/local/Microsoft/Office/16.0/Wef", "tests/_data/plugins/apps/productivity/wef")
 

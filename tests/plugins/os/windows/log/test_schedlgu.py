@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime
 
 from dissect.target.plugins.os.windows.log.schedlgu import SchedLgUPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_shedlgu(target_win, fs_win):
+
+def test_shedlgu(target_win: Target, fs_win: VirtualFilesystem) -> None:
     shedlgu_file = absolute_path("_data/plugins/os/windows/log/schedlgu/schedlgu.txt")
     fs_win.map_file("Windows/SchedLgU.Txt", shedlgu_file)
 

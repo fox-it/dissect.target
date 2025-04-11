@@ -1,7 +1,13 @@
-from typing import Iterator
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 EnvironmentVariableRecord = TargetRecordDescriptor(
     "linux/proc/environ",
@@ -19,7 +25,8 @@ class EnvironPlugin(Plugin):
     """Linux volatile proc environment plugin."""
 
     def check_compatible(self) -> None:
-        self.target.proc
+        if not self.target.has_function("proc"):
+            raise UnsupportedPluginError("proc filesystem not available")
 
     @export(record=EnvironmentVariableRecord)
     def environ(self) -> Iterator[EnvironmentVariableRecord]:

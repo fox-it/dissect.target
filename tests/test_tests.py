@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 
@@ -12,7 +14,7 @@ except Exception:
 
 @pytest.mark.skipif(not HAS_GIT_LFS, reason="git lfs command not available")
 def test_lfs_tracking(request: pytest.FixtureRequest) -> None:
-    """test if all files that should be checked into git lfs are actually tracked"""
+    """Test if all files that should be checked into git lfs are actually tracked."""
     output = subprocess.run(["git", "lfs", "ls-files", "--name-only"], capture_output=True, text=True)
     tracked_lfs_files = set(output.stdout.splitlines())
 
@@ -30,7 +32,7 @@ def test_lfs_tracking(request: pytest.FixtureRequest) -> None:
         for path in Path(request.config.rootdir).rglob(pattern):
             relative_path = str(path.relative_to(request.config.rootdir))
             if (
-                not path.stat().st_size == 0
+                path.stat().st_size != 0
                 and relative_path in tracked_git_files
                 and relative_path not in tracked_lfs_files
             ):

@@ -107,6 +107,7 @@ dev = [
     "dissect.volume[dev]>=3.0.dev,<4.0.dev",
     "dissect.xfs[dev]>=3.0.dev,<4.0.dev",
     "pexpect",
+    "typing_extensions",
 ]
 yara = [
     # Grab the dependencies for dissect.target
@@ -143,13 +144,56 @@ target-shell = "dissect.target.tools.shell:main"
 target-yara = "dissect.target.tools.yara:main"
 target-qfind = "dissect.target.tools.qfind:main"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+required-version = ">=0.11.0"
 
-[tool.isort]
-profile = "black"
-known_first_party = ["dissect.target"]
-known_third_party = ["dissect"]
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "F",
+  "E",
+  "W",
+  "I",
+  "UP",
+  "YTT",
+  "ANN",
+  "B",
+  "C4",
+  "DTZ",
+  "T10",
+  "FA",
+  "ISC",
+  "G",
+  "INP",
+  "PIE",
+  "PYI",
+  "PT",
+  "Q",
+  "RSE",
+  "RET",
+  "SLOT",
+  "SIM",
+  "TID",
+  "TCH",
+  "PTH",
+  "PLC",
+  "TRY",
+  "FLY",
+  "PERF",
+  "FURB",
+  "RUF",
+]
+ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM105", "TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/_docs/**" = ["INP001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dissect.target"]
+known-third-party = ["dissect"]
 
 [tool.setuptools]
 license-files = ["LICENSE", "COPYRIGHT"]

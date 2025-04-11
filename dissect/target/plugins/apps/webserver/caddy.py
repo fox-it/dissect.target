@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import json
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import from_unix
 
@@ -13,7 +14,12 @@ from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 LOG_FILE_REGEX = re.compile(r"(log|output file) (?P<log_file>.*)( \{)?$")
 LOG_REGEX = re.compile(

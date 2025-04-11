@@ -1,13 +1,18 @@
-from datetime import datetime, timezone
+from __future__ import annotations
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.chat.msn import MSNPlugin, convert_email
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
 
 def test_msn(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
-    """test if we parse MSN Chat messages on Windows XP correctly."""
+    """Test if we parse MSN Chat messages on Windows XP correctly."""
 
     morpheus_id = convert_email("morpheus@matrix.internal")
     neo_id = convert_email("neo@matrix.internal")

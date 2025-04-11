@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.plugins.apps.av.trendmicro import (
@@ -7,8 +11,12 @@ from dissect.target.plugins.apps.av.trendmicro import (
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_trendmicro_plugin_worryfree_firewall(target_win, fs_win):
+
+def test_trendmicro_plugin_worryfree_firewall(target_win: Target, fs_win: VirtualFilesystem) -> None:
     log_file = absolute_path("_data/plugins/apps/av/trendmicro/firewall.log")
     fs_win.map_file("Program Files (x86)/Trend Micro/Security Agent/PFW/PfwLog_20230101.dat", log_file)
     target_win.add_plugin(TrendMicroPlugin)
@@ -24,7 +32,7 @@ def test_trendmicro_plugin_worryfree_firewall(target_win, fs_win):
     assert records[0].description == "SecurityLevelDrop"
 
 
-def test_trendmicro_plugin_worryfree_log(target_win, fs_win):
+def test_trendmicro_plugin_worryfree_log(target_win: Target, fs_win: VirtualFilesystem) -> None:
     log_file = absolute_path("_data/plugins/apps/av/trendmicro/pccnt35.log")
     fs_win.map_file("Program Files (x86)/Trend Micro/Security Agent/Misc/pccnt35.log", log_file)
     target_win.add_plugin(TrendMicroPlugin)

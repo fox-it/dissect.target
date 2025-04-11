@@ -1,7 +1,13 @@
-from itertools import chain
-from typing import Iterator
+from __future__ import annotations
 
+from itertools import chain
+from typing import TYPE_CHECKING
+
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 NETSTAT_HEADER = f"Active Internet connections (only servers)\n{'Proto':<10}{'Recv-Q':^10}{'Send-Q':^10}{'Local Address':^20}{'Foreign Address':^20}{'State':^10}{'User':^15}{'Inode':^10}{'PID/Program name':^10}{'Command':>10}"  # noqa
 NETSTAT_TEMPLATE = "{protocol:<12}{receive_queue:<10}{transmit_queue:<11}{local_addr:<19}{remote_addr:<20}{state:<13}{owner:<12}{inode:<8}{pid_program:<19}{cmdline}"  # noqa
@@ -11,7 +17,8 @@ class NetstatPlugin(Plugin):
     """Linux volatile netstat plugin."""
 
     def check_compatible(self) -> None:
-        self.target.proc
+        if not self.target.has_function("proc"):
+            raise UnsupportedPluginError("proc filesystem not available")
 
     @export(output="yield")
     def netstat(self) -> Iterator[str]:

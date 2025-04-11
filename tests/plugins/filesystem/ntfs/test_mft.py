@@ -9,7 +9,6 @@ import pytest
 from dissect.ntfs.c_ntfs import ATTRIBUTE_TYPE_CODE
 from dissect.ntfs.exceptions import Error
 
-from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.ntfs import NtfsFilesystem
 from dissect.target.plugins.filesystem.ntfs.mft import (
@@ -28,6 +27,8 @@ from tests._utils import absolute_path
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dissect.target.target import Target
+
 
 @pytest.fixture(params=[True, False])
 def compact(request: pytest.FixtureRequest) -> bool:
@@ -36,14 +37,14 @@ def compact(request: pytest.FixtureRequest) -> bool:
 
 @pytest.fixture
 def target_win_mft(target_win: Target) -> Target:
-    filesystem = NtfsFilesystem(mft=open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb"))
+    filesystem = NtfsFilesystem(mft=absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw").open("rb"))
     target_win.filesystems = [filesystem]
     target_win.add_plugin(MftPlugin)
     return target_win
 
 
 @pytest.mark.parametrize(
-    "drive_letters, expected",
+    ("drive_letters", "expected"),
     [
         (("z:", "c:", "a:"), "a:\\"),
         (("foo", "bar", "bla"), "bar\\"),
@@ -100,14 +101,14 @@ def test_get_owner_and_group_fail(exception: Exception) -> None:
     assert get_owner_and_group(mocked_entry, mocked_fs) == (None, None)
 
 
-def test_get_owner_and_group_none_attr():
+def test_get_owner_and_group_none_attr() -> None:
     mocked_entry = Mock()
     mocked_entry.attributes = {ATTRIBUTE_TYPE_CODE.STANDARD_INFORMATION: [None]}
     assert get_owner_and_group(mocked_entry, Mock()) == (None, None)
 
 
 @pytest.mark.parametrize(
-    "guid_bytes, expected_result",
+    ("guid_bytes", "expected_result"),
     [
         (b",\xa6\xc1}\x88\xc4\xc5G\x8e\xab\t$\x0f8\x89N", "7dc1a62c-c488-47c5-8eab-09240f38894e"),
         (b"", None),
@@ -133,7 +134,7 @@ def test_volume_identifier_none_guid() -> None:
 
 
 @pytest.mark.parametrize(
-    "regex_pattern, expected_nr_of_records",
+    ("regex_pattern", "expected_nr_of_records"),
     [
         (r".*", 304),
         (r".+Size:(No Data)", 120),
@@ -208,7 +209,7 @@ def test_mft_plugin_macb_nodup() -> None:
         tss.add(ts)
         return ts
 
-    for _ in range(0, 100):
+    for _ in range(100):
         tss = set()
         records = []
         for ts_type in ["M", "A", "C", "B"]:

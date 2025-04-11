@@ -1,29 +1,33 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 from flow.record.fieldtypes import path
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.browser import iexplore
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 # NOTE: Missing cookies, extensions and passwords tests.
 
 
 @pytest.fixture
-def target_iexplore(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_iexplore(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     base_path = "Users\\John\\AppData\\Local\\Microsoft\\Windows\\WebCache"
     files = [
         ("WebCacheV01.dat", "_data/plugins/apps/browser/iexplore/WebCacheV01.dat.gz", "gzip"),
     ]
 
     for filename, test_path, compression in files:
-        fs_win.map_file("\\".join([base_path, filename]), absolute_path(test_path), compression=compression)
+        fs_win.map_file(f"{base_path}\\{filename}", absolute_path(test_path), compression=compression)
 
     target_win_users.add_plugin(iexplore.InternetExplorerPlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 def test_iexplore_history(target_iexplore: Target) -> None:

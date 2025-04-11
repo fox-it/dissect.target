@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.regutil import RegistryKey
 
 RegistryKeyRecord = TargetRecordDescriptor(
     "windows/registry/regf/key",
@@ -86,10 +91,9 @@ class RegfPlugin(Plugin):
                 # Bit of a nasty hack
                 name = f"HKEY_USERS\\{name}"
 
-            for entry in self.walk(hive.root(), name, path):
-                yield entry
+            yield from self.walk(hive.root(), name, path)
 
-    def walk(self, key, parent, path):
+    def walk(self, key: RegistryKey, parent: str, path: str) -> Iterator[RegistryKeyRecord | RegistryValueRecord]:
         yield RegistryKeyRecord(
             ts=key.timestamp,
             path=parent,
@@ -112,5 +116,4 @@ class RegfPlugin(Plugin):
 
         for subkey in key.subkeys():
             n_parent = f"{parent}\\{subkey.name}"
-            for item in self.walk(subkey, n_parent, path):
-                yield item
+            yield from self.walk(subkey, n_parent, path)

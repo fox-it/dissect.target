@@ -3,10 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Callable
 
-from dissect.ntfs.attr import Attribute, FileName, StandardInformation
 from dissect.ntfs.c_ntfs import FILE_RECORD_SEGMENT_IN_USE
-from dissect.ntfs.mft import MftRecord
-from flow.record import Record
 from flow.record.fieldtypes import windows_path
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -22,6 +19,11 @@ from dissect.target.plugins.filesystem.ntfs.utils import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from dissect.ntfs import MftRecord
+    from dissect.ntfs.attr import Attribute, FileName, StandardInformation
+    from flow.record import Record
+    from typing_extensions import Self
 
     from dissect.target.filesystems.ntfs import NtfsFilesystem
     from dissect.target.target import Target
@@ -186,7 +188,7 @@ class MftPlugin(NamespacePlugin):
 
         record_formatter = default_formatter
 
-        def noop_aggregator(records: list[Record]) -> Iterator[Record]:
+        def noop_aggregator(records: Iterator[Record]) -> Iterator[Record]:
             yield from records
 
         aggregator = noop_aggregator
@@ -201,7 +203,7 @@ class MftPlugin(NamespacePlugin):
             try:
                 filesystems = [self.ntfs_filesystems[fs]]
             except KeyError:
-                self.target.log.error("NTFS filesystem with index number %s does not exist", fs)
+                self.target.log.error("NTFS filesystem with index number %s does not exist", fs)  # noqa: TRY400
                 return
         else:
             filesystems = self.ntfs_filesystems.values()
@@ -231,7 +233,7 @@ class MftPlugin(NamespacePlugin):
                                     target=self.target,
                                 )
                             )
-                    except Exception as e:
+                    except Exception as e:  # noqa: PERF203
                         self.target.log.warning("An error occured parsing MFT segment %d: %s", record.segment, str(e))
                         self.target.log.debug("", exc_info=e)
 
@@ -487,7 +489,7 @@ def default_formatter(
         yield record_desc(ts=timestamp, ts_type=type, **kwargs)
 
 
-def macb_aggregator(records: list[Record]) -> Iterator[Record]:
+def macb_aggregator(records: Iterator[Record]) -> Iterator[Record]:
     def macb_set(bitfield: str, index: int, letter: str) -> str:
         return bitfield[:index] + letter + bitfield[index + 1 :]
 
@@ -529,7 +531,7 @@ class _Info:
     drive_letter: str | None = None
 
     @classmethod
-    def init(cls, target: Target, fs: NtfsFilesystem) -> _Info:
+    def init(cls, target: Target, fs: NtfsFilesystem) -> Self:
         # If this filesystem is a "fake" NTFS filesystem, used to enhance a
         # VirtualFilesystem, The driveletter (more accurate mount point)
         # returned will be that of the VirtualFilesystem. This makes sure

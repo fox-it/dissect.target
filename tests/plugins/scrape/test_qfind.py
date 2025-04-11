@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import io
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.containers.raw import RawContainer
 from dissect.target.plugins.scrape.qfind import QFindPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 re_ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 

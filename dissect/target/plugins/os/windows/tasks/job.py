@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 import datetime
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from flow.record import GroupedRecord
 
 from dissect.target.exceptions import InvalidTaskError
-from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugins.os.windows.tasks.records import (
     DailyTriggerRecord,
     ExecRecord,
@@ -16,7 +16,12 @@ from dissect.target.plugins.os.windows.tasks.records import (
     TriggerRecord,
     WeeklyTriggerRecord,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.helpers.record import TargetRecordDescriptor
 
 atjob_def = """
 struct PRIORITY {
@@ -143,13 +148,14 @@ class AtTask:
         target: the target system.
     """
 
-    def __init__(self, job_file: TargetPath, target: Target):
+    def __init__(self, job_file: TargetPath, tzinfo: datetime.tzinfo = datetime.timezone.utc):
         try:
             self.at_data = c_atjob.ATJOB_DATA(job_file.open())
         except Exception as e:
             raise InvalidTaskError(e)
 
         self.task_path = job_file
+        self.tzinfo = tzinfo
 
         last_year = self.at_data.last_year
         last_month = self.at_data.last_month
@@ -171,6 +177,7 @@ class AtTask:
                 minute=last_minute,
                 second=last_second,
                 microsecond=last_millisecond * 1000,  # Convert millisecond to microsecond
+                tzinfo=self.tzinfo,
             )
             # Convert the datetime object to ISO format timestamp string
             self.last_run_date = timestamp.isoformat()
@@ -180,19 +187,19 @@ class AtTask:
         self.description = self.at_data.comment.rstrip("\x00")
         self.restart_on_failure_interval = self.minutes_duration_to_iso(self.at_data.retry_interval)
         self.restart_on_failure_count = self.at_data.retry_count
-        self.dissalow_start_on_batteries = True if self.at_data.task_flags.disallow_battery else False
-        self.stop_going_on_batteries = True if self.at_data.task_flags.stop_battery else False
-        self.run_only_network_available = True if self.at_data.task_flags.internet_connected else False
-        self.wake_to_run = True if self.at_data.task_flags.wake_to_run else False
-        self.enabled = False if self.at_data.task_flags.disabled else True
-        self.hidden = True if self.at_data.task_flags.hidden else False
+        self.dissalow_start_on_batteries = bool(self.at_data.task_flags.disallow_battery)
+        self.stop_going_on_batteries = bool(self.at_data.task_flags.stop_battery)
+        self.run_only_network_available = bool(self.at_data.task_flags.internet_connected)
+        self.wake_to_run = bool(self.at_data.task_flags.wake_to_run)
+        self.enabled = not self.at_data.task_flags.disabled
+        self.hidden = bool(self.at_data.task_flags.hidden)
         self.idle_duration = self.minutes_duration_to_iso(self.at_data.idle_wait)
         self.idle_wait_timeout = self.minutes_duration_to_iso(self.at_data.idle_deadline)
-        self.idle_stop_on_idle_end = True if self.at_data.task_flags.stop_on_idle_end else False
-        self.idle_restart_on_idle = True if self.at_data.task_flags.restart_on_idle else False
+        self.idle_stop_on_idle_end = bool(self.at_data.task_flags.stop_on_idle_end)
+        self.idle_restart_on_idle = bool(self.at_data.task_flags.restart_on_idle)
         self.execution_time_limit = round(self.at_data.max_run_time / 60000)
         self.execution_time_limit = self.minutes_duration_to_iso(self.execution_time_limit)
-        self.run_only_idle = True if self.at_data.task_flags.only_idle else False
+        self.run_only_idle = bool(self.at_data.task_flags.only_idle)
         self.data = self.at_data.user_data
 
         # check which prio bit is set
@@ -236,23 +243,27 @@ class AtTask:
         }
         for trigger in self.at_data.task_triggers:
             trigger_type = TRIGGER_TYPE_NAMES.get(trigger.trigger_type, None)
-            enabled = False if trigger.trigger_flags.trigger_disabled else True
+            enabled = not trigger.trigger_flags.trigger_disabled
 
             s_year = trigger.begin_year
             s_month = trigger.begin_month
             s_day = trigger.begin_day
-            start_boundary = datetime.datetime(year=s_year, month=s_month, day=s_day).date().isoformat()
+            start_boundary = (
+                datetime.datetime(year=s_year, month=s_month, day=s_day, tzinfo=self.tzinfo).date().isoformat()
+            )
 
             e_year = trigger.end_year
             e_month = trigger.end_month
             e_day = trigger.end_day
             end_boundary = None
             if trigger.trigger_flags.has_end_date:
-                end_boundary = datetime.datetime(year=e_year, month=e_month, day=e_day).date().isoformat()
+                end_boundary = (
+                    datetime.datetime(year=e_year, month=e_month, day=e_day, tzinfo=self.tzinfo).date().isoformat()
+                )
 
             repetition_interval = self.minutes_duration_to_iso(trigger.minutes_interval)
             repetition_duration = self.minutes_duration_to_iso(trigger.minutes_duration)
-            repetition_stop_duration_end = True if trigger.trigger_flags.kill_at_end == 1 else False
+            repetition_stop_duration_end = trigger.trigger_flags.kill_at_end == 1
             execution_time_limit = self.minutes_duration_to_iso(round(self.at_data.max_run_time / 60000))
 
             base = TriggerRecord(
@@ -351,7 +362,7 @@ class AtTask:
 
                 yield GroupedRecord("filesystem/windows/task/monthly_dow", [base, record, padding_record])
 
-    def minutes_duration_to_iso(self, minutes: int) -> Optional[str]:
+    def minutes_duration_to_iso(self, minutes: int) -> str | None:
         """Convert the given number of minutes to an ISO 8601 duration format string, like those found in the xml tasks.
         The most significant unit is days (D), the least significant is minutes (M).
 
@@ -360,7 +371,7 @@ class AtTask:
 
         Returns:
             An ISO 8601 duration format string representing the given number of minutes,
-            or `None` if the number of minutes is zero.
+            or ``None`` if the number of minutes is zero.
 
         Raises:
             TypeError: If the minutes argument is not an integer.
@@ -370,18 +381,17 @@ class AtTask:
 
         if minutes == 0:
             return None
-        else:
-            # Calculate the number of days, hours, and minutes
-            days, minutes = divmod(minutes, 1440)
-            hours, minutes = divmod(minutes, 60)
+        # Calculate the number of days, hours, and minutes
+        days, minutes = divmod(minutes, 1440)
+        hours, minutes = divmod(minutes, 60)
 
-            # Build the ISO duration format string
-            duration_iso = "P" if days == 0 else f"P{days}D"
-            duration_iso += "T" if hours or minutes else ""
-            duration_iso += f"{hours}H" if hours != 0 else ""
-            duration_iso += f"{minutes}M" if minutes != 0 else ""
+        # Build the ISO duration format string
+        duration_iso = "P" if days == 0 else f"P{days}D"
+        duration_iso += "T" if hours or minutes else ""
+        duration_iso += f"{hours}H" if hours != 0 else ""
+        duration_iso += f"{minutes}M" if minutes != 0 else ""
 
-            return duration_iso
+        return duration_iso
 
     def get_flags_data(self, flags: int, items: list[str]) -> Iterator[str]:
         """Create a generator of items corresponding to the flags.

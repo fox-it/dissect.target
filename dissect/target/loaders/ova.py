@@ -1,8 +1,13 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import LoaderError
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.loaders.ovf import OvfLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class OvaLoader(OvfLoader):
@@ -19,7 +24,7 @@ class OvaLoader(OvfLoader):
         if ovf_path is None:
             raise LoaderError("Invalid OVA file (can't find .ovf)")
 
-        super().__init__(ovf_path)
+        super().__init__(ovf_path, **kwargs)
 
     @staticmethod
     def detect(path: Path) -> bool:

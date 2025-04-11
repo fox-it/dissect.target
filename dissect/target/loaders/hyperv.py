@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import base64
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-from xml.etree.ElementTree import Element
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 from dissect.hypervisor import hyperv
@@ -14,6 +12,9 @@ from dissect.target.helpers import fsutil
 from dissect.target.loader import Loader
 
 if TYPE_CHECKING:
+    from pathlib import Path
+    from xml.etree.ElementTree import Element
+
     from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
@@ -37,13 +38,14 @@ def is_hyperv_xml(path: Path) -> bool:
 
     try:
         et = ElementTree.fromstring(path.read_bytes())
-        element_names = [el.tag for el in et]
-        return et.tag == "configuration" and "manifest" in element_names
     except Exception:
         return False
+    else:
+        element_names = [el.tag for el in et]
+        return et.tag == "configuration" and "manifest" in element_names
 
 
-def xml_as_dict(element: Element, root: Optional[dict] = None) -> dict:
+def xml_as_dict(element: Element, root: dict | None = None) -> dict:
     """Convert a Hyper-V XML file into a dictionary.
 
     Recursively converts all XML elements into a correctly typed dictionary.
@@ -66,7 +68,7 @@ def xml_as_dict(element: Element, root: Optional[dict] = None) -> dict:
     elif ftype == "bytes":
         root[element.tag] = base64.b64decode(element.text)
     elif ftype in ("bool", "boolean"):
-        root[element.tag] = True if element.text.lower() == "true" else False
+        root[element.tag] = element.text.lower() == "true"
     else:
         # We don't necessarily want to error out, so add as string instead
         log.warning("Unknown Hyper-V XML value type, adding as string instead: %s (%s)", ftype, element.tag)
@@ -88,6 +90,8 @@ class HyperVLoader(Loader):
     """
 
     def __init__(self, path: Path, **kwargs):
+        super().__init__(path, **kwargs)
+
         self.vmcx = None
         self.xml = None
 
@@ -98,24 +102,17 @@ class HyperVLoader(Loader):
         else:
             raise ValueError(f"HyperVLoader initialized with unsupported file: {path}")
 
-        path = path.resolve()
-        self.base_dir = path.parent
-        super().__init__(path)
-
     @staticmethod
     def detect(path: Path) -> bool:
         return path.suffix.lower() == ".vmcx" or is_hyperv_xml(path)
 
     def map(self, target: Target) -> None:
-        if self.vmcx:
-            obj = self.vmcx.as_dict()
-        else:
-            obj = xml_as_dict(self.xml)
+        obj = self.vmcx.as_dict() if self.vmcx else xml_as_dict(self.xml)
 
         configuration = obj["configuration"]
 
         # Naive approach first
-        instance_guids = {key for key in configuration.keys() if key[1:-1].lower() in DRIVE_CONTROLLER_GUIDS}
+        instance_guids = {key for key in configuration if key[1:-1].lower() in DRIVE_CONTROLLER_GUIDS}
 
         # Add properly discovered instances next
         for value in configuration["manifest"].values():
@@ -148,19 +145,19 @@ class HyperVLoader(Loader):
                     filename = fsutil.basename(filepath, alt_separator="\\")
 
                     # First attempt path relative to .vmcx/.xml file
-                    disk_path = self.base_dir.joinpath(filename)
+                    disk_path = self.base_path.joinpath(filename)
 
                     # Next attempt "Virtual Hard Disks" directory relative from .vmcx/.xml file
                     if not disk_path.exists():
-                        disk_path = self.base_dir.joinpath("Virtual Hard Disks").joinpath(filename)
+                        disk_path = self.base_path.joinpath("Virtual Hard Disks").joinpath(filename)
 
                     # Next attempt "Virtual Hard Disks" directory one up from .vmcx/.xml file
                     if not disk_path.exists():
-                        disk_path = self.base_dir.parent.joinpath("Virtual Hard Disks").joinpath(filename)
+                        disk_path = self.base_path.parent.joinpath("Virtual Hard Disks").joinpath(filename)
 
                     # Finally attempt absolute path
                     if not disk_path.exists():
-                        disk_path = self.base_dir.joinpath("/").joinpath(filepath).resolve()
+                        disk_path = self.base_path.joinpath("/").joinpath(filepath).resolve()
 
                     try:
                         target.disks.add(container.open(disk_path))

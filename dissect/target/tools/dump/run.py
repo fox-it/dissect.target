@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import itertools
@@ -7,14 +7,12 @@ import sys
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from flow.record import Record
 
-from dissect.target import Target
 from dissect.target.exceptions import PluginError, UnsupportedPluginError
-from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.target import Target
 from dissect.target.tools.dump.state import (
     DumpState,
     create_state,
@@ -34,6 +32,13 @@ from dissect.target.tools.utils import (
     process_generic_arguments,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
+    from flow.record import Record
+
+    from dissect.target.helpers.record import TargetRecordDescriptor
+
 log = structlog.get_logger("dissect.target.tools.dump.run")
 
 
@@ -42,22 +47,20 @@ class RecordStreamElement:
     target: Target
     func: str
     record: Record
-    end_pos: Optional[int] = None
-    sink_path: Optional[Path] = None
+    end_pos: int | None = None
+    sink_path: Path | None = None
 
 
 def get_targets(targets: list[str]) -> Iterator[Target]:
-    """Return a generator with `Target` objects for provided paths"""
-    for target in Target.open_all(targets):
-        yield target
+    """Return a generator with :class:`Target` objects for provided paths."""
+    yield from Target.open_all(targets)
 
 
 def execute_function(target: Target, function: FunctionDescriptor) -> TargetRecordDescriptor:
-    """
-    Execute function `function` on provided target `target` and return a generator
+    """Execute function ``function`` on provided target ``target`` and return a generator
     with the records produced.
 
-    Only output type `record` is supported for plugin functions.
+    Only output type ``record`` is supported for plugin functions.
     """
 
     local_log = log.bind(func=function, target=target)
@@ -80,8 +83,7 @@ def execute_function(target: Target, function: FunctionDescriptor) -> TargetReco
     result = target_attr() if callable(target_attr) else target_attr
 
     try:
-        for value in result:
-            yield value
+        yield from result
     except Exception:
         local_log.error("Error while executing function", exc_info=True)
         return
@@ -92,10 +94,9 @@ def produce_target_func_pairs(
     functions: str,
     state: DumpState,
 ) -> Iterator[tuple[Target, FunctionDescriptor]]:
-    """
-    Return a generator with target and function pairs for execution.
+    """Return a generator with target and function pairs for execution.
 
-    Target and function pairs that correspond to finished sinks in provided state `state` are skipped.
+    Target and function pairs that correspond to finished sinks in provided state ``state`` are skipped.
     """
     pairs_to_skip = set()
     if state:
@@ -115,21 +116,19 @@ def produce_target_func_pairs(
             state.mark_as_finished(target, func_def.name)
 
 
-def execute_functions(target_func_stream: Iterable[tuple[Target, str]]) -> Iterable[RecordStreamElement]:
-    """
-    Execute a function on a target for target / function pairs in the stream.
+def execute_functions(target_func_stream: Iterable[tuple[Target, str]]) -> Iterator[RecordStreamElement]:
+    """Execute a function on a target for target / function pairs in the stream.
 
-    Returns a generator of `RecordStreamElement` objects.
+    Returns a generator of ``RecordStreamElement`` objects.
     """
     for target, func in target_func_stream:
         for record in execute_function(target, func):
             yield RecordStreamElement(target=target, func=func, record=record)
 
 
-def log_progress(stream: Iterable[Any], step_size: int = 1000) -> Iterable[Any]:
-    """
-    Log a number of items that went though the generator stream
-    after every N element (N is configured in `step_size`).
+def log_progress(stream: Iterable[Any], step_size: int = 1000) -> Iterator[Any]:
+    """Log a number of items that went though the generator stream after
+    every N element (N is configured in ``step_size``).
     """
     i = 0
     targets = set()
@@ -151,9 +150,7 @@ def sink_records(
     record_stream: Iterable[RecordStreamElement],
     state: DumpState,
 ) -> Iterator[RecordStreamElement]:
-    """
-    Persist records from the stream into appropriate sinks, per serialization, compression and record type.
-    """
+    """Persist records from the stream into appropriate sinks, per serialization, compression and record type."""
     with cached_sink_writers(state) as write_element:
         for element in record_stream:
             write_element(element)
@@ -164,9 +161,7 @@ def persist_processing_state(
     record_stream: Iterable[RecordStreamElement],
     state: DumpState,
 ) -> Iterator[RecordStreamElement]:
-    """
-    Keep track of the pipeline state in a persistent state object.
-    """
+    """Keep track of the pipeline state in a persistent state object."""
     with persisted_state(state) as save_state_periodically:
         for element in record_stream:
             save_state_periodically()
@@ -178,13 +173,11 @@ def execute_pipeline(
     functions: str,
     output_dir: Path,
     serialization: Serialization,
-    compression: Optional[Compression] = None,
-    restart: Optional[bool] = False,
-    limit: Optional[int] = None,
+    compression: Compression | None = None,
+    restart: bool | None = False,
+    limit: int | None = None,
 ) -> None:
-    """
-    Run the record generation, processing and sinking pipeline.
-    """
+    """Run the record generation, processing and sinking pipeline."""
 
     compression = compression or Compression.NONE
 
@@ -286,7 +279,7 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def main():
+def main() -> None:
     args = parse_arguments()
 
     try:
@@ -300,7 +293,7 @@ def main():
             limit=args.limit,
         )
     except Exception:
-        log.error("Exception while running the pipeline", exc_info=True)
+        log.exception("Exception while running the pipeline")
         sys.exit(1)
 
 

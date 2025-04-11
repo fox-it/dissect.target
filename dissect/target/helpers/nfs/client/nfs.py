@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, Iterator, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, NamedTuple, TypeVar
 
 from dissect.target.exceptions import Error
 from dissect.target.helpers.nfs.nfs3 import (
@@ -34,13 +34,15 @@ from dissect.target.helpers.nfs.serializer import (
     ResultDeserializer as NfsResultDeserializer,
 )
 from dissect.target.helpers.sunrpc.client import AbstractClient as SunRpcAbstractClient
-from dissect.target.helpers.sunrpc.client import AuthScheme
+from dissect.target.helpers.sunrpc.client import AuthScheme, LocalPortPolicy
 from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
-from dissect.target.helpers.sunrpc.client import LocalPortPolicy
 from dissect.target.helpers.sunrpc.serializer import OpaqueVarLengthSerializer
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from types import TracebackType
+
+    from typing_extensions import Self
 
 Credentials = TypeVar("Credentials")
 Verifier = TypeVar("Verifier")
@@ -69,8 +71,8 @@ class Client(AbstractContextManager):
     def __init__(self, rpc_client: SunRpcAbstractClient):
         self._rpc_client = rpc_client
 
-    def __enter__(self) -> Client:
-        """Return `self` upon entering the runtime context."""
+    def __enter__(self) -> Self:
+        """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 
     def __exit__(self, _: type[BaseException] | None, __: BaseException | None, ___: TracebackType | None) -> bool:
@@ -176,7 +178,7 @@ class Client(AbstractContextManager):
 
         return result.target
 
-    def close(self):
+    def close(self) -> None:
         self._rpc_client.close()
 
     def __del__(self):

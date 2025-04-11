@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 # Example startupinfo entry:
 #
@@ -41,13 +46,13 @@ def parse_ts(time_string: str) -> datetime.datetime | None:
     if not time_string:
         return None
 
-    return datetime.datetime.strptime(time_string[:26], "%Y/%m/%d:%H:%M:%S.%f")
+    return datetime.datetime.strptime(time_string[:26], "%Y/%m/%d:%H:%M:%S.%f").replace(tzinfo=datetime.timezone.utc)
 
 
 class StartupInfoPlugin(Plugin):
     """Windows startup info plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self._files = []
 

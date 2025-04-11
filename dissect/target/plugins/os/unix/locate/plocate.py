@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import platform
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 from dissect.util.stream import RangeStream
@@ -10,6 +10,9 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 try:
     from zstandard import (
@@ -69,7 +72,7 @@ c_plocate = cstruct().load(plocate_def)
 
 
 class PLocateFile:
-    """plocate file parser
+    """Parser for plocate files.
 
     The ``plocate.db`` file contains a hashtable and trigrams to enable quick lookups of filenames.
 

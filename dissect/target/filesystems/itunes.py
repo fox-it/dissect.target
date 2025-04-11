@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import stat
-from typing import TYPE_CHECKING, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.util.stream import AlignedStream
 
@@ -16,6 +16,8 @@ from dissect.target.filesystem import (
 from dissect.target.helpers import fsutil
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.loaders.itunes import FileInfo, ITunesBackup
 
 
@@ -42,7 +44,7 @@ class ITunesFilesystem(Filesystem):
     def _detect(fh: BinaryIO) -> bool:
         raise TypeError("Detect is not allowed on ITunesFilesystem class")
 
-    def get(self, path: str, relentry: Optional[FilesystemEntry] = None) -> FilesystemEntry:
+    def get(self, path: str, relentry: FilesystemEntry | None = None) -> FilesystemEntry:
         """Returns a ITunesFileEntry object corresponding to the given path."""
         return self._fs.get(path, relentry)
 
@@ -88,7 +90,7 @@ class ITunesFilesystemEntry(VirtualFile):
     def readlink(self) -> str:
         """Read the link if this entry is a symlink. Returns a string."""
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
         return self.entry.metadata["Target"]
 
     def readlink_ext(self) -> FilesystemEntry:

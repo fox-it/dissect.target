@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
 from functools import lru_cache
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 from flow.record.base import RE_VALID_FIELD_NAME
@@ -16,6 +17,12 @@ from dissect.target.plugins.apps.webserver.webserver import (
     WebserverAccessLogRecord,
     WebserverPlugin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 LOG_RECORD_NAME = "filesystem/windows/iis/logs"
 
@@ -51,21 +58,21 @@ class IISLogsPlugin(WebserverPlugin):
     References:
         - https://docs.microsoft.com/en-us/iis/get-started/planning-your-iis-architecture/introduction-to-applicationhostconfig
         - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29
-    """  # noqa: E501
+    """
 
     APPLICATION_HOST_CONFIG = "sysvol/windows/system32/inetsrv/config/applicationHost.config"
 
-    DEFAULT_LOG_PATHS = [
+    DEFAULT_LOG_PATHS = (
         "sysvol\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
         "sysvol\\Windows.old\\Windows\\System32\\LogFiles\\W3SVC*\\*.log",
         "sysvol\\inetpub\\logs\\LogFiles\\*.log",
         "sysvol\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log",
         "sysvol\\Resources\\Directory\\*\\LogFiles\\Web\\W3SVC*\\*.log",
-    ]
+    )
 
     __namespace__ = "iis"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.config = self.target.fs.path(self.APPLICATION_HOST_CONFIG)
         self.log_dirs = self.get_log_dirs()
@@ -98,7 +105,7 @@ class IISLogsPlugin(WebserverPlugin):
                 # later on we use */*.log to collect the files, so we need to move up 2 levels
                 log_dir = self.target.fs.path(log_path).parents[1]
             except IndexError:
-                self.target.log.error("Incompatible path found: %s", log_path)
+                self.target.log.exception("Incompatible path found: %s", log_path)
                 continue
 
             if not has_glob_magic(str(log_dir)) and log_dir.exists():
@@ -133,7 +140,7 @@ class IISLogsPlugin(WebserverPlugin):
             - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29#iis-log-file-format
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc728311%28v=ws.10%29
             - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
-        """  # noqa: E501
+        """
 
         tzinfo = None
         try:
@@ -194,7 +201,7 @@ class IISLogsPlugin(WebserverPlugin):
             - https://docs.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525807%28v=vs.90%29#w3c-extended-log-file-format
             - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786596%28v=ws.10%29
             - https://learn.microsoft.com/en-us/iis/configuration/system.applicationHost/sites/site/logFile
-        """  # noqa: E501
+        """
 
         basic_fields = {
             "c-ip",
@@ -342,7 +349,7 @@ class IISLogsPlugin(WebserverPlugin):
 
 
 def replace_dash_with_none(data: dict) -> dict:
-    """Replace "-" placeholder in dict values with None"""
+    """Replace ``-`` placeholder in dictionary values with ``None``."""
     return {k: (None if v == "-" else v) for k, v in data.items()}
 
 
@@ -353,5 +360,4 @@ def normalise_field_name(field: str) -> str:
     if RE_VALID_FIELD_NAME.match(field):
         return field
 
-    field = FIELD_NAME_INVALID_CHARS_RE.sub("_", field).strip("_").lower()
-    return field
+    return FIELD_NAME_INVALID_CHARS_RE.sub("_", field).strip("_").lower()

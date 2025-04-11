@@ -1,7 +1,13 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix.packagemanager import PackageManagerPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_packagemanager_logs_debian(target_debian: Target, fs_debian: VirtualFilesystem) -> None:

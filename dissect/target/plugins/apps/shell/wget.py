@@ -1,12 +1,18 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 WgetHstsRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "apps/shell/wget/hsts",

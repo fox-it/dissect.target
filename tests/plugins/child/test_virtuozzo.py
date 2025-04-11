@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.child.virtuozzo import VirtuozzoChildTargetPlugin
 
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
-def test_plugins_child_virtuozzo(target_unix, fs_unix):
+
+def test_virtuozzo(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     fs_unix.makedirs("vz/root/a")
     fs_unix.makedirs("vz/root/b")
 

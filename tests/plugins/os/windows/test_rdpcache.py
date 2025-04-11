@@ -1,12 +1,11 @@
+from __future__ import annotations
+
 import hashlib
 from io import BytesIO
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.windows.rdpcache import (
     BMP_DATA_OFFSET,
     BMP_MAGIC,
@@ -22,18 +21,24 @@ from dissect.target.plugins.os.windows.rdpcache import (
 )
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target import Target
+    from dissect.target.filesystem import VirtualFilesystem
+
 BMC_PATH = absolute_path("_data/plugins/os/windows/rdpcache/bcache24.bmc")
 BIN_PATH = absolute_path("_data/plugins/os/windows/rdpcache/Cache0000.bin")
 
 
 @pytest.fixture
-def target_win_rdp_cache(target_win_users: Target, fs_win: VirtualFilesystem) -> Iterator[Target]:
+def target_win_rdp_cache(target_win_users: Target, fs_win: VirtualFilesystem) -> Target:
     fs_win.map_file("Users\\John\\AppData\\Local\\Microsoft\\Terminal Server Client\\Cache\\Cache0000.bin", BIN_PATH)
     fs_win.map_file("Users\\John\\AppData\\Local\\Microsoft\\Terminal Server Client\\Cache\\bcache24.bmc", BMC_PATH)
 
     target_win_users.add_plugin(RdpCachePlugin)
 
-    yield target_win_users
+    return target_win_users
 
 
 def test_wrap_in_border() -> None:
@@ -58,13 +63,13 @@ def test_wrap_in_border() -> None:
 def test_bmc_no_remnants() -> None:
     """Test if ``rdpcache.extract_bmc`` behaves as expected."""
 
-    with open(BMC_PATH, "rb") as fh:
+    with BMC_PATH.open("rb") as fh:
         tiles = list(extract_bmc(fh))
 
         # The test sample contains 'remnant tiles', but these contain no color data (its all null bytes)
         # We expect the parser to filter those out
         assert len(tiles) == 40
-        assert not any((tile.is_remnant for tile in tiles))
+        assert not any(tile.is_remnant for tile in tiles)
 
         total_tile_data = b"".join(tile.colors for tile in tiles)
         assert hashlib.md5(total_tile_data).hexdigest() == "3fb7c485c7ee83e0d5d748d2e1c9d206"
@@ -73,11 +78,11 @@ def test_bmc_no_remnants() -> None:
 def test_bin() -> None:
     """Test if ``rdpcache.extract_bin`` behaves as expected."""
 
-    with open(BIN_PATH, "rb") as fh:
+    with BIN_PATH.open("rb") as fh:
         tiles = list(extract_bin(fh))
 
         assert len(tiles) == 254
-        assert not any((tile.is_remnant for tile in tiles))
+        assert not any(tile.is_remnant for tile in tiles)
         total_tile_data = b"".join(tile.colors for tile in tiles)
         assert hashlib.md5(total_tile_data).hexdigest() == "7e7a88aa54efd92b3ab8e4f7b29afe3f"
 
@@ -85,7 +90,7 @@ def test_bin() -> None:
 def test_collage() -> None:
     """Test ``rdpcache.assemble_tiles_into_collage`` behaves as expected."""
 
-    with open(BIN_PATH, "rb") as fh:
+    with BIN_PATH.open("rb") as fh:
         tiles = list(extract_bin(fh))
         collage_no_borders = assemble_tiles_into_collage(tiles)
         assert collage_no_borders.width == 64 * 64  # Rows should be max. 64 tiles
@@ -101,7 +106,7 @@ def test_collage() -> None:
 def test_bmp_export() -> None:
     """Test if we can convert a tile to a bitmap correctly."""
 
-    grey_pixel = b"\x80\x80\x80\xFF"
+    grey_pixel = b"\x80\x80\x80\xff"
     square = grey_pixel * 16
     tile = BitmapTile(4, 4, square)
 
@@ -130,14 +135,14 @@ def test_bmp_export() -> None:
 def test_parse_color_data() -> None:
     """Test ``rdpcache.parse_color_data`` behavior."""
 
-    blue_color_half_transparency = b"\xFF\x00\x00\x80"
+    blue_color_half_transparency = b"\xff\x00\x00\x80"
     blue_square = blue_color_half_transparency * 4
 
     # The bmc parsing boosts transparency, replacing every fourth byte with 255
-    assert parse_color_data(blue_square) == b"\xFF\x00\x00\xFF" * 4
+    assert parse_color_data(blue_square) == b"\xff\x00\x00\xff" * 4
 
-    blue_pixel = b"\xFF\x00\x00\xFF"
-    red_pixel = b"\x00\x00\xFF\xFF"
+    blue_pixel = b"\xff\x00\x00\xff"
+    red_pixel = b"\x00\x00\xff\xff"
 
     blue_row = blue_pixel * 64
     red_row = red_pixel * 64

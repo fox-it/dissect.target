@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystem import VirtualFilesystem
+from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import (
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.parametrize(
-    "path, expected",
+    ("path", "expected"),
     [
         # None objects fall through (BC)
         (None, (None, None)),
@@ -50,7 +50,7 @@ def test_extract_path_info(
 
 
 @pytest.mark.parametrize(
-    "boot, mft, expected_logs",
+    ("boot", "mft", "expected_logs"),
     [
         (None, None, []),
         (
@@ -115,7 +115,7 @@ def test_virtual_ntfs_resiliency(
         True: Mock(),
     }
 
-    def _try_open(fs, path):
+    def _try_open(fs: Filesystem, path: str) -> Mock:
         state = None
         if path == "$Boot":
             state = boot
@@ -123,9 +123,9 @@ def test_virtual_ntfs_resiliency(
             state = mft
         return sentinels[state]
 
-    def NtfsFilesystem(boot=None, mft=None, **kwargs):
+    def NtfsFilesystem(boot: Mock | None = None, mft: Mock | None = None, **kwargs) -> Mock:
         if boot is sentinels[False] or mft is sentinels[False]:
-            raise Exception("Oopsiewoopsie")
+            raise ValueError("Oopsiewoopsie")
 
         fake_ntfs = Mock()
         fake_ntfs.ntfs.mft = None
@@ -136,10 +136,11 @@ def test_virtual_ntfs_resiliency(
         return fake_ntfs
 
     vfs = VirtualFilesystem()
-    with patch("dissect.target.helpers.loaderutil._try_open", new=_try_open), patch(
-        "dissect.target.helpers.loaderutil.NtfsFilesystem", new=NtfsFilesystem
+    with (
+        patch("dissect.target.helpers.loaderutil._try_open", new=_try_open),
+        patch("dissect.target.helpers.loaderutil.NtfsFilesystem", new=NtfsFilesystem),
     ):
         add_virtual_ntfs_filesystem(target_default, vfs)
 
     assert caplog.messages == expected_logs
-    assert hasattr(vfs, "ntfs") == (True if mft else False)
+    assert hasattr(vfs, "ntfs") == (bool(mft))

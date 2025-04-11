@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pathlib
 import tempfile
 from unittest.mock import Mock, patch
@@ -57,7 +59,7 @@ def test_symlink_to_dir(tmp_path: pathlib.Path) -> None:
     assert symlink_entry.readlink() == "/nested"
     assert symlink_entry.readlink_ext().entry == fs.get("/nested").entry
 
-    assert sorted(list(symlink_entry.iterdir())) == ["file1", "file2"]
+    assert sorted(symlink_entry.iterdir()) == ["file1", "file2"]
     assert sorted([e.entry for e in symlink_entry.scandir()], key=lambda e: e.name) == [
         fs.get("/nested/file1").entry,
         fs.get("/nested/file2").entry,

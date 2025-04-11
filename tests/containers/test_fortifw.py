@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import gzip
 import io
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.containers.fortifw import FortiFirmwareFile, find_xor_key, main
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # decompressed header of FGT_VM64-v7.4.3.F-build2573-FORTINET.out
 FIRMWARE_HEADER = bytes.fromhex(
@@ -36,7 +41,7 @@ def test_find_xor_key() -> None:
 
 
 @pytest.mark.parametrize(
-    "header,is_gzipped",
+    ("header", "is_gzipped"),
     [
         pytest.param(FIRMWARE_HEADER, False, id="uncompressed"),
         pytest.param(gzip.compress(FIRMWARE_HEADER), True, id="compressed"),

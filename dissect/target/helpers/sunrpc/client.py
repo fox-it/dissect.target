@@ -24,6 +24,8 @@ from dissect.target.helpers.sunrpc.serializer import (
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from typing_extensions import Self
+
     from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
 
 
@@ -174,9 +176,8 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         """Bind to a free privileged port (1-1023)."""
         for port in range(1, 1024):
             try:
-                sock.bind(("", port))
-                return
-            except OSError:
+                return sock.bind(("", port))
+            except OSError:  # noqa: PERF203
                 continue
 
         raise OSError("No free privileged port available")
@@ -187,7 +188,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         self._fragment_size = fragment_size
         self._xid = 1
 
-    def __enter__(self) -> Client:
+    def __enter__(self) -> Self:
         """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 

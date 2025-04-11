@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import stat
-from typing import Any, BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from dissect.xfs import xfs
 
@@ -13,6 +15,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +37,7 @@ class XfsFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return XfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[xfs.INode] = None) -> xfs.INode:
+    def _get_node(self, path: str, node: xfs.INode | None = None) -> xfs.INode:
         try:
             return self.xfs.get(path, node)
         except xfs.FileNotFoundError as e:
@@ -63,7 +68,7 @@ class XfsFilesystemEntry(FilesystemEntry):
             for f in self.readlink_ext().iterdir():
                 yield f
         else:
-            for f in self.entry.listdir().keys():
+            for f in self.entry.listdir():
                 if f in (".", ".."):
                     continue
                 yield f

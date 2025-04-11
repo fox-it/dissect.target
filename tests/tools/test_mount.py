@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import pytest
-
 from dissect.target.filesystem import VirtualFilesystem
-from dissect.target.target import Target
 from dissect.target.tools.mount import main as target_mount
 from dissect.target.volume import Volume
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.target import Target
 
 
 def test_duplicate_volume_name(target_bare: Target, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -14,9 +19,11 @@ def test_duplicate_volume_name(target_bare: Target, monkeypatch: pytest.MonkeyPa
         m.setattr("sys.argv", ["target-mount", "mock-target", "mock-mount"])
         m.setattr("dissect.target.tools.mount.HAS_FUSE", True)
 
-        with patch("dissect.target.tools.mount.Target") as MockTarget, patch(
-            "dissect.target.tools.mount.FUSE", create=True
-        ) as MockFUSE, patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount:
+        with (
+            patch("dissect.target.tools.mount.Target") as MockTarget,
+            patch("dissect.target.tools.mount.FUSE", create=True) as MockFUSE,
+            patch("dissect.target.tools.mount.DissectMount", create=True) as MockDissectMount,
+        ):
             MockTarget.open.return_value = target_bare
 
             target_bare.volumes.add(Volume(BytesIO(), 1, 0, 0, None, name="first"))

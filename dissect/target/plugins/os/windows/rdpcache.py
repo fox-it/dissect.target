@@ -2,17 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, arg, export
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 bitmap_cache_def = """
 // https://www.cert.ssi.gouv.fr/actualite/CERTFR-2016-ACT-017/
@@ -110,7 +114,7 @@ EMPTY_LOGICAL_COLOR_SPACE = c_bmp.CIEXYZTRIPLE(
     ciexyzGreen=c_bmp.CIEXYZ(ciexyzX=0, ciexyzY=0, ciexyzZ=0),
     ciexyzBlue=c_bmp.CIEXYZ(ciexyzX=0, ciexyzY=0, ciexyzZ=0),
 )
-EMPTY_PIXEL = b"\xFF\xFF\xFF\x00"  # Transparent white pixel
+EMPTY_PIXEL = b"\xff\xff\xff\x00"  # Transparent white pixel
 BORDER_PIXEL = b"\x80\x80\x80\xff"  # Grey pixel
 
 
@@ -141,7 +145,7 @@ def parse_color_data(data: bytes, reverse_rows: bool = False, row_width: int = 6
     color_data = b""
     row = b""
     while len(data) > 0:
-        chunk = data[:3] + b"\xFF"
+        chunk = data[:3] + b"\xff"
         data = data[4:]
         if reverse_rows:
             row += chunk
@@ -338,7 +342,7 @@ class RdpCachePlugin(Plugin):
     __namespace__ = "rdpcache"
 
     CACHE_PATH = "AppData/Local/Microsoft/Terminal Server Client/Cache/"
-    GLOBS = ["Cache*.bin", "bcache2*.bmc"]
+    GLOBS = ("Cache*.bin", "bcache2*.bmc")
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -441,14 +445,13 @@ class RdpCachePlugin(Plugin):
                     filename = f"{prefix}{i}.bmp"
 
                 if not no_individual_tiles:
-                    with open(output_dir.joinpath(filename), "wb") as out_fh:
-                        out_fh.write(tile_to_bitmap(tile))
+                    output_dir.joinpath(filename).write_bytes(tile_to_bitmap(tile))
 
             if include_remnants and not remnant_tiles:
                 self.target.log.info("No remnant tile data found for %s", path)
 
             elif remnant_tiles and not include_remnants:
-                self.target.log.warning("Remnant tile data found for %s, but remnant setting is set to exclude.", path)
+                self.target.log.warning("Remnant tile data found for %s, but remnant setting is set to exclude", path)
 
             if path.name.endswith(".bin"):
                 # For bin files, collages look better if we assemble them in reverse order
@@ -474,5 +477,5 @@ class RdpCachePlugin(Plugin):
                     try:
                         file.write_bytes(tile_to_bitmap(assemble_tiles_into_collage(tiles, border_around_tile)))
                     except Exception as e:
-                        self.target.log.error("Unable to write bitmap to file %s: %s", file, e)
+                        self.target.log.error("Unable to write bitmap to file %s: %s", file, e)  # noqa: TRY400
                         self.target.log.debug("", exc_info=e)

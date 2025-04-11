@@ -1,12 +1,18 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 from dissect.thumbcache.exceptions import UnknownThumbnailTypeError
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugins.os.windows.thumbcache import ThumbcachePlugin
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 def create_user_data_paths(target_win: Target, tmp_path: Path) -> Path:
@@ -27,7 +33,7 @@ def create_user_data_paths(target_win: Target, tmp_path: Path) -> Path:
     return explorer_dir
 
 
-def test_thumbcache_unsupported(target_win: Target, tmp_path: Path):
+def test_thumbcache_unsupported(target_win: Target, tmp_path: Path) -> None:
     with pytest.raises(UnsupportedPluginError):
         target_win.add_plugin(ThumbcachePlugin)
 
@@ -38,14 +44,14 @@ def test_thumbcache_unsupported(target_win: Target, tmp_path: Path):
         target_win.add_plugin(ThumbcachePlugin)
 
 
-def test_thumbcach_supported(target_win: Target, tmp_path: Path):
+def test_thumbcach_supported(target_win: Target, tmp_path: Path) -> None:
     explorer_dir = create_user_data_paths(target_win, tmp_path)
 
     (explorer_dir / "thumbcache_idx.db").touch()
     target_win.add_plugin(ThumbcachePlugin)
 
 
-def test_thumbcache_dump_entry(target_win: Target, tmp_path: Path):
+def test_thumbcache_dump_entry(target_win: Target, tmp_path: Path) -> None:
     create_user_data_paths(target_win, tmp_path)
     plugin = ThumbcachePlugin(target_win)
     with patch("dissect.target.plugins.os.windows.thumbcache.dump_entry_data_through_index") as mocked_dump:
@@ -53,7 +59,7 @@ def test_thumbcache_dump_entry(target_win: Target, tmp_path: Path):
         mocked_dump.assert_called_once()
 
 
-def test_thumbcache_create_flow(target_win: Target, tmp_path: Path):
+def test_thumbcache_create_flow(target_win: Target, tmp_path: Path) -> None:
     create_user_data_paths(target_win, tmp_path)
     with patch("dissect.target.plugins.os.windows.thumbcache.Thumbcache") as mocked_thumbcache:
         plugin = ThumbcachePlugin(target_win)
@@ -62,7 +68,7 @@ def test_thumbcache_create_flow(target_win: Target, tmp_path: Path):
         mocked_thumbcache.assert_called_once()
 
 
-def test_thumbcache_unknown_exception(target_win: Target, tmp_path: Path):
+def test_thumbcache_unknown_exception(target_win: Target, tmp_path: Path) -> None:
     create_user_data_paths(target_win, tmp_path)
     plugin = ThumbcachePlugin(target_win)
     logger = Mock()
@@ -71,10 +77,11 @@ def test_thumbcache_unknown_exception(target_win: Target, tmp_path: Path):
     with patch("dissect.target.plugins.os.windows.thumbcache.Thumbcache"):
         plugin._create_entries = Mock(side_effect=[FileNotFoundError])
         list(plugin._parse_thumbcache(None, None, None))
-        logger.critical.assert_called_once()
+        logger.error.assert_called_once()
+        logger.debug.assert_called_once()
 
 
-def test_thumbcache_thumbcache_exception(target_win: Target, tmp_path: Path):
+def test_thumbcache_thumbcache_exception(target_win: Target, tmp_path: Path) -> None:
     create_user_data_paths(target_win, tmp_path)
     plugin = ThumbcachePlugin(target_win)
     logger = Mock()

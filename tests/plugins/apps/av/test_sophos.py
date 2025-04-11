@@ -1,13 +1,19 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.av.sophos import (
     HitmanAlertRecord,
     SophosLogRecord,
     SophosPlugin,
 )
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_sophos_hitman_plugin_log(target_win: Target, fs_win: VirtualFilesystem) -> None:

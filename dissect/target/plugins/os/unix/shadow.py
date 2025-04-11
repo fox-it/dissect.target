@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 UnixShadowRecord = TargetRecordDescriptor(
     "unix/shadow",
@@ -30,11 +33,11 @@ UnixShadowRecord = TargetRecordDescriptor(
 class ShadowPlugin(Plugin):
     """Unix shadow passwords plugin."""
 
+    SHADOW_FILES = ("/etc/shadow", "/etc/shadow-")
+
     def check_compatible(self) -> None:
         if not self.target.fs.path("/etc/shadow").exists():
             raise UnsupportedPluginError("No shadow file found")
-
-    SHADOW_FILES = ["/etc/shadow", "/etc/shadow-"]
 
     @export(record=UnixShadowRecord)
     def passwords(self) -> Iterator[UnixShadowRecord]:
@@ -171,6 +174,6 @@ def extract_crypt_details(shent: dict) -> dict:
 def epoch_days_to_datetime(days: int) -> datetime:
     """Convert a number representing the days since 1 January 1970 to a datetime object."""
     if not isinstance(days, int):
-        raise ValueError("days argument should be an integer")
+        raise TypeError("days argument should be an integer")
 
     return datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc) + timedelta(days)

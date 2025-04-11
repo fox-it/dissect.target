@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 import argparse
 import logging
-from typing import Union
 
 from dissect.util.feature import Feature, feature_enabled
 
-from dissect.target import Target, filesystem
+from dissect.target import filesystem
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.utils import parse_options_string
+from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -44,7 +46,7 @@ logging.raiseExceptions = False
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -60,14 +62,15 @@ def main():
     process_generic_arguments(args, rest)
 
     if not HAS_FUSE:
-        parser.exit("fusepy is not installed: pip install fusepy")
+        log.error("fusepy is not installed: pip install fusepy")
+        return 1
 
     try:
         t = Target.open(args.target)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
 
     vfs = filesystem.VirtualFilesystem()
     vfs.mount("fs", t.fs)
@@ -113,12 +116,14 @@ def main():
     try:
         FUSE(DissectMount(vfs), args.mount, **options)
     except RuntimeError as e:
-        log.error("Mounting target %s failed", t)
+        log.error("Mounting target %s failed", t)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
+
+    return 0
 
 
-def _format_options(options: dict[str, Union[str, bool]]) -> str:
+def _format_options(options: dict[str, str | bool]) -> str:
     return ",".join(key if value is True else f"{key}={value}" for key, value in options.items())
 
 

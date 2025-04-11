@@ -1,12 +1,18 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import from_unix
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 TrendMicroWFLogRecord = TargetRecordDescriptor(
     "application/av/trendmicro/wf/log",
@@ -59,7 +65,7 @@ class TrendMicroPlugin(Plugin):
     LOG_FILE_FIREWALL = f"{LOG_FOLDER}/PFW/PfwLog_*.dat"  # Windows intrusions
     LOG_FILE_INFECTIONS = f"{LOG_FOLDER}/Misc/pccnt35.log"  # Windows infections
 
-    def __init__(self, target: Target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.codepage = self.target.codepage or "ascii"
 

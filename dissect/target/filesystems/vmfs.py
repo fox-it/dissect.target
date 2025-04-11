@@ -1,8 +1,9 @@
-from typing import BinaryIO, Iterator, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
 
 import dissect.vmfs as vmfs
 from dissect.vmfs.c_vmfs import c_vmfs
-from dissect.vmfs.vmfs import FileDescriptor
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -13,6 +14,11 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.vmfs.vmfs import FileDescriptor
 
 
 class VmfsFilesystem(Filesystem):
@@ -33,10 +39,9 @@ class VmfsFilesystem(Filesystem):
         )
 
     def get(self, path: str) -> FilesystemEntry:
-        """Returns a VmfsFilesystemEntry object corresponding to the given pathname"""
         return VmfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[FileDescriptor] = None) -> FileDescriptor:
+    def _get_node(self, path: str, node: FileDescriptor | None = None) -> FileDescriptor:
         """Returns an internal VMFS entry for a given path and optional relative entry."""
         try:
             return self.vmfs.get(path, node)
@@ -109,7 +114,7 @@ class VmfsFilesystemEntry(FilesystemEntry):
     def readlink(self) -> str:
         """Read the link of the given path if it is a symlink. Returns a string."""
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 

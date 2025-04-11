@@ -3,10 +3,13 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.fsutil import open_decompress
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
 log = logging.getLogger(__name__)
 

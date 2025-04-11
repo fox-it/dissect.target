@@ -1,13 +1,19 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import configutil
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, alias, export
 from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 TrashRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "linux/filesystem/recyclebin",
@@ -24,10 +30,10 @@ TrashRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
 class GnomeTrashPlugin(Plugin):
     """Linux GNOME Trash plugin."""
 
-    PATHS = [
+    PATHS = (
         # Default $XDG_DATA_HOME/Trash
         ".local/share/Trash",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -43,7 +49,7 @@ class GnomeTrashPlugin(Plugin):
                     yield user_details, path
 
         # mounted devices trash folders
-        for mount_path in list(self.target.fs.mounts) + ["/mnt", "/media"]:
+        for mount_path in [*list(self.target.fs.mounts), "/mnt", "/media"]:
             if mount_path == "/":
                 continue
 
@@ -94,8 +100,7 @@ class GnomeTrashPlugin(Plugin):
                     deleted_files = [deleted_path]
 
                     if deleted_path.is_dir():
-                        for child in deleted_path.rglob("*"):
-                            deleted_files.append(child)
+                        deleted_files.extend(deleted_path.rglob("*"))
 
                     for file in deleted_files:
                         # NOTE: We currently do not 'fix' the original_path of files inside deleted directories.
@@ -114,7 +119,7 @@ class GnomeTrashPlugin(Plugin):
                 # We cannot determine if the deleted entry is a directory since the path does
                 # not exist at $TRASH/files, so we work with what we have instead.
                 else:
-                    self.target.log.warning(f"Expected trashed file(s) at {deleted_path}")
+                    self.target.log.warning("Expected trashed file(s) at %s", deleted_path)
                     yield TrashRecord(
                         ts=trash_info.get("DeletionDate", 0),
                         path=original_path,

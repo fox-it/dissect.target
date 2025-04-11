@@ -6,8 +6,8 @@ from collections import defaultdict
 from configparser import ConfigParser, MissingSectionHeaderError
 from io import StringIO
 from itertools import chain
-from re import compile, sub
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Match
+from re import Match, compile, sub
+from typing import TYPE_CHECKING, Any, Callable
 
 from defusedxml import ElementTree
 
@@ -15,6 +15,8 @@ from dissect.target.exceptions import PluginError
 from dissect.target.helpers import configutil
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
     from dissect.target.helpers.fsutil import TargetPath
     from dissect.target.plugins.os.unix.log.journal import JournalRecord
     from dissect.target.plugins.os.unix.log.messages import MessagesRecord
@@ -49,7 +51,7 @@ class Template:
         options: Configuration options to look for in the specified configuration file (ip, dns, dhcp, etc.).
     """
 
-    def __init__(self, name: str, parser: Any, sections: list[str], options: list[str]) -> None:
+    def __init__(self, name: str, parser: Any, sections: list[str], options: list[str]):
         self.name = name
         self.parser = parser
 
@@ -95,9 +97,8 @@ class Template:
         """
         if HAS_YAML:
             return self.parser(path.open("rb"))
-        else:
-            log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
-            return None
+        log.error("Failed to parse %s. Cannot import ruamel.yaml", self.name)
+        return None
 
     def _parse_wicked_config(self, path: TargetPath) -> dict:
         """Internal function to parse a wicked XML based configuration file into a dict.
@@ -111,7 +112,10 @@ class Template:
         # nasty workaround for namespaced XML without namespace (xlmns) definitions
         # we have to replace the ":" for this with "___" (three underscores) to make the xml config non-namespaced.
         pattern = compile(r"(?<=\n)\s+(<.+?>)")
-        replace_match: Callable[[Match]] = lambda match: match.group(1).replace(":", "___")
+
+        def replace_match(match: Match) -> str:
+            return match.group(1).replace(":", "___")
+
         text = sub(pattern, replace_match, path.open("rt").read())
 
         xml = self.parser.parse(StringIO(text))
@@ -128,11 +132,11 @@ class Template:
         """
         try:
             self.parser.read_string(path.open("rt").read(), path.name)
-            return self.parser._sections
         except MissingSectionHeaderError:
             # configparser does like config files without headers, so we inject a header to make it work.
             self.parser.read_string(f"[{self.name}]\n" + path.open("rt").read(), path.name)
-            return self.parser._sections
+
+        return self.parser._sections
 
     def _parse_text_config(self, comments: str, delim: str, path: TargetPath) -> dict:
         """Internal function to parse a basic plain text based configuration file into a dict.
@@ -213,7 +217,7 @@ class Parser:
         template: Template object to create a config from.
     """
 
-    def __init__(self, target: Target, config_globs: list[str], template: Template) -> None:
+    def __init__(self, target: Target, config_globs: list[str], template: Template):
         self.target = target
         self.template = template
 
@@ -265,9 +269,7 @@ class Parser:
 
         for glob in self.config_globs:
             glob = glob.lstrip("/")
-            for path in self.target.fs.path().glob(glob):
-                if path.is_file():
-                    config_files.append(path)
+            config_files.extend(path for path in self.target.fs.path().glob(glob) if path.is_file())
         return config_files
 
     def translate(self, value: Any, option: str) -> str:
@@ -288,6 +290,7 @@ class Parser:
         for translation_key, translation_values in translation_table.items():
             if option in translation_values and value:
                 return translation_key
+        return None
 
     def _get_option(self, config: dict, option: str, section: str | None = None) -> str | Callable | None:
         """Internal function to get arbitrary options values from a parsed (non-translated) dictionary.
@@ -302,7 +305,7 @@ class Parser:
         """
         if not config:
             log.error("Cannot get option %s: No config to parse", option)
-            return
+            return None
 
         if section:
             # account for values of sections which are None
@@ -311,11 +314,11 @@ class Parser:
         for key, value in config.items():
             if key == option:
                 return value
-            elif isinstance(value, dict):
+            if isinstance(value, dict):
                 if option in value:
                     return value[option]
-                else:
-                    return self._get_option(value, option)
+                return self._get_option(value, option)
+        return None
 
 
 class NetworkManager:
@@ -328,7 +331,7 @@ class NetworkManager:
         config_flobs: Glob patterns to retreive possible configuration files belonging to this network manager.
     """
 
-    def __init__(self, name: str, detection_globs: tuple[str], config_globs: tuple[str]) -> None:
+    def __init__(self, name: str, detection_globs: tuple[str], config_globs: tuple[str]):
         self.target = None
         self.parser = None
         self.config = None
@@ -346,7 +349,7 @@ class NetworkManager:
         for path in self.detection_globs:
             path = path.lstrip("/")
 
-            if len(list(target.fs.path().glob(path))):
+            if next(target.fs.path().glob(path), None):
                 target.log.debug("Found compatible network manager: %s", self.name)
                 return True
 
@@ -371,17 +374,16 @@ class NetworkManager:
             target.log.debug("Applying parsing template %s to network manager %s", template.name, self.name)
             target.log.debug("Registered network manager: %s as active", self.name)
             return True
-        else:
-            self.target, self.parser = None, None
-            target.log.debug("Failed to register network manager %s as active.", self.name)
-            return False
+        self.target, self.parser = None, None
+        target.log.debug("Failed to register network manager %s as active", self.name)
+        return False
 
     def parse(self) -> None:
         """Parse the network configuration for this network manager."""
         if self.registered:
             self.config = self.parser.parse()
         else:
-            log.error("Network manager %s is not registered. Cannot parse config.", self.name)
+            log.error("Network manager %s is not registered, cannot parse config", self.name)
 
     @property
     def interface(self) -> set:
@@ -410,10 +412,7 @@ class NetworkManager:
 
     @property
     def registered(self) -> bool:
-        if self.target and self.parser:
-            return True
-        else:
-            return False
+        return bool(self.target and self.parser)
 
     def _dhcp(self) -> set:
         """Internal function to translate DHCP values to their boolean equivalent.
@@ -495,9 +494,8 @@ class LinuxNetworkManager:
         Registers the discovered network managers as active for parsing later on.
         """
         for manager in MANAGERS:
-            if manager.detect(self.target):
-                if manager.register(self.target, TEMPLATES[manager.name]):
-                    self.managers.append(manager)
+            if manager.detect(self.target) and manager.register(self.target, TEMPLATES[manager.name]):
+                self.managers.append(manager)
 
     def get_config_value(self, attr: str) -> list[set]:
         """Return the specified value from a network configuration option.
@@ -530,11 +528,11 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
     for log_func in ["messages", "journal"]:
         try:
             messages = chain(messages, getattr(target, log_func)())
-        except PluginError:
-            target.log.debug(f"Could not search for DHCP leases in {log_func} files.")
+        except PluginError:  # noqa: PERF203
+            target.log.debug("Could not search for DHCP leases in %s files", log_func)
 
     if not messages:
-        target.log.warning(f"Could not search for DHCP leases using {log_func}: No log entries found.")
+        target.log.warning("Could not search for DHCP leases using %s: No log entries found", log_func)
 
     def records_enumerate(iterable: Iterable) -> Iterator[tuple[int, JournalRecord | MessagesRecord]]:
         count = 0
@@ -596,7 +594,7 @@ def parse_unix_dhcp_log_messages(target: Target, iter_all: bool = False) -> set[
         # or if we have found at least one ip address. When `iter_all` is `True` we continue searching.
         if not iter_all and (ips or count > 10_000):
             if not ips:
-                target.log.warning("No DHCP IP addresses found in first 10000 journal entries.")
+                target.log.warning("No DHCP IP addresses found in first 10000 journal entries")
             break
 
     return ips
@@ -637,10 +635,7 @@ def parse_unix_dhcp_leases(target: Target) -> set[str]:
 
 
 def should_ignore_ip(ip: str) -> bool:
-    for i in IGNORED_IPS:
-        if ip.startswith(i):
-            return True
-    return False
+    return any(ip.startswith(i) for i in IGNORED_IPS)
 
 
 MANAGERS = [

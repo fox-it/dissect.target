@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import BinaryIO, Iterable, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 
@@ -8,6 +8,9 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.locate.locate import BaseLocatePlugin
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 gnulocate_def = """
 #define MAGIC 0x004c4f43415445303200             /* b'/x00LOCATE02/x00' */
@@ -30,7 +33,7 @@ c_gnulocate = cstruct().load(gnulocate_def)
 
 
 class GNULocateFile:
-    """locate file parser
+    """GNU locate file parser.
 
     Multiple formats exist for the locatedb file. This class only supports the most recent version ``LOCATE02``.
 
@@ -50,7 +53,7 @@ class GNULocateFile:
         if magic != c_gnulocate.MAGIC:
             raise ValueError(f"Invalid Locate file magic. Expected /x00LOCATE02/x00, got {magic}")
 
-    def __iter__(self) -> Iterable[GNULocateFile]:
+    def __iter__(self) -> Iterator[GNULocateFile]:
         try:
             while True:
                 # NOTE: The offset could be negative, which indicates

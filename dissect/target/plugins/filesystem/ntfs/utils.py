@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import re
 from enum import Enum, auto
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from dissect.ntfs.exceptions import FileNotFoundError
-from dissect.ntfs.mft import MftRecord
 
-from dissect.target import Target
-from dissect.target.filesystems.ntfs import NtfsFilesystem
+if TYPE_CHECKING:
+    from dissect.ntfs.mft import MftRecord
+
+    from dissect.target.filesystems.ntfs import NtfsFilesystem
+    from dissect.target.target import Target
 
 DRIVE_LETTER_RE = re.compile(r"[a-zA-Z]:")
 
 
 class InformationType(Enum):
-    """Valid information types"""
+    """Valid information types."""
 
     STANDARD_INFORMATION = auto()
     FILE_INFORMATION = auto()
@@ -53,12 +56,11 @@ def get_drive_letter(target: Target, filesystem: NtfsFilesystem) -> str:
 
     if drives:
         return f"{drives[0]}\\"
-    else:
-        return ""
+    return ""
 
 
 def get_volume_identifier(fs: NtfsFilesystem) -> str | None:
-    """Return the filesystem guid if available"""
+    """Return the filesystem GUID if available."""
     try:
         return f"{UUID(bytes_le=fs.volume.guid)}"
     except (AttributeError, TypeError, ValueError):

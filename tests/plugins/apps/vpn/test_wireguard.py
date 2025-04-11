@@ -1,7 +1,13 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.vpn.wireguard import WireGuardPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_wireguard_plugin_global_log(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

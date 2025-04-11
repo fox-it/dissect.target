@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, BinaryIO, Type, Union
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.target.exceptions import ContainerError
 from dissect.target.helpers.lazy import import_lazy
@@ -12,11 +12,11 @@ from dissect.target.helpers.utils import readinto
 if TYPE_CHECKING:
     from dissect.target.volume import VolumeSystem
 
-CONTAINERS: list[Type[Container]] = []
+CONTAINERS: list[type[Container]] = []
 MODULE_PATH = "dissect.target.containers"
 
 RawContainer = import_lazy("dissect.target.containers.raw").RawContainer
-"""A lazy import of :mod:`dissect.target.containers.raw`"""
+"""A lazy import of :mod:`dissect.target.containers.raw`."""
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ class Container(io.IOBase):
     __type__: str = None
     """A short string identifying the type of container."""
 
-    def __init__(self, fh: Union[BinaryIO, Path], size: int, vs: VolumeSystem = None):
+    def __init__(self, fh: BinaryIO | Path, size: int, vs: VolumeSystem = None):
         self.fh = fh
         self.size = size
 
@@ -53,7 +53,7 @@ class Container(io.IOBase):
         return f"<{self.__class__.__name__} size={self.size} vs={self.vs}>"
 
     @classmethod
-    def detect(cls, item: Union[list, BinaryIO, Path]) -> bool:
+    def detect(cls, item: list | BinaryIO | Path) -> bool:
         """Detect if this ``Container`` can handle this file format.
 
         Args:
@@ -65,16 +65,16 @@ class Container(io.IOBase):
         i = item[0] if isinstance(item, list) else item
         if hasattr(i, "read"):
             return cls.detect_fh(i, item)
-        elif cls.detect_path(i, item):
+        if cls.detect_path(i, item):
             return True
-        elif i.exists():
+        if i.exists():
             with i.open("rb") as fh:
                 return cls.detect_fh(fh, item)
 
         return False
 
     @classmethod
-    def detect_fh(cls, fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def detect_fh(cls, fh: BinaryIO, original: list | BinaryIO) -> bool:
         """Detect if this ``Container`` can be used to open the file-like object ``fh``.
 
         The function checks whether the raw data contains any magic information that corresponds to this
@@ -102,7 +102,7 @@ class Container(io.IOBase):
         return False
 
     @staticmethod
-    def _detect_fh(fh: BinaryIO, original: Union[list, BinaryIO]) -> bool:
+    def _detect_fh(fh: BinaryIO, original: list | BinaryIO) -> bool:
         """Detect if this ``Container`` can be used to open the file-like object ``fh``.
 
         This method should be implemented by subclasses. The position of ``fh`` is guaranteed to be ``0``.
@@ -114,10 +114,10 @@ class Container(io.IOBase):
         Returns:
             ``True`` if this ``Container`` can be used for this file-like object, ``False`` otherwise.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @staticmethod
-    def detect_path(path: Path, original: Union[list, Path]) -> bool:
+    def detect_path(path: Path, original: list | Path) -> bool:
         """Detect if this ``Container`` can be used to open ``path``.
 
         The function checks wether file inside ``path`` is formatted in such a way that
@@ -131,11 +131,11 @@ class Container(io.IOBase):
         Returns:
             ``True`` if this ``Container`` can be used for this path, ``False`` otherwise.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def read(self, length: int = -1) -> bytes:
         """Read a ``length`` of bytes from this ``Container``."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def readinto(self, b: bytearray) -> int:
         """Uses :func:`dissect.target.helpers.utils.readinto`."""
@@ -154,7 +154,7 @@ class Container(io.IOBase):
             offset: The offset relative to the position indicated by ``whence``.
             whence: Where to start the seek from.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def seekable(self) -> bool:
         """Returns whether ``seek`` can be used by this ``Container``. Always ``True``."""
@@ -162,17 +162,16 @@ class Container(io.IOBase):
 
     def tell(self) -> int:
         """Returns the current seek position of the ``Container``."""
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def close(self) -> None:
         """Close the container.
 
         Override this if you need to clean-up anything.
         """
-        pass
 
 
-def register(module: str, class_name: str, internal: bool = True):
+def register(module: str, class_name: str, internal: bool = True) -> None:
     """Register a container implementation to use when opening a container.
 
     This function registers a container using ``module`` relative to the ``MODULE_PATH``.
@@ -185,12 +184,12 @@ def register(module: str, class_name: str, internal: bool = True):
     """
 
     if internal:
-        module = ".".join([MODULE_PATH, module])
+        module = f"{MODULE_PATH}.{module}"
 
     CONTAINERS.append(getattr(import_lazy(module), class_name))
 
 
-def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
+def open(item: list | str | BinaryIO | Path, *args, **kwargs) -> Container:
     """Open a :class:`Container` from the given object.
 
     All currently supported containers are checked to find a compatible one.
@@ -228,14 +227,14 @@ def open(item: Union[list, str, BinaryIO, Path], *args, **kwargs):
         first_fh.seek(0)
 
     try:
-        for container in CONTAINERS + [RawContainer]:
+        for container in [*CONTAINERS, RawContainer]:
             try:
                 # Path must be leading for things like SplitContainer, but fall back to fh if we have one
                 if (first_path and container.detect_path(first_path, item)) or (
                     first_fh and container.detect_fh(first_fh, item)
                 ):
                     return container(item, *args, **kwargs)
-            except ImportError as e:
+            except ImportError as e:  # noqa: PERF203
                 log.info("Failed to import %s", container)
                 log.debug("", exc_info=e)
             except Exception as e:

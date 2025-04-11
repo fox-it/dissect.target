@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import stat
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO, Optional
 
 from dissect.fat import exfat
 from dissect.util.stream import RunlistStream
@@ -11,6 +11,9 @@ from dissect.target.exceptions import FileNotFoundError, NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 ExfatFileTree = tuple[exfat.c_exfat.FILE, dict[str, Optional["ExfatFileTree"]]]
 
 
@@ -18,7 +21,7 @@ class ExfatFilesystem(Filesystem):
     __type__ = "exfat"
 
     def __init__(self, fh: BinaryIO, *args, **kwargs):
-        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
+        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
         self.exfat = exfat.ExFAT(fh)
         self.cluster_size = self.exfat.cluster_size
 
@@ -27,10 +30,9 @@ class ExfatFilesystem(Filesystem):
         return fh.read(11)[3:] == b"EXFAT   "
 
     def get(self, path: str) -> ExfatFilesystemEntry:
-        """Returns a ExfatFilesystemEntry object corresponding to the given pathname"""
         return ExfatFilesystemEntry(self, path, self._get_entry(path))
 
-    def _get_entry(self, path: str, root: Optional[ExfatFileTree] = None) -> ExfatFileTree:
+    def _get_entry(self, path: str, root: ExfatFileTree | None = None) -> ExfatFileTree:
         dirent = root if root is not None else self.exfat.files["/"]
 
         # Programmatically we will often use the `/` separator, so replace it
@@ -73,13 +75,11 @@ class ExfatFilesystemEntry(FilesystemEntry):
         return ExfatFilesystemEntry(self.fs, full_path, self.fs._get_entry(path, self.entry))
 
     def open(self) -> BinaryIO:
-        """Returns file handle (file like object)"""
         if self.entry[0].stream.flags.not_fragmented:
             runlist = self.fs.exfat.runlist(self.cluster, True, self.size)
         else:
             runlist = self.fs.exfat.runlist(self.cluster, False)
-        fh = RunlistStream(self.fs.exfat.filesystem, runlist, self.size, self.fs.cluster_size)
-        return fh
+        return RunlistStream(self.fs.exfat.filesystem, runlist, self.size, self.fs.cluster_size)
 
     def _iterdir(self) -> Iterator[tuple[str, ExfatFileTree]]:
         if not self.is_dir():
@@ -127,9 +127,9 @@ class ExfatFilesystemEntry(FilesystemEntry):
 
         # all timestamps are recorded in local time. the utc offset (of the system generating the timestamp in question)
         # is recorded in the associated tz byte
-        c_tz = UTC(self.fs.exfat._utc_timezone(fe.create_timezone))  # noqa
-        m_tz = UTC(self.fs.exfat._utc_timezone(fe.modified_timezone))  # noqa
-        a_tz = UTC(self.fs.exfat._utc_timezone(fe.access_timezone))  # noqa
+        c_tz = UTC(self.fs.exfat._utc_timezone(fe.create_timezone))
+        m_tz = UTC(self.fs.exfat._utc_timezone(fe.modified_timezone))
+        a_tz = UTC(self.fs.exfat._utc_timezone(fe.access_timezone))
 
         ctime = dostimestamp(fe.create_time, fe.create_offset).replace(tzinfo=c_tz)
         mtime = dostimestamp(fe.modified_time, fe.modified_offset).replace(tzinfo=m_tz)
