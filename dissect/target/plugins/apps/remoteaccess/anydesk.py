@@ -31,6 +31,18 @@ class AnydeskPlugin(RemoteAccessPlugin):
         # Standard/Custom client Linux/MacOS
         "var/log/anydesk*/*.trace",
     ]
+    
+    # Anydesk Filetransfer logs when installed as a service
+    FILETRANSFER_SERVICE_LOGS = [
+        # File transfer service log
+        "sysvol/ProgramData/AnyDesk/file_transfer_trace.txt",
+    ]
+
+    # User specific Anydesk filetransfer log
+    FILETRANSFER_USER_LOGS = [
+        # File transfer log
+        "AppData/Roaming/AnyDesk/file_transfer_trace.txt",
+    ]
 
     # User specific Anydesk logs
     USER_GLOBS = [
@@ -50,26 +62,85 @@ class AnydeskPlugin(RemoteAccessPlugin):
         "remoteaccess/anydesk/log", GENERIC_LOG_RECORD_FIELDS
     )
 
+    FILE_TRANSFER_FIELDS = [("string", "filename")]
+    RemoteAccessLogRecordFileTransfer = create_extended_descriptor([UserRecordDescriptorExtension])(
+        "remoteaccess/anydesk/filetransfer", GENERIC_LOG_RECORD_FIELDS + FILE_TRANSFER_FIELDS
+    )
+
     def __init__(self, target):
         super().__init__(target)
 
         self.trace_files: set[tuple[TargetPath, UserDetails]] = set()
+        self.filetransfer_files: set[tuple[TargetPath, UserDetails]] = set()
 
-        # Service globs
+        # Anydesk filetransfer service globs
+        user = None
+        for trace_glob in self.FILETRANSFER_SERVICE_LOGS:
+            for trace_file in self.target.fs.path().glob(trace_glob):
+                self.filetransfer_files.add((trace_file, user))
+
+        # Anydesk filetransfer User globs
+        for user_details in self.target.user_details.all_with_home():
+            for trace_glob in self.FILETRANSFER_USER_LOGS:
+                for trace_file in user_details.home_path.glob(trace_glob):
+                    self.filetransfer_files.add((trace_file, user_details.user))
+
+        # Anydesk trace file service globs
         user = None
         for trace_glob in self.SERVICE_GLOBS:
             for trace_file in self.target.fs.path().glob(trace_glob):
                 self.trace_files.add((trace_file, user))
 
-        # User globs
+        # Anydesk trace file user globs
         for user_details in self.target.user_details.all_with_home():
             for trace_glob in self.USER_GLOBS:
                 for trace_file in user_details.home_path.glob(trace_glob):
                     self.trace_files.add((trace_file, user_details.user))
 
     def check_compatible(self) -> None:
-        if not self.trace_files:
-            raise UnsupportedPluginError("No Anydesk trace files found on target")
+        if not self.trace_files and not self.filetransfer_files:
+            raise UnsupportedPluginError("No Anydesk files found on target")
+
+    @export(record=RemoteAccessLogRecordFileTransfer)
+    def filetransfer(self) -> Iterator[RemoteAccessLogRecordFileTransfer]:
+        """Parse AnyDesk filetransfer files.
+
+        AnyDesk is a remote desktop application and can be used by adversaries to get (persistent) access to a machine.
+        FileTransfer (file_transfer_trace.txt) files show what files are downloaded to a system.
+        Timestamps in trace files do not carry a time zone designator (TZD) but are in fact UTC.
+        """
+        for trace_file, user in self.filetransfer_files:
+            for line in trace_file.open("rt", encoding='utf-16-le', errors="backslashreplace"):
+                line = line.strip()
+
+                try:
+                    # Example log entry:
+                    # Clipboard\t\t2025-01-01, 13:37\tstart \tdownload\t'malware.exe' (~0 B out of 4.20 MiB)
+                    timestamp = line.split('\t')[2]
+                    timestamp = datetime.strptime(timestamp, "%Y-%m-%d, %H:%M").replace(
+                        tzinfo=timezone.utc
+                    )
+                    # Replace log lines tabs with spaces for readability
+                    message = line.replace('\t', ' ')
+
+                    # Attempt to extract 'filename' from message.
+                    filename = ""
+                    match = re.search(r"\'([^\']*)\'", message)
+                    if match:
+                        filename = match.group(1)
+
+                    yield self.RemoteAccessLogRecordFileTransfer(
+                        ts=timestamp,
+                        message=message,
+                        filename=filename,
+                        source=trace_file,
+                        _target=self.target,
+                        _user=user,
+                    )
+
+                except ValueError as e:
+                    self.target.log.warning("Could not parse log line in file %s: '%s'", trace_file, line)
+                    self.target.log.debug("", exc_info=e)
 
     @export(record=RemoteAccessLogRecord)
     def logs(self) -> Iterator[RemoteAccessLogRecord]:
