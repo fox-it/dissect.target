@@ -36,6 +36,8 @@ from dissect.target.helpers.utils import StrEnum
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.helpers.record import ChildTargetRecord
     from dissect.target.target import Target
@@ -1182,7 +1184,7 @@ class OSPlugin(Plugin):
         raise NotImplementedError
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> OSPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         """Initiate this OSPlugin with the given target and detected filesystem.
 
         Args:

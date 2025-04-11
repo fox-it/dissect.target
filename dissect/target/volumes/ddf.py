@@ -10,6 +10,8 @@ from dissect.target.volume import LogicalVolumeSystem, Volume
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
 
 class DdfVolumeSystem(LogicalVolumeSystem):
     __type__ = "ddf"
@@ -19,7 +21,7 @@ class DdfVolumeSystem(LogicalVolumeSystem):
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         sets: dict[bytes, list[DDFPhysicalDisk]] = {}
 
         for vol in volumes:

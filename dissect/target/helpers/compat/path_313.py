@@ -36,6 +36,8 @@ from dissect.target.helpers.compat import path_common
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
 
@@ -114,7 +116,7 @@ class PureDissectPath(PurePath):
         self._fs = fs
         self.parser = _DissectParser(alt_separator=fs.alt_separator, case_sensitive=fs.case_sensitive)
 
-    def with_segments(self, *pathsegments) -> TargetPath:
+    def with_segments(self, *pathsegments) -> Self:
         return type(self)(self._fs, *pathsegments)
 
     # NOTE: This is copied from pathlib/_local.py
@@ -216,7 +218,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise UnsupportedOperation(self._unsupported_msg("write_text()"))
 
-    def iterdir(self) -> Iterator[TargetPath]:
+    def iterdir(self) -> Iterator[Self]:
         """Yield path objects of the directory contents.
 
         The children are yielded in arbitrary order, and the
@@ -231,7 +233,7 @@ class TargetPath(Path, PureDissectPath):
 
     def glob(
         self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: bool = False
-    ) -> Iterator[TargetPath]:
+    ) -> Iterator[Self]:
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
@@ -239,7 +241,7 @@ class TargetPath(Path, PureDissectPath):
 
     def rglob(
         self, pattern: str, *, case_sensitive: bool | None = None, recurse_symlinks: str = False
-    ) -> Iterator[TargetPath]:
+    ) -> Iterator[Self]:
         """Recursively yield all existing files (of any kind, including
         directories) matching the given relative pattern, anywhere in
         this subtree.
@@ -248,11 +250,11 @@ class TargetPath(Path, PureDissectPath):
 
     def walk(
         self, top_down: bool = True, on_error: Callable[[Exception], None] | None = None, follow_symlinks: bool = False
-    ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
+    ) -> Iterator[tuple[Self, list[str], list[str]]]:
         """Walk the directory tree from this directory, similar to os.walk()."""
         return PathBase.walk(self, top_down=top_down, on_error=on_error, follow_symlinks=follow_symlinks)
 
-    def absolute(self) -> TargetPath:
+    def absolute(self) -> Self:
         """Return an absolute version of this path
         No normalization or symlink resolution is performed.
 
@@ -261,31 +263,31 @@ class TargetPath(Path, PureDissectPath):
         raise UnsupportedOperation(self._unsupported_msg("absolute()"))
 
     @classmethod
-    def cwd(cls) -> TargetPath:
+    def cwd(cls) -> Self:
         """Return a new path pointing to the current working directory."""
         raise UnsupportedOperation(cls._unsupported_msg("cwd()"))
 
-    def expanduser(self) -> TargetPath:
+    def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
         (as returned by os.path.expanduser)
         """
         raise UnsupportedOperation(self._unsupported_msg("expanduser()"))
 
     @classmethod
-    def home(cls) -> TargetPath:
+    def home(cls) -> Self:
         """Return a new path pointing to the user's home directory (as
         returned by os.path.expanduser('~')).
         """
         raise UnsupportedOperation(cls._unsupported_msg("home()"))
 
-    def readlink(self) -> TargetPath:
+    def readlink(self) -> Self:
         """
         Return the path to which the symbolic link points.
         """
         return self.with_segments(self.get().readlink())
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
-    def resolve(self, strict: bool = False) -> TargetPath:
+    def resolve(self, strict: bool = False) -> Self:
         """
         Make the path absolute, resolving all symlinks on the way and also
         normalizing it.
@@ -331,7 +333,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise UnsupportedOperation(self._unsupported_msg("mkdir()"))
 
-    def rename(self, target: str) -> TargetPath:
+    def rename(self, target: str) -> Self:
         """
         Rename this path to the target path.
 
@@ -343,7 +345,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise UnsupportedOperation(self._unsupported_msg("rename()"))
 
-    def replace(self, target: str) -> TargetPath:
+    def replace(self, target: str) -> Self:
         """
         Rename this path to the target path, overwriting if that path exists.
 

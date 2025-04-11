@@ -24,6 +24,8 @@ from dissect.target.helpers.sunrpc.serializer import (
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from typing_extensions import Self
+
     from dissect.target.helpers.nfs.nfs3 import ProcedureDescriptor
 
 
@@ -186,7 +188,7 @@ class Client(AbstractContextManager, AbstractClient, Generic[Credentials, Verifi
         self._fragment_size = fragment_size
         self._xid = 1
 
-    def __enter__(self) -> Client:  # noqa: PYI034
+    def __enter__(self) -> Self:
         """Return ``self`` upon entering the runtime context."""
         return self  # type: Necessary for type checker
 

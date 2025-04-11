@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from typing_extensions import Self
+
     from dissect.target.target import Target
 
 
@@ -74,7 +76,7 @@ class NetSocket:
     cmdline: str | None = None  # process cmdline associated to the socket
 
     @classmethod
-    def from_line(cls, line: str, ip_vers: int = 4) -> NetSocket:
+    def from_line(cls, line: str, ip_vers: int = 4) -> Self:
         socket = cls(*line.split())
 
         socket.uid = int(socket.uid)
@@ -109,7 +111,7 @@ class UnixSocket:
     protocol_string: str = "unix"
 
     @classmethod
-    def from_line(cls, line: str) -> UnixSocket:
+    def from_line(cls, line: str) -> Self:
         socket = cls(*line.split())
 
         socket.type = int(socket.type)
@@ -142,7 +144,7 @@ class PacketSocket:
     protocol_string: str = "packet"
 
     @classmethod
-    def from_line(cls, line: str) -> PacketSocket:
+    def from_line(cls, line: str) -> Self:
         parts = line.split()
         return cls(*[int(parts[0], 16), *list(map(int, parts[1:]))])
 

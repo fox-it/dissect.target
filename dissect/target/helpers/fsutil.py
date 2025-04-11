@@ -55,6 +55,8 @@ from dissect.target.helpers.polypath import (
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
+    from typing_extensions import Self
+
     import dissect.target.filesystem as filesystem
 
 if sys.version_info >= (3, 13):
@@ -249,7 +251,7 @@ class stat_result:
         return ts_int, ts_ns * 1e-9, ts_ns
 
     @classmethod
-    def copy(cls, other: stat_result) -> stat_result:
+    def copy(cls, other: stat_result) -> Self:
         # First copy the basic 10 fields
         st = cls(list(other))
         # Then iterate and copy any other

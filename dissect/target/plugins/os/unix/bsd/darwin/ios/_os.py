@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, VirtualFilesystem
     from dissect.target.target import Target
 
@@ -51,7 +53,7 @@ class IOSPlugin(DarwinPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: VirtualFilesystem) -> None:
+    def create(cls, target: Target, sysvol: VirtualFilesystem) -> Self:
         target.fs.mount("/", sysvol)
         return cls(target)
 
@@ -94,7 +96,7 @@ class Config:
     VERSION: dict[str, Any]
 
     @classmethod
-    def load(cls, *args: list[Path]) -> Config:
+    def load(cls, *args: list[Path]) -> Self:
         plists = []
         for path in args:
             if path.is_file():

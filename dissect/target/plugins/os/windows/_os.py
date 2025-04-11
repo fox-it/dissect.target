@@ -13,6 +13,8 @@ from dissect.target.plugin import OperatingSystem, OSPlugin, export
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
@@ -48,7 +50,7 @@ class WindowsPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> WindowsPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)

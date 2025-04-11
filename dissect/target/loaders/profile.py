@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
@@ -40,7 +42,7 @@ class ProfileOSPlugin(OSPlugin):
         return True
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> ProfileOSPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         return cls(target)
 
     @export(property=True)

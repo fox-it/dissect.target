@@ -25,6 +25,8 @@ from dissect.target.helpers.sunrpc.client import Client as SunRpcClient
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
 ConCredentials = TypeVar("ConCredentials")
 ConVerifier = TypeVar("ConVerifier")
 
@@ -68,7 +70,7 @@ class NfsFilesystem(Filesystem):
         auth: AuthScheme[ConCredentials, ConVerifier] | AuthSetter,
         local_port: int | LocalPortPolicy = 0,
         timeout_in_seconds: float | None = 5.0,
-    ) -> NfsFilesystem:
+    ) -> Self:
         """Utility function to setup a connection to a NFS share.
 
         Args:

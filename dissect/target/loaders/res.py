@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from pathlib import Path
     from xml.etree.ElementTree import Element
 
+    from typing_extensions import Self
+
     from dissect.target.target import Target
 
 EXTENSIONS = ("upr", "upf", "upr.zip", "upf.zip")
@@ -153,7 +155,7 @@ class ResOSPlugin(OSPlugin):
         return True
 
     @classmethod
-    def create(cls, target: Target, sysvol: filesystem.Filesystem) -> ResOSPlugin:
+    def create(cls, target: Target, sysvol: filesystem.Filesystem) -> Self:
         target.fs.case_sensitive = False
         target.fs.mount("sysvol", sysvol)
         return cls(target)

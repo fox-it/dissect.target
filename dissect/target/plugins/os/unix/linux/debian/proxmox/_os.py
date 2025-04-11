@@ -18,6 +18,8 @@ from dissect.target.plugins.os.unix._os import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux.debian._os import DebianPlugin
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from dissect.target.target import Target
 
 
@@ -31,7 +33,7 @@ class ProxmoxPlugin(DebianPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> ProxmoxPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         obj = super().create(target, sysvol)
 
         if (config_db := target.fs.path("/var/lib/pve-cluster/config.db")).exists():

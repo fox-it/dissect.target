@@ -18,6 +18,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from typing_extensions import Self
+
     from dissect.target.target import Target
 
 try:
@@ -264,7 +266,7 @@ class ClassKey:
         self.key = None
 
     @classmethod
-    def from_bag_dict(cls, data: dict[str, bytes | int]) -> ClassKey:
+    def from_bag_dict(cls, data: dict[str, bytes | int]) -> Self:
         return cls(
             data.get("UUID"),
             data.get("CLAS"),

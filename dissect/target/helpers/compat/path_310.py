@@ -30,6 +30,8 @@ from dissect.target.helpers.compat import path_common
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem, FilesystemEntry
     from dissect.target.helpers.fsutil import stat_result
 
@@ -173,7 +175,7 @@ class PureDissectPath(PurePath):
         raise TypeError("TargetPath pickling is currently not supported")
 
     @classmethod
-    def _from_parts(cls, args: list) -> TargetPath:
+    def _from_parts(cls, args: list) -> Self:
         fs = args[0]
 
         if not isinstance(fs, filesystem.Filesystem):
@@ -196,44 +198,44 @@ class PureDissectPath(PurePath):
 
         return self
 
-    def _make_child(self, args: list) -> TargetPath:
+    def _make_child(self, args: list) -> Self:
         child = super()._make_child(args)
         child._fs = self._fs
         child._flavour = self._flavour
         return child
 
-    def with_name(self, name: str) -> TargetPath:
+    def with_name(self, name: str) -> Self:
         result = super().with_name(name)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def with_stem(self, stem: str) -> TargetPath:
+    def with_stem(self, stem: str) -> Self:
         result = super().with_stem(stem)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def with_suffix(self, suffix: str) -> TargetPath:
+    def with_suffix(self, suffix: str) -> Self:
         result = super().with_suffix(suffix)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def relative_to(self, *other) -> TargetPath:
+    def relative_to(self, *other) -> Self:
         result = super().relative_to(*other)
         result._fs = self._fs
         result._flavour = self._flavour
         return result
 
-    def __rtruediv__(self, key: str) -> TargetPath:
+    def __rtruediv__(self, key: str) -> Self:
         try:
             return self._from_parts([self._fs, key, *self._parts])
         except TypeError:
             return NotImplemented
 
     @property
-    def parent(self) -> TargetPath:
+    def parent(self) -> Self:
         result = super().parent
         result._fs = self._fs
         result._flavour = self._flavour
@@ -248,7 +250,7 @@ class TargetPath(Path, PureDissectPath):
     _accessor = _dissect_accessor
     __slots__ = ("_entry",)
 
-    def _make_child_relpath(self, part: str) -> TargetPath:
+    def _make_child_relpath(self, part: str) -> Self:
         child = super()._make_child_relpath(part)
         child._fs = self._fs
         child._flavour = self._flavour
@@ -262,20 +264,20 @@ class TargetPath(Path, PureDissectPath):
             return self._entry
 
     @classmethod
-    def cwd(cls) -> TargetPath:
+    def cwd(cls) -> Self:
         """Return a new path pointing to the current working directory
         (as returned by os.getcwd()).
         """
         raise NotImplementedError("TargetPath.cwd() is unsupported")
 
     @classmethod
-    def home(cls) -> TargetPath:
+    def home(cls) -> Self:
         """Return a new path pointing to the user's home directory (as
         returned by os.path.expanduser('~')).
         """
         raise NotImplementedError("TargetPath.home() is unsupported")
 
-    def iterdir(self) -> Iterator[TargetPath]:
+    def iterdir(self) -> Iterator[Self]:
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
@@ -290,7 +292,7 @@ class TargetPath(Path, PureDissectPath):
     # NOTE: Forward compatibility with CPython >= 3.12
     def walk(
         self, top_down: bool = True, on_error: Callable[[Exception], None] | None = None, follow_symlinks: bool = False
-    ) -> Iterator[tuple[TargetPath, list[str], list[str]]]:
+    ) -> Iterator[tuple[Self, list[str], list[str]]]:
         """Walk the directory tree from this directory, similar to os.walk()."""
         paths = [self]
 
@@ -334,7 +336,7 @@ class TargetPath(Path, PureDissectPath):
 
             paths += [path._make_child_relpath(d) for d in reversed(dirnames)]
 
-    def absolute(self) -> TargetPath:
+    def absolute(self) -> Self:
         """Return an absolute version of this path.  This function works
         even if the path doesn't point to anything.
 
@@ -344,7 +346,7 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.absolute() is unsupported in Dissect")
 
     # NOTE: We changed some of the error handling here to deal with our own exception types
-    def resolve(self, strict: bool = False) -> TargetPath:
+    def resolve(self, strict: bool = False) -> Self:
         """
         Make the path absolute, resolving all symlinks on the way and also
         normalizing it (for example turning slashes into backslashes under
@@ -402,7 +404,7 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.write_text() is unsupported")
 
-    def readlink(self) -> TargetPath:
+    def readlink(self) -> Self:
         """
         Return the path to which the symbolic link points.
         """
@@ -416,7 +418,7 @@ class TargetPath(Path, PureDissectPath):
         """
         return self._accessor.isjunction(self)
 
-    def expanduser(self) -> TargetPath:
+    def expanduser(self) -> Self:
         """Return a new path with expanded ~ and ~user constructs
         (as returned by os.path.expanduser)
         """

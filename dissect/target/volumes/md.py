@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from uuid import UUID
 
+    from typing_extensions import Self
+
 
 class MdVolumeSystem(LogicalVolumeSystem):
     __type__ = "md"
@@ -19,7 +21,7 @@ class MdVolumeSystem(LogicalVolumeSystem):
         super().__init__(fh, *args, **kwargs)
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         devices: dict[UUID, list[MDPhysicalDisk]] = {}
 
         for vol in volumes:

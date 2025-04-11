@@ -27,6 +27,8 @@ from dissect.target.helpers.fsutil import TargetPath
 if TYPE_CHECKING:
     from types import TracebackType
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import FilesystemEntry
 
 try:
@@ -548,7 +550,7 @@ class ScopeManager:
         self._current = self._root
         self._previous = None
 
-    def __enter__(self) -> ScopeManager:  # noqa: PYI034
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

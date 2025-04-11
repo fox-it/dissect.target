@@ -12,6 +12,8 @@ from dissect.target.helpers.utils import readinto
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.volumes.disk import DissectVolumeSystem
 
@@ -214,7 +216,7 @@ class LogicalVolumeSystem(VolumeSystem):
         raise NotImplementedError
 
     @classmethod
-    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[LogicalVolumeSystem]:
+    def open_all(cls, volumes: list[BinaryIO]) -> Iterator[Self]:
         """Open all the discovered logical volume systems from the given file-like objects.
 
         There can be more than one logical volume system on a given set of file-like objects. For example, you can have

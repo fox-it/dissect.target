@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
@@ -44,7 +46,7 @@ class AndroidPlugin(LinuxPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> AndroidPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.mount("/", sysvol)
         return cls(target)
 

@@ -27,6 +27,8 @@ from dissect.target.plugins.os.unix.linux.fortios._keys import (
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from typing_extensions import Self
+
     from dissect.target.filesystem import Filesystem
     from dissect.target.target import Target
 
@@ -103,7 +105,7 @@ class FortiOSPlugin(LinuxPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> FortiOSPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.log.warning("Attempting to load rootfs.gz, this can take a while")
         rootfs = sysvol.path("/rootfs.gz")
         vfs = None
@@ -352,7 +354,7 @@ class ConfigNode(dict):
 
 class FortiOSConfig(ConfigNode):
     @classmethod
-    def from_fh(cls, fh: TextIO) -> FortiOSConfig:
+    def from_fh(cls, fh: TextIO) -> Self:
         root = cls()
 
         stack = []
