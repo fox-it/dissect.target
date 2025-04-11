@@ -31,7 +31,7 @@ class AnydeskPlugin(RemoteAccessPlugin):
         # Standard/Custom client Linux/MacOS
         "var/log/anydesk*/*.trace",
     ]
-    
+
     # Anydesk Filetransfer logs when installed as a service
     FILETRANSFER_SERVICE_LOGS = [
         # File transfer service log
@@ -110,18 +110,16 @@ class AnydeskPlugin(RemoteAccessPlugin):
         Timestamps in trace files do not carry a time zone designator (TZD) but are in fact UTC.
         """
         for trace_file, user in self.filetransfer_files:
-            for line in trace_file.open("rt", encoding='utf-16-le', errors="backslashreplace"):
+            for line in trace_file.open("rt", encoding="utf-16-le", errors="backslashreplace"):
                 line = line.strip()
 
                 try:
                     # Example log entry:
                     # Clipboard\t\t2025-01-01, 13:37\tstart \tdownload\t'malware.exe' (~0 B out of 4.20 MiB)
-                    timestamp = line.split('\t')[2]
-                    timestamp = datetime.strptime(timestamp, "%Y-%m-%d, %H:%M").replace(
-                        tzinfo=timezone.utc
-                    )
+                    timestamp = line.split("\t")[2]
+                    timestamp = datetime.strptime(timestamp, "%Y-%m-%d, %H:%M").replace(tzinfo=timezone.utc)
                     # Replace log lines tabs with spaces for readability
-                    message = line.replace('\t', ' ')
+                    message = line.replace("\t", " ")
 
                     # Attempt to extract 'filename' from message.
                     filename = ""
