@@ -4,15 +4,16 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.plugin import arg, find_functions
+from dissect.target.plugin import Plugin, arg, find_functions
 from dissect.target.tools.utils import (
     args_to_uri,
     configure_generic_arguments,
+    execute_function_on_target,
     generate_argparse_for_unbound_method,
     persist_execution_report,
     process_generic_arguments,
@@ -154,3 +155,23 @@ def test_plugin_mutual_exclusive_arguments():
     with patch("inspect.isfunction", return_value=True):
         parser = generate_argparse_for_unbound_method(method)
     assert len(parser._mutually_exclusive_groups) == 2
+
+
+def test_namespace_plugin_args() -> None:
+    class Fake(Plugin):
+        __namespace__ = "fake"
+        __register__ = False
+
+        @arg("--a")
+        def __call__(self, a: str = None) -> None:
+            return a
+
+    mock_target = Mock()
+    obj = Fake(mock_target)
+
+    mock_target.get_function.return_value = Fake, obj
+
+    _, result, rest = execute_function_on_target(mock_target, Mock(), ["--a", "asdf", "--b", "123"])
+
+    assert result == "asdf"
+    assert rest == ["--b", "123"]
