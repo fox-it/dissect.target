@@ -42,17 +42,19 @@ def main() -> int:
 
     try:
         for target in Target.open_all(args.targets, args.children):
-            target.qfind(
+            for _ in target.qfind(
                 args.needles,
                 args.needle_file,
                 args.encoding,
                 args.no_hex_decode,
                 args.raw,
+                args.regex,
                 args.ignore_case,
                 args.allow_non_ascii,
                 args.unique,
                 args.window,
-            )
+            ):
+                pass
 
     except TargetError as e:
         log.error(e)  # noqa: TRY400

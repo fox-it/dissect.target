@@ -5,10 +5,12 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterator
 
 from dissect.cstruct import utils
 
+from dissect.target.container import Container
+from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugin import Plugin, arg, export
 
@@ -16,6 +18,16 @@ if TYPE_CHECKING:
     from dissect.target.container import Container
     from dissect.target.target import Target
     from dissect.target.volume import Volume
+
+QFindHitRecord = TargetRecordDescriptor(
+    "qfind/hit",
+    [
+        ("varint", "offset"),
+        ("string", "needle"),
+        ("string", "codec"),
+        ("string", "content"),
+    ],
+)
 
 
 class QFindPlugin(Plugin):
@@ -27,13 +39,14 @@ class QFindPlugin(Plugin):
     @arg("-n", "--needles", type=str, nargs="*", metavar="NEEDLES", help="needles to search for")
     @arg("-nf", "--needle-file", type=Path, help="file containing the needles to search for")
     @arg("-e", "--encoding", type=str, help="encode text needles with these comma separated encodings")
-    @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
     @arg("-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output")
+    @arg("-r", "--regex", action="store_true", help="parse needles as regexes")
+    @arg("--no-hex-decode", action="store_true", help="do not automatically add decoded hex needles (only in raw mode)")
     @arg("-i", "--ignore-case", action="store_true", help="case insensitive search")
     @arg("--allow-non-ascii", action="store_true", help="allow non-ASCII characters in the output")
     @arg("-u", "--unique", action="store_true", help="only show unique string hits (does not apply to raw output)")
     @arg("-W", "--window", type=int, default=256, help="maximum window size in bytes for context around each hit")
-    @export(output="none")
+    @export(record=QFindHitRecord)  # can be QFindHitRecord or none output depending on invocation
     def qfind(
         self,
         needles: list[str] | None = None,
@@ -41,12 +54,16 @@ class QFindPlugin(Plugin):
         encoding: str = "",
         no_hex_decode: bool = False,
         raw: bool = False,
+        regex: bool = False,
         ignore_case: bool = False,
         allow_non_ascii: bool = False,
         unique: bool = False,
         window: int = 256,
-    ) -> None:
+    ) -> Iterator[QFindHitRecord] | None:
         """Find a needle in a haystack.
+
+        Needles starting with a ``#`` are ignored in needle files.
+        Hex encode such needles to include them in the needle stack.
 
         Example:
             .. code-block::
@@ -63,15 +80,23 @@ class QFindPlugin(Plugin):
                 # find all instances of "malware" in the target, in UTF-8 and UTF-16-LE (UTF-8 is default)
                 target-qfind <TARGET> --needles malware --encoding utf-16-le
 
-                # use target-query instead of target-qfind
+                # find all matches of regular expression "malware\\s\\d+" in the target (e.g. ``malware 1337``)
+                target-qfind <TARGET> --needles "malware\\s\\d+" --regex
+
+                # use target-query instead of target-qfind (output in records)
                 target-query <TARGET> -f qfind --needles malware
         """
         all_needles = set(needles or [])
         if needle_file and needle_file.exists():
             with needle_file.open("r") as fh:
                 for line in fh:
-                    if (line := line.strip()) and not line.startswith("#"):
-                        all_needles.add(line)
+                    if line := line.strip():
+                        if line.startswith("#"):
+                            self.target.log.warning("Ignoring needle %r", line)
+                        else:
+                            all_needles.add(line)
+
+        self.target.log.info("Loaded %s needles", len(all_needles))
 
         encodings = set()
         for codec in (encoding or "").split(","):
@@ -111,9 +136,21 @@ class QFindPlugin(Plugin):
                 tmp[re.compile(re.escape(encoded_needle), re.IGNORECASE)] = _
             needle_lookup = tmp
 
+        if regex:
+            tmp = {}
+            for needle, _ in needle_lookup.items():
+                tmp[re.compile(needle, re.IGNORECASE if ignore_case else re.NOFLAG)] = _
+            needle_lookup = tmp
+
+        # Output records if invoked through target-query only.
+        # TODO: Find a more suitable method to derive invocation method.
+        record = False
+        if "target-query" in sys.argv[0]:
+            record = True
+
         seen = set()
         for _, stream, needle, offset in self.target.scrape.find(
-            list(needle_lookup.keys()), progress=progress(self.target)
+            list(needle_lookup.keys()), progress=progress(self.target) if not record else None
         ):
             original_needle, codec = needle_lookup[needle]
             needle_len = len(needle.pattern if isinstance(needle, re.Pattern) else needle)
@@ -127,8 +164,25 @@ class QFindPlugin(Plugin):
                 print(header)
                 palette = [(offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
                 utils.hexdump(buf, palette, offset=before_offset)
+
+            elif record:
+                if unique:
+                    if buf in seen:
+                        continue
+                    seen.add(buf)  # TODO: store digest of buffer instead, to reduce memory usage
+
+                yield QFindHitRecord(
+                    offset=offset,
+                    needle=original_needle,
+                    codec=codec,
+                    content=buf.hex(),
+                    _target=self.target,
+                )
+
             else:
                 codec = "utf-8" if codec == "hex" else codec
+
+                # TODO: needle_len is incorrect with regex matches and causes invalid color lengths
                 before_part = recover_string(
                     buf[: offset - before_offset], codec, reverse=True, ascii=not allow_non_ascii
                 )
