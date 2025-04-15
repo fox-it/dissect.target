@@ -309,14 +309,10 @@ class WindowsPlugin(OSPlugin):
                     home = profile_image_path.value
                     name = home.split("\\")[-1]
 
-                # Windows XP uses %variables% in home paths
-                if "%" in home:
-                    home = self.target.resolve(home)
-
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=windows_path(home),
+                    home=self.target.resolve(home),
                     _target=self.target,
                 )
 
