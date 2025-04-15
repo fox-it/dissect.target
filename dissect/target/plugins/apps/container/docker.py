@@ -13,51 +13,30 @@ from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.protobuf import ProtobufVarint
 from dissect.target.helpers.record import TargetRecordDescriptor
-from dissect.target.plugin import Plugin, arg, export
+from dissect.target.plugin import arg, export
+from dissect.target.plugins.apps.container.container import (
+    COMMON_CONTAINER_FIELDS,
+    COMMON_IMAGE_FIELDS,
+    COMMON_LOG_FIELDS,
+    ContainerPlugin,
+)
 from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
 DockerContainerRecord = TargetRecordDescriptor(
     "apps/containers/docker/container",
-    [
-        ("string", "container_id"),
-        ("string", "image"),
-        ("string", "image_id"),
-        ("string", "command"),
-        ("datetime", "created"),
-        ("boolean", "running"),
-        ("varint", "pid"),
-        ("datetime", "started"),
-        ("datetime", "finished"),
-        ("string", "ports"),
-        ("string", "names"),
-        ("string[]", "volumes"),
-        ("string[]", "environment"),
-        ("path", "mount_path"),
-        ("path", "config_path"),
-    ],
+    COMMON_CONTAINER_FIELDS,
 )
 
 DockerImageRecord = TargetRecordDescriptor(
     "apps/containers/docker/image",
-    [
-        ("string", "name"),
-        ("string", "tag"),
-        ("string", "image_id"),
-        ("string", "hash"),
-        ("datetime", "created"),
-    ],
+    COMMON_IMAGE_FIELDS,
 )
 
 DockerLogRecord = TargetRecordDescriptor(
     "apps/containers/docker/log",
-    [
-        ("datetime", "ts"),
-        ("string", "container"),
-        ("string", "stream"),
-        ("string", "message"),
-    ],
+    COMMON_LOG_FIELDS,
 )
 
 # Resources:
@@ -103,7 +82,7 @@ ASCII_MAP = {
 }
 
 
-class DockerPlugin(Plugin):
+class DockerPlugin(ContainerPlugin):
     """Parse Docker Daemon artefacts.
 
     References:
@@ -161,6 +140,7 @@ class DockerPlugin(Plugin):
                         image_id=hash_to_image_id(hash),
                         created=created,
                         hash=hash,
+                        source=images_path,
                         _target=self.target,
                     )
 
@@ -213,12 +193,13 @@ class DockerPlugin(Plugin):
                     pid=config.get("State", {}).get("Pid"),
                     started=convert_timestamp(config.get("State", {}).get("StartedAt")),
                     finished=convert_timestamp(config.get("State", {}).get("FinishedAt")),
-                    ports=convert_ports(ports),
+                    ports=list(convert_ports(ports)),
                     names=config.get("Name", "").replace("/", "", 1),
                     volumes=volumes,
                     environment=config.get("Config", {}).get("Env", []),
                     mount_path=mount_path,
                     config_path=config_path,
+                    source=config_path,
                     _target=self.target,
                 )
 
@@ -267,6 +248,7 @@ class DockerPlugin(Plugin):
                                 if raw_messages
                                 else strip_log(log_entry.get("log"), remove_backspaces)
                             ),
+                            source=log_file,
                             _target=self.target,
                         )
 
@@ -280,6 +262,7 @@ class DockerPlugin(Plugin):
                             message=(
                                 log_entry.message if raw_messages else strip_log(log_entry.message, remove_backspaces)
                             ),
+                            source=log_file,
                             _target=self.target,
                         )
 
@@ -319,6 +302,7 @@ def get_data_path(path: Path) -> str | None:
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         log.warning("Could not read JSON file: %s", path)
         log.debug(exc_info=e)
+        return
 
     return config.get("data-root")
 
@@ -343,18 +327,30 @@ def find_installs(target: Target) -> Iterator[Path]:
         ".docker/daemon.json",
     ]
 
-    if (default_root := target.fs.path("/var/lib/docker")).exists():
-        yield default_root
+    default_root_paths = [
+        "/var/lib/docker",
+        "/var/snap/docker/common/var-lib-docker",
+    ]
+
+    for path in default_root_paths:
+        if (default_root := target.fs.path(path)).exists():
+            yield default_root
 
     for path in default_config_paths:
         if (config_file := target.fs.path(path)).exists():
-            if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
+            if not (data_path := get_data_path(config_file)):
+                target.log.info("Unable to get data-root from docker daemon file %s", config_file)
+                continue
+            if (data_root_path := target.fs.path(data_path)).exists():
                 yield data_root_path
 
     for path in user_config_paths:
         for user_details in target.user_details.all_with_home():
             if (config_file := user_details.home_path.joinpath(path)).exists():
-                if (data_root_path := target.fs.path(get_data_path(config_file))).exists():
+                if not (data_path := get_data_path(config_file)):
+                    target.log.info("Unable to get data-root from docker daemon file %s", config_file)
+                    continue
+                if (data_root_path := target.fs.path(data_path)).exists():
                     yield data_root_path
 
 
@@ -383,7 +379,7 @@ def convert_timestamp(timestamp: str | None) -> str:
     return f"{timestamp[:19]}.{microseconds}{match['postfix']}"
 
 
-def convert_ports(ports: dict[str, list | dict]) -> dict:
+def convert_ports(ports: dict[str, list | dict]) -> Iterator[str]:
     """Depending on the state of the container (turned on or off) we
     can salvage forwarded ports for the container in different
     parts of the config.v2.json file.
@@ -391,20 +387,20 @@ def convert_ports(ports: dict[str, list | dict]) -> dict:
     This function attempts to be agnostic and deals with
     "Ports" lists and "ExposedPorts" dicts.
 
-    NOTE: This function makes a couple of assumptions and ignores
-    ipv6 assignments. Feel free to improve this helper function.
+    NOTE: This function makes a couple of assumptions. Feel free to
+    improve this helper function.
+
+    Returns an iterator of strings in the format ``0.0.0.0:1234->5678/tcp``.
     """
 
-    fports = {}
     for key, value in ports.items():
         if isinstance(value, list):
-            # NOTE: We ignore IPv6 assignments here.
-            fports[key] = f"{value[0]['HostIp']}:{value[0]['HostPort']}"
+            for v in value:
+                yield f"{v['HostIp']}:{v['HostPort']}->{key}"
+
         elif isinstance(value, dict):
             # NOTE: We make the assumption the default broadcast ip 0.0.0.0 was used.
-            fports[key] = f"0.0.0.0:{key.split('/')[0]}"
-
-    return fports
+            yield f"0.0.0.0:{key.split('/')[0]}->{key}"
 
 
 def hash_to_image_id(hash: str) -> str:
