@@ -45,7 +45,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
         "Library/Logs/RustDesk/*.log",
     ]
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self.log_files: set[tuple[TargetPath, UserDetails | None]] = set()
