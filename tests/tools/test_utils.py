@@ -165,7 +165,7 @@ def test_namespace_plugin_args() -> None:
         __register__ = False
 
         @arg("--a")
-        def __call__(self, a: str = None) -> None:
+        def __call__(self, a: str | None = None) -> None:
             return a
 
     mock_target = Mock()
