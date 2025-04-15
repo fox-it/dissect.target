@@ -290,23 +290,21 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
-    def _check_nfs_enabled(self, address: str, exported_dir: str, mount_point: str) -> bool:
-        if not isinstance(self.target._loader, LocalLoader):
-            return False
+    @property
+    def is_nfs_enabled(self) -> bool:
+        return isinstance(self.target._loader, LocalLoader) and "enable-nfs" in self.target.path_query
 
-        if "enable-nfs" not in self.target.path_query:
-            log.warning(
-                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-                address,
-                exported_dir,
-                mount_point,
-            )
-            return False
-
-        return True
+    def _log_nfs_mount_disabled(self, address: str, exported_dir: str, mount_point: str) -> None:
+        log.warning(
+            "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+            address,
+            exported_dir,
+            mount_point,
+        )
 
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
-        if not self._check_nfs_enabled(address, exported_dir, mount_point):
+        if not self.is_nfs_enabled:
+            self._log_nfs_mount_disabled(address, exported_dir, mount_point)
             return
 
         # Try all users to see if we can access the share
