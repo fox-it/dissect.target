@@ -1,17 +1,32 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 from dissect.target.loaders.vmx import VmxLoader
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     import pytest
 
     from dissect.target.target import Target
+
+
+@contextlib.contextmanager
+def _mock_vmx_and_vmdk(disks: list[str]) -> Iterator[MagicMock]:
+    with (
+        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
+        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
+    ):
+        MockVMX.parse.return_value = MockVMX
+        MockVMX.disks.return_value = disks
+        MockVmdkContainer.return_value = MockVmdkContainer
+
+        yield MockVmdkContainer
 
 
 def test_vmx_loader(target_bare: Target, tmp_path: Path) -> None:
@@ -22,14 +37,7 @@ def test_vmx_loader(target_bare: Target, tmp_path: Path) -> None:
     vmx_path.touch()
     (vm_path / "mock.vmdk").touch()
 
-    with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
-    ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = ["mock.vmdk"]
-        MockVmdkContainer.return_value = MockVmdkContainer
-
+    with _mock_vmx_and_vmdk(["mock.vmdk"]) as MockVmdkContainer:
         assert VmxLoader.detect(vmx_path)
 
         VmxLoader(vmx_path).map(target_bare)
@@ -44,15 +52,7 @@ def test_vmx_loader_missing_disk(target_bare: Target, tmp_path: Path, caplog: py
     vmx_path = vm_path / "Test.vmx"
     vmx_path.touch()
 
-    with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
-        caplog.at_level(logging.DEBUG, target_bare.log.name),
-    ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = ["mock.vmdk"]
-        MockVmdkContainer.return_value = MockVmdkContainer
-
+    with _mock_vmx_and_vmdk(["mock.vmdk"]), caplog.at_level(logging.DEBUG, target_bare.log.name):
         assert VmxLoader.detect(vmx_path)
 
         VmxLoader(vmx_path).map(target_bare)
@@ -71,14 +71,9 @@ def test_vmx_loader_missing_snapshots(target_bare: Target, tmp_path: Path, caplo
     (vm_path / "mock-000001.vmdk").touch()
 
     with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
+        _mock_vmx_and_vmdk(["mock-000002.vmdk"]) as MockVmdkContainer,
         caplog.at_level(logging.DEBUG, target_bare.log.name),
     ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = ["mock-000002.vmdk"]
-        MockVmdkContainer.return_value = MockVmdkContainer
-
         VmxLoader(vmx_path).map(target_bare)
 
         assert len(target_bare.disks) == 1
@@ -103,14 +98,9 @@ def test_vmx_loader_missing_snapshots_base(
     (vm_path / "mock.vmdk").touch()
 
     with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
+        _mock_vmx_and_vmdk(["mock-000002.vmdk"]) as MockVmdkContainer,
         caplog.at_level(logging.DEBUG, target_bare.log.name),
     ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = ["mock-000002.vmdk"]
-        MockVmdkContainer.return_value = MockVmdkContainer
-
         VmxLoader(vmx_path).map(target_bare)
 
         assert len(target_bare.disks) == 1
@@ -134,15 +124,7 @@ def test_vmx_loader_missing_all_snapshots(
     vmx_path = vm_path / "Test.vmx"
     vmx_path.touch()
 
-    with (
-        patch("dissect.hypervisor.descriptor.vmx.VMX") as MockVMX,
-        patch("dissect.target.loaders.vmx.VmdkContainer") as MockVmdkContainer,
-        caplog.at_level(logging.DEBUG, target_bare.log.name),
-    ):
-        MockVMX.parse.return_value = MockVMX
-        MockVMX.disks.return_value = ["mock-000001.vmdk"]
-        MockVmdkContainer.return_value = MockVmdkContainer
-
+    with _mock_vmx_and_vmdk(["mock-000001.vmdk"]), caplog.at_level(logging.DEBUG, target_bare.log.name):
         VmxLoader(vmx_path).map(target_bare)
 
         assert len(target_bare.disks) == 0

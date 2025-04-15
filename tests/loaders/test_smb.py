@@ -46,23 +46,24 @@ def test_smb_loader(mock_impacket: MagicMock, mock_connection: MagicMock) -> Non
 
     with patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"smb": SmbLoader}):
         loader = loader_open("smb://user@host")
-        assert isinstance(loader, SmbLoader)
-        assert loader._conn is mock_connection
-        mock_impacket.smbconnection.SMBConnection.assert_called_with(
-            remoteName="host", remoteHost="host", myName=SmbLoader.MACHINE_NAME
-        )
-        mock_connection.login.assert_called_with(
-            domain=".", user="user", password="", nthash=SmbLoader.EMPTY_NT, lmhash=SmbLoader.EMPTY_LM
-        )
 
-        mock_connection.listShares.return_value = [{"shi1_netname": "C$\x00"}]
+    assert isinstance(loader, SmbLoader)
+    assert loader._conn is mock_connection
+    mock_impacket.smbconnection.SMBConnection.assert_called_with(
+        remoteName="host", remoteHost="host", myName=SmbLoader.MACHINE_NAME
+    )
+    mock_connection.login.assert_called_with(
+        domain=".", user="user", password="", nthash=SmbLoader.EMPTY_NT, lmhash=SmbLoader.EMPTY_LM
+    )
 
-        t = Target()
-        loader.map(t)
+    mock_connection.listShares.return_value = [{"shi1_netname": "C$\x00"}]
 
-        assert len(t.filesystems) == 1
-        assert isinstance(t.fs.mounts["c:"], SmbFilesystem)
-        assert t.fs.mounts["c:"].share_name == "C$"
+    t = Target()
+    loader.map(t)
 
-        assert len(t._plugins) == 1
-        assert isinstance(t._plugins[0], SmbRegistry)
+    assert len(t.filesystems) == 1
+    assert isinstance(t.fs.mounts["c:"], SmbFilesystem)
+    assert t.fs.mounts["c:"].share_name == "C$"
+
+    assert len(t._plugins) == 1
+    assert isinstance(t._plugins[0], SmbRegistry)

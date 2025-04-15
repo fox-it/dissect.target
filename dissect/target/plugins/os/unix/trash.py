@@ -49,7 +49,7 @@ class GnomeTrashPlugin(Plugin):
                     yield user_details, path
 
         # mounted devices trash folders
-        for mount_path in [*list(self.target.fs.mounts), "/mnt", "/media"]:
+        for mount_path in [*self.target.fs.mounts, "/mnt", "/media"]:
             if mount_path == "/":
                 continue
 

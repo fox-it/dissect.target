@@ -298,8 +298,9 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
 
     # Mini-filter unsuccesful scan
     assert records[6].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
-    assert records[6].path == "".join(
-        "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
+    assert (
+        records[6].path
+        == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
     )
     assert records[6].ts == dt("2024-07-13 14:38:15.272000+00:00")
     assert records[6].process == "(unknown)"
@@ -318,8 +319,9 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     # Mini-filter blocked file
     assert records[7].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[7].ts == dt("2024-07-13 14:38:15.272000+00:00")
-    assert records[7].blocked_file == "".join(
-        "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs.",  # noqa: E501
+    assert (
+        records[7].blocked_file
+        == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
     )
     assert records[7].process == "(unknown)"
     assert records[7].status == "0xc000004a"

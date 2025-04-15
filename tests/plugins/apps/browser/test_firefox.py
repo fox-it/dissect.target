@@ -115,7 +115,7 @@ def test_firefox_cookies(target_platform: Target, request: pytest.FixtureRequest
     assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].ts_created == dt("2023-07-13 09:53:47.460676+00:00")
-    assert sorted([*(c.name for c in records)]) == [
+    assert sorted(c.name for c in records) == [
         "_lr_env_src_ats",
         "_lr_retry_request",
         "_uc_referrer",
@@ -218,7 +218,7 @@ def test_firefox_oculus_cookies(target_firefox_oculus: Target) -> None:
     assert {"firefox"} == {record.browser for record in records}
 
     assert records[0].ts_created == dt("2023-07-06 07:50:55.352988+00:00")
-    assert sorted([*(c.name for c in records)]) == [
+    assert sorted(c.name for c in records) == [
         "AEC",
         "AWSALBTGCORS",
         "CONSENT",

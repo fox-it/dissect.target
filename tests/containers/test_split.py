@@ -9,7 +9,7 @@ from dissect.target import container
 from dissect.target.containers.split import SplitContainer
 
 if TYPE_CHECKING:
-    import pathlib
+    from pathlib import Path
 
 
 def _assert_split_container(fh: SplitContainer) -> None:
@@ -23,7 +23,7 @@ def split_fhs() -> list[BinaryIO]:
 
 
 @pytest.fixture
-def split_paths(tmp_path: pathlib.Path, split_fhs: list[BinaryIO]) -> list[pathlib.Path]:
+def split_paths(tmp_path: Path, split_fhs: list[BinaryIO]) -> list[Path]:
     paths = [(tmp_path / f"split.{i:>03}") for i in range(4)]
 
     for fh, path in zip(split_fhs, paths):
@@ -34,7 +34,7 @@ def split_paths(tmp_path: pathlib.Path, split_fhs: list[BinaryIO]) -> list[pathl
 
 
 @pytest.fixture
-def split_symlink(tmp_path: pathlib.Path, split_paths: list[pathlib.Path]) -> pathlib.Path:
+def split_symlink(tmp_path: Path, split_paths: list[Path]) -> Path:
     dir_path = tmp_path / "dir"
     symlink_path = dir_path / split_paths[0].name
     dir_path.mkdir()

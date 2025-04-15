@@ -145,7 +145,7 @@ class ResFile(filesystem.VirtualFile):
     def lstat(self) -> fsutil.stat_result:
         return self.stat()
 
-    def open(self) -> io.BytesIO:
+    def open(self) -> BinaryIO:
         return self.entry.open()
 
 

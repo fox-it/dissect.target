@@ -586,7 +586,7 @@ class DifferentialCli(ExtendedCmd):
         return False
 
     def do_cd(self, path: str) -> bool:
-        """dhange directory to the given path"""
+        """change directory to the given path"""
         path = fsutil.abspath(path, cwd=str(self.cwd), alt_separator=self.alt_separator)
         if self._targets_with_directory(path, warn_when_incomplete=True) != 0:
             self.cwd = path

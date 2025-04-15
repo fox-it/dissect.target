@@ -275,7 +275,7 @@ def run_target_shell(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, argv: str | list, stdin: str
 ) -> tuple[bytes, bytes]:
     with monkeypatch.context() as m:
-        (m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv])),)
+        m.setattr("sys.argv", ["target-shell"] + (argv if isinstance(argv, list) else [argv]))
         m.setattr("sys.stdin", StringIO(stdin))
         m.setenv("NO_COLOR", "1")
         target_shell()

@@ -896,14 +896,14 @@ def parse_shell_item_list(buf: bytes) -> Iterator[SHITEM]:
                 elif extension_signature == 0xBEEF0005:
                     ext = EXTENSION_BLOCK_BEEF0005
 
-                elif (
-                    extension_signature == 0xBEEF0006
-                    or extension_signature == 0xBEEF000A
-                    or extension_signature == 0xBEEF0013
-                    or extension_signature == 0xBEEF0014
-                    or extension_signature == 0xBEEF0019
-                    or extension_signature == 0xBEEF0025
-                    or extension_signature == 0xBEEF0026
+                elif extension_signature in (
+                    0xBEEF0006,
+                    0xBEEF000A,
+                    0xBEEF0013,
+                    0xBEEF0014,
+                    0xBEEF0019,
+                    0xBEEF0025,
+                    0xBEEF0026,
                 ):
                     pass
 

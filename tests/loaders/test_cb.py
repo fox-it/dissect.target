@@ -58,20 +58,21 @@ def test_cb_loader(mock_session: MagicMock) -> None:
 
     with patch.dict("dissect.target.loader.LOADERS_BY_SCHEME", {"cb": CbLoader}):
         loader = loader_open("cb://workstation@instance")
-        assert isinstance(loader, CbLoader)
-        assert loader.session is mock_session
 
-        mock_session.session_data = {"drives": ["C:\\"]}
+    assert isinstance(loader, CbLoader)
+    assert loader.session is mock_session
 
-        t = Target()
-        loader.map(t)
+    mock_session.session_data = {"drives": ["C:\\"]}
 
-        assert len(t.filesystems) == 1
-        assert isinstance(t.fs.mounts["c:\\"], CbFilesystem)
-        assert t.fs.mounts["c:\\"].prefix == "c:\\"
+    t = Target()
+    loader.map(t)
 
-        assert len(t._plugins) == 1
-        assert isinstance(t._plugins[0], CbRegistry)
+    assert len(t.filesystems) == 1
+    assert isinstance(t.fs.mounts["c:\\"], CbFilesystem)
+    assert t.fs.mounts["c:\\"].prefix == "c:\\"
+
+    assert len(t._plugins) == 1
+    assert isinstance(t._plugins[0], CbRegistry)
 
 
 def test_cb_registry(target_bare: Target, mock_session: MagicMock) -> None:

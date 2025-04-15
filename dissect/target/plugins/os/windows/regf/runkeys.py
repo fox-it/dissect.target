@@ -51,7 +51,7 @@ class RunKeysPlugin(Plugin):
     )
 
     def check_compatible(self) -> None:
-        if not len(list(self.target.registry.keys(self.KEYS))) > 0:
+        if not next(self.target.registry.keys(self.KEYS), None):
             raise UnsupportedPluginError("No registry run key found")
 
     @export(record=RunKeyRecord)
