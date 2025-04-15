@@ -87,8 +87,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
                 if line := line.strip():
                     try:
                         # Still needs to be checked for RustDesk implementation
-                        match = re.match(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)", line)
-                        if not match:
+                        if not (match := re.match(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)", line)):
                             raise ValueError("Line does not match expected format")
 
                         ts, level, source, message = match.groups()
