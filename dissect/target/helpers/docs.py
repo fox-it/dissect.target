@@ -86,12 +86,12 @@ def get_plugin_overview(
         plugin_desc = get_plugin_description(plugin_class)
         paragraphs.append(plugin_desc)
 
-        # add a line break between plugin description and function descriptions
+        # Add a line break between plugin description and function descriptions
         paragraphs.append("")
 
     func_descriptions_paragraph = get_plugin_functions_desc(plugin_class, with_docstrings=with_func_docstrings)
 
-    # indent func docs additionally if plugin desc is printed
+    # Indent func docs additionally if plugin desc is printed
     if with_plugin_desc:
         func_descriptions_paragraph = textwrap.indent(
             func_descriptions_paragraph,

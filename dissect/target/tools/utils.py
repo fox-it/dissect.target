@@ -107,22 +107,7 @@ def generate_argparse_for_unbound_method(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
-    fargs = getattr(method, "__args__", [])
-    groups = {}
-    default_group_options = {"required": False}
-    for args, kwargs in fargs:
-        if "group" in kwargs:
-            group_name = kwargs.pop("group")
-            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
-            if group_name not in groups:
-                group = parser.add_mutually_exclusive_group(**options)
-                groups[group_name] = group
-            else:
-                group = groups[group_name]
-
-            group.add_argument(*args, **kwargs)
-        else:
-            parser.add_argument(*args, **kwargs)
+    _add_args_to_parser(parser, getattr(method, "__args__", []))
 
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
@@ -148,6 +133,8 @@ def generate_argparse_for_plugin_class(
     help_formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=desc, formatter_class=help_formatter, conflict_handler="resolve")
 
+    _add_args_to_parser(parser, getattr(plugin_cls.__call__, "__args__", []))
+
     usage = parser.format_usage()
     offset = usage.find(parser.prog) + len(parser.prog)
     usage_tmpl = usage_tmpl or "{prog} {usage}"
@@ -155,6 +142,27 @@ def generate_argparse_for_plugin_class(
     parser.usage = usage_tmpl.format(prog=parser.prog, name=method_name, usage=usage[offset:])
 
     return parser
+
+
+def _add_args_to_parser(
+    parser: argparse.ArgumentParser,
+    fargs: list[tuple[list[str], dict[str, Any]]],
+) -> None:
+    groups = {}
+    default_group_options = {"required": False}
+    for args, kwargs in fargs:
+        if "group" in kwargs:
+            group_name = kwargs.pop("group")
+            options = kwargs.pop("group_options") if "group_options" in kwargs else default_group_options
+            if group_name not in groups:
+                group = parser.add_mutually_exclusive_group(**options)
+                groups[group_name] = group
+            else:
+                group = groups[group_name]
+
+            group.add_argument(*args, **kwargs)
+        else:
+            parser.add_argument(*args, **kwargs)
 
 
 def generate_argparse_for_plugin(
