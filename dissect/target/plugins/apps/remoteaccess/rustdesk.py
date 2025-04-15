@@ -16,6 +16,9 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
 from dissect.target.plugins.general.users import UserDetails
 from dissect.target.target import Target
 
+# Regex to validate RustDesk loglines
+RE_LOG_LINE = re.compile(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)")
+
 
 class RustdeskPlugin(RemoteAccessPlugin):
     """Rustdesk plugin."""
@@ -30,6 +33,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
     SERVER_GLOBS = [
         # Windows >= Windows 7
         "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
+        "sysvol/ProgramData/RustDesk/*/*/*.log",
         # Linux
         "var/log/rustdesk-server/*.log",
     ]
@@ -86,13 +90,12 @@ class RustdeskPlugin(RemoteAccessPlugin):
             for line in log_file.open("rt", errors="backslashreplace"):
                 if line := line.strip():
                     try:
-                        # Still needs to be checked for RustDesk implementation
-                        if not (match := re.match(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)", line)):
+                        if not (match := RE_LOG_LINE.match(line)):
                             raise ValueError("Line does not match expected format")
 
                         ts, level, source, message = match.groups()
 
-                        timestamp = datetime.fromisoformat(ts)
+                        timestamp = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f %z")
                         message = re.sub(r"\s\s+", " ", f"{level} {source} {message}")
 
                         yield self.RemoteAccessLogRecord(
@@ -102,7 +105,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
                             _target=self.target,
                             _user=user,
                         )
-
                     except ValueError as e:
                         self.target.log.warning("Could not parse log line in file %s: '%s'", log_file, line)
                         self.target.log.debug("", exc_info=e)
