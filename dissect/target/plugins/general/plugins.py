@@ -115,7 +115,7 @@ def _categorize_functions(functions: list[plugin.FunctionDescriptor] | None = No
 
 
 def _generate_plugin_tree_overview(
-    plugin_tree: dict | type[Plugin],
+    plugin_tree: dict | set[type[Plugin]],
     print_docs: bool,
     indent: int = 0,
 ) -> list[str]:
