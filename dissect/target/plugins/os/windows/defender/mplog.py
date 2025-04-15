@@ -396,9 +396,9 @@ DEFENDER_MPLOG_BLOCK_PATTERNS = [
             Last\sPerf:(?P<last_perf>.*)\n
             First\sRTP\sScan:(?P<first_rtp_scan>.*)\n
             Plugin\sStates:(?P<plugin_states>.*)\n
-            Process\sExclusions:\n(?P<process_exclusions>.*)\n
-            Path\sExclusions:\n(?P<path_exclusions>.*)\n
-            Ext\sExclusions:\n(?P<ext_exclusions>.*)\n
+            Process\sExclusions:\n(?P<process_exclusions>.*)
+            Path\sExclusions:\n(?P<path_exclusions>.*)
+            Ext\sExclusions:\n(?P<ext_exclusions>.*)
             Worker\sThreads
             """,
             re.VERBOSE | re.MULTILINE | re.DOTALL,
