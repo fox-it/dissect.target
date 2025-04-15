@@ -14,6 +14,7 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     RemoteAccessPlugin,
 )
 from dissect.target.plugins.general.users import UserDetails
+from dissect.target.target import Target
 
 
 class RustdeskPlugin(RemoteAccessPlugin):
