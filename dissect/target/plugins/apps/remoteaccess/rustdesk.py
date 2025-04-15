@@ -1,4 +1,5 @@
-import logging
+from __future__ import annotations
+
 import re
 from datetime import datetime
 from typing import Iterator
@@ -15,8 +16,6 @@ from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
 from dissect.target.plugins.general.users import UserDetails
 
 
-log = logging.getLogger(__name__)
-
 class RustdeskPlugin(RemoteAccessPlugin):
     """Rustdesk plugin."""
 
@@ -30,7 +29,6 @@ class RustdeskPlugin(RemoteAccessPlugin):
     SERVER_GLOBS = [
         # Windows >= Windows 7
         "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
-
         # Linux
         "var/log/rustdesk-server/*.log",
     ]
@@ -39,13 +37,10 @@ class RustdeskPlugin(RemoteAccessPlugin):
     USER_GLOBS = [
         # Windows
         "AppData/Roaming/Rustdesk/log/*.log",
-
         # Linux
         ".local/share/logs/RustDesk/server/*.log",
-
         # Android
         "storage/emulated/0/RustDesk/logs/*.log",
-
         # Mac
         "Library/Logs/RustDesk/*.log",
     ]
@@ -53,13 +48,12 @@ class RustdeskPlugin(RemoteAccessPlugin):
     def __init__(self, target):
         super().__init__(target)
 
-        self.log_files: set[tuple[TargetPath, UserDetails]] = set()
+        self.log_files: set[tuple[TargetPath, UserDetails | None]] = set()
 
         # Service globs
-        user = None
         for log_glob in self.SERVER_GLOBS:
             for log_file in self.target.fs.path().glob(log_glob):
-                self.log_files.add((log_file, user))
+                self.log_files.add((log_file, None))
 
         # User globs
         for user_details in self.target.user_details.all_with_home():
@@ -73,13 +67,13 @@ class RustdeskPlugin(RemoteAccessPlugin):
 
     @export(record=RemoteAccessLogRecord)
     def logs(self) -> Iterator[RemoteAccessLogRecord]:
-        """Parse Rustdesk log files.
+        """Parse RustDesk log files.
 
-        Rustdesk is remote access software that allows users to connect to a remote computer.
+        Rustdesk is a remote desktop application that can be used to get (persistent) access to a machine.
         The project is open source and can be found at: https://github.com/rustdesk/rustdesk/
 
         The log files are stored in different locations, based on the Target OS and client type.
-        Unlike Anydesk, Rustdesk does have a carry a time zone designator (TZD).
+        Unlike Anydesk, Rustdesk does carry a time zone designator (TZD).
 
         Refrences:
             - https://rustdesk.com/docs/en/self-host/rustdesk-server-pro/faq
@@ -89,27 +83,26 @@ class RustdeskPlugin(RemoteAccessPlugin):
         """
         for log_file, user in self.log_files:
             for line in log_file.open("rt", errors="backslashreplace"):
-                line = line.strip()
+                if line := line.strip():
+                    try:
+                        # Still needs to be checked for RustDesk implementation
+                        match = re.match(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)", line)
+                        if not match:
+                            raise ValueError("Line does not match expected format")
 
-                try:
-                    # Still needs to be checked for Rustdesk implementation
-                    match = re.match(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)", line)
-                    if not match:
-                        raise ValueError("Line does not match expected format")
+                        ts, level, source, message = match.groups()
 
-                    ts, level, source, message = match.groups()
+                        timestamp = datetime.fromisoformat(ts)
+                        message = re.sub(r"\s\s+", " ", f"{level} {source} {message}")
 
-                    timestamp = datetime.fromisoformat(ts)
-                    message = re.sub(r"\s\s+", " ", f"{level} {source} {message}")
+                        yield self.RemoteAccessLogRecord(
+                            ts=timestamp,
+                            message=message,
+                            source=log_file,
+                            _target=self.target,
+                            _user=user,
+                        )
 
-                    yield self.RemoteAccessLogRecord(
-                        ts=timestamp,
-                        message=message,
-                        source=log_file,
-                        _target=self.target,
-                        _user=user,
-                    )
-
-                except ValueError as e:
-                    self.target.log.warning("Could not parse log line in file %s: '%s'", log_file, line)
-                    self.target.log.debug("", exc_info=e)
+                    except ValueError as e:
+                        self.target.log.warning("Could not parse log line in file %s: '%s'", log_file, line)
+                        self.target.log.debug("", exc_info=e)
