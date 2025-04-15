@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class LocalePlugin(Plugin):
-    """Unix locale plugin."""
+    """Default locale plugin."""
 
     def check_compatible(self) -> None:
         pass

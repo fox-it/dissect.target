@@ -327,9 +327,13 @@ class ApachePlugin(WebserverPlugin):
                     for found_conf in root.glob(f"*{rest}"):
                         self._process_conf_file(found_conf, seen)
 
-                elif (self.server_root and (include_path := self.server_root.joinpath(location)).exists()) or (
-                    include_path := self.target.fs.path(location)
-                ).exists():
+                elif (
+                    # Relative from server root
+                    (self.server_root and (include_path := self.server_root.joinpath(location)).exists())
+                    or
+                    # Absolute path
+                    ((include_path := self.target.fs.path(location)).exists())
+                ):
                     self._process_conf_file(include_path, seen)
 
                 else:
