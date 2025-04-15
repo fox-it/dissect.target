@@ -6,21 +6,21 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystems.jffs import JFFSFilesystem, JFFSFilesystemEntry
+from dissect.target.filesystems.jffs import JffsFilesystem, JffsFilesystemEntry
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
 @pytest.fixture
-def jffs_fs() -> Iterator[JFFSFilesystem]:
+def jffs_fs() -> Iterator[JffsFilesystem]:
     with patch("dissect.jffs.jffs2.JFFS2"):
-        jffs_fs = JFFSFilesystem(Mock())
+        jffs_fs = JffsFilesystem(Mock())
         yield jffs_fs
 
 
 @pytest.fixture
-def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> JFFSFilesystemEntry:
+def jffs_fs_file_entry(jffs_fs: JffsFilesystem) -> JffsFilesystemEntry:
     raw_inode = Mock(uid=1000, guid=999, isize=165002)
     inode = Mock(
         mode=0o100664,
@@ -35,11 +35,11 @@ def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> JFFSFilesystemEntry:
         is_symlink=lambda: False,
     )
 
-    return JFFSFilesystemEntry(jffs_fs, "/some_file", inode)
+    return JffsFilesystemEntry(jffs_fs, "/some_file", inode)
 
 
 @pytest.fixture
-def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> JFFSFilesystemEntry:
+def jffs_fs_directory_entry(jffs_fs: JffsFilesystem) -> JffsFilesystemEntry:
     raw_inode = Mock(uid=1000, guid=999, isize=0)
     inode = Mock(
         mode=0o40775,
@@ -54,14 +54,14 @@ def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> JFFSFilesystemEntry:
         is_symlink=lambda: False,
     )
 
-    return JFFSFilesystemEntry(jffs_fs, "/some_directory", inode)
+    return JffsFilesystemEntry(jffs_fs, "/some_directory", inode)
 
 
 @pytest.mark.parametrize(
     ("entry_fixture", "expected_blocks"), [("jffs_fs_file_entry", 323), ("jffs_fs_directory_entry", 0)]
 )
 def test_jffs2_stat(entry_fixture: str, expected_blocks: int, request: pytest.FixtureRequest) -> None:
-    jffs_entry: JFFSFilesystemEntry = request.getfixturevalue(entry_fixture)
+    jffs_entry: JffsFilesystemEntry = request.getfixturevalue(entry_fixture)
     stat = jffs_entry.stat()
 
     entry = jffs_entry.entry
