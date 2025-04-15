@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-import warnings
 from collections import defaultdict
 from functools import lru_cache
 from typing import TYPE_CHECKING, Final
@@ -301,11 +300,6 @@ class RegistryPlugin(Plugin):
     def subkey(self, key: str, subkey: str) -> KeyCollection:
         """Convenience method for accessing a specific subkey."""
         return self.key(key).subkey(subkey)
-
-    @internal
-    def iterkeys(self, keys: str | Iterable[str]) -> Iterator[KeyCollection]:
-        warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning, stacklevel=2)
-        yield from self.keys(keys)
 
     @internal
     def keys(self, keys: str | Iterable[str]) -> Iterator[RegistryKey]:
