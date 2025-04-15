@@ -4,8 +4,6 @@ import operator
 import struct
 from typing import TYPE_CHECKING, Any
 
-from flow.record.fieldtypes import windows_path
-
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
