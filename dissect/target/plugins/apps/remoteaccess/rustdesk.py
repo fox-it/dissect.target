@@ -2,19 +2,23 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import export
 from dissect.target.plugins.apps.remoteaccess.remoteaccess import (
     GENERIC_LOG_RECORD_FIELDS,
     RemoteAccessPlugin,
 )
-from dissect.target.plugins.general.users import UserDetails
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.plugins.general.users import UserDetails
+    from dissect.target.target import Target
 
 # Regex to validate RustDesk loglines
 RE_LOG_LINE = re.compile(r"\[(.*?)\] (\w+) \[(.*?)\] (.*)")
@@ -30,16 +34,16 @@ class RustdeskPlugin(RemoteAccessPlugin):
     )
 
     # Rustdesk logs when installed as a service/server
-    SERVER_GLOBS = [
+    SERVER_GLOBS = (
         # Windows >= Windows 7
         "sysvol/Windows/ServiceProfiles/LocalService/AppData/Roaming/RustDesk/log/server/*.log",
         "sysvol/ProgramData/RustDesk/*/*/*.log",
         # Linux
         "var/log/rustdesk-server/*.log",
-    ]
+    )
 
     # User specific Rustdesk logs
-    USER_GLOBS = [
+    USER_GLOBS = (
         # Windows
         "AppData/Roaming/Rustdesk/log/*.log",
         # Linux
@@ -48,7 +52,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
         "storage/emulated/0/RustDesk/logs/*.log",
         # Mac
         "Library/Logs/RustDesk/*.log",
-    ]
+    )
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -91,7 +95,7 @@ class RustdeskPlugin(RemoteAccessPlugin):
                 if line := line.strip():
                     try:
                         if not (match := RE_LOG_LINE.match(line)):
-                            raise ValueError("Line does not match expected format")
+                            raise ValueError("Line does not match expected format")  # noqa: TRY301
 
                         ts, level, source, message = match.groups()
 
