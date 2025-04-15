@@ -212,7 +212,7 @@ class ESXiPlugin(UnixPlugin):
 
         nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
         if not nfs_shares:
-            if self.is_nfs_enabled:
+            if self._is_nfs_enabled:
                 self.target.log.info("No NFS shares found in datastore")
             return
 
@@ -231,7 +231,7 @@ class ESXiPlugin(UnixPlugin):
     def _add_nfs(self, nfs_ip: str, remote_share: str, mount_alias: str) -> None:
         """Mount NFS share to the target."""
 
-        if not self.is_nfs_enabled:
+        if not self._is_nfs_enabled:
             self._log_nfs_mount_disabled(nfs_ip, remote_share, mount_alias)
             return
 

@@ -291,7 +291,7 @@ class UnixPlugin(OSPlugin):
                     self.target.fs.mount(mount_point, fs)
 
     @property
-    def is_nfs_enabled(self) -> bool:
+    def _is_nfs_enabled(self) -> bool:
         return isinstance(self.target._loader, LocalLoader) and "enable-nfs" in self.target.path_query
 
     def _log_nfs_mount_disabled(self, address: str, exported_dir: str, mount_point: str) -> None:
@@ -303,7 +303,7 @@ class UnixPlugin(OSPlugin):
         )
 
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
-        if not self.is_nfs_enabled:
+        if not self._is_nfs_enabled:
             self._log_nfs_mount_disabled(address, exported_dir, mount_point)
             return
 
