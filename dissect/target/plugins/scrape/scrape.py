@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, BinaryIO, Callable
 
@@ -115,7 +116,7 @@ class ScrapePlugin(Plugin):
         lock_seek: bool = True,
         block_size: int = io.DEFAULT_BUFFER_SIZE,
         progress: Callable[[Container | Volume, int, int], None] | None = None,
-    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int]]:
+    ) -> Iterator[tuple[Container | Volume, MappingStream, Needle, int, re.Match | None]]:
         """Yields needles and their offsets found in all disks and volumes of a target.
 
         Args:
@@ -126,7 +127,7 @@ class ScrapePlugin(Plugin):
             progress: A function to call with the current disk, offset and size of the stream.
         """
         for disk, stream in self.create_streams():
-            for needle, offset in find_needles(
+            for needle, offset, match in find_needles(
                 stream,
                 needles,
                 lock_seek=lock_seek,
@@ -135,7 +136,7 @@ class ScrapePlugin(Plugin):
                 if progress
                 else None,
             ):
-                yield disk, stream, needle, offset
+                yield disk, stream, needle, offset, match
 
     @internal
     def scrape_chunks_from_disks(
@@ -182,7 +183,7 @@ class ScrapePlugin(Plugin):
         needle: Needle | None = None,
         needles: list[Needle] | None = None,
         block_size: int = io.DEFAULT_BUFFER_SIZE,
-    ) -> Iterator[tuple[BinaryIO, bytes, int]]:
+    ) -> Iterator[tuple[BinaryIO, bytes, int, re.Match | None]]:
         """Yields ``(bytestream, needle, offset)`` tuples, scraped from ``target.disks``.
 
         Args:
@@ -201,5 +202,5 @@ class ScrapePlugin(Plugin):
 
         for disk in self.target.disks:
             disk.seek(0)
-            for needle, offset in find_needles(disk, needles=needles, block_size=block_size):
-                yield disk, needle, offset
+            for needle, offset, match in find_needles(disk, needles=needles, block_size=block_size):
+                yield disk, needle, offset, match
