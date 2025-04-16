@@ -149,7 +149,7 @@ class NfsFilesystemEntry(FilesystemEntry):
 
     def get(self, path: str) -> NfsFilesystemEntry:
         """Get a new filesystem entry relative to this entry"""
-        if self.is_file():
+        if not self.is_dir():
             raise NotADirectoryError
 
         return self.fs.get(path, relentry=self)
