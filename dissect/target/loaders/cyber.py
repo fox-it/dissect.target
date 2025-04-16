@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import os
 import textwrap
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.helpers.cyber import cyber
 from dissect.target.loader import Loader
 from dissect.target.loader import open as loader_open
 from dissect.target.loaders.raw import RawLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 HEADER = r"""
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓

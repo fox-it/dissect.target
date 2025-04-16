@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
@@ -11,6 +10,12 @@ from dissect.target.helpers.record import (
     create_extended_descriptor,
 )
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 CronjobRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "unix/cronjob",
@@ -58,20 +63,20 @@ RE_ENVVAR = re.compile(r"^(?P<key>[a-zA-Z_]+[a-zA-Z[0-9_])=(?P<value>.*)")
 class CronjobPlugin(Plugin):
     """Unix cronjob plugin."""
 
-    CRONTAB_DIRS = [
+    CRONTAB_DIRS = (
         "/var/cron/tabs",
         "/var/spool/cron",
         "/var/spool/cron/crontabs",
         "/etc/cron.d",
         "/usr/local/etc/cron.d",  # FreeBSD
-    ]
+    )
 
-    CRONTAB_FILES = [
+    CRONTAB_FILES = (
         "/etc/crontab",
         "/etc/anacrontab",
-    ]
+    )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.crontabs = list(self.find_crontabs())
 

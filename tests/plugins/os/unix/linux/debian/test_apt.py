@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import pytest
 
 from dissect.target.plugins.os.unix.linux.debian.apt import AptPlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
@@ -14,7 +21,7 @@ from tests._utils import absolute_path
         "history.log.1.bz2",
     ],
 )
-def test_apt_logs(test_file, target_unix, fs_unix) -> None:
+def test_apt_logs(test_file: str, target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     tz = timezone.utc
     data_file = absolute_path(f"_data/plugins/os/unix/linux/debian/apt/{test_file}")
     fs_unix.map_file(f"/var/log/apt/{test_file}", data_file)

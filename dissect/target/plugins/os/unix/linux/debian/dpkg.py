@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+import datetime
 import gzip
-from datetime import datetime
-from typing import Dict, Generator, Iterator, List, TextIO
+from typing import TYPE_CHECKING, TextIO
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 STATUS_FILE_NAME = "/var/lib/dpkg/status"
 LOG_FILES_GLOB = "/var/log/dpkg.log*"
@@ -47,9 +52,7 @@ DpkgPackageLogRecord = TargetRecordDescriptor(
 
 
 class DpkgPlugin(Plugin):
-    """
-    Returns records for package details extracted from dpkg's status and log files.
-    """
+    """Returns records for package details extracted from dpkg's status and log files."""
 
     __namespace__ = "dpkg"
 
@@ -60,7 +63,7 @@ class DpkgPlugin(Plugin):
 
     @export(record=DpkgPackageStatusRecord)
     def status(self) -> Iterator[DpkgPackageStatusRecord]:
-        """Yield records for packages in dpkg's status database"""
+        """Yield records for packages in dpkg's status database."""
 
         status_file_path = self.target.fs.path(STATUS_FILE_NAME)
 
@@ -83,18 +86,19 @@ class DpkgPlugin(Plugin):
 
     @export(record=DpkgPackageLogRecord)
     def log(self) -> Iterator[DpkgPackageLogRecord]:
-        """Yield records for actions logged in dpkg's logs"""
+        """Yield records for actions logged in dpkg's logs."""
+        target_tz = self.target.datetime.tzinfo
 
         for log_file in self.target.fs.glob(LOG_FILES_GLOB):
             fh = self.target.fs.open(log_file)
             if log_file.lower().endswith(".gz"):
-                fh = gzip.open(fh)
+                fh = gzip.open(fh)  # noqa: SIM115
 
             for line in fh:
                 line = line.decode("utf-8").strip()
 
                 try:
-                    parsed_line = parse_log_line(line)
+                    parsed_line = parse_log_line(line, target_tz)
                 except ValueError:
                     self.target.log.debug("Can not parse dpkg log line `%s`", line, exc_info=True)
                     continue
@@ -105,8 +109,8 @@ class DpkgPlugin(Plugin):
                 yield DpkgPackageLogRecord(_target=self.target, **parsed_line)
 
 
-def read_status_blocks(fh: TextIO) -> Generator[List[str], None, None]:
-    """Yield package status blocks read from `fh` text stream as the lists of lines"""
+def read_status_blocks(fh: TextIO) -> Iterator[list[str]]:
+    """Yield package status blocks read from ``fh`` text stream as the lists of lines."""
     block_lines = []
     for line in fh:
         line = line.strip()
@@ -124,8 +128,8 @@ def read_status_blocks(fh: TextIO) -> Generator[List[str], None, None]:
         yield block_lines
 
 
-def parse_status_block(block_lines: List[str]) -> Dict[str, str]:
-    """Parse package details block from dpkg status file"""
+def parse_status_block(block_lines: list[str]) -> dict[str, str]:
+    """Parse package details block from dpkg status file."""
     result = {}
     for line in block_lines:
         field_name, _, value = line.partition(": ")
@@ -134,12 +138,12 @@ def parse_status_block(block_lines: List[str]) -> Dict[str, str]:
     return result
 
 
-def parse_log_date_time(date_str: str, time_str: str) -> datetime:
-    return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+def parse_log_date_time(date_str: str, time_str: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> datetime:
+    return datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=tzinfo)
 
 
-def parse_log_line(log_line: str) -> Dict[str, str]:
-    """Parse dpkg log file line"""
+def parse_log_line(log_line: str, tzinfo: datetime.tzinfo = datetime.timezone.utc) -> dict[str, str]:
+    """Parse dpkg log file line."""
 
     parts = log_line.split(" ")
 
@@ -151,7 +155,7 @@ def parse_log_line(log_line: str) -> Dict[str, str]:
     log_date, log_time, operation = parts[:3]
 
     result = {
-        "ts": parse_log_date_time(log_date, log_time),
+        "ts": parse_log_date_time(log_date, log_time, tzinfo=tzinfo),
         "operation": operation,
     }
 

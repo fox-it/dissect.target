@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.esedb.c_esedb import decode_guid
 from dissect.esedb.esedb import EseDB
@@ -11,6 +10,12 @@ from dissect.util.ts import oatimestamp
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from datetime import datetime
+
+    from dissect.target.target import Target
 
 WuaHistoryRecord = TargetRecordDescriptor(
     "filesystem/windows/wua_history",
@@ -941,7 +946,7 @@ class WuaHistoryPlugin(Plugin):
     DATASTORE_PATH = "sysvol/windows/softwaredistribution/datastore/datastore.edb"
     DATASTORE_UPDATE_TABLE = "tbHistory"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self._datastore = None
@@ -952,7 +957,8 @@ class WuaHistoryPlugin(Plugin):
                 self._datastore = EseDB(path.open())
                 self._update_table = self._datastore.table(self.DATASTORE_UPDATE_TABLE)
             except Exception as e:
-                self.target.log.warning("Error opening Windows Update Agent datastore.", exc_info=e)
+                self.target.log.warning("Error opening Windows Update Agent datastore")
+                self.target.log.debug("", exc_info=e)
 
     def check_compatible(self) -> None:
         if not self._datastore or not self._update_table:

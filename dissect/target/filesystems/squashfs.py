@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import stat
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.squashfs import INode, SquashFS, c_squashfs, exceptions
 
@@ -12,6 +14,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class SquashFSFilesystem(Filesystem):
@@ -28,7 +33,7 @@ class SquashFSFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return SquashFSFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[INode] = None) -> INode:
+    def _get_node(self, path: str, node: INode | None = None) -> INode:
         try:
             return self.squashfs.get(path, node)
         except exceptions.FileNotFoundError as e:
@@ -92,7 +97,7 @@ class SquashFSFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 
@@ -102,7 +107,7 @@ class SquashFSFilesystemEntry(FilesystemEntry):
     def lstat(self) -> fsutil.stat_result:
         node = self.entry
 
-        st_info = fsutil.stat_result(
+        return fsutil.stat_result(
             [
                 node.mode,
                 node.inode_number,
@@ -116,5 +121,3 @@ class SquashFSFilesystemEntry(FilesystemEntry):
                 0,  # ctime
             ]
         )
-
-        return st_info

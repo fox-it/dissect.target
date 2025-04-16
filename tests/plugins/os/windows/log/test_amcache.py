@@ -1,17 +1,24 @@
+from __future__ import annotations
+
 import datetime
-import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.plugins.os.windows.amcache import AmcachePlugin
 from dissect.target.plugins.os.windows.log.amcache import AmcacheInstallPlugin
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-def test_amcache_new_format(target_win, fs_win):
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
+
+
+def test_amcache_new_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     amcache_file = absolute_path("_data/plugins/os/windows/amcache/amcache-new.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 
@@ -35,7 +42,7 @@ def test_amcache_new_format(target_win, fs_win):
     assert len(drivers) == 361
 
 
-def test_amcache_old_format(target_win, fs_win):
+def test_amcache_old_format(target_win: Target, fs_win: VirtualFilesystem) -> None:
     amcache_file = absolute_path("_data/plugins/os/windows/amcache/amcache-old.hve")
     fs_win.map_file("windows/appcompat/programs/amcache.hve", amcache_file)
 
@@ -59,7 +66,7 @@ def test_amcache_old_format(target_win, fs_win):
     assert len(drivers) == 0
 
 
-def test_amcache_windows_11_applaunches(target_win, fs_win):
+def test_amcache_windows_11_applaunches(target_win: Target, fs_win: VirtualFilesystem) -> None:
     applaunch_file = absolute_path("_data/plugins/os/windows/amcache/PcaAppLaunchDic.txt")
     fs_win.map_file("windows/appcompat/pca/PcaAppLaunchDic.txt", applaunch_file)
 
@@ -71,7 +78,7 @@ def test_amcache_windows_11_applaunches(target_win, fs_win):
     assert applaunches[0].path == "C:\\ProgramData\\Sophos\\AutoUpdate\\Cache\\sophos_autoupdate1.dir\\su-setup32.exe"
 
 
-def new_read_key_subkeys(self, key):
+def mock_read_key_subkeys(self: AmcachePlugin, key: str) -> Iterator[Mock]:
     base_values = {
         "AppxPackageFullName": "Microsoft.Microsoft3DViewer_7.2105.4012.0_x64__8wekyb3d8bbwe",
         "AppxPackageRelativeId": "Microsoft.Microsoft3DViewer",
@@ -106,37 +113,36 @@ def new_read_key_subkeys(self, key):
     mock_values.append(mock_value)
 
     mock_entry = Mock()
-    mock_entry.timestamp = datetime.datetime(2021, 12, 31)
+    mock_entry.timestamp = datetime.datetime(2021, 12, 31, tzinfo=datetime.timezone.utc)
     mock_entry.values = Mock(return_value=mock_values)
 
     yield mock_entry
 
 
 @pytest.mark.parametrize(
-    "test_file_id,expected_file_id",
+    ("test_file_id", "expected_file_id"),
     [
         ("00008e01cdeb9a1c23cee421a647f29c45f67623be97", "8e01cdeb9a1c23cee421a647f29c45f67623be97"),
         ("", None),
         (None, None),
     ],
 )
-@patch.object(AmcachePlugin, "read_key_subkeys", new_read_key_subkeys)
-def test_parse_inventory_application_file(target_win, test_file_id, expected_file_id):
+@patch.object(AmcachePlugin, "read_key_subkeys", mock_read_key_subkeys)
+def test_parse_inventory_application_file(
+    target_win: Target, test_file_id: str | None, expected_file_id: str | None
+) -> None:
     with patch("dissect.target.plugins.os.windows.amcache.ApplicationFileAppcompatRecord") as mock_record:
         amcache_plugin = AmcachePlugin(target_win)
         amcache_plugin._mock_file_id = test_file_id
         records = list(amcache_plugin.parse_inventory_application_file())
 
         assert len(records) == 1
-        if sys.version_info[:2] < (3, 8):
-            call_kwargs = mock_record.call_args[1]
-        else:
-            call_kwargs = mock_record.call_args.kwargs
+        call_kwargs = mock_record.call_args.kwargs
 
         assert call_kwargs.get("digest", None) == (None, expected_file_id, None)
 
 
-def test_amcache_install_entry(target_win: Target):
+def test_amcache_install_entry(target_win: Target) -> None:
     amcache_install_plugin = AmcacheInstallPlugin(target_win)
 
     amcache_install_plugin.logs = Path(absolute_path("_data/plugins/os/windows/amcache/install"))

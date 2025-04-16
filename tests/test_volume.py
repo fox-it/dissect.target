@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from io import BytesIO
+from typing import BinaryIO
 from unittest.mock import patch
 
 from dissect.target import volume
@@ -10,13 +13,13 @@ def test_reset_file_position() -> None:
     fh.seek(512)
 
     class MockVolumeSystem(volume.VolumeSystem):
-        def __init__(self, fh):
+        def __init__(self, fh: BinaryIO):
             assert fh.tell() == 0
             fh.seek(1024)
             self.success = True
 
         @staticmethod
-        def _detect(fh):
+        def _detect(fh: BinaryIO) -> bool:
             assert fh.tell() == 0
             fh.seek(256)
             return True

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import stat
-from typing import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,6 +15,9 @@ from dissect.target.helpers.nfs.nfs3 import (
     NfsTime,
     SpecData,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture

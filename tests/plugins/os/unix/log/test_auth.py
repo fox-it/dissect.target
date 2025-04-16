@@ -2,21 +2,25 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.log.auth import AuthPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_auth_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("Europe/Amsterdam".encode()))
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Europe/Amsterdam"))
 
     data_path = "_data/plugins/os/unix/log/auth/auth.log"
     data_file = absolute_path(data_path)
@@ -36,7 +40,7 @@ def test_auth_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
 
 
 def test_auth_plugin_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("Pacific/Honolulu".encode()))
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Pacific/Honolulu"))
 
     empty_file = absolute_path("_data/plugins/os/unix/log/empty.log")
     fs_unix.map_file("var/log/auth.log", empty_file)
@@ -59,7 +63,7 @@ def test_auth_plugin_with_gz(target_unix: Target, fs_unix: VirtualFilesystem) ->
 
 
 def test_auth_plugin_with_bz(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("America/Nuuk".encode()))
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"America/Nuuk"))
 
     empty_file = absolute_path("_data/plugins/os/unix/log/empty.log")
     fs_unix.map_file("var/log/auth.log", empty_file)
@@ -82,7 +86,7 @@ def test_auth_plugin_with_bz(target_unix: Target, fs_unix: VirtualFilesystem) ->
 
 
 def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    fs_unix.map_file_fh("/etc/timezone", BytesIO("Etc/UTC".encode()))
+    fs_unix.map_file_fh("/etc/timezone", BytesIO(b"Etc/UTC"))
 
     data_path = "_data/plugins/os/unix/log/auth/secure"
     data_file = absolute_path(data_path)
@@ -103,7 +107,7 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
 
 
 @pytest.mark.parametrize(
-    "message, results",
+    ("message", "results"),
     [
         pytest.param(
             "Mar 29 10:43:01 ubuntu-1 sshd[1193]: Accepted password for test_user from 8.8.8.8 port 52942 ssh2",
@@ -286,7 +290,7 @@ def test_auth_plugin_year_rollover(target_unix: Target, fs_unix: VirtualFilesyst
     ],
 )
 def test_auth_plugin_additional_fields(
-    target_unix, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, str | int]
+    target_unix: Target, fs_unix: VirtualFilesystem, tmp_path: Path, message: str, results: dict[str, str | int]
 ) -> None:
     data_path = tmp_path / "auth.log"
     data_path.write_text(message)
@@ -307,12 +311,12 @@ def test_auth_plugin_additional_fields(
 
 
 def test_auth_plugin_iso_date_format(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we correctly handle Ubuntu 24.04 ISO formatted dates."""
+    """Test if we correctly handle Ubuntu 24.04 ISO formatted dates."""
 
     fs_unix.map_file("/var/log/auth.log", absolute_path("_data/plugins/os/unix/log/auth/iso.log"))
     target_unix.add_plugin(AuthPlugin)
 
-    results = sorted(list(target_unix.authlog()), key=lambda r: r.ts)
+    results = sorted(target_unix.authlog(), key=lambda r: r.ts)
     assert len(results) == 10
 
     assert results[0].ts == datetime(2024, 12, 31, 11, 37, 1, 123456, tzinfo=timezone.utc)

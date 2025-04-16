@@ -4,7 +4,7 @@ import struct
 import textwrap
 from io import BytesIO
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, BinaryIO
 from unittest.mock import Mock, patch
 
 import pytest
@@ -14,18 +14,20 @@ from dissect.target.containers import raw, vhd
 from dissect.target.exceptions import ContainerError
 from dissect.target.plugin import load_modules_from_paths
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 @pytest.fixture
 def mocked_ewf_detect() -> Iterator[Mock]:
     mocked_ewf = Mock()
     mocked_ewf.EwfContainer.detect.return_value = True
-    mocked_ewf.EwfContainer.detect
     with patch.object(container, "CONTAINERS", [mocked_ewf.EwfContainer]):
         yield mocked_ewf.EwfContainer
 
 
 @pytest.mark.parametrize(
-    "path, expected_output",
+    ("path", "expected_output"),
     [
         ("hello", Path("hello")),
         (["hello"], [Path("hello")]),
@@ -82,13 +84,13 @@ def test_reset_file_position() -> None:
     fh.seek(512)
 
     class MockContainer(container.Container):
-        def __init__(self, fh):
+        def __init__(self, fh: BinaryIO):
             assert fh.tell() == 0
             fh.seek(1024)
             self.success = True
 
         @staticmethod
-        def _detect_fh(fh, *args, **kwargs):
+        def _detect_fh(fh: BinaryIO, *args, **kwargs) -> bool:
             assert fh.tell() == 0
             fh.seek(256)
             return True

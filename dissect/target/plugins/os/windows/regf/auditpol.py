@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import io
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 adtev_def = """
 struct header {

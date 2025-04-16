@@ -1,29 +1,20 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.plugins.filesystem.resolver import ResolverPlugin
-from dissect.target.target import Target
 
-
-@pytest.fixture
-def extended_win_fs(fs_win: VirtualFilesystem) -> VirtualFilesystem:
-    fs_win.map_file_entry("windows/system32/calc.exe", VirtualFile(fs_win, "windows/system32/calc.exe", None))
-    fs_win.map_file_entry("windows/syswow64/calc.exe", VirtualFile(fs_win, "windows/syswow64/calc.exe", None))
-    fs_win.map_file_entry("some dir with spaces/calc.exe", VirtualFile(fs_win, "some dir with spaces/calc.exe", None))
-    fs_win.map_file_entry("some_dir/calc.exe", VirtualFile(fs_win, "some_dir/calc.exe", None))
-    fs_win.map_file_entry("other_dir/calc.exe", VirtualFile(fs_win, "other_dir/calc.exe", None))
-    fs_win.map_file_entry("other_dir/foo.bat", VirtualFile(fs_win, "other_dir/foo.bat", None))
-
-    return fs_win
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
-    "test_target, resolve_func",
+    ("test_target", "resolve_func"),
     [
         (
             "target_win",
@@ -35,7 +26,7 @@ def extended_win_fs(fs_win: VirtualFilesystem) -> VirtualFilesystem:
         ),
     ],
 )
-def test_resolver_plugin_resolve(target_win: Target, target_unix: Target, test_target: str, resolve_func: str) -> None:
+def test_resolve(target_win: Target, target_unix: Target, test_target: str, resolve_func: str) -> None:
     targets = {
         "target_win": target_win,
         "target_unix": target_unix,
@@ -48,7 +39,7 @@ def test_resolver_plugin_resolve(target_win: Target, target_unix: Target, test_t
         resolve_func.assert_called()
 
 
-def test_resolver_plugin_resolve_no_path(target_win: Target) -> None:
+def test_resolve_no_path(target_win: Target) -> None:
     path = ""
     assert target_win.resolve(path) is path
 
@@ -71,7 +62,7 @@ def mock_user_env(user: str | None) -> OrderedDict[str, str]:
 
 
 @pytest.mark.parametrize(
-    "path, user, resolved_path",
+    ("path", "user", "resolved_path"),
     [
         (
             "",
@@ -150,20 +141,29 @@ def mock_user_env(user: str | None) -> OrderedDict[str, str]:
         ),
     ],
 )
-def test_resolver_plugin_resolve_windows(
-    target_win: Target, path: str, extended_win_fs: VirtualFilesystem, user: str | None, resolved_path: str
+def test_resolve_windows(
+    target_win: Target, path: str, fs_win: VirtualFilesystem, user: str | None, resolved_path: str
 ) -> None:
+    fs_win.map_file_entry("windows/system32/calc.exe", VirtualFile(fs_win, "windows/system32/calc.exe", None))
+    fs_win.map_file_entry("windows/syswow64/calc.exe", VirtualFile(fs_win, "windows/syswow64/calc.exe", None))
+    fs_win.map_file_entry("some dir with spaces/calc.exe", VirtualFile(fs_win, "some dir with spaces/calc.exe", None))
+    fs_win.map_file_entry("some_dir/calc.exe", VirtualFile(fs_win, "some_dir/calc.exe", None))
+    fs_win.map_file_entry("other_dir/calc.exe", VirtualFile(fs_win, "other_dir/calc.exe", None))
+    fs_win.map_file_entry("other_dir/foo.bat", VirtualFile(fs_win, "other_dir/foo.bat", None))
+
     resolver_plugin = ResolverPlugin(target_win)
-    target_win.pathext  # This will load the EnvironmentVariablePlugin
+    assert target_win.pathext is not None  # This will load the EnvironmentVariablePlugin
     env_plugin = next(plugin for plugin in target_win._plugins if type(plugin).__name__ == "EnvironmentVariablePlugin")
-    with patch.object(env_plugin, "_get_pathext", return_value={".exe", ".bat"}, autospec=True):
-        with patch.object(env_plugin, "expand_env", side_effect=mock_expand_env, autospec=True):
-            with patch.object(env_plugin, "user_env", side_effect=mock_user_env, autospec=True):
-                assert resolver_plugin.resolve_windows(path, user_sid=user) == resolved_path
+    with (
+        patch.object(env_plugin, "_get_pathext", return_value={".exe", ".bat"}, autospec=True),
+        patch.object(env_plugin, "expand_env", side_effect=mock_expand_env, autospec=True),
+        patch.object(env_plugin, "user_env", side_effect=mock_user_env, autospec=True),
+    ):
+        assert resolver_plugin.resolve_windows(path, user_sid=user) == resolved_path
 
 
 @pytest.mark.parametrize(
-    "path, user, resolved_path",
+    ("path", "user", "resolved_path"),
     [
         (
             "",
@@ -187,6 +187,6 @@ def test_resolver_plugin_resolve_windows(
         ),
     ],
 )
-def test_resolver_plugin_resolve_default(target_unix: Target, path: str, user: str, resolved_path: str):
+def test_resolve_default(target_unix: Target, path: str, user: str, resolved_path: str) -> None:
     resolver_plugin = ResolverPlugin(target_unix)
     assert resolver_plugin.resolve_default(path, user_id=user) == resolved_path

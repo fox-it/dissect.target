@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import hashlib
 from functools import cached_property
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import RegistryKeyNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 try:
     from Crypto.Cipher import AES, ARC4, DES
@@ -177,7 +180,8 @@ def _decrypt_des(data: bytes, key: bytes) -> bytes:
 def _transform_key(key: bytes) -> bytes:
     new_key = []
     new_key.append(((key[0] >> 0x01) << 1) & 0xFE)
-    for i in range(0, 6):
-        new_key.append((((key[i] & ((1 << (i + 1)) - 1)) << (6 - i) | (key[i + 1] >> (i + 2))) << 1) & 0xFE)
+    new_key.extend(
+        (((key[i] & ((1 << (i + 1)) - 1)) << (6 - i) | (key[i + 1] >> (i + 2))) << 1) & 0xFE for i in range(6)
+    )
     new_key.append(((key[6] & 0x7F) << 1) & 0xFE)
     return bytes(new_key)

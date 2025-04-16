@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
-import pytest
-
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.shadow import ShadowPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    import pytest
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -22,11 +26,9 @@ def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
     assert (
         results[0].crypt
         == "$6$oLHns1qc.C3DoQ8c$temOg6X.UF5Ly3gM03cGnBLib30mv8J49dUI.w9.EHTnO4R467zyKbfBnmTa5IIvDr5mRXFoJVBGKF6QuFDpo1"
-    )  # noqa E501
+    )
     assert results[0].salt == "oLHns1qc.C3DoQ8c"
-    assert (
-        results[0].hash == "temOg6X.UF5Ly3gM03cGnBLib30mv8J49dUI.w9.EHTnO4R467zyKbfBnmTa5IIvDr5mRXFoJVBGKF6QuFDpo1"
-    )  # noqa E501
+    assert results[0].hash == "temOg6X.UF5Ly3gM03cGnBLib30mv8J49dUI.w9.EHTnO4R467zyKbfBnmTa5IIvDr5mRXFoJVBGKF6QuFDpo1"
     assert results[0].algorithm == "sha512"
     assert results[0].crypt_param is None
     assert results[0].last_change == datetime(2021, 12, 2, 0, 0, 0, tzinfo=timezone.utc)  # 18963
@@ -39,11 +41,11 @@ def test_unix_shadow(target_unix_users: Target, fs_unix: VirtualFilesystem) -> N
 
 
 def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if both the shadow file and shadow backup file are read and returns unique hash+user combinations"""
+    """Test if both the shadow file and shadow backup file are read and returns unique hash+user combinations."""
     shadow_file = absolute_path("_data/plugins/os/unix/shadow/shadow")
     fs_unix.map_file("/etc/shadow", shadow_file)
 
-    first_entry = Path(shadow_file).open("rb").read()
+    first_entry = shadow_file.read_bytes()
     other_entry = first_entry.replace(b"test", b"other-user")
     duplicate_entry = first_entry
     fs_unix.map_file_fh("/etc/shadow-", BytesIO(first_entry + other_entry + duplicate_entry))
@@ -58,7 +60,7 @@ def test_unix_shadow_backup_file(target_unix_users: Target, fs_unix: VirtualFile
 def test_unix_shadow_invalid_shent(
     caplog: pytest.LogCaptureFixture, target_unix_users: Target, fs_unix: VirtualFilesystem
 ) -> None:
-    """test if we can parse invalid day values in shents."""
+    """Test if we can parse invalid day values in shents."""
 
     shadow_invalid = """
     no_last_change:$6$salt$hash1::0:99999:7::123456:

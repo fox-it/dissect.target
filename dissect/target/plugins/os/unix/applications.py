@@ -1,4 +1,6 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers import configutil
@@ -8,7 +10,12 @@ from dissect.target.helpers.record import (
     TargetRecordDescriptor,
 )
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 UnixApplicationRecord = TargetRecordDescriptor(
     "unix/application",
@@ -19,16 +26,14 @@ UnixApplicationRecord = TargetRecordDescriptor(
 class UnixApplicationsPlugin(Plugin):
     """Unix Applications plugin."""
 
-    SYSTEM_PATHS = [
+    SYSTEM_PATHS = (
         "/usr/share/applications/",
         "/usr/local/share/applications/",
         "/var/lib/snapd/desktop/applications/",
         "/var/lib/flatpak/exports/share/applications/",
-    ]
+    )
 
-    USER_PATHS = [
-        ".local/share/applications/",
-    ]
+    USER_PATHS = (".local/share/applications/",)
 
     SYSTEM_APPS = ("org.gnome.",)
 

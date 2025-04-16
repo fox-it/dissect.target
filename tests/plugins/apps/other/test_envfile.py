@@ -1,9 +1,14 @@
-from datetime import datetime
+from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.other.env import EnvironmentFilePlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_envfile(target_unix: Target, fs_unix: VirtualFilesystem) -> None:

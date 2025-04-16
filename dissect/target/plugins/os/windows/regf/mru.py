@@ -1,25 +1,30 @@
+from __future__ import annotations
+
 import struct
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.util.ts import wintimestamp
 
-from dissect.target import Target
 from dissect.target.exceptions import RegistryError, UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import (
     RegistryRecordDescriptorExtension,
     UserRecordDescriptorExtension,
 )
-from dissect.target.helpers.record import (
-    TargetRecordDescriptor,
-    create_extended_descriptor,
-)
-from dissect.target.helpers.regutil import RegistryKey
+from dissect.target.helpers.record import TargetRecordDescriptor, create_extended_descriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.regf.shellbags import (
     FILE_ENTRY,
     SHITEM,
     parse_shell_item_list,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from flow.record import Record
+
+    from dissect.target.helpers.regutil import RegistryKey
+    from dissect.target.target import Target
 
 UserRegistryRecordDescriptor = create_extended_descriptor(
     [
@@ -125,7 +130,7 @@ class MRUPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.target.has_function("registry"):
-            return UnsupportedPluginError("Target has no registry")
+            raise UnsupportedPluginError("Target has no registry")
 
     @export(record=RunMRURecord)
     def run(self) -> Iterator[RunMRURecord]:
@@ -252,7 +257,7 @@ class MRUPlugin(Plugin):
 
         References:
             - https://winreg-kb.readthedocs.io/en/latest/sources/explorer-keys/Most-recently-used.html#keys-with-a-mrulist-value
-        """  # noqa: E501
+        """
 
         KEY = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Map Network Drive MRU"
 
@@ -311,9 +316,7 @@ class MRUPlugin(Plugin):
                         pass
 
 
-def parse_mru_key(
-    target: Target, key: RegistryKey, record: TargetRecordDescriptor
-) -> Iterator[RunMRURecord | OpenSaveMRURecord | MapNetworkDriveMRURecord | LastVisitedMRURecord]:
+def parse_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
     try:
@@ -355,9 +358,7 @@ def parse_mru_key(
         yield from parse_mru_key(target, subkey, record)
 
 
-def parse_mru_ex_key(
-    target: Target, key: RegistryKey, record: UserRegistryRecordDescriptor
-) -> Iterator[RecentDocsRecord | OpenSaveMRURecord | LastVisitedMRURecord | ACMruRecord]:
+def parse_mru_ex_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
     try:
@@ -415,8 +416,7 @@ def parse_mru_ex_key(
     for subkey in key.subkeys():
         yield from parse_mru_ex_key(target, subkey, record)
 
-
-def parse_office_mru(target: Target, key: RegistryKey, record: MSOfficeMRURecord) -> Iterator[MSOfficeMRURecord]:
+def parse_office_mru(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     try:
         yield from parse_office_mru_key(target, key.subkey("File MRU"), record)
     except RegistryError:
@@ -434,7 +434,7 @@ def parse_office_mru(target: Target, key: RegistryKey, record: MSOfficeMRURecord
         pass
 
 
-def parse_office_mru_key(target: Target, key: RegistryKey, record: MSOfficeMRURecord) -> Iterator[MSOfficeMRURecord]:
+def parse_office_mru_key(target: Target, key: RegistryKey, record: TargetRecordDescriptor) -> Iterator[Record]:
     user = target.registry.get_user(key)
 
     for value in key.values():

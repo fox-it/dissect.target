@@ -1,16 +1,15 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import annotations
 
 import argparse
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Union
 
-from dissect.target import Target
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.record import TargetRecordDescriptor
+from dissect.target.target import Target
 from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -42,7 +41,7 @@ logging.raiseExceptions = False
 
 
 @catch_sigpipe
-def main():
+def main() -> int:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="target-info",
@@ -87,16 +86,18 @@ def main():
                     if i > 0:
                         print("-" * 70)
                     print_target_info(target)
-            except Exception as e:
-                target.log.error("Exception in retrieving information for target: `%s`. Use `-vv` for details.", target)
+            except Exception as e:  # noqa: PERF203
+                target.log.error("Exception in retrieving information for target: `%s`, use `-vv` for details", target)  # noqa: TRY400
                 target.log.debug("", exc_info=e)
     except TargetError as e:
-        log.error(e)
+        log.error(e)  # noqa: TRY400
         log.debug("", exc_info=e)
-        parser.exit(1)
+        return 1
+
+    return 0
 
 
-def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
+def get_target_info(target: Target) -> dict[str, str | list[str]]:
     return {
         "disks": get_disks_info(target),
         "volumes": get_volumes_info(target),
@@ -114,9 +115,10 @@ def get_target_info(target: Target) -> dict[str, Union[str, list[str]]]:
     }
 
 
-def get_optional_func(target: Target, func: str) -> Union[str, None]:
+def get_optional_func(target: Target, func: str) -> str | None:
     if target.has_function(func):
         return getattr(target, func)
+    return None
 
 
 def print_target_info(target: Target) -> None:
@@ -144,11 +146,11 @@ def print_target_info(target: Target) -> None:
         print(f"{name.capitalize().replace('_', ' '):14s} : {value}")
 
 
-def get_disks_info(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_disks_info(target: Target) -> list[dict[str, str | int]]:
     return [{"type": d.__class__.__name__, "size": d.size} for d in target.disks]
 
 
-def get_volumes_info(target: Target) -> list[dict[str, Union[str, int]]]:
+def get_volumes_info(target: Target) -> list[dict[str, str | int]]:
     return [{"name": v.name, "size": v.size, "fs": v.fs.__class__.__name__} for v in target.volumes]
 
 

@@ -4,12 +4,12 @@ from io import BytesIO
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.linux.fortios._os import FortiOSPlugin
 from dissect.target.plugins.os.unix.linux.fortios.generic import GenericPlugin
-from dissect.target.plugins.os.unix.linux.fortios.locale import LocalePlugin
+from dissect.target.plugins.os.unix.linux.fortios.locale import FortiOSLocalePlugin
 from dissect.target.target import Target
 
 
 def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if we detect FortiGate OS correctly."""
+    """Test if we detect FortiGate OS correctly."""
 
     global_config = """\
     #config-version=FGVM64-7.4.2-FW-build2571-231219:opmode=0:vdom=0
@@ -65,7 +65,7 @@ def test_fortigate_os(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     )
 
     target_unix.add_plugin(FortiOSPlugin)
-    target_unix.add_plugin(LocalePlugin)
+    target_unix.add_plugin(FortiOSLocalePlugin)
     target_unix.add_plugin(GenericPlugin)
 
     # tests FortiOSPlugin.detect() indirectly

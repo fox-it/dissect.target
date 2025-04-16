@@ -1,6 +1,7 @@
-import os
-import random
-import shutil
+from __future__ import annotations
+
+import io
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
@@ -8,102 +9,101 @@ import pytest
 from dissect.target.filesystem import VirtualFile, VirtualFilesystem
 from dissect.target.tools.fs import _extract_path, cp
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 
 @pytest.fixture
-def vfs(files) -> VirtualFilesystem:
+def vfs(files: list[str]) -> VirtualFilesystem:
     vfs = VirtualFilesystem()
     for file in files:
         if file[-1] == "/":
             vfs.makedirs(file)
         else:
-            vfs.map_file_entry(file, VirtualFile(vfs, file, None))
+            vfs.map_file_entry(file, VirtualFile(vfs, file, io.BytesIO(b"")))
     return vfs
 
 
 @pytest.mark.parametrize("files", [["file"]])
-def test_extract_file(vfs):
-    output_file = f"/tmp/file{random.randint(0, 1000)}"
+def test_extract_file(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "file"
+
     try:
-        _extract_path(vfs.path("file"), output_file)
+        _extract_path(vfs.path("file"), output_path)
     except Exception:  # noqua
         # The files are virtual, so we expect the method to raise an exception
         pass
 
-    assert os.path.exists(output_file)
-    # cleanup
-    os.remove(output_file)
+    assert output_path.exists()
 
 
 @pytest.mark.parametrize("files", [[]])
-def test_file_not_exist(vfs):
-    output_file = f"/tmp/file{random.randint(0, 1000)}"
+def test_file_not_exist(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "file"
 
-    _extract_path(vfs.path("file"), output_file)
+    _extract_path(vfs.path("file"), output_path)
 
-    assert not os.path.exists(output_file)
+    assert not output_path.exists()
 
 
 @pytest.mark.parametrize("files", [["dir/"]])
-def test_extract_directory(vfs):
-    output = f"/tmp/dir{random.randint(0, 1000)}"
+def test_extract_directory(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "out"
 
-    _extract_path(vfs.path("dir"), f"{output}/test")
+    _extract_path(vfs.path("dir"), output_path)
 
-    assert os.path.isdir(f"{output}/test")
-
-    # cleanup
-    shutil.rmtree(output)
+    assert output_path.exists()
 
 
 @pytest.mark.parametrize("files", [["dir/", "dir/test"]])
-def test_cp_file_path(vfs):
+def test_cp_file_path(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "out"
+
     args = Mock()
-    args.output = f"/tmp/dir{random.randint(0, 1000)}"
+    args.output = str(output_path)
 
     cp(None, vfs.path("dir/test"), args)
 
-    assert os.path.isfile(f"{args.output}/test")
-
-    # cleanup
-    shutil.rmtree(args.output)
+    assert output_path.joinpath("test").exists()
 
 
 @pytest.mark.parametrize("files", [["dir/", "dir/test"]])
-def test_cp_directory(vfs):
+def test_cp_directory(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "out"
+
     args = Mock()
-    args.output = f"/tmp/dir{random.randint(0, 1000)}"
+    args.output = str(output_path)
 
     cp(None, vfs.path("dir"), args)
 
-    assert os.path.isfile(f"{args.output}/test")
-
-    # cleanup
-    shutil.rmtree(args.output)
+    assert output_path.joinpath("test").exists()
 
 
 @pytest.mark.parametrize("files", [[]])
-def test_cp_non_existing_file(vfs):
+def test_cp_non_existing_file(vfs: VirtualFilesystem, tmp_path: Path) -> None:
+    output_path = tmp_path / "out"
+
     args = Mock()
-    args.output = f"/tmp/dir{random.randint(0, 1000)}"
+    args.output = str(output_path)
 
     cp(None, vfs.path("dir/test"), args)
 
-    assert not os.path.exists(args.output)
+    assert not output_path.exists()
 
 
 @pytest.mark.parametrize(
     "files",
     [["dir/", "dir/test", "dir/subdirectory_1/", "dir/subdirectory_2/", "dir/subdirectory_3/subdirectory_4/"]],
 )
-def test_cp_subdirectories(vfs, files):
+def test_cp_subdirectories(vfs: VirtualFilesystem, files: list[str], tmp_path: Path) -> None:
+    output_path = tmp_path / "out"
+
     args = Mock()
-    args.output = f"/tmp/dir{random.randint(0, 1000)}"
+    args.output = str(output_path)
 
     cp(None, vfs.path("dir/"), args)
 
     filesystem_files = (file.replace("dir/", "") for file in files)
 
     for directories in filesystem_files:
-        assert os.path.exists(f"{args.output}/{directories}")
-    # cleanup
-    shutil.rmtree(args.output)
+        assert output_path.joinpath(directories).exists()

@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import plistlib
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 AccountPolicyRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "macos/account_policy",
@@ -33,7 +38,7 @@ class UserPlugin(Plugin):
 
     @export(record=AccountPolicyRecord)
     def account_policy(self) -> Iterator[AccountPolicyRecord]:
-        """Yield user account policy information"""
+        """Yield user account policy information."""
 
         # The data is not retrieved from the home folder of the user
         for user_details in self.target.user_details.all():

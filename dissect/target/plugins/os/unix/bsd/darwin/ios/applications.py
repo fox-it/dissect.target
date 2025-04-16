@@ -1,6 +1,6 @@
 import plistlib
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from dissect.util.plist import NSKeyedArchiver
 
@@ -44,16 +44,15 @@ class IOSApplicationsPlugin(Plugin):
 
             # System apps do not have a iTunesMetadata.plist file.
             info = {}
-            if not metadata:
-                if info_file := next(app_dir.glob("*.app/Info.plist"), None):
-                    info = plistlib.load(info_file.open("rb"))
-                    if info.get("CFBundleIdentifier", "").startswith("com.apple."):
-                        info["author"] = "Apple"
-                        info["type"] = "system"
+            if not metadata and (info_file := next(app_dir.glob("*.app/Info.plist"), None)):
+                info = plistlib.load(info_file.open("rb"))
+                if info.get("CFBundleIdentifier", "").startswith("com.apple."):
+                    info["author"] = "Apple"
+                    info["type"] = "system"
 
             # Ultimate fallback to application name
             if not info.get("CFBundleDisplayName") and not metadata.get("itemName"):
-                metadata["itemName"] = next(app_dir.glob("*.app"), Path("")).name.removesuffix(".app")
+                metadata["itemName"] = next(app_dir.glob("*.app"), Path()).name.removesuffix(".app")
 
             yield IOSApplicationRecord(
                 ts_installed=bundle.get("installDate"),

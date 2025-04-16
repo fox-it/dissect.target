@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import zlib
 from io import BytesIO
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.cstruct import cstruct
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # The structs rawheader and rawrecord have added padding compared to the structs in the source code
 # https://github.com/Atoptool/atop/blob/master/rawlog.h, https://github.com/Atoptool/atop/blob/master/photoproc.h
@@ -234,7 +239,7 @@ class AtopFile:
                 process = self.decompress(self.fh.read(record.pcomplen))
                 for _ in range(record.ndeviat):
                     yield c_atop.tstat(process)
-            except EOFError:
+            except EOFError:  # noqa: PERF203
                 break
 
     def decompress(self, data: bytes) -> bytes:
@@ -252,14 +257,14 @@ class AtopPlugin(Plugin):
     ATOP_GLOB = "atop_*"
     ATOP_MAGIC = 0xFEEDBEEF
     ATOP_PATH = "/var/log/atop"
-    ATOP_VERSIONS = ["2.6", "2.7"]
+    ATOP_VERSIONS = ("2.6", "2.7")
 
     def check_compatible(self) -> None:
         if not self.target.fs.path(self.ATOP_PATH).exists():
             raise UnsupportedPluginError("No ATOP files found")
 
     @export(record=AtopRecord)
-    def atop(self) -> AtopRecord:
+    def atop(self) -> Iterator[AtopRecord]:
         """Return the content of Atop log files.
 
         An Atop log file contains the activity of all processes that were running during the interval.
@@ -307,7 +312,7 @@ class AtopPlugin(Plugin):
 
             atop_magic = int.from_bytes(fh.read(4), "little")
 
-            if not atop_magic == self.ATOP_MAGIC:
+            if atop_magic != self.ATOP_MAGIC:
                 self.target.log.warning("The Atop log file %s has an invalid magic header", file.name)
                 continue
 

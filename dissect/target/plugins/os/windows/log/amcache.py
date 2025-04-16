@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from typing import TYPE_CHECKING, Iterator, Union
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 re_field = re.compile(r"(.+)=(.+)")
 
@@ -59,11 +61,11 @@ AmcacheArpCreateRecord = TargetRecordDescriptor(
 
 
 def _to_log_timestamp(timestamp: str) -> datetime:
-    return datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S")
+    return datetime.strptime(timestamp, "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone.utc)
 
 
 def create_record(
-    description: Union[AmcacheFileCreateRecord, AmcacheArpCreateRecord],
+    description: AmcacheFileCreateRecord | AmcacheArpCreateRecord,
     filename: str,
     install_properties: dict[str, str],
     create: str,
@@ -109,7 +111,7 @@ def create_record(
 class AmcacheInstallPlugin(Plugin):
     """Amcache install log plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.logs = self.target.fs.path("sysvol/windows/appcompat/programs/install")
 

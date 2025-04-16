@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import zlib
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.cstruct import cstruct
 from dissect.util.ts import wintimestamp
@@ -10,7 +10,6 @@ from flow.record.fieldtypes import digest
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import (
     UnixUserRecord,
     WindowsUserRecord,
@@ -18,7 +17,12 @@ from dissect.target.helpers.record import (
 )
 from dissect.target.plugin import alias, export
 from dissect.target.plugins.apps.editor.editor import COMMON_EDITOR_FIELDS, EditorPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 # Thanks to @Nordgaren, @daddycocoaman, @JustArion and @ogmini for their suggestions and feedback in the PR
 # thread. This really helped to figure out the last missing bits and pieces
@@ -121,7 +125,7 @@ def _calc_crc32(data: bytes) -> bytes:
 
 
 class WindowsNotepadTab:
-    """Windows notepad tab content parser"""
+    """Windows notepad tab content parser."""
 
     def __init__(self, file: TargetPath):
         self.file = file

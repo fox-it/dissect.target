@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows.regf.applications import (
     WindowsApplicationsPlugin,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) -> None:
-    """test if windows applications are detected correctly in the registry"""
+    """Test if windows applications are detected correctly in the registry."""
 
     firefox_name = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Mozilla Firefox 123.0.1 (x64 nl)"
     firefox_key = VirtualKey(hive_hklm, firefox_name)
@@ -65,7 +70,7 @@ def test_windows_applications(target_win_users: Target, hive_hklm: VirtualHive) 
     hive_hklm.map_key(msvc_name, msvc_key)
 
     target_win_users.add_plugin(WindowsApplicationsPlugin)
-    results = sorted(list(target_win_users.applications()), key=lambda r: r.name)
+    results = sorted(target_win_users.applications(), key=lambda r: r.name)
 
     assert len(results) == 4
 

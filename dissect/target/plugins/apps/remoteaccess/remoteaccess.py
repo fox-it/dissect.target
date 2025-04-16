@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import NamespacePlugin

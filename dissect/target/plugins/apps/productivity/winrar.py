@@ -1,8 +1,13 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.os.windows.generic import UserRegistryRecordDescriptor
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 WinRarRecord = UserRegistryRecordDescriptor(
     "application/productivity/winrar",
@@ -18,7 +23,7 @@ class WinRarPlugin(Plugin):
 
     BASE_KEY = "HKEY_CURRENT_USER\\Software\\WinRAR"
 
-    def check_compatible(self):
+    def check_compatible(self) -> None:
         if not self.target.has_function("registry") or not list(self.target.registry.keys(self.BASE_KEY)):
             raise UnsupportedPluginError("No WinRAR registry keys found on target")
 

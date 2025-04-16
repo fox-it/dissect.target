@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import textwrap
 from io import BytesIO
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.ssh.opensshd import SSHServerPlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_sshd_config_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

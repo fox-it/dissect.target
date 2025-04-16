@@ -1,5 +1,6 @@
-from pathlib import Path
-from typing import Any, Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from dissect.esedb.exceptions import Error
 from dissect.esedb.tools import ual
@@ -7,6 +8,12 @@ from dissect.esedb.tools import ual
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 ClientAccessRecord = TargetRecordDescriptor(
     "filesystem/windows/ual/client_access",
@@ -146,7 +153,7 @@ class UalPlugin(Plugin):
 
     References:
         - https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-R2-and-2012/hh849634%28v=ws.11%29
-    """  # noqa: E501
+    """
 
     __namespace__ = "ual"
 
@@ -155,7 +162,7 @@ class UalPlugin(Plugin):
     IDENTITY_DB_FILENAME = "SystemIdentity.mdb"
     IDENTITY_DB_PATH = f"sysvol/Windows/System32/LogFiles/Sum/{IDENTITY_DB_FILENAME}"
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self.mdb_paths = self.find_mdb_files()
@@ -165,7 +172,7 @@ class UalPlugin(Plugin):
         self.populate_role_guid_map()
 
     def check_compatible(self) -> None:
-        if not any([path.exists() for path in self.mdb_paths]):
+        if not any(path.exists() for path in self.mdb_paths):
             raise UnsupportedPluginError("No MDB files found")
 
     def find_mdb_files(self) -> list[Path]:
@@ -184,7 +191,8 @@ class UalPlugin(Plugin):
         try:
             self.identity_db_parser = ual.UAL(fh)
         except Error as e:
-            self.target.log.warning("Error opening UAL SystemIdentity.mdb database", exc_info=e)
+            self.target.log.warning("Error opening UAL SystemIdentity.mdb database")
+            self.target.log.debug("", exc_info=e)
             return
 
         self.target.log.debug("SystemIdentity.mdb DB loaded")
@@ -201,7 +209,8 @@ class UalPlugin(Plugin):
             try:
                 parser = ual.UAL(fh)
             except Error as e:
-                self.target.log.warning("Error opening database: %s", mdb_path, exc_info=e)
+                self.target.log.warning("Error opening database: %s", mdb_path)
+                self.target.log.debug("", exc_info=e)
                 continue
 
             for table_record in parser.get_table_records(table_name):

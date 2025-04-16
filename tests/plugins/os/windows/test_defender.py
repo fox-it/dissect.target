@@ -1,17 +1,24 @@
-import os
-from datetime import datetime
+from __future__ import annotations
+
+from datetime import datetime, timezone
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 from flow.record.fieldtypes import command
 from flow.record.fieldtypes import datetime as dt
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from flow.record import Record
+
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
@@ -29,7 +36,7 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
 
     # verify that all records have unique EventIDs
     assert all(r.ts is not None for r in records)
-    assert len(list(r.EventID for r in records)) == 9
+    assert len([r.EventID for r in records]) == 9
     assert {r.Provider_Name for r in records} == {"Microsoft-Windows-Windows Defender"}
     assert {r.Channel for r in records} == {"Microsoft-Windows-Windows Defender/Operational"}
     # Both informational records (no threat name) and detections are present
@@ -49,7 +56,7 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
     # Test whether the quarantining of a Mimikatz binary is properly parsed.
     mimikatz_record = records[0]
-    detection_date = datetime.strptime("2022-12-02", "%Y-%m-%d").date()
+    detection_date = datetime.strptime("2022-12-02", "%Y-%m-%d").replace(tzinfo=timezone.utc).date()
 
     assert mimikatz_record.detection_type == "file"
     assert mimikatz_record.detection_name == "HackTool:Win64/Mikatz!dha"
@@ -87,22 +94,21 @@ def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesys
     expected_files = [payload_filename, security_descriptor_filename, zone_identifier_filename]
     expected_files.sort()
 
-    directory_content = os.listdir(recovery_dst)
+    directory_content = [p.name for p in recovery_dst.iterdir()]
     directory_content.sort()
     assert expected_files == directory_content
     # Replaced the mimikatz payload with `DUMMY_PAYLOAD` to avoid defender collecting it
     assert recovery_dst.joinpath(payload_filename).read_bytes() == b"DUMMY_PAYLOAD"
 
     # Verify that the security descriptors are valid security descriptors
-    with open(recovery_dst.joinpath(security_descriptor_filename), "rb") as descriptor_file:
-        descriptor_buf = descriptor_file.read()
-        descriptor = SecurityDescriptor(BytesIO(descriptor_buf))
+    descriptor_buf = recovery_dst.joinpath(security_descriptor_filename).read_bytes()
+    descriptor = SecurityDescriptor(BytesIO(descriptor_buf))
 
-        assert isinstance(descriptor.dacl, ACL)
-        assert isinstance(descriptor.sacl, ACL)
+    assert isinstance(descriptor.dacl, ACL)
+    assert isinstance(descriptor.sacl, ACL)
 
-        assert descriptor.owner == expected_owner
-        assert descriptor.group == expected_group
+    assert descriptor.owner == expected_owner
+    assert descriptor.group == expected_group
 
     # Verify valid zone identifier for mimikatz file
     assert recovery_dst.joinpath(zone_identifier_filename).read_bytes() == expected_zone_identifier_content
@@ -155,7 +161,7 @@ def test_defender_exclusions(target_win: Target, hive_hklm: VirtualHive) -> None
     assert len(exclusion_records) == 6
 
 
-def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, log_filename: str):
+def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path, log_filename: str) -> list[Record]:
     # map default log location to pass EvtxPlugin's compatibility check
     fs_win.map_dir("windows/system32/winevt/logs", tmp_path)
 
@@ -163,8 +169,7 @@ def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path
     fs_win.map_file("ProgramData/Microsoft/Windows Defender/Support/MPLog-20240101-094808.log", log_file)
 
     target_win.add_plugin(MicrosoftDefenderPlugin)
-    records = list(target_win.defender.mplog())
-    return records
+    return list(target_win.defender.mplog())
 
 
 def test_defender_mplogs_rtp(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
@@ -197,21 +202,11 @@ def test_defender_mplogs_resource_scan(target_win: Target, fs_win: VirtualFilesy
     assert sorted(record.threats) == sorted(["Worm:VBS/Jenxcus.DN", "HackTool:MSIL/Mimikatz!MSR"])
     assert sorted(record.resources) == sorted(
         [
-            "".join(
-                [
-                    "C:\\ProgramData\\App\\Scans\\FilesStash\\9F8E7D6C-5A4B-3C2D-1E0F-A1B2C3D4E5F6_1d23456789abcdef|",
-                    "C:\\Users\\user\\Downloads\\file.rar",
-                ]
-            ),
+            "C:\\ProgramData\\App\\Scans\\FilesStash\\9F8E7D6C-5A4B-3C2D-1E0F-A1B2C3D4E5F6_1d23456789abcdef|C:\\Users\\user\\Downloads\\file.rar",
             "C:\\Users\\user\\Downloads\\file.rar->file.WsF",
             "C:\\ProgramData\\App\\Scans\\FilesStash\\9F8E7D6C-5A4B-3C2D-1E0F-A1B2C3D4E5F6_1d23456789abcdef",
             "C:\\Users\\user\\Downloads\\file.rar|https:/example.com/download?id=67890|browser_broker.exe",
-            "".join(
-                [
-                    "C:\\ProgramData\\App\\Scans\\FilesStash\\9F8E7D6C-5A4B-3C2D-1E0F-A1B2C3D4E5F6_1d23456789abcdef|",
-                    "https:/example.com/download?id=12345|browser_broker.exe",
-                ]
-            ),
+            "C:\\ProgramData\\App\\Scans\\FilesStash\\9F8E7D6C-5A4B-3C2D-1E0F-A1B2C3D4E5F6_1d23456789abcdef|https:/example.com/download?id=12345|browser_broker.exe",
             "C:\\Users\\user\\Downloads\\file.rar",
             "C:\\Users\\user\\Videos\\binary.exe",
         ]
@@ -273,22 +268,15 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[1].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[1].ts == dt("2023-01-20 08:45:40.321000+00:00")
     assert records[1].lowfi == command(
-        "".join(
-            [
-                "C:\\OS\\System32\\cfg.exe(reg add HKLM\\SYSTEM\\",
-                "OtherControlSet\\Control\\SecurityOptions\\SecurityModule /v RandomFlag /t REG_DWORD /d 0 /f)",
-            ]
-        ),
+        "C:\\OS\\System32\\cfg.exe(reg add HKLM\\SYSTEM\\OtherControlSet\\Control\\SecurityOptions\\SecurityModule /v RandomFlag /t REG_DWORD /d 0 /f)",  # noqa: E501
     )
 
     # Detection Add
     assert records[2].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[2].ts == dt("2023-01-27 15:33:07.698000+00:00")
-    assert records[2].detection == "".join(
-        [
-            "HackTool:MSIL/RndGen!MD5 file:C:\\Users\\user987\\Documents\\executable.exe ",
-            "PropBag [length: 0, data: (null)]",
-        ]
+    assert (
+        records[2].detection
+        == "HackTool:MSIL/RndGen!MD5 file:C:\\Users\\user987\\Documents\\executable.exe PropBag [length: 0, data: (null)]"  # noqa: E501
     )
 
     # Threat
@@ -310,12 +298,9 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
 
     # Mini-filter unsuccesful scan
     assert records[6].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
-    assert records[6].path == "".join(
-        [
-            "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\",
-            "Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\",
-            "ANWebView\\Default\\Popular URLs.",
-        ]
+    assert (
+        records[6].path
+        == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
     )
     assert records[6].ts == dt("2024-07-13 14:38:15.272000+00:00")
     assert records[6].process == "(unknown)"
@@ -334,11 +319,9 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     # Mini-filter blocked file
     assert records[7].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[7].ts == dt("2024-07-13 14:38:15.272000+00:00")
-    assert records[7].blocked_file == "".join(
-        [
-            "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\",
-            "MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs.",
-        ]
+    assert (
+        records[7].blocked_file
+        == "\\Device\\HarddiskVolume2\\Users\\userdefault\\AppData\\Local\\Packages\\MicrosoftBrowser.Default_cw5n8h2txyuma\\LocalState\\ANWebView\\Default\\Popular URLs."  # noqa: E501
     )
     assert records[7].process == "(unknown)"
     assert records[7].status == "0xc000004a"
@@ -366,10 +349,9 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     assert records[9].source_log == "sysvol/programdata/microsoft/windows defender/support/MPLog-20240101-094808.log"
     assert records[9].ts == dt("2024-09-03 18:12:05.364000+00:00")
     assert records[9].original_file_name == "RandomData0123_static.dll"
-    assert records[9].full_path == "".join(
-        [
-            "c:\\os\\winsxs\\x64_default-app-service_31bf3856ad364e35_10.0.29999.9999_none_fakef123456789a\\",
-            "randomdata0123.dll",
-        ]
+    assert (
+        records[9].full_path
+        == "c:\\os\\winsxs\\x64_default-app-service_31bf3856ad364e35_10.0.29999.9999_none_fakef123456789a\\randomdata0123.dll"  # noqa: E501
     )
+
     assert records[9].hr == "0x1"

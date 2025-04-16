@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import math
 import stat
-from typing import BinaryIO, Iterator, Optional
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.ntfs import NTFS, NTFS_SIGNATURE, IndexEntry, MftRecord
 from dissect.ntfs.exceptions import Error as NtfsError
 from dissect.ntfs.exceptions import FileNotFoundError as NtfsFileNotFoundError
 from dissect.ntfs.exceptions import NotADirectoryError as NtfsNotADirectoryError
-from dissect.ntfs.util import AttributeMap
 
 from dissect.target.exceptions import (
     FileNotFoundError,
@@ -19,21 +18,26 @@ from dissect.target.exceptions import (
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.ntfs.util import AttributeMap
+
 
 class NtfsFilesystem(Filesystem):
     __type__ = "ntfs"
 
     def __init__(
         self,
-        fh: Optional[BinaryIO] = None,
-        boot: Optional[BinaryIO] = None,
-        mft: Optional[BinaryIO] = None,
-        usnjrnl: Optional[BinaryIO] = None,
-        sds: Optional[BinaryIO] = None,
+        fh: BinaryIO | None = None,
+        boot: BinaryIO | None = None,
+        mft: BinaryIO | None = None,
+        usnjrnl: BinaryIO | None = None,
+        sds: BinaryIO | None = None,
         *args,
         **kwargs,
     ):
-        super().__init__(fh, case_sensitive=False, alt_separator="\\", *args, **kwargs)
+        super().__init__(fh, *args, case_sensitive=False, alt_separator="\\", **kwargs)
         self.ntfs = NTFS(fh, boot=boot, mft=mft, usnjrnl=usnjrnl, sds=sds)
 
     @staticmethod
@@ -44,7 +48,7 @@ class NtfsFilesystem(Filesystem):
     def get(self, path: str) -> NtfsFilesystemEntry:
         return NtfsFilesystemEntry(self, path, self._get_record(path))
 
-    def _get_record(self, path: str, root: Optional[MftRecord] = None) -> MftRecord:
+    def _get_record(self, path: str, root: MftRecord | None = None) -> MftRecord:
         try:
             path = path.rsplit(":", maxsplit=1)[0]
             return self.ntfs.mft.get(path, root=root)
@@ -58,7 +62,7 @@ class NtfsFilesystem(Filesystem):
 
 class NtfsFilesystemEntry(FilesystemEntry):
     def __init__(
-        self, fs: NtfsFilesystem, path: str, entry: Optional[MftRecord] = None, index_entry: Optional[IndexEntry] = None
+        self, fs: NtfsFilesystem, path: str, entry: MftRecord | None = None, index_entry: IndexEntry | None = None
     ):
         super().__init__(fs, path, entry)
         self.index_entry = index_entry
@@ -133,7 +137,7 @@ class NtfsFilesystemEntry(FilesystemEntry):
         # opening a file or iterating a directory. This is because the reparse point itself will have the appropriate
         # flags set to indicate if the target is a file or directory
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         reparse_point = self.dereference().attributes.REPARSE_POINT
         print_name = reparse_point.print_name

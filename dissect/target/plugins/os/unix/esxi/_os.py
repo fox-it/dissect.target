@@ -8,13 +8,11 @@ import subprocess
 from configparser import ConfigParser
 from configparser import Error as ConfigParserError
 from io import BytesIO
-from typing import Any, BinaryIO, Iterator, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
-
-from dissect.target.helpers.fsutil import TargetPath
 
 try:
     from dissect.hypervisor.util.envelope import (
@@ -28,12 +26,19 @@ try:
 except ImportError:
     HAS_ENVELOPE = False
 
-from dissect.target.filesystem import Filesystem, VirtualFilesystem
 from dissect.target.filesystems import tar
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, arg, export, internal
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem, VirtualFilesystem
+    from dissect.target.helpers.fsutil import TargetPath
+    from dissect.target.target import Target
 
 VirtualMachineRecord = TargetRecordDescriptor(
     "esxi/vm",
@@ -98,7 +103,7 @@ class ESXiPlugin(UnixPlugin):
         return cfgs[0][0] if cfgs else None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> ESXiPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         cfg = parse_boot_cfg(sysvol.path("boot.cfg").open("rt"))
 
         # Mount all the visor tars in individual filesystem layers
@@ -131,6 +136,7 @@ class ESXiPlugin(UnixPlugin):
     def domain(self) -> str | None:
         if hostname := self._cfg("/adv/Misc/HostName"):
             return hostname.partition(".")[2]
+        return None
 
     @export(property=True)
     def ips(self) -> list[str]:
@@ -157,6 +163,7 @@ class ESXiPlugin(UnixPlugin):
 
             _, _, version = line.partition("=")
             return f"VMware ESXi {version.strip()}"
+        return None
 
     @export(record=VirtualMachineRecord)
     def vm_inventory(self) -> Iterator[VirtualMachineRecord]:
@@ -210,7 +217,7 @@ def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> N
             # NOTE: The XZ layer may also contain file signatures
             # Could be interesting to check.
             if cfile.peek(6)[:6] == b"\xfd7zXZ\x00":
-                cfile = lzma.LZMAFile(cfile)
+                cfile = lzma.LZMAFile(cfile)  # noqa: SIM115
 
             tfs = tar.TarFilesystem(cfile, tarinfo=vmtar.VisorTarInfo)
 
@@ -243,8 +250,7 @@ def _decrypt_envelope(local_tgz_ve: TargetPath, encryption_info: TargetPath) -> 
     """Decrypt ``local.tgz.ve`` ourselves with hard-coded keys."""
     envelope = Envelope(local_tgz_ve.open())
     keystore = KeyStore.from_text(encryption_info.read_text("utf-8"))
-    local_tgz = BytesIO(envelope.decrypt(keystore.key, aad=b"ESXConfiguration"))
-    return local_tgz
+    return BytesIO(envelope.decrypt(keystore.key, aad=b"ESXConfiguration"))
 
 
 def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
@@ -284,12 +290,13 @@ def _create_local_fs(target: Target, local_tgz_ve: TargetPath, encryption_info: 
         local_tgz = _decrypt_crypto_util(local_tgz_ve)
 
         if local_tgz is None:
-            target.log.warning("Dynamic decryption of %s failed.", local_tgz_ve)
+            target.log.warning("Dynamic decryption of %s failed", local_tgz_ve)
     else:
         target.log.warning("local.tgz is encrypted but static decryption failed and no dynamic decryption available!")
 
     if local_tgz:
         return tar.TarFilesystem(local_tgz)
+    return None
 
 
 def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
@@ -325,10 +332,9 @@ def _mount_filesystems(target: Target, sysvol: Filesystem, cfg: dict[str, str]) 
                     target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/altbootbank")
 
             # /store == partition number 8
-            if version and version[0] == "6":
-                if fs.volume.number == 8:
-                    target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/store")
-                    target.fs.symlink("/store", "/locker")
+            if version and version[0] == "6" and fs.volume.number == 8:
+                target.fs.symlink(f"/vmfs/volumes/{fs_uuid}", "/store")
+                target.fs.symlink("/store", "/locker")
 
         elif fs.__type__ == "vmfs":
             target.fs.mount(f"/vmfs/volumes/{fs.vmfs.uuid}", fs)

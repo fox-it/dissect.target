@@ -1,10 +1,10 @@
+from __future__ import annotations
+
+import datetime
 import itertools
 import re
-from datetime import datetime
-from typing import Iterator
-from zoneinfo import ZoneInfo
+from typing import TYPE_CHECKING
 
-from dissect.target import Target
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.plugin import export
@@ -13,6 +13,11 @@ from dissect.target.plugins.os.unix.packagemanager import (
     PackageManagerLogRecord,
     PackageManagerPlugin,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 APT_LOG_OPERATIONS = ["Install", "Reinstall", "Upgrade", "Downgrade", "Remove", "Purge"]
 REGEX_PACKAGE_NAMES = re.compile(r"(.*?\)),?")
@@ -27,8 +32,7 @@ class AptPlugin(PackageManagerPlugin):
     LOG_FILES_GLOB = "history.*"
 
     def check_compatible(self) -> None:
-        log_files = list(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB))
-        if not len(log_files):
+        if not next(self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB), None):
             raise UnsupportedPluginError("No APT files found")
 
     @export(record=PackageManagerLogRecord)
@@ -47,8 +51,8 @@ class AptPlugin(PackageManagerPlugin):
             Requested-By: user (1000)
             End-Date: 2022-09-21  06:48:57
         """  # noqa E501
+        target_tz = self.target.datetime.tzinfo
 
-        tzinfo = self.target.datetime.tzinfo
         for path in self.target.fs.path(self.LOG_DIR_PATH).glob(self.LOG_FILES_GLOB):
             chunk = []
             for line in itertools.chain(open_decompress(path, "rt"), [""]):
@@ -56,14 +60,17 @@ class AptPlugin(PackageManagerPlugin):
 
                 # Indicates the end of a log chunk
                 if line == "":
-                    yield from split_into_records(chunk, tzinfo, self.target)
+                    yield from split_into_records(chunk, target_tz, self.target)
+
                     chunk = []
                     continue
 
                 chunk.append(line)
 
 
-def split_into_records(chunk: Iterator[str], tz: ZoneInfo, target: Target) -> Iterator[PackageManagerLogRecord]:
+def split_into_records(
+    chunk: Iterator[str], tzinfo: datetime.tzinfo, target: Target
+) -> Iterator[PackageManagerLogRecord]:
     """Parse the chunk line for line and try to extract as much information from each line as possible."""
     packages = []
     ts = None
@@ -75,12 +82,11 @@ def split_into_records(chunk: Iterator[str], tz: ZoneInfo, target: Target) -> It
             operation, package_names = line.split(": ")
             package_names = split_package_names(package_names)
 
-            for name in package_names:
-                packages.append((operation, name))
+            packages.extend((operation, name) for name in package_names)
 
         elif line.startswith("Start-Date"):
             dt_string = line.split("Start-Date: ")[1]
-            ts = datetime.strptime(dt_string, "%Y-%m-%d  %H:%M:%S").replace(tzinfo=tz)
+            ts = datetime.datetime.strptime(dt_string, "%Y-%m-%d  %H:%M:%S").replace(tzinfo=tzinfo)
 
         elif line.startswith("Requested-By"):
             user = line.split("Requested-By: ")[1]
@@ -113,7 +119,7 @@ def split_package_names(package_names: str) -> list[str]:
 
     Returns:
         A list of package names, e.g. ``['linux-headers-5.4.0-126:amd64 (5.4.0-126.142, automatic)', ...]``
-    """  # noqa E501
+    """
 
     package_names = REGEX_PACKAGE_NAMES.findall(package_names)
     return [name.strip() for name in package_names]

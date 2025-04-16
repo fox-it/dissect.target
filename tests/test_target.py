@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import io
 import urllib.parse
 from collections import defaultdict
-from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, ClassVar
 from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
@@ -15,44 +16,95 @@ from dissect.target.filesystems.dir import DirectoryFilesystem
 from dissect.target.loaders.dir import DirLoader
 from dissect.target.loaders.raw import RawLoader
 from dissect.target.loaders.vbox import VBoxLoader
-from dissect.target.target import Event, Target, TargetLogAdapter, log
+from dissect.target.target import DiskCollection, Event, Target, TargetLogAdapter, log
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from logging import Logger
+    from pathlib import Path
 
 
 class ErrorCounter(TargetLogAdapter):
     errors = 0
 
-    def error(*args, **kwargs):
+    def error(*args, **kwargs) -> None:
         ErrorCounter.errors += 1
 
 
 @pytest.mark.parametrize(
-    "topo, entry_point, expected_result, expected_errors",
+    ("topo", "entry_point", "expected_result", "expected_errors"),
     [
         # Base cases:
         # Scenario 0:  Can we still load a single target that's not a dir?
-        (["/raw.tst"], "/raw.tst", "[TestLoader('/raw.tst')]", 0),
+        (
+            [
+                "/raw.tst",
+            ],
+            "/raw.tst",
+            "[TestLoader('/raw.tst')]",
+            0,
+        ),
         # Scenario 0b: Make sure we still get so see errors if a target fails to load
         # (1 error + 1 exception no load)
-        (["/raw.vbox"], "/raw.vbox", "[]", 2),
+        (
+            [
+                "/raw.vbox",
+            ],
+            "/raw.vbox",
+            "[]",
+            2,
+        ),
         # Scenario 0c: Attempting to load a dir with nothing of interest yield an error
         # (1 exception no load)
-        (["/dir/garbage"], "/dir", "[]", 1),
+        (
+            [
+                "/dir/garbage",
+            ],
+            "/dir",
+            "[]",
+            1,
+        ),
         # Dir cases:
         # Scenario 1:  Dir is loadable target (simple)
-        (["/dir/etc", "/dir/var"], "/dir", "[DirLoader('/dir')]", 0),
+        (
+            [
+                "/dir/etc",
+                "/dir/var",
+            ],
+            "/dir",
+            "[DirLoader('/dir')]",
+            0,
+        ),
         # Scenario 2: dir contains multiple loadable targets
-        (["/dir/raw.img", "/dir/raw2.tst"], "/dir", "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]", 0),
+        (
+            [
+                "/dir/raw.img",
+                "/dir/raw2.tst",
+            ],
+            "/dir",
+            "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
+            0,
+        ),
         # Scenario 2b: dir contains multiple loadable targets and some garbage
         # (it will wrap the garbage in a RawLoader to try)
         (
-            ["/dir/raw.img", "/dir/raw2.tst", "/dir/info.txt"],
+            [
+                "/dir/raw.img",
+                "/dir/raw2.tst",
+                "/dir/info.txt",
+            ],
             "/dir",
             "[RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst'), RawLoader('/dir/info.txt')]",
             0,
         ),
         # Scenario 3: dir contains 1 loadable dir as well as 2 loadable targets
         (
-            ["/dir/unix/etc", "/dir/unix/var", "/dir/raw.img", "/dir/raw2.tst"],
+            [
+                "/dir/unix/etc",
+                "/dir/unix/var",
+                "/dir/raw.img",
+                "/dir/raw2.tst",
+            ],
             "/dir",
             "[DirLoader('/dir/unix'), RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
@@ -68,8 +120,7 @@ class ErrorCounter(TargetLogAdapter):
                 "/dir/raw2.tst",
             ],
             "/dir",
-            "[DirLoader('/dir/unix'), DirLoader('/dir/win'),"
-            " RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
+            "[DirLoader('/dir/unix'), DirLoader('/dir/win'), RawLoader('/dir/raw.img'), TestLoader('/dir/raw2.tst')]",
             0,
         ),
         # Scenario 4: dir is a loadable dir but contains other files including loadable targets
@@ -116,10 +167,10 @@ def test_target_open_dirs(topo: list[str], entry_point: str, expected_result: st
     # specific implementations.
     class TestLoader(RawLoader):
         @staticmethod
-        def detect(path: str) -> bool:
+        def detect(path: Path) -> bool:
             return str(path).endswith(".tst")
 
-        def map(self, target: Target):
+        def map(self, target: Target) -> None:
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
 
     class SelectLdr(DirLoader):
@@ -129,9 +180,9 @@ def test_target_open_dirs(topo: list[str], entry_point: str, expected_result: st
 
         @staticmethod
         def find_all(path: Path, **kwargs) -> Iterator[Path]:
-            return [Path("/dir/raw1.img").as_posix(), Path("/dir/raw3.img").as_posix()]
+            return [path.joinpath("/dir/raw1.img"), path.joinpath("/dir/raw3.img")]
 
-        def map(self, target: Target):
+        def map(self, target: Target) -> None:
             target.disks.add(RawContainer(io.BytesIO(b"\x00")))
 
     def make_vfs(topo: dict) -> dict:
@@ -170,29 +221,29 @@ def mocked_win_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
     mock_good_fs = Mock(name="good-fs")
     mock_good_fs.iter_subfs.return_value = []
 
-    def mock_filesystem_open(volume):
+    def mock_filesystem_open(volume: Mock) -> Mock:
         if volume == mock_good_volume:
             return mock_good_fs
         raise FilesystemError("Not supported")
 
-    def get_mock_drive_volumes(_):
+    def get_mock_drive_volumes(log: Logger) -> list[tuple[Mock, bool, Mock, int]]:
         # drive_volume, is_windrive, disk, disk_num
         return [
             (mock_good_volume, False, Mock(), 1),
             (mock_bad_volume, False, Mock(), 2),
         ]
 
-    def mock_disk_apply(self):
+    def mock_disk_apply(self: DiskCollection) -> None:
         if len(self.target.disks) > 0:
             self.target.volumes.add(mock_good_volume)
             self.target.volumes.add(mock_bad_volume)
 
-    with patch("dissect.target.loaders.local._get_os_name") as mock_os_name, patch(
-        "dissect.target.filesystem.open", new=mock_filesystem_open
-    ), patch("dissect.target.plugin.os_plugins") as mock_os_plugins, patch(
-        "dissect.target.target.DiskCollection.apply", new=mock_disk_apply
-    ), patch(
-        "dissect.target.loaders.local._get_windows_drive_volumes", new=get_mock_drive_volumes
+    with (
+        patch("dissect.target.loaders.local._get_os_name") as mock_os_name,
+        patch("dissect.target.filesystem.open", new=mock_filesystem_open),
+        patch("dissect.target.plugin.os_plugins") as mock_os_plugins,
+        patch("dissect.target.target.DiskCollection.apply", new=mock_disk_apply),
+        patch("dissect.target.loaders.local._get_windows_drive_volumes", new=get_mock_drive_volumes),
     ):
         mock_os_plugins.return_value = []
         mock_os_name.return_value = "windows"
@@ -210,20 +261,21 @@ def mocked_lin_volumes_fs() -> Iterator[tuple[Mock, Mock, Mock]]:
 
     mock_good_fs = Mock(name="good-fs")
 
-    def mock_filesystem_open(volume):
+    def mock_filesystem_open(volume: Mock) -> Mock:
         if volume == mock_good_volume:
             return mock_good_fs
         raise FilesystemError("Not supported")
 
-    def mock_disk_apply(self):
+    def mock_disk_apply(self: DiskCollection) -> None:
         if len(self.target.disks) > 0:
             self.target.volumes.add(mock_good_volume)
             self.target.volumes.add(mock_bad_volume)
 
-    with patch("dissect.target.loaders.local._get_os_name") as mock_os_name, patch(
-        "dissect.target.filesystem.open", new=mock_filesystem_open
-    ), patch("dissect.target.plugin.os_plugins") as mock_os_plugins, patch(
-        "dissect.target.target.DiskCollection.apply", new=mock_disk_apply
+    with (
+        patch("dissect.target.loaders.local._get_os_name") as mock_os_name,
+        patch("dissect.target.filesystem.open", new=mock_filesystem_open),
+        patch("dissect.target.plugin.os_plugins") as mock_os_plugins,
+        patch("dissect.target.target.DiskCollection.apply", new=mock_disk_apply),
     ):
         mock_os_plugins.return_value = []
         mock_os_name.return_value = "linux"
@@ -346,11 +398,13 @@ def test_target_name_no_hostname() -> None:
 def test_target_name_hostname_raises() -> None:
     test_name = "test-target"
 
-    with patch("dissect.target.target.Target._generic_name", PropertyMock(return_value=test_name)):
-        with patch("dissect.target.target.Target.hostname", PropertyMock(side_effect=Exception("ERROR")), create=True):
-            target_bare = Target()
+    with (
+        patch("dissect.target.target.Target._generic_name", PropertyMock(return_value=test_name)),
+        patch("dissect.target.target.Target.hostname", PropertyMock(side_effect=Exception("ERROR")), create=True),
+    ):
+        target_bare = Target()
 
-            assert target_bare.name == test_name
+        assert target_bare.name == test_name
 
 
 def test_target_name_set() -> None:
@@ -378,7 +432,7 @@ def test_target_set_event_callback() -> None:
     mock_callback2 = MagicMock()
 
     class MockTarget(Target):
-        event_callbacks = defaultdict(set)
+        event_callbacks: ClassVar = defaultdict(set)
 
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback1)
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback2)
@@ -406,7 +460,7 @@ def test_target_send_event() -> None:
     mock_callback2 = MagicMock()
 
     class MockTarget(Target):
-        event_callbacks = defaultdict(set)
+        event_callbacks: ClassVar = defaultdict(set)
 
     MockTarget.set_event_callback(event_type=None, event_callback=mock_callback1)
     MockTarget.set_event_callback(event_type=Event.FUNC_EXEC, event_callback=mock_callback2)
@@ -502,7 +556,7 @@ def test_fs_mount_others(target_unix: Target, nr_of_fs: int) -> None:
     target_unix._mount_others()
 
     for idx in range(nr_of_fs):
-        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts
         assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
 
     assert not target_unix.fs.path(f"$fs$/fs{nr_of_fs}").exists()
@@ -514,12 +568,12 @@ def test_fs_mount_already_there(target_unix: Target, nr_of_fs: int) -> None:
         target_unix.filesystems.add(Mock())
         target_unix._mount_others()
 
-        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts.keys()
+        assert f"/$fs$/fs{idx}" in target_unix.fs.mounts
         assert target_unix.fs.path(f"$fs$/fs{idx}").exists()
 
 
 def test_children_on_invalid_target(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
-    """test that we don't attempt to load child targets on an invalid target"""
+    """Test that we don't attempt to load child targets on an invalid target."""
     p = tmp_path.joinpath("empty-dir")
     p.mkdir()
 

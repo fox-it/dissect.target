@@ -1,64 +1,67 @@
-from datetime import datetime
-from typing import Iterator
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 
 import pytest
 
-from dissect.target.filesystems.jffs import JFFSFilesystem, JFFSFilesystemEntry
+from dissect.target.filesystems.jffs import JffsFilesystem, JffsFilesystemEntry
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture
-def jffs_fs() -> Iterator[JFFSFilesystem]:
+def jffs_fs() -> Iterator[JffsFilesystem]:
     with patch("dissect.jffs.jffs2.JFFS2"):
-        jffs_fs = JFFSFilesystem(Mock())
+        jffs_fs = JffsFilesystem(Mock())
         yield jffs_fs
 
 
 @pytest.fixture
-def jffs_fs_file_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
+def jffs_fs_file_entry(jffs_fs: JffsFilesystem) -> JffsFilesystemEntry:
     raw_inode = Mock(uid=1000, guid=999, isize=165002)
     inode = Mock(
         mode=0o100664,
         inum=4,
         nlink=1,
         inode=raw_inode,
-        atime=datetime(2024, 10, 1, 12, 0, 0),
-        mtime=datetime(2024, 10, 2, 12, 0, 0),
-        ctime=datetime(2024, 10, 3, 12, 0, 0),
+        atime=datetime(2024, 10, 1, 12, 0, 0, tzinfo=timezone.utc),
+        mtime=datetime(2024, 10, 2, 12, 0, 0, tzinfo=timezone.utc),
+        ctime=datetime(2024, 10, 3, 12, 0, 0, tzinfo=timezone.utc),
         is_file=lambda: True,
         is_dir=lambda: False,
         is_symlink=lambda: False,
     )
 
-    entry = JFFSFilesystemEntry(jffs_fs, "/some_file", inode)
-    yield entry
+    return JffsFilesystemEntry(jffs_fs, "/some_file", inode)
 
 
 @pytest.fixture
-def jffs_fs_directory_entry(jffs_fs: JFFSFilesystem) -> Iterator[JFFSFilesystemEntry]:
+def jffs_fs_directory_entry(jffs_fs: JffsFilesystem) -> JffsFilesystemEntry:
     raw_inode = Mock(uid=1000, guid=999, isize=0)
     inode = Mock(
         mode=0o40775,
         inum=2,
         nlink=2,
         inode=raw_inode,
-        atime=datetime(2024, 10, 1, 12, 0, 0),
-        mtime=datetime(2024, 10, 2, 12, 0, 0),
-        ctime=datetime(2024, 10, 3, 12, 0, 0),
+        atime=datetime(2024, 10, 1, 12, 0, 0, tzinfo=timezone.utc),
+        mtime=datetime(2024, 10, 2, 12, 0, 0, tzinfo=timezone.utc),
+        ctime=datetime(2024, 10, 3, 12, 0, 0, tzinfo=timezone.utc),
         is_file=lambda: False,
         is_dir=lambda: True,
         is_symlink=lambda: False,
     )
 
-    entry = JFFSFilesystemEntry(jffs_fs, "/some_directory", inode)
-    yield entry
+    return JffsFilesystemEntry(jffs_fs, "/some_directory", inode)
 
 
 @pytest.mark.parametrize(
-    "entry_fixture, expected_blocks", [("jffs_fs_file_entry", 323), ("jffs_fs_directory_entry", 0)]
+    ("entry_fixture", "expected_blocks"), [("jffs_fs_file_entry", 323), ("jffs_fs_directory_entry", 0)]
 )
 def test_jffs2_stat(entry_fixture: str, expected_blocks: int, request: pytest.FixtureRequest) -> None:
-    jffs_entry: JFFSFilesystemEntry = request.getfixturevalue(entry_fixture)
+    jffs_entry: JffsFilesystemEntry = request.getfixturevalue(entry_fixture)
     stat = jffs_entry.stat()
 
     entry = jffs_entry.entry
