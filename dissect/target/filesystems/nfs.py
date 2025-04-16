@@ -5,6 +5,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, BinaryIO, Callable, TypeVar
 
 from dissect.util.stream import AlignedStream
+
 from dissect.target.exceptions import NotADirectoryError
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
@@ -147,6 +148,7 @@ class NfsFilesystemEntry(FilesystemEntry):
         return self._backing_attributes
 
     def get(self, path: str) -> NfsFilesystemEntry:
+        """Get a new filesystem entry relative to this entry"""
         if self.is_file():
             raise NotADirectoryError
 
