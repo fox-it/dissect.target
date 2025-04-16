@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import io
 from datetime import datetime, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+import pytest
 from dissect.ntfs.secure import ACL, SecurityDescriptor
 from flow.record.fieldtypes import command
 from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin
+from dissect.target.plugins.os.windows.defender.quarantine import (
+    STREAM_ID,
+    c_defender,
+    rc4_crypt,
+    recover_quarantined_file_streams,
+)
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
@@ -355,3 +363,69 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
     )
 
     assert records[9].hr == "0x1"
+
+
+@pytest.mark.parametrize(
+    ("stream_id", "extension"),
+    [
+        (
+            STREAM_ID.EA_DATA,
+            "ea_data",
+        ),
+        (
+            STREAM_ID.SECURITY_DATA,
+            "security_descriptor",
+        ),
+        (
+            STREAM_ID.GHOSTED_FILE_EXTENTS,
+            "ghosted_file_extents",
+        ),
+    ],
+)
+def test_recover_quarantined_file_streams_valid_param(stream_id: int, extension: str) -> None:
+    quarantine_buf = b"\x69" * 32
+    quarantine_stream = rc4_crypt(
+        c_defender.WIN32_STREAM_ID(
+            stream_id, c_defender.STREAM_ATTRIBUTES.STREAM_NORMAL_ATTRIBUTE, len(quarantine_buf), 0
+        ).dumps()
+        + quarantine_buf
+    )
+
+    filename, filebuf = next(recover_quarantined_file_streams(io.BytesIO(quarantine_stream), "valid_stream"))
+
+    assert filename.endswith(extension)
+    assert filebuf == quarantine_buf
+
+
+def test_recover_quarantined_file_streams_invalid() -> None:
+    quarantine_buf = b"\x69" * 32
+    valid_quarantine_stream = c_defender.WIN32_STREAM_ID(
+        STREAM_ID.EA_DATA, c_defender.STREAM_ATTRIBUTES.STREAM_NORMAL_ATTRIBUTE, len(quarantine_buf), 0
+    ).dumps()
+
+    # Make stream ID invalid.
+    invalid_quarantine_stream = b"\x69" + valid_quarantine_stream[1:]
+
+    quarantine_stream = rc4_crypt(invalid_quarantine_stream + quarantine_buf)
+
+    with pytest.raises(ValueError, match="Unexpected Stream ID "):
+        next(recover_quarantined_file_streams(io.BytesIO(quarantine_stream), "invalid_stream"))
+
+
+def test_recover_quarantined_file_streams(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path) -> None:
+    quarantine_file = absolute_path(
+        "_data/plugins/os/windows/defender/quarantine/ResourceData/A6/A6C8322B8A19AEED96EFBD045206966DA4C9619D"
+    )
+
+    with quarantine_file.open("rb") as fh:
+        assert list(recover_quarantined_file_streams(fh, quarantine_file.name)) == [
+            (
+                "A6C8322B8A19AEED96EFBD045206966DA4C9619D.security_descriptor",
+                b"\x01\x00\x14\x88\x14\x00\x00\x000\x00\x00\x00\xa4\x00\x00\x00L\x00\x00\x00\x01\x05\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\xa4\x14\xd2\x9b\x1a\x02\xa7O\x07\xf67\xb4\xe8\x03\x00\x00\x01\x05\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\xa4\x14\xd2\x9b\x1a\x02\xa7O\x07\xf67\xb4\x01\x02\x00\x00\x02\x00X\x00\x03\x00\x00\x00\x00\x00\x14\x00\xff\x01\x1f\x00\x01\x01\x00\x00\x00\x00\x00\x05\x12\x00\x00\x00\x00\x00\x18\x00\xff\x01\x1f\x00\x01\x02\x00\x00\x00\x00\x00\x05 \x00\x00\x00 \x02\x00\x00\x00\x00$\x00\xff\x01\x1f\x00\x01\x05\x00\x00\x00\x00\x00\x05\x15\x00\x00\x00\xa4\x14\xd2\x9b\x1a\x02\xa7O\x07\xf67\xb4\xe8\x03\x00\x00\x02\x00L\x00\x01\x00\x00\x00\x12\x10D\x00\x00\x00\x00\x00\x01\x01\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x14\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00(\x00\x00\x00I\x00M\x00A\x00G\x00E\x00L\x00O\x00A\x00D\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00",  # noqa: E501
+            ),
+            ("A6C8322B8A19AEED96EFBD045206966DA4C9619D", b"DUMMY_PAYLOAD"),
+            (
+                "A6C8322B8A19AEED96EFBD045206966DA4C9619D.ZoneIdentifierDATA",
+                b"[ZoneTransfer]\r\nZoneId=3\r\nReferrerUrl=C:\\Users\\user\\Downloads\\mimikatz_trunk.zip\r\n",
+            ),
+        ]
