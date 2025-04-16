@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from dissect.target.filesystem import Filesystem
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 
 class BsdPlugin(UnixPlugin):
@@ -30,10 +35,10 @@ class BsdPlugin(UnixPlugin):
 
         for line in fh.open("rt").readlines():
             if line.startswith("hostname"):
-                hostname = line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
-                return hostname
+                return line.rstrip().split("=", maxsplit=1)[1].replace('"', "")
+        return None
 
     @export(property=True)
     def ips(self) -> list[str] | None:
-        self.target.log.error(f"ips plugin not implemented for {self.__class__}")
+        self.target.log.error("ips plugin not implemented for %s", self.__class__)
         return None

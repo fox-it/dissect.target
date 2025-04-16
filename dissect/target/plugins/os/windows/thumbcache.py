@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.thumbcache import Error, Thumbcache
 from dissect.thumbcache.tools.extract_with_index import dump_entry_data_through_index
 
 from dissect.target.exceptions import UnsupportedPluginError
-from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers.fsutil import TargetPath
 
 GENERIC_THUMBCACHE_FIELDS = [
     ("string", "identifier"),
@@ -51,7 +55,9 @@ class ThumbcachePlugin(Plugin):
                 return
         raise UnsupportedPluginError("There was no cache path for that plugin")
 
-    def _create_entries(self, cache: Thumbcache, record_type: TargetRecordDescriptor):
+    def _create_entries(
+        self, cache: Thumbcache, record_type: TargetRecordDescriptor
+    ) -> Iterator[ThumbcacheRecord | IconcacheRecord | IndexRecord]:
         for path, entry in cache.entries():
             yield record_type(
                 identifier=entry.identifier,
@@ -85,13 +91,13 @@ class ThumbcachePlugin(Plugin):
                     cache = Thumbcache(cache_path, prefix=prefix)
                     yield from self._create_entries(cache, record_type)
 
-            except Error as e:
+            except Error as e:  # noqa: PERF203
                 # A specific thumbcache exception occurred, log the error.
-                self.target.log.error(e)
+                self.target.log.error(e)  # noqa: TRY400
             except Exception as e:
                 # A different exception occurred, log the exception.
-                self.target.log.critical(e, exc_info=True)
-                pass
+                self.target.log.error("Error parsing thumbcache: %s", e)  # noqa: TRY400
+                self.target.log.debug(e, exc_info=e)
 
     @arg("--output", "-o", dest="output_dir", type=Path, help="Path to extract thumbcache thumbnails to.")
     @export(record=[ThumbcacheRecord, IndexRecord])

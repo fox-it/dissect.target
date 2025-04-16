@@ -97,5 +97,5 @@ class MacOSNetworkPlugin(NetworkPlugin):
                 )
 
             except Exception as e:
-                self.target.log.warning("Error reading configuration for network device %s", name, exc_info=e)
-                continue
+                self.target.log.warning("Error reading configuration for network device %s", name)
+                self.target.log.debug("", exc_info=e)

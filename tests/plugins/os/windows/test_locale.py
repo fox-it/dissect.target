@@ -1,8 +1,15 @@
-from dissect.target.helpers.regutil import VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.locale import LocalePlugin as WindowsLocalePlugin
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.plugins.os.windows.locale import WindowsLocalePlugin
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
-def test_locale_plugin_windows(target_win_users, hive_hku, hive_hklm):
+def test_locale_plugin_windows(target_win_users: Target, hive_hku: VirtualHive, hive_hklm: VirtualHive) -> None:
     # Hive structure originates from a Windows Server 2019 installation.
 
     # language dict

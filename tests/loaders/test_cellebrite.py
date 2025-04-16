@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dissect.target.loaders.cellebrite import CellebriteFilesystem, CellebriteLoader
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 def test_cellebrite_loader(target_bare: Target) -> None:
@@ -46,7 +51,7 @@ def test_cellebrite_loader(target_bare: Target) -> None:
     assert len(target_bare.filesystems) == 1
     assert isinstance(target_bare.filesystems[0], CellebriteFilesystem)
 
-    assert sorted(list(map(str, target_bare.fs.path("/").iterdir()))) == [
+    assert sorted(map(str, target_bare.fs.path("/").iterdir())) == [
         "/$fs$",
         "/etc",
         "/home",

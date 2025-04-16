@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dissect.target.helpers.record import TargetRecordDescriptor
 
 BootTriggerRecord = TargetRecordDescriptor(

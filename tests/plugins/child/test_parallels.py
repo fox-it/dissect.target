@@ -1,10 +1,16 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.child.parallels import ParallelsChildTargetPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_parallels_child_detection(target_macos_users: Target, fs_macos: VirtualFilesystem) -> None:
-    """test if we correctly find Parallels child VMs on MacOS targets."""
+    """Test if we correctly find Parallels child VMs on MacOS targets."""
 
     fs_macos.makedirs("Users/dissect/Parallels/Windows 11.pvm")
     fs_macos.makedirs("Users/dissect/Documents/Parallels/Windows 10.pvm")

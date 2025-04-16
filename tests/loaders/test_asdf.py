@@ -1,11 +1,16 @@
-from pathlib import Path
+from __future__ import annotations
 
-from dissect.target import Target
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 from dissect.target.loaders.asdf import AsdfLoader
 from tests._utils import absolute_path
 
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
-def test_asdf_loader_metadata(target_bare: Target):
+
+def test_asdf_loader_metadata(target_bare: Target) -> None:
     asdf_path = Path(absolute_path("_data/loaders/asdf/metadata.asdf"))
 
     loader = AsdfLoader(asdf_path)

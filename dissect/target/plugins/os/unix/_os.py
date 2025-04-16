@@ -3,13 +3,11 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from pathlib import Path
-from typing import Callable, Iterator
+from typing import TYPE_CHECKING, Callable
 
 from flow.record.fieldtypes import posix_path
 
 from dissect.target.exceptions import FilesystemError
-from dissect.target.filesystem import Filesystem
 from dissect.target.filesystems.nfs import NfsFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.nfs.client.nfs import Client as NfsClient
@@ -20,7 +18,15 @@ from dissect.target.helpers.sunrpc.client import LocalPortPolicy, auth_unix
 from dissect.target.helpers.utils import parse_options_string
 from dissect.target.loaders.local import LocalLoader
 from dissect.target.plugin import OperatingSystem, OSPlugin, arg, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +54,7 @@ class UnixPlugin(OSPlugin):
     """UNIX plugin."""
 
     # Files to parse for user details
-    PASSWD_FILES = ["/etc/passwd", "/etc/passwd-", "/etc/master.passwd"]
+    PASSWD_FILES = ("/etc/passwd", "/etc/passwd-", "/etc/master.passwd")
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -68,7 +74,7 @@ class UnixPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> UnixPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.mount("/", sysvol)
         return cls(target)
 
@@ -198,10 +204,7 @@ class UnixPlugin(OSPlugin):
             if not (path := self.target.fs.path(path)).exists():
                 continue
 
-            if callable:
-                hostname = callable(path)
-            else:
-                hostname = path.open("rt").read().rstrip()
+            hostname = callable(path) if callable else path.open("rt").read().rstrip()
 
             if hostname and "." in hostname:
                 hostname, domain = hostname.split(".", maxsplit=1)
@@ -224,6 +227,7 @@ class UnixPlugin(OSPlugin):
         for line in path.open("rt"):
             if line.startswith(("127.0.0.1 ", "::1 ")) and "localhost" not in line:
                 return line.split(" ")[1]
+        return None
 
     def _parse_hosts_string(self, paths: list[str] | None = None) -> dict[str, str]:
         paths = paths or ["/etc/hosts"]
@@ -307,12 +311,14 @@ class UnixPlugin(OSPlugin):
                     # Use a readdir to check if we have access.
                     # RdJ: Perhaps an ACCESS call (to be implemented) is better than READDIR
                     nfs_client.readdir(filehandle)
-                    return  # We have access
                 except NfsError as e:
                     if e.nfsstat != NfsStat.ERR_ACCES:
                         self.target.log.warning("Reading NFS share gives %s", e.nfsstat)
                         nfs_client.close()
-                        raise e
+                        raise
+                else:
+                    # We have access
+                    return
 
             raise FilesystemError("No user has access to NFS share")
 
@@ -366,7 +372,7 @@ class UnixPlugin(OSPlugin):
                         if line.startswith("#"):
                             continue
 
-                        elif "=" not in line:
+                        if "=" not in line:
                             os_release["DISTRIB_DESCRIPTION"] = line.strip()
 
                         else:
@@ -390,7 +396,7 @@ class UnixPlugin(OSPlugin):
                     break
 
         if not path.exists():
-            return
+            return None
 
         fh = path.open("rb")
         fh.seek(4)  # ELF - e_ident[EI_CLASS]
@@ -400,7 +406,7 @@ class UnixPlugin(OSPlugin):
         e_machine = int.from_bytes(fh.read(2), "little")
         arch = ARCH_MAP.get(e_machine, "unknown")
 
-        return f"{arch}_32-{os}" if bits == 1 and not arch[-2:] == "32" else f"{arch}-{os}"
+        return f"{arch}_32-{os}" if bits == 1 and arch[-2:] != "32" else f"{arch}-{os}"
 
 
 def parse_fstab(

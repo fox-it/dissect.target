@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import argparse
 from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.plugin import FailureDescriptor, FunctionDescriptor, PluginRegistry
-from dissect.target.target import Event
+from dissect.target.target import Event, Target
 from dissect.target.tools.report import (
     ExecutionReport,
     TargetExecutionReport,
@@ -206,10 +207,12 @@ def test_execution_report_get_formatted_report(
     target_report1: TargetExecutionReport,
     target_report2: TargetExecutionReport,
 ) -> None:
-    with patch("dissect.target.tools.report.make_cli_args_overview", return_value="line_1"):
-        with patch("dissect.target.tools.report.make_plugin_import_errors_overview", return_value="line_2"):
-            with patch("dissect.target.tools.report.format_target_report", return_value="line_x"):
-                assert execution_report.get_formatted_report() == "line_1\nline_2\nline_x\nline_x"
+    with (
+        patch("dissect.target.tools.report.make_cli_args_overview", return_value="line_1"),
+        patch("dissect.target.tools.report.make_plugin_import_errors_overview", return_value="line_2"),
+        patch("dissect.target.tools.report.format_target_report", return_value="line_x"),
+    ):
+        assert execution_report.get_formatted_report() == "line_1\nline_2\nline_x\nline_x"
 
 
 def test_execution_report_add_target_report(
@@ -342,10 +345,12 @@ def test_execution_report_as_dict(
         },
     }
 
-    with patch.object(target_report1, "as_dict", return_value="report1"):
-        with patch.object(target_report2, "as_dict", return_value="report2"):
-            execution_report_dict = execution_report.as_dict()
-            assert execution_report_dict == expected_dict
+    with (
+        patch.object(target_report1, "as_dict", return_value="report1"),
+        patch.object(target_report2, "as_dict", return_value="report2"),
+    ):
+        execution_report_dict = execution_report.as_dict()
+        assert execution_report_dict == expected_dict
 
 
 def test_report_make_cli_args_overview(

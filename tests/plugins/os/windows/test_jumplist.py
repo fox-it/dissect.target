@@ -1,7 +1,13 @@
-from dissect.target.filesystem import VirtualFilesystem
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.windows.jumplist import JumpListPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_os_windows_jumplist(target_win_users: Target, fs_win: VirtualFilesystem) -> None:
@@ -15,19 +21,15 @@ def test_os_windows_jumplist(target_win_users: Target, fs_win: VirtualFilesystem
             user_details.home_path.joinpath(
                 "AppData/Roaming/Microsoft/Windows/Recent/CustomDestinations/590aee7bdd69b59b.customDestinations-ms"
             )
-        )[
-            3:
-        ],  # drop C:/
+        )[3:],  # drop C:/
         custom_destination,
     )
     fs_win.map_file(
         str(
             user_details.home_path.joinpath(
-                "AppData/Roaming/Microsoft/Windows/Recent/AutomaticDestinations/5f7b5f1e01b83767.automaticDestinations-ms"  # noqa: E501
+                "AppData/Roaming/Microsoft/Windows/Recent/AutomaticDestinations/5f7b5f1e01b83767.automaticDestinations-ms"
             )
-        )[
-            3:
-        ],  # drop C:/
+        )[3:],  # drop C:/
         automatic_destination,
     )
 

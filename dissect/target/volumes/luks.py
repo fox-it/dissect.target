@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from typing import BinaryIO, Iterator
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.fve import luks
-from dissect.util.stream import AlignedStream
 
 from dissect.target.exceptions import VolumeSystemError
 from dissect.target.helpers.keychain import KeyType
 from dissect.target.volume import EncryptedVolumeSystem, Volume
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.util.stream import AlignedStream
 
 log = logging.getLogger(__name__)
 
@@ -31,19 +35,19 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
 
     def _volumes(self) -> Iterator[Volume]:
         if isinstance(self.fh, Volume):
-            volume_details = dict(
-                number=self.fh.number,
-                offset=self.fh.offset,
-                vtype=self.fh.type,
-                name=self.fh.name,
-            )
+            volume_details = {
+                "number": self.fh.number,
+                "offset": self.fh.offset,
+                "vtype": self.fh.type,
+                "name": self.fh.name,
+            }
         else:
-            volume_details = dict(
-                number=1,
-                offset=0,
-                vtype=None,
-                name=None,
-            )
+            volume_details = {
+                "number": 1,
+                "offset": 0,
+                "vtype": None,
+                "name": None,
+            }
 
         stream = self.unlock_volume()
         yield Volume(
@@ -60,14 +64,14 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
     ) -> None:
         try:
             if keyslot is None:
-                for keyslot in self.luks.keyslots.keys():
+                for keyslot in self.luks.keyslots:
                     try:
                         self.luks.unlock(key, keyslot)
                         break
                     except ValueError:
                         continue
                 else:
-                    raise ValueError("Failed to find matching keyslot for provided volume encryption key")
+                    raise ValueError("Failed to find matching keyslot for provided volume encryption key")  # noqa: TRY301
             else:
                 self.luks.unlock(key, keyslot)
 
@@ -123,5 +127,4 @@ class LUKSVolumeSystem(EncryptedVolumeSystem):
 
         if self.luks.unlocked:
             return self.luks.open()
-        else:
-            raise LUKSVolumeSystemError("Failed to unlock LUKS volume")
+        raise LUKSVolumeSystemError("Failed to unlock LUKS volume")

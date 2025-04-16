@@ -3,13 +3,18 @@ from __future__ import annotations
 import io
 import itertools
 from itertools import product
-from typing import Iterable, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Final
 
 from dissect.target.exceptions import ConfigurationParsingError, UnsupportedPluginError
-from dissect.target.helpers import fsutil
 from dissect.target.helpers.configutil import Default, ListUnwrapper, _update_dictionary
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.helpers import fsutil
+    from dissect.target.target import Target
 
 COMMON_ELEMENTS = [
     ("string", "name"),  # basename of .conf file
@@ -53,7 +58,7 @@ OpenVPNClient = TargetRecordDescriptor(
 class OpenVPNParser(Default):
     def __init__(self, *args, **kwargs):
         boolean_fields = OpenVPNServer.getfields("boolean") + OpenVPNClient.getfields("boolean")
-        self.boolean_field_names = set(field.name.replace("_", "-") for field in boolean_fields)
+        self.boolean_field_names = {field.name.replace("_", "-") for field in boolean_fields}
 
         super().__init__(*args, separator=(r"\s",), collapse=["key", "ca", "cert"], **kwargs)
 
@@ -71,8 +76,8 @@ class OpenVPNParser(Default):
 
         self.parsed_data = ListUnwrapper.unwrap(root)
 
-    def _read_blob(self, lines: Iterable[str]) -> str | list[dict]:
-        """Read the whole section between <data></data> sections"""
+    def _read_blob(self, lines: Iterator[str]) -> str | list[dict]:
+        """Read the whole section between ``<data></data>`` sections."""
         output = ""
         with io.StringIO() as buffer:
             for line in lines:
@@ -84,7 +89,7 @@ class OpenVPNParser(Default):
 
         # Check for connection profile blocks
         if not output.startswith("-----"):
-            profile_dict = dict()
+            profile_dict = {}
             for line in output.splitlines():
                 self._parse_line(profile_dict, line)
 
@@ -115,20 +120,20 @@ class OpenVPNPlugin(Plugin):
 
     __namespace__ = "openvpn"
 
-    config_globs = [
+    config_globs = (
         # This catches openvpn@, openvpn-client@, and openvpn-server@ systemd configurations
         # Linux
         "/etc/openvpn/",
         # Windows
         "sysvol/Program Files/OpenVPN/config/",
-    ]
+    )
 
-    user_config_paths = {
+    user_config_paths: Final[dict[str, list[str]]] = {
         OperatingSystem.WINDOWS.value: ["OpenVPN/config/"],
         OperatingSystem.OSX.value: ["Library/Application Support/OpenVPN Connect/profiles/"],
     }
 
-    def __init__(self, target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.configs: list[fsutil.TargetPath] = []
         for base, glob in product(self.config_globs, ["*.conf", "*.ovpn"]):
@@ -144,7 +149,7 @@ class OpenVPNPlugin(Plugin):
         if not self.configs:
             raise UnsupportedPluginError("No OpenVPN configuration files found")
 
-    def _load_config(self, parser: OpenVPNParser, config_path: fsutil.TargetPath) -> Optional[dict]:
+    def _load_config(self, parser: OpenVPNParser, config_path: fsutil.TargetPath) -> dict | None:
         with config_path.open("rt") as file:
             try:
                 parser.parse_file(file)
@@ -158,7 +163,7 @@ class OpenVPNPlugin(Plugin):
 
     @export(record=[OpenVPNServer, OpenVPNClient])
     @arg("--export-key", action="store_true")
-    def config(self, export_key: bool = False) -> Iterator[Union[OpenVPNServer, OpenVPNClient]]:
+    def config(self, export_key: bool = False) -> Iterator[OpenVPNServer | OpenVPNClient]:
         """Parses config files from openvpn interfaces."""
         # We define the parser here so we can reuse it
         parser = OpenVPNParser()

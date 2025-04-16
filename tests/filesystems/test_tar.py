@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import tarfile
 
@@ -7,7 +9,7 @@ from dissect.target.exceptions import IsADirectoryError, NotADirectoryError
 from dissect.target.filesystems.tar import TarFilesystem, TarFilesystemEntry
 
 
-def _mkdir(tf, name):
+def _mkdir(tf: tarfile.TarFile, name: str) -> None:
     info = tf.tarinfo()
     info.name = name
     info.mode = 0o40777
@@ -20,7 +22,7 @@ def _mkdir(tf, name):
     tf.addfile(info)
 
 
-def _mkfile(tf, name, content):
+def _mkfile(tf: tarfile.TarFile, name: str, content: bytes) -> None:
     info = tf.tarinfo()
     info.name = name
     info.mode = 0o100777
@@ -33,7 +35,7 @@ def _mkfile(tf, name, content):
     tf.addfile(info, io.BytesIO(content))
 
 
-def _mksym(tf, name, dest):
+def _mksym(tf: tarfile.TarFile, name: str, dest: str) -> None:
     info = tf.tarinfo()
     info.name = name
     info.mode = 0o120777
@@ -46,7 +48,7 @@ def _mksym(tf, name, dest):
     tf.addfile(info)
 
 
-def _create_tar(prefix="", tar_dir=True, tar_sym=False):
+def _create_tar(prefix: str = "", tar_dir: bool = True, tar_sym: bool = False) -> io.BytesIO:
     buf = io.BytesIO()
     tf = tarfile.TarFile(fileobj=buf, mode="w")
 
@@ -75,37 +77,37 @@ def _create_tar(prefix="", tar_dir=True, tar_sym=False):
 
 
 @pytest.fixture
-def tar_simple():
-    yield _create_tar()
+def tar_simple() -> io.BytesIO:
+    return _create_tar()
 
 
 @pytest.fixture
-def tar_base():
-    yield _create_tar("base/")
+def tar_base() -> io.BytesIO:
+    return _create_tar("base/")
 
 
 @pytest.fixture
-def tar_relative():
-    yield _create_tar("./", False)
+def tar_relative() -> io.BytesIO:
+    return _create_tar("./", False)
 
 
 @pytest.fixture
-def tar_relative_dir():
-    yield _create_tar("./")
+def tar_relative_dir() -> io.BytesIO:
+    return _create_tar("./")
 
 
 @pytest.fixture
-def tar_virtual_dir():
-    yield _create_tar("", False)
+def tar_virtual_dir() -> io.BytesIO:
+    return _create_tar("", False)
 
 
 @pytest.fixture
-def tar_symlink():
-    yield _create_tar("", tar_sym=True)
+def tar_symlink() -> io.BytesIO:
+    return _create_tar("", tar_sym=True)
 
 
 @pytest.mark.parametrize(
-    "obj, base",
+    ("obj", "base"),
     [
         ("tar_simple", ""),
         ("tar_base", "base/"),
@@ -115,7 +117,7 @@ def tar_symlink():
         ("tar_symlink", ""),
     ],
 )
-def test_filesystems_tar(obj, base, request):
+def test_filesystems_tar(obj: str, base: str, request: pytest.FixtureRequest) -> None:
     fh = request.getfixturevalue(obj)
 
     assert TarFilesystem.detect(fh)

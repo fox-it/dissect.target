@@ -131,7 +131,7 @@ def _generate_plugin_tree_overview(
         ]
 
     result = []
-    for key in plugin_tree.keys():
+    for key in plugin_tree:
         result.append(textwrap.indent(key + ":", prefix=" " * indent) if key != "" else "OS plugins")
         result.extend(
             _generate_plugin_tree_overview(

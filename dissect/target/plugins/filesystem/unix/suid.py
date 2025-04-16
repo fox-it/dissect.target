@@ -1,10 +1,15 @@
+from __future__ import annotations
+
 import stat
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.filesystem.walkfs import FilesystemRecord
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 SuidRecord = TargetRecordDescriptor(
     "filesystem/unix/suid",

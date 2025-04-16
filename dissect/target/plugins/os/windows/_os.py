@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import operator
 import struct
-from typing import Any, Iterator
-
-from flow.record.fieldtypes import windows_path
+from typing import TYPE_CHECKING, Any
 
 from dissect.target.exceptions import RegistryError, RegistryValueNotFoundError
-from dissect.target.filesystem import Filesystem
 from dissect.target.helpers.record import WindowsUserRecord
 from dissect.target.plugin import OperatingSystem, OSPlugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from typing_extensions import Self
+
+    from dissect.target.filesystem import Filesystem
+    from dissect.target.target import Target
 
 ARCH_MAP = {
     "x86": 32,
@@ -44,7 +48,7 @@ class WindowsPlugin(OSPlugin):
         return None
 
     @classmethod
-    def create(cls, target: Target, sysvol: Filesystem) -> WindowsPlugin:
+    def create(cls, target: Target, sysvol: Filesystem) -> Self:
         target.fs.case_sensitive = False
         target.fs.alt_separator = "\\"
         target.fs.mount("sysvol", sysvol)
@@ -214,12 +218,7 @@ class WindowsPlugin(OSPlugin):
 
         def _part_str(parts: dict[str, Any], name: str) -> str:
             value = parts.get(name)
-            if value is None:
-                value = f"<Unknown {name}>"
-            else:
-                value = str(value)
-
-            return value
+            return f"<Unknown {name}>" if value is None else str(value)
 
         version_parts = {}
         version_parts["ProductName"] = self._get_version_reg_value("ProductName")
@@ -233,7 +232,7 @@ class WindowsPlugin(OSPlugin):
         version_parts["CSDVersion"] = self._get_version_reg_value("CSDVersion")
 
         version_string = None
-        if any(map(lambda value: value is not None, version_parts.values())):
+        if any(value is not None for value in version_parts.values()):
             version = []
 
             nt_version = _part_str(version_parts, "CurrentVersion")
@@ -266,11 +265,10 @@ class WindowsPlugin(OSPlugin):
 
     @export(property=True)
     def architecture(self) -> str | None:
-        """
-        Returns a dict containing the architecture and bitness of the system
+        """Returns a target triple containing the architecture and bitness of the system.
 
         Returns:
-            Dict: arch: architecture, bitness: bits
+            Target triple string.
         """
 
         key = "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
@@ -279,11 +277,9 @@ class WindowsPlugin(OSPlugin):
             arch = self.target.registry.key(key).value("PROCESSOR_ARCHITECTURE").value
             bits = ARCH_MAP.get(arch)
 
-            # return {"arch": arch, "bitness": bits}
             if bits == 64:
                 return f"{arch}-win{bits}".lower()
-            else:
-                return f"{arch}_{bits}-win{bits}".lower()
+            return f"{arch}_{bits}-win{bits}".lower()
         except RegistryError:
             pass
 
@@ -311,14 +307,10 @@ class WindowsPlugin(OSPlugin):
                     home = profile_image_path.value
                     name = home.split("\\")[-1]
 
-                # Windows XP uses %variables% in home paths
-                if "%" in home:
-                    home = self.target.resolve(home)
-
                 yield WindowsUserRecord(
                     sid=subkey.name,
                     name=name,
-                    home=windows_path(home),
+                    home=self.target.resolve(home),
                     _target=self.target,
                 )
 

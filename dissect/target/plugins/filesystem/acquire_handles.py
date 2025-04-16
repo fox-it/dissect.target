@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import csv
 import gzip
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 AcquireOpenHandlesRecord = TargetRecordDescriptor(
     "filesystem/acquire_open_handles",
@@ -26,7 +33,7 @@ AcquireOpenHandlesRecord = TargetRecordDescriptor(
 class OpenHandlesPlugin(Plugin):
     """Plugin to return open file handles collected by Acquire."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.open_handles_file = target.fs.path("$metadata$/open_handles.csv.gz")
 
@@ -41,8 +48,8 @@ class OpenHandlesPlugin(Plugin):
         An Acquire file container contains an open handles csv when the handles module was used. The content of this csv
         file is returned.
         """
-        with self.open_handles_file.open() as fh:
-            for row in csv.DictReader(gzip.open(fh, "rt")):
+        with self.open_handles_file.open() as fh, gzip.open(fh, "rt") as gz_fh:
+            for row in csv.DictReader(gz_fh):
                 if name := row.get("name"):
                     row.update({"name": self.target.fs.path(name)})
                 yield AcquireOpenHandlesRecord(_target=self.target, **row)

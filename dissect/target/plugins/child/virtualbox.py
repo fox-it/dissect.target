@@ -1,5 +1,6 @@
-from pathlib import Path
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree as ET
 from dissect.hypervisor.descriptor.vbox import VBox
@@ -7,7 +8,12 @@ from dissect.hypervisor.descriptor.vbox import VBox
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.plugin import ChildTargetPlugin
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 
 class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
@@ -21,18 +27,16 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
 
     __type__ = "virtualbox"
 
-    USER_PATHS = [
+    USER_PATHS = (
         # Windows
         ".VirtualBox",
         # Linux
         ".config/VirtualBox",
         # macOS
         "Library/VirtualBox",
-    ]
+    )
 
-    DEFAULT_PATHS = [
-        "VirtualBox VMs",
-    ]
+    DEFAULT_PATHS = ("VirtualBox VMs",)
 
     def __init__(self, target: Target):
         super().__init__(target)
@@ -67,19 +71,23 @@ class VirtualBoxChildTargetPlugin(ChildTargetPlugin):
 
                     # Parse MachineEntries
                     for machine in config.findall(f".//{VBox.VBOX_XML_NAMESPACE}MachineEntry"):
-                        if src := machine.get("src"):
-                            if (src_path := self.target.fs.path(src)).exists() and src_path not in seen:
-                                seen.add(src_path)
-                                yield src_path
+                        if (
+                            (src := machine.get("src"))
+                            and (src_path := self.target.fs.path(src)).exists()
+                            and src_path not in seen
+                        ):
+                            seen.add(src_path)
+                            yield src_path
 
                     # Glob for SystemProperties defaultMachineFolder
                     for system_properties in config.findall(f".//{VBox.VBOX_XML_NAMESPACE}SystemProperties"):
-                        if folder_str := system_properties.get("defaultMachineFolder"):
-                            if (folder_dir := self.target.fs.path(folder_str)).is_dir():
-                                for vbox_file in folder_dir.glob("*/*.vbox"):
-                                    if vbox_file not in seen:
-                                        seen.add(vbox_file)
-                                        yield vbox_file
+                        if (folder_str := system_properties.get("defaultMachineFolder")) and (
+                            folder_dir := self.target.fs.path(folder_str)
+                        ).is_dir():
+                            for vbox_file in folder_dir.glob("*/*.vbox"):
+                                if vbox_file not in seen:
+                                    seen.add(vbox_file)
+                                    yield vbox_file
 
     def check_compatible(self) -> None:
         if not self.vboxes:

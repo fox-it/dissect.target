@@ -1,10 +1,12 @@
-import os
+from __future__ import annotations
+
+from pathlib import Path
 
 
-def absolute_path(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
+def absolute_path(filename: str) -> Path:
+    return Path(__file__).parent.joinpath(filename).resolve()
 
 
-def mkdirs(root, paths):
+def mkdirs(root: Path, paths: list[str]) -> None:
     for path in paths:
         root.joinpath(path).mkdir(parents=True)

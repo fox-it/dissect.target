@@ -1,13 +1,19 @@
-import pathlib
+from __future__ import annotations
+
 import tarfile
+from typing import TYPE_CHECKING
 
 import pytest
 
-from dissect.target import Target
 from dissect.target.loaders.tar import TarLoader
 from dissect.target.plugins.os.windows._os import WindowsPlugin
 from tests._utils import absolute_path
 from tests.filesystems.test_tar import _mkdir
+
+if TYPE_CHECKING:
+    import pathlib
+
+    from dissect.target.target import Target
 
 
 def test_tar_loader_compressed_tar_file(target_win: Target) -> None:
@@ -32,7 +38,7 @@ def test_tar_sensitive_drive_letter(target_bare: Target) -> None:
 
     # mounts = / and c:
     assert sorted(target_bare.fs.mounts.keys()) == ["/", "c:"]
-    assert "C:" not in target_bare.fs.mounts.keys()
+    assert "C:" not in target_bare.fs.mounts
 
     # Initialize our own WindowsPlugin to override the detection
     target_bare._os_plugin = WindowsPlugin.create(target_bare, target_bare.fs.mounts["c:"])
@@ -62,7 +68,7 @@ def test_tar_loader_compressed_tar_file_with_empty_dir(target_unix: Target) -> N
 
 
 @pytest.mark.parametrize(
-    "archive, expected_drive_letter",
+    ("archive", "expected_drive_letter"),
     [
         ("_data/loaders/tar/test-windows-sysvol-absolute.tar", "c:"),  # C: due to backwards compatibility
         ("_data/loaders/tar/test-windows-sysvol-relative.tar", "c:"),  # C: due to backwards compatibility
@@ -81,7 +87,7 @@ def test_tar_loader_windows_sysvol_formats(target_default: Target, archive: str,
 
 
 def test_tar_loader_windows_case_sensitivity(target_default: Target, tmp_path: pathlib.Path) -> None:
-    """test if we correctly map a tar with Windows folder structure as a case-insensitive filesystem."""
+    """Test if we correctly map a tar with Windows folder structure as a case-insensitive filesystem."""
 
     tar_path = tmp_path.joinpath("target.tar.gz")
     with tarfile.open(tar_path, "w:gz") as tf:
@@ -114,9 +120,9 @@ def test_tar_anonymous_filesystems(target_default: Target) -> None:
 
     # mounts = $fs$/fs0, $fs$/fs1 and /
     assert len(target_default.fs.mounts) == 3
-    assert "$fs$/fs0" in target_default.fs.mounts.keys()
-    assert "$fs$/fs1" in target_default.fs.mounts.keys()
-    assert "/" in target_default.fs.mounts.keys()
+    assert "$fs$/fs0" in target_default.fs.mounts
+    assert "$fs$/fs1" in target_default.fs.mounts
+    assert "/" in target_default.fs.mounts
     assert target_default.fs.get("$fs$/fs0/foo").open().read() == b"hello world\n"
     assert target_default.fs.get("$fs$/fs1/bar").open().read() == b"hello world\n"
 
@@ -147,7 +153,7 @@ def test_tar_anonymous_filesystems(target_default: Target) -> None:
     ],
 )
 def test_tar_detect(should_detect: bool, filename: str, buffer: str, tmp_path: pathlib.Path) -> None:
-    """test if we detect the given buffer as a (compressed) tar file or not."""
+    """Test if we detect the given buffer as a (compressed) tar file or not."""
     tmp_tar = tmp_path.joinpath(filename)
     tmp_tar.touch()
     with tmp_tar.open("wb") as fh:

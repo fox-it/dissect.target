@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
 from dissect.target.plugins.os.windows.credential.lsa import LSAPlugin
-from dissect.target.target import Target
 from tests.plugins.os.windows.test__os import map_version_value
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 SYSTEM_KEY = "SYSTEM\\ControlSet001\\Control\\LSA"
 POLICY_KEY_PATH_NT5 = "SECURITY\\Policy\\PolSecretEncryptionKey"
@@ -38,7 +44,7 @@ def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes]) -> None:
 
     for name, value in secrets.items():
         if not isinstance(value, bytes):
-            raise ValueError(f"Given value for {name} should be in bytes!")
+            raise TypeError(f"Given value for {name} should be in bytes!")
 
         currval_key = VirtualKey(hive_hklm, "CurrVal")
         currval_key.add_value("(Default)", value)
@@ -50,7 +56,7 @@ def map_lsa_secrets(hive_hklm: VirtualHive, secrets: dict[str, bytes]) -> None:
 
 
 def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows 10 system"""
+    """Test decrypting LSA secrets of a Windows 10 system."""
 
     map_lsa_system_keys(
         hive_hklm,
@@ -100,7 +106,7 @@ def test_lsa_secrets_win_10(target_win: Target, hive_hklm: VirtualHive) -> None:
 
 
 def test_lsa_secrets_win_xp(target_win: Target, hive_hklm: VirtualHive) -> None:
-    """test decrypting LSA secrets of a Windows XP system"""
+    """Test decrypting LSA secrets of a Windows XP system."""
 
     map_lsa_system_keys(
         hive_hklm,

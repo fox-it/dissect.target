@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from io import BytesIO
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch
 from uuid import UUID
 
@@ -12,6 +12,9 @@ from flow.record.fieldtypes import posix_path
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix._os import UnixPlugin, parse_fstab
 from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 FSTAB_CONTENT = """
 # /etc/fstab: static file system information.
@@ -193,7 +196,7 @@ def test_users(target_unix_users: Target) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected_arch, elf_buf",
+    ("expected_arch", "elf_buf"),
     [
         # https://launchpad.net/ubuntu/+source/coreutils/9.4-3.1ubuntu1
         ("x86_64-unix", "7f454c4602010100000000000000000003003e0001000000a06d000000000000"),  # amd64
@@ -205,6 +208,6 @@ def test_users(target_unix_users: Target) -> None:
     ],
 )
 def test_architecture(target_unix: Target, fs_unix: VirtualFilesystem, expected_arch: str, elf_buf: str) -> None:
-    """test if we correctly parse unix architecture."""
+    """Test if we correctly parse unix architecture."""
     fs_unix.map_file_fh("/bin/ls", BytesIO(bytes.fromhex(elf_buf)))
     assert target_unix.architecture == expected_arch

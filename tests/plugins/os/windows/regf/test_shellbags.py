@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -9,11 +10,13 @@ from dissect.target.plugins.os.windows.regf.shellbags import (
     ShellBagsPlugin,
     parse_shell_item_list,
 )
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from dissect.target.target import Target
 
 
 @pytest.mark.parametrize(
-    "shellbag, name, modification_time, localized_name",
+    ("shellbag", "name", "modification_time", "localized_name"),
     [
         (
             (
@@ -22,7 +25,7 @@ from dissect.target.target import Target
                 b"\x00\x00"
             ),
             "Menu Start",
-            datetime.datetime(2024, 2, 23, 9, 14, 2),
+            datetime.datetime(2024, 2, 23, 9, 14, 2, tzinfo=datetime.timezone.utc),
             b"@shell32.dll,-21786",
         ),
         (
@@ -33,7 +36,7 @@ from dissect.target.target import Target
                 b"\x00l\x00,\x00-\x002\x001\x008\x001\x003\x00\x00\x00\x14\x00\x00\x00"
             ),
             "Users",
-            datetime.datetime(2023, 8, 23, 13, 24, 22),
+            datetime.datetime(2023, 8, 23, 13, 24, 22, tzinfo=datetime.timezone.utc),
             "@shell32.dll,-21813",
         ),
     ],
@@ -54,7 +57,7 @@ def test_shellbags_parser(
 
 
 @pytest.mark.parametrize(
-    "bags, expected_type, expected_path",
+    ("bags", "expected_type", "expected_path"),
     [
         # single VOLUME with path `A:\`
         (
@@ -133,7 +136,7 @@ def test_shellbags_plugin(
     expected_type: list[str],
     expected_path: list[str],
 ) -> None:
-    """test if shellbags mapped to a registry hive are found and parsed correctly."""
+    """Test if shellbags mapped to a registry hive are found and parsed correctly."""
 
     key_name = "Software\\Microsoft\\Windows\\Shell\\BagMRU"
 

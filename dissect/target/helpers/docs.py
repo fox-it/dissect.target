@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import inspect
 import itertools
 import textwrap
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-from dissect.target.plugin import Plugin
+if TYPE_CHECKING:
+    from dissect.target.plugin import Plugin
 
 NO_DOCS = "No documentation"
 
@@ -37,7 +40,7 @@ def get_func_description(func: Callable, with_docstrings: bool = False) -> str:
     if with_docstrings:
         func_title = f"`{func_name}` (output: {func_output})"
         func_doc = textwrap.indent(func_doc, prefix=INDENT_STEP)
-        desc = "\n".join([func_title, "", func_doc])
+        desc = f"{func_title}\n\n{func_doc}"
     else:
         docstring_first_line = func_doc.splitlines()[0].lstrip()
         desc = FUNC_DOC_TEMPLATE.format(
@@ -51,7 +54,7 @@ def get_plugin_functions_desc(plugin_class: type[Plugin], with_docstrings: bool 
     descriptions = []
     for func_name in plugin_class.__exports__:
         func_obj = getattr(plugin_class, func_name)
-        if func_obj is getattr(plugin_class, "__call__", None):
+        if func_obj is getattr(plugin_class, "__call__", None):  # noqa: B004
             continue
 
         _, func = _get_real_func_obj(func_obj)
@@ -65,16 +68,14 @@ def get_plugin_functions_desc(plugin_class: type[Plugin], with_docstrings: bool 
         # add empty lines after every func description
         descriptions = [block for pair in zip(descriptions, itertools.repeat("")) for block in pair]
 
-    paragraph = "\n".join(descriptions)
-    return paragraph
+    return "\n".join(descriptions)
 
 
 def get_plugin_description(plugin_class: type[Plugin]) -> str:
     plugin_name = plugin_class.__name__
     plugin_desc_title = f"`{plugin_name}` (`{plugin_class.__module__}.{plugin_name}`)"
     plugin_doc = textwrap.indent(get_docstring(plugin_class), prefix=INDENT_STEP)
-    paragraph = "\n".join([plugin_desc_title, "", plugin_doc])
-    return paragraph
+    return f"{plugin_desc_title}\n\n{plugin_doc}"
 
 
 def get_plugin_overview(
@@ -99,15 +100,13 @@ def get_plugin_overview(
         )
 
     paragraphs.append(func_descriptions_paragraph)
-    overview = "\n".join(paragraphs)
-    return overview
+    return "\n".join(paragraphs)
 
 
 def _get_plugin_class_for_func(func: Callable) -> type[Plugin]:
     """Return plugin class for provided function instance."""
     func_parent_name = func.__qualname__.rsplit(".", 1)[0]
-    klass = getattr(inspect.getmodule(func), func_parent_name, None)
-    return klass
+    return getattr(inspect.getmodule(func), func_parent_name, None)
 
 
 def _get_real_func_obj(func: Callable) -> tuple[type[Plugin], Callable]:
@@ -135,7 +134,7 @@ def _get_real_func_obj(func: Callable) -> tuple[type[Plugin], Callable]:
 
 
 def _get_func_details(func: Callable) -> tuple[str, str]:
-    """Return a tuple with function's name, output label and docstring"""
+    """Return a tuple with function's name, output label and docstring."""
     func_doc = get_docstring(func)
 
     if hasattr(func, "__output__") and func.__output__ in FUNCTION_OUTPUT_DESCRIPTION:

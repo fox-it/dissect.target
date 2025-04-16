@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Iterator
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
-from dissect.target.target import Target
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 ModuleRecord = TargetRecordDescriptor(
     "linux/module",
@@ -67,7 +73,7 @@ class ModulePlugin(Plugin):
 
     @export(output="yield")
     def lsmod(self) -> Iterator[str]:
-        """Return information about active kernel modules in lsmod format"""
+        """Return information about active kernel modules in lsmod format."""
         yield f"{'Module ':<28} {'Size':<7}  Used by"
         for module in self._iterate_modules():
             yield f"{module.name:<28} {module.size:<7}  {module.refcnt} {','.join(module.used_by)}"

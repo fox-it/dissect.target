@@ -1,13 +1,20 @@
+from __future__ import annotations
+
 import re
 from collections import OrderedDict
 from configparser import ConfigParser
 from functools import partial
-from pathlib import Path
-from typing import Iterator, Union
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import OperatingSystem, Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    from dissect.target.target import Target
 
 WireGuardInterfaceRecord = TargetRecordDescriptor(
     "application/vpn/wireguard/interface",
@@ -60,7 +67,7 @@ class WireGuardPlugin(Plugin):
     # TODO: other locations such as $HOME/.config/wireguard
     # TODO: parse native network manager formats from MacOS, Ubuntu and Windows.
 
-    CONFIG_GLOBS = [
+    CONFIG_GLOBS = (
         # Linux
         "/etc/wireguard/*.conf",
         # MacOS
@@ -69,11 +76,11 @@ class WireGuardPlugin(Plugin):
         # Windows
         "C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\WireGuard\\Configurations\\*.dpapi",
         "C:\\Program Files\\WireGuard\\Data\\Configurations\\*.dpapi",
-    ]
+    )
 
     TUNNEL_NAME_RE = re.compile(r"\.(conf(\.dpapi)?|netdev)$")
 
-    def __init__(self, target) -> None:
+    def __init__(self, target: Target):
         super().__init__(target)
         self.configs: list[Path] = []
         for path in self.CONFIG_GLOBS:
@@ -84,7 +91,7 @@ class WireGuardPlugin(Plugin):
             raise UnsupportedPluginError("No Wireguard configuration files found")
 
     @export(record=[WireGuardInterfaceRecord, WireGuardPeerRecord])
-    def config(self) -> Iterator[Union[WireGuardInterfaceRecord, WireGuardPeerRecord]]:
+    def config(self) -> Iterator[WireGuardInterfaceRecord | WireGuardPeerRecord]:
         """Parses interface config files from wireguard installations."""
 
         for config_path in self.configs:
@@ -164,7 +171,7 @@ class MultiDict(OrderedDict):
         self._unique = 0
         super().__init__(*args, **kwargs)
 
-    def __setitem__(self, key, val):
+    def __setitem__(self, key: str, val: str):
         if isinstance(val, dict) and (key in ["Peer", "Interface"]):
             self._unique += 1
             key += str(self._unique)

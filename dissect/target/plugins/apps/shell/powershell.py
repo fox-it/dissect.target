@@ -1,9 +1,16 @@
-from typing import Iterator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.descriptor_extensions import UserRecordDescriptorExtension
 from dissect.target.helpers.record import create_extended_descriptor
 from dissect.target.plugin import Plugin, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dissect.target.target import Target
 
 ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(
     "powershell/history",
@@ -19,12 +26,12 @@ ConsoleHostHistoryRecord = create_extended_descriptor([UserRecordDescriptorExten
 class PowerShellHistoryPlugin(Plugin):
     """Windows PowerShell history plugin."""
 
-    PATHS = [
+    PATHS = (
         "AppData/Roaming/Microsoft/Windows/PowerShell/psreadline",
         ".local/share/powershell/PSReadLine",
-    ]
+    )
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
 
         self._history = []

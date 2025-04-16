@@ -4,7 +4,6 @@ import hashlib
 import logging
 from io import BytesIO
 from pathlib import Path
-from typing import Iterator
 
 from dissect.target.helpers import hashutil
 
@@ -16,9 +15,14 @@ try:
 except ImportError:
     HAS_YARA = False
 
+from typing import TYPE_CHECKING
+
 from dissect.target.exceptions import FileNotFoundError, UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 log = logging.getLogger(__name__)
 
@@ -103,7 +107,7 @@ class YaraPlugin(Plugin):
                 except RuntimeWarning as e:
                     self.target.log.warning("Runtime warning while scanning file '%s': %s", file, e)
                 except Exception as e:
-                    self.target.log.error("Exception scanning file '%s'", file)
+                    self.target.log.error("Exception scanning file '%s'", file)  # noqa: TRY400
                     self.target.log.debug("", exc_info=e)
 
 
@@ -146,12 +150,11 @@ def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | 
             if len(files) > 1:
                 log.error("Providing multiple compiled YARA files is not supported. Did not add %s", file)
                 continue
-            else:
-                log.info("Adding single compiled YARA file %s", file)
-                compiled_rules = compile_yara(file, is_compiled=True)
-                break
+            log.info("Adding single compiled YARA file %s", file)
+            compiled_rules = compile_yara(file, is_compiled=True)
+            break
 
-        elif check and not is_valid_yara({"check_namespace": file}):
+        if check and not is_valid_yara({"check_namespace": file}):
             log.warning("File %s contains invalid rule(s)!", file)
             files.remove(file)
             continue
@@ -160,7 +163,7 @@ def process_rules(paths: list[str | Path], check: bool = False) -> yara.Rules | 
         try:
             compiled_rules = compile_yara({hashlib.md5(file.as_posix().encode()).hexdigest(): file for file in files})
         except yara.Error as e:
-            log.error("Failed to compile YARA file(s): %s", e)
+            log.error("Failed to compile YARA file(s): %s", e)  # noqa: TRY400
 
     return compiled_rules
 
@@ -169,16 +172,15 @@ def compile_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> ya
     """Compile or load the given YARA file(s) to rules."""
     if is_compiled and isinstance(files, Path):
         return yara.load(files.as_posix())
-    else:
-        return yara.compile(filepaths={ns: Path(path).as_posix() for ns, path in files.items()})
+    return yara.compile(filepaths={ns: Path(path).as_posix() for ns, path in files.items()})
 
 
 def is_valid_yara(files: dict[str, Path] | Path, is_compiled: bool = False) -> bool:
     """Determine if the given YARA file(s) compile without errors or warnings."""
     try:
         compile_yara(files, is_compiled)
-        return True
-
     except (yara.SyntaxError, yara.WarningError, yara.Error) as e:
         log.debug("Rule file(s) '%s' invalid: %s", files, e)
         return False
+    else:
+        return True

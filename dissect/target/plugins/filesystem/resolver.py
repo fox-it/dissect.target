@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import re
-from typing import Optional
 
 from dissect.target.helpers import fsutil
 from dissect.target.plugin import OperatingSystem, Plugin, internal
@@ -25,7 +26,7 @@ class ResolverPlugin(Plugin):
         pass
 
     @internal
-    def resolve(self, path: str, user: Optional[str] = None) -> str:
+    def resolve(self, path: str, user: str | None = None) -> fsutil.TargetPath:
         """Resolve a partial path string to a file or directory present in the target.
 
         For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
@@ -41,7 +42,7 @@ class ResolverPlugin(Plugin):
 
         return self.target.fs.path(resolved_path)
 
-    def resolve_windows(self, path: str, user_sid: Optional[str] = None) -> str:
+    def resolve_windows(self, path: str, user_sid: str | None = None) -> str:
         # Normalize first so the replacements are easier
         path = fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)
 
@@ -67,9 +68,8 @@ class ResolverPlugin(Plugin):
 
         # Very simplistic lookup for an executable as part of an `"path/to/executable" -arguments -here` construction
         quoted = re_quoted.findall(path)
-        if quoted:
-            if self.target.fs.exists(quoted[0]):
-                return quoted[0]
+        if quoted and self.target.fs.exists(quoted[0]):
+            return quoted[0]
 
         # Construct a list of search paths to look in. If a user SID is given, both the system and user search paths are
         # used, else only the system search paths.
@@ -90,10 +90,10 @@ class ResolverPlugin(Plugin):
         # If it does, it's probably the file we're looking for.
         lookup = ""
         parts = path.split(" ")
-        pathext = self.target.pathext | set([""])
+        pathext = self.target.pathext | {""}
 
         for part in parts:
-            lookup = " ".join([lookup, part]) if lookup else part
+            lookup = f"{lookup} {part}" if lookup else part
             for ext in pathext:
                 lookup_ext = lookup + ext
                 if self.target.fs.is_file(lookup_ext):
@@ -106,5 +106,5 @@ class ResolverPlugin(Plugin):
 
         return path
 
-    def resolve_default(self, path: str, user_id: Optional[str] = None) -> str:
+    def resolve_default(self, path: str, user_id: str | None = None) -> str:
         return fsutil.normalize(path, alt_separator=self.target.fs.alt_separator)

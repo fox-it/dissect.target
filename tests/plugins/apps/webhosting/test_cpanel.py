@@ -1,9 +1,14 @@
-from datetime import datetime, timezone
+from __future__ import annotations
 
-from dissect.target import Target
-from dissect.target.filesystem import VirtualFilesystem
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.apps.webhosting.cpanel import CPanelPlugin
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_cpanel_plugin(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:

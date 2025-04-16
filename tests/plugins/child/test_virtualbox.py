@@ -1,9 +1,14 @@
-from io import BytesIO
+from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from io import BytesIO
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.child.virtualbox import VirtualBoxChildTargetPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -34,7 +39,7 @@ def test_child_virtualbox_linux(target_unix_users: Target, fs_unix: VirtualFiles
     target_unix_users.add_plugin(VirtualBoxChildTargetPlugin)
     children = list(target_unix_users.list_children())
 
-    assert list(sorted(map(str, [child.path for child in children]))) == [
+    assert sorted(map(str, [child.path for child in children])) == [
         "/example/vms/example-vm/example-vm.vbox",
         "/example/vms/second-vm/second-vm.vbox",
         "/example/vms/third-vm/third-vm.vbox",

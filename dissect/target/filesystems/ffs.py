@@ -1,4 +1,6 @@
-from typing import BinaryIO, Iterator, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, BinaryIO
 
 from dissect.ffs import c_ffs, ffs
 
@@ -11,6 +13,9 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystem import Filesystem, FilesystemEntry
 from dissect.target.helpers import fsutil
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class FfsFilesystem(Filesystem):
@@ -35,7 +40,7 @@ class FfsFilesystem(Filesystem):
     def get(self, path: str) -> FilesystemEntry:
         return FfsFilesystemEntry(self, path, self._get_node(path))
 
-    def _get_node(self, path: str, node: Optional[ffs.INode] = None) -> ffs.INode:
+    def _get_node(self, path: str, node: ffs.INode | None = None) -> ffs.INode:
         try:
             return self.ffs.get(path, node)
         except ffs.FileNotFoundError as e:
@@ -99,7 +104,7 @@ class FfsFilesystemEntry(FilesystemEntry):
 
     def readlink(self) -> str:
         if not self.is_symlink():
-            raise NotASymlinkError()
+            raise NotASymlinkError
 
         return self.entry.link
 

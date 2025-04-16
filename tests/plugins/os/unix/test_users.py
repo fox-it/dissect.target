@@ -1,10 +1,14 @@
-from io import BytesIO
-from pathlib import Path
+from __future__ import annotations
 
-from dissect.target.filesystem import VirtualFilesystem
+from io import BytesIO
+from typing import TYPE_CHECKING
+
 from dissect.target.plugins.os.unix._os import UnixPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_unix_passwd_file(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
@@ -26,7 +30,7 @@ def test_unix_passwd_file(target_unix_users: Target, fs_unix: VirtualFilesystem)
 def test_unix_passwd_syslog(target_unix_users: Target, fs_unix: VirtualFilesystem) -> None:
     syslog_file = absolute_path("_data/plugins/os/unix/_os/passwd-syslog")
     fs_unix.map_file("/var/log/syslog", syslog_file)
-    fs_unix.map_file_fh("/etc/passwd", BytesIO("".encode()))
+    fs_unix.map_file_fh("/etc/passwd", BytesIO(b""))
     target_unix_users.add_plugin(UnixPlugin)
 
     results = list(target_unix_users.users(sessions=True))
@@ -52,10 +56,10 @@ def test_unix_passwd_syslog(target_unix_users: Target, fs_unix: VirtualFilesyste
 
 
 def test_unix_passwd_backup_file(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
-    """test if backup passwd files are read and only unique entries are returned"""
+    """Test if backup passwd files are read and only unique entries are returned."""
     passwd_file = absolute_path("_data/plugins/os/unix/_os/passwd")
     fs_unix.map_file("/etc/passwd", passwd_file)
-    backup_file = Path(passwd_file).open("rb").read() + b"deleted-user:x:1001:1001:deleted-user:/home/deleted:/bin/sh"
+    backup_file = passwd_file.read_bytes() + b"deleted-user:x:1001:1001:deleted-user:/home/deleted:/bin/sh"
     fs_unix.map_file_fh("/etc/passwd-", BytesIO(backup_file))
     target_unix.add_plugin(UnixPlugin)
 

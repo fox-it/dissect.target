@@ -1,11 +1,16 @@
+from __future__ import annotations
+
 import operator
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
-from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.apps.remoteaccess.anydesk import AnydeskPlugin
-from dissect.target.target import Target
 from tests._utils import absolute_path
+
+if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
+    from dissect.target.target import Target
 
 
 def test_anydesk_plugin_log(target_win_users: Target, fs_win: VirtualFilesystem) -> None:

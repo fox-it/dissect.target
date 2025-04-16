@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import pytest
 
 from dissect.target.helpers.localeutil import normalize_language, normalize_timezone
 
 
-def test_helpers_localeutil_normalize_timezone():
+def test_helpers_localeutil_normalize_timezone() -> None:
     assert normalize_timezone("W. Europe Standard Time") == "Europe/Berlin"
     assert normalize_timezone("GMT Standard Time") == "Europe/London"
     assert normalize_timezone("UTC") == "UTC"
