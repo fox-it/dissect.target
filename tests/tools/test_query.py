@@ -52,10 +52,10 @@ def test_list(capsys: pytest.CaptureFixture, monkeypatch: pytest.MonkeyPatch) ->
     ],
 )
 def test_invalid_functions(
-    capsys: pytest.CaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
     given_funcs: list[str],
     expected_invalid_funcs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
 ) -> None:
     with monkeypatch.context() as m:
         m.setattr(
@@ -105,10 +105,10 @@ def test_invalid_functions(
     ],
 )
 def test_invalid_excluded_functions(
-    capsys: pytest.CaptureFixture,
-    monkeypatch: pytest.MonkeyPatch,
     given_funcs: list[str],
     expected_invalid_funcs: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
 ) -> None:
     with monkeypatch.context() as m:
         m.setattr(

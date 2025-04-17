@@ -203,13 +203,30 @@ def recover_quarantined_file_streams(fh: BinaryIO, filename: str) -> Iterator[tu
         except EOFError:
             break
         data = buf.read(stream.Size)
-        if stream.StreamId == STREAM_ID.SECURITY_DATA:
-            yield (f"{filename}.security_descriptor", data)
-        elif stream.StreamId == STREAM_ID.DATA:
+
+        if stream.StreamId == STREAM_ID.DATA:
             yield (filename, data)
+        elif stream.StreamId == STREAM_ID.EA_DATA:
+            yield (f"{filename}.ea_data", data)
+        elif stream.StreamId == STREAM_ID.SECURITY_DATA:
+            yield (f"{filename}.security_descriptor", data)
         elif stream.StreamId == STREAM_ID.ALTERNATE_DATA:
             sanitized_stream_name = "".join(x for x in stream.StreamName if x.isalnum())
             yield (f"{filename}.{sanitized_stream_name}", data)
+        elif stream.StreamId == STREAM_ID.LINK:
+            yield (f"{filename}.link", data)
+        elif stream.StreamId == STREAM_ID.PROPERTY_DATA:
+            yield (f"{filename}.property_data", data)
+        elif stream.StreamId == STREAM_ID.OBJECT_ID:
+            yield (f"{filename}.object_id", data)
+        elif stream.StreamId == STREAM_ID.REPARSE_DATA:
+            yield (f"{filename}.reparse_data", data)
+        elif stream.StreamId == STREAM_ID.SPARSE_BLOCK:
+            yield (f"{filename}.sparse_block", data)
+        elif stream.StreamId == STREAM_ID.TXFS_DATA:
+            yield (f"{filename}.txfs_data", data)
+        elif stream.StreamId == STREAM_ID.GHOSTED_FILE_EXTENTS:
+            yield (f"{filename}.ghosted_file_extents", data)
         else:
             raise ValueError(f"Unexpected Stream ID {stream.StreamId}")
 

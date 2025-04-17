@@ -805,7 +805,7 @@ def failed() -> list[FailureDescriptor]:
 
 
 @functools.cache
-def _generate_long_paths() -> dict[str, FunctionDescriptor]:
+def _generate_long_paths() -> dict[str, list[FunctionDescriptor]]:
     """Generate a dictionary of all long paths to their function descriptors."""
     paths = {}
     for value in _get_plugins().__functions__.__regular__.values():
@@ -813,7 +813,8 @@ def _generate_long_paths() -> dict[str, FunctionDescriptor]:
             # Namespace plugins are callable so exclude the explicit __call__ method
             if descriptor.method_name == "__call__":
                 continue
-            paths[descriptor.path] = descriptor
+
+            paths.setdefault(descriptor.path, []).append(descriptor)
 
     return paths
 
@@ -939,17 +940,16 @@ def _filter_tree_match(pattern: str, os_filter: str, show_hidden: bool = False) 
         search_pattern += "*"
 
     for path in fnmatch.filter(path_lookup.keys(), search_pattern):
-        descriptor = path_lookup[path]
+        for descriptor in path_lookup[path]:
+            # Skip plugins that don't want to be found by wildcards
+            if not descriptor.exported or (not show_hidden and not descriptor.findable):
+                continue
 
-        # Skip plugins that don't want to be found by wildcards
-        if not descriptor.exported or (not show_hidden and not descriptor.findable):
-            continue
+            # Skip plugins that do not match our OS
+            if os_filter and not _os_match(os_filter, descriptor.path):
+                continue
 
-        # Skip plugins that do not match our OS
-        if os_filter and not _os_match(os_filter, descriptor.path):
-            continue
-
-        yield descriptor
+            yield descriptor
 
 
 def _filter_compatible(
