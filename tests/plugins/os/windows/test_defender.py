@@ -377,6 +377,30 @@ def test_defender_mplogs_lines(target_win: Target, fs_win: VirtualFilesystem, tm
             "security_descriptor",
         ),
         (
+            STREAM_ID.LINK,
+            "link",
+        ),
+        (
+            STREAM_ID.PROPERTY_DATA,
+            "property_data",
+        ),
+        (
+            STREAM_ID.OBJECT_ID,
+            "object_id",
+        ),
+        (
+            STREAM_ID.REPARSE_DATA,
+            "reparse_data",
+        ),
+        (
+            STREAM_ID.SPARSE_BLOCK,
+            "sparse_block",
+        ),
+        (
+            STREAM_ID.TXFS_DATA,
+            "txfs_data",
+        ),
+        (
             STREAM_ID.GHOSTED_FILE_EXTENTS,
             "ghosted_file_extents",
         ),
