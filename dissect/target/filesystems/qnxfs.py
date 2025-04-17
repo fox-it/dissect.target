@@ -40,7 +40,7 @@ class QnxFilesystem(Filesystem):
         try:
             return self.qnxfs.get(path, node)
         except qnxfs.FileNotFoundError as e:
-            raise FileNotFoundError(path, cause=e)
+            raise FileNotFoundError(path) from e
         except qnxfs.NotADirectoryError as e:
             raise NotADirectoryError(path, cause=e)
         except qnxfs.NotASymlinkError as e:
@@ -55,8 +55,7 @@ class QnxFilesystemEntry(FilesystemEntry):
 
     def get(self, path: str) -> FilesystemEntry:
         entry_path = fsutil.join(self.path, path, alt_separator=self.fs.alt_separator)
-        entry = self.fs._get_node(path, self.entry)
-        return QnxFilesystemEntry(self.fs, entry_path, entry)
+        return QnxFilesystemEntry(self.fs, entry_path, self.fs._get_node(path, self.entry))
 
     def open(self) -> BinaryIO:
         if self.is_dir():
@@ -73,8 +72,7 @@ class QnxFilesystemEntry(FilesystemEntry):
             yield from self.entry.iterdir()
 
     def iterdir(self) -> Iterator[str]:
-        for name, _ in self._iterdir():
-            yield name
+        yield from (name for name, _ in self._iterdir())
 
     def scandir(self) -> Iterator[FilesystemEntry]:
         for name, entry in self._iterdir():
