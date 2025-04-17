@@ -27,7 +27,6 @@ from dissect.target.plugin import (
     PluginDescriptorLookup,
     PluginRegistry,
     _find_py_files,
-    _generate_long_paths,
     _save_plugin_import_failure,
     alias,
     environment_variable_paths,
@@ -49,11 +48,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
-
-
-@pytest.fixture(autouse=True)
-def clear_caches() -> None:
-    _generate_long_paths.cache_clear()
 
 
 def test_save_plugin_import_failure() -> None:
