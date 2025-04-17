@@ -295,12 +295,20 @@ class UnixPlugin(OSPlugin):
         return isinstance(self.target._loader, LocalLoader) and "enable-nfs" in self.target.path_query
 
     def _log_nfs_mount_disabled(self, address: str, exported_dir: str, mount_point: str) -> None:
-        log.warning(
-            "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-            address,
-            exported_dir,
-            mount_point,
-        )
+        if isinstance(self.target._loader, LocalLoader):
+            log.warning(
+                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                address,
+                exported_dir,
+                mount_point,
+            )
+        else:
+            log.warning(
+                "NFS mount %s:%s at %s is unavailable on a non-local target",
+                address,
+                exported_dir,
+                mount_point,
+            )
 
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
         if not self._is_nfs_enabled:
@@ -311,7 +319,9 @@ class UnixPlugin(OSPlugin):
         def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
             users = list(self.users())
             if not users:
-                self.target.log.debug("No users found, trying root for mounting NFS share %s:%s at %s", address, exported_dir, mount_point)
+                self.target.log.debug(
+                    "No users found, trying root for mounting NFS share %s:%s at %s", address, exported_dir, mount_point
+                )
                 users = [UnixUserRecord(uid=0, gid=0)]
 
             for user in users:
