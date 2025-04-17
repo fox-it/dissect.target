@@ -13,6 +13,7 @@ from dissect.target.filesystem import Filesystem, VirtualFilesystem, VirtualSyml
 from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
+from dissect.target.plugin import _generate_long_paths
 from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
@@ -44,6 +45,11 @@ if not pathlib.Path(data_dir).is_dir():
         "the dissect.target GitHub repository at:\n"
         "https://github.com/fox-it/dissect.target"
     )
+
+
+@pytest.fixture(autouse=True)
+def clear_caches() -> None:
+    _generate_long_paths.cache_clear()
 
 
 def make_mock_target(tmp_path: pathlib.Path) -> Iterator[Target]:
