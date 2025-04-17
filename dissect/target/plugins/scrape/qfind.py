@@ -6,7 +6,7 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Iterator
+from typing import TYPE_CHECKING, Callable
 
 from dissect.cstruct import utils
 
@@ -15,14 +15,17 @@ from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from dissect.target.container import Container
     from dissect.target.target import Target
     from dissect.target.volume import Volume
 
+re_NOFLAG = 0  # re.NOFLAG is Python 3.11 and newer only
 COLOR_GREY = "\033[38;5;248m"
 
-QFindHitRecord = TargetRecordDescriptor(
-    "qfind/hit",
+QFindMatchRecord = TargetRecordDescriptor(
+    "qfind/match",
     [
         ("varint", "offset"),
         ("string", "needle"),
@@ -48,7 +51,7 @@ class QFindPlugin(Plugin):
     @arg("-u", "--unique", action="store_true", help="only yield unique string hits (does not apply to raw output)")
     @arg("-W", "--window", type=int, default=256, help="maximum window size in bytes for context around each hit")
     @arg("--strip-null-bytes", action="store_true", help="strip null bytes from matched content")
-    @export(record=QFindHitRecord)
+    @export(record=QFindMatchRecord)
     def qfind(
         self,
         needles: list[str] | None = None,
@@ -62,7 +65,7 @@ class QFindPlugin(Plugin):
         strip_null_bytes: bool = False,
         *,
         progress: bool = False,
-    ) -> Iterator[QFindHitRecord]:
+    ) -> Iterator[QFindMatchRecord]:
         """Find a needle in a haystack.
 
         Hex encode needles starting with ``#`` in needle files, otherwise these needles are ignored.
@@ -151,7 +154,7 @@ class QFindPlugin(Plugin):
         elif regex:
             tmp = {}
             for needle, _ in needle_lookup.items():
-                tmp[re.compile(needle, re.IGNORECASE if ignore_case else re.NOFLAG)] = _
+                tmp[re.compile(needle, re.IGNORECASE if ignore_case else re_NOFLAG)] = _
             needle_lookup = tmp
 
         seen = set()
@@ -176,12 +179,9 @@ class QFindPlugin(Plugin):
                     continue
                 seen.add(digest)
 
-            if isinstance(needle, re.Pattern) and match:
-                match = match.group()
-            else:
-                match = original_needle
+            match = match.group() if isinstance(needle, re.Pattern) and match else original_needle
 
-            yield QFindHitRecord(
+            yield QFindMatchRecord(
                 offset=offset,
                 needle=original_needle,
                 codec=codec,
@@ -207,9 +207,7 @@ def progress_handler(target: Target) -> Callable[[Container | Volume, int, int],
             sys.stderr.write(f"\n{utils.COLOR_WHITE}[Current disk: {disk}]{utils.COLOR_NORMAL}\n")
             current_disk = disk
 
-        sys.stderr.write(
-            f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}"
-        )
+        sys.stderr.write(f"\r{COLOR_GREY}{offset / float(size) * 100:0.2f}% {animation[char]}{utils.COLOR_NORMAL}")
         sys.stderr.flush()
 
         if offset % 1337 * 42 == 0:

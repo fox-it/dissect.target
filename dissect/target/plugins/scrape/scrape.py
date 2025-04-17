@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import re
 from collections import defaultdict
 from typing import TYPE_CHECKING, BinaryIO, Callable
 
@@ -12,6 +11,7 @@ from dissect.target.plugin import Plugin, internal
 from dissect.target.volume import EncryptedVolumeSystem, LogicalVolumeSystem, Volume
 
 if TYPE_CHECKING:
+    import re
     from collections.abc import Iterator
 
     from dissect.target.container import Container

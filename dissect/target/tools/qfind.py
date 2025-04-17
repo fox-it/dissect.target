@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
+import os
 
 from dissect.cstruct import utils
 
 from dissect.target.exceptions import TargetError
 from dissect.target.helpers.scrape import recover_string
-from dissect.target.plugins.scrape.qfind import QFindPlugin
+from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
 from dissect.target.target import Target
 from dissect.target.tools.utils import (
     catch_sigpipe,
@@ -18,6 +18,7 @@ from dissect.target.tools.utils import (
 )
 
 log = logging.getLogger(__name__)
+NO_COLOR = os.getenv("NO_COLOR")
 
 
 @catch_sigpipe
@@ -50,6 +51,7 @@ def main() -> int:
 
     try:
         for target in Target.open_all(args.targets, args.children):
+            hit: QFindMatchRecord
             for hit in target.qfind(
                 args.needles,
                 args.needle_file,
@@ -62,13 +64,22 @@ def main() -> int:
                 args.strip_null_bytes,
                 progress=True,
             ):
-                header = f"\r{utils.COLOR_WHITE}[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]{utils.COLOR_NORMAL}"
+                header = f"[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]"
+
+                if not NO_COLOR:
+                    header = utils.COLOR_WHITE + header + utils.COLOR_NORMAL
+
                 before_offset = max(0, hit.offset - args.window)
                 needle_len = len(hit.match)
 
+                print(f"\r{header}")
+
                 if args.raw:
-                    print(header)
-                    palette = [(hit.offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
+                    palette = (
+                        [(hit.offset - before_offset, utils.COLOR_NORMAL), (needle_len, utils.COLOR_BG_RED)]
+                        if not NO_COLOR
+                        else None
+                    )
                     utils.hexdump(hit.content, palette, offset=before_offset)
 
                 else:
@@ -80,17 +91,15 @@ def main() -> int:
                         hit.content[hit.offset - before_offset :], codec, ascii=not args.allow_non_ascii
                     )
                     hit = (
-                        before_part
-                        + utils.COLOR_BG_RED
-                        + after_part[:needle_len]
-                        + utils.COLOR_NORMAL
-                        + after_part[needle_len:]
+                        before_part,
+                        (utils.COLOR_BG_RED if not NO_COLOR else ""),
+                        after_part[:needle_len],
+                        (utils.COLOR_NORMAL if not NO_COLOR else ""),
+                        after_part[needle_len:],
                     )
+                    print("".join(hit))
 
-                    print(header)
-                    print(hit)
-
-            print("\r\n" if sys.platform in ["win32", "cygwin"] else "\n", flush=True)
+        print(end="\r\n")
 
     except TargetError as e:
         log.error(e)  # noqa: TRY400

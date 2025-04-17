@@ -81,7 +81,6 @@ def find_needles(
         last_needle_pos = -1
         last_needle_end = 0
         while True:
-
             needle_positions = []
 
             for needle in needles:
@@ -167,7 +166,7 @@ def scrape_chunks(
         chunk_reader=chunk_reader or _read_plain_chunk,
     )
 
-    for needle, _, chunk in chunk_stream:
+    for needle, _, chunk, _ in chunk_stream:
         try:
             for record in chunk_parser(needle, chunk):
                 yield record
