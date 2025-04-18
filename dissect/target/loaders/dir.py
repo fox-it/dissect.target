@@ -104,7 +104,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     Args:
         target: The target to map into.
         path: The path to map from.
-            If path is a local path, must be provided as an absolute path in order to work with target-mount
+            If path is a local path, must be provided as an absolute path in order to work with ``target-mount``.
         **kwargs: Optional arguments for :func:`loaderutil.add_virtual_ntfs_filesystem
             <dissect.target.helpers.loaderutil.add_virtual_ntfs_filesystem>`.
     """
