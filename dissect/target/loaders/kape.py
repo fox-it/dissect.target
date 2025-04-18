@@ -65,7 +65,7 @@ class KapeLoader(DirLoader):
         return False
 
     def map(self, target: Target) -> None:
-        path = self.path if self.path.is_dir() else next(open_vhdx(self.path)).path()
+        path = self.absolute_path if self.absolute_path.is_dir() else next(open_vhdx(self.absolute_path)).path()
 
         find_and_map_dirs(
             target,

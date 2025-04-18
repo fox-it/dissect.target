@@ -27,7 +27,7 @@ class DirLoader(Loader):
         return find_entry_path(path) is not None
 
     def map(self, target: Target) -> None:
-        path = self.path.joinpath(find_entry_path(self.path))
+        path = self.absolute_path.joinpath(find_entry_path(self.absolute_path))
         find_and_map_dirs(target, path)
 
 
@@ -104,6 +104,7 @@ def find_and_map_dirs(target: Target, path: Path, **kwargs) -> None:
     Args:
         target: The target to map into.
         path: The path to map from.
+            If path is a local path, must be provided as an absolute path in order to work with ``target-mount``.
         **kwargs: Optional arguments for :func:`loaderutil.add_virtual_ntfs_filesystem
             <dissect.target.helpers.loaderutil.add_virtual_ntfs_filesystem>`.
     """

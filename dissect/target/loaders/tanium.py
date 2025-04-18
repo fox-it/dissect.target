@@ -44,7 +44,7 @@ class TaniumLoader(DirLoader):
     def map(self, target: Target) -> None:
         find_and_map_dirs(
             target,
-            self.path.joinpath("file"),
+            self.absolute_path.joinpath("file"),
             sds_path="$Secure_$SDS",
             usnjrnl_path="$Extend/$UsnJrnl_$J",
         )
