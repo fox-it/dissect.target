@@ -5,13 +5,61 @@ from typing import TYPE_CHECKING
 from dissect.util.ts import wintimestamp
 
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
-from dissect.target.plugins.os.windows.regf.cam import CamPlugin
+from dissect.target.plugins.os.windows.cam import CamPlugin
+from tests._utils import absolute_path
 
 if TYPE_CHECKING:
+    from dissect.target.filesystem import VirtualFilesystem
     from dissect.target.target import Target
 
 
-def test_cam(target_win_users: Target, hive_hku: VirtualHive, hive_hklm: VirtualHive) -> None:
+def test_cam_history(target_win_users: Target, hive_hklm: VirtualHive, fs_win: VirtualFilesystem) -> None:
+    fs_win.map_file(
+        "ProgramData/Microsoft/Windows/CapabilityAccessManager/CapabilityAccessManager.db",
+        absolute_path("_data/plugins/os/windows/cam/CapabilityAccessManager.db"),
+    )
+
+    hklm_cam_key = VirtualKey(
+        hive_hklm,
+        "Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\CapabilityUsageHistory",
+    )
+
+    database_root_value = "C:\\ProgramData\\Microsoft\\Windows\\CapabilityAccessManager"
+    hklm_cam_key.add_value("DatabaseRoot", VirtualValue(hive_hklm, "DatabaseRoot", database_root_value))
+
+    hive_hklm.map_key(hklm_cam_key.path, hklm_cam_key)
+
+    target_win_users.add_plugin(CamPlugin)
+    results = list(target_win_users.cam())
+
+    assert len(results) == 3
+
+    # Record windows/cam/usagehistory - NonPackagedUsageHistory
+    assert results[0].last_used_time_stop == wintimestamp(133885054906926593)
+    assert results[0].last_used_time_start == wintimestamp(133885044556858623)
+    assert results[0].package_type == "NonPackagedUsageHistory"
+    assert results[0].capability == "microphone"
+    assert results[0].file_id_hash.sha1 == "f0bfca16305374262ad1919c258deba64fc25006"
+    assert results[0].binary_full_path == "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+
+    # Record windows/cam/usagehistory - NonPackagedUsageHistory
+    assert results[1].last_used_time_stop == wintimestamp(133884984261774039)
+    assert results[1].last_used_time_start == wintimestamp(133884984204276055)
+    assert results[1].package_type == "PackagedUsageHistory"
+    assert results[1].capability == "microphone"
+    assert results[1].package_family_name == "Microsoft.WindowsSoundRecorder_8wekyb3d8bbwe"
+    assert results[1].app_name == "Sound Recorder"
+
+    # Record windows/cam/identityrelationshiphistory - NonPackagedIdentityRelationship
+    assert results[2].last_observed_time == wintimestamp(133892048101847846)
+    assert results[2].file_id == "0000565c728f1a97551d85db2e788c69e0d8a18ea777"
+    assert results[0].binary_full_path == "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+
+    # Record windows/cam/globalprompthistory - NonPackagedGlobalPromptHistory
+    # No test data for this record type.
+
+
+def test_cam_registry(target_win_users: Target, hive_hku: VirtualHive, hive_hklm: VirtualHive) -> None:
     hku_cam_key = VirtualKey(
         hive_hku,
         "Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\webcam",
