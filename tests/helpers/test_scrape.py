@@ -57,9 +57,9 @@ def test_one_needle() -> None:
 
     found_needles = list(scrape.find_needles(stream, needles=[needle], block_size=block_size))
     assert found_needles == [
-        (needle, needle_offsets[0]),
-        (needle, needle_offsets[1]),
-        (needle, needle_offsets[2]),
+        (needle, needle_offsets[0], None),
+        (needle, needle_offsets[1], None),
+        (needle, needle_offsets[2], None),
     ]
 
     stream.seek(0)
@@ -81,9 +81,9 @@ def test_one_needle() -> None:
     )
 
     assert found_chunks == [
-        (needle, needle_offsets[0], chunks[0]),
-        (needle, needle_offsets[1], chunks[1]),
-        (needle, needle_offsets[2], chunks[2]),
+        (needle, needle_offsets[0], chunks[0], None),
+        (needle, needle_offsets[1], chunks[1], None),
+        (needle, needle_offsets[2], chunks[2], None),
     ]
 
     stream.seek(0)
@@ -172,11 +172,11 @@ def test_multiple_needles() -> None:
 
     found_needles = list(scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size))
     assert found_needles == [
-        (needle1, needle_offsets[0]),
-        (needle2, needle_offsets[1]),
-        (needle3, needle_offsets[2]),
-        (needle1, needle_offsets[3]),
-        (needle2, needle_offsets[4]),
+        (needle1, needle_offsets[0], None),
+        (needle2, needle_offsets[1], None),
+        (needle3, needle_offsets[2], None),
+        (needle1, needle_offsets[3], None),
+        (needle2, needle_offsets[4], None),
     ]
 
     stream.seek(0)
@@ -194,11 +194,11 @@ def test_multiple_needles() -> None:
     )
 
     assert found_chunks == [
-        (needle1, needle_offsets[0], chunks[0]),
-        (needle2, needle_offsets[1], chunks[1]),
-        (needle3, needle_offsets[2], chunks[2]),
-        (needle1, needle_offsets[3], chunks[3]),
-        (needle2, needle_offsets[4], chunks[4]),
+        (needle1, needle_offsets[0], chunks[0], None),
+        (needle2, needle_offsets[1], chunks[1], None),
+        (needle3, needle_offsets[2], chunks[2], None),
+        (needle1, needle_offsets[3], chunks[3], None),
+        (needle2, needle_offsets[4], chunks[4], None),
     ]
 
 
@@ -222,18 +222,18 @@ def test_multiple_overlapping_needles() -> None:
     found_needles = list(scrape.find_needles(stream, needles=[needle1, needle2, needle3], block_size=block_size))
     # 2 full needles + 2 from overlapping 'YYYBBAAAZZZ'
     assert found_needles == [
-        (needle1, 0),
-        (needle2, 8),
-        (needle3, 17),
-        (needle1, 19),
+        (needle1, 0, None),
+        (needle2, 8, None),
+        (needle3, 17, None),
+        (needle1, 19, None),
     ]
 
 
 def test_find_needle() -> None:
     buf = b"A" * 100 + b"needle" + b"B" * 100
 
-    assert list(scrape.find_needles(io.BytesIO(buf), [b"needle"])) == [(b"needle", 100)]
-    assert list(scrape.find_needles(io.BytesIO(buf), b"needle")) == [(b"needle", 100)]
+    assert list(scrape.find_needles(io.BytesIO(buf), [b"needle"])) == [(b"needle", 100, None)]
+    assert list(scrape.find_needles(io.BytesIO(buf), b"needle")) == [(b"needle", 100, None)]
 
     with pytest.raises(ValueError, match="At least one needle value must be provided"):
         list(scrape.find_needles(io.BytesIO(buf), []))
@@ -246,7 +246,9 @@ def test_find_needle() -> None:
     mock_progress.assert_called_once_with(0)
 
     buf = io.BytesIO(b"A" * 100 + b"needle" + b"B" * 100 + b"needle" + b"C" * 100 + b"needle" + b"D" * 100)
-    for i, (_needle, offset) in enumerate(scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)):
+    for i, (_needle, offset, _match) in enumerate(
+        scrape.find_needles(buf, [b"needle"], lock_seek=False, block_size=100)
+    ):
         if i == 0:
             assert offset == 100
             buf.seek(300)
