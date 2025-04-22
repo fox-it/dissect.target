@@ -81,9 +81,11 @@ class ESXiPlugin(UnixPlugin):
         configstore = target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
-
-        # Mount NFS shares after parsing the config store
-        self._mount_nfs_shares()
+            self._mount_nfs_shares()
+        else:
+            self.target.log.warning(
+                "No configstore found, some functionality may not work (such as mounting NFS shares)"
+            )
 
     def _cfg(self, path: str) -> str | None:
         if not self._config:
@@ -205,9 +207,8 @@ class ESXiPlugin(UnixPlugin):
         return OperatingSystem.ESXI.value
 
     def _mount_nfs_shares(self) -> None:
-        # Mount NFS shares
+        """Mount NFS shares found in the configstore."""
         if not self._configstore:
-            self.target.log.warning("Unable to mount NFS shares, no configstore found")
             return
 
         nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})

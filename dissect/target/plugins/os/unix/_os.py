@@ -344,7 +344,7 @@ class UnixPlugin(OSPlugin):
                     return
 
             self.target.log.debug("No user has access to NFS share %s:%s at %s", address, exported_dir, mount_point)
-            raise FilesystemError("No user has access to NFS share %s:%s at %s", address, exported_dir, mount_point)
+            raise FilesystemError(f"No user has access to NFS share {address}:{exported_dir} at {mount_point}")
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
