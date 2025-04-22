@@ -139,12 +139,6 @@ class QFindPlugin(Plugin):
             self.target.log.error("No needles to search for (use '--needles' or '--needle-file')")
             return
 
-        if strip_null_bytes and progress:
-            self.target.log.error(
-                "Cannot use --strip-null-bytes in 'target-qfind', only applicable to 'target-query -f qfind'"
-            )
-            return
-
         if ignore_case and not regex:
             tmp = {}
             for encoded_needle, _ in needle_lookup.items():

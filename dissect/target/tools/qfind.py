@@ -11,6 +11,7 @@ from dissect.target.exceptions import TargetError
 from dissect.target.helpers.scrape import recover_string
 from dissect.target.plugins.scrape.qfind import QFindMatchRecord, QFindPlugin
 from dissect.target.target import Target
+from dissect.target.tools.query import record_output
 from dissect.target.tools.utils import (
     catch_sigpipe,
     configure_generic_arguments,
@@ -36,6 +37,9 @@ def main() -> int:
         "-R", "--raw", action="store_true", help="show raw hex dumps instead of post-processed string output"
     )
     parser.add_argument("--allow-non-ascii", action="store_true", help="allow non-ASCII characters in the output")
+    parser.add_argument("-j", "--json", action="store_true", help="output records as json")
+    parser.add_argument("-r", "--record", action="store_true", help="output records")
+    parser.add_argument("-s", "--strings", action="store_true", help="print record output as string")
 
     for args, kwargs in getattr(QFindPlugin.qfind, "__args__", []):
         parser.add_argument(*args, **kwargs)
@@ -48,6 +52,13 @@ def main() -> int:
     if not args.targets:
         log.error("No targets provided")
         return 1
+
+    if args.record or args.json:
+        RECORD_OUTPUT = True
+        rs = record_output(args.strings, args.json)
+
+    else:
+        RECORD_OUTPUT = False
 
     try:
         for target in Target.open_all(args.targets, args.children):
@@ -64,6 +75,10 @@ def main() -> int:
                 args.strip_null_bytes,
                 progress=True,
             ):
+                if RECORD_OUTPUT:
+                    rs.write(hit)
+                    continue
+
                 header = f"[{hit.offset:#08x} @ {hit.needle} ({hit.codec})]"
 
                 if not NO_COLOR:
@@ -99,7 +114,8 @@ def main() -> int:
                     )
                     print("".join(hit))
 
-        print(end="\r\n")
+        if not RECORD_OUTPUT:
+            print(end="\r\n")
 
     except TargetError as e:
         log.error(e)  # noqa: TRY400
