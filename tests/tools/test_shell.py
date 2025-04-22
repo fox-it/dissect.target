@@ -26,12 +26,14 @@ from dissect.target.tools.shell import main as target_shell
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
+    from types import CoroutineType
 
     from dissect.target.target import Target
 
 try:
     import pexpect
+    import pexpect.expect
 
     HAS_PEXPECT = True
 except ImportError:
@@ -46,6 +48,41 @@ INPUT_STREAM = f"""
     {GREP_MISSING}
     last line
 """
+
+if HAS_PEXPECT:
+
+    class AnsiExpecter(pexpect.expect.Expecter):
+        ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
+        """Matches on carriage returns (``\x0d`` / ``\r``) so change your ``child.expect()`` calls accordingly."""
+
+        def new_data(self, data: bytes) -> int | None:
+            data = self.ANSI_ESCAPE.sub(b"", data)
+            return pexpect.expect.Expecter.new_data(self, data)
+
+    class AnsiSpawn(pexpect.spawn):
+        def expect_list(
+            self, pattern_list: Iterable, timeout: float = -1, searchwindowsize: int = -1, async_: bool = False, **kw
+        ) -> int | CoroutineType:
+            """Override :meth:`SpawnBase.expect_list` with our own :class:`AnsiExpecter`.
+
+            In sync with commit ``acb017a`` (2022-02-06).
+
+            Resources:
+                - https://github.com/pexpect/pexpect/blob/master/pexpect/spawnbase.py
+            """
+            if timeout == -1:
+                timeout = self.timeout
+            if "async" in kw:
+                async_ = kw.pop("async")
+            if kw:
+                raise TypeError(f"Unknown keyword arguments: {kw}")
+
+            exp = AnsiExpecter(self, pexpect.expect.searcher_re(pattern_list), searchwindowsize)
+            if async_:
+                from pexpect._async import expect_async
+
+                return expect_async(exp, timeout)
+            return exp.expect_loop(timeout)
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
@@ -411,7 +448,7 @@ def test_shell_prompt_tab_autocomplete() -> None:
     target_path = absolute_path("_data/tools/info/image.tar")
 
     # We set NO_COLOR=1 so that the output is not colored and easier to match
-    child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+    child = AnsiSpawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
 
     # increase window size to avoid line wrapping
     child.setwinsize(100, 100)
@@ -421,11 +458,11 @@ def test_shell_prompt_tab_autocomplete() -> None:
     # this should auto complete to `ls /home/user`
     child.sendline("ls /home/u\t")
     # expect the prompt to be printed again
-    child.expect(re.escape("ls /home/user/\r\n"), timeout=5)
+    child.expect(re.escape("ls /home/user/\n"), timeout=5)
     # execute the autocompleted command
     child.send("\n")
     # we expect the files in /home/user to be printed
-    child.expect(re.escape(".bash_history\r\n.zsh_history\r\n"), timeout=5)
+    child.expect(re.escape(".bash_history\n.zsh_history\n"), timeout=5)
     child.expect(re.escape("ubuntu:/$ "), timeout=5)
 
     # send partial ls /etc/ command
@@ -435,12 +472,12 @@ def test_shell_prompt_tab_autocomplete() -> None:
     child.send("\t\t")
 
     # expect the files in /etc/ to be printed
-    child.expect(r"hosts\s+localtime\s+network/\s+os-release\s+passwd\s+shadow\s+timezone\s*\r\n", timeout=5)
+    child.expect(r"hosts\s+localtime\s+network/\s+os-release\s+passwd\s+shadow\s+timezone\s*\n", timeout=5)
 
     # send newline to just list everything in /etc/
     child.send("\n")
     # expect the last few files in /etc/ to be printed
-    child.expect("shadow\r\ntimezone\r\n", timeout=5)
+    child.expect("shadow\ntimezone\n", timeout=5)
 
     # exit the shell
     child.expect(re.escape("ubuntu:/$ "), timeout=5)
