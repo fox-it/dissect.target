@@ -5,11 +5,14 @@ from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from typing import TYPE_CHECKING
 
+import pytest
+
 from dissect.target.plugins.apps.webserver.apache import (
     LOG_FORMAT_ACCESS_COMBINED,
     LOG_FORMAT_ACCESS_COMMON,
     LOG_FORMAT_ACCESS_VHOST_COMBINED,
     ApachePlugin,
+    LogFormat,
 )
 from tests._utils import absolute_path
 
@@ -18,35 +21,45 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 
-def test_infer_access_log_format_combined() -> None:
-    log_combined = (
-        '127.0.0.1 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0 '
-        "(Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 "
-        'Safari/537.36"'
-    )
-    assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
-
-
-def test_infer_access_log_format_vhost_combined() -> None:
-    log_vhost_combined = (
-        'example.com:80 127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 '
-        '"-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/108.0.0.0 Safari/537.36"'
-    )
-    assert ApachePlugin.infer_access_log_format(log_vhost_combined) == LOG_FORMAT_ACCESS_VHOST_COMBINED
-
-
-def test_infer_access_log_format_common() -> None:
-    log_common = '127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312'
-    assert ApachePlugin.infer_access_log_format(log_common) == LOG_FORMAT_ACCESS_COMMON
-
-
-def test_infer_access_log_ipv6() -> None:
-    log_combined = (
-        '2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [20/Dec/2022:15:18:01 +0100] "GET / HTTP/1.1" 200 '
-        '1126 "-" "curl/7.81.0"'
-    )
-    assert ApachePlugin.infer_access_log_format(log_combined) == LOG_FORMAT_ACCESS_COMBINED
+@pytest.mark.parametrize(
+    ("log_line", "expected_log_format"),
+    [
+        pytest.param(
+            (
+                '127.0.0.1 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0 '
+                "(Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 "
+                'Safari/537.36"'
+            ),
+            LOG_FORMAT_ACCESS_COMBINED,
+            id="combined",
+        ),
+        pytest.param(
+            (
+                '2001:0db8:85a3:0000:0000:8a2e:0370:7334 - - [20/Dec/2022:15:18:01 +0100] "GET / HTTP/1.1" 200 '
+                '1126 "-" "curl/7.81.0"'
+            ),
+            LOG_FORMAT_ACCESS_COMBINED,
+            id="combined-ipv6",
+        ),
+        pytest.param(
+            (
+                'example.com:80 127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312 '
+                '"-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/108.0.0.0 Safari/537.36"'
+            ),
+            LOG_FORMAT_ACCESS_VHOST_COMBINED,
+            id="vhost-combined",
+        ),
+        pytest.param(
+            '127.0.0.1 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312',
+            LOG_FORMAT_ACCESS_COMMON,
+            id="common",
+        ),
+    ],
+)
+def test_infer_access_log_format(log_line: str, expected_log_format: LogFormat) -> None:
+    """test if we infer the access log format for given log lines correctly."""
+    assert ApachePlugin.infer_access_log_format(log_line) == expected_log_format
 
 
 def test_txt(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -113,7 +126,7 @@ def test_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem)
     assert combined_log.ts == datetime(2022, 12, 19, 17, 6, 19, tzinfo=tz)
     assert combined_log.status_code == 200
     assert combined_log.remote_ip == "1.2.3.4"
-    assert combined_log.remote_user == "-"
+    assert combined_log.remote_user is None
     assert combined_log.method == "GET"
     assert combined_log.uri == "/"
     assert combined_log.protocol == "HTTP/1.1"
@@ -128,11 +141,11 @@ def test_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem)
     assert vhost_combined_log.ts == datetime(2022, 12, 19, 17, 25, 40, tzinfo=tz)
     assert vhost_combined_log.status_code == 200
     assert vhost_combined_log.remote_ip == "1.2.3.4"
-    assert vhost_combined_log.remote_user == "-"
+    assert vhost_combined_log.remote_user is None
     assert vhost_combined_log.method == "GET"
     assert vhost_combined_log.uri == "/index.html"
     assert vhost_combined_log.protocol == "HTTP/1.1"
-    assert vhost_combined_log.referer == "-"
+    assert vhost_combined_log.referer is None
     assert (
         vhost_combined_log.useragent
         == "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 "
@@ -143,7 +156,7 @@ def test_all_access_log_formats(target_unix: Target, fs_unix: VirtualFilesystem)
     assert common_log.ts == datetime(2022, 12, 19, 17, 25, 48, tzinfo=tz)
     assert common_log.status_code == 200
     assert common_log.remote_ip == "4.3.2.1"
-    assert common_log.remote_user == "-"
+    assert common_log.remote_user is None
     assert common_log.method == "GET"
     assert common_log.uri == "/"
     assert common_log.protocol == "HTTP/1.1"
@@ -402,3 +415,52 @@ def test_apache_virtual_hosts(target_unix: Target, fs_unix: VirtualFilesystem) -
     assert records[1].server_port == 80
     assert records[1].root_path == "/path/to/other/html"
     assert records[1].source == "/etc/apache2/sites-available/example.conf"
+
+
+def test_apache_access_format_malformed_regression(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """Test if we correctly detect and parse some "malformed" access log formats."""
+
+    # Combined format without e.g. 'GET / HTTP/1.1' but instead '"-"'.
+    combined_without_http_phrase = b'1.2.3.4 - - [11/Nov/2025:12:34:56 +0100] "-" 418 - "-" "-"'
+
+    # Common format without a response size in bytes e.g. 1234 but instead '-'.
+    common_without_response_size = b'5.6.7.8 - - [31/Dec/2025:01:23:45 +0100] "GET / HTTP/1.1" 418 -'
+
+    fs_unix.map_file_fh(
+        "/var/log/apache2/access.log", BytesIO(combined_without_http_phrase + b"\n" + common_without_response_size)
+    )
+
+    target_unix.add_plugin(ApachePlugin)
+    results = list(target_unix.apache.access())
+
+    assert len(results) == 2
+
+    assert results[0].ts == datetime(2025, 11, 11, 11, 34, 56, 0, tzinfo=timezone.utc)
+    assert results[0].remote_user is None
+    assert results[0].remote_ip == "1.2.3.4"
+    assert results[0].local_ip is None
+    assert results[0].pid is None
+    assert results[0].method is None
+    assert results[0].uri is None
+    assert results[0].protocol is None
+    assert results[0].status_code == 418
+    assert results[0].bytes_sent == 0
+    assert results[0].referer is None
+    assert results[0].useragent is None
+    assert results[0].response_time_ms is None
+    assert results[0].source == "/var/log/apache2/access.log"
+
+    assert results[1].ts == datetime(2025, 12, 31, 0, 23, 45, 0, tzinfo=timezone.utc)
+    assert results[1].remote_user is None
+    assert results[1].remote_ip == "5.6.7.8"
+    assert results[1].local_ip is None
+    assert results[1].pid is None
+    assert results[1].method == "GET"
+    assert results[1].uri == "/"
+    assert results[1].protocol == "HTTP/1.1"
+    assert results[1].status_code == 418
+    assert results[1].bytes_sent == 0
+    assert results[1].referer is None
+    assert results[1].useragent is None
+    assert results[1].response_time_ms is None
+    assert results[1].source == "/var/log/apache2/access.log"

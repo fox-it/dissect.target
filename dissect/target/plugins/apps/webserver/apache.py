@@ -107,11 +107,17 @@ RE_ACCESS_COMMON_PATTERN = r"""
     \s
     (\[(?P<pid>[0-9]+)\]\s)?            # The process ID of the child that serviced the request (optional).
     "
-    (?P<method>.*?)                     # The HTTP Method used for the request.
-    \s
-    (?P<uri>.*?)                        # The HTTP URI of the request.
-    \s
-    ?(?P<protocol>HTTP\/.*?)?           # The request protocol.
+    (
+        -                               # Malformed requests may result in the value "-"
+        |
+        (
+            (?P<method>.*?)             # The HTTP Method used for the request.
+            \s
+            (?P<uri>.*?)                # The HTTP URI of the request.
+            \s
+            ?(?P<protocol>HTTP\/.*?)?   # The request protocol.
+        )
+    )
     "
     \s
     (?P<status_code>\d{3})              # The HTTP Status Code of the response.
@@ -403,17 +409,17 @@ class ApachePlugin(WebserverPlugin):
 
                 yield WebserverAccessLogRecord(
                     ts=datetime.strptime(log["ts"], "%d/%b/%Y:%H:%M:%S %z"),
-                    remote_user=log["remote_user"],
+                    remote_user=clean_value(log["remote_user"]),
                     remote_ip=log["remote_ip"],
-                    local_ip=log.get("local_ip"),
+                    local_ip=clean_value(log.get("local_ip")),
                     method=log["method"],
                     uri=log["uri"],
                     protocol=log["protocol"],
                     status_code=log["status_code"],
-                    bytes_sent=log["bytes_sent"].strip("-") or 0,
+                    bytes_sent=clean_value(log["bytes_sent"]) or 0,
                     pid=log.get("pid"),
-                    referer=log.get("referer"),
-                    useragent=log.get("useragent"),
+                    referer=clean_value(log.get("referer")),
+                    useragent=clean_value(log.get("useragent")),
                     response_time_ms=response_time,
                     source=path,
                     _target=self.target,
@@ -522,7 +528,6 @@ class ApachePlugin(WebserverPlugin):
 
         Three default log type examples from Apache (note that the ipv4 could also be ipv6)
 
-
         Combined::
 
             1.2.3.4 - - [19/Dec/2022:17:25:12 +0100] "GET / HTTP/1.1" 304 247 "-" "Mozilla/5.0
@@ -532,6 +537,7 @@ class ApachePlugin(WebserverPlugin):
         Common::
 
             1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 200 312
+            1.2.3.4 - - [19/Dec/2022:17:25:40 +0100] "GET / HTTP/1.1" 301 -
 
         vhost_combined::
 
@@ -547,7 +553,17 @@ class ApachePlugin(WebserverPlugin):
         if line[-1] == '"':
             # ends with a quotation mark but does not contain a response time, meaning there is only a user agent
             return LOG_FORMAT_ACCESS_COMBINED
-        if line[-1].isdigit():
+        if line[-1].isdigit() or line[-1] == "-":
+            # ends with a digit or '-' indicating response size in bytes
             return LOG_FORMAT_ACCESS_COMMON
 
         return None
+
+
+def clean_value(value: str | None) -> str | None:
+    """Clean the given value by replacing empty strings and ``"-"`` with ``None``."""
+
+    if not value or value == "-":
+        return None
+
+    return value
