@@ -27,7 +27,6 @@ from dissect.target.plugin import (
     PluginDescriptorLookup,
     PluginRegistry,
     _find_py_files,
-    _generate_long_paths,
     _save_plugin_import_failure,
     alias,
     environment_variable_paths,
@@ -49,11 +48,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from flow.record import Record
-
-
-@pytest.fixture(autouse=True)
-def clear_caches() -> None:
-    _generate_long_paths.cache_clear()
 
 
 def test_save_plugin_import_failure() -> None:
@@ -571,6 +565,33 @@ def test_namespace_plugin_registration(mock_plugins: PluginRegistry) -> None:
     assert next(lookup("NS.test")).exported
     assert next(lookup("t1")).exported
     assert next(lookup("t1.test")).exported
+
+
+@patch("dissect.target.plugin.PLUGINS", new_callable=PluginRegistry)
+def test_namesplace_plugin_multiple_same_module(mock_plugins: PluginRegistry) -> None:
+    class NS(NamespacePlugin):
+        __namespace__ = "ns"
+
+        def check_compatible(self) -> None:
+            return None
+
+    class Foo(NS):
+        __namespace__ = "foo"
+
+        @export(output="yield")
+        def baz(self) -> Iterator[str]:
+            yield from ["foo"]
+
+    class Bar(NS):
+        __namespace__ = "bar"
+
+        @export(output="yield")
+        def baz(self) -> Iterator[str]:
+            yield from ["bar"]
+
+    result, _ = find_functions("*.baz")
+    assert len(result) == 2
+    assert sorted(desc.name for desc in result) == ["bar.baz", "foo.baz"]
 
 
 def test_find_plugin_function_default(target_default: Target) -> None:
