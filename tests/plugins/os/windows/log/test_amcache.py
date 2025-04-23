@@ -91,7 +91,7 @@ def test_amcache_windows_11_general(target_win: Target, fs_win: VirtualFilesyste
     fs_win.map_file("windows/appcompat/pca/PcaGeneralDb0.txt", db0_file)
     fs_win.map_file("windows/appcompat/pca/PcaGeneralDb1.txt", db1_file)
 
-    # To rest path resolving
+    # To test path resolving
     fs_win.map_file_fh("C:\\Program Files\\freefilesync\\bin\\freefilesync_x64.exe", BytesIO(b""))
 
     target_win.add_plugin(AmcachePlugin)

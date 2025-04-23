@@ -667,6 +667,7 @@ class AmcachePlugin(AmcachePluginOldMixin, Plugin):
 
         References:
             - https://aboutdfir.com/new-windows-11-pro-22h2-evidence-of-execution-artifact/
+            - https://www.sygnia.co/blog/new-windows-11-pca-artifact/
         """
 
         for path in self.target.fs.path("sysvol/windows/appcompat/pca").glob("PcaGeneralDb*.txt"):

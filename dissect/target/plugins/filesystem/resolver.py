@@ -29,11 +29,11 @@ class ResolverPlugin(Plugin):
     def resolve(self, path: str, user: str | None = None) -> fsutil.TargetPath:
         """Resolve a partial path string to a file or directory present in the target.
 
-        For Windows known file locations are searched, e.g. paths from the %path% variable and common path extentions
-        tried. If a user SID is provided that user's %path% variable is used.
+        For Windows known file locations are searched, e.g. paths from the ``%path%`` variable and common
+        path extensions tried. If a user SID is provided that user's ``%path%`` variable is used.
         """
         if not path:
-            return path
+            return self.target.fs.path(path)
 
         if self.target.os == OperatingSystem.WINDOWS:
             resolved_path = self.resolve_windows(path, user_sid=user)
