@@ -60,14 +60,7 @@ def find_needles(
             offset = fh.tell()
 
         read_size = min(block_size, end - offset) if end is not None else block_size
-        next_block = None
-
-        try:
-            next_block = fh.read(read_size)
-        except EOFError:
-            break
-
-        if not next_block:
+        if not (next_block := fh.read(read_size)):
             break
 
         if progress:
