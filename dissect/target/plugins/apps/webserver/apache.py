@@ -563,7 +563,7 @@ class ApachePlugin(WebserverPlugin):
 def clean_value(value: str | None) -> str | None:
     """Clean the given value by replacing empty strings and ``"-"`` with ``None``."""
 
-    if not value or value == "-":
+    if value in ("-", ""):
         return None
 
     return value
