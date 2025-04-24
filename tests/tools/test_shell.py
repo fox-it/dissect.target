@@ -49,7 +49,7 @@ INPUT_STREAM = f"""
     last line
 """
 
-if HAS_PEXPECT:
+if HAS_PEXPECT and platform.system() != "Windows":
 
     class AnsiExpecter(pexpect.expect.Expecter):
         ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
@@ -435,10 +435,6 @@ def test_shell_hostname_escaping(
 
 
 @pytest.mark.skipif(not HAS_PEXPECT, reason="requires pexpect")
-@pytest.mark.skipif(
-    platform.python_implementation() == "PyPy",
-    reason="PyPy's prompt contains too much ANSI escape codes",
-)
 @pytest.mark.skipif(
     platform.system() == "Windows",
     reason="pexpect.spawn not available on Windows",
