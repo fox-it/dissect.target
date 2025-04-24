@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from dissect.target.target import Target
 
 try:
-    from Crypto.Cipher import AES
+    from Crypto.Cipher import AES, ChaCha20_Poly1305
     from Crypto.Protocol.KDF import PBKDF2
 
     HAS_CRYPTO = True
@@ -61,7 +61,7 @@ struct Envelope {
     char    ciphertext[ciphertext_len]; // basically until EOF
 };
 struct GoogleChromeCipher {
-    char    flag[1];
+    uint8   flag;                       // 0x01 = AES GCM, 0x02 = ChaCha20 Poly1305
     char    iv[12];
     char    ciphertext[32];
     char    mac_tag[16];
@@ -593,13 +593,21 @@ class ChromiumMixin:
                     keys["app_bound_key"] = s_plaintext.ciphertext
 
                 else:
-                    # Google Chrome has encrypted the decryption key using AES GCM and a static key.
+                    # Google Chrome has encrypted the AES decryption key using either AES GCM or ChaCha20 Poly1305
+                    # using a static key.
                     data = c_elevation.GoogleChromeCipher(s_plaintext.ciphertext)
 
-                    static_elevation_key = bytes.fromhex(
-                        "b31c6e241ac846728da9c1fac4936651cffb944d143ab816276bcc6da0284787"
-                    )
-                    cipher = AES.new(static_elevation_key, AES.MODE_GCM, nonce=data.iv)
+                    if data.flag == 0x01:
+                        key = bytes.fromhex("b31c6e241ac846728da9c1fac4936651cffb944d143ab816276bcc6da0284787")
+                        cipher = AES.new(key=key, mode=AES.MODE_GCM, nonce=data.iv)
+
+                    elif data.flag == 0x02:
+                        key = bytes.fromhex("e98f37d7f4e1fa433d19304dc2258042090e2d1d7eea7670d41f738d08729660")
+                        cipher = ChaCha20_Poly1305.new(key=key, nonce=data.iv)
+
+                    else:
+                        raise ValueError("Unsupported ElevationService key flag {data.flag!r}")  # noqa: TRY301
+
                     aes_key = cipher.decrypt_and_verify(data.ciphertext, data.mac_tag)
                     keys["app_bound_key"] = aes_key
 
