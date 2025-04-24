@@ -1,13 +1,15 @@
 [build-system]
-requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=65.5.0", "setuptools_scm[toml]>=6.4.0", "tomli>=1; python_version < '3.11'"]
+backend-path = ["dissect/target"]
+build-backend = "_build"
 
 [project]
 name = "dissect.target"
 description = "This module ties all other Dissect modules together, it provides a programming API and command line tools which allow easy access to various data sources inside disk images or file collections (a.k.a. targets)"
 readme = "README.md"
 requires-python = "~=3.9"
-license.text = "Affero General Public License v3"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "COPYRIGHT"]
 authors = [
   {name = "Dissect Team", email = "dissect@fox-it.com"}
 ]
@@ -16,7 +18,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Intended Audience :: Information Technology",
-  "License :: OSI Approved",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
   "Topic :: Internet :: Log Analysis",
@@ -197,10 +198,10 @@ ignore = ["E203", "B904", "UP024", "ANN002", "ANN003", "ANN204", "ANN401", "SIM1
 known-first-party = ["dissect.target"]
 known-third-party = ["dissect"]
 
-[tool.setuptools]
-license-files = ["LICENSE", "COPYRIGHT"]
-
 [tool.setuptools.packages.find]
 include = ["dissect.*"]
+
+[tool.setuptools.cmdclass]
+build_py = "dissect.target._build.build_py"
 
 [tool.setuptools_scm]
