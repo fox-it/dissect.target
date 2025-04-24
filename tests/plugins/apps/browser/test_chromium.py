@@ -155,5 +155,5 @@ def test_unix_chromium_passwords_gnome(target_unix_users: Target, fs_unix: Virtu
 
 def test_decrypt_v10() -> None:
     encrypted = b"v10\xd0&E\xbb\x85\xe7_\xfd\xf8\x93\x90/\x08{'\xa9"
-    decrypted = decrypt_v10(encrypted)
+    decrypted = decrypt_v10(None, None, None, encrypted)
     assert decrypted == "password"
