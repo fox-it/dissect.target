@@ -14,6 +14,10 @@ from defusedxml import ElementTree
 from dissect.hypervisor.util import vmtar
 from dissect.sql import sqlite3
 
+from dissect.target.filesystems.nfs import NfsFilesystem
+from dissect.target.helpers.sunrpc import client
+from dissect.target.helpers.sunrpc.client import LocalPortPolicy
+
 try:
     from dissect.hypervisor.util.envelope import (
         HAS_PYCRYPTODOME,
@@ -77,6 +81,11 @@ class ESXiPlugin(UnixPlugin):
         configstore = target.fs.path("/var/lib/vmware/configstore/backup/current-store-1")
         if configstore.exists():
             self._configstore = parse_config_store(configstore.open())
+            self._mount_nfs_shares()
+        else:
+            self.target.log.warning(
+                "No configstore found, some functionality may not work (such as mounting NFS shares)"
+            )
 
     def _cfg(self, path: str) -> str | None:
         if not self._config:
@@ -197,6 +206,60 @@ class ESXiPlugin(UnixPlugin):
     def os(self) -> str:
         return OperatingSystem.ESXI.value
 
+    def _mount_nfs_shares(self) -> None:
+        """Mount NFS shares found in the configstore."""
+        if not self._configstore:
+            return
+
+        nfs_shares: dict[str, Any] = self._configstore.get("esx", {}).get("storage", {}).get("nfs_v3_datastores", {})
+        if not nfs_shares:
+            if self._is_nfs_enabled:
+                self.target.log.info("No NFS shares found in datastore")
+            return
+
+        for key, nfs_share in nfs_shares.items():
+            # Parse the NFS share configuration
+            user_value: dict[str, Any] = nfs_share.get("user_value", {})
+            nfs_ip = user_value.get("hostname", "")
+            volume_name = user_value.get("volume_name", "")
+            remote_share = user_value.get("remote_share", "")
+            if not nfs_ip or not volume_name or not remote_share:
+                self.target.log.warning("Invalid NFS share configuration with key: %s", key)
+                continue
+            mount_point = f"/vmfs/volumes/{volume_name}"
+            self._add_nfs(nfs_ip, remote_share, mount_point)
+
+    def _add_nfs(self, nfs_ip: str, remote_share: str, mount_alias: str) -> None:
+        """Mount NFS share to the target."""
+
+        if not self._is_nfs_enabled:
+            self._log_nfs_mount_disabled(nfs_ip, remote_share, mount_alias)
+            return
+
+        uuid = nfs_volume_uuid(nfs_ip, remote_share)
+        mount_point = f"/vmfs/volumes/{uuid}"
+        try:
+            self.target.log.debug("Mounting NFS share %s at %s with alias %s", remote_share, mount_point, mount_alias)
+
+            # On ESXi, there is typically only a single root user.
+            # Besides, UnixPlugin::users does not work (see issue https://github.com/fox-it/dissect.target/issues/1093).
+            # Moreover, socket rebinding is not implemented on ESXi.
+            # Therefore, we try logging only as root. This implies that he NFS share has `no_root_squash` enabled.
+            # According to the docs, ESxi mounts NFS shares using root privileges (https://www.vmware.com/docs/vmw-best-practices-running-nfs-vmware-vsphere)  # noqa: E501
+            credentials = client.auth_unix("machine", 0, 0, [])
+            nfs = NfsFilesystem.connect(nfs_ip, remote_share, credentials, LocalPortPolicy.PRIVILEGED)
+
+            self.target.fs.mount(mount_point, nfs)
+            self.target.fs.symlink(mount_point, mount_alias)
+        except Exception as e:
+            self.target.log.warning(
+                "Failed to mount NFS share %s:%s at %s",
+                nfs_ip,
+                remote_share,
+                mount_alias,
+            )
+            self.target.log.debug("", exc_info=e)
+
 
 def _mount_modules(target: Target, sysvol: Filesystem, cfg: dict[str, str]) -> None:
     modules = [m.strip() for m in cfg["modules"].split("---")]
@@ -262,7 +325,15 @@ def _decrypt_crypto_util(local_tgz_ve: TargetPath) -> BytesIO | None:
     """
 
     result = subprocess.run(
-        ["crypto-util", "envelope", "extract", "--aad", "ESXConfiguration", f"/{local_tgz_ve.as_posix()}", "-"],
+        [
+            "crypto-util",
+            "envelope",
+            "extract",
+            "--aad",
+            "ESXConfiguration",
+            f"/{local_tgz_ve.as_posix()}",
+            "-",
+        ],
         capture_output=True,
     )
 
@@ -400,7 +471,8 @@ def _link_log_dir(target: Target, cfg: dict[str, str], plugin_obj: ESXiPlugin) -
                     log_dir = "/scratch/log"
             except ConfigParserError as e:
                 target.log.warning(
-                    "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log", exc_info=e
+                    "Failed to read log_dir from vmsyslog.conf, falling back to /scratch/log",
+                    exc_info=e,
                 )
                 log_dir = "/scratch/log"
 
@@ -514,3 +586,75 @@ def parse_config_store(fh: BinaryIO) -> dict[str, Any]:
             identifier["revision"] = row.Revision
 
     return store
+
+
+def mix64(a: int, b: int, c: int) -> int:
+    """
+    Mixes three 64-bit values reversibly.
+    """
+    # Implement logical right shift by masking first
+    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 43)
+    b = (b - c - a) ^ (a << 9)
+    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 8)
+    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 38)
+    b = (b - c - a) ^ (a << 23)
+    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 5)
+    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 35)
+    b = (b - c - a) ^ (a << 49)
+    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 11)
+    a = (a - b - c) ^ ((c & 0xFFFFFFFFFFFFFFFF) >> 12)
+    b = (b - c - a) ^ (a << 18)
+    c = (c - a - b) ^ ((b & 0xFFFFFFFFFFFFFFFF) >> 22)
+    # Normalize to 64 bits
+    return a & 0xFFFFFFFFFFFFFFFF, b & 0xFFFFFFFFFFFFFFFF, c & 0xFFFFFFFFFFFFFFFF
+
+
+def esxi_hash(key: bytes, level: int) -> int:
+    """
+    Hashes a variable-length key into a 64-bit value.
+
+    This hash function is used in the ESXi kernel.
+    It is an exact implementation of the hash3 function defined here: http://burtleburtle.net/bob/c/lookup8.c
+    """
+    a: int = level
+    b: int = level
+    c: int = 0x9E3779B97F4A7C13  # Golden ratio, arbitrary value
+    bytes_left: int = len(key)
+    i: int = 0
+
+    # Process the key in 24-byte chunks
+    while bytes_left >= 24:
+        a += int.from_bytes(key[i : i + 8], "little")
+        b += int.from_bytes(key[i + 8 : i + 16], "little")
+        c += int.from_bytes(key[i + 16 : i + 24], "little")
+        a, b, c = mix64(a, b, c)
+        i += 24
+        bytes_left -= 24
+
+    # Handle the last 23 bytes
+    c = c + len(key)
+    if bytes_left > 0:
+        for shift, byte in enumerate(key[i:]):
+            if shift < 8:
+                a += byte << (shift * 8)
+            elif shift < 16:
+                b += byte << ((shift - 8) * 8)
+            else:
+                # c takes 23 - 8 - 8 = 7 bytes (length is added to LSB)
+                c += byte << ((shift - 15) * 8)
+
+    _, _, c = mix64(a, b, c)
+    return c
+
+
+def nfs_volume_uuid(host: str, path: str) -> str:
+    """Generate a UUID for an NFS volume based on the host and path.
+
+    This is used to create a unique identifier for NFS volumes in ESXi.
+    """
+
+    h1 = esxi_hash(host.encode(), 42)  # 42 is starting value
+    h2 = esxi_hash(path.encode(), h1)
+
+    low, high = h2 & 0xFFFFFFFF, ((h2 >> 32) & 0xFFFFFFFF)
+    return f"{low:8x}-{high:8x}"
