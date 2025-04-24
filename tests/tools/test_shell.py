@@ -26,8 +26,7 @@ from dissect.target.tools.shell import main as target_shell
 from tests._utils import absolute_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
-    from types import CoroutineType
+    from collections.abc import Iterator
 
     from dissect.target.target import Target
 
@@ -50,39 +49,12 @@ INPUT_STREAM = f"""
 """
 
 if HAS_PEXPECT and platform.system() != "Windows":
+    ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
+    original_new_data = pexpect.expect.Expecter.new_data
 
-    class AnsiExpecter(pexpect.expect.Expecter):
-        ANSI_ESCAPE = re.compile(rb"\x07|\x08|\x0d|\x7f|\x1b[@-_][0-?]*[ -/]*[@-~]")
+    def ansi_new_data(cls: pexpect.expect.Expecter, data: bytes) -> int | None:
         """Matches on carriage returns (``\x0d`` / ``\r``) so change your ``child.expect()`` calls accordingly."""
-
-        def new_data(self, data: bytes) -> int | None:
-            data = self.ANSI_ESCAPE.sub(b"", data)
-            return pexpect.expect.Expecter.new_data(self, data)
-
-    class AnsiSpawn(pexpect.spawn):
-        def expect_list(
-            self, pattern_list: Iterable, timeout: float = -1, searchwindowsize: int = -1, async_: bool = False, **kw
-        ) -> int | CoroutineType:
-            """Override :meth:`SpawnBase.expect_list` with our own :class:`AnsiExpecter`.
-
-            In sync with commit ``acb017a`` (2022-02-06).
-
-            Resources:
-                - https://github.com/pexpect/pexpect/blob/master/pexpect/spawnbase.py
-            """
-            if timeout == -1:
-                timeout = self.timeout
-            if "async" in kw:
-                async_ = kw.pop("async")
-            if kw:
-                raise TypeError(f"Unknown keyword arguments: {kw}")
-
-            exp = AnsiExpecter(self, pexpect.expect.searcher_re(pattern_list), searchwindowsize)
-            if async_:
-                from pexpect._async import expect_async
-
-                return expect_async(exp, timeout)
-            return exp.expect_loop(timeout)
+        return original_new_data(cls, ANSI_ESCAPE.sub(b"", data))
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unix-specific test.")
@@ -439,12 +411,14 @@ def test_shell_hostname_escaping(
     platform.system() == "Windows",
     reason="pexpect.spawn not available on Windows",
 )
+@patch("pexpect.expect.Expecter.new_data", new=ansi_new_data)
 def test_shell_prompt_tab_autocomplete() -> None:
     """Test the prompt tab-autocompletion."""
+
     target_path = absolute_path("_data/tools/info/image.tar")
 
     # We set NO_COLOR=1 so that the output is not colored and easier to match
-    child = AnsiSpawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
+    child = pexpect.spawn("target-shell", args=[str(target_path)], env=ChainMap(os.environ, {"NO_COLOR": "1"}))
 
     # increase window size to avoid line wrapping
     child.setwinsize(100, 100)
