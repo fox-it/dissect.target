@@ -315,8 +315,7 @@ class MSOffice(Plugin):
     def _walk_startup_folder(self, startup_folder: str, user_sid: str | None = None) -> Iterator[OfficeStartupItem]:
         """Resolve the given path and return all statup items."""
 
-        resolved_startup_folder_str = self.target.resolve(startup_folder, user_sid)
-        resolved_startup_folder: Path = self.target.fs.path(resolved_startup_folder_str)
+        resolved_startup_folder: Path = self.target.resolve(startup_folder, user_sid)
         if not resolved_startup_folder.is_dir():
             return
 
