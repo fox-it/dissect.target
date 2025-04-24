@@ -169,10 +169,14 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def domain(self) -> str | None:
-        if self._domain is None or self._domain == "localhost":
-            # fall back to /etc/hosts file
-            return self._hosts_dict.get("hostname")
-        return self._domain
+        if self._domain and "localhost" not in self._domain:
+            return self._domain
+
+        # fall back to /etc/hosts file
+        if "localhost" not in (domain := self._hosts_dict.get("hostname", "")):
+            return domain or None
+
+        return None
 
     @export(property=True)
     def os(self) -> str:
@@ -248,16 +252,8 @@ class UnixPlugin(OSPlugin):
 
         for dev_id, volume_name, mount_point, fs_type, options in parse_fstab(fstab, self.target.log):
             # Mount nfs, but only when target has been mapped by the `LocalLoader`
-            if fs_type == "nfs" and isinstance(self.target._loader, LocalLoader):
-                if "enable-nfs" in self.target.path_query:
-                    self._add_nfs(dev_id, volume_name, mount_point)
-                else:
-                    log.warning(
-                        "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
-                        dev_id,
-                        volume_name,
-                        mount_point,
-                    )
+            if fs_type == "nfs":
+                self._add_nfs(dev_id, volume_name, mount_point)
                 continue
 
             opts = parse_options_string(options)
@@ -298,10 +294,41 @@ class UnixPlugin(OSPlugin):
                     self.target.log.debug("Mounting %s (%s) at %s", fs, fs.volume, mount_point)
                     self.target.fs.mount(mount_point, fs)
 
+    @property
+    def _is_nfs_enabled(self) -> bool:
+        return isinstance(self.target._loader, LocalLoader) and "enable-nfs" in self.target.path_query
+
+    def _log_nfs_mount_disabled(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if isinstance(self.target._loader, LocalLoader):
+            log.warning(
+                "NFS mount %s:%s at %s is disabled. To enable, pass --enable-nfs to the local loader. Alternatively, add a query parameter to the target query string: local?enable-nfs",  # noqa: E501
+                address,
+                exported_dir,
+                mount_point,
+            )
+        else:
+            log.warning(
+                "NFS mount %s:%s at %s is unavailable on a non-local target",
+                address,
+                exported_dir,
+                mount_point,
+            )
+
     def _add_nfs(self, address: str, exported_dir: str, mount_point: str) -> None:
+        if not self._is_nfs_enabled:
+            self._log_nfs_mount_disabled(address, exported_dir, mount_point)
+            return
+
         # Try all users to see if we can access the share
         def auth_setter(nfs_client: NfsClient, filehandle: FileHandle, _: list[int]) -> None:
-            for user in self.users():
+            users = list(self.users())
+            if not users:
+                self.target.log.debug(
+                    "No users found, trying root for mounting NFS share %s:%s at %s", address, exported_dir, mount_point
+                )
+                users = [UnixUserRecord(uid=0, gid=0)]
+
+            for user in users:
                 if user.uid is None or user.gid is None:
                     continue
                 auth = auth_unix("machine", user.uid, user.gid, [])
@@ -320,7 +347,8 @@ class UnixPlugin(OSPlugin):
                     # We have access
                     return
 
-            raise FilesystemError("No user has access to NFS share")
+            self.target.log.debug("No user has access to NFS share %s:%s at %s", address, exported_dir, mount_point)
+            raise FilesystemError(f"No user has access to NFS share {address}:{exported_dir} at {mount_point}")
 
         try:
             self.target.log.debug("Mounting NFS share %s at %s", exported_dir, mount_point)
