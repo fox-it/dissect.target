@@ -131,13 +131,18 @@ class ChromiumMixin:
             FileNotFoundError: If the history file could not be found.
             SQLError: If the history file could not be opened.
         """
-
+        seen = set()
         dirs = list(self.DIRS)
         if subdirs:
             dirs.extend([join(dir, subdir) for dir, subdir in itertools.product(self.DIRS, subdirs)])
 
         for user, cur_dir in self._build_userdirs(dirs):
             db_file = cur_dir.joinpath(filename)
+
+            if db_file in seen:
+                continue
+            seen.add(db_file)
+
             try:
                 yield user, db_file, sqlite3.SQLite3(db_file.open())
             except FileNotFoundError:
