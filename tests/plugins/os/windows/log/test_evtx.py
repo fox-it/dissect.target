@@ -166,7 +166,7 @@ def test_evtx_key_deduplication(key: str, keys: set[str], expected_key: str) -> 
     assert evtx.unique_key(key, keys) == expected_key
 
 
-def test_evtx_single_file_mode(target_default: Target) -> None:
+def test_evtx_single_file_mode() -> None:
     data_path = absolute_path("_data/plugins/os/windows/log/evtx/TestLogX.evtx")
 
     target = Target.minimal([str(data_path)])

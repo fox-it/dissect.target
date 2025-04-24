@@ -32,7 +32,12 @@ class LogLoader(Loader):
 
     def __init__(self, path: Path, parsed_path: urllib.parse.ParseResult | None = None):
         super().__init__(path, parsed_path)
-        warnings.warn("The LogLoader is deprecated in favor of single files (--single_file)", DeprecationWarning)
+        warnings.warn(
+            "The LogLoader is deprecated in favor of single files (`--single-file`)"
+            " and will be removed in dissect.target 3.24",
+            FutureWarning,
+            stacklevel=2,
+        )
         self.options = dict(urllib.parse.parse_qsl(parsed_path.query, keep_blank_values=True)) if parsed_path else {}
 
     @staticmethod
