@@ -1,15 +1,19 @@
+import logging
 import re
 from datetime import datetime, timezone
+from typing import Callable
 
 import pytest
 from flow.record import GroupedRecord
 
-from dissect.target.plugins.os.windows.tasks import TasksPlugin
+from dissect.target.filesystem import Filesystem
+from dissect.target.plugins.os.windows.tasks._plugin import TaskRecord, TasksPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
 @pytest.fixture
-def setup_tasks_test(target_win, fs_win):
+def setup_tasks_test(target_win: Target, fs_win: Filesystem) -> None:
     xml_task_file = absolute_path("_data/plugins/os/windows/tasks/MapsToastTask")
     atjob_task_file = absolute_path("_data/plugins/os/windows/tasks/AtTask.job")
 
@@ -22,7 +26,20 @@ def setup_tasks_test(target_win, fs_win):
     target_win.add_plugin(TasksPlugin)
 
 
-def assert_xml_task_properties(xml_task):
+@pytest.fixture
+def setup_invalid_tasks_test(target_win: Target, fs_win: Filesystem, setup_tasks_test) -> None:
+    xml_task_file_invalid = absolute_path("_data/plugins/os/windows/tasks/InvalidTask")
+
+    fs_win.map_file("windows/system32/tasks/Microsoft/Windows/Maps/InvalidTask", xml_task_file_invalid)
+    fs_win.map_file(
+        "windows/system32/GroupPolicy/DataStore/ANY_SID/Machine/Preferences/ScheduledTasks/invalid_xml.xml",
+        xml_task_file_invalid,
+    )
+
+    target_win.add_plugin(TasksPlugin)
+
+
+def assert_xml_task_properties(xml_task: TaskRecord) -> None:
     assert str(xml_task.uri) == "\\Microsoft\\Windows\\Maps\\MapsToastTask"
     assert (
         xml_task.security_descriptor
@@ -70,7 +87,7 @@ def assert_xml_task_properties(xml_task):
     assert xml_task.data is None
 
 
-def assert_at_task_properties(at_task):
+def assert_at_task_properties(at_task: TaskRecord) -> None:
     assert at_task.uri is None
     assert at_task.security_descriptor is None
     assert str(at_task.task_path) == "sysvol\\windows\\tasks\\AtTask.job"
@@ -115,20 +132,20 @@ def assert_at_task_properties(at_task):
     assert at_task.data == "[]"
 
 
-def assert_xml_task_grouped_properties(xml_task_grouped):
+def assert_xml_task_grouped_properties(xml_task_grouped: GroupedRecord) -> None:
     assert xml_task_grouped.action_type == "ComHandler"
     assert xml_task_grouped.class_id == "{9885AEF2-BD9F-41E0-B15E-B3141395E803}"
     assert xml_task_grouped.data is None
 
 
-def assert_at_task_grouped_exec(at_task_grouped):
+def assert_at_task_grouped_exec(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.action_type == "Exec"
     assert at_task_grouped.arguments == ""
     assert at_task_grouped.command == "C:\\WINDOWS\\NOTEPAD.EXE"
     assert at_task_grouped.working_directory == "C:\\Documents and Settings\\John"
 
 
-def assert_at_task_grouped_daily(at_task_grouped):
+def assert_at_task_grouped_daily(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.days_between_triggers == 3
     assert at_task_grouped.end_boundary == "2023-05-12"
     assert at_task_grouped.execution_time_limit == "P3D"
@@ -139,13 +156,13 @@ def assert_at_task_grouped_daily(at_task_grouped):
     assert_at_task_grouped_padding(at_task_grouped)
 
 
-def assert_at_task_grouped_padding(at_task_grouped):
+def assert_at_task_grouped_padding(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.padding == 0
     assert at_task_grouped.reserved2 == 0
     assert at_task_grouped.reserved3 == 0
 
 
-def assert_at_task_grouped_monthlydow(at_task_grouped):
+def assert_at_task_grouped_monthlydow(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.records[1].enabled == "True"
     assert at_task_grouped.start_boundary == "2023-05-11"
     assert at_task_grouped.end_boundary == "2023-05-20"
@@ -159,7 +176,7 @@ def assert_at_task_grouped_monthlydow(at_task_grouped):
     assert_at_task_grouped_padding(at_task_grouped)
 
 
-def assert_at_task_grouped_weekly(at_task_grouped):
+def assert_at_task_grouped_weekly(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.records[1].enabled == "True"
     assert at_task_grouped.end_boundary == "2023-05-27"
     assert at_task_grouped.execution_time_limit == "P3D"
@@ -173,7 +190,7 @@ def assert_at_task_grouped_weekly(at_task_grouped):
     assert_at_task_grouped_padding(at_task_grouped)
 
 
-def assert_at_task_grouped_monthly_date(at_task_grouped):
+def assert_at_task_grouped_monthly_date(at_task_grouped: GroupedRecord) -> None:
     assert at_task_grouped.day_of_month == "15"
     assert at_task_grouped.months_of_year == ["March", "May", "June", "July", "August", "October"]
     assert at_task_grouped.records[1].enabled == "True"
@@ -193,7 +210,9 @@ def assert_at_task_grouped_monthly_date(at_task_grouped):
         (assert_at_task_properties, "AtTask"),
     ],
 )
-def test_single_record_properties(target_win, setup_tasks_test, assert_func, marker):
+def test_single_record_properties(
+    target_win: Target, setup_tasks_test: pytest.fixture, assert_func: Callable, marker: str
+) -> None:
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
@@ -213,9 +232,20 @@ def test_single_record_properties(target_win, setup_tasks_test, assert_func, mar
         (assert_at_task_grouped_monthly_date, "2023-05-29"),
     ],
 )
-def test_grouped_record_properties(target_win, setup_tasks_test, assert_func, marker):
+def test_grouped_record_properties(
+    target_win, setup_invalid_tasks_test: pytest.fixture, assert_func: Callable, marker: str
+) -> None:
     records = list(target_win.tasks())
     assert len(records) == 10
     pat = re.compile(rf"{marker}")
     grouped_records = filter(lambda x: re.findall(pat, str(x)) and isinstance(x, GroupedRecord), records)
     assert_func(list(grouped_records)[0])
+
+
+def test_xml_task_invalid(
+    target_win: Target, setup_invalid_tasks_test: pytest.fixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        assert len(list(target_win.tasks())) == 10
+        assert "Invalid task file encountered:" in caplog.text

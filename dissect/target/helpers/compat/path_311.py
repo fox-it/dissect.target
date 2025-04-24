@@ -17,34 +17,21 @@ Commit hash we're in sync with: 846a23d
 Notes:
     - CPython 3.11 ditched the _Accessor class, so we override the methods that should use it
 """
+
 from __future__ import annotations
 
 import fnmatch
 import re
 from pathlib import Path, PurePath, _PosixFlavour
-from stat import S_ISBLK, S_ISCHR, S_ISFIFO, S_ISSOCK
-from typing import IO, TYPE_CHECKING, Any, Callable, Iterator, Optional
+from typing import IO, TYPE_CHECKING, Any, Callable, Iterator
 
 from dissect.target import filesystem
-from dissect.target.exceptions import (
-    FileNotFoundError,
-    FilesystemError,
-    NotADirectoryError,
-    NotASymlinkError,
-    SymlinkRecursionError,
-)
-from dissect.target.helpers.compat.path_common import (
-    _DissectPathParents,
-    io_open,
-    isjunction,
-    realpath,
-    scandir,
-)
-from dissect.target.helpers.polypath import normalize
+from dissect.target.exceptions import FilesystemError, SymlinkRecursionError
+from dissect.target.helpers import polypath
+from dissect.target.helpers.compat import path_common
 
 if TYPE_CHECKING:
     from dissect.target.filesystem import Filesystem, FilesystemEntry
-    from dissect.target.helpers.compat.path_common import _DissectScandirIterator
     from dissect.target.helpers.fsutil import stat_result
 
 
@@ -101,7 +88,7 @@ class PureDissectPath(PurePath):
         path_args = []
         for arg in args[1:]:
             if isinstance(arg, str):
-                arg = normalize(arg, alt_separator=alt_separator)
+                arg = polypath.normalize(arg, alt_separator=alt_separator)
             path_args.append(arg)
 
         self = super()._from_parts(path_args)
@@ -155,8 +142,8 @@ class PureDissectPath(PurePath):
         return result
 
     @property
-    def parents(self) -> _DissectPathParents:
-        return _DissectPathParents(self)
+    def parents(self) -> path_common._DissectPathParents:
+        return path_common._DissectPathParents(self)
 
 
 class TargetPath(Path, PureDissectPath):
@@ -193,7 +180,7 @@ class TargetPath(Path, PureDissectPath):
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
-        for entry in scandir(self):
+        for entry in path_common.scandir(self):
             if entry.name in {".", ".."}:
                 # Yielding a path object for these makes little sense
                 continue
@@ -201,8 +188,8 @@ class TargetPath(Path, PureDissectPath):
             child_path._entry = entry
             yield child_path
 
-    def _scandir(self) -> _DissectScandirIterator:
-        return scandir(self)
+    def _scandir(self) -> path_common._DissectScandirIterator:
+        return path_common.scandir(self)
 
     # NOTE: Forward compatibility with CPython >= 3.12
     def walk(
@@ -267,7 +254,7 @@ class TargetPath(Path, PureDissectPath):
         normalizing it.
         """
 
-        s = realpath(self, strict=strict)
+        s = path_common.realpath(self, strict=strict)
         p = self._from_parts((self._fs, s))
 
         # In non-strict mode, realpath() doesn't raise on symlink loops.
@@ -306,9 +293,9 @@ class TargetPath(Path, PureDissectPath):
         self,
         mode: str = "rb",
         buffering: int = 0,
-        encoding: Optional[str] = None,
-        errors: Optional[str] = None,
-        newline: Optional[str] = None,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
     ) -> IO:
         """Open file and return a stream.
 
@@ -317,7 +304,7 @@ class TargetPath(Path, PureDissectPath):
         Note: in contrast to regular Python, the mode is binary by default. Text mode
         has to be explicitly specified. Buffering is also disabled by default.
         """
-        return io_open(self, mode, buffering, encoding, errors, newline)
+        return path_common.io_open(self, mode, buffering, encoding, errors, newline)
 
     def write_bytes(self, data: bytes) -> int:
         """
@@ -326,7 +313,7 @@ class TargetPath(Path, PureDissectPath):
         raise NotImplementedError("TargetPath.write_bytes() is unsupported")
 
     def write_text(
-        self, data: str, encoding: Optional[str] = None, errors: Optional[str] = None, newline: Optional[str] = None
+        self, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> int:
         """
         Open the file in text mode, write to it, and close the file.
@@ -430,36 +417,6 @@ class TargetPath(Path, PureDissectPath):
         """
         raise NotImplementedError("TargetPath.link_to() is unsupported")
 
-    def exists(self) -> bool:
-        """
-        Whether this path exists.
-        """
-        try:
-            # .exists() must resolve possible symlinks
-            self.get().stat()
-            return True
-        except (FileNotFoundError, NotADirectoryError, NotASymlinkError, SymlinkRecursionError, ValueError):
-            return False
-
-    def is_dir(self) -> bool:
-        """
-        Whether this path is a directory.
-        """
-        try:
-            return self.get().is_dir()
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_file(self) -> bool:
-        """
-        Whether this path is a regular file (also True for symlinks pointing
-        to regular files).
-        """
-        try:
-            return self.get().is_file()
-        except (FilesystemError, ValueError):
-            return False
-
     def is_mount(self) -> bool:
         """
         Check if this path is a POSIX mount point
@@ -480,57 +437,12 @@ class TargetPath(Path, PureDissectPath):
         parent_ino = self.parent.stat().st_ino
         return ino == parent_ino
 
-    def is_symlink(self) -> bool:
-        """
-        Whether this path is a symbolic link.
-        """
-        try:
-            return self.get().is_symlink()
-        except (FilesystemError, ValueError):
-            return False
-
     # NOTE: Forward compatibility with CPython >= 3.12
     def is_junction(self) -> bool:
         """
         Whether this path is a junction.
         """
-        return isjunction(self)
-
-    def is_block_device(self) -> bool:
-        """
-        Whether this path is a block device.
-        """
-        try:
-            return S_ISBLK(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_char_device(self) -> bool:
-        """
-        Whether this path is a character device.
-        """
-        try:
-            return S_ISCHR(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_fifo(self) -> bool:
-        """
-        Whether this path is a FIFO.
-        """
-        try:
-            return S_ISFIFO(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
-
-    def is_socket(self) -> bool:
-        """
-        Whether this path is a socket.
-        """
-        try:
-            return S_ISSOCK(self.stat().st_mode)
-        except (FilesystemError, ValueError):
-            return False
+        return path_common.isjunction(self)
 
     def expanduser(self) -> TargetPath:
         """Return a new path with expanded ~ and ~user constructs

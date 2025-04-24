@@ -23,7 +23,7 @@ from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.loaderutil import extract_path_info
 from dissect.target.helpers.record import ChildTargetRecord
 from dissect.target.helpers.utils import StrEnum, parse_path_uri, slugify
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 
 log = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ class Target:
         try:
             self._config = config.load(config_paths)
         except Exception as e:
-            self.log.warning("Error loading config file: %s", self.path)
+            self.log.warning("Error loading config file: %s", config_paths)
             self.log.debug("", exc_info=e)
             self._config = config.load(None)  # This loads an empty config.
 
@@ -117,6 +117,46 @@ class Target:
         self.filesystems = FilesystemCollection(self)
 
         self.fs = filesystem.RootFilesystem(self)
+
+    def __repr__(self) -> str:
+        return f"<Target {self.path}>"
+
+    def __getattr__(self, attr: str) -> Union[plugin.Plugin, Any]:
+        """Override of the default ``__getattr__`` so plugins and functions can be called from a ``Target`` object."""
+        p, func = self.get_function(attr)
+
+        if isinstance(func, property):
+            # If it's a property, execute it and return the result
+            try:
+                result = func.__get__(p)
+                self.send_event(Event.FUNC_EXEC, func=attr)
+                return result
+            except Exception:
+                if not attr.startswith("__"):
+                    self.send_event(
+                        Event.FUNC_EXEC_ERROR,
+                        func=attr,
+                        stacktrace=traceback.format_exc(),
+                    )
+                raise
+
+        return func
+
+    def __dir__(self) -> list[str]:
+        """Override the default ``__dir__`` to provide autocomplete for things like IPython."""
+        funcs = []
+        if self._os_plugin:
+            funcs = list(self._os_plugin.__functions__)
+
+        for plugin_desc in plugin.plugins(self._os_plugin):
+            funcs.extend(plugin_desc.functions)
+
+        result = set(self.__dict__.keys())
+        result.update(self.__class__.__dict__.keys())
+        result.update(object.__dict__.keys())
+        result.update(funcs)
+
+        return list(result)
 
     @classmethod
     def set_event_callback(cls, *, event_type: Optional[Event] = None, event_callback: Callable) -> None:
@@ -303,12 +343,13 @@ class Target:
                     try:
                         # Attempt to load the target using this loader
                         target = cls._load(sub_entry, ldr)
+                    except Exception as e:
+                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
+                        continue
+                    else:
                         loaded = True
                         at_least_one_loaded = True
                         yield target
-
-                    except Exception as e:
-                        getlogger(sub_entry).error("Failed to load target with loader %s", ldr, exc_info=e)
 
                     if include_children:
                         try:
@@ -338,23 +379,23 @@ class Target:
 
         for plugin_desc in plugin.child_plugins():
             try:
-                plugin_cls = plugin.load(plugin_desc)
+                plugin_cls: type[plugin.ChildTargetPlugin] = plugin.load(plugin_desc)
                 child_plugin = plugin_cls(self)
             except PluginError:
-                self.log.exception("Failed to load child plugin: %s", plugin_desc["class"])
+                self.log.exception("Failed to load child plugin: %s", plugin_desc.qualname)
                 continue
             except Exception:
-                self.log.exception("Broken child plugin: %s", plugin_desc["class"])
+                self.log.exception("Broken child plugin: %s", plugin_desc.qualname)
                 continue
 
             try:
                 child_plugin.check_compatible()
                 self._child_plugins[child_plugin.__type__] = child_plugin
             except PluginError as e:
-                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc["class"], e)
+                self.log.debug("Child plugin reported itself as incompatible: %s (%s)", plugin_desc.qualname, e)
             except Exception:
                 self.log.exception(
-                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc["class"]
+                    "An exception occurred while checking for child plugin compatibility: %s", plugin_desc.qualname
                 )
 
     def open_child(self, child: Union[str, Path]) -> Target:
@@ -406,6 +447,25 @@ class Target:
         for child_plugin in self._child_plugins.values():
             yield from child_plugin.list_children()
 
+    def reload(self) -> Target:
+        """Reload the current target.
+
+        Using the loader with which the target was originally loaded,
+        reload the path of the current target.
+        This is useful when the target is live.
+
+        Raises:
+            TargetError: If the target has no path or loader.
+
+        Returns:
+            A fresh ``Target`` object
+        """
+
+        if self._loader and self.path:
+            return self._load(self.path, self._loader)
+
+        raise TargetError("Target has no path and/or loader")
+
     @classmethod
     def _load(cls, path: Union[str, Path], ldr: loader.Loader) -> Target:
         """Internal function that attemps to load a path using a given loader.
@@ -451,7 +511,7 @@ class Target:
         if not len(self.disks) and not len(self.volumes) and not len(self.filesystems):
             raise TargetError(f"Failed to load target. No disks, volumes or filesystems: {self.path}")
 
-        candidates = []
+        candidates: list[tuple[plugin.PluginDescriptor, type[plugin.OSPlugin], filesystem.Filesystem]] = []
 
         for plugin_desc in plugin.os_plugins():
             # Subclassed OS Plugins used to also subclass the detection of the
@@ -465,25 +525,26 @@ class Target:
             #
             # Now subclassed OS Plugins are on the same detection "layer" as
             # regular OS Plugins, but can still inherit functions.
-            self.log.debug("Loading OS plugin: %s", plugin_desc["class"])
+            qualname = plugin_desc.qualname
+            self.log.debug("Loading OS plugin: %s", qualname)
             try:
-                os_plugin = plugin.load(plugin_desc)
+                os_plugin: type[plugin.OSPlugin] = plugin.load(plugin_desc)
                 fs = os_plugin.detect(self)
             except PluginError:
-                self.log.exception("Failed to load OS plugin: %s", plugin_desc["class"])
+                self.log.exception("Failed to load OS plugin: %s", qualname)
                 continue
             except Exception:
-                self.log.exception("Broken OS plugin: %s", plugin_desc["class"])
+                self.log.exception("Broken OS plugin: %s", qualname)
                 continue
 
             if not fs:
                 continue
 
-            self.log.info("Found compatible OS plugin: %s", plugin_desc["class"])
+            self.log.info("Found compatible OS plugin: %s", qualname)
             candidates.append((plugin_desc, os_plugin, fs))
 
         fs = None
-        os_plugin = default.DefaultPlugin
+        os_plugin = DefaultPlugin
 
         if candidates:
             plugin_desc, os_plugin, fs = candidates[0]
@@ -492,7 +553,7 @@ class Target:
                 if len(candidate_plugin.mro()) > len(os_plugin.mro()):
                     plugin_desc, os_plugin, fs = candidate_plugin_desc, candidate_plugin, candidate_fs
 
-            self.log.debug("Selected OS plugin: %s", plugin_desc["class"])
+            self.log.debug("Selected OS plugin: %s", plugin_desc.qualname)
         else:
             # No OS detected
             self.log.warning("Failed to find OS plugin, falling back to default")
@@ -516,7 +577,7 @@ class Target:
 
     def add_plugin(
         self,
-        plugin_cls: Union[plugin.Plugin, type[plugin.Plugin]],
+        plugin_cls: plugin.Plugin | type[plugin.Plugin],
         check_compatible: bool = True,
     ) -> plugin.Plugin:
         """Add and register a plugin by class.
@@ -563,6 +624,20 @@ class Target:
 
         return p
 
+    def load_plugin(self, descriptor: plugin.PluginDescriptor | plugin.FunctionDescriptor) -> plugin.Plugin:
+        """Load a plugin by descriptor.
+
+        Args:
+            plugin_desc: The descriptor of the plugin to load.
+
+        Returns:
+            The loaded plugin instance.
+
+        Raises:
+            PluginError: Raised when any exception occurs while trying to load the plugin.
+        """
+        return self.add_plugin(plugin.load(descriptor))
+
     def _register_plugin_functions(self, plugin_inst: plugin.Plugin) -> None:
         """Internal function that registers all the exported functions from a given plugin.
 
@@ -575,12 +650,15 @@ class Target:
 
         if plugin_inst.__namespace__:
             self._functions[plugin_inst.__namespace__] = (plugin_inst, plugin_inst)
+
+            for func in plugin_inst.__functions__:
+                self._functions[f"{plugin_inst.__namespace__}.{func}"] = (plugin_inst, None)
         else:
             for func in plugin_inst.__functions__:
                 # If we getattr here, property members will be executed, so we do that in __getattr__
                 self._functions[func] = (plugin_inst, None)
 
-    def get_function(self, function: str) -> FunctionTuple:
+    def get_function(self, function: str | plugin.FunctionDescriptor) -> FunctionTuple:
         """Attempt to get a given function.
 
         If the function is not already registered, look for plugins that export the function and register them.
@@ -595,42 +673,58 @@ class Target:
             UnsupportedPluginError: Raised when plugins were found, but they were incompatible
             PluginError: Raised when any other exception occurs while trying to load the plugin.
         """
-        if function not in self._functions:
-            causes = []
+        if isinstance(function, plugin.FunctionDescriptor):
+            function_name = function.name
 
-            plugin_desc = None
-            for plugin_desc in plugin.lookup(function, self._os_plugin):
+            if function_name not in self._functions:
                 try:
-                    plugin_cls = plugin.load(plugin_desc)
-                    self.add_plugin(plugin_cls)
-                    self.log.debug("Found compatible plugin '%s' for function '%s'", plugin_desc["class"], function)
-                    break
-                except UnsupportedPluginError as e:
-                    self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=plugin_desc)
-                    causes.append(e)
-            else:
-                if plugin_desc:
-                    # In this case we made at least one iteration but it was skipped due incompatibility.
-                    # Just take the last known cause for now
+                    self.load_plugin(function)
+                except UnsupportedPluginError:
+                    self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=function)
                     raise UnsupportedPluginError(
-                        f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
-                        extra=causes[1:] if len(causes) > 1 else None,
-                    ) from causes[0] if causes else None
+                        f"Unsupported function `{function.name}` (`{function.module}`)",
+                    )
+
+        else:
+            function_name = function
+
+            if function not in self._functions:
+                causes = []
+
+                descriptor = None
+                for descriptor in plugin.lookup(function, self._os_plugin):
+                    try:
+                        self.load_plugin(descriptor)
+                        self.log.debug("Found compatible plugin '%s' for function '%s'", descriptor.qualname, function)
+                        break
+                    except UnsupportedPluginError as e:
+                        self.send_event(Event.INCOMPATIBLE_PLUGIN, plugin_desc=descriptor)
+                        causes.append(e)
+                else:
+                    if descriptor:
+                        # In this case we made at least one iteration but it was skipped due incompatibility.
+                        # Just take the last known cause for now
+                        raise UnsupportedPluginError(
+                            f"Unsupported function `{function}` for target with OS plugin {self._os_plugin}",
+                            extra=causes[1:] if len(causes) > 1 else None,
+                        ) from (causes[0] if causes else None)
 
         # We still ended up with no compatible plugins
-        if function not in self._functions:
-            raise PluginNotFoundError(f"Can't find plugin with function `{function}`")
+        if function_name not in self._functions:
+            raise PluginNotFoundError(f"Can't find plugin with function `{function_name}`")
 
-        p, func = self._functions[function]
+        p, func = self._functions[function_name]
         if func is None:
-            func = getattr(p.__class__, function)
+            method_attr = function_name.rpartition(".")[2] if p.__namespace__ else function_name
+            func = getattr(p.__class__, method_attr)
+
             if not isinstance(func, property) or (
                 isinstance(func, property) and getattr(func.fget, "__persist__", False)
             ):
                 # If the persist flag is set on a property, store the property result in the function cache
                 # This is so we don't have to evaluate the property again
-                func = getattr(p, function)
-            self._functions[function] = (p, func)
+                func = getattr(p, method_attr)
+            self._functions[function_name] = (p, func)
 
         return p, func
 
@@ -648,46 +742,6 @@ class Target:
             return True
         except PluginError:
             return False
-
-    def __getattr__(self, attr: str) -> Union[plugin.Plugin, Any]:
-        """Override of the default __getattr__ so plugins and functions can be called from a ``Target`` object."""
-        p, func = self.get_function(attr)
-
-        if isinstance(func, property):
-            # If it's a property, execute it and return the result
-            try:
-                result = func.__get__(p)
-                self.send_event(Event.FUNC_EXEC, func=attr)
-                return result
-            except Exception:
-                if not attr.startswith("__"):
-                    self.send_event(
-                        Event.FUNC_EXEC_ERROR,
-                        func=attr,
-                        stacktrace=traceback.format_exc(),
-                    )
-                raise
-
-        return func
-
-    def __dir__(self):
-        """Override the default __dir__ to provide autocomplete for things like IPython."""
-        funcs = []
-        if self._os_plugin:
-            funcs = list(self._os_plugin.__functions__)
-
-        for plugin_desc in plugin.plugins(self._os_plugin):
-            funcs.extend(plugin_desc["functions"])
-
-        result = set(self.__dict__.keys())
-        result.update(self.__class__.__dict__.keys())
-        result.update(object.__dict__.keys())
-        result.update(funcs)
-
-        return list(result)
-
-    def __repr__(self):
-        return f"<Target {self.path}>"
 
 
 T = TypeVar("T")

@@ -1,41 +1,22 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
-import dissect.target.plugins.general.plugins as plugin
+from dissect.target import plugin
 from dissect.target.plugins.general.plugins import (
     PluginListPlugin,
-    categorize_plugins,
-    dictify_module_recursive,
-    output_plugin_description_recursive,
-    update_dict_recursive,
+    _categorize_functions,
+    _generate_plugin_tree_overview,
 )
 
 
-def test_dictify_module():
-    last_value = Mock()
-
-    output_dict = dictify_module_recursive(["hello", "world"], last_value)
-
-    assert output_dict == {"hello": {"world": last_value}}
-
-
-def test_update_dict():
-    tmp_dictionary = dict()
-
-    update_dict_recursive(tmp_dictionary, dictify_module_recursive(["hello", "world"], None))
-    update_dict_recursive(tmp_dictionary, dictify_module_recursive(["hello", "lawrence"], None))
-
-    assert tmp_dictionary == {"hello": {"world": None, "lawrence": None}}
-
-
-def test_plugin_description():
-    description = [x for x in output_plugin_description_recursive(PluginListPlugin, False)]
+def test_plugin_description() -> None:
+    description = [x for x in _generate_plugin_tree_overview(PluginListPlugin, False)]
     assert description == ["plugins - Print all available plugins. (output: no output)"]
 
 
-def test_plugin_description_compacting():
-    module = dictify_module_recursive(["hello", "world"], PluginListPlugin)
+def test_plugin_description_compacting() -> None:
+    module = {"hello": {"world": PluginListPlugin}}
 
-    description = [x for x in output_plugin_description_recursive(module, False)]
+    description = [x for x in _generate_plugin_tree_overview(module, False)]
     assert description == [
         "hello:",
         "  world:",
@@ -43,13 +24,10 @@ def test_plugin_description_compacting():
     ]
 
 
-def test_plugin_description_in_dict_multiple():
-    tmp_dictionary = dict()
+def test_plugin_description_in_dict_multiple() -> None:
+    module = {"hello": {"world": {"data": PluginListPlugin, "data2": PluginListPlugin}}}
 
-    update_dict_recursive(tmp_dictionary, dictify_module_recursive(["hello", "world", "data"], PluginListPlugin))
-    update_dict_recursive(tmp_dictionary, dictify_module_recursive(["hello", "world", "data2"], PluginListPlugin))
-
-    description = [x for x in output_plugin_description_recursive(tmp_dictionary, False)]
+    description = [x for x in _generate_plugin_tree_overview(module, False)]
     assert description == [
         "hello:",
         "  world:",
@@ -60,8 +38,22 @@ def test_plugin_description_in_dict_multiple():
     ]
 
 
-@patch.object(plugin.plugin, "load")
-@patch.object(plugin, "get_exported_plugins")
-def test_categorize_plugins(mocked_export, mocked_load):
-    mocked_export.return_value = [{"module": "something.data"}]
-    assert categorize_plugins() == {"something": {"data": mocked_load.return_value}}
+@patch("dissect.target.plugins.general.plugins.plugin.load")
+@patch("dissect.target.plugins.general.plugins.plugin.functions")
+def test_categorize_plugins(mocked_plugins: MagicMock, mocked_load: MagicMock) -> None:
+    mocked_plugins.return_value = [
+        plugin.FunctionDescriptor(
+            name="data",
+            namespace=None,
+            path="something.data",
+            exported=True,
+            internal=False,
+            findable=True,
+            alias=False,
+            output=None,
+            method_name="data",
+            module="other.root.something.data",
+            qualname="DataClass",
+        ),
+    ]
+    assert _categorize_functions() == {"something": mocked_load.return_value}

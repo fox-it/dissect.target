@@ -35,7 +35,7 @@ class MssqlPlugin(Plugin):
 
     __namespace__ = "mssql"
 
-    MSSQL_KEY = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server"
+    MSSQL_KEY_GLOB = "HKLM\\SOFTWARE\\Microsoft\\Microsoft SQL Server\\MSSQL*.*"
     FILE_GLOB = "ERRORLOG*"
 
     def __init__(self, target: Target):
@@ -44,7 +44,7 @@ class MssqlPlugin(Plugin):
 
     def check_compatible(self) -> None:
         if not self.instances:
-            raise UnsupportedPluginError("System does not seem to be running SQL Server")
+            raise UnsupportedPluginError("No Microsoft SQL Server instances have been found")
 
     @export(record=MssqlErrorlogRecord)
     def errorlog(self) -> Iterator[MssqlErrorlogRecord]:
@@ -89,15 +89,8 @@ class MssqlPlugin(Plugin):
 
                     buf += line
 
-    def _find_instances(self) -> list[str, TargetPath]:
-        instances = []
-
-        for subkey in self.target.registry.key(self.MSSQL_KEY).subkeys():
-            if subkey.name.startswith("MSSQL") and "." in subkey.name:
-                instances.append(
-                    (
-                        subkey.name,
-                        self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent,
-                    )
-                )
-        return instances
+    def _find_instances(self) -> set[str, TargetPath]:
+        return {
+            (subkey.name, self.target.fs.path(subkey.subkey("SQLServerAgent").value("ErrorLogFile").value).parent)
+            for subkey in self.target.registry.glob_ext(self.MSSQL_KEY_GLOB)
+        }

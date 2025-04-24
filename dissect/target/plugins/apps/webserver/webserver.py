@@ -38,10 +38,22 @@ WebserverErrorLogRecord = TargetRecordDescriptor(
     ],
 )
 
+WebserverHostRecord = TargetRecordDescriptor(
+    "application/log/webserver/host",
+    [
+        ("datetime", "ts"),
+        ("string", "server_name"),
+        ("varint", "server_port"),
+        ("path", "root_path"),
+        ("path", "access_log_config"),
+        ("path", "error_log_config"),
+        ("path", "source"),
+    ],
+)
+
 
 class WebserverPlugin(NamespacePlugin):
     __namespace__ = "webserver"
-    __findable__ = False
 
     @export(record=[WebserverAccessLogRecord, WebserverErrorLogRecord])
     def logs(self) -> Iterator[Union[WebserverAccessLogRecord, WebserverErrorLogRecord]]:

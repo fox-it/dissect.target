@@ -3,11 +3,13 @@ from io import BytesIO
 
 from dissect.util.ts import from_unix
 
+from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.plugins.os.unix.log.audit import AuditPlugin
+from dissect.target.target import Target
 from tests._utils import absolute_path
 
 
-def test_audit_plugin(target_unix, fs_unix):
+def test_audit_plugin(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     data_file = absolute_path("_data/plugins/os/unix/log/audit/audit.log")
     fs_unix.map_file("var/log/audit/audit.log", data_file)
 
@@ -32,7 +34,7 @@ def test_audit_plugin(target_unix, fs_unix):
     assert result.message == 'cwd="/home/shadowman"'
 
 
-def test_audit_plugin_config(target_unix, fs_unix):
+def test_audit_plugin_config(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
     config = """
     log_file = /foo/bar/audit/audit.log
     # log_file=/tmp/disabled/audit/audit.log
@@ -41,8 +43,7 @@ def test_audit_plugin_config(target_unix, fs_unix):
     fs_unix.map_file_fh("tmp/disabled/audit/audit.log", BytesIO(b"Foo"))
     fs_unix.map_file_fh("foo/bar/audit/audit.log", BytesIO(b"Foo"))
 
-    audit = AuditPlugin(target_unix)
-    log_paths = audit.get_log_paths()
+    log_paths = AuditPlugin(target_unix).get_log_paths()
     assert len(log_paths) == 2
     assert str(log_paths[0]) == "/foo/bar/audit/audit.log"
     assert str(log_paths[1]) == "/tmp/disabled/audit/audit.log"

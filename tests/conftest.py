@@ -14,7 +14,7 @@ from dissect.target.filesystems.tar import TarFilesystem
 from dissect.target.helpers.fsutil import TargetPath
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey, VirtualValue
 from dissect.target.plugin import OSPlugin
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.bsd.citrix._os import CitrixPlugin
 from dissect.target.plugins.os.unix.bsd.osx._os import MacPlugin
@@ -218,6 +218,10 @@ def fs_bsd() -> Iterator[VirtualFilesystem]:
 @pytest.fixture
 def fs_android() -> Iterator[VirtualFilesystem]:
     fs = VirtualFilesystem()
+    fs.makedirs("/data")
+    fs.makedirs("/system")
+    fs.makedirs("/vendor")
+    fs.makedirs("/product")
     fs.map_file("/build.prop", absolute_path("_data/plugins/os/unix/linux/android/build.prop"))
     yield fs
 
@@ -261,7 +265,7 @@ def target_bare(tmp_path: pathlib.Path) -> Iterator[Target]:
 
 @pytest.fixture
 def target_default(tmp_path: pathlib.Path) -> Iterator[Target]:
-    yield make_os_target(tmp_path, default.DefaultPlugin)
+    yield make_os_target(tmp_path, DefaultPlugin)
 
 
 @pytest.fixture
@@ -441,6 +445,7 @@ def target_unix_users(target_unix: Target, fs_unix: Filesystem) -> Iterator[Targ
     passwd = """
     root:x:0:0:root:/root:/bin/bash
     user:x:1000:1000:user:/home/user:/bin/bash
+    +@ngtest:x:::::
     """
     fs_unix.map_file_fh("/etc/passwd", BytesIO(textwrap.dedent(passwd).encode()))
     yield target_unix
@@ -486,3 +491,25 @@ def target_linux_docker(tmp_path: pathlib.Path, fs_docker: TarFilesystem) -> Ite
     mock_target.fs.mount("/", fs_docker)
     mock_target.apply()
     yield mock_target
+
+
+class TargetUnixFactory:
+    def __init__(self, tmp_path: pathlib.Path):
+        self.tmp_path = tmp_path
+
+    def new(self, hostname: str = "hostname") -> tuple[Target, VirtualFilesystem]:
+        """Initialize a virtual unix target."""
+        fs = VirtualFilesystem()
+
+        fs.makedirs("var")
+        fs.makedirs("etc")
+        fs.map_file_fh("/etc/hostname", BytesIO(hostname.encode()))
+
+        return make_os_target(self.tmp_path, UnixPlugin, root_fs=fs), fs
+
+
+@pytest.fixture
+def target_unix_factory(tmp_path: pathlib.Path) -> TargetUnixFactory:
+    """This fixture returns a class that can instantiate a virtual unix targets from a blueprint. This can then be used
+    to create a fixture for the source target and the desination target, without them 'bleeding' into each other."""
+    return TargetUnixFactory(tmp_path)

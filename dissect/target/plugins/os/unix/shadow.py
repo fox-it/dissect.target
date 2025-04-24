@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 from typing import Iterator
 
 from dissect.target.exceptions import UnsupportedPluginError
@@ -13,12 +16,12 @@ UnixShadowRecord = TargetRecordDescriptor(
         ("string", "hash"),
         ("string", "algorithm"),
         ("string", "crypt_param"),
-        ("string", "last_change"),
-        ("varint", "min_age"),
-        ("varint", "max_age"),
+        ("datetime", "last_change"),
+        ("datetime", "min_age"),
+        ("datetime", "max_age"),
         ("varint", "warning_period"),
-        ("string", "inactivity_period"),
-        ("string", "expiration_date"),
+        ("varint", "inactivity_period"),
+        ("datetime", "expiration_date"),
         ("string", "unused_field"),
     ],
 )
@@ -39,6 +42,7 @@ class ShadowPlugin(Plugin):
 
         Resources:
             - https://manpages.ubuntu.com/manpages/oracular/en/man5/passwd.5.html
+            - https://linux.die.net/man/5/shadow
         """
 
         seen_hashes = set()
@@ -64,6 +68,40 @@ class ShadowPlugin(Plugin):
 
                     seen_hashes.add(current_hash)
 
+                    # improve readability
+                    last_change = None
+                    min_age = None
+                    max_age = None
+                    expiration_date = None
+
+                    try:
+                        last_change = int(shent.get(2)) if shent.get(2) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(2)
+                        )
+
+                    try:
+                        min_age = int(shent.get(3)) if shent.get(3) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(3)
+                        )
+
+                    try:
+                        max_age = int(shent.get(4)) if shent.get(4) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(4)
+                        )
+
+                    try:
+                        expiration_date = int(shent.get(7)) if shent.get(7) else None
+                    except ValueError as e:
+                        self.target.log.warning(
+                            "Unable to parse last_change shadow value in %s: %s ('%s')", shadow_file, e, shent.get(7)
+                        )
+
                     yield UnixShadowRecord(
                         name=shent.get(0),
                         crypt=shent.get(1),
@@ -71,12 +109,12 @@ class ShadowPlugin(Plugin):
                         crypt_param=crypt.get("param"),
                         salt=crypt.get("salt"),
                         hash=crypt.get("hash"),
-                        last_change=shent.get(2),
-                        min_age=shent.get(3),
-                        max_age=shent.get(4),
-                        warning_period=shent.get(5),
-                        inactivity_period=shent.get(6),
-                        expiration_date=shent.get(7),
+                        last_change=epoch_days_to_datetime(last_change) if last_change else None,
+                        min_age=epoch_days_to_datetime(last_change + min_age) if last_change and min_age else None,
+                        max_age=epoch_days_to_datetime(last_change + max_age) if last_change and max_age else None,
+                        warning_period=shent.get(5) if shent.get(5) else None,
+                        inactivity_period=shent.get(6) if shent.get(6) else None,
+                        expiration_date=epoch_days_to_datetime(expiration_date) if expiration_date else None,
                         unused_field=shent.get(8),
                         _target=self.target,
                     )
@@ -128,3 +166,11 @@ def extract_crypt_details(shent: dict) -> dict:
         crypt["algo"] = algos[crypt["algo"]]
 
     return crypt
+
+
+def epoch_days_to_datetime(days: int) -> datetime:
+    """Convert a number representing the days since 1 January 1970 to a datetime object."""
+    if not isinstance(days, int):
+        raise ValueError("days argument should be an integer")
+
+    return datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc) + timedelta(days)

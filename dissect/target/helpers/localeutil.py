@@ -48,3 +48,5 @@ WINDOWS_ZONE_MAP = {
     )
     if child.attrib["territory"] == "001"
 }
+
+WINDOWS_ZONE_MAP["UTC"] = "UTC"  # Change 'Etc/UTC' to 'UTC' to be consistent across operating systems.

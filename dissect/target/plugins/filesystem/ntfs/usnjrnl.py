@@ -2,6 +2,7 @@ from typing import Iterator
 
 from dissect.ntfs.c_ntfs import segment_reference
 
+from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, export
 from dissect.target.plugins.filesystem.ntfs.utils import get_drive_letter
@@ -27,7 +28,8 @@ class UsnjrnlPlugin(Plugin):
     """NFTS UsnJrnl plugin."""
 
     def check_compatible(self) -> None:
-        pass
+        if not any(fs for fs in self.target.filesystems if fs.__type__ == "ntfs"):
+            raise UnsupportedPluginError("No NTFS filesystem(s) found on target")
 
     @export(record=UsnjrnlRecord)
     def usnjrnl(self) -> Iterator[UsnjrnlRecord]:

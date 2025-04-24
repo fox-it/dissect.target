@@ -33,12 +33,10 @@ def main():
     parser.add_argument("-w", "--write", default="-", help="output file")
     parser.add_argument("-o", "--offset", type=int, default=0, help="offset to read from.")
     parser.add_argument("-b", "--bytes", type=int, default=-1, help="amount of bytes to read")
-
     configure_generic_arguments(parser)
 
-    args = parser.parse_args()
-
-    process_generic_arguments(args)
+    args, rest = parser.parse_known_args()
+    process_generic_arguments(args, rest)
 
     try:
         t = Target.open(args.target)

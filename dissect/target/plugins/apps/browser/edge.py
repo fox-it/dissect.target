@@ -25,12 +25,17 @@ class EdgePlugin(ChromiumMixin, BrowserPlugin):
     DIRS = [
         # Linux
         ".config/microsoft-edge/Default/",
+        ".config/microsoft-edge/Profile*",
         ".var/app/com.microsoft.Edge/config/microsoft-edge/Default",
+        ".var/app/com.microsoft.Edge/config/microsoft-edge/Profile*",
         # Windows
         "AppData/Local/Microsoft/Edge/User Data/Default",
+        "AppData/Local/Microsoft/Edge/User Data/Profile*",
         "AppData/Local/Microsoft/Edge/User Data/Snapshots/*/Default",
+        "AppData/Local/Microsoft/Edge/User Data/Snapshots/*/Profile*",
         # Macos
         "Library/Application Support/Microsoft Edge/Default",
+        "Library/Application Support/Microsoft Edge/Profile*",
     ]
 
     BrowserHistoryRecord = create_extended_descriptor([UserRecordDescriptorExtension])(

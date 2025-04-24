@@ -217,9 +217,11 @@ def print_stat(path: fsutil.TargetPath, stdout: TextIO, dereference: bool = Fals
         atime=datetime.fromtimestamp(s.st_atime, tz=timezone.utc).isoformat(timespec="microseconds"),
         mtime=datetime.fromtimestamp(s.st_mtime, tz=timezone.utc).isoformat(timespec="microseconds"),
         ctime=datetime.fromtimestamp(s.st_ctime, tz=timezone.utc).isoformat(timespec="microseconds"),
-        btime=datetime.fromtimestamp(s.st_birthtime, tz=timezone.utc).isoformat(timespec="microseconds")
-        if hasattr(s, "st_birthtime") and s.st_birthtime
-        else "?",
+        btime=(
+            datetime.fromtimestamp(s.st_birthtime, tz=timezone.utc).isoformat(timespec="microseconds")
+            if hasattr(s, "st_birthtime") and s.st_birthtime
+            else "?"
+        ),
     )
     print(res, file=stdout)
 

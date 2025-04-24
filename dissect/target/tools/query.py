@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import annotations
+
 import argparse
 import logging
 import pathlib
 import sys
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Iterator
 
-from flow.record import RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record import Record, RecordPrinter, RecordStreamWriter, RecordWriter
+from flow.record.adapter import AbstractWriter
 
-from dissect.target import Target
+from dissect.target import Target, plugin
 from dissect.target.exceptions import (
     FatalError,
     PluginNotFoundError,
@@ -18,10 +21,20 @@ from dissect.target.exceptions import (
     UnsupportedPluginError,
 )
 from dissect.target.helpers import cache, record_modifier
-from dissect.target.plugin import PLUGINS, OSPlugin, Plugin, find_plugin_functions
-from dissect.target.report import ExecutionReport
+from dissect.target.plugin import (
+    PLUGINS,
+    FunctionDescriptor,
+    OSPlugin,
+    Plugin,
+    find_functions,
+)
+from dissect.target.plugins.general.plugins import (
+    _get_default_functions,
+    generate_functions_json,
+    generate_functions_overview,
+)
+from dissect.target.tools.report import ExecutionReport
 from dissect.target.tools.utils import (
-    args_to_uri,
     catch_sigpipe,
     configure_generic_arguments,
     execute_function_on_target,
@@ -41,7 +54,7 @@ logging.raiseExceptions = False
 USAGE_FORMAT_TMPL = "{prog} -f {name}{usage}"
 
 
-def record_output(strings=False, json=False):
+def record_output(strings: bool = False, json: bool = False) -> AbstractWriter:
     if json:
         return RecordWriter("jsonfile://-")
 
@@ -53,8 +66,51 @@ def record_output(strings=False, json=False):
     return RecordStreamWriter(fp)
 
 
+def list_plugins(
+    targets: list[str] | None = None,
+    patterns: str = "",
+    include_children: bool = False,
+    as_json: bool = False,
+    argv: list[str] | None = None,
+) -> None:
+    collected = set()
+    if targets:
+        for target in Target.open_all(targets, include_children):
+            funcs, _ = find_functions(patterns, target, compatibility=True, show_hidden=True)
+            collected.update(funcs)
+    elif patterns:
+        funcs, _ = find_functions(patterns, Target(), show_hidden=True)
+        collected.update(funcs)
+    else:
+        collected.update(_get_default_functions())
+
+    target = Target()
+    fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
+    fargs, rest = fparser.parse_known_args(argv or [])
+
+    # Display in a user friendly manner
+    if collected:
+        if as_json:
+            print('{"plugins": ', end="")
+            print(generate_functions_json(collected), end="")
+        else:
+            print(generate_functions_overview(collected, include_docs=fargs.print_docs))
+
+    # No real targets specified, show the available loaders
+    if not targets:
+        fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
+        fargs, rest = fparser.parse_known_args(rest)
+        del fargs.as_json
+        if as_json:
+            print(', "loaders": ', end="")
+        target.loaders(**vars(fargs), as_json=as_json)
+
+    if as_json:
+        print("}")
+
+
 @catch_sigpipe
-def main():
+def main() -> None:
     help_formatter = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(
         description="dissect.target",
@@ -78,17 +134,9 @@ def main():
         "--list",
         action="store",
         nargs="?",
-        const="*",
+        const="",
         default=None,
         help="list (matching) available plugins and loaders",
-    )
-
-    parser.add_argument(
-        "-L",
-        "--loader",
-        action="store",
-        default=None,
-        help="select a specific loader (i.e. vmx, raw)",
     )
 
     parser.add_argument("-s", "--strings", action="store_true", help="print output as string")
@@ -106,8 +154,7 @@ def main():
         "--rewrite-cache",
         action="store_true",
         help=(
-            "force cache files to be rewritten (has no effect if either --no-cache "
-            "or --only-read-cache are specified)"
+            "force cache files to be rewritten (has no effect if either --no-cache or --only-read-cache are specified)"
         ),
     )
     parser.add_argument("--cmdb", action="store_true")
@@ -122,15 +169,12 @@ def main():
 
     args, rest = parser.parse_known_args()
 
-    # If loader is specified then map to uri
-    targets = args_to_uri(args.targets, args.loader, rest) if args.loader else args.targets
-
     # Show help for target-query
     if not args.function and ("-h" in rest or "--help" in rest):
         parser.print_help()
         parser.exit()
 
-    process_generic_arguments(args)
+    process_generic_arguments(args, rest)
 
     if args.no_cache:
         cache.IGNORE_CACHE = True
@@ -149,14 +193,17 @@ def main():
 
     # Show help for a function or in general
     if "-h" in rest or "--help" in rest:
-        found_functions, _ = find_plugin_functions(None, args.function, compatibility=False)
+        found_functions, _ = find_functions(args.function)
         if not len(found_functions):
             parser.error("function(s) not found, see -l for available plugins")
+
         func = found_functions[0]
-        if issubclass(func.class_object, OSPlugin):
+        plugin_class = plugin.load(func)
+        if issubclass(plugin_class, OSPlugin):
             obj = getattr(OSPlugin, func.method_name)
         else:
-            obj = getattr(func.class_object, func.method_name)
+            obj = getattr(plugin_class, func.method_name)
+
         if isinstance(obj, type) and issubclass(obj, Plugin):
             parser = generate_argparse_for_plugin_class(obj, usage_tmpl=USAGE_FORMAT_TMPL)
         elif isinstance(obj, Callable) or isinstance(obj, property):
@@ -168,48 +215,28 @@ def main():
 
     # Show the list of available plugins for the given optional target and optional
     # search pattern, only display plugins that can be applied to ANY targets
-    if args.list:
-        collected_plugins = []
-
-        if targets:
-            for plugin_target in Target.open_all(targets, args.children):
-                funcs, _ = find_plugin_functions(plugin_target, args.list, compatibility=True, show_hidden=True)
-                for func in funcs:
-                    collected_plugins.append(func)
-        else:
-            funcs, _ = find_plugin_functions(Target(), args.list, compatibility=False, show_hidden=True)
-            for func in funcs:
-                collected_plugins.append(func)
-
-        target = Target()
-        fparser = generate_argparse_for_bound_method(target.plugins, usage_tmpl=USAGE_FORMAT_TMPL)
-        fargs, rest = fparser.parse_known_args(rest)
-
-        # Display in a user friendly manner
-        if collected_plugins:
-            if args.json:
-                print('{"plugins": ', end="")
-            target.plugins(collected_plugins, as_json=args.json)
-
-        # No real targets specified, show the available loaders
-        if not targets:
-            fparser = generate_argparse_for_bound_method(target.loaders, usage_tmpl=USAGE_FORMAT_TMPL)
-            fargs, rest = fparser.parse_known_args(rest)
-            del fargs.as_json
-            if args.json:
-                print(', "loaders": ', end="")
-            target.loaders(**vars(fargs), as_json=args.json)
-
-        if args.json:
-            print("}")
-
+    if args.list is not None:
+        list_plugins(args.targets, args.list, args.children, args.json, rest)
         parser.exit()
 
-    if not targets:
+    if not args.targets:
         parser.error("too few arguments")
 
     if not args.function:
         parser.error("argument -f/--function is required")
+
+    if args.report_dir and not args.report_dir.is_dir():
+        parser.error(f"--report-dir {args.report_dir} is not a valid directory")
+
+    funcs, invalid_funcs = find_functions(args.function)
+    if any(invalid_funcs):
+        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
+
+    excluded_funcs, invalid_excluded_funcs = find_functions(args.excluded_functions)
+    if any(invalid_excluded_funcs):
+        parser.error(
+            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
+        )
 
     # Verify uniformity of output types, otherwise default to records.
     # Note that this is a heuristic, the targets are not opened yet because of
@@ -224,28 +251,12 @@ def main():
     # The only scenario that might cause this is with
     # custom plugins with idiosyncratic output across OS-versions/branches.
     output_types = set()
-    funcs, invalid_funcs = find_plugin_functions(None, args.function, compatibility=False)
-
-    if any(invalid_funcs):
-        parser.error(f"argument -f/--function contains invalid plugin(s): {', '.join(invalid_funcs)}")
-
-    excluded_funcs, invalid_excluded_funcs = find_plugin_functions(
-        None,
-        args.excluded_functions,
-        compatibility=False,
-    )
-
-    if any(invalid_excluded_funcs):
-        parser.error(
-            f"argument -xf/--excluded-functions contains invalid plugin(s): {', '.join(invalid_excluded_funcs)}",
-        )
-
     excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
 
     for func in funcs:
         if func.path in excluded_func_paths:
             continue
-        output_types.add(func.output_type)
+        output_types.add(func.output)
 
     default_output_type = None
 
@@ -254,41 +265,35 @@ def main():
         log.warning("Mixed output types detected: %s. Only outputting records.", ",".join(output_types))
         default_output_type = "record"
 
-    if args.report_dir and not args.report_dir.is_dir():
-        parser.error(f"--report-dir {args.report_dir} is not a valid directory")
-
     execution_report = ExecutionReport()
     execution_report.set_cli_args(args)
     execution_report.set_event_callbacks(Target)
 
     try:
-        for target in Target.open_all(targets, args.children):
+        for target in Target.open_all(args.targets, args.children):
             if args.child:
                 try:
                     target = target.open_child(args.child)
-                except Exception:
-                    target.log.exception("Exception while opening child '%s'", args.child)
+                except Exception as e:
+                    target.log.exception("Exception while opening child %r: %s", args.child, e)
+                    target.log.debug("", exc_info=e)
 
             if args.dry_run:
                 print(f"Dry run on: {target}")
 
-            record_entries = []
+            record_entries: list[tuple[FunctionDescriptor, Iterator[Record]]] = []
             basic_entries = []
             yield_entries = []
 
             first_seen_output_type = default_output_type
-            cli_params_unparsed = rest
 
-            excluded_funcs, _ = find_plugin_functions(target, args.excluded_functions, compatibility=False)
-            excluded_func_paths = {excluded_func.path for excluded_func in excluded_funcs}
-
-            for func_def in find_and_filter_plugins(target, args.function, excluded_func_paths):
+            for func_def in find_and_filter_plugins(args.function, target, excluded_func_paths):
                 # If the default type is record (meaning we skip everything else)
                 # and actual output type is not record, continue.
                 # We perform this check here because plugins that require output files/dirs
                 # will exit if we attempt to exec them without (because they are implied by the wildcard).
                 # Also this saves cycles of course.
-                if default_output_type == "record" and func_def.output_type != "record":
+                if default_output_type == "record" and func_def.output != "record":
                     continue
 
                 if args.dry_run:
@@ -296,9 +301,7 @@ def main():
                     continue
 
                 try:
-                    output_type, result, cli_params_unparsed = execute_function_on_target(
-                        target, func_def, cli_params_unparsed
-                    )
+                    output_type, result, rest = execute_function_on_target(target, func_def, rest)
                 except UnsupportedPluginError as e:
                     target.log.error(
                         "Unsupported plugin for %s: %s",
@@ -314,8 +317,10 @@ def main():
                 except FatalError as fatal:
                     fatal.emit_last_message(target.log.error)
                     parser.exit(1)
-                except Exception:
-                    target.log.error("Exception while executing function `%s`", func_def, exc_info=True)
+                except Exception as e:
+                    target.log.error("Exception while executing function %s (%s): %s", func_def.name, func_def.path, e)
+                    target.log.debug("", exc_info=e)
+                    target.log.debug("Function info: %s", func_def)
                     continue
 
                 if first_seen_output_type and output_type != first_seen_output_type:
@@ -334,7 +339,7 @@ def main():
                     first_seen_output_type = output_type
 
                 if output_type == "record":
-                    record_entries.append(result)
+                    record_entries.append((func_def, result))
                 elif output_type == "yield":
                     yield_entries.append(result)
                 elif output_type == "none":
@@ -374,23 +379,31 @@ def main():
                 continue
 
             rs = record_output(args.strings, args.json)
-            for entry in record_entries:
+            for func_def, record_generator in record_entries:
                 try:
-                    for record_entries in entry:
-                        rs.write(modifier_func(target, record_entries))
+                    for record in record_generator:
+                        rs.write(modifier_func(target, record))
                         count += 1
                         if args.limit is not None and count >= args.limit:
                             break_out = True
                             break
+
                 except Exception as e:
-                    # Ignore errors if multiple functions
-                    if len(funcs) > 1:
-                        target.log.error(f"Exception occurred while processing output of {func}", exc_info=e)
+                    # Ignore errors if multiple functions or multiple targets
+                    if len(record_entries) > 1 or len(args.targets) > 1:
+                        target.log.error(
+                            "Exception occurred while processing output of %s.%s: %s",
+                            func_def.qualname,
+                            func_def.name,
+                            e,
+                        )
+                        target.log.debug("", exc_info=e)
                     else:
                         raise e
 
                 if break_out:
                     break
+
     except TargetError as e:
         log.error(e)
         log.debug("", exc_info=e)

@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from dissect.target import Target
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.filesystems.tar import TarFilesystem
-from dissect.target.plugins.general import default
+from dissect.target.plugins.os.default._os import DefaultPlugin
 from dissect.target.plugins.os.unix._os import UnixPlugin
 from dissect.target.plugins.os.unix.log.messages import MessagesPlugin, MessagesRecord
 from tests._utils import absolute_path
@@ -73,7 +73,7 @@ def test_unix_log_messages_compressed_timezone_year_rollover() -> None:
     fs = TarFilesystem(bio)
     target.filesystems.add(fs)
     target.fs.mount("/", fs)
-    target._os_plugin = default.DefaultPlugin
+    target._os_plugin = DefaultPlugin
     target.apply()
     target.add_plugin(MessagesPlugin)
 
@@ -106,6 +106,12 @@ def test_unix_log_messages_malformed_log_year_rollover(target_unix_users: Target
 
         results = list(target_unix_users.messages())
         assert len(results) == 2
+
+        assert results[0].ts
+        assert results[0].service == "systemd"
+        assert results[0].pid == 1
+        assert results[0].message == "Starting Journal Service..."
+        assert results[0].source == "/var/log/messages"
 
 
 def test_unix_messages_cloud_init(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
@@ -165,3 +171,33 @@ def test_unix_messages_ts_iso_8601_format(target_unix: Target, fs_unix: VirtualF
     assert results[0].ts == datetime(2024, 12, 31, 11, 37, 0, 123456, tzinfo=timezone.utc)
     assert results[0].message == "Started anacron.service - Run anacron jobs."
     assert results[0].source == "/var/log/syslog.1"
+
+
+def test_linux_messages_kernel_logs(target_unix: Target, fs_unix: VirtualFilesystem) -> None:
+    """test if we can parse kernel ring buffer messages."""
+
+    messages = """
+    Dec 31 13:37:01 hostname kernel: [1337.1337] some example message
+    Jan  1 13:37:02 kernel: [    0.000000] x86/fpu: Supporting feature 0x1337: 'message'
+    Jan  2 13:37:03 kernel: [    0.000000] x86/fpu: state[1337]:  1337, size[1337]:   1337
+    Jan  3 13:37:04 kernel:
+    """
+
+    fs_unix.map_file_fh("/var/log/installer/syslog.1", BytesIO(gzip.compress(textwrap.dedent(messages).encode())))
+    target_unix.add_plugin(UnixPlugin)
+    target_unix.add_plugin(MessagesPlugin)
+
+    results = sorted(list(target_unix.syslog()), key=lambda r: r.ts)
+    assert len(results) == 4
+
+    assert results[0].service == "kernel"
+    assert results[0].message == "[1337.1337] some example message"
+
+    assert results[1].service == "kernel"
+    assert results[1].message == "[    0.000000] x86/fpu: Supporting feature 0x1337: 'message'"
+
+    assert results[2].service == "kernel"
+    assert results[2].message == "[    0.000000] x86/fpu: state[1337]:  1337, size[1337]:   1337"
+
+    assert results[3].service == "kernel"
+    assert results[3].message is None

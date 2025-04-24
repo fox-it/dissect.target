@@ -1,9 +1,9 @@
 import re
 from typing import Iterator
 
-from dissect.target import plugin
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.utils import year_rollover_helper
+from dissect.target.plugin import export
 from dissect.target.plugins.os.unix.packagemanager import (
     OperationTypes,
     PackageManagerLogRecord,
@@ -27,7 +27,7 @@ class YumPlugin(PackageManagerPlugin):
         if not len(log_files):
             raise UnsupportedPluginError("No Yum files found")
 
-    @plugin.export(record=PackageManagerLogRecord)
+    @export(record=PackageManagerLogRecord)
     def logs(self) -> Iterator[PackageManagerLogRecord]:
         """Package manager log parser for CentOS' Yellowdog Updater (Yum).
 

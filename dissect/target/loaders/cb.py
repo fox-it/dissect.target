@@ -25,7 +25,12 @@ from dissect.target.exceptions import (
 )
 from dissect.target.filesystems.cb import CbFilesystem
 from dissect.target.helpers.fsutil import TargetPath
-from dissect.target.helpers.regutil import RegistryHive, RegistryKey, RegistryValue
+from dissect.target.helpers.regutil import (
+    RegistryHive,
+    RegistryKey,
+    RegistryValue,
+    ValueType,
+)
 from dissect.target.loader import Loader
 from dissect.target.plugins.os.windows.registry import RegistryPlugin
 
@@ -161,7 +166,7 @@ class CbRegistryKey(RegistryKey):
     def subkeys(self) -> list[CbRegistryKey]:
         return list(map(self.subkey, self.data["sub_keys"]))
 
-    def value(self, value: str) -> str:
+    def _value(self, value: str) -> CbRegistryValue:
         reg_value = value.lower()
         for val in self.values():
             if val.name.lower() == reg_value:
@@ -197,7 +202,7 @@ class CbRegistryValue(RegistryValue):
         return self._name
 
     @property
-    def value(self) -> str:
+    def value(self) -> ValueType:
         return self._value
 
     @property

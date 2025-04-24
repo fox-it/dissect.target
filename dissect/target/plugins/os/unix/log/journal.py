@@ -315,9 +315,18 @@ class JournalFile:
         offset = self.header.entry_array_offset
         while offset != 0:
             self.fh.seek(offset)
+            object_type = self.fh.read(1)[0]
 
-            if self.fh.read(1)[0] != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
-                raise ValueError(f"Expected OBJECT_ENTRY_ARRAY at offset {offset}")
+            if object_type == c_journal.ObjectType.OBJECT_UNUSED:
+                self.target.log.warning(
+                    "ObjectType OBJECT_UNUSED encountered for next OBJECT_ENTRY_ARRAY offset at 0x%X. "
+                    "This indicates allocated space in the journal file which is not used yet.",
+                    offset,
+                )
+                break
+
+            elif object_type != c_journal.ObjectType.OBJECT_ENTRY_ARRAY:
+                raise ValueError(f"Expected OBJECT_ENTRY_ARRAY or OBJECT_UNUSED at offset {offset}")
 
             if self.header.incompatible_flags & c_journal.IncompatibleFlag.HEADER_INCOMPATIBLE_COMPACT:
                 entry_array_object = c_journal.EntryArrayObject_Compact(self.fh)

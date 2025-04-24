@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import urllib
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Generic, Iterator, TypeVar
 
 from dissect.target.helpers.lazy import import_lazy
 from dissect.target.helpers.loaderutil import extract_path_info
@@ -61,7 +61,7 @@ class Loader:
     def __init__(self, path: Path, **kwargs):
         self.path = path
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}('{self.path}')"
 
     @staticmethod
@@ -101,6 +101,30 @@ class Loader:
         raise NotImplementedError()
 
 
+T = TypeVar("T")
+
+
+class SubLoader(Generic[T]):
+    """A base class for loading arbitary data and coupling it to a :class:`Target <dissect.target.target.Target>`.
+
+    Should not be called like a regular :class:`Loader`. For examples see :class:`TarLoader`
+    and :class:`TarSubLoader` implementations.
+    """
+
+    def __init__(self, value: T):
+        pass
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
+    @staticmethod
+    def detect(value: T) -> bool:
+        raise NotImplementedError
+
+    def map(self, target: Target) -> None:
+        raise NotImplementedError
+
+
 def register(module_name: str, class_name: str, internal: bool = True) -> None:
     """Registers a ``Loader`` class inside ``LOADERS``.
 
@@ -123,8 +147,8 @@ def register(module_name: str, class_name: str, internal: bool = True) -> None:
 
 
 def find_loader(
-    item: Path, parsed_path: Optional[urllib.parse.ParseResult] = None, fallbacks: list[Loader] = [DirLoader]
-) -> Optional[Loader]:
+    item: Path, parsed_path: urllib.parse.ParseResult | None = None, fallbacks: list[Loader] = [DirLoader]
+) -> Loader | None:
     """Finds a :class:`Loader` class for the specific ``item``.
 
     This searches for a specific :class:`Loader` classs that is able to load a target pointed to by ``item``.
@@ -154,7 +178,7 @@ def find_loader(
             log.debug("", exc_info=exception)
 
 
-def open(item: Union[str, Path], *args, **kwargs) -> Loader:
+def open(item: str | Path, *args, **kwargs) -> Loader:
     """Opens a :class:`Loader` for a specific ``item``.
 
     This instantiates a :class:`Loader` for a specific ``item``.
@@ -195,6 +219,7 @@ register("kape", "KapeLoader")
 register("tanium", "TaniumLoader")
 register("itunes", "ITunesLoader")
 register("ab", "AndroidBackupLoader")
+register("cellebrite", "CellebriteLoader")
 register("target", "TargetLoader")
 register("log", "LogLoader")
 # Disabling ResLoader because of DIS-536

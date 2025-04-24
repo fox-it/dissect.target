@@ -34,7 +34,6 @@ class CaddyPlugin(WebserverPlugin):
         if not len(self.log_paths):
             raise UnsupportedPluginError("No Caddy paths found")
 
-    @plugin.internal
     def get_log_paths(self) -> list[Path]:
         log_paths = []
 

@@ -34,11 +34,9 @@ def test_os_windows_jumplist(target_win_users: Target, fs_win: VirtualFilesystem
     target_win_users.add_plugin(JumpListPlugin)
 
     records = list(target_win_users.jumplist())
-
-    record = records[0]
-
     assert len(records) == 3
 
+    record = records[0]
     assert record.application_id == "590aee7bdd69b59b"
     assert record.application_name == "Powershell Windows 10"
     assert record.type == "customDestinations"

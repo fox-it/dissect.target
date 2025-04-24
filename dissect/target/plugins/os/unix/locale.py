@@ -20,12 +20,15 @@ UnixKeyboardRecord = TargetRecordDescriptor(
 
 
 def timezone_from_path(path: Path) -> str:
-    """Return timezone name for given zoneinfo path.
+    """Return timezone name for the given zoneinfo path.
 
-    /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
+    .. code-block::
+
+        /usr/share/zoneinfo/Europe/Amsterdam -> Europe/Amsterdam
+        /usr/share/zoneinfo/UTC              -> UTC
+        Etc/UTC                              -> UTC
     """
-    zoneinfo_path = str(path).split("/")
-    return "/".join(zoneinfo_path[-2:])
+    return "/".join([p for p in path.parts[-2:] if p.lower() not in ["zoneinfo", "etc"]])
 
 
 class LocalePlugin(Plugin):
@@ -42,7 +45,7 @@ class LocalePlugin(Plugin):
         # on most unix systems
         if (path := self.target.fs.path("/etc/timezone")).exists():
             for line in path.open("rt"):
-                return line.strip()
+                return timezone_from_path(Path(line.strip()))
 
         # /etc/localtime can be a symlink, hardlink or a copy of:
         # eg. /usr/share/zoneinfo/America/New_York
@@ -81,15 +84,18 @@ class LocalePlugin(Plugin):
             "/etc/sysconfig/i18n",
         ]
 
-        found_languages = []
+        found_languages = set()
 
         for locale_path in locale_paths:
             if (path := self.target.fs.path(locale_path)).exists():
                 for line in path.open("rt"):
                     if "LANG=" in line:
-                        found_languages.append(normalize_language(line.replace("LANG=", "").strip().strip('"')))
+                        lang_str = line.partition("=")[-1].strip().strip('"')
+                        if lang_str == "C.UTF-8":  # Skip if no locales are installed.
+                            continue
+                        found_languages.add(normalize_language(lang_str))
 
-        return found_languages
+        return list(found_languages)
 
     @export(record=UnixKeyboardRecord)
     def keyboard(self) -> Iterator[UnixKeyboardRecord]:

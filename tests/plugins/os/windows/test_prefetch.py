@@ -1,33 +1,36 @@
+from typing import Iterator
 from unittest.mock import Mock, patch
 
 import pytest
+from dissect.cstruct import cstruct
 
 import dissect.target.plugins.os.windows.prefetch as prefetch
 
 
 @pytest.fixture()
-def mocked_cstruct(version):
+def mocked_cstruct(version: int) -> Iterator[cstruct]:
     with patch.object(prefetch, "c_prefetch") as mocked_cstruct:
         mocked_cstruct.PREFETCH_HEADER.return_value.version = version
         yield mocked_cstruct
 
 
 @pytest.fixture()
-def mocked_prefetch():
+def mocked_prefetch() -> prefetch.Prefetch:
     with patch.object(prefetch, "c_prefetch"):
         with patch.multiple(prefetch.Prefetch, identify=Mock(), parse=Mock()):
             return prefetch.Prefetch(Mock())
 
 
 @pytest.mark.parametrize(
-    "version, dict_output",
+    ("version", "dict_output"),
     [
         (17, ("FILE_INFORMATION_17", "FILE_METRICS_ARRAY_ENTRY_17")),
         (23, ("FILE_INFORMATION_23", "FILE_METRICS_ARRAY_ENTRY_23")),
         (30, ("FILE_INFORMATION_26", "FILE_METRICS_ARRAY_ENTRY_23")),
+        (31, ("FILE_INFORMATION_26", "FILE_METRICS_ARRAY_ENTRY_23")),
     ],
 )
-def test_prefetch_valid_versions(mocked_cstruct, version, dict_output):
+def test_prefetch_valid_versions(mocked_cstruct: cstruct, version: int, dict_output: tuple[str, str]) -> None:
     with patch.object(prefetch, "prefetch_version_structs") as prefetch_diffs:
         file_info = getattr(mocked_cstruct, dict_output[0])
         metric_array = getattr(mocked_cstruct, dict_output[1])
@@ -40,12 +43,12 @@ def test_prefetch_valid_versions(mocked_cstruct, version, dict_output):
 
 
 @pytest.mark.parametrize("version", [0xDEADBEEF])
-def test_prefetch_invalid_version(mocked_cstruct):
+def test_prefetch_invalid_version(mocked_cstruct: cstruct) -> None:
     with pytest.raises(NotImplementedError):
         prefetch.Prefetch(Mock())
 
 
-def test_prefetch_datetime(mocked_prefetch):
+def test_prefetch_datetime(mocked_prefetch: prefetch.Prefetch) -> None:
     mocked_prefetch.fn = Mock()
     mocked_prefetch.fn.last_run_time = 0xDEADBEEF
 
@@ -53,13 +56,13 @@ def test_prefetch_datetime(mocked_prefetch):
         assert mocked_prefetch.latest_timestamp == wintimestamp.return_value
 
 
-def test_prefetch_unknown_attribute(mocked_prefetch):
+def test_prefetch_unknown_attribute(mocked_prefetch: prefetch.Prefetch) -> None:
     mocked_prefetch.fn = Mock(spec=[])
     assert len(mocked_prefetch.previous_timestamps) == 0
 
 
 @pytest.mark.parametrize(
-    "dates,expected_length",
+    ("dates", "expected_length"),
     [
         ([0x0] * 12, 0),
         ([0x1] * 8, 8),
@@ -67,14 +70,14 @@ def test_prefetch_unknown_attribute(mocked_prefetch):
         ([0x1, 0x0, 0x0, 0x20, 0x0], 2),
     ],
 )
-def test_prefetch_last_run_dates(mocked_prefetch, dates, expected_length):
+def test_prefetch_last_run_dates(mocked_prefetch: prefetch.Prefetch, dates: list[int], expected_length: int):
     mocked_prefetch.fn = Mock()
     mocked_prefetch.fn.last_run_remains = dates
 
     assert len(mocked_prefetch.previous_timestamps) == expected_length
 
 
-def test_prefetch_parse_metrics(mocked_prefetch):
+def test_prefetch_parse_metrics(mocked_prefetch: prefetch.Prefetch) -> None:
     mocked_prefetch.fh = Mock()
     mocked_prefetch.fn = Mock()
     mocked_prefetch.fn.number_of_file_metrics_entries = 10
@@ -87,7 +90,7 @@ def test_prefetch_parse_metrics(mocked_prefetch):
         assert len(test) == 10
 
 
-def test_prefetch_read_filename(mocked_prefetch):
+def test_prefetch_read_filename(mocked_prefetch: prefetch.Prefetch) -> None:
     mocked_fileheader = Mock()
     mocked_fileheader.read.return_value = b""
 

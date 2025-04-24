@@ -4,13 +4,18 @@ import logging
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import quote, unquote
 
+from dissect.target.filesystems.dir import DirectoryFilesystem
+from dissect.target.filesystems.zip import ZipFilesystem
+from dissect.target.helpers.fsutil import basename, dirname, join
 from dissect.target.loaders.dir import DirLoader, find_dirs, map_dirs
 from dissect.target.plugin import OperatingSystem
 from dissect.target.plugins.apps.edr.velociraptor import VELOCIRAPTOR_RESULTS
 
 if TYPE_CHECKING:
-    from dissect.target import Target
+    from pathlib import Path
+    from dissect.target.target import Target
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +70,7 @@ def extract_drive_letter(name: str) -> str | None:
     # X: in URL encoding
     if len(name) == 4 and name.endswith("%3A"):
         return name[0].lower()
+    return None
 
 
 class VelociraptorLoader(DirLoader):
@@ -73,7 +79,7 @@ class VelociraptorLoader(DirLoader):
     As of Velociraptor version 0.7.0 the structure of the Velociraptor Offline Collector varies by operating system.
     Generic.Collectors.File (Unix) uses the accessors file and auto. The loader supports the following configuration::
 
-        {"Generic.Collectors.File":{"Root":"/","collectionSpec":"Glob\\netc/**\\nvar/log/**"}}
+        {"Generic.Collectors.File": {"Root": "/", "collectionSpec": "Glob\\netc/**\\nvar/log/**"}}
 
     Generic.Collectors.File (Windows) and Windows.KapeFiles.Targets (Windows) uses the accessors mft, ntfs, lazy_ntfs,
     ntfs_vss and auto. The loader supports a collection where multiple accessors were used.
@@ -85,13 +91,15 @@ class VelociraptorLoader(DirLoader):
     """
 
     def __init__(self, path: Path, **kwargs):
-        super().__init__(path)
+        super().__init__(path, **kwargs)
         if path.suffix == ".zip":
-            log.warning(
-                f"Velociraptor target {path!r} is compressed, which will slightly affect performance. "
-                "Consider uncompressing the archive and passing the uncompressed folder to Dissect."
-            )
             self.root = zipfile.Path(path.open("rb"))
+            if self.root.root.getinfo("uploads.json").compress_type > 0:
+                log.warning(
+                    "Velociraptor target '%s' is compressed, which will slightly affect performance. "
+                    "Consider uncompressing the archive and passing the uncompressed folder to Dissect.",
+                    path,
+                )
         else:
             self.root = path
 
@@ -140,3 +148,28 @@ class VelociraptorLoader(DirLoader):
         uploads = self.root.joinpath("uploads.json")
         if uploads.exists() and uploads.is_file():
             target.fs.map_file(str(target.fs.path(VELOCIRAPTOR_RESULTS).joinpath(uploads.name)), str(uploads))
+
+        # Velociraptor URL encodes paths before storing these in a collection, this leads plugins not being able to find
+        # these paths. To circumvent this issue, for a zip file the path names are URL decoded before mapping into the
+        # VFS and for a directory the paths are URL encoded at lookup time.
+        map_dirs(
+            target,
+            dirs,
+            os_type,
+            dirfs=VelociraptorDirectoryFilesystem,
+            zipfs=VelociraptorZipFilesystem,
+        )
+
+
+class VelociraptorDirectoryFilesystem(DirectoryFilesystem):
+    def _resolve_path(self, path: str) -> Path:
+        path = quote(path, safe="$/% ")
+        if (fname := basename(path)).startswith("."):
+            path = join(dirname(path), fname.replace(".", "%2E", 1))
+
+        return super()._resolve_path(path)
+
+
+class VelociraptorZipFilesystem(ZipFilesystem):
+    def _resolve_path(self, path: str) -> str:
+        return unquote(super()._resolve_path(path))

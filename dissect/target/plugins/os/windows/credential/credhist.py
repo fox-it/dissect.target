@@ -125,7 +125,7 @@ class CredHistFile:
                 yield CredHistEntry(
                     version=entry.dwVersion,
                     guid=UUID(bytes_le=entry.guidLink),
-                    user_sid=read_sid(entry.pSid),
+                    user_sid=read_sid(entry.pSid) if entry.pSid else None,
                     hash_alg=HashAlgorithm.from_id(entry.algHash),
                     cipher_alg=cipher_alg,
                     sha1=None,
@@ -133,6 +133,7 @@ class CredHistFile:
                     raw=entry,
                 )
         except EOFError:
+            # An empty CREDHIST file will be 24 bytes long and has dwNextLinkSize set to 0.
             pass
 
     def decrypt(self, password_hash: bytes) -> None:
@@ -178,6 +179,7 @@ class CredHistPlugin(Plugin):
     @export(record=CredHistRecord)
     def credhist(self) -> Iterator[CredHistRecord]:
         """Yield and decrypt all Windows CREDHIST entries on the target."""
+
         passwords = keychain_passwords()
 
         if not passwords:

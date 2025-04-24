@@ -9,7 +9,7 @@ from flow.record.fieldtypes import datetime as dt
 
 from dissect.target.filesystem import VirtualFilesystem
 from dissect.target.helpers.regutil import VirtualHive, VirtualKey
-from dissect.target.plugins.os.windows import defender
+from dissect.target.plugins.os.windows.defender._plugin import MicrosoftDefenderPlugin
 from dissect.target.target import Target
 from tests._utils import absolute_path
 
@@ -21,7 +21,7 @@ def test_defender_evtx_logs(target_win: Target, fs_win: VirtualFilesystem, tmp_p
     log_file = absolute_path("_data/plugins/os/windows/defender/operational.evtx")
     fs_win.map_file("windows/system32/winevt/logs/Microsoft-Windows-Windows Defender%4Operational.evtx", log_file)
 
-    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+    target_win.add_plugin(MicrosoftDefenderPlugin)
 
     records = list(target_win.defender.evtx())
 
@@ -41,7 +41,7 @@ def test_defender_quarantine_entries(target_win: Target, fs_win: VirtualFilesyst
 
     fs_win.map_dir("programdata/microsoft/windows defender/quarantine", quarantine_dir)
 
-    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+    target_win.add_plugin(MicrosoftDefenderPlugin)
 
     records = list(target_win.defender.quarantine())
 
@@ -71,7 +71,7 @@ def test_defender_quarantine_recovery(target_win: Target, fs_win: VirtualFilesys
     recovery_dst.mkdir()
 
     # Recover
-    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+    target_win.add_plugin(MicrosoftDefenderPlugin)
     target_win.defender.recover(output_dir=recovery_dst)
 
     # Set up variables to indicate what we expect to find
@@ -126,7 +126,7 @@ def test_defender_exclusions(target_win: Target, hive_hklm: VirtualHive) -> None
         exclusions_key.add_subkey(exclusion_type, exclusion_type_key)
 
     hive_hklm.map_key(exclusions_key.path, exclusions_key)
-    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+    target_win.add_plugin(MicrosoftDefenderPlugin)
 
     exclusion_records = list(target_win.defender.exclusions())
 
@@ -162,7 +162,7 @@ def _mplog_records(target_win: Target, fs_win: VirtualFilesystem, tmp_path: Path
     log_file = absolute_path(f"_data/plugins/os/windows/defender/mplog/{log_filename}.log")
     fs_win.map_file("ProgramData/Microsoft/Windows Defender/Support/MPLog-20240101-094808.log", log_file)
 
-    target_win.add_plugin(defender.MicrosoftDefenderPlugin)
+    target_win.add_plugin(MicrosoftDefenderPlugin)
     records = list(target_win.defender.mplog())
     return records
 

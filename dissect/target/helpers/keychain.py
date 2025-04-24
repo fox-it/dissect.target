@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import csv
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, Union
+from typing import NamedTuple
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +20,9 @@ class KeyType(Enum):
 
 class Key(NamedTuple):
     key_type: KeyType
-    value: Union[str, bytes]
-    provider: str = None
-    identifier: str = None
+    value: str | bytes
+    provider: str | None = None
+    identifier: str | None = None
     is_wildcard: bool = False
 
 
@@ -28,13 +30,13 @@ KEYCHAIN: list[Key] = []
 
 
 def register_key(
-    key_type: KeyType, value: str, identifier: str = None, provider: str = None, is_wildcard: bool = False
+    key_type: KeyType, value: str, identifier: str | None = None, provider: str | None = None, is_wildcard: bool = False
 ) -> None:
     if key_type == KeyType.RAW:
         try:
             value = bytes.fromhex(value)
         except ValueError:
-            log.warning("Failed to decode raw key as hex, ignoring: %s", value)
+            log.debug("Failed to decode raw key as hex, ignoring: %s", value)
             return
 
     if key_type in (KeyType.RECOVERY_KEY, KeyType.FILE):

@@ -7,7 +7,7 @@ from dissect.target.helpers.record import (
     UnixInterfaceRecord,
     WindowsInterfaceRecord,
 )
-from dissect.target.plugins.general.network import InterfaceRecord, NetworkPlugin
+from dissect.target.plugins.os.default.network import InterfaceRecord, NetworkPlugin
 from dissect.target.target import Target
 
 
@@ -17,10 +17,10 @@ def network_record(request: pytest.FixtureRequest) -> InterfaceRecord:
         name="interface_name",
         type="physical",
         enabled=True,
-        mac=["DE:AD:BE:EF:00:00"],
-        ip=["10.42.42.10"],
+        cidr=["10.42.42.10/24"],
         gateway=["10.42.42.1"],
         dns=["8.8.8.8", "1.1.1.1"],
+        mac=["DE:AD:BE:EF:00:00"],
         source="some_file",
     )
 

@@ -29,8 +29,8 @@ def findall(buf: bytes, needle: bytes) -> Iterator[int]:
 T = TypeVar("T")
 
 
-def to_list(value: T | list[T]) -> list[T]:
-    """Convert a single value or a list of values to a list.
+def to_list(value: T | list[T] | None) -> list[T]:
+    """Convert a single value or a list of values to a list. A value of ``None`` is converted to an empty list.
 
     Args:
         value: The value to convert.
@@ -38,8 +38,11 @@ def to_list(value: T | list[T]) -> list[T]:
     Returns:
         A list of values.
     """
+    if value is None:
+        return []
     if not isinstance(value, list):
         return [value]
+
     return value
 
 
@@ -143,15 +146,33 @@ def year_rollover_helper(
                 log.debug("Skipping line: %s", line)
                 continue
 
+            # We have to append the current_year to strptime instead of adding it using replace later.
+            # This prevents DeprecationWarnings on cpython >= 3.13 and Exceptions on cpython >= 3.15.
+            # See https://github.com/python/cpython/issues/70647 and https://github.com/python/cpython/pull/117107.
+            # Use 1904 instead of 1900 to include leap days (29 Feb).
             try:
-                relative_ts = datetime.strptime(timestamp.group(0), ts_format)
+                compare_ts = datetime.strptime(f"{timestamp.group(0)};1904", f"{ts_format};%Y")
             except ValueError as e:
-                log.warning("Timestamp '%s' does not match format '%s', skipping line.", timestamp.group(0), ts_format)
+                log.warning("Unable to create comparison timestamp for %r in line %r: %s", timestamp.group(0), line, e)
                 log.debug("", exc_info=e)
                 continue
 
-            if last_seen_month and relative_ts.month > last_seen_month:
+            if last_seen_month and compare_ts.month > last_seen_month:
                 current_year -= 1
-            last_seen_month = relative_ts.month
+            last_seen_month = compare_ts.month
 
-            yield relative_ts.replace(year=current_year, tzinfo=tzinfo), line
+            try:
+                relative_ts = datetime.strptime(f"{timestamp.group(0)};{current_year}", f"{ts_format};%Y")
+            except ValueError as e:
+                log.warning(
+                    "Timestamp '%s;%s' does not match format '%s;%%Y', skipping line %r: %s",
+                    timestamp.group(0),
+                    current_year,
+                    ts_format,
+                    line,
+                    e,
+                )
+                log.debug("", exc_info=e)
+                continue
+
+            yield relative_ts.replace(tzinfo=tzinfo), line

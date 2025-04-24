@@ -17,6 +17,7 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/$Extend",
         f"uploads/{sub_dir}/%5C%5C%3F%5CGLOBALROOT%5CDevice%5CHarddiskVolumeShadowCopy1/windows/system32",
+        f"uploads/{sub_dir}/%5C%5C.%5CC%3A/%2ETEST",
         f"results",
     ]
     root = tmp_path
@@ -24,6 +25,8 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 
     (root / "uploads.json").write_bytes(b"{}")
     (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/C-DRIVE.txt").write_bytes(b"{}")
+    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/Microsoft-Windows-Windows Defender%254WHC.evtx").write_bytes(b"{}")
+    (root / f"uploads/{sub_dir}/%5C%5C.%5CC%3A/other.txt").write_text("my first file")
 
     with open(absolute_path("_data/plugins/filesystem/ntfs/mft/mft.raw"), "rb") as fh:
         mft = fh.read(10 * 1025)
@@ -55,8 +58,6 @@ def create_root(sub_dir: str, tmp_path: Path) -> Path:
 )
 def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_path: Path) -> None:
     root = create_root(sub_dir, tmp_path)
-    root.joinpath(f"uploads/{other_dir}/C%3A").mkdir(parents=True, exist_ok=True)
-    root.joinpath(f"uploads/{other_dir}/C%3A/other.txt").write_text("my first file")
 
     assert VelociraptorLoader.detect(root) is True
 
@@ -73,8 +74,11 @@ def test_windows_ntfs(sub_dir: str, other_dir: str, target_bare: Target, tmp_pat
             usnjrnl_records += len(list(fs.ntfs.usnjrnl.records()))
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
+
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
     assert target_bare.fs.path("sysvol/other.txt").read_text() == "my first file"
+    assert target_bare.fs.path("sysvol/.TEST").exists()
+    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%254WHC.evtx").exists()
 
 
 @pytest.mark.parametrize(
@@ -103,17 +107,19 @@ def test_windows_ntfs_zip(sub_dir: str, target_bare: Target, tmp_path: Path) -> 
     assert usnjrnl_records == 2
     assert len(target_bare.filesystems) == 4
     assert target_bare.fs.path("sysvol/C-DRIVE.txt").exists()
+    assert target_bare.fs.path("sysvol/.TEST").exists()
+    assert target_bare.fs.path("sysvol/Microsoft-Windows-Windows Defender%4WHC.evtx").exists()
 
 
 @pytest.mark.parametrize(
     "paths",
     [
-        (["uploads/file/etc", "uploads/file/var"]),
-        (["uploads/auto/etc", "uploads/auto/var"]),
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt"]),
-        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt"]),
-        (["uploads/file/Library", "uploads/file/Applications"]),
-        (["uploads/auto/Library", "uploads/auto/Applications"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt", "uploads/auto/%2ETEST"]),
+        (["uploads/file/Library", "uploads/file/Applications", "uploads/file/%2ETEST"]),
+        (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
 def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
@@ -126,19 +132,22 @@ def test_unix(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
 
     loader = VelociraptorLoader(root)
     loader.map(target_bare)
+    target_bare.apply()
 
     assert len(target_bare.filesystems) == 1
+    assert target_bare.fs.path("/.TEST").exists()
 
 
 @pytest.mark.parametrize(
     "paths",
     [
-        (["uploads/file/etc", "uploads/file/var"]),
-        (["uploads/auto/etc", "uploads/auto/var"]),
-        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt"]),
-        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt"]),
-        (["uploads/file/Library", "uploads/file/Applications"]),
-        (["uploads/auto/Library", "uploads/auto/Applications"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/%2ETEST"]),
+        (["uploads/file/etc", "uploads/file/var", "uploads/file/opt", "uploads/file/%2ETEST"]),
+        (["uploads/auto/etc", "uploads/auto/var", "uploads/auto/opt", "uploads/auto/%2ETEST"]),
+        (["uploads/file/Library", "uploads/file/Applications", "uploads/file/%2ETEST"]),
+        (["uploads/auto/Library", "uploads/auto/Applications", "uploads/auto/%2ETEST"]),
     ],
 )
 def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None:
@@ -154,5 +163,7 @@ def test_unix_zip(paths: list[str], target_bare: Target, tmp_path: Path) -> None
 
     loader = VelociraptorLoader(zip_path)
     loader.map(target_bare)
+    target_bare.apply()
 
     assert len(target_bare.filesystems) == 1
+    assert target_bare.fs.path("/.TEST").exists()

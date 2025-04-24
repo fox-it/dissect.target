@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 import logging
 import re
 import warnings
 from collections import defaultdict
 from functools import lru_cache
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from dissect.target.exceptions import (
     HiveUnavailableError,
     RegistryKeyNotFoundError,
+    RegistryValueNotFoundError,
     UnsupportedPluginError,
 )
 from dissect.target.helpers.fsutil import TargetPath
@@ -18,6 +21,7 @@ from dissect.target.helpers.regutil import (
     RegfHive,
     RegistryHive,
     RegistryKey,
+    RegistryValue,
     ValueCollection,
     VirtualHive,
     glob_ext,
@@ -293,27 +297,37 @@ class RegistryPlugin(Plugin):
         return self.key(key).subkey(subkey)
 
     @internal
-    def iterkeys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
+    def iterkeys(self, keys: str | list[str]) -> Iterator[KeyCollection]:
         warnings.warn("The iterkeys() function is deprecated, use keys() instead", DeprecationWarning)
-        for key in self.keys(keys):
-            yield key
+        yield from self.keys(keys)
 
     @internal
-    def keys(self, keys: Union[str, list[str]]) -> Iterator[KeyCollection]:
+    def keys(self, keys: str | list[str]) -> Iterator[RegistryKey]:
         """Yields all keys that match the given queries.
 
-        Automatically resolves CurrentVersion keys. Also unrolls KeyCollections.
+        Automatically resolves CurrentVersion keys. Also flattens KeyCollections.
         """
         keys = [keys] if not isinstance(keys, list) else keys
 
         for key in self._iter_controlset_keypaths(keys):
             try:
-                res = self.key(key)
-                for r in res:
-                    yield r
+                yield from self.key(key)
             except RegistryKeyNotFoundError:
                 pass
             except HiveUnavailableError:
+                pass
+
+    @internal
+    def values(self, keys: str | list[str], value: str) -> Iterator[RegistryValue]:
+        """Yields all values that match the given queries.
+
+        Automatically resolves CurrentVersion keys. Also flattens ValueCollections.
+        """
+
+        for key in self.keys(keys):
+            try:
+                yield key.value(value)
+            except RegistryValueNotFoundError:
                 pass
 
     def _iter_controlset_keypaths(self, keys: list[str]) -> Iterator[str]:
@@ -340,7 +354,7 @@ class RegistryPlugin(Plugin):
         return self.MAPPINGS
 
     @internal
-    def get_user_details(self, key: RegistryKey) -> UserDetails:
+    def get_user_details(self, key: RegistryKey | RegistryValue) -> UserDetails | None:
         """Return user details for the user who owns a registry hive that contains the provided key"""
         if not key.hive or not getattr(key.hive, "filepath", None):
             return
@@ -348,7 +362,7 @@ class RegistryPlugin(Plugin):
         return self._hives_to_users.get(key.hive)
 
     @internal
-    def get_user(self, key: RegistryKey) -> WindowsUserRecord:
+    def get_user(self, key: RegistryKey | RegistryValue) -> WindowsUserRecord | None:
         """Return user record for the user who owns a registry hive that contains the provided key"""
         details = self._hives_to_users.get(key.hive)
         if details:

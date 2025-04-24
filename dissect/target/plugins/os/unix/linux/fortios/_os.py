@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import struct
 from base64 import b64decode
 from datetime import datetime
 from io import BytesIO
@@ -17,11 +18,17 @@ from dissect.target.helpers.fsutil import open_decompress
 from dissect.target.helpers.record import TargetRecordDescriptor, UnixUserRecord
 from dissect.target.plugin import OperatingSystem, export
 from dissect.target.plugins.os.unix.linux._os import LinuxPlugin
-from dissect.target.plugins.os.unix.linux.fortios._keys import KERNEL_KEY_MAP
+from dissect.target.plugins.os.unix.linux.fortios._keys import (
+    KERNEL_KEY_MAP,
+    AesKey,
+    ChaCha20Key,
+    ChaCha20Seed,
+)
 from dissect.target.target import Target
 
 try:
     from Crypto.Cipher import AES, ChaCha20
+    from Crypto.Util import Counter
 
     HAS_CRYPTO = True
 except ImportError:
@@ -36,6 +43,20 @@ FortiOSUserRecord = TargetRecordDescriptor(
         ("path", "home"),
     ],
 )
+
+
+def create_tar_filesystem(fileobj: BinaryIO) -> TarFilesystem:
+    """Create appropriate ``TarFilesystem`` based on file format.
+
+    Args:
+        fileobj: The file-like object of a tar or cpio file
+
+    Returns:
+        TarFilesystem with cpio handler if cpio format is detected.
+    """
+    if open_decompress(fileobj=fileobj).read(4) == b"0707":
+        return TarFilesystem(fileobj, tarinfo=cpio.CpioInfo)
+    return TarFilesystem(fileobj)
 
 
 class FortiOSPlugin(LinuxPlugin):
@@ -87,17 +108,17 @@ class FortiOSPlugin(LinuxPlugin):
         vfs = None
 
         try:
-            if open_decompress(rootfs).read(4) == b"0707":
-                vfs = TarFilesystem(rootfs.open(), tarinfo=cpio.CpioInfo)
-            else:
-                vfs = TarFilesystem(rootfs.open())
+            vfs = create_tar_filesystem(rootfs.open())
         except ReadError:
             # The rootfs.gz file could be encrypted.
             try:
                 kernel_hash = get_kernel_hash(sysvol)
-                key, iv = key_iv_for_kernel_hash(kernel_hash)
-                rfs_fh = decrypt_rootfs(rootfs.open(), key, iv)
-                vfs = TarFilesystem(rfs_fh, tarinfo=cpio.CpioInfo)
+                target.log.info("Kernel hash: %s", kernel_hash)
+                key = key_iv_for_kernel_hash(kernel_hash)
+                target.log.info("Trying to decrypt_rootfs using key: %r", key)
+                rfs_fh = decrypt_rootfs(rootfs.open(), key)
+                target.log.info("Decrypted fh: %r", rfs_fh)
+                vfs = create_tar_filesystem(rfs_fh)
             except RuntimeError:
                 target.log.warning("Could not decrypt rootfs.gz. Missing `pycryptodome` dependency.")
             except ValueError as e:
@@ -114,7 +135,7 @@ class FortiOSPlugin(LinuxPlugin):
 
         # FortiGate
         if (datafs_tar := sysvol.path("/datafs.tar.gz")).exists():
-            target.fs.append_layer().mount("/data", TarFilesystem(datafs_tar.open("rb")))
+            target.fs.append_layer().mount("/data", TarFilesystem(BytesIO(datafs_tar.open("rb").read())))
 
         # Additional FortiGate or FortiManager tars with corrupt XZ streams
         target.log.warning("Attempting to load XZ files, this can take a while.")
@@ -127,12 +148,17 @@ class FortiOSPlugin(LinuxPlugin):
             "syntax.tar.xz",
         ):
             if (tar := target.fs.path(path)).exists() or (tar := sysvol.path(path)).exists():
-                fh = xz.repair_checksum(tar.open("rb"))
+                fh = xz.repair_checksum(BytesIO(tar.open("rb").read()))
                 target.fs.append_layer().mount("/", TarFilesystem(fh))
 
         # FortiAnalyzer and FortiManager
         if (rootfs_ext_tar := sysvol.path("rootfs-ext.tar.xz")).exists():
             target.fs.append_layer().mount("/", TarFilesystem(rootfs_ext_tar.open("rb")))
+
+        # If there is no /migadmin at this point, check sysvol and map accordingly
+        if not target.fs.exists("/migadmin") and target.fs.exists("/data/migadmin"):
+            target.log.info("Directory migadmin found in sysvol, mapping /migadmin to /data/migadmin")
+            target.fs.map_file_entry("/migadmin", target.fs.get("/data/migadmin"))
 
         # Filesystem mounts can be discovered in the FortiCare debug report
         # or using ``fnsysctl ls`` and ``fnsysctl df`` in the cli.
@@ -471,7 +497,7 @@ def decrypt_password(input: str) -> str:
         return "ENC:" + input
 
 
-def key_iv_for_kernel_hash(kernel_hash: str) -> tuple[bytes, bytes]:
+def key_iv_for_kernel_hash(kernel_hash: str) -> AesKey | ChaCha20Key:
     """Return decryption key and IV for a specific sha256 kernel hash.
 
     The decryption key and IV are used to decrypt the ``rootfs.gz`` file.
@@ -486,17 +512,96 @@ def key_iv_for_kernel_hash(kernel_hash: str) -> tuple[bytes, bytes]:
         ValueError: When no decryption keys are available for the given kernel hash.
     """
 
-    key = bytes.fromhex(KERNEL_KEY_MAP.get(kernel_hash, ""))
-    if len(key) == 32:
+    key = KERNEL_KEY_MAP.get(kernel_hash)
+    if isinstance(key, ChaCha20Seed):
         # FortiOS 7.4.x uses a KDF to derive the key and IV
-        return _kdf_7_4_x(key)
-    elif len(key) == 48:
+        key, iv = _kdf_7_4_x(key.key)
+        return ChaCha20Key(key, iv)
+    elif isinstance(key, ChaCha20Key):
         # FortiOS 7.0.13 and 7.0.14 uses a static key and IV
-        return key[:32], key[32:]
+        return key
+    elif isinstance(key, AesKey):
+        # FortiOS 7.0.16, 7.2.9, 7.4.4, 7.6.0 and higher uses AES-CTR with a custom CTR increment
+        return key
     raise ValueError(f"No known decryption keys for kernel hash: {kernel_hash}")
 
 
-def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
+def chacha20_decrypt(fh: BinaryIO, key: ChaCha20Key) -> bytes:
+    """Decrypt file using ChaCha20 with given ChaCha20Key.
+
+    Args:
+        fh: File-like object to the encrypted rootfs.gz file.
+        key: ChaCha20Key.
+
+    Returns:
+        Decrypted bytes.
+    """
+
+    # First 8 bytes = counter, last 8 bytes = nonce
+    # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
+    # We're interested in updating the position in the ChaCha20 internal state, so to make
+    # PyCryptodome "OpenSSL-compatible" we have to multiply the counter by 64
+    cipher = ChaCha20.new(key=key.key, nonce=key.iv[8:])
+    cipher.seek(int.from_bytes(key.iv[:8], "little") * 64)
+    return cipher.decrypt(fh.read())
+
+
+def calculate_counter_increment(iv: bytes) -> int:
+    """Calculate the custom FortiGate CTR increment from IV.
+
+    Args:
+        iv: 16 bytes IV.
+
+    Returns:
+        Custom CTR increment.
+    """
+    increment = 0
+    for i in range(16):
+        increment ^= (iv[i] & 15) ^ ((iv[i] >> 4) & 0xFF)
+    return max(increment, 1)
+
+
+def aes_decrypt(fh: BinaryIO, key: AesKey) -> bytes:
+    """Decrypt file using a custom AES CTR increment with given AesKey.
+
+    Args:
+        fh: File-like object to the encrypted rootfs.gz file.
+        key: AesKey.
+
+    Returns:
+        Decrypted bytes.
+    """
+
+    data = bytearray(fh.read())
+
+    # Calculate custom CTR increment from IV
+    increment = calculate_counter_increment(key.iv)
+    advance_block = (b"\x69" * 16) * (increment - 1)
+
+    # AES counter is little-endian and has a prefix
+    prefix, counter = struct.unpack("<8sQ", key.iv)
+    ctr = Counter.new(
+        64,
+        prefix=prefix,
+        initial_value=counter,
+        little_endian=True,
+        allow_wraparound=True,
+    )
+    cipher = AES.new(key.key, mode=AES.MODE_CTR, counter=ctr)
+
+    nblocks, nleft = divmod(len(data), 16)
+    for i in range(nblocks):
+        offset = i * 16
+        data[offset : offset + 16] = cipher.decrypt(data[offset : offset + 16])
+        cipher.decrypt(advance_block)  # custom advance the counter
+
+    if nleft:
+        data[nblocks * 16 :] = cipher.decrypt(data[nblocks * 16 :])
+
+    return data
+
+
+def decrypt_rootfs(fh: BinaryIO, key: ChaCha20Key | AesKey) -> BinaryIO:
     """Attempt to decrypt an encrypted ``rootfs.gz`` file with given key and IV.
 
     FortiOS releases as of 7.4.1 / 2023-08-31, have ChaCha20 encrypted ``rootfs.gz`` files.
@@ -511,8 +616,7 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
 
     Args:
         fh: File-like object to the encrypted rootfs.gz file.
-        key: ChaCha20 key.
-        iv: ChaCha20 iv.
+        key: ChaCha20Key or AesKey.
 
     Returns:
         File-like object to the decrypted rootfs.gz file.
@@ -525,13 +629,12 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
     if not HAS_CRYPTO:
         raise RuntimeError("Missing pycryptodome dependency")
 
-    # First 8 bytes = counter, last 8 bytes = nonce
-    # PyCryptodome interally divides this seek by 64 to get a (position, offset) tuple
-    # We're interested in updating the position in the ChaCha20 internal state, so to make
-    # PyCryptodome "OpenSSL-compatible" we have to multiply the counter by 64
-    cipher = ChaCha20.new(key=key, nonce=iv[8:])
-    cipher.seek(int.from_bytes(iv[:8], "little") * 64)
-    result = cipher.decrypt(fh.read())
+    result = b""
+    if isinstance(key, ChaCha20Key):
+        result = chacha20_decrypt(fh, key)
+    elif isinstance(key, AesKey):
+        result = aes_decrypt(fh, key)
+        result = result[:-256]  # strip off the 256 byte footer
 
     if result[0:2] != b"\x1f\x8b":
         raise ValueError("Failed to decrypt: No gzip magic header found.")
@@ -539,7 +642,7 @@ def decrypt_rootfs(fh: BinaryIO, key: bytes, iv: bytes) -> BinaryIO:
     return BytesIO(result)
 
 
-def _kdf_7_4_x(key_data: str | bytes) -> tuple[bytes, bytes]:
+def _kdf_7_4_x(key_data: str | bytes, offset_key: int = 4, offset_iv: int = 5) -> tuple[bytes, bytes]:
     """Derive 32 byte key and 16 byte IV from 32 byte seed.
 
     As the IV needs to be 16 bytes, we return the first 16 bytes of the sha256 hash.
@@ -548,8 +651,8 @@ def _kdf_7_4_x(key_data: str | bytes) -> tuple[bytes, bytes]:
     if isinstance(key_data, str):
         key_data = bytes.fromhex(key_data)
 
-    key = hashlib.sha256(key_data[4:32] + key_data[:4]).digest()
-    iv = hashlib.sha256(key_data[5:32] + key_data[:5]).digest()[:16]
+    key = hashlib.sha256(key_data[offset_key:32] + key_data[:offset_key]).digest()
+    iv = hashlib.sha256(key_data[offset_iv:32] + key_data[:offset_iv]).digest()[:16]
     return key, iv
 
 

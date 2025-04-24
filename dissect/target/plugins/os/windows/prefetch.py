@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
-from typing import Iterator
+from typing import TYPE_CHECKING, BinaryIO, Iterator
 
 from dissect.cstruct import cstruct
 from dissect.util import lzxpress_huffman
@@ -10,6 +10,11 @@ from dissect.util.ts import wintimestamp
 from dissect.target.exceptions import UnsupportedPluginError
 from dissect.target.helpers.record import TargetRecordDescriptor
 from dissect.target.plugin import Plugin, arg, export
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from dissect.target.target import Target
 
 PrefetchRecord = TargetRecordDescriptor(
     "filesystem/ntfs/prefetch",
@@ -167,11 +172,12 @@ prefetch_version_structs = {
     17: (c_prefetch.FILE_INFORMATION_17, c_prefetch.FILE_METRICS_ARRAY_ENTRY_17),
     23: (c_prefetch.FILE_INFORMATION_23, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
     30: (c_prefetch.FILE_INFORMATION_26, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
+    31: (c_prefetch.FILE_INFORMATION_26, c_prefetch.FILE_METRICS_ARRAY_ENTRY_23),
 }
 
 
 class Prefetch:
-    def __init__(self, fh):
+    def __init__(self, fh: BinaryIO):
         header_detect = c_prefetch.PREFETCH_HEADER_DETECT(fh.read(8))
         if header_detect.signature == b"MAM\x04":
             fh = BytesIO(lzxpress_huffman.decompress(fh))
@@ -186,25 +192,27 @@ class Prefetch:
 
         self.parse()
 
-    def identify(self):
+    def identify(self) -> int:
         self.fh.seek(0)
         version = self.header.version
 
         if version in prefetch_version_structs.keys():
             return version
 
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def parse(self):
+    def parse(self) -> None:
         try:
             file_info_header, file_metrics_header = prefetch_version_structs.get(self.version)
             self.fh.seek(84)
             self.fn = file_info_header(self.fh)
             self.metrics = self.parse_metrics(metric_array_struct=file_metrics_header)
         except KeyError:
-            raise NotImplementedError()
+            raise NotImplementedError
 
-    def parse_metrics(self, metric_array_struct):
+    def parse_metrics(
+        self, metric_array_struct: c_prefetch.FILE_METRICS_ARRAY_ENTRY_17 | c_prefetch.FILE_METRICS_ARRAY_ENTRY_23
+    ) -> list[str | None]:
         metrics = []
         self.fh.seek(self.fn.metrics_array_offset)
         for _ in range(self.fn.number_of_file_metrics_entries):
@@ -216,7 +224,7 @@ class Prefetch:
             metrics.append(filename.decode("utf-16-le"))
         return metrics
 
-    def read_filename(self, off, size):
+    def read_filename(self, off: int, size: int) -> bytes:
         offset = self.fh.tell()
         self.fh.seek(off)
         data = self.fh.read(size * 2)
@@ -224,12 +232,12 @@ class Prefetch:
         return data
 
     @property
-    def latest_timestamp(self):
+    def latest_timestamp(self) -> datetime:
         """Get the latest execution timestamp inside the prefetch file."""
         return wintimestamp(self.fn.last_run_time)
 
     @property
-    def previous_timestamps(self):
+    def previous_timestamps(self) -> list[datetime | None]:
         """Get the previous timestamps from the prefetch file."""
         try:
             # We check if timestamp actually has a value
@@ -242,7 +250,7 @@ class Prefetch:
 class PrefetchPlugin(Plugin):
     """Windows prefetch plugin."""
 
-    def __init__(self, target):
+    def __init__(self, target: Target):
         super().__init__(target)
         self.prefetchdir = self.target.fs.path("sysvol/windows/prefetch")
 
