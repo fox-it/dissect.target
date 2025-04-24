@@ -57,7 +57,7 @@ def test_access_logs(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert citrix_netscaler_headers_combined_response_log.method == "GET"
     assert citrix_netscaler_headers_combined_response_log.uri == "/"
     assert citrix_netscaler_headers_combined_response_log.protocol == "HTTP/1.1"
-    assert citrix_netscaler_headers_combined_response_log.referer == "-"
+    assert citrix_netscaler_headers_combined_response_log.referer is None
     assert (
         citrix_netscaler_headers_combined_response_log.useragent
         == "Mozilla/5.0 (Windows NT 10.0; Win64; x64); AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 "
@@ -73,7 +73,7 @@ def test_access_logs(target_citrix: Target, fs_bsd: VirtualFilesystem) -> None:
     assert citrix_netscaler_headers_combined_response_log.method == "GET"
     assert citrix_netscaler_headers_combined_response_log.uri == "/"
     assert citrix_netscaler_headers_combined_response_log.protocol == "HTTP/1.1"
-    assert citrix_netscaler_headers_combined_response_log.referer == "-"
+    assert citrix_netscaler_headers_combined_response_log.referer is None
     assert citrix_netscaler_headers_combined_response_log.useragent == "curl/7.78.0"
     assert citrix_netscaler_headers_combined_response_log.response_time_ms == 39
     assert citrix_netscaler_headers_combined_response_log.pid == 82775

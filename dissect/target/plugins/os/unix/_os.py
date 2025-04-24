@@ -169,10 +169,14 @@ class UnixPlugin(OSPlugin):
 
     @export(property=True)
     def domain(self) -> str | None:
-        if self._domain is None or self._domain == "localhost":
-            # fall back to /etc/hosts file
-            return self._hosts_dict.get("hostname")
-        return self._domain
+        if self._domain and "localhost" not in self._domain:
+            return self._domain
+
+        # fall back to /etc/hosts file
+        if "localhost" not in (domain := self._hosts_dict.get("hostname", "")):
+            return domain or None
+
+        return None
 
     @export(property=True)
     def os(self) -> str:
